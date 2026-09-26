@@ -38,6 +38,9 @@ import java.util.concurrent.CompletionException;
 @Internal
 public final class FirstElementFlow<T> implements Subscriber<T> {
     private final DelayedExecutionFlow<T> flow = DelayedExecutionFlow.create();
+    // volatile only publishes the subscription to a cancel from another thread; cancelling a
+    // Reactive Streams subscription is thread-safe by specification
+    @SuppressWarnings("java:S3077")
     private volatile @Nullable Subscription subscription;
     private boolean done;
 
