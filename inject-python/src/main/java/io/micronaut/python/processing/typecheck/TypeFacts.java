@@ -15,25 +15,34 @@
  */
 package io.micronaut.python.processing.typecheck;
 
+import io.micronaut.annotation.processing.PostponeToNextRoundException;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * What the type checker knows about the Java types a compilation uses, answered from the visitor
@@ -45,8 +54,27 @@ import java.util.Optional;
 @Experimental
 public final class TypeFacts {
 
+    /**
+     * The prefix of the type names the Python side uses for its own values, such as
+     * {@code python:str}; {@link #isAssignable(String, String)} knows which Java parameter types
+     * accept them.
+     */
+    public static final String PYTHON_TYPE_PREFIX = "python:";
+
+    private static final Set<String> JAVA_STRING = Set.of("java.lang.String", "java.lang.CharSequence", "java.lang.Object", "java.io.Serializable", "java.lang.Comparable");
+    private static final Set<String> JAVA_CHAR = Set.of("char", "java.lang.Character");
+    private static final Set<String> JAVA_INTEGRAL = Set.of("int", "long", "short", "byte", "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Number", "java.math.BigInteger", "java.math.BigDecimal");
+    private static final Set<String> JAVA_FLOATING = Set.of("double", "float", "java.lang.Double", "java.lang.Float", "java.lang.Number", "java.math.BigDecimal");
+    private static final Set<String> JAVA_BOOLEAN = Set.of("boolean", "java.lang.Boolean");
+    private static final Set<String> JAVA_LIST = Set.of("java.util.List", "java.util.Collection", "java.lang.Iterable", "java.util.ArrayList", "java.util.SequencedCollection");
+    private static final Set<String> JAVA_SET = Set.of("java.util.Set", "java.util.Collection", "java.lang.Iterable", "java.util.HashSet");
+    private static final Set<String> JAVA_MAP = Set.of("java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap");
+    private static final Set<String> PRIMITIVES = Set.of("boolean", "byte", "short", "int", "long", "char", "float", "double");
+
     private final VisitorContext visitorContext;
     private final Map<String, Optional<AnnotationDescription>> annotations = new HashMap<>();
+    private final Map<String, Optional<TypeDescription>> types = new HashMap<>();
+    private final Map<String, Boolean> assignable = new HashMap<>();
 
     /**
      * @param visitorContext The context resolving the Java and Python classes of the compilation
@@ -63,7 +91,234 @@ public final class TypeFacts {
      * or its classpath at all (a plain Python decorator)
      */
     public @Nullable AnnotationDescription describeAnnotation(String qualifiedName) {
-        return annotations.computeIfAbsent(qualifiedName, name -> Optional.ofNullable(loadAnnotation(name))).orElse(null);
+        return annotations.computeIfAbsent(qualifiedName, name -> Optional.ofNullable(complete(() -> loadAnnotation(name)))).orElse(null);
+    }
+
+    /**
+     * Describes a Java type, or the generated type of a Python class of the compilation: its
+     * members, inherited ones included, as plain names and signatures.
+     *
+     * @param qualifiedName The qualified name of the type
+     * @return The description, or {@code null} when the name is not a class of the compilation or
+     * its classpath
+     */
+    public @Nullable TypeDescription describe(String qualifiedName) {
+        return types.computeIfAbsent(qualifiedName, name -> Optional.ofNullable(complete(() -> loadType(name)))).orElse(null);
+    }
+
+    /**
+     * A description, or {@code null} when javac cannot complete a type it needs in this round (a
+     * type generated later, a missing dependency): the checker has no opinion on such a type rather
+     * than a postponed round.
+     */
+    private static <T> @Nullable T complete(Supplier<@Nullable T> loader) {
+        try {
+            return loader.get();
+        } catch (PostponeToNextRoundException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether a value of one type can be passed where another type is expected, with the
+     * conversions the Python runtime applies at the boundary: a Python value ({@code python:str},
+     * {@code python:int}, ...) fits the Java types it converts to, a Java type fits its supertypes
+     * and its boxed or unboxed counterpart.
+     *
+     * @param from The type of the value: a Java type name or a {@code python:} kind
+     * @param to   The Java type expected
+     * @return Whether the value fits
+     */
+    public boolean isAssignable(String from, String to) {
+        return assignable.computeIfAbsent(from + "->" + to, key -> {
+            Boolean result = complete(() -> computeAssignable(from, to));
+            return result != null && result;  // an incomplete type fits nothing, and is never reported on
+        });
+    }
+
+    private boolean computeAssignable(String from, String to) {
+        if (from.equals(to) || "java.lang.Object".equals(to)) {
+            return true;
+        }
+        if (from.startsWith(PYTHON_TYPE_PREFIX)) {
+            return pythonValueFits(from.substring(PYTHON_TYPE_PREFIX.length()), to);
+        }
+        if (to.endsWith("[]") || from.endsWith("[]")) {
+            return from.equals(to);
+        }
+        ClassElement source = resolveClass(from);
+        ClassElement target = resolveClass(to);
+        if (source == null || target == null) {
+            // an unknown side never causes a report
+            return true;
+        }
+        if (PythonJavaTypes.isSameOrBoxedType(source, target)) {
+            return true;
+        }
+        if (PRIMITIVES.contains(from) || PRIMITIVES.contains(to)) {
+            return numericWidening(from, to);
+        }
+        return source.isAssignable(target);
+    }
+
+    private static boolean numericWidening(String from, String to) {
+        String f = unbox(from);
+        String t = unbox(to);
+        if (f.equals(t)) {
+            return true;
+        }
+        List<String> order = List.of("byte", "short", "int", "long", "float", "double");
+        int fi = order.indexOf(f);
+        int ti = order.indexOf(t);
+        return fi >= 0 && ti >= 0 && fi <= ti;
+    }
+
+    private static String unbox(String name) {
+        return switch (name) {
+            case "java.lang.Integer" -> "int";
+            case "java.lang.Long" -> "long";
+            case "java.lang.Short" -> "short";
+            case "java.lang.Byte" -> "byte";
+            case "java.lang.Double" -> "double";
+            case "java.lang.Float" -> "float";
+            case "java.lang.Boolean" -> "boolean";
+            case "java.lang.Character" -> "char";
+            default -> name;
+        };
+    }
+
+    private boolean pythonValueFits(String kind, String to) {
+        if (to.endsWith("[]")) {
+            // an array parameter takes a list, or a single element the runtime wraps
+            String component = to.substring(0, to.length() - 2);
+            return "list".equals(kind) || "tuple".equals(kind) || ("bytes".equals(kind) && "byte".equals(component)) || pythonValueFits(kind, component);
+        }
+        return switch (kind) {
+            case "str" -> JAVA_STRING.contains(to) || JAVA_CHAR.contains(to) || isEnumOrClass(to);
+            case "int" -> JAVA_INTEGRAL.contains(to) || JAVA_FLOATING.contains(to) || "java.lang.Object".equals(to);
+            case "float" -> JAVA_FLOATING.contains(to) || "java.lang.Object".equals(to);
+            case "bool" -> JAVA_BOOLEAN.contains(to) || "java.lang.Object".equals(to);
+            case "none" -> !PRIMITIVES.contains(to);
+            case "bytes" -> "byte[]".equals(to) || "java.lang.Object".equals(to);
+            case "list", "tuple" -> JAVA_LIST.contains(to) || "java.lang.Object".equals(to) || isInterfaceAssignableFrom(to, "java.util.List");
+            case "set" -> JAVA_SET.contains(to) || "java.lang.Object".equals(to) || isInterfaceAssignableFrom(to, "java.util.Set");
+            case "dict" -> JAVA_MAP.contains(to) || "java.lang.Object".equals(to) || isInterfaceAssignableFrom(to, "java.util.Map");
+            default -> true;
+        };
+    }
+
+    private boolean isEnumOrClass(String to) {
+        if ("java.lang.Class".equals(to)) {
+            return true;
+        }
+        ClassElement element = resolveClass(to);
+        return element != null && element.isEnum();
+    }
+
+    private boolean isInterfaceAssignableFrom(String to, String implementation) {
+        ClassElement target = resolveClass(to);
+        ClassElement source = resolveClass(implementation);
+        return target != null && source != null && source.isAssignable(target);
+    }
+
+    private @Nullable TypeDescription loadType(String qualifiedName) {
+        ClassElement element = resolveClass(qualifiedName);
+        if (element == null) {
+            return null;
+        }
+        // the host exposes the public members; a Python subclass reaches the protected ones as well
+        Map<String, List<MethodSignature>> methods = new LinkedHashMap<>();
+        Set<String> protectedMethods = new LinkedHashSet<>();
+        for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS)) {
+            if (method.isPublic()) {
+                methods.computeIfAbsent(method.getName(), name -> new ArrayList<>()).add(signature(method));
+            } else if (method.isProtected()) {
+                protectedMethods.add(method.getName());
+            }
+        }
+        Map<String, String> fields = new LinkedHashMap<>();
+        Set<String> staticFields = new LinkedHashSet<>();
+        for (FieldElement field : element.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())) {
+            if (!field.isPublic()) {
+                continue;
+            }
+            fields.put(field.getName(), typeName(field.getType()));
+            if (field.isStatic()) {
+                staticFields.add(field.getName());
+            }
+        }
+        Set<String> enumConstants = element instanceof EnumElement enumElement ? new LinkedHashSet<>(enumElement.values()) : Set.of();
+        Map<String, String> nestedTypes = new LinkedHashMap<>();
+        for (ClassElement nested : element.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES)) {
+            if (nested.isPublic()) {
+                nestedTypes.put(nested.getSimpleName(), nested.getName());
+            }
+        }
+        List<MethodSignature> constructors = new ArrayList<>();
+        for (ConstructorElement constructor : element.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+            if (constructor.isPublic()) {
+                constructors.add(signature(constructor));
+            }
+        }
+        return new TypeDescription(
+            element.getName(),
+            element.isInterface(),
+            element.isAbstract(),
+            element.isEnum(),
+            PythonJavaTypes.isPythonClass(element),
+            methods,
+            protectedMethods,
+            fields,
+            staticFields,
+            enumConstants,
+            nestedTypes,
+            constructors,
+            !element.isPublic() || hasHiddenSupertype(element, new HashSet<>())
+        );
+    }
+
+    /**
+     * Whether a supertype of the type is not public: the element model does not list the members
+     * such a supertype contributes, though the runtime exposes them, so the type's members cannot
+     * be known completely. A type that is not public itself is only ever seen through a public
+     * subtype, whose members it does not list either.
+     */
+    private static boolean hasHiddenSupertype(ClassElement element, Set<String> seen) {
+        if (!seen.add(element.getName())) {
+            return false;
+        }
+        for (ClassElement supertype : supertypes(element)) {
+            if (!supertype.isPublic() || hasHiddenSupertype(supertype, seen)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<ClassElement> supertypes(ClassElement element) {
+        List<ClassElement> supertypes = new ArrayList<>(element.getInterfaces());
+        element.getSuperType().ifPresent(supertypes::add);
+        return supertypes;
+    }
+
+    private static MethodSignature signature(MethodElement method) {
+        List<String> parameterTypes = new ArrayList<>();
+        for (ParameterElement parameter : method.getParameters()) {
+            parameterTypes.add(typeName(parameter.getType()));
+        }
+        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getReturnType()));
+    }
+
+    /**
+     * The name of a type with its array dimensions, which {@link ClassElement#getName()} omits. A type
+     * variable is its erasure, {@code Object}, which says nothing about the actual value: the checker
+     * leaves such a value alone.
+     */
+    private static String typeName(ClassElement type) {
+        if (type.isTypeVariable() || type.isGenericPlaceholder()) {
+            return Object.class.getName() + "[]".repeat(type.getArrayDimensions());
+        }
+        return type.getName() + "[]".repeat(type.getArrayDimensions());
     }
 
     private @Nullable AnnotationDescription loadAnnotation(String qualifiedName) {
@@ -105,6 +360,10 @@ public final class TypeFacts {
      * Looks a class up by its qualified name, trying the nested-class spellings
      * ({@code a.b.Outer$Nested}) when the dotted name is not a class.
      */
+    /**
+     * The element of a qualified name, trying the binary name of a nested type when the dotted name
+     * resolves to nothing.
+     */
     private @Nullable ClassElement resolveClass(String qualifiedName) {
         String candidate = qualifiedName;
         while (true) {
@@ -117,6 +376,78 @@ public final class TypeFacts {
                 return null;
             }
             candidate = candidate.substring(0, lastDot) + '$' + candidate.substring(lastDot + 1);
+        }
+    }
+
+    /**
+     * A Java type, or the generated type of a Python class, as the checker sees it.
+     *
+     * @param name          The qualified name
+     * @param anInterface   Whether the type is an interface
+     * @param isAbstract    Whether the type is abstract
+     * @param anEnum        Whether the type is an enum
+     * @param pythonDefined Whether the type is generated from a Python class of the compilation
+     * @param methods       The public methods by name, inherited ones included, each with its signatures
+     * @param protectedMethods The names of the protected methods, which a Python subclass reaches
+     * @param fields        The public fields by name with their types, enum constants included
+     * @param staticFields  The names of the static fields
+     * @param enumConstants The enum constants, when the type is an enum
+     * @param nestedTypes   The nested types by simple name with their qualified names
+     * @param constructors  The constructors
+     * @param open          Whether the type can have members the description does not list: the
+     *                      type or a supertype is not public, so the element model omits members
+     */
+    public record TypeDescription(String name,
+                                  boolean anInterface,
+                                  boolean isAbstract,
+                                  boolean anEnum,
+                                  boolean pythonDefined,
+                                  Map<String, List<MethodSignature>> methods,
+                                  Set<String> protectedMethods,
+                                  Map<String, String> fields,
+                                  Set<String> staticFields,
+                                  Set<String> enumConstants,
+                                  Map<String, String> nestedTypes,
+                                  List<MethodSignature> constructors,
+                                  boolean open) {
+
+        /**
+         * @return The simple name, nested types separated by dots
+         */
+        public String simpleName() {
+            return name.substring(name.lastIndexOf('.') + 1).replace('$', '.');
+        }
+    }
+
+    /**
+     * The signature of a method or constructor.
+     *
+     * @param parameterTypes The qualified names of the parameter types, an array as {@code T[]}
+     * @param varargs        Whether the last parameter takes the remaining arguments
+     * @param isStatic       Whether the method is static
+     * @param returnType     The qualified name of the return type, {@code void} for none
+     */
+    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType) {
+
+        public MethodSignature {
+            parameterTypes = List.copyOf(parameterTypes);
+        }
+
+        /**
+         * @param name The method name
+         * @return The signature as Java spells it, with simple type names
+         */
+        public String render(String name) {
+            StringBuilder out = new StringBuilder(name).append('(');
+            for (int i = 0; i < parameterTypes.size(); i++) {
+                String type = parameterTypes.get(i);
+                String simple = type.substring(type.lastIndexOf('.') + 1).replace('$', '.');
+                if (varargs && i == parameterTypes.size() - 1 && simple.endsWith("[]")) {
+                    simple = simple.substring(0, simple.length() - 2) + "...";
+                }
+                out.append(i > 0 ? ", " : "").append(simple);
+            }
+            return out.append(')').toString();
         }
     }
 
