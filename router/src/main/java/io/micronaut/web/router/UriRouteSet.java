@@ -20,6 +20,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.jspecify.annotations.Nullable;
 
@@ -67,6 +68,10 @@ final class UriRouteSet {
      * Whether a route has a dynamic target, see {@link DynamicRouteTarget}.
      */
     private final boolean hasDynamicTargets;
+    /**
+     * Whether a route has constraints on its path variables.
+     */
+    private final boolean constrained;
     private final boolean empty;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
@@ -97,6 +102,8 @@ final class UriRouteSet {
         }
         this.indexesByMethod = indexes;
         this.hasDynamicTargets = hasDynamicTargets;
+        this.constrained = customMethodMap.values().stream().flatMap(Arrays::stream)
+            .anyMatch(route -> route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained());
         this.empty = customMethodMap.isEmpty();
     }
 
@@ -153,7 +160,17 @@ final class UriRouteSet {
      * @return The matches
      */
     <T, R> List<UriRouteMatch<T, R>> find(HttpMethod httpMethod, String uri) {
-        return toMatches(uri, allRoutesByMethod.getOrDefault(httpMethod.name(), EMPTY));
+        List<UriRouteMatch<T, R>> matches = toMatches(uri, allRoutesByMethod.getOrDefault(httpMethod.name(), EMPTY));
+        if (!constrained || matches.isEmpty()) {
+            return matches;
+        }
+        List<UriRouteMatch<T, R>> accepted = new ArrayList<>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            if (acceptsVariables(match.getRouteInfo(), match)) {
+                accepted.add(match);
+            }
+        }
+        return accepted;
     }
 
     /**
@@ -330,7 +347,7 @@ final class UriRouteSet {
     <T, R> Optional<UriRouteMatch<T, R>> route(HttpMethod httpMethod, String uri) {
         for (UriRouteInfo<Object, Object> uriRouteInfo : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY)) {
             Optional<UriRouteMatch<Object, Object>> match = uriRouteInfo.match(uri);
-            if (match.isPresent()) {
+            if (match.isPresent() && acceptsVariables(uriRouteInfo, match.get())) {
                 return (Optional) match;
             }
         }
@@ -367,7 +384,7 @@ final class UriRouteSet {
                     }
                 }
                 UriRouteMatch match = route.tryMatch(uri);
-                if (match != null) {
+                if (match != null && acceptsVariables(route, match)) {
                     matchedRoutes.add(match);
                 }
             }
@@ -403,7 +420,7 @@ final class UriRouteSet {
                     continue;
                 }
                 UriRouteMatch match = route.tryMatch(path);
-                if (match != null) {
+                if (match != null && acceptsVariables(route, match)) {
                     matchedRoutes.add(match);
                 }
             }
@@ -460,6 +477,9 @@ final class UriRouteSet {
             if (shouldSkipForPort(request, route, ports)) {
                 continue;
             }
+            if (rejectsVariables(route, request.getPath())) {
+                continue;
+            }
             if (permitsBody) {
                 if (!route.isPermitsRequestBody()) {
                     continue;
@@ -487,6 +507,33 @@ final class UriRouteSet {
             result.add(route);
         }
         return result;
+    }
+
+    /**
+     * Whether the route has constraints on its path variables that the variables it binds from
+     * the path reject, see {@code RouteSpec#constrain}: then the route is not a candidate. A route
+     * without constraints is not matched here.
+     *
+     * @param route The route
+     * @param path  The path
+     * @return Whether the route rejects the path
+     */
+    private static boolean rejectsVariables(UriRouteInfo<Object, Object> route, String path) {
+        if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.isConstrained()) {
+            UriRouteMatch<Object, Object> match = info.tryMatch(path);
+            return match == null || !info.acceptsVariables(match.getVariableValues());
+        }
+        return false;
+    }
+
+    /**
+     * @param route The route
+     * @param match A match of the route
+     * @return Whether the constraints of the route, if any, accept the variables of the match
+     */
+    private static boolean acceptsVariables(UriRouteInfo<?, ?> route, UriMatchInfo match) {
+        return !(route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained())
+            || info.acceptsVariables(match.getVariableValues());
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {
