@@ -204,6 +204,7 @@ httpServer:
     functionalRoutesConditions: Conditions, Order, Ports and Attributes
     functionalRoutesAnnotations: Annotations on Handler Routes
     functionalRoutesErrors: Error and Status Routes
+    functionalRoutesLocators: Locator Routes
     functionalRoutesDeclared: Declared Routes
     functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions

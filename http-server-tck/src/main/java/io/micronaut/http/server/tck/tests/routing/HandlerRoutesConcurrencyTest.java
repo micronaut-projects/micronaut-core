@@ -28,6 +28,7 @@ import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Handler routes under concurrent requests: the route, group and server filters and the handlers are shared by
+ * Handler routes under concurrent requests: the route, group and server filters, the handlers and the asynchronous locators are shared by
  * every request, and no request may see the values of another.
  */
 @SuppressWarnings({
@@ -67,17 +68,19 @@ public class HandlerRoutesConcurrencyTest {
         try (ServerUnderTest server = server()) {
             List<String> failures = runConcurrently(THREADS, REQUESTS_PER_THREAD, (thread, n) -> {
                 String id = thread + "-" + n;
-                int kind = ThreadLocalRandom.current().nextInt(4);
+                int kind = ThreadLocalRandom.current().nextInt(5);
                 HttpRequest<?> request = switch (kind) {
                     case 0 -> HttpRequest.GET("/conc/sync/" + id);
                     case 1 -> HttpRequest.GET("/conc/async/" + id);
                     case 2 -> HttpRequest.POST("/conc/echo/" + id, "body of " + id).contentType(MediaType.TEXT_PLAIN_TYPE);
+                    case 3 -> HttpRequest.GET("/conc/located/" + id + "/show");
                     default -> HttpRequest.GET("/conc/context/" + id);
                 };
                 String expectedBody = switch (kind) {
                     case 0 -> "sync " + id;
                     case 1 -> "async " + id;
                     case 2 -> "echo " + id + ": body of " + id;
+                    case 3 -> "located " + id;
                     default -> "context " + id;
                 };
                 HttpResponse<String> response = server.exchange(((MutableHttpRequest<?>) request).header(ID, id), String.class);
@@ -152,6 +155,9 @@ public class HandlerRoutesConcurrencyTest {
     record RequestId(String id) implements PropagatedContextElement {
     }
 
+    record Located(String id) {
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ConcurrentRoutes implements HttpRoutes {
@@ -166,6 +172,9 @@ public class HandlerRoutesConcurrencyTest {
             routes.filter("/conc/**").before((request, propagatedContext) -> {
                 propagatedContext.add(new RequestId(id(request)));
             }).and().after((request, response) -> response.header("X-Server-Filter", PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
+            LocatedRoutes<Located> located = TckLocatedRoutes.of(Located.class, table -> table.GET("/show", (request, pathVariables) ->
+                    text("located " + LocatedRoutes.locatedTarget(pathVariables, Located.class).id()))
+                .after((request, response) -> response.header("X-Route-Filter", pathVariables(request))));
             routes.path("/conc", group -> {
                 group.beforeAsync(request -> CompletableFuture.supplyAsync(() -> {
                     request.setAttribute("group-id", id(request));
@@ -182,6 +191,10 @@ public class HandlerRoutesConcurrencyTest {
                         .thenApply(value -> text("echo " + pathVariables.getString("id") + ": " + value)))
                     .consumes(MediaType.TEXT_PLAIN_TYPE)
                     .afterAsync((request, response) -> CompletableFuture.runAsync(() -> response.header("X-Route-Filter", id(request)), executor));
+                group.locateAsync("/located/{id}", (request, pathVariables) -> {
+                    String id = pathVariables.getString("id");
+                    return CompletableFuture.supplyAsync(() -> new Located(id), executor);
+                }, located);
                 group.GET("/context/{id}", (request, pathVariables) ->
                         text("context " + PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")))
                     .after((request, response) -> response.header("X-Route-Filter", id(request)));
@@ -189,7 +202,7 @@ public class HandlerRoutesConcurrencyTest {
         }
 
         /**
-         * The third segment of the path: the id of {@code /conc/sync/{id}}.
+         * The third segment of the path: the id of {@code /conc/sync/{id}} and {@code /conc/located/{id}/show}.
          */
         private static String pathVariables(HttpRequest<?> request) {
             String path = request.getPath();
