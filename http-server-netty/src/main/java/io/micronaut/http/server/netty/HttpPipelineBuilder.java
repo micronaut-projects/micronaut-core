@@ -22,6 +22,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.Compressor;
 import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
@@ -141,6 +142,12 @@ final class HttpPipelineBuilder {
 
     private final boolean quic;
 
+    /**
+     * The response compressor shared by all connections of this server, released with it.
+     */
+    @Nullable
+    private final Compressor compressor;
+
     HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, @Nullable ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
         this.server = server;
         this.embeddedServices = embeddedServices;
@@ -149,6 +156,7 @@ final class HttpPipelineBuilder {
         this.hostResolver = hostResolver;
         this.serverCustomizer = serverCustomizer;
         this.quic = quic;
+        this.compressor = Compressor.create(embeddedServices.getHttpCompressionStrategy());
 
         Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
         loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
@@ -497,7 +505,7 @@ final class HttpPipelineBuilder {
             NettyHttpServerConfiguration.Http2Settings http2 = server.getServerConfiguration().getHttp2();
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
                 .decompress(server.getServerConfiguration().isRequestDecompressionEnabled())
-                .compressor(embeddedServices.getHttpCompressionStrategy())
+                .compressor(compressor)
                 .bodySizeLimits(bodySizeLimits())
                 .accessLogManagerFactory(accessLogManagerFactory)
                 .validateHeaders(server.getServerConfiguration().isValidateHeaders())
@@ -822,7 +830,7 @@ final class HttpPipelineBuilder {
 
             RequestHandler requestHandler = makeRequestHandler(webSocketUpgradeHandler, sslHandler != null);
             PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler, quic);
-            pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
+            pipeliningServerHandler.setCompressor(compressor);
             pipeliningServerHandler.setBodySizeLimits(bodySizeLimits());
             pipeliningServerHandler.setRequestDecompressionEnabled(server.getServerConfiguration().isRequestDecompressionEnabled());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, pipeliningServerHandler);
