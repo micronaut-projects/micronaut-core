@@ -36,17 +36,13 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.ByteBodyHttpResponse;
-import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.net.http.HttpConnectTimeoutException;
-import java.net.http.HttpTimeoutException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
@@ -241,13 +237,6 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 // the outcome is reported once the body ends: a response whose body is cut off is a failure
                 return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits,
                         failure -> reportBodyEnd(sent.instance(), responseInfo.statusCode(), failure))))
-                    .onErrorMap(
-                        e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
-                        e -> {
-                            report(sent.instance(), LoadBalancer.Outcome.TIMEOUT);
-                            return ReadTimeoutException.TIMEOUT_EXCEPTION;
-                        }
-                    )
                     .onErrorMap(IOException.class, e -> sendError(sent.instance(), httpRequest.uri(), e));
             })
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
