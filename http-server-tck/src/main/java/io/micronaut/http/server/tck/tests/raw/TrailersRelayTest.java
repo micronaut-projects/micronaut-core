@@ -34,8 +34,10 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
@@ -303,7 +305,8 @@ public final class TrailersRelayTest {
         private final RawHttpClient client;
         private final RelayState relay;
 
-        Routes(RawHttpClient client, RelayState relay) {
+        // the upstream is a plain HTTP/1.1 socket, even when the suite configures the client for HTTP/2
+        Routes(@Client(plaintextMode = HttpVersionSelection.PlaintextMode.HTTP_1) RawHttpClient client, RelayState relay) {
             this.client = client;
             this.relay = relay;
         }
