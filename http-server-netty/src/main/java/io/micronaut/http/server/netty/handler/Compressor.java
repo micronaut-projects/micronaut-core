@@ -287,7 +287,7 @@ final class Compressor {
                 for (Object outboundMessage : compressionChannel.outboundMessages()) {
                     newContentLength += ((ByteBuf) outboundMessage).readableBytes();
                 }
-                hr.headers().set(HttpHeaderNames.CONTENT_LENGTH, newContentLength);
+                ContentLengthValues.set(hr.headers(), newContentLength);
             }
         }
 

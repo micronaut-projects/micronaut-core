@@ -50,6 +50,25 @@ class NettyHttpRequestSpec extends Specification {
         altered.headers.get("foo") == 'bar'
     }
 
+    void "test body conversion"() {
+        given:
+        DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET, "/foo/bar")
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, NettyByteBodyFactory.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
+
+        expect:
+        !request.getBody(Integer).isPresent()
+
+        when:
+        request.setLegacyBody("42")
+
+        then:
+        request.getBody(Integer).get() == 42
+        request.getBody(Integer).get() == 42
+        request.getBody(Long).get() == 42L
+        request.getBody(String).get() == "42"
+        request.getBody(Object).get() == "42"
+    }
+
     void "test mutating a mutable request"() {
         given:
         DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET, "/foo/bar")

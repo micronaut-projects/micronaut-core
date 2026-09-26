@@ -192,7 +192,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private ParsedFormType parsedFormType;
 
-    private final BodyConvertor bodyConvertor = newBodyConvertor();
+    @Nullable
+    private BodyConvertor bodyConvertor;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -398,7 +399,21 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(ArgumentConversionContext<T1> conversionContext) {
-        return getBody().flatMap(t -> bodyConvertor.convert(conversionContext, t));
+        return getBody().flatMap(t -> bodyConvertor().convert(conversionContext, t));
+    }
+
+    private BodyConvertor bodyConvertor() {
+        BodyConvertor bodyConvertor = this.bodyConvertor;
+        if (bodyConvertor == null) {
+            synchronized (this) { // double check
+                bodyConvertor = this.bodyConvertor;
+                if (bodyConvertor == null) {
+                    bodyConvertor = newBodyConvertor();
+                    this.bodyConvertor = bodyConvertor;
+                }
+            }
+        }
+        return bodyConvertor;
     }
 
     /**

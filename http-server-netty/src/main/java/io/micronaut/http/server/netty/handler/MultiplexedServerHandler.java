@@ -304,7 +304,7 @@ abstract class MultiplexedServerHandler {
             if (PipeliningServerHandler.canHaveBody(response.status())) {
                 OptionalLong length = body.expectedLength();
                 if (length.isPresent()) {
-                    response.headers().set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+                    ContentLengthValues.set(response.headers(), length.getAsLong());
                 }
             } else {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
