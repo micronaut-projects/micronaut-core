@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
@@ -117,6 +118,12 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     @Override
     public HttpRouteGroup where(Predicate<HttpRequest<?>> condition) {
         settings.where(condition);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup constrain(Predicate<? super PathVariables> accepted) {
+        settings.constrain(accepted);
         return this;
     }
 

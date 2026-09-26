@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
 
 import org.jspecify.annotations.Nullable;
@@ -156,6 +157,15 @@ record DefaultHttpRouteSpec(List<RouteSettings> routes, ToIntFunction<String> po
         Objects.requireNonNull(condition, "condition");
         for (RouteSettings route : routes) {
             route.where(condition);
+        }
+        return this;
+    }
+
+    @Override
+    public HttpRouteSpec constrain(Predicate<? super PathVariables> accepted) {
+        Objects.requireNonNull(accepted, "accepted");
+        for (RouteSettings route : routes) {
+            route.constrain(accepted);
         }
         return this;
     }
