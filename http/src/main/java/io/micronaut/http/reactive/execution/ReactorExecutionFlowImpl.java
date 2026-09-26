@@ -343,6 +343,9 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
         }
+        if (next instanceof SubscriberAwareExecutionFlow<R> subscriberAwareFlow) {
+            return Mono.defer(() -> toMono(subscriberAwareFlow.reactiveFlow()));
+        }
         ImperativeExecutionFlow<?> imperativeFlow = next.tryComplete();
         if (imperativeFlow != null) {
             Mono<Object> m;
