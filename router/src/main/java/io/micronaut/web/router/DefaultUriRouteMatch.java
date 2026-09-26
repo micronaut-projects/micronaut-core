@@ -61,6 +61,18 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
         this.defaultCharset = defaultCharset;
     }
 
+    /**
+     * @return The URI match info, with the raw values of the variables
+     */
+    UriMatchInfo matchInfo() {
+        return matchInfo;
+    }
+
+    @Override
+    @Nullable Object resolvedTarget() {
+        return matchInfo instanceof DynamicRouteTarget.ResolvedMatchInfo resolved ? resolved.target() : null;
+    }
+
     @Override
     public String getUri() {
         return matchInfo.getUri();

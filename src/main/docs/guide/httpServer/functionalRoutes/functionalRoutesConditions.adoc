@@ -1,0 +1,53 @@
+=== Conditions and order
+
+`where(Predicate<HttpRequest<?>>)`, on a route or a group, matches only the requests that meet the condition, like `@RouteCondition` on a controller method. api:web.router.builder.RequestPredicates[] builds conditions on the headers, query parameters, media types and method of a request.
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="where", indent=0, title="A route for the requests that meet a condition"]
+
+<1> The route matches the requests with an `X-Beta` header or a `beta=true` query parameter. The conditions of the groups of a route, outer group first, and those of the route must all be met.
+<2> A request both routes match is ambiguous: they have the same URI template. The route with the lowest order wins.
+<3> The route for the other requests, with the default order `0`, the order of controller routes.
+
+A request that the conditions of a route reject is answered as if the route did not exist: by another route, or with `404`, never with a `405`, `415` or `406` of the rejected route. The conditions run while the request is matched, for every request to the path of the route, so they must be fast, must not block and must not read the body.
+
+The order only breaks a tie between routes that are equally good for a request. The router first selects the most specific route by its URI template, then by the media types, then prefers an explicit `HEAD` route over an implicit one, and only then compares the orders: the order never makes a less specific route win. Routes left with the same order still make the request ambiguous, which is answered with `400`. A group's order applies to its routes, and a route's own order overrides it.
+
+The order is global: it is compared between any routes left for a request, controller routes and the routes of every `HttpRoutes` bean and group alike, and the lower order wins. Controller routes have the order `0`, so a handler route with a negative order wins a tie with a controller route, and one with a positive order loses it. The order of an `HttpRoutes` bean, e.g. `@Order` on the bean, orders the beans, not their routes.
+
+=== Path variable constraints
+
+`constrain(...)`, on a route or a group, matches only the requests whose path variables the constraint accepts. A request the constraint rejects is not a match of the route, as if its URI template did not match: another route on the same path answers it, or it is answered with `404`.
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="constrain", indent=0, title="Routes for some values of a path variable"]
+
+<1> The routes of the group match the known shops only, the values of the `SHOPS` set: `/shops/west/stock` is answered with `404`. The same constraint on a group of routes a locator resolves keeps an unknown shop from ever reaching the locator.
+<2> The variable converted to a type: a value that does not convert, like `lamp`, or that the predicate rejects, like `-1`, is not a match. The order breaks the tie with the other route for the values both accept.
+<3> The route for the other values.
+
+The four forms are `constrain(Predicate<PathVariables>)`, `constrain(variable, Predicate<String>)`, `constrain(variable, type, Predicate<T>)` and `constrain(variable, Collection<String>)`. A variable without a value, a value that does not convert and a predicate that throws all reject the request; the exception is logged at `DEBUG` level.
+
+The constraints run while the request is matched, right after the URI template of the route matched, before the media types, the conditions of `where` and the ambiguity between routes. The methods allowed for a `405`, the media types for a `415` or `406`, CORS preflight requests and implicit `HEAD` routes consider only the routes whose constraints pass, so a rejected value never produces a `405`. The constraints of the groups of a route, outer group first, and of the route must all pass. Like conditions, constraints must be fast and must not block; a route without constraints costs nothing more to match.
+
+=== Attributes
+
+`attribute(name, value)` gives a route, or every route of a group, metadata that the code handling its requests reads from the matched route: the handler, route filters, server filters and `@ServerFilter` beans (with a api:web.router.RouteInfo[] parameter, or with `RouteAttributes.getRouteInfo(request)`).
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="attributes", indent=0, title="Route attributes"]
+
+<1> Every route of the group has the attribute.
+<2> A filter reads the attribute of the matched route.
+<3> An attribute of a route overrides the attribute of its group.
+
+The attributes are the attributes of the route, not of the request. The map is read-only and its values are never `null`.
+
+=== Ports
+
+`port(int)`, on a route or a group, routes the requests on that port only, like `@Controller(port = ...)`: the server opens the port when it starts, and a request on another port is answered as if the route did not exist, with `404`.
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="port", indent=0, title="Routes on another port"]
+
+<1> The routes of the group match the requests on the management port only.
+
+`port(String)` takes the port like the `port` member of `@Controller`: a number, or property placeholders with defaults, e.g. `port("${my.admin.port:8081}")`, resolved with the environment of the application when the routes are declared. A placeholder that cannot be resolved fails the startup, like for a controller, and a port that is not a number between `1` and `65535` is rejected.
+
+Once a route of the application has a port, the routes without one match the requests on the default ports of the server only.

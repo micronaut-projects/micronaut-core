@@ -1,0 +1,18 @@
+WARNING: Functional routes are experimental. The API, in the package pkg:web.router.builder[] and the related types api:http.body.AsyncRequestBody[], api:http.body.BodyElements[] and the package pkg:http.form[], is annotated with ann:core.annotation.Experimental[] and may change in a future release.
+
+Besides controllers, the Micronaut HTTP server routes requests to *handler functions* declared in code. A bean of type api:web.router.builder.HttpRoutes[] receives an api:web.router.builder.HttpRouteBuilder[] and declares its routes with it:
+
+snippet::io.micronaut.docs.server.functional.HelloRoutes[tags="imports,clazz", indent=0, title="A handler route"]
+
+A handler route is a route like the route of a controller method, not a separate request model. The router sees the handler as an executable method, so everything that applies to a controller route applies to a handler route:
+
+* argument binding, the message body readers and writers, and content negotiation (the `405`, `415` and `406` answers);
+* the application's filters (`@ServerFilter` beans and api:http.filter.HttpServerFilter[] beans), CORS and the implicit `HEAD` route of a `GET` route;
+* the error routes: `@Error` methods and api:http.server.exceptions.ExceptionHandler[] beans, which receive checked exceptions unwrapped;
+* the executors (`@ExecuteOn`, `@NonBlocking` and the thread selection of the server), and the propagated context.
+
+Functional routes add what is natural to declare in code: groups of routes with a common path prefix and common filters, filters on a single route, request conditions and error routes local to a group.
+
+Every `HttpRoutes` bean adds its routes next to the controllers, under `micronaut.server.context-path` if one is configured. Declare an `HttpRoutes` bean as a class, as above, or return a lambda from a factory method, as in the next section. The order of the `HttpRoutes` beans only orders the beans: it never decides which route answers a request.
+
+WARNING: A route specification, group or builder kept after `HttpRoutes.routes(...)` returned has no effect: the router reads the routes, their configuration and their filters when it is created. The routes cannot change while the application runs.

@@ -194,6 +194,18 @@ httpServer:
     byteBodyPrimary: Primary operations
     byteBodySplitting: Splitting
     byteBodyExample: Example
+  functionalRoutes:
+    title: Functional Routes (Experimental)
+    functionalRoutesDeclaring: Declaring Routes
+    functionalRoutesBody: Reading the Request Body
+    functionalRoutesForms: Forms and File Uploads
+    functionalRoutesGroups: Route Groups and Path Prefixes
+    functionalRoutesFilters: Route, Group and Server Filters
+    functionalRoutesConditions: Conditions, Order, Ports and Attributes
+    functionalRoutesAnnotations: Annotations on Handler Routes
+    functionalRoutesErrors: Error and Status Routes
+    functionalRoutesDeclared: Declared Routes
+    functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:
