@@ -136,6 +136,18 @@ public interface ArgumentBinder<T, S> {
         }
 
         /**
+         * Whether the value was produced for the complete argument of the binding context,
+         * including its type arguments (for example, a body deserialized with {@code List<Book>}),
+         * so the caller doesn't need to convert it again.
+         *
+         * @return True if the value doesn't require further conversion to the argument type
+         * @since 5.3.0
+         */
+        default boolean isConvertedToArgumentType() {
+            return false;
+        }
+
+        /**
          * Transform the result, if present.
          *
          * @param transform The transformation function
