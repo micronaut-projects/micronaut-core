@@ -36,6 +36,7 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -229,10 +230,15 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 RawRequestOptions options = request.getAttribute(OPTIONS_ATTRIBUTE, RawRequestOptions.class).orElse(null);
                 // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
                 java.net.http.HttpClient httpClient = options == null || options.isFollowRedirects() ? rawClient.get() : rawNoRedirectClient.get();
-                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits)))
+                // the outcome is reported once the body ends: a response whose body is cut off is a failure
+                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits,
+                        failure -> reportBodyEnd(sent.instance(), responseInfo.statusCode(), failure))))
                     .onErrorMap(
                         e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
-                        e -> ReadTimeoutException.TIMEOUT_EXCEPTION
+                        e -> {
+                            report(sent.instance(), LoadBalancer.Outcome.TIMEOUT);
+                            return ReadTimeoutException.TIMEOUT_EXCEPTION;
+                        }
                     )
                     .onErrorMap(IOException.class, e -> sendError(sent.instance(), httpRequest.uri(), e));
             })

@@ -310,6 +310,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             transitionToState(ctx, this, AfterContent.INSTANCE);
+            listener.bodyFailed(ctx, cause);
             streaming.error(cause);
             listener.finish(ctx);
         }
@@ -424,6 +425,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             transitionToState(ctx, this, AfterContent.INSTANCE);
+            listener.bodyFailed(ctx, cause);
             streaming.error(cause);
             listener.finish(ctx);
         }
@@ -546,8 +548,19 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void complete(HttpResponse response, CloseableByteBody body);
 
         /**
-         * Called when the last piece of the body is received. This handler can be removed and the
-         * connection can be returned to the connection pool.
+         * Called when the body passed to {@link #complete(HttpResponse, CloseableByteBody)}
+         * fails before its last piece, e.g. the connection closed or the read timed out. The
+         * failure is then passed to the body, and {@link #finish} is called.
+         *
+         * @param ctx   The handler context
+         * @param cause The failure
+         */
+        default void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+        }
+
+        /**
+         * Called when the last piece of the body is received, or the body failed. This handler
+         * can be removed and the connection can be returned to the connection pool.
          *
          * @param ctx The handler context
          */

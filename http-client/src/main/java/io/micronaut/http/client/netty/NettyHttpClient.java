@@ -83,6 +83,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
@@ -1822,14 +1823,52 @@ final class NettyHttpClient implements
 
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
             boolean stillExpectingContinue = expectContinue;
+            /**
+             * The outcome of the exchange is reported to the load balancer once: a failure
+             * before the response or of its body, or else the status once the body ended or
+             * the caller let it go. An exchange cancelled before its response is not reported.
+             * All on the event loop.
+             */
+            boolean reported;
+            int code;
+
+            private void reportOnce(LoadBalancer.@Nullable Outcome outcome) {
+                if (!reported) {
+                    reported = true;
+                    if (outcome != null) {
+                        report(instance, outcome);
+                    }
+                }
+            }
+
+            private void reportResponse() {
+                if (responded.get()) {
+                    reportOnce(code >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
+                }
+            }
 
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
                 poolHandle.taint();
                 if (!sink.isCancelled()) {
                     // nobody takes the error of a cancelled exchange, e.g. its closed connection
-                    completeExceptionallySafe(sink, handleResponseError(request, instance, cause));
+                    HttpClientException failure = handleResponseError(request, instance, cause);
+                    reportOnce(failureOutcome(failure));
+                    completeExceptionallySafe(sink, failure);
                 }
+            }
+
+            @Override
+            public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+                // the body fails for its consumer, which maps and decorates the cause
+                reportOnce(failureOutcome(cause));
+            }
+
+            @Override
+            public void allowDiscard() {
+                // the caller is done with the response before its body ended: the instance
+                // responded, and what the connection does after that is not counted against it
+                reportResponse();
             }
 
             @Override
@@ -1846,12 +1885,15 @@ final class NettyHttpClient implements
 
             @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
+                code = response.status().code();
                 responded.set(true);
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
                 if (sink.isCancelled()) {
-                    // nobody takes the response of a cancelled exchange
+                    // nobody takes the response of a cancelled exchange, and its outcome says
+                    // nothing about the instance
+                    reported = true;
                     body.close();
                     return;
                 }
@@ -1879,6 +1921,8 @@ final class NettyHttpClient implements
 
             @Override
             public void finish(ChannelHandlerContext ctx) {
+                // the body ended, unless it failed, which was reported first
+                reportResponse();
                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
                 if (streamWriter != null) {
                     if (!streamWriter.isCompleted()) {
@@ -2191,6 +2235,16 @@ final class NettyHttpClient implements
         return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
     }
 
+    /**
+     * Map a failure of a response, before or after its headers, to a client exception. The
+     * outcome for the load balancer is not reported here: the response listener of the exchange
+     * reports it, see {@link #failureOutcome}.
+     *
+     * @param finalRequest The request
+     * @param instance     The service instance the load balancer selected, or {@code null}
+     * @param cause        The failure
+     * @return The client exception
+     */
     private HttpClientException handleResponseError(io.micronaut.http.HttpRequest<?> finalRequest, @Nullable ServiceInstance instance, Throwable cause) {
         String message = cause.getMessage();
         if (message == null) {
@@ -2213,7 +2267,12 @@ final class NettyHttpClient implements
         } else {
             result = decorate(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
         }
-        failedBeforeSending(result, finalRequest, instance);
+        if (result instanceof UnprocessedRequestException unprocessed) {
+            unprocessed.setTarget(finalRequest.getUri(), instance);
+            if (unprocessed.getServiceId() == null) {
+                decorate(unprocessed);
+            }
+        }
         return result;
     }
 
@@ -2233,6 +2292,28 @@ final class NettyHttpClient implements
     }
 
     /**
+     * The outcome to report to the load balancer for a failed exchange.
+     *
+     * @param failure The failure, before the response or of its body, as raised or as mapped
+     * @return The outcome, or {@code null} if the failure says nothing about the instance
+     */
+    private static LoadBalancer.@Nullable Outcome failureOutcome(Throwable failure) {
+        if (failure instanceof UnprocessedRequestException unprocessed) {
+            return switch (unprocessed.getReason()) {
+                case CONNECT, CONNECT_TIMEOUT -> LoadBalancer.Outcome.CONNECT_FAILURE;
+                case STREAM_REFUSED -> LoadBalancer.Outcome.RESET;
+                // a pool that is full, or a keep-alive connection the server closed, say nothing about the instance
+                default -> null;
+            };
+        } else if (failure instanceof ReadTimeoutException || failure instanceof io.netty.handler.timeout.ReadTimeoutException) {
+            return LoadBalancer.Outcome.TIMEOUT;
+        } else if (failure instanceof ResponseClosedException || failure instanceof StreamResetException) {
+            return LoadBalancer.Outcome.RESET;
+        }
+        return null;
+    }
+
+    /**
      * Record the target of a request that was not sent on its exception, and the service id if
      * it has none yet.
      *
@@ -2247,8 +2328,24 @@ final class NettyHttpClient implements
             if (unprocessed.getServiceId() == null) {
                 decorate(unprocessed);
             }
+            LoadBalancer.Outcome outcome = failureOutcome(unprocessed);
+            if (outcome != null) {
+                report(instance, outcome);
+            }
         }
         return failure;
+    }
+
+    /**
+     * Report the outcome of an exchange to the load balancer that selected its instance, if any.
+     *
+     * @param instance The service instance the load balancer selected, or {@code null}
+     * @param outcome  The outcome
+     */
+    private void report(@Nullable ServiceInstance instance, LoadBalancer.Outcome outcome) {
+        if (instance != null && loadBalancer != null) {
+            loadBalancer.report(instance, outcome);
+        }
     }
 
     private void setRedirectHeaders(io.micronaut.http.HttpRequest<?> request,
