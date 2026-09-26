@@ -793,19 +793,19 @@ final class NettyHttpClient implements
 
     private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
-        DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-            resp.nettyResponse.protocolVersion(),
-            resp.nettyResponse.status(),
-            buf,
-            resp.nettyResponse.headers(),
-            EmptyHttpHeaders.INSTANCE
-        );
-
+        FullHttpResponse fullHttpResponse;
         try {
             if (log.isTraceEnabled()) {
-                traceBody("Response", fullHttpResponse.content());
+                traceBody("Response", buf);
             }
+            // copy the pooled body exactly once; every response object created below (including
+            // the error paths) shares this copy, and the pooled buffer can be released right away
+            fullHttpResponse = FullNettyClientHttpResponse.detach(resp.nettyResponse, buf);
+        } finally {
+            buf.release();
+        }
 
+        try {
             boolean convertBodyWithBodyType = shouldConvertWithBodyType(fullHttpResponse, this.configuration, bodyType, errorType);
             FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
 
@@ -842,8 +842,6 @@ final class NettyHttpClient implements
                 }
             ));
             return ExecutionFlow.error(clientResponseError);
-        } finally {
-            fullHttpResponse.release();
         }
     }
 
