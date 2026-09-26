@@ -25,8 +25,11 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GenUtils;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -218,7 +221,22 @@ public final class AnnotationMetadataGenUtils {
      */
     public static Function<String, ExpressionDef> createLoadClassValueExpressionFn(ClassTypeDef declaringType,
                                                                                    Map<String, MethodDef> loadTypeMethods) {
-        return typeName -> invokeLoadClassValueMethod(declaringType, loadTypeMethods, typeName);
+        return createLoadClassValueExpressionFn(declaringType, loadTypeMethods, null);
+    }
+
+    /**
+     * Create a new load class value expression function.
+     *
+     * @param declaringType   The declaring type
+     * @param loadTypeMethods The load type methods
+     * @param visitorContext  The visitor context, used to leave out the class literal of an inaccessible class
+     * @return The function
+     * @since 5.2
+     */
+    public static Function<String, ExpressionDef> createLoadClassValueExpressionFn(ClassTypeDef declaringType,
+                                                                                   Map<String, MethodDef> loadTypeMethods,
+                                                                                   @Nullable VisitorContext visitorContext) {
+        return typeName -> invokeLoadClassValueMethod(declaringType, loadTypeMethods, typeName, visitorContext);
     }
 
     /**
@@ -306,10 +324,22 @@ public final class AnnotationMetadataGenUtils {
 
     private static ExpressionDef. InvokeStaticMethod invokeLoadClassValueMethod(ClassTypeDef declaringType,
                                                                                Map<String, MethodDef> loadTypeMethods,
-                                                                               String typeName) {
+                                                                               String typeName,
+                                                                               @Nullable VisitorContext visitorContext) {
         final MethodDef loadTypeGeneratorMethod = loadTypeMethods.computeIfAbsent(typeName, type -> {
 
             final String methodName = LOAD_CLASS_PREFIX + loadTypeMethods.size();
+
+            if (!isAccessibleFrom(visitorContext, typeName, NameUtils.getPackageName(declaringType.getName()))) {
+                // The class literal of an inaccessible class fails at runtime anyway, and does not compile as source
+                return MethodDef.builder(methodName)
+                    .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                    .returns(TYPE_ANNOTATION_CLASS_VALUE)
+                    .buildStatic(methodParameters -> TYPE_ANNOTATION_CLASS_VALUE.instantiate(
+                        CONSTRUCTOR_CLASS_VALUE,
+                        ExpressionDef.constant(typeName)
+                    ).returning());
+            }
 
             // This logic will generate a method such as the following, allowing non-dynamic classloading:
             //
@@ -327,7 +357,7 @@ public final class AnnotationMetadataGenUtils {
                 .buildStatic(methodParameters -> StatementDef.doTry(
                     TYPE_ANNOTATION_CLASS_VALUE.instantiate(
                         CONSTRUCTOR_CLASS_VALUE_WITH_CLASS,
-                        ExpressionDef.constant(TypeDef.of(typeName))
+                        ExpressionDef.constant(classTypeDefOf(typeName))
                     ).returning()
                 ).doCatch(Throwable.class, exceptionVar -> TYPE_ANNOTATION_CLASS_VALUE.instantiate(
                     CONSTRUCTOR_CLASS_VALUE,
@@ -336,6 +366,38 @@ public final class AnnotationMetadataGenUtils {
         });
 
         return declaringType.invokeStatic(loadTypeGeneratorMethod);
+    }
+
+    private static boolean isAccessibleFrom(@Nullable VisitorContext visitorContext, String typeName, String packageName) {
+        if (visitorContext == null) {
+            return true;
+        }
+        ClassElement classElement = visitorContext.getClassElement(typeName).orElse(null);
+        while (classElement != null) {
+            if (!classElement.isPublic() && (classElement.isPrivate() || !classElement.getPackageName().equals(packageName))) {
+                return false;
+            }
+            classElement = classElement.getEnclosingType().orElse(null);
+        }
+        return true;
+    }
+
+    /**
+     * Builds a {@link ClassTypeDef} for an arbitrary, by-name class reference (e.g. an annotation
+     * member's class value), correctly flagging it as an inner (member) class when its binary name
+     * contains a {@code $} that isn't the leading character of the simple name - the JVM's own nested
+     * class separator - as opposed to a Micronaut-generated name, which always leads with {@code $}
+     * (e.g. {@code $Foo$Bar}) despite denoting a single, flat top-level class.
+     *
+     * @param typeName The fully qualified (binary) class name
+     * @return The class type definition
+     */
+    private static ClassTypeDef classTypeDefOf(String typeName) {
+        int simpleNameStart = typeName.lastIndexOf('.') + 1;
+        boolean isInner = simpleNameStart < typeName.length()
+            && typeName.charAt(simpleNameStart) != '$'
+            && typeName.indexOf('$', simpleNameStart + 1) != -1;
+        return ClassTypeDef.of(typeName, isInner);
     }
 
     private static void addAnnotationDefaults(List<StatementDef> statements,
