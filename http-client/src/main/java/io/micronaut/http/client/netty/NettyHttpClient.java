@@ -1188,6 +1188,9 @@ final class NettyHttpClient implements
      * @param requestURI         The URI of the request
      * @param requestContentType The request content type
      * @param permitsBody        Whether permits body
+     * @param channel            The channel
+     * @param outgoingHeaders    Headers added by the client that apply only to the outgoing
+     *                           netty request, so that the caller's request is not modified
      * @return The body
      * @throws HttpPostRequestEncoder.ErrorDataEncoderException if there is an encoder exception
      */
@@ -1196,11 +1199,12 @@ final class NettyHttpClient implements
         URI requestURI,
         MediaType requestContentType,
         boolean permitsBody,
-        Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        Channel channel,
+        HttpHeaders outgoingHeaders) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
         NettyByteBodyFactory byteBodyFactory = new NettyByteBodyFactory(channel);
         if (!request.getHeaders().contains(HttpHeaderNames.HOST)) {
-            request.getHeaders().set(HttpHeaderNames.HOST, getHostHeader(requestURI));
+            outgoingHeaders.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
         }
 
         if (permitsBody) {
@@ -1208,7 +1212,7 @@ final class NettyHttpClient implements
             if (body.isPresent()) {
                 if (!request.getHeaders().contains(HttpHeaderNames.CONTENT_TYPE)) {
                     MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
-                    request.getHeaders().set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+                    outgoingHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
                 }
             }
         }
@@ -1224,9 +1228,9 @@ final class NettyHttpClient implements
             boolean hasBody = body.isPresent();
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody && !isEncodedFormBody(body.get())) {
                 Object bodyValue = body.get();
-                return buildFormRequest(request, byteBodyFactory, r -> buildFormDataRequest(r, bodyValue));
+                return buildFormRequest(request, outgoingHeaders, byteBodyFactory, r -> buildFormDataRequest(r, bodyValue));
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody && !isEncodedFormBody(body.get())) {
-                return buildFormRequest(request, byteBodyFactory, r -> buildMultipartRequest(r, body.get()));
+                return buildFormRequest(request, outgoingHeaders, byteBodyFactory, r -> buildMultipartRequest(r, body.get()));
             } else {
                 ReadBuffer bodyContent;
                 if (hasBody) {
@@ -1586,6 +1590,7 @@ final class NettyHttpClient implements
                 URI requestURI = request.getUri();
                 boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
                 CloseableByteBody byteBody;
+                HttpHeaders outgoingHeaders = new DefaultHttpHeaders();
                 try {
                     byteBody = buildNettyRequest(
                         request,
@@ -1594,7 +1599,8 @@ final class NettyHttpClient implements
                             .getContentType()
                             .orElse(MediaType.APPLICATION_JSON_TYPE),
                         permitsBody,
-                        poolHandle.channel
+                        poolHandle.channel,
+                        outgoingHeaders
                     );
                 } catch (Exception e) {
                     // nothing was written yet, so the connection is still usable: return it to
@@ -1609,7 +1615,7 @@ final class NettyHttpClient implements
                 }
 
                 // send the raw request
-                return sendRawRequest(poolHandle, request, byteBody);
+                return sendRawRequest(poolHandle, request, byteBody, outgoingHeaders);
             })
             .flatMap(byteBodyResponse -> {
                 // handle redirects or map the response bytes
@@ -1659,12 +1665,14 @@ final class NettyHttpClient implements
      * @param poolHandle The pool handle to send the request on
      * @param request    The request to send
      * @param byteBody   The request body
+     * @param outgoingHeaders Headers to set on the outgoing netty request only
      * @return A mono containing the response
      */
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequest(
         ConnectionManager.PoolHandle poolHandle,
         io.micronaut.http.HttpRequest<?> request,
-        CloseableByteBody byteBody
+        CloseableByteBody byteBody,
+        HttpHeaders outgoingHeaders
     ) {
         poolHandle.touch();
         URI uri = request.getUri();
@@ -1672,9 +1680,18 @@ final class NettyHttpClient implements
         if (uri.getRawQuery() != null) {
             uriWithoutHost += "?" + uri.getRawQuery();
         }
-        HttpRequest nettyRequest = NettyHttpRequestBuilder.asBuilder(request)
-            .toHttpRequestWithoutBody()
-            .setUri(uriWithoutHost);
+        HttpRequest requestWithoutBody = NettyHttpRequestBuilder.asBuilder(request)
+            .toHttpRequestWithoutBody();
+        // the netty request may share its headers with the caller's request, so copy them before
+        // adding transport headers (Host, Content-Length, Connection...) to keep the caller's
+        // request unchanged and reusable
+        HttpRequest nettyRequest = new DefaultHttpRequest(
+            requestWithoutBody.protocolVersion(),
+            requestWithoutBody.method(),
+            uriWithoutHost,
+            requestWithoutBody.headers().copy()
+        );
+        nettyRequest.headers().setAll(outgoingHeaders);
 
         DelayedExecutionFlow<NettyClientByteBodyResponse> flow = DelayedExecutionFlow.create();
         // need to run the create() on the event loop so that pipeline modification happens synchronously
@@ -1900,29 +1917,30 @@ final class NettyHttpClient implements
 
     private CloseableByteBody buildFormRequest(
         MutableHttpRequest<?> request,
+        HttpHeaders outgoingHeaders,
         NettyByteBodyFactory bodyFactory,
         ThrowingFunction<HttpRequest, HttpPostRequestEncoder, HttpPostRequestEncoder.ErrorDataEncoderException> buildMethod
     ) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         // this function acts like a wrapper around HttpPostRequestEncoder. HttpPostRequestEncoder
         // takes a request + form data and transforms it to a request + bytes. Because we only want
-        // the bytes, we need to copy the data from the netty request back to the original
-        // MutableHttpRequest. This is just the Content-Type header, which sometimes gets an extra
+        // the bytes, we need to copy the data from the netty request into the
+        // outgoing headers. This is just the Content-Type header, which sometimes gets an extra
         // boundary specifier that we need.
 
         // build the mock netty request (only the content-type matters)
         HttpRequest nettyRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
         List<AsciiString> relevantHeaders = List.of(HttpHeaderNames.CONTENT_TYPE);
         for (AsciiString header : relevantHeaders) {
-            nettyRequest.headers().add(header, request.getHeaders().getAll(header));
+            nettyRequest.headers().add(header, outgoingHeaders.contains(header) ? outgoingHeaders.getAll(header) : request.getHeaders().getAll(header));
         }
 
         HttpPostRequestEncoder encoder = buildMethod.apply(nettyRequest);
         HttpRequest finalized = encoder.finalizeRequest();
         // copy back the content-type
         for (AsciiString header : relevantHeaders) {
-            request.getHeaders().remove(header);
+            outgoingHeaders.remove(header);
             for (String value : finalized.headers().getAll(header)) {
-                request.getHeaders().add(header, value);
+                outgoingHeaders.add(header, value);
             }
         }
         // return the body bytes
