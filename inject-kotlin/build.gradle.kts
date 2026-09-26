@@ -87,7 +87,6 @@ tasks {
 //        showStandardStreams = true
 //    }
         maxHeapSize = "3G"
-        forkEvery = 40
         maxParallelForks = 4
         // The annotation processing tests run short compilations: C2 costs more CPU than it saves
         jvmArgs("-XX:TieredStopAtLevel=1")
