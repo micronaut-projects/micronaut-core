@@ -240,15 +240,27 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @PreDestroy
     public void close() {
         for (HttpClient httpClient : unbalancedClients.values()) {
-            try {
-                httpClient.close();
-            } catch (Throwable e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down HTTP client: {}", e.getMessage(), e);
-                }
-            }
+            closeClient(httpClient);
         }
         unbalancedClients.clear();
+        // load-balanced clients (e.g. created via BeanContext#createBean(HttpClient, url)) also
+        // hold resources such as reference-counted SSL contexts, so shut them down as well
+        synchronized (balancedClients) {
+            for (HttpClient httpClient : balancedClients) {
+                closeClient(httpClient);
+            }
+            balancedClients.clear();
+        }
+    }
+
+    private static void closeClient(HttpClient httpClient) {
+        try {
+            httpClient.close();
+        } catch (Throwable e) {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Error shutting down HTTP client: {}", e.getMessage(), e);
+            }
+        }
     }
 
     @Override
@@ -557,8 +569,10 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         for (DefaultHttpClient client : unbalancedClients.values()) {
             client.connectionManager().refresh();
         }
-        for (DefaultHttpClient client : balancedClients) {
-            client.connectionManager().refresh();
+        synchronized (balancedClients) {
+            for (DefaultHttpClient client : balancedClients) {
+                client.connectionManager().refresh();
+            }
         }
     }
 
