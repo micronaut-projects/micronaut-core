@@ -61,3 +61,8 @@ tasks {
         from("$projectDir/src/main/groovy")
     }
 }
+
+// Run the whole corpus of tests at a type-check mode: ./gradlew :micronaut-inject-python-test:test -Ppython-ci -Dmicronaut.python.typecheck=error
+tasks.withType<Test>().configureEach {
+    System.getProperty("micronaut.python.typecheck")?.let { systemProperty("micronaut.python.typecheck", it) }
+}
