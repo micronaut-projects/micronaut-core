@@ -660,6 +660,13 @@ public class RequestLifecycle {
 
             // check if any argument binders are still waiting for data
             ExecutionFlow<?> routeWaitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
+            // usually the binders are already done at this point (e.g. the form fields were
+            // available). Continue on the completed flow then, so that the rest of the route
+            // does not have to go through the steps of a delayed flow.
+            ExecutionFlow<?> completed = routeWaitsFor.tryComplete();
+            if (completed != null) {
+                routeWaitsFor = completed;
+            }
             return routeWaitsFor.then(() -> {
                 if (frc != null) {
                     frc.stopDeadlockDetection();

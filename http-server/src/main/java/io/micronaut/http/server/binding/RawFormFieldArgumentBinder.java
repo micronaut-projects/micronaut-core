@@ -19,7 +19,7 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
@@ -27,13 +27,12 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
+import io.micronaut.http.server.multipart.FirstElementFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Mono;
 
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Binder for {@link RawFormField}.
@@ -66,22 +65,23 @@ public final class RawFormFieldArgumentBinder implements TypedRequestArgumentBin
         Argument<RawFormField> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        CompletableFuture<RawFormField> future = Mono.from(formFactory.get().getOrCreateCompleter(fchr)
-                .subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)))
-            .toFuture();
+        ExecutionFlow<RawFormField> flow = FirstElementFlow.first(formFactory.get().getOrCreateCompleter(fchr)
+                .subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)));
 
-        BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
+        FirstElementFlow.Settled<RawFormField> settled = FirstElementFlow.settle(flow);
+
+        BasicHttpAttributes.addRouteWaitsFor(source, settled.flow());
 
         return new PendingRequestBindingResult<>() {
 
             @Override
             public boolean isPending() {
-                return !future.isDone();
+                return !settled.isDone();
             }
 
             @Override
             public Optional<RawFormField> getValue() {
-                return Optional.ofNullable(future.getNow(null));
+                return settled.valueNow();
             }
         };
     }
