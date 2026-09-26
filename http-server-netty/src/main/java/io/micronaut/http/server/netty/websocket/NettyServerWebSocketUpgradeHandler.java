@@ -400,6 +400,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // intentionally empty: the replayed copy must not reach the HTTP request handler again
         }
     }
 
