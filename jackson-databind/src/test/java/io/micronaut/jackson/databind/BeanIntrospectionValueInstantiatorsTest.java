@@ -244,6 +244,7 @@ class BeanIntrospectionValueInstantiatorsTest {
     public record Delegating(String value) {
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
         public Delegating {
+            // only carries the creator annotation
         }
     }
 
