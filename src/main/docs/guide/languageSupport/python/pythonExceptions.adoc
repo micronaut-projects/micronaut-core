@@ -33,6 +33,26 @@ class TaskNotFoundProblem(AbstractThrowableProblem):
 
 The call above resolves to the `(URI, String, StatusType, String)` constructor of the base: the second and last arguments are strings, the third is an `HttpStatusType`, and `TYPE` (a call of a static method) accepts any parameter.
 
+== Python exception classes
+
+A Python class extending the builtin `Exception` is generated the same way, with `RuntimeException` as the Java base: Micronaut exception handlers and `@Error` methods declared for the Python type match it when it is raised from Python code, and Java code catches it as a `RuntimeException`. The Java message is `str(exception)`, whatever the arguments of the class's `__init__` or of `Exception`; a cause raised with `from` is the Java `getCause()`. A class without an `__init__` takes the arguments of `Exception` in Python, and a message, or nothing, in Java:
+
+[source,python]
+----
+class EmailAlreadyUsed(Exception):
+    """Raised when an email address is already registered."""
+
+
+@Singleton
+class UserService:
+    def create(self, data: UserCreate) -> User:
+        if self.users.existsByEmail(data.email):
+            raise EmailAlreadyUsed(data.email)
+        ...
+----
+
+A class extending a Python exception class of the compilation extends its generated class. The static compiler (see the static compilation documentation) raises and catches such classes in the Java bodies it generates.
+
 Once an exception has crossed into Java it is the generated Java class. Python code that calls back into Java, for example through an intercepted method, therefore catches the Java class rather than the Python class:
 
 [source,python]
