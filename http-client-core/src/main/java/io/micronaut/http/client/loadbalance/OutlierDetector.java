@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 
 /**
@@ -51,7 +52,7 @@ public final class OutlierDetector {
      * The URIs of the instances of the last selection: the maximum share of ejected instances
      * is a share of these, and only these are counted as ejected.
      */
-    private volatile Set<URI> members = Set.of();
+    private final AtomicReference<Set<URI>> members = new AtomicReference<>(Set.of());
 
     /**
      * @param configuration The configuration
@@ -99,7 +100,7 @@ public final class OutlierDetector {
      * again, which is not counted until the instance is a member again.
      */
     private void updateMembers(List<ServiceInstance> instances) {
-        Set<URI> current = members;
+        Set<URI> current = members();
         if (current.size() == instances.size()) {
             boolean same = true;
             for (ServiceInstance instance : instances) {
@@ -116,7 +117,7 @@ public final class OutlierDetector {
         for (ServiceInstance instance : instances) {
             uris.add(instance.getURI());
         }
-        members = uris;
+        members.set(uris);
         states.keySet().retainAll(uris);
     }
 
@@ -171,7 +172,7 @@ public final class OutlierDetector {
         state.consecutiveFailures = 0;
         state.consecutiveServerErrors = 0;
         synchronized (ejectionLock) {
-            Set<URI> current = members;
+            Set<URI> current = members();
             int total = current.size();
             if (total > 0) {
                 long ejected = 0;
@@ -234,5 +235,9 @@ public final class OutlierDetector {
                 tried = true;
             }
         }
+    }
+
+    private Set<URI> members() {
+        return Objects.requireNonNull(members.get());
     }
 }

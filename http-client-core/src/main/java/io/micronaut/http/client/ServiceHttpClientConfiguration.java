@@ -189,7 +189,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             @Nullable ServiceOutlierDetectionConfiguration outlierDetection,
             HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);
-        this.outlierDetection = Objects.requireNonNullElseGet(outlierDetection, ServiceOutlierDetectionConfiguration::new);
+        this.outlierDetection = outlierDetection != null ? outlierDetection : new ServiceOutlierDetectionConfiguration();
         this.serviceId = serviceId;
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);

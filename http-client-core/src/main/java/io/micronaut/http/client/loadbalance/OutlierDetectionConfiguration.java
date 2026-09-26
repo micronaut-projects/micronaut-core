@@ -147,7 +147,7 @@ public class OutlierDetectionConfiguration {
      * @param baseEjectionTime The base ejection time, positive
      */
     public void setBaseEjectionTime(Duration baseEjectionTime) {
-        if (baseEjectionTime == null || baseEjectionTime.isNegative() || baseEjectionTime.isZero()) {
+        if (baseEjectionTime.isNegative() || baseEjectionTime.isZero()) {
             throw new IllegalArgumentException("baseEjectionTime must be positive");
         }
         this.baseEjectionTime = baseEjectionTime;
@@ -167,7 +167,7 @@ public class OutlierDetectionConfiguration {
      * @param maxEjectionTime The maximum ejection time, positive
      */
     public void setMaxEjectionTime(Duration maxEjectionTime) {
-        if (maxEjectionTime == null || maxEjectionTime.isNegative() || maxEjectionTime.isZero()) {
+        if (maxEjectionTime.isNegative() || maxEjectionTime.isZero()) {
             throw new IllegalArgumentException("maxEjectionTime must be positive");
         }
         this.maxEjectionTime = maxEjectionTime;

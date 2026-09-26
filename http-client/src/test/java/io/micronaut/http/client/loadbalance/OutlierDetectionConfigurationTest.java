@@ -61,8 +61,8 @@ class OutlierDetectionConfigurationTest {
             try (RawHttpClient client = ctx.getBean(RawHttpClientRegistry.class).getRawClient(HttpVersionSelection.forClientConfiguration(configuration), "dead", null)) {
                 List<Integer> ports = new ArrayList<>();
                 for (int i = 0; i < 3; i++) {
-                    UnprocessedRequestException failure = Assertions.assertThrows(UnprocessedRequestException.class,
-                        () -> Mono.from(client.exchange(HttpRequest.GET("/"), null, null)).block());
+                    Mono<?> exchange = Mono.from(client.exchange(HttpRequest.GET("/"), null, null));
+                    UnprocessedRequestException failure = Assertions.assertThrows(UnprocessedRequestException.class, exchange::block);
                     ports.add(failure.getServiceInstance().orElseThrow().getPort());
                 }
                 // the first instance is ejected by its failure; ejecting the second too would exceed the maximum share

@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -32,8 +33,7 @@ import java.util.stream.Collectors;
 public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     protected final AtomicInteger index = new AtomicInteger(0);
-    @Nullable
-    private volatile OutlierDetector outlierDetector;
+    private final AtomicReference<@Nullable OutlierDetector> outlierDetector = new AtomicReference<>();
 
     /**
      * A load balancer that ignores the reported outcomes.
@@ -77,7 +77,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @since 5.3.0
      */
     public void setOutlierDetection(@Nullable OutlierDetectionConfiguration outlierDetection) {
-        this.outlierDetector = outlierDetection != null && outlierDetection.isEnabled() ? new OutlierDetector(outlierDetection) : null;
+        outlierDetector.set(outlierDetection != null && outlierDetection.isEnabled() ? new OutlierDetector(outlierDetection) : null);
     }
 
     /**
@@ -96,9 +96,9 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         List<ServiceInstance> availableServices = serviceInstances.stream()
             .filter(si -> si.getHealthStatus().equals(HealthStatus.UP))
             .collect(Collectors.toList());
-        OutlierDetector outlierDetector = this.outlierDetector;
-        if (outlierDetector != null) {
-            availableServices = outlierDetector.available(availableServices);
+        OutlierDetector detector = outlierDetector.get();
+        if (detector != null) {
+            availableServices = detector.available(availableServices);
         }
         int len = availableServices.size();
         if (len == 0) {
@@ -116,9 +116,9 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     @Override
     public void report(ServiceInstance serviceInstance, Outcome outcome) {
-        OutlierDetector outlierDetector = this.outlierDetector;
-        if (outlierDetector != null) {
-            outlierDetector.report(serviceInstance, outcome);
+        OutlierDetector detector = outlierDetector.get();
+        if (detector != null) {
+            detector.report(serviceInstance, outcome);
         }
     }
 
