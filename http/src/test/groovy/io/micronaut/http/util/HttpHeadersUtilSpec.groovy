@@ -148,7 +148,29 @@ class HttpHeadersUtilSpec extends Specification {
         HttpHeadersUtil.stripHopByHopHeaders(headers)
 
         then:
-        headers.names().toList().sort() == ["Accept", "X-Proxyish"]
+        headers.names().toList().sort() == ["Accept", "TE", "X-Proxyish"]
         headers.getAll("Accept") == ["text/plain", "application/json"]
+        // the trailers travel with the body, so the next hop may send them
+        headers.getAll("TE") == ["trailers"]
+    }
+
+    void "TE: #te is #result after the hop-by-hop headers are stripped"() {
+        given:
+        MutableHttpHeaders headers = HttpRequest.GET("/").headers
+        headers.add("TE", te)
+
+        when:
+        HttpHeadersUtil.stripHopByHopHeaders(headers)
+
+        then:
+        headers.getAll("TE") == result
+
+        where:
+        te                           | result
+        "trailers"                   | ["trailers"]
+        "gzip, trailers"             | ["trailers"]
+        "Trailers ;q=0.5, deflate"   | ["trailers"]
+        "gzip"                       | []
+        "trailersx, xtrailers"       | []
     }
 }

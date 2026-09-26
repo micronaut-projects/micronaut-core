@@ -44,6 +44,7 @@ import java.util.regex.Pattern;
 public final class HttpHeadersUtil {
     private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     private static final String PROXY_HEADER_PREFIX = "proxy-";
+    private static final String TE_TRAILERS = "trailers";
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
@@ -56,13 +57,15 @@ public final class HttpHeadersUtil {
      * Remove the hop-by-hop headers, as a proxy must before it relays a request or a response
      * (RFC 9110, section 7.6.1): {@code Connection} and the headers it lists, {@code Keep-Alive},
      * {@code Proxy-*}, {@code TE}, {@code Trailer}, {@code Transfer-Encoding} and
-     * {@code Upgrade}.
+     * {@code Upgrade}. {@code TE: trailers} is kept when {@code TE} lists it: the trailers of a
+     * message travel with its body, so the next hop may send them.
      *
      * @param headers The headers to change
      * @since 5.3.0
      */
     @Experimental
     public static void stripHopByHopHeaders(MutableHttpHeaders headers) {
+        boolean acceptsTrailers = acceptsTrailers(headers);
         for (String connection : headers.getAll(HttpHeaders.CONNECTION)) {
             int length = connection.length();
             int start = 0;
@@ -96,6 +99,39 @@ public final class HttpHeadersUtil {
                 headers.remove(name);
             }
         }
+        if (acceptsTrailers) {
+            headers.set(HttpHeaders.TE, TE_TRAILERS);
+        }
+    }
+
+    /**
+     * @return Whether a {@code TE} header lists {@code trailers}, e.g.
+     * {@code TE: gzip, trailers}, with or without a weight
+     */
+    private static boolean acceptsTrailers(HttpHeaders headers) {
+        for (String te : headers.getAll(HttpHeaders.TE)) {
+            int length = te.length();
+            int start = 0;
+            while (start < length) {
+                int comma = te.indexOf(',', start);
+                int end = comma < 0 ? length : comma;
+                int weight = te.indexOf(';', start);
+                int codingEnd = weight >= 0 && weight < end ? weight : end;
+                int from = start;
+                while (from < codingEnd && Character.isWhitespace(te.charAt(from))) {
+                    from++;
+                }
+                int to = codingEnd;
+                while (to > from && Character.isWhitespace(te.charAt(to - 1))) {
+                    to--;
+                }
+                if (to - from == TE_TRAILERS.length() && te.regionMatches(true, from, TE_TRAILERS, 0, TE_TRAILERS.length())) {
+                    return true;
+                }
+                start = end + 1;
+            }
+        }
+        return false;
     }
 
     /**

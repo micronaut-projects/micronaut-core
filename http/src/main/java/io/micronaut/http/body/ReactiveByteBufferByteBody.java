@@ -21,6 +21,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
@@ -191,6 +192,16 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
         @Override
         public void complete() {
             submit(super::complete);
+        }
+
+        @Override
+        public void complete(HttpHeaders trailers) {
+            submit(() -> super.complete(trailers));
+        }
+
+        @Override
+        protected void submitDeferred(Runnable task) {
+            submit(task);
         }
     }
 }
