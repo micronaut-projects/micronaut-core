@@ -94,21 +94,17 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         String requestPath = null;
         for (FilterEntry filterEntry : filterEntries) {
             final GenericHttpFilter filter = filterEntry.getFilter();
-            if (!GenericHttpFilter.isEnabled(filter)) {
-                continue;
-            }
-            if (filterEntry.hasMethods() && !anyMethodMatches(request.getMethod(), filterEntry.getFilterMethods())) {
-                continue;
-            }
-            if (filterEntry.hasPatterns()) {
+            boolean matches = GenericHttpFilter.isEnabled(filter)
+                && (!filterEntry.hasMethods() || anyMethodMatches(request.getMethod(), filterEntry.getFilterMethods()));
+            if (matches && filterEntry.hasPatterns()) {
                 if (requestPath == null) {
                     requestPath = StringUtils.prependUri("/", request.getUri().getPath());
                 }
-                if (!anyPatternMatches(requestPath, filterEntry.getPatterns(), filterEntry.getPatternStyle())) {
-                    continue;
-                }
+                matches = anyPatternMatches(requestPath, filterEntry.getPatterns(), filterEntry.getPatternStyle());
             }
-            filterList.add(filter);
+            if (matches) {
+                filterList.add(filter);
+            }
         }
         return filterList;
     }
