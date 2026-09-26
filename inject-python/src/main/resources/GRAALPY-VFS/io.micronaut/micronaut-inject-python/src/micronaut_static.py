@@ -97,6 +97,7 @@ class StaticPlanner:
         self.decisions = []
         self.bodies = []
         self.diagnostics = []
+        self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
 
     def plan(self, checker, visitor_context=None):
         """
@@ -127,11 +128,15 @@ class StaticPlanner:
         span = function_def.span()
         if not compiled:
             return self._record(qualified, span, "EXCLUDED", scope, [], 0)
-        java_layout = self._java_layout(module, class_def, function_def, node) if class_def is not None else None
+        bindings = None
+        if getattr(self.checker, "facts", None) is not None and node is not None:
+            unit = CheckUnit(module.source_path, function_def.name(), function_def, node, class_def, None, module)
+            bindings = Bindings(self.checker, unit)
+        java_layout = self._java_layout(module, class_def, function_def, node, bindings) if class_def is not None else None
         reasons = self._candidate_reasons(module, class_def, class_node, function_def, node, span, java_layout)
         if reasons:
             return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == "FUNCTION")
-        reasons = self._signature_reasons(module, class_def, function_def, node, span, java_layout)
+        reasons = self._signature_reasons(module, class_def, function_def, node, span, java_layout, bindings)
         statements = 0
         if node is not None:
             statements = len(node.body)
@@ -152,9 +157,12 @@ class StaticPlanner:
 
     def _lower(self, module, class_def, function_def, node, java_layout=None):
         """The compiled body of a candidate, or None with the reasons: what the inference flags, then what the lowering refuses."""
-        unit = CheckUnit(module.source_path, f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name(), function_def, node, class_def, None, module)
-        rules = JavaReceiverRules(self.checker, unit, silent=True)
-        rules.check()
+        # the type checker's own inference of the function when it ran, else a silent run of it
+        rules = getattr(self.checker, "inference", {}).get(id(node))
+        if rules is None:
+            unit = CheckUnit(module.source_path, f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name(), function_def, node, class_def, None, module)
+            rules = JavaReceiverRules(self.checker, unit, silent=True)
+            rules.check()
         if rules.problems:
             return None, list(rules.problems)
         class_model = self.checker.python_classes.of(class_def) if class_def is not None else None
@@ -193,7 +201,9 @@ class StaticPlanner:
                 reasons.append(("class-not-eligible", "a module-level function without an executable decorator is not a method of the generated class", span))
                 return reasons
         else:
-            ineligible = self._class_ineligibility(class_def, class_node)
+            if id(class_def) not in self._ineligibility:
+                self._ineligibility[id(class_def)] = self._class_ineligibility(class_def, class_node)
+            ineligible = self._ineligibility[id(class_def)]
             if ineligible is not None:
                 reasons.append(("class-not-eligible", ineligible, class_def.span() or span))
                 return reasons
@@ -269,7 +279,7 @@ class StaticPlanner:
         name = decorator.annotationName()
         return facts.describeAnnotation(name) if "." in name else None
 
-    def _java_layout(self, module, class_def, function_def, node):
+    def _java_layout(self, module, class_def, function_def, node, bindings=None):
         """
         The (parameter types, return type) of the Java method the function implements, when the
         hints spell it: each parameter hinted with the Java parameter type (or the Java parameter
@@ -283,8 +293,9 @@ class StaticPlanner:
         layouts = self._java_signatures(class_def, function_def.name(), len(parameters))
         if not layouts:
             return None
-        unit = CheckUnit(module.source_path, function_def.name(), function_def, node, class_def, None, module)
-        bindings = Bindings(self.checker, unit)
+        if bindings is None:
+            unit = CheckUnit(module.source_path, function_def.name(), function_def, node, class_def, None, module)
+            bindings = Bindings(self.checker, unit)
         hinted = []
         for argument in parameters:
             hint = argument.typeAnnotation()
@@ -373,18 +384,21 @@ class StaticPlanner:
             targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target] if isinstance(statement, ast.AnnAssign) else []
             if any(isinstance(target, ast.Name) and target.id == "__slots__" for target in targets):
                 return f"[{class_def.name()}] declares __slots__"
-        description = self.checker.facts.describe(class_def.qualifiedName()) if getattr(self.checker, "facts", None) is not None else None
-        if description is not None and description.anInterface():
-            return f"[{class_def.name()}] compiles to an interface"
+        facts = getattr(self.checker, "facts", None)
+        if facts is not None:
+            # the one fact needed of the class, asked without describing its members
+            is_interface = facts.isInterface(class_def.qualifiedName()) if hasattr(facts, "isInterface") else \
+                (facts.describe(class_def.qualifiedName()) is not None and facts.describe(class_def.qualifiedName()).anInterface())
+            if is_interface:
+                return f"[{class_def.name()}] compiles to an interface"
         return None
 
-    def _signature_reasons(self, module, class_def, function_def, node, span, java_layout=None):
+    def _signature_reasons(self, module, class_def, function_def, node, span, java_layout=None, bindings=None):
         """Why the signature has no fixed Java layout, and which hints resolve to no type."""
         reasons = []
-        bindings = None
         if function_def.name() in JAVA_RESERVED_NAMES:
             reasons.append(("java-reserved-name", f"method name [{function_def.name()}] cannot be declared in Java", span))
-        if getattr(self.checker, "facts", None) is not None and node is not None:
+        if bindings is None and getattr(self.checker, "facts", None) is not None and node is not None:
             unit = CheckUnit(module.source_path, function_def.name(), function_def, node, class_def, None, module)
             bindings = Bindings(self.checker, unit)
         for argument in function_def.arguments().arguments():

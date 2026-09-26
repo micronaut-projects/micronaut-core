@@ -59,6 +59,12 @@ import java.util.function.Supplier;
  */
 @Experimental
 public final class PythonAstParser {
+    /**
+     * A system property naming a file: when set, the Truffle CPU sampler profiles the Python side
+     * of the pipeline and writes a histogram of the Python functions to the file when the context
+     * closes. A development aid for the benchmarks; off otherwise.
+     */
+    public static final String CPU_SAMPLER_PROPERTY = "micronaut.python.cpusampler";
 
     public static final String PYTHON = "python";
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
@@ -84,6 +90,10 @@ public final class PythonAstParser {
     private static final Source PROCESSOR_SOURCE = Source.newBuilder(PYTHON, getSource(), "micronaut-processor-driver.py").cached(true).buildLiteral();
     private static final Source CALL_EXTRACTION_SOURCE = Source.newBuilder(PYTHON, getCallExtractionSource(), "micronaut-call-extraction.py").cached(true).buildLiteral();
     private static final Source TRANSFORM_SOURCE = Source.newBuilder(PYTHON, getTransformSource(), "micronaut-transform-driver.py").cached(true).buildLiteral();
+    // the caches the modules of one compilation share: made afresh per transform and per parse, since
+    // the class elements they hold belong to one javac task
+    private static final Source TRANSFORM_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_transform_caches = {}", "micronaut-transform-caches.py").cached(true).buildLiteral();
+    private static final Source PROCESSOR_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_processor_caches = {}", "micronaut-processor-caches.py").cached(true).buildLiteral();
     private static final Source TYPE_CHECKER_SOURCE = Source.newBuilder(PYTHON, """
         if type_check_enabled:
             from micronaut_typecheck import TypeChecker
@@ -125,10 +135,12 @@ public final class PythonAstParser {
         // across compilations, but an engine pins every context created on it until that context is
         // closed, and the optimizing runtime keeps compiled code per engine: the compile-time test
         // suite, which creates hundreds of parsers in one JVM, ran out of heap on GraalVM CE.
+        long started = PipelineTimings.start();
         this.context = buildTolerantly(classLoader, incremental);
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
+        PipelineTimings.record(PipelineTimings.CONTEXT, started);
     }
 
     /**
@@ -141,7 +153,7 @@ public final class PythonAstParser {
     }
 
     private static Context.Builder newContextBuilder(ClassLoader classLoader) {
-        return GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+        Context.Builder builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
                 .build())
@@ -149,6 +161,13 @@ public final class PythonAstParser {
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+        String samplerOutput = System.getProperty(CPU_SAMPLER_PROPERTY);
+        if (samplerOutput != null && !samplerOutput.isEmpty()) {
+            builder.option("cpusampler", "true")
+                .option("cpusampler.Output", "histogram")
+                .option("cpusampler.OutputFile", samplerOutput);
+        }
+        return builder;
     }
 
     /**
@@ -200,6 +219,7 @@ public final class PythonAstParser {
     }
 
     private PythonEnvironment parse(CharSequence sources, @Nullable Value tree, String packageName, VisitorContext visitorContext) {
+        context.eval(PROCESSOR_CACHES_SOURCE);
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
@@ -365,6 +385,19 @@ public final class PythonAstParser {
                                               VisitorContext visitorContext,
                                               TypeCheckConfiguration typeCheck,
                                               StaticCompilationConfiguration staticCompilation) {
+        long started = PipelineTimings.start();
+        try {
+            return parseTransformedTimed(transformed, srcDirs, visitorContext, typeCheck, staticCompilation);
+        } finally {
+            PipelineTimings.record(PipelineTimings.PARSE, started);
+        }
+    }
+
+    private PythonEnvironment parseTransformedTimed(List<TransformResult> transformed,
+                                                    List<String> srcDirs,
+                                                    VisitorContext visitorContext,
+                                                    TypeCheckConfiguration typeCheck,
+                                                    StaticCompilationConfiguration staticCompilation) {
         List<ParsedSource> sources = new ArrayList<>(transformed.size());
         List<Source> originals = new ArrayList<>(transformed.size());
         for (TransformResult result : transformed) {
@@ -411,7 +444,9 @@ public final class PythonAstParser {
             return List.of();
         }
         bindings.putMember("visitor_context", visitorContext);
+        long started = PipelineTimings.start();
         context.eval(TYPE_CHECK_SOURCE);
+        PipelineTimings.record(PipelineTimings.TYPE_CHECK, started);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
     }
@@ -433,7 +468,9 @@ public final class PythonAstParser {
             return StaticCompilationPlan.EMPTY;
         }
         bindings.putMember("visitor_context", visitorContext);
+        long started = PipelineTimings.start();
         context.eval(STATIC_PLAN_SOURCE);
+        PipelineTimings.record(PipelineTimings.PLAN, started);
         Value decisions = bindings.getMember("static_decisions");
         Value bodies = bindings.getMember("static_bodies");
         Value diagnostics = bindings.getMember("static_diagnostics");
@@ -453,6 +490,7 @@ public final class PythonAstParser {
     }
 
     private PythonEnvironment parseSources(List<ParsedSource> sources, List<String> srcDirs, VisitorContext visitorContext) {
+        context.eval(PROCESSOR_CACHES_SOURCE);
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
@@ -677,6 +715,7 @@ public final class PythonAstParser {
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, List<String> srcDirs, Source... pythonSource) {
         transformArtifacts.clear();
         Value bindings = context.getBindings(PYTHON);
+        context.eval(TRANSFORM_CACHES_SOURCE);
         bindings.putMember("python_source_dirs", srcDirs.toArray(String[]::new));
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
         Set<String> missingClassElements = new java.util.HashSet<>();
@@ -735,8 +774,10 @@ public final class PythonAstParser {
             bindings.putMember("package_name", sourceRoot.isEmpty() ? "" : getPackageNameOfSource(sourceRoot, source));
 
             Value result;
+            long started = PipelineTimings.start();
             try {
                 result = context.eval(TRANSFORM_SOURCE);
+                PipelineTimings.record(PipelineTimings.TRANSFORM, started);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
                 e.printStackTrace(new PrintWriter(stack));
@@ -867,7 +908,7 @@ public final class PythonAstParser {
             tree = parsed_tree if has_parsed_tree else ast.parse(src)
             visitor = MicronautAstVisitor(
                 callback, package_name, file_name, visitor_context, src_root,
-                source_path=source_path, source_text=src, type_checker=type_checker
+                source_path=source_path, source_text=src, type_checker=type_checker, caches=_mn_processor_caches
             )
             visitor.visit(tree)
             diagnostics = visitor.diagnostics
@@ -880,7 +921,7 @@ public final class PythonAstParser {
             from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
 
             tree = ast.parse(src)
-            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs, source_path=source_path, source_text=src)
+            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs, source_path=source_path, source_text=src, caches=_mn_transform_caches)
             transformed_tree = transformer.visit(tree)
             # The diagnostic runtime source is only read by tests and error reports, so it is
             # produced on demand instead of costing a parse, a transformer pass and an unparse per file.
