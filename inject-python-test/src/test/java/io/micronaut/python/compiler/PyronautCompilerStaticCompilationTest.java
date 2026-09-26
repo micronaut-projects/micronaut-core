@@ -128,6 +128,28 @@ class PyronautCompilerStaticCompilationTest {
     }
 
     @Test
+    void aStubWithCompiledBodiesBindsItsPythonObjectAndTracesWhenAsked(@TempDir Path directory) throws IOException {
+        Path output = Files.createDirectories(directory.resolve("output"));
+        PyronautCompiler.builder()
+            .pythonCode(SOURCE)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .options(List.of("-A" + StaticCompilationMode.TRACE_OPTION + "=true"))
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated;
+        try (var paths = Files.walk(output)) {
+            generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("PricingService.java")).findFirst().orElseThrow());
+        }
+        assertTrue(generated.contains("PythonStatic.entered(\"python.PricingService#total\")"), generated);
+        assertTrue(generated.contains("PythonStatic.bindCompiled(value, new python.PricingService.PyronautCompiled(value))"), generated);
+        assertTrue(generated.contains("public static final class PyronautCompiled"), generated);
+        assertTrue(generated.contains("private final Value self;"), generated);
+        assertEquals(2, generated.split("Compiled from ", -1).length - 1, generated);
+    }
+
+    @Test
     void strictModeFailsTheBuildForAnExplicitSwitchThatCannotBeHonoured() {
         RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
             .pythonCode(SOURCE)

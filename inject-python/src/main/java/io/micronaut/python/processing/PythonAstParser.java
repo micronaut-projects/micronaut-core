@@ -24,6 +24,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.staticcompile.Ir;
 import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
 import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
@@ -98,6 +99,10 @@ public final class PythonAstParser {
     private static final Source TYPE_CHECK_SOURCE = Source.newBuilder(PYTHON, """
         diagnostics = [] if type_checker is None else type_checker.check(visitor_context)
         """, "micronaut-typecheck-driver.py").cached(true).buildLiteral();
+    private static final Source DELEGATION_SOURCE = Source.newBuilder(PYTHON, """
+        from micronaut_static import apply_delegation
+        delegated = apply_delegation(runtime_tree, list(delegation_targets))
+        """, "micronaut-static-delegation-driver.py").cached(true).buildLiteral();
     private static final Source STATIC_PLAN_SOURCE = Source.newBuilder(PYTHON, """
         static_decisions = [] if static_planner is None else static_planner.plan(type_checker, visitor_context)
         static_bodies = [] if static_planner is None else list(static_planner.bodies)
@@ -773,6 +778,42 @@ public final class PythonAstParser {
             );
         }
         return results;
+    }
+
+    /**
+     * Rewrites the compiled functions of the runtime tree of a source to delegate to their Java
+     * bodies when the Python object is bound to its stub, keeping the original body as the
+     * fallback for objects created in Python. A rewritten tree needs runtime bytecode.
+     *
+     * @param transformResult The transformed source
+     * @param plan            The static compilation plan
+     * @return How many functions were rewritten
+     * @since 5.3.0
+     */
+    public int applyStaticDelegation(TransformResult transformResult, StaticCompilationPlan plan) {
+        TransformArtifacts artifacts = artifacts(transformResult);
+        String sourcePath = sourcePathOf(transformResult.originalSource());
+        List<String> targets = new ArrayList<>();
+        for (Ir.CompiledBody body : plan.bodies().values()) {
+            // the bodies declared in this source: a class of the same simple name in another package has its own
+            if (body.span() != null && !body.span().path().equals(sourcePath)) {
+                continue;
+            }
+            targets.add(body.className().substring(body.className().lastIndexOf('.') + 1) + "#" + body.methodName());
+        }
+        if (targets.isEmpty()) {
+            return 0;
+        }
+        Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("runtime_tree", artifacts.runtimeTree());
+        bindings.putMember("delegation_targets", targets.toArray(String[]::new));
+        context.eval(DELEGATION_SOURCE);
+        Value delegated = bindings.getMember("delegated");
+        int count = delegated == null ? 0 : delegated.asInt();
+        if (count > 0 && !artifacts.runtimeRequired()) {
+            transformArtifacts.put(transformResult, new TransformArtifacts(artifacts.tree(), artifacts.runtimeTree(), true));
+        }
+        return count;
     }
 
     PythonBytecodeCompiler.Result compileRuntimeBytecode(TransformResult transformResult,

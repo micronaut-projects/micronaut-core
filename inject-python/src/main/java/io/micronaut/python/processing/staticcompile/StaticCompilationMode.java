@@ -64,6 +64,12 @@ public enum StaticCompilationMode {
     public static final String ANNOTATIONS_OPTION = "micronaut.python.compile.static.annotations";
 
     /**
+     * The name of the annotation processor option that makes every compiled body count its entries
+     * in {@code PythonStatic.entries()}, for tests and diagnosis of what runs as Java.
+     */
+    public static final String TRACE_OPTION = "micronaut.python.compile.static.trace";
+
+    /**
      * @return The value of the option for this mode
      */
     public String optionValue() {
