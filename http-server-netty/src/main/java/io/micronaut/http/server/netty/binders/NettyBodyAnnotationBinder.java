@@ -124,24 +124,11 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         ByteBody body = nhr.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST);
         ExecutionFlow<? extends CloseableAvailableByteBody> buffered = InternalByteBody.bufferFlow(body);
 
-        return new PendingRequestBindingResult<>() {
+        var pending = new PendingRequestBindingResult<T>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
             @Nullable
             Optional<T> result;
-
-            {
-                // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
-                // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
-                BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm ->
-                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate(() -> {
-                        try {
-                            result = transform(nhr, context, imm);
-                            return ExecutionFlow.just(null);
-                        } catch (Throwable e) {
-                            return ExecutionFlow.error(e);
-                        }
-                    })));
-            }
+            boolean convertedToArgumentType;
 
             @SuppressWarnings("OptionalAssignedToNull")
             @Override
@@ -158,10 +145,34 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             public List<ConversionError> getConversionErrors() {
                 return context.getLastError().map(List::of).orElseGet(List::of);
             }
+
+            @Override
+            public boolean isConvertedToArgumentType() {
+                return convertedToArgumentType;
+            }
         };
+        // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
+        // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
+        BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm ->
+            PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate(() -> {
+                try {
+                    MessageBodyReader<T> reader = findReader(nhr, context);
+                    // A body reader produces the value for the complete argument, including type arguments
+                    pending.convertedToArgumentType = reader != null;
+                    pending.result = transform(nhr, context, reader, imm);
+                    return ExecutionFlow.just(null);
+                } catch (Throwable e) {
+                    return ExecutionFlow.error(e);
+                }
+            })));
+        return pending;
     }
 
     Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, AvailableByteBody imm) throws Throwable {
+        return transform(nhr, context, findReader(nhr, context), imm);
+    }
+
+    private @Nullable MessageBodyReader<T> findReader(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context) {
         MessageBodyReader<T> reader = null;
         final RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(nhr).orElse(null);
         if (routeInfo != null) {
@@ -171,6 +182,11 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (mediaType != null && (reader == null || !reader.isReadable(context.getArgument(), mediaType))) {
             reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
         }
+        return reader;
+    }
+
+    private Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, @Nullable MessageBodyReader<T> reader, AvailableByteBody imm) throws Throwable {
+        MediaType mediaType = nhr.getContentType().orElse(null);
         if (reader == null && nhr.hasFormBody()) {
             Map<String, List<CloseableByteBody>> bodies = new LinkedHashMap<>();
             for (RawFormField rff : toListNow(nhr.getRawFormFields(imm))) {
