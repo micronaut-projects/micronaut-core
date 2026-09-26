@@ -158,6 +158,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                 // an interim response, e.g. 103 Early Hints: the final response follows
                 listener.interimResponseReceived(ctx, msg);
                 nextState = new DiscardingInterimContent(this);
+            } else if (code == HttpResponseStatus.SWITCHING_PROTOCOLS.code() && listener.upgrade(ctx, msg)) {
+                // the connection now carries another protocol, and the listener took it over
+                transitionToState(ctx, this, AfterContent.INSTANCE);
+                if (msg instanceof HttpContent c) {
+                    c.release();
+                }
+                return;
             } else {
                 nextState = new BufferedContent(listener, msg);
             }
@@ -523,6 +530,21 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          * @return {@code true} iff this is a HEAD response
          */
         default boolean isHeadResponse() {
+            return false;
+        }
+
+        /**
+         * Called when the handler receives a {@code 101 Switching Protocols} response. A listener
+         * that takes the connection over for the new protocol removes this handler and the HTTP
+         * codec from the pipeline and returns {@code true}; the raw bytes that follow then reach
+         * the handlers it added. Returns {@code false} by default: the response is then read like
+         * any other.
+         *
+         * @param ctx      The handler context
+         * @param response The response
+         * @return Whether the listener took the connection over
+         */
+        default boolean upgrade(ChannelHandlerContext ctx, HttpResponse response) {
             return false;
         }
 

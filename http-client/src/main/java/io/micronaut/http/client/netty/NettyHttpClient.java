@@ -103,6 +103,7 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
@@ -153,6 +154,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
@@ -240,6 +242,16 @@ final class NettyHttpClient implements
      * {@link RawRequestOptions#isDecompress()}.
      */
     private static final String NO_DECOMPRESSION = "micronaut.http.client.raw.no-decompression";
+    /**
+     * Request attribute of a request that may switch the connection to another protocol, see
+     * {@link RawRequestOptions#isAllowUpgrade()}.
+     */
+    private static final String ALLOW_UPGRADE = "micronaut.http.client.raw.allow-upgrade";
+    /**
+     * Request attribute with the {@link RawRequestOptions#getActivityTimeout() activity timeout}
+     * of an upgraded connection.
+     */
+    private static final String ACTIVITY_TIMEOUT = "micronaut.http.client.raw.activity-timeout";
 
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1504,6 +1516,12 @@ final class NettyHttpClient implements
     }
 
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
+        if (options.isAllowUpgrade()) {
+            request.setAttribute(ALLOW_UPGRADE, Boolean.TRUE);
+        }
+        if (options.getActivityTimeout() != null) {
+            request.setAttribute(ACTIVITY_TIMEOUT, options.getActivityTimeout());
+        }
         if (!options.isFollowRedirects()) {
             request.setAttribute(NO_FOLLOW_REDIRECTS, Boolean.TRUE);
         }
@@ -1730,6 +1748,16 @@ final class NettyHttpClient implements
         }
 
         boolean expectContinue = HttpUtil.is100ContinueExpected(nettyRequest);
+        // the protocols the request offers, from all its Upgrade field lines
+        String requestedUpgrade = request.getAttribute(ALLOW_UPGRADE).isPresent() ? joinedValues(nettyRequest.headers(), HttpHeaderNames.UPGRADE) : null;
+        if (requestedUpgrade != null && poolHandle.http2) {
+            // a protocol switch takes the whole connection, which an HTTP/2 stream is not
+            byteBody.close();
+            poolHandle.release();
+            completeExceptionallySafe(sink, decorate(new HttpClientException("The request asks to upgrade the connection to '" + requestedUpgrade +
+                "', which needs an HTTP/1.1 connection, but the client connects to " + request.getUri().getHost() + " with HTTP/2")));
+            return;
+        }
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
         poolHandle.channel.attr(ResponseContentDecompressor.SKIP_DECOMPRESSION)
             .set(request.getAttribute(NO_DECOMPRESSION).isPresent() ? Boolean.TRUE : null);
@@ -1749,7 +1777,7 @@ final class NettyHttpClient implements
                 });
                 pipeline.addLast(streamWriter);
             }
-            prepareRequestPipeline(poolHandle, request, instance, sink, nettyRequest, expectContinue, length, streamWriter, byteBuf);
+            prepareRequestPipeline(poolHandle, request, instance, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf);
         } catch (Throwable t) {
             // the request was not written, but the pipeline may be half built: don't reuse the
             // connection, and make sure the pool handle is released and the caller sees the error
@@ -1808,6 +1836,7 @@ final class NettyHttpClient implements
         DelayedExecutionFlow<NettyClientByteBodyResponse> sink,
         HttpRequest nettyRequest,
         boolean expectContinue,
+        @Nullable String requestedUpgrade,
         OptionalLong length,
         @Nullable StreamWriter streamWriter,
         @Nullable ByteBuf byteBuf
@@ -1912,6 +1941,50 @@ final class NettyHttpClient implements
             }
 
             @Override
+            public boolean upgrade(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpResponse response) {
+                if (requestedUpgrade == null) {
+                    return false;
+                }
+                String accepted = joinedValues(response.headers(), HttpHeaderNames.UPGRADE);
+                if (accepted == null || !isOffered(accepted, requestedUpgrade)) {
+                    // the server switched to something else than what was asked: not a connection to relay
+                    fail(ctx, new HttpClientException("The server switched the connection to protocol '" + accepted + "', but '" + requestedUpgrade + "' was offered"));
+                    finish(ctx);
+                    return true;
+                }
+                responded.set(true);
+                // the connection belongs to the new protocol now, and is closed when that ends
+                poolHandle.taint();
+                if (sink.isCancelled()) {
+                    finish(ctx);
+                    return true;
+                }
+                ChannelPipeline pipeline = ctx.pipeline();
+                pipeline.remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
+                // a body still held for 100 Continue is not sent on the switched connection
+                dropHeldBody.run();
+                if (streamWriter != null) {
+                    streamWriter.cancel();
+                    pipeline.remove(streamWriter);
+                }
+                Duration activityTimeout = request.getAttribute(ACTIVITY_TIMEOUT, Duration.class).orElse(null);
+                if (activityTimeout != null) {
+                    pipeline.addLast(new IdleStateHandler(0, 0, activityTimeout.toNanos(), TimeUnit.NANOSECONDS));
+                }
+                RawDuplexHandler duplex = new RawDuplexHandler(poolHandle.channel(), poolHandle::release);
+                // in place before the codec goes: the bytes of the new protocol the codec read together with the
+                // 101 are passed on to the next handlers when it is removed, and must reach the duplex handler
+                pipeline.addLast(RawDuplexHandler.NAME, duplex);
+                for (String name : List.of(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC)) {
+                    if (pipeline.get(name) != null) {
+                        pipeline.remove(name);
+                    }
+                }
+                sink.complete(new NettyClientUpgradedResponse(response, duplex, conversionService));
+                return true;
+            }
+
+            @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
                 // the final response arrived before 100 Continue, e.g. 417 Expectation Failed: the
                 // server rejected the body, so it is not sent when the fallback timer fires later,
@@ -1991,7 +2064,9 @@ final class NettyHttpClient implements
         }
 
         if (!poolHandle.http2) {
-            if (poolHandle.canReturn()) {
+            if (requestedUpgrade != null) {
+                nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE);
+            } else if (poolHandle.canReturn()) {
                 nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
             } else {
                 nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -2327,6 +2402,46 @@ final class NettyHttpClient implements
                 "Cannot acquire connection: the acquire timeout of " + configuration.getConnectionPoolConfiguration().getAcquireTimeout().orElse(null) + " elapsed", failure);
         }
         return failure;
+    }
+
+    /**
+     * @return The values of all field lines of a header, joined as one list, or {@code null} if
+     * there is none
+     */
+    private static @Nullable String joinedValues(io.netty.handler.codec.http.HttpHeaders headers, CharSequence name) {
+        List<String> values = headers.getAll(name);
+        return values.isEmpty() ? null : String.join(",", values);
+    }
+
+    /**
+     * Whether the protocols a server switched to were offered: a client may offer several, e.g.
+     * {@code Upgrade: websocket, example/1}, and the server selects among them (RFC 9110, section
+     * 7.8). Tokens are compared ignoring case.
+     *
+     * @param selected The {@code Upgrade} list of the {@code 101} response
+     * @param offered  The {@code Upgrade} list of the request
+     * @return Whether every selected protocol was offered
+     */
+    static boolean isOffered(String selected, String offered) {
+        boolean any = false;
+        for (String token : selected.split(",")) {
+            String protocol = token.trim();
+            if (protocol.isEmpty()) {
+                continue;
+            }
+            any = true;
+            boolean found = false;
+            for (String candidate : offered.split(",")) {
+                if (candidate.trim().equalsIgnoreCase(protocol)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return any;
     }
 
     /**
