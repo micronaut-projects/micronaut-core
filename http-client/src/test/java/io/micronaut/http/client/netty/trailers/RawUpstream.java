@@ -22,7 +22,6 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.BlockingQueue;
@@ -147,10 +146,8 @@ final class RawUpstream implements AutoCloseable {
                         }
                     }
                 }
-            } catch (SocketException e) {
-                // reset by the client, or closed by the test
             } catch (IOException e) {
-                // closed
+                // reset by the client, or closed by the test
             }
             closedByClient.countDown();
         }

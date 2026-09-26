@@ -143,11 +143,11 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     @Override
     public void onComplete() {
-        BaseSharedBuffer sharedBuffer = java.util.Objects.requireNonNull(this.sharedBuffer);
+        BaseSharedBuffer buffer = java.util.Objects.requireNonNull(sharedBuffer);
         if (trailers == null) {
-            sharedBuffer.complete();
+            buffer.complete();
         } else {
-            sharedBuffer.complete(trailers);
+            buffer.complete(trailers);
         }
     }
 }

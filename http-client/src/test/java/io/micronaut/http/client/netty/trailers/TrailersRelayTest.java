@@ -262,6 +262,7 @@ public final class TrailersRelayTest {
             context.init(null, new TrustManager[]{new X509TrustManager() {
                 @Override
                 public void checkClientTrusted(X509Certificate[] chain, String authType) {
+                    // the test is the client, no client certificate is checked
                 }
 
                 @Override
@@ -405,8 +406,8 @@ public final class TrailersRelayTest {
                 requestReceived.countDown();
                 out.write("HTTP/1.1 200 OK\r\nContent-Type: application/grpc\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n".getBytes(StandardCharsets.US_ASCII));
                 out.flush();
-                CountDownLatch beforeTrailers = this.beforeTrailers;
-                if (beforeTrailers != null && !beforeTrailers.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                CountDownLatch latch = beforeTrailers;
+                if (latch != null && !latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     return;
                 }
                 out.write("0\r\ngrpc-status: 0\r\ngrpc-message: fine\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
