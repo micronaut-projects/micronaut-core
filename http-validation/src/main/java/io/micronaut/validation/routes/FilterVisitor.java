@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.CookieValue;
@@ -38,6 +39,7 @@ import io.micronaut.http.form.FileUpload;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
+import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
@@ -156,6 +158,17 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                 if (isServerRequestBodyType(parameterType)) {
                     if (!serverRequestFilter) {
                         context.fail("The body of the request (" + parameterType.getName() + ") can only be bound in a request filter method of a @ServerFilter", parameter);
+                        return;
+                    }
+                    continue;
+                }
+                if (parameterType.getName().equals(PathVariables.class.getName())) {
+                    if (!element.getDeclaringType().isAnnotationPresent(ServerFilter.class)) {
+                        context.fail("The path variables of the route (" + parameterType.getName() + ") can only be bound in a filter method of a @ServerFilter", parameter);
+                        return;
+                    }
+                    if (element.hasAnnotation(PreMatching.class)) {
+                        context.fail("A @PreMatching filter method runs before the request is routed and cannot bind the path variables of the route (" + parameterType.getName() + ")", parameter);
                         return;
                     }
                     continue;
