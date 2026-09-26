@@ -2093,7 +2093,7 @@ final class NettyHttpClient implements
                     completeExceptionallySafe(sink, e);
                 }, onSent);
             }
-            if (!prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf, retry, replayBody)) {
+            if (!prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, requestedUpgrade, length, streamWriter, byteBuf, retry, replayBody)) {
                 // the connection could not take the request, prepareRequestPipeline cleaned up
                 return;
             }
@@ -2179,7 +2179,6 @@ final class NettyHttpClient implements
         @Nullable LoadBalancerSelection selection,
         DelayedExecutionFlow<NettyClientByteBodyResponse> sink,
         HttpRequest nettyRequest,
-        boolean expectContinue,
         @Nullable String requestedUpgrade,
         OptionalLong length,
         @Nullable StreamWriter streamWriter,
@@ -2196,6 +2195,7 @@ final class NettyHttpClient implements
             }
         }
 
+        boolean expectContinue = HttpUtil.is100ContinueExpected(nettyRequest);
         AtomicBoolean responded = new AtomicBoolean();
 
         // whether the body is still held back for a 100 Continue; only touched on the event loop.
