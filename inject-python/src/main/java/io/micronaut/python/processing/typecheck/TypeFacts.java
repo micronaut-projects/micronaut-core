@@ -306,7 +306,13 @@ public final class TypeFacts {
         for (ParameterElement parameter : method.getParameters()) {
             parameterTypes.add(typeName(parameter.getType()));
         }
-        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getReturnType()));
+        boolean throwsChecked = false;
+        for (ClassElement thrown : method.getThrownTypes()) {
+            if (!thrown.isAssignable(RuntimeException.class) && !thrown.isAssignable(Error.class)) {
+                throwsChecked = true;
+            }
+        }
+        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getReturnType()), throwsChecked);
     }
 
     /**
@@ -329,7 +335,7 @@ public final class TypeFacts {
         boolean pythonDefined = PythonJavaTypes.isPythonClass(element);
         boolean annotation = element instanceof AnnotationElement || element.isAssignable(Annotation.class);
         if (!annotation) {
-            return new AnnotationDescription(element.getName(), false, pythonDefined, false, Map.of(), List.of());
+            return new AnnotationDescription(element.getName(), false, pythonDefined, false, false, Map.of(), List.of());
         }
         // an around or introduction binding applied to a class advises every method of the class,
         // whatever the annotation's own targets say
@@ -353,7 +359,8 @@ public final class TypeFacts {
         List<String> targets = element instanceof AnnotationElement annotationElement
             ? annotationElement.getTargets().stream().map(ElementType::name).sorted().toList()
             : List.of();
-        return new AnnotationDescription(element.getName(), true, pythonDefined, interceptorBinding, members, targets);
+        boolean validationConstraint = element.hasStereotype("jakarta.validation.Constraint") || "jakarta.validation.Valid".equals(element.getName());
+        return new AnnotationDescription(element.getName(), true, pythonDefined, interceptorBinding, validationConstraint, members, targets);
     }
 
     /**
@@ -426,8 +433,9 @@ public final class TypeFacts {
      * @param varargs        Whether the last parameter takes the remaining arguments
      * @param isStatic       Whether the method is static
      * @param returnType     The qualified name of the return type, {@code void} for none
+     * @param throwsChecked  Whether the method declares a checked exception
      */
-    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType) {
+    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked) {
 
         public MethodSignature {
             parameterTypes = List.copyOf(parameterTypes);
@@ -459,6 +467,8 @@ public final class TypeFacts {
      * @param pythonDefined      Whether the type is generated from a Python definition
      * @param interceptorBinding Whether the annotation binds around or introduction advice, which a
      *                           class applies to all of its methods
+     * @param validationConstraint Whether the annotation is a validation constraint or {@code Valid},
+     *                           which advises the method it is applied to with validation
      * @param members            The members by name
      * @param targets            The names of the {@link ElementType}s the annotation may be applied to;
      *                           empty when unknown
@@ -467,6 +477,7 @@ public final class TypeFacts {
                                         boolean annotation,
                                         boolean pythonDefined,
                                         boolean interceptorBinding,
+                                        boolean validationConstraint,
                                         Map<String, MemberDescription> members,
                                         List<String> targets) {
 
