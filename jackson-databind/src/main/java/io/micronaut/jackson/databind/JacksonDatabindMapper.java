@@ -366,28 +366,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         // the generator, with its output buffer, is created once for all values. A generator
         // puts a space between root values by default; the caller frames the values, so nothing
         // goes between them
-        ObjectWriter writer = createWriter(type).withRootValueSeparator("");
-        JsonGenerator generator = writer.createGenerator(outputStream);
-        return new JsonStreamWriter<>() {
-            @Override
-            public void write(@Nullable T value) throws IOException {
-                // each value is serialized in a context of its own, as writeValue does: the
-                // values are decoded independently, so the object ids seen while writing one
-                // value (JsonIdentityInfo) must not carry over to the next
-                writer.writeValue(generator, value);
-                // the generator buffers its output, and FLUSH_AFTER_WRITE_VALUE may be disabled
-                generator.flush();
-            }
-
-            @Override
-            public void close() throws IOException {
-                try {
-                    generator.close();
-                } finally {
-                    outputStream.close();
-                }
-            }
-        };
+        return new GeneratorStreamWriter<>(createWriter(type).withRootValueSeparator(""), outputStream);
     }
 
     @Override
@@ -476,6 +455,42 @@ public final class JacksonDatabindMapper implements JsonMapper {
     private record TypeCache<T>(Argument<?> type, @Nullable Class<?> view, T cachedValue) {
         boolean matches(Argument<?> type, @Nullable Class<?> view) {
             return this.view == view && this.type.equalsType(type);
+        }
+    }
+
+    /**
+     * A stream writer that owns one generator, and closes it with the stream.
+     *
+     * @param <T> The value type
+     */
+    private static final class GeneratorStreamWriter<T> implements JsonStreamWriter<T> {
+        private final ObjectWriter writer;
+        private final OutputStream outputStream;
+        private final JsonGenerator generator;
+
+        GeneratorStreamWriter(ObjectWriter writer, OutputStream outputStream) throws IOException {
+            this.writer = writer;
+            this.outputStream = outputStream;
+            this.generator = writer.createGenerator(outputStream);
+        }
+
+        @Override
+        public void write(@Nullable T value) throws IOException {
+            // each value is serialized in a context of its own, as writeValue does: the
+            // values are decoded independently, so the object ids seen while writing one
+            // value (JsonIdentityInfo) must not carry over to the next
+            writer.writeValue(generator, value);
+            // the generator buffers its output, and FLUSH_AFTER_WRITE_VALUE may be disabled
+            generator.flush();
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                generator.close();
+            } finally {
+                outputStream.close();
+            }
         }
     }
 }

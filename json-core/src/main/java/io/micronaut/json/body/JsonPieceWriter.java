@@ -119,12 +119,12 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
         }
 
         private OutputStream target() {
-            ReadBufferFactory.BufferingOutputStream buffer = this.buffer;
-            if (buffer == null) {
-                buffer = factory.outputStreamBuffer();
-                this.buffer = buffer;
+            ReadBufferFactory.BufferingOutputStream current = this.buffer;
+            if (current == null) {
+                current = factory.outputStreamBuffer();
+                this.buffer = current;
             }
-            return buffer.stream();
+            return current.stream();
         }
 
         @Override
@@ -144,23 +144,23 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
          * @throws IOException If the buffer cannot be finished
          */
         ReadBuffer cut() throws IOException {
-            ReadBufferFactory.BufferingOutputStream buffer = this.buffer;
-            if (buffer == null) {
+            ReadBufferFactory.BufferingOutputStream current = this.buffer;
+            if (current == null) {
                 return factory.createEmpty();
             }
             this.buffer = null;
-            return buffer.finishBuffer();
+            return current.finishBuffer();
         }
 
         /**
          * Drop the bytes written since the last cut.
          */
         void discard() {
-            ReadBufferFactory.BufferingOutputStream buffer = this.buffer;
-            if (buffer != null) {
+            ReadBufferFactory.BufferingOutputStream current = this.buffer;
+            if (current != null) {
                 this.buffer = null;
                 try {
-                    buffer.close();
+                    current.close();
                 } catch (IOException e) {
                     // the buffer is released either way
                 }

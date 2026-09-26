@@ -642,10 +642,10 @@ public abstract class ResponseLifecycle {
         }
 
         private void closePieceWriter() {
-            PieceWriter<Object> pieceWriter = this.pieceWriter;
-            if (pieceWriter != null) {
+            PieceWriter<Object> current = this.pieceWriter;
+            if (current != null) {
                 this.pieceWriter = null;
-                pieceWriter.close();
+                current.close();
             }
         }
     }
