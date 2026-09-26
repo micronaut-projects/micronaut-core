@@ -49,8 +49,15 @@ import java.util.function.Consumer;
  * {@link #dirty()}. The state management logic ensures that {@link #doSomeWork()} is called in a
  * serialized fashion (no concurrency or reentrancy) at least once after each {@link #dirty()}
  * call.
+ *
+ * @deprecated This is the connection pool of micronaut-core 4.0, kept for compatibility. It is
+ * only used when {@link HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion#V4_0} is
+ * selected explicitly, and will be removed in a future release. Use the default
+ * {@link HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion#V4_9} implementation
+ * ({@link Pool49}) instead.
  */
 @Internal
+@Deprecated(since = "5.3.0")
 final class Pool40 implements Pool {
     private final Pool.Listener listener;
     private final Logger log;
@@ -70,6 +77,7 @@ final class Pool40 implements Pool {
         this.log = log;
         this.connectionPoolConfiguration = connectionPoolConfiguration;
         this.group = group;
+        log.warn("The connection pool version V4_0 is deprecated and will be removed in a future release. Switch to the default pool version V4_9.");
     }
 
     @Override
