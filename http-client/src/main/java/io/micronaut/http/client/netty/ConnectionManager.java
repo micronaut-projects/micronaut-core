@@ -969,6 +969,13 @@ public class ConnectionManager {
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
         @Nullable
         NettyClientCustomizer bootstrappedCustomizer;
+
+        @Override
+        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+            // before the pipeline is built, so that the tracker stays first
+            TransportWriteTracker.addFirst(ctx.pipeline());
+            super.handlerAdded(ctx);
+        }
     }
 
     /**
@@ -1366,14 +1373,7 @@ public class ConnectionManager {
 
         @Override
         public Throwable wrapError(@Nullable Throwable error) {
-            HttpClientException wrapped;
-            if (error == null) {
-                // no failure observed, but channel closed
-                wrapped = new HttpClientException("Unknown connect error");
-            } else {
-                wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
-            }
-            return wrapped;
+            return NettyHttpClient.connectError(error);
         }
 
         @Override
@@ -1778,6 +1778,7 @@ public class ConnectionManager {
                         configuration.getReadTimeout().ifPresent(timeout ->
                             streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, new StreamReadTimeoutHandler(timeout, this)));
                         streamPipeline
+                            .addLast(new StreamResetHandler())
                             .addLast(new ChannelOutboundHandlerAdapter() {
                                 @Override
                                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {

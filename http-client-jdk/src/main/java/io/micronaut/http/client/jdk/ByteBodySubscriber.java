@@ -23,8 +23,11 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReactiveByteBufferByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
 import org.reactivestreams.Subscription;
 
+import java.io.EOFException;
+import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -88,7 +91,25 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     @Override
     public void onError(Throwable throwable) {
+        if (isTruncatedBody(throwable)) {
+            throwable = new ResponseClosedException("Connection closed before the response body was received completely", true);
+        }
         defer.onError(throwable);
+    }
+
+    /**
+     * Whether the JDK client reports a connection closed before the body was complete: an EOF, or
+     * its messages for a fixed-length or a chunked body that ended early.
+     */
+    private static boolean isTruncatedBody(Throwable throwable) {
+        if (throwable instanceof EOFException) {
+            return true;
+        }
+        if (throwable instanceof IOException) {
+            String message = throwable.getMessage();
+            return message != null && (message.startsWith("fixed content-length:") || message.startsWith("chunked transfer encoding"));
+        }
+        return false;
     }
 
     @Override
