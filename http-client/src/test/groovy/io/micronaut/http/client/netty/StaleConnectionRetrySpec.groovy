@@ -5,8 +5,10 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientException
+import io.micronaut.http.client.exceptions.UnprocessedRequestException
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
+import io.netty.channel.Channel
 import reactor.core.Disposable
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -18,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -199,6 +202,103 @@ class StaleConnectionRetrySpec extends Specification {
         def e = thrown(HttpClientException)
         e.message.contains('Connection closed before response was received')
         server.requests.findAll { it.path == '/second' }.size() == 2
+    }
+
+    void "a request whose reused connection is found closed when it is written is retried on a new connection"() {
+        given: "a connection that closes right before the next request on it is written, as when the client only sees the close of the idle connection by then"
+        AtomicBoolean closeBeforeWrite = new AtomicBoolean()
+        ctx.getBean(NettyClientCustomizer.Registry).register(new NettyClientCustomizer() {
+            @Override
+            NettyClientCustomizer specializeForChannel(Channel channel, NettyClientCustomizer.ChannelRole role) {
+                return new NettyClientCustomizer() {
+                    @Override
+                    void onRequestPipelineBuilt() {
+                        if (closeBeforeWrite.compareAndSet(true, false)) {
+                            channel.close()
+                        }
+                    }
+                }
+            }
+        })
+        start { int connection, int requestOnConnection -> true }
+        ByteBuf body = Unpooled.copiedBuffer('hello', StandardCharsets.UTF_8)
+
+        expect:
+        exchange(HttpRequest.GET('/first')) == 'ok /first'
+
+        when:
+        closeBeforeWrite.set(true)
+        String response = exchange(HttpRequest.PUT('/put', body).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then: "the request never reached the closed connection, and is sent once on a new connection with its body"
+        response == 'ok /put'
+        !closeBeforeWrite.get()
+        server.requests*.toString() == ['0/0 GET /first', '1/0 PUT /put hello']
+        server.connections.get() == 2
+        waitFor { body.refCnt() == 0 }
+    }
+
+    void "a retry whose new connection cannot be opened fails with the connect error"() {
+        given: "a server that stops listening, then closes the connection instead of answering its second request"
+        start { int connection, int requestOnConnection ->
+            if (requestOnConnection == 0) {
+                return true
+            }
+            server.serverSocket.close()
+            return false
+        }
+
+        expect:
+        exchange(HttpRequest.GET('/first')) == 'ok /first'
+
+        when:
+        exchange(HttpRequest.GET('/second'))
+
+        then: "the retry reports that no connection could be opened"
+        def e = thrown(UnprocessedRequestException)
+        e.reason == UnprocessedRequestException.Reason.CONNECT
+        server.requests*.toString() == ['0/0 GET /first', '0/1 GET /second']
+        server.connections.get() == 1
+    }
+
+    void "a retry is sent on another idle pooled connection of the same event loop"() {
+        given: "a single event loop, two pooled connections, and a server that closes the first connection that gets a second request"
+        ApplicationContext singleLoopCtx = ApplicationContext.run([
+                'micronaut.http.client.read-timeout': '10s',
+                'micronaut.netty.event-loops.default.num-threads': 1,
+        ])
+        CountDownLatch bothArrived = new CountDownLatch(2)
+        AtomicBoolean closedOne = new AtomicBoolean()
+        start(singleLoopCtx) { int connection, int requestOnConnection ->
+            if (requestOnConnection == 0) {
+                bothArrived.countDown()
+                // hold the answer so that the client opens a second connection
+                bothArrived.await(10, TimeUnit.SECONDS)
+                return true
+            }
+            return !closedOne.compareAndSet(false, true)
+        }
+        assert Flux.merge(
+                Flux.from(client.retrieve(HttpRequest.GET('/a'), String)),
+                Flux.from(client.retrieve(HttpRequest.GET('/b'), String))
+        ).collectList().block().toSorted() == ['ok /a', 'ok /b']
+        Thread.sleep(100)
+
+        when:
+        String response = exchange(HttpRequest.PUT('/put', 'hello').contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then: "the request is sent again on the other pooled connection, without opening a new one"
+        response == 'ok /put'
+        def attempts = server.requests.findAll { it.path == '/put' }
+        attempts*.index == [1, 1]
+        attempts*.connection.toSet().size() == 2
+        attempts*.body == ['hello', 'hello']
+        server.connections.get() == 2
+
+        cleanup:
+        client?.close()
+        client = null
+        singleLoopCtx.close()
     }
 
     void "cancelling a retried request while its new connection is pending releases the request body"() {
