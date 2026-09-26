@@ -24,8 +24,10 @@ import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import jakarta.inject.Singleton;
@@ -290,7 +292,8 @@ public final class UpgradeRelayTest {
         private final RawHttpClient client;
         private final UpstreamAddress upstream;
 
-        Relay(RawHttpClient client, UpstreamAddress upstream) {
+        // the upstream is a plain HTTP/1.1 socket, even when the suite configures the client for HTTP/2
+        Relay(@Client(plaintextMode = HttpVersionSelection.PlaintextMode.HTTP_1) RawHttpClient client, UpstreamAddress upstream) {
             this.client = client;
             this.upstream = upstream;
         }
