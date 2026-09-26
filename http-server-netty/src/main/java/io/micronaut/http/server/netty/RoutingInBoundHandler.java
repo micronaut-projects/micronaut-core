@@ -98,10 +98,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final Supplier<Executor> requestEventExecutorSupplier;
     final boolean multipartEnabled;
     final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
-    @Nullable
-    ExecutorService ioExecutor;
-    @Nullable
-    Executor requestEventExecutor;
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher;
     final RouteExecutor routeExecutor;
@@ -115,8 +111,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
     /**
      * @param serverConfiguration               The Netty HTTP server configuration
      * @param embeddedServerContext             The embedded server context
-     * @param ioExecutor                        The IO executor
-     * @param requestEventExecutor              The request event executor
+     * @param ioExecutor                        The IO executor supplier, must be memoized
+     * @param requestEventExecutor              The request event executor supplier, must be memoized
      * @param terminateEventPublisher           The terminate event publisher
      * @param receivedPublisher                 The received publisher
      * @param conversionService                 The conversion service
@@ -130,6 +126,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher, ConversionService conversionService) {
         this.staticResourceResolver = embeddedServerContext.getStaticResourceResolver();
         this.messageBodyHandlerRegistry = embeddedServerContext.getMessageBodyHandlerRegistry();
+        // Memoization (thread-safe, lazy, evaluated at most once) is done by the caller via SupplierUtil.memoized
         this.ioExecutorSupplier = ioExecutor;
         this.requestEventExecutorSupplier = requestEventExecutor;
         this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
@@ -402,31 +399,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     ExecutorService getIoExecutor() {
-        ExecutorService executor = this.ioExecutor;
-        if (executor == null) {
-            synchronized (this) { // double check
-                executor = this.ioExecutor;
-                if (executor == null) {
-                    executor = this.ioExecutorSupplier.get();
-                    this.ioExecutor = executor;
-                }
-            }
-        }
-        return executor;
+        return ioExecutorSupplier.get();
     }
 
     Executor getRequestEventExecutor() {
-        Executor executor = this.requestEventExecutor;
-        if (executor == null) {
-            synchronized (this) { // double check
-                executor = this.requestEventExecutor;
-                if (executor == null) {
-                    executor = this.requestEventExecutorSupplier.get();
-                    this.requestEventExecutor = executor;
-                }
-            }
-        }
-        return executor;
+        return requestEventExecutorSupplier.get();
     }
 
     private void closeConnectionIfError(HttpResponse<?> message, HttpRequest<?> request, OutboundAccess outboundAccess) {
