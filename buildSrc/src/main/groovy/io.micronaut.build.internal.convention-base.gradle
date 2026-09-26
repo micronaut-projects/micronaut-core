@@ -32,6 +32,11 @@ micronautCore.documented.convention(true)
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     jvmArgs '-Xmx2048m'
+    if (!project.path.contains("python")) {
+        // Test JVMs are short-lived: C2 compilations cost more CPU than they save, and CI runs out of
+        // CPU. The Python tests keep the top tier, which also compiles the GraalPy guest code.
+        jvmArgs '-XX:TieredStopAtLevel=1'
+    }
     systemProperty "micronaut.cloud.platform", "OTHER"
     jvmArgs "--enable-preview"
 }

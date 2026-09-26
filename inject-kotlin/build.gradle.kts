@@ -87,7 +87,6 @@ tasks {
 //        showStandardStreams = true
 //    }
         maxHeapSize = "3G"
-        forkEvery = 40
         maxParallelForks = 4
     }
 }
