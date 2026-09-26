@@ -32,6 +32,7 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.util.ReferenceCountUtil;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -336,7 +337,22 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             }
             this.demand = newDemand;
             if (oldDemand <= 0 && newDemand > 0) {
-                streamingContext.read();
+                requestRead();
+            }
+        }
+
+        /**
+         * Request more data from the channel. On an HTTP/2 stream, the read also returns the
+         * consumed bytes to the flow control window, but while a read is already pending, netty
+         * only writes that WINDOW_UPDATE and does not flush it. When the consumption is signalled
+         * outside the read loop of the connection (e.g. later on the event loop, or from another
+         * thread), nothing else flushes it, and the peer stays blocked on the exhausted window.
+         */
+        private void requestRead() {
+            streamingContext.read();
+            if (streamingContext.channel() instanceof Http2StreamChannel) {
+                // a no-op if there is nothing to flush, or if the connection flushes after its read
+                streamingContext.flush();
             }
         }
 
@@ -370,7 +386,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             long oldDemand = demand;
             demand = Long.MAX_VALUE;
             if (oldDemand <= 0 && state == this) {
-                streamingContext.read();
+                requestRead();
             }
         }
     }

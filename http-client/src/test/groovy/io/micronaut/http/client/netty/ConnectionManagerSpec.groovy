@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory
+import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ReadBuffer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -37,6 +38,7 @@ import io.netty.channel.ChannelInitializer
 import io.netty.channel.ChannelPromise
 import io.netty.channel.EventLoop
 import io.netty.channel.ServerChannel
+import io.netty.channel.WriteBufferWaterMark
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
@@ -82,7 +84,9 @@ import jakarta.inject.Singleton
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.function.Executable
 import org.spockframework.runtime.model.parallel.ExecutionMode
+import org.reactivestreams.Subscription
 import reactor.core.Disposable
+import reactor.core.publisher.BaseSubscriber
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Execution
@@ -170,6 +174,69 @@ class ConnectionManagerSpec extends Specification {
         conn.testStreamingResponse(r1)
 
         assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 streaming window update is flushed when consumption is signalled after the read'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        long received = 0
+        boolean complete = false
+        BaseSubscriber<ByteBuffer<?>> subscriber = new BaseSubscriber<ByteBuffer<?>>() {
+            @Override
+            protected void hookOnSubscribe(Subscription subscription) {
+                // no demand yet: the consumer is slow
+            }
+
+            @Override
+            protected void hookOnNext(ByteBuffer<?> value) {
+                received += value.readableBytes()
+            }
+
+            @Override
+            protected void hookOnComplete() {
+                complete = true
+            }
+        }
+        Flux.from(client.dataStream(HttpRequest.GET('https://example.com/foo'))).subscribe(subscriber)
+        conn.exchangeSettings()
+        conn.advance()
+        Http2HeadersFrame request = conn.serverChannel.readInbound()
+
+        int frameSize = 16384
+        int frames = 16
+        def responseHeaders = new DefaultHttp2Headers()
+        responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
+        conn.serverChannel.write(new DefaultHttp2HeadersFrame(responseHeaders, false).stream(request.stream()))
+        for (int i = 0; i < frames; i++) {
+            conn.serverChannel.write(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(new byte[frameSize]), i == frames - 1).stream(request.stream()))
+        }
+        // the server can only send as much as the flow control window of the client allows. All
+        // of it arrives in one read, so the client has a read pending when it has consumed it
+        conn.serverChannel.config().setWriteBufferWaterMark(new WriteBufferWaterMark(1 << 20, 1 << 21))
+        conn.serverChannel.flush()
+        conn.advance()
+
+        when:
+        // the consumer only now asks for the data, outside the read of the connection
+        subscriber.request(Long.MAX_VALUE)
+        conn.advance()
+
+        then:
+        // the window update reached the server, which sent the rest
+        received == (long) frameSize * frames
+        complete
 
         cleanup:
         client.close()
