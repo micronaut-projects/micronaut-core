@@ -1126,7 +1126,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (canHaveBody(response.status())) {
                 if (!headResponse) {
-                    response.headers().set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
+                    ContentLengthValues.set(response.headers(), response.content().readableBytes());
                 }
             } else {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
@@ -1148,7 +1148,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (expectedLength.isPresent()) {
                     response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                     if (canHaveBody(response.status())) {
-                        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, expectedLength.getAsLong());
+                        ContentLengthValues.set(response.headers(), expectedLength.getAsLong());
                     } else {
                         response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                     }

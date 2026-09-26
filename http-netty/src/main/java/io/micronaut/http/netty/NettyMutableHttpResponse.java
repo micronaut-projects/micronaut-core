@@ -44,6 +44,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpHeadersFactory;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
@@ -82,7 +83,8 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     private final ConversionService conversionService;
     @Nullable
     private MutableConvertibleValues<Object> attributes;
-    private final BodyConvertor bodyConvertor = newBodyConvertor();
+    @Nullable
+    private BodyConvertor bodyConvertor;
     @Nullable
     private MessageBodyWriter<B> messageBodyWriter;
 
@@ -159,7 +161,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         this.conversionService = conversionService;
 
         if (nettyHeaders == null) {
-            nettyHeaders = new DefaultHttpHeaders(false);
+            nettyHeaders = new ResponseHeaders();
         }
         this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
@@ -333,6 +335,11 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+        BodyConvertor bodyConvertor = this.bodyConvertor;
+        if (bodyConvertor == null) {
+            bodyConvertor = newBodyConvertor();
+            this.bodyConvertor = bodyConvertor;
+        }
         return bodyConvertor.convert(conversionContext, body);
     }
 
@@ -352,7 +359,10 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
                 buf.release();
             }
             setBody(body);
-            bodyConvertor.cleanup();
+            BodyConvertor bodyConvertor = this.bodyConvertor;
+            if (bodyConvertor != null) {
+                bodyConvertor.cleanup();
+            }
         }
         return (MutableHttpResponse<T>) this;
     }
@@ -484,6 +494,21 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             nextConvertor = null;
         }
 
+    }
+
+    /**
+     * The headers of a response created without headers. A response carries a handful of
+     * headers, so the hash table starts with 8 buckets instead of the 16 used by
+     * {@link DefaultHttpHeaders}. The table still grows by chaining, and names and values are
+     * validated exactly as by {@code new DefaultHttpHeaders(false)}.
+     */
+    private static final class ResponseHeaders extends DefaultHttpHeaders {
+        private static final DefaultHttpHeadersFactory NO_VALIDATION = DefaultHttpHeadersFactory.headersFactory().withValidation(false);
+        private static final int SIZE_HINT = 8;
+
+        ResponseHeaders() {
+            super(NO_VALIDATION.getNameValidator(), NO_VALIDATION.getValueValidator(), SIZE_HINT);
+        }
     }
 
 }
