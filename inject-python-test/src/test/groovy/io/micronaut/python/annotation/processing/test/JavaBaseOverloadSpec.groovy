@@ -55,6 +55,61 @@ class ListRenderer(OverloadedBase):
         context?.close()
     }
 
+    void "a type hint naming a subtype of one overload's parameter type selects that overload"() {
+        given:
+        def pythonCode = '''
+from java.util import ArrayList
+from jakarta.inject import Singleton
+from io.micronaut.python.annotation.processing.test.javabases import OverloadedBase
+
+
+@Singleton
+class SubtypeRenderer(OverloadedBase):
+
+    def render(self, values: ArrayList[str]) -> str:
+        return "python:" + "|".join(values)
+'''
+        when: 'no overload names ArrayList, one names a supertype of it'
+        def context = buildContext(pythonCode)
+        OverloadedBase bean = getBean(context, "python.SubtypeRenderer") as OverloadedBase
+
+        then: 'the stub declares the overload the hint is assignable to, not the hinted subtype'
+        bean.class.declaredMethods.findAll { it.name == "render" && !it.bridge }*.parameterTypes == [[List] as Class[]]
+
+        and: 'the selected overload runs the Python method'
+        bean.render(["a", "b"]) == "python:a|b"
+
+        and: 'the other overload keeps the base implementation, which delegates to the Python one'
+        bean.render("abc") == "python:abc"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a type hint assignable to several overloads is a compile error"() {
+        when: 'ArrayList names neither overload exactly and is assignable to both'
+        buildContext('''
+from java.util import ArrayList
+from jakarta.inject import Singleton
+from io.micronaut.python.annotation.processing.test.javabases import AssignableOverloadedBase
+
+
+@Singleton
+class AmbiguousAcceptor(AssignableOverloadedBase):
+
+    def accept(self, values: ArrayList[str]) -> str:
+        return "python"
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('Python method [accept] of class [AmbiguousAcceptor] matches several overloads of [io.micronaut.python.annotation.processing.test.javabases.AssignableOverloadedBase]')
+        e.message.contains('accept(java.util.Collection)')
+        e.message.contains('accept(java.lang.Iterable)')
+        e.message.contains('The type hints of the Python method are [accept(values: java.util.ArrayList)]')
+        e.message.contains('narrow the type hint')
+    }
+
     void "a Python method without hints for an overloaded base method is a compile error"() {
         when:
         buildContext('''
@@ -69,11 +124,32 @@ class AnyRenderer(OverloadedBase):
         return "python"
 ''')
 
-        then:
+        then: 'the message names no match, the overloads that exist and the hints that were seen'
         def e = thrown(RuntimeException)
-        e.message.contains('Python method [render] of class [AnyRenderer] matches several overloads of [io.micronaut.python.annotation.processing.test.javabases.OverloadedBase]')
+        e.message.contains('Python method [render] of class [AnyRenderer] matches none of the overloads of [io.micronaut.python.annotation.processing.test.javabases.OverloadedBase]')
         e.message.contains('render(java.lang.String)')
         e.message.contains('render(java.util.List)')
+        e.message.contains('The type hints of the Python method are [render(values)]')
         e.message.contains('type hint')
+    }
+
+    void "a type hint naming an unrelated type matches none of the overloads"() {
+        when:
+        buildContext('''
+from jakarta.inject import Singleton
+from io.micronaut.python.annotation.processing.test.javabases import OverloadedBase
+
+
+@Singleton
+class UnrelatedRenderer(OverloadedBase):
+
+    def render(self, values: int) -> str:
+        return "python"
+''')
+
+        then: 'the message names no match and the hint that was seen'
+        def e = thrown(RuntimeException)
+        e.message.contains('Python method [render] of class [UnrelatedRenderer] matches none of the overloads of [io.micronaut.python.annotation.processing.test.javabases.OverloadedBase]')
+        e.message.contains('The type hints of the Python method are [render(values: ')
     }
 }
