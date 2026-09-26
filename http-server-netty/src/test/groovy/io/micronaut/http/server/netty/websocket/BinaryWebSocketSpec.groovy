@@ -245,6 +245,11 @@ class BinaryWebSocketSpec extends Specification {
         conditions.eventually {
             fred.pingReplies.contains('foo') && fred.pingReplies.size() == 1
         }
+
+        cleanup:
+        fred?.close()
+        wsClient?.close()
+        embeddedServer.close()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6069')

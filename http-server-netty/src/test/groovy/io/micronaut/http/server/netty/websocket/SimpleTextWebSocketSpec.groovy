@@ -284,6 +284,9 @@ class SimpleTextWebSocketSpec extends Specification {
         then:
         def ex = thrown(WebSocketClientException)
         ex.message.contains("Invalid handshake response getStatus: 200 OK")
+
+        cleanup:
+        embeddedServer.close()
     }
 
     void "test filters are invoked for web socket requests that don't match any routes"() {
@@ -298,6 +301,9 @@ class SimpleTextWebSocketSpec extends Specification {
         def ex = thrown(WebSocketClientException)
         ex.message.contains("Invalid handshake response getStatus: 404 Not Found")
         embeddedServer.applicationContext.getBean(WebSocketContextValidationFilter).executeCount.get() == 1
+
+        cleanup:
+        embeddedServer.close()
     }
 
     @Singleton

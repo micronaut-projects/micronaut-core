@@ -197,6 +197,9 @@ class H2cSpec extends Specification {
 
         expect:
         http1Client.toBlocking().exchange(HttpRequest.PUT("http://localhost:${embeddedServer.port}/h2c/put", "foo"), String).body() == 'Example response: foo'
+
+        cleanup:
+        http1Client.close()
     }
 
     void 'test using direct netty http2 client: body in initial request'() {
