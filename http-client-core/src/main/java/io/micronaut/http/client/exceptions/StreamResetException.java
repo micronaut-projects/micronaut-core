@@ -23,6 +23,7 @@ package io.micronaut.http.client.exceptions;
  * @author Denis Stepanov
  * @since 5.3.0
  */
+@SuppressWarnings("java:S110") // the hierarchy depth comes from HttpClientException
 public class StreamResetException extends HttpClientException {
     private final long errorCode;
 
