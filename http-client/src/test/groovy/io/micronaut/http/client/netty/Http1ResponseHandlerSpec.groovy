@@ -11,7 +11,9 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelOutboundHandlerAdapter
+import io.netty.channel.DefaultEventLoopGroup
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.channel.local.LocalChannel
 import io.netty.handler.codec.DecoderResult
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
@@ -386,12 +388,103 @@ class Http1ResponseHandlerSpec extends Specification {
         channel.checkException()
     }
 
+    def "writability changes are forwarded to the listener of the request in progress"() {
+        given:
+        def tail = new TailRecorder()
+        def handler = new Http1ResponseHandler()
+        def channel = new EmbeddedChannel(handler, tail)
+        int writabilityChanges = 0
+        def listener = new SimpleListener() {
+            @Override
+            void writabilityChanged(ChannelHandlerContext ctx) {
+                writabilityChanges++
+            }
+        }
+
+        when: "no request is in progress"
+        channel.pipeline().fireChannelWritabilityChanged()
+        then: "the event only passes through"
+        writabilityChanges == 0
+        tail.writabilityChanges == 1
+
+        when: "a request is in progress"
+        handler.startRequest(listener)
+        channel.pipeline().fireChannelWritabilityChanged()
+        then: "the listener is notified, and the event passes through"
+        writabilityChanges == 1
+        tail.writabilityChanges == 2
+
+        when: "the request is done"
+        channel.writeInbound(new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1,
+                HttpResponseStatus.OK,
+                Unpooled.EMPTY_BUFFER,
+                new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0),
+                EmptyHttpHeaders.INSTANCE
+        ))
+        channel.pipeline().fireChannelWritabilityChanged()
+        then: "the listener of the finished request is not notified anymore"
+        listener.finished
+        handler.idle
+        writabilityChanges == 1
+        tail.writabilityChanges == 3
+
+        when: "a listener that does not care about writability is in progress"
+        def plainListener = new SimpleListener()
+        handler.startRequest(plainListener)
+        channel.pipeline().fireChannelWritabilityChanged()
+        then:
+        tail.writabilityChanges == 4
+        !handler.idle
+
+        cleanup:
+        listener.body?.close()
+        channel.checkException()
+    }
+
+    def "a request cannot start off the event loop or without a channel"() {
+        given:
+        def group = new DefaultEventLoopGroup(1)
+        def channel = new LocalChannel()
+        group.register(channel).sync()
+        def handler = new Http1ResponseHandler()
+
+        when: "the handler is not in a pipeline"
+        handler.startRequest(new SimpleListener())
+        then:
+        def notAdded = thrown(IllegalStateException)
+        notAdded.message == "Not added to a channel"
+
+        when: "the request is started from another thread than the event loop of the channel"
+        channel.eventLoop().submit { channel.pipeline().addLast(handler) }.sync()
+        handler.startRequest(new SimpleListener())
+        then:
+        def offLoop = thrown(IllegalStateException)
+        offLoop.message == "Not on event loop"
+        handler.idle
+
+        when: "the request is started on the event loop"
+        channel.eventLoop().submit { handler.startRequest(new SimpleListener()) }.sync()
+        then:
+        !handler.idle
+
+        cleanup:
+        channel.close().sync()
+        group.shutdownGracefully().sync()
+    }
+
     private static final class TailRecorder extends ChannelInboundHandlerAdapter {
         final List<Object> messages = []
+        int writabilityChanges = 0
 
         @Override
         void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             messages.add(msg)
+        }
+
+        @Override
+        void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+            writabilityChanges++
         }
     }
 

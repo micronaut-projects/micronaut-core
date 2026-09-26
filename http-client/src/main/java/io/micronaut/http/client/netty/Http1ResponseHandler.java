@@ -116,11 +116,11 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
      * @param listener The listener for the response
      */
     void startRequest(ResponseListener listener) {
-        ChannelHandlerContext ctx = this.ctx;
-        if (ctx == null) {
+        ChannelHandlerContext context = this.ctx;
+        if (context == null) {
             throw new IllegalStateException("Not added to a channel");
         }
-        if (!ctx.executor().inEventLoop()) {
+        if (!context.executor().inEventLoop()) {
             throw new IllegalStateException("Not on event loop");
         }
         if (state != Idle.INSTANCE) {
@@ -129,7 +129,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         setPropagatedContext(PropagatedContext.getOrEmpty());
         this.listener = listener;
         state = new BeforeResponse(listener);
-        ctx.read();
+        context.read();
     }
 
     /**
@@ -173,9 +173,9 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-        ResponseListener listener = this.listener;
-        if (listener != null) {
-            listener.writabilityChanged(ctx);
+        ResponseListener current = this.listener;
+        if (current != null) {
+            current.writabilityChanged(ctx);
         }
         ctx.fireChannelWritabilityChanged();
     }

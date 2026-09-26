@@ -2,12 +2,14 @@ package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
@@ -85,6 +87,58 @@ class RequestPipelineFailureReleasesConnectionSpec extends Specification {
         "no body"        | HttpRequest.GET("/pipeline-failure/ok")
     }
 
+    def "connection is closed and replaced when a customizer fails after the response handler took the request (#description)"() {
+        given: "a client whose only customizer fails for the next request, after the response handler started it"
+        // a customizer that is not wrapped in the composite customizer of the client registry,
+        // which would log and swallow its failure
+        def customizer = new FailingCustomizer()
+        DefaultHttpClient customizedClient = DefaultHttpClient.builder()
+                .uri(server.URI)
+                .configuration(server.applicationContext.getBean(HttpClientConfiguration))
+                .clientCustomizer(customizer)
+                .build()
+
+        and: "a warmed up single pooled connection"
+        assert customizedClient.toBlocking().retrieve("/pipeline-failure/ok") == "ok"
+        List<Channel> before = customizedClient.connectionManager().getChannels()
+        assert before.size() == 1
+        Channel first = before[0]
+        customizer.failNext = true
+
+        when: "a request is sent on that connection"
+        customizedClient.toBlocking().exchange(request, String)
+
+        then: "the client reports the customizer error"
+        def e = thrown(Exception)
+        causeChain(e).any { it.message == FailingCustomizer.MESSAGE }
+        !customizer.failNext
+
+        and: "the connection is closed, and nothing is left running on it"
+        new PollingConditions(timeout: 5).eventually {
+            assert !first.isActive()
+            assert customizedClient.connectionManager().liveRequestCount() == 0
+        }
+
+        when: "a normal request follows on the same client"
+        def response = customizedClient.toBlocking().retrieve(HttpRequest.POST("/pipeline-failure/echo", "again").contentType(MediaType.TEXT_PLAIN_TYPE), String)
+
+        then: "it succeeds on a new connection"
+        response == "again"
+        List<Channel> after = customizedClient.connectionManager().getChannels()
+        after.size() == 1
+        after[0] != first
+
+        cleanup:
+        customizedClient.close()
+
+        where:
+        description                     | request
+        "available body"                | HttpRequest.POST("/pipeline-failure/echo", "hello".getBytes(StandardCharsets.UTF_8)).contentType(MediaType.TEXT_PLAIN_TYPE)
+        "available body, expect 100"    | HttpRequest.POST("/pipeline-failure/echo", "hello".getBytes(StandardCharsets.UTF_8)).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.EXPECT, "100-continue")
+        "streaming body"                | HttpRequest.POST("/pipeline-failure/echo", Flux.just("hel", "lo")).contentType(MediaType.TEXT_PLAIN_TYPE)
+        "streaming body, expect 100"    | HttpRequest.POST("/pipeline-failure/echo", Flux.just("hel", "lo")).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.EXPECT, "100-continue")
+    }
+
     private static List<Throwable> causeChain(Throwable t) {
         List<Throwable> chain = []
         while (t != null && !chain.contains(t)) {
@@ -92,6 +146,35 @@ class RequestPipelineFailureReleasesConnectionSpec extends Specification {
             t = t.cause
         }
         chain
+    }
+
+    /**
+     * Customizer that fails in {@link NettyClientCustomizer#onRequestPipelineBuilt()} once
+     * {@link #failNext} is set, i.e. after the response handler of the connection already started
+     * the request, but before anything was written.
+     */
+    static class FailingCustomizer implements NettyClientCustomizer {
+        static final String MESSAGE = "customizer failure"
+
+        volatile boolean failNext
+
+        @Override
+        NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            return new NettyClientCustomizer() {
+                @Override
+                NettyClientCustomizer specializeForChannel(Channel channel_, ChannelRole role_) {
+                    return FailingCustomizer.this.specializeForChannel(channel_, role_)
+                }
+
+                @Override
+                void onRequestPipelineBuilt() {
+                    if (failNext) {
+                        failNext = false
+                        throw new IllegalStateException(MESSAGE)
+                    }
+                }
+            }
+        }
     }
 
     @Requires(property = "spec.name", value = "RequestPipelineFailureReleasesConnectionSpec")

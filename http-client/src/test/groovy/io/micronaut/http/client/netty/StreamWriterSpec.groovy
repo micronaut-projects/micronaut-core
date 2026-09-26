@@ -66,12 +66,81 @@ class StreamWriterSpec extends Specification {
         channel.finishAndReleaseAll()
     }
 
-    private static StreamingNettyByteBody streamingBody(EmbeddedChannel channel) {
-        def sharedBuffer = new NettyByteBodyFactory(channel).createStreamingBuffer(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
-            @Override
-            void onBytesConsumed(long bytesConsumed) {
-            }
-        })
+    def "bytes written while the channel is not writable are acknowledged once it is writable again"() {
+        given:
+        def channel = new EmbeddedChannel()
+        def upstream = new RecordingUpstream()
+        def writer = new StreamWriter(channel, streamingBody(channel, upstream), { throw new AssertionError(it) })
+        writer.startWriting()
+        def outboundBuffer = channel.unsafe().outboundBuffer()
+
+        when: "a chunk is written while the channel is writable"
+        writer.add(readBuffer("foo"))
+        then: "it is acknowledged immediately"
+        upstream.consumed == 3
+
+        when: "a chunk is written while the channel is not writable"
+        outboundBuffer.setUserDefinedWritability(1, false)
+        writer.add(readBuffer("barbaz"))
+        then: "the acknowledgement is held back to apply backpressure"
+        !channel.isWritable()
+        upstream.consumed == 3
+
+        when: "the channel becomes writable again"
+        outboundBuffer.setUserDefinedWritability(1, true)
+        writer.channelWritabilityChanged()
+        then: "the held back bytes are acknowledged"
+        upstream.consumed == 9
+
+        when: "writability changes again with nothing held back"
+        writer.channelWritabilityChanged()
+        then:
+        upstream.consumed == 9
+
+        cleanup:
+        writer.cancel()
+        channel.finishAndReleaseAll()
+    }
+
+    def "writability changes after cancel are ignored"() {
+        given:
+        def channel = new EmbeddedChannel()
+        def upstream = new RecordingUpstream()
+        def writer = new StreamWriter(channel, streamingBody(channel, upstream), { throw new AssertionError(it) })
+        writer.startWriting()
+        def outboundBuffer = channel.unsafe().outboundBuffer()
+        outboundBuffer.setUserDefinedWritability(1, false)
+        writer.add(readBuffer("foo"))
+
+        when: "the request is done before the channel became writable again"
+        writer.cancel()
+        def consumedAtCancel = upstream.consumed
+        outboundBuffer.setUserDefinedWritability(1, true)
+        writer.channelWritabilityChanged()
+
+        then: "the held back bytes are not acknowledged by the writer anymore, the connection may serve another request"
+        upstream.consumed == consumedAtCancel
+
+        cleanup:
+        channel.finishAndReleaseAll()
+    }
+
+    private static readBuffer(String s) {
+        NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(Unpooled.copiedBuffer(s, StandardCharsets.UTF_8))
+    }
+
+    private static StreamingNettyByteBody streamingBody(EmbeddedChannel channel, BufferConsumer.Upstream upstream = new RecordingUpstream()) {
+        def sharedBuffer = new NettyByteBodyFactory(channel).createStreamingBuffer(BodySizeLimits.UNLIMITED, upstream)
         return new StreamingNettyByteBody(sharedBuffer)
+    }
+
+    private static final class RecordingUpstream implements BufferConsumer.Upstream {
+        long consumed
+
+        @Override
+        void onBytesConsumed(long bytesConsumed) {
+            // record the acknowledged bytes, the tests check the backpressure signal
+            consumed += bytesConsumed
+        }
     }
 }
