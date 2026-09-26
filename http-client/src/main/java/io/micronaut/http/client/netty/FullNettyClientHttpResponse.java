@@ -232,6 +232,11 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return conversionService.convert(unpooledContent.slice(), ByteBuf.class, type);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>The returned message's content is a non-reference-counted copy of the response body
+     * owned by this object, so the caller does not need to (and cannot) release it.
+     */
     @Override
     public FullHttpResponse toFullHttpResponse() {
         var copy = new DefaultFullHttpResponse(
@@ -245,9 +250,14 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return copy;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>The original Netty response is released by the client once this object is built, so
+     * this returns {@link #toFullHttpResponse()}, whose content is backed by the copied body.
+     */
     @Override
     public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
-        return nettyHttpResponse;
+        return toFullHttpResponse();
     }
 
     @Override
