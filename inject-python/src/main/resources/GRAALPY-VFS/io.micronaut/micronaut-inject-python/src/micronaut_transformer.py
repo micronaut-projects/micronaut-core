@@ -83,6 +83,20 @@ def unresolved_java_io_import_error(name: str, kind: str = 'import') -> str:
 
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
 _JavaTypes = java.type("io.micronaut.python.processing.util.PythonJavaTypes")
+_Diagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
+_SourceSpan = java.type("io.micronaut.python.processing.model.SourceSpan")
+
+# CPython reports the columns of AST nodes as UTF-8 byte offsets, GraalPy as character offsets; the
+# probe finds out which, so the spans always count characters. It runs on first use, not at import:
+# a module imported from its bytecode cache must not need the compiler.
+_ast_columns_are_bytes = None
+
+
+def ast_columns_are_bytes():
+    global _ast_columns_are_bytes
+    if _ast_columns_are_bytes is None:
+        _ast_columns_are_bytes = ast.parse('"\u00e9"; x\n').body[1].col_offset == 6
+    return _ast_columns_are_bytes
 
 
 def decorator_name(decorator: ast.AST) -> Optional[str]:
@@ -287,7 +301,7 @@ class MicronautTransformer(ast.NodeTransformer):
     """
 
     def __init__(self, callback_get_class_element, callback_get_class_elements, strip_java_interface_bases=False,
-                 package_name='', source_root='', python_source_dirs=None):
+                 package_name='', source_root='', python_source_dirs=None, source_path=None, source_text=None):
         """
         Initialize the transformer.
 
@@ -298,6 +312,8 @@ class MicronautTransformer(ast.NodeTransformer):
             package_name: The package of the module being transformed, when it belongs to a source root
             source_root: The source root the module belongs to, when there is one
             python_source_dirs: The Python source directories of the project, whose modules are never Java imports
+            source_path: The path of the module, for the location of its diagnostics
+            source_text: The text of the module, for the column conversion of its diagnostics
         """
         self.callback_get_class_element = callback_get_class_element
         self.callback_get_class_elements = callback_get_class_elements
@@ -316,7 +332,11 @@ class MicronautTransformer(ast.NodeTransformer):
         self.java_interface_names = set()
         self.java_class_elements = {}
         self.java_keyword_method_aliases = {}
+        # The problems found in the module, as located PythonDiagnostic values
         self.validation_errors = []
+        self.source_path = source_path or "Unknown"
+        self._source_lines = re.split(r"\r\n|\r|\n", source_text) if source_text is not None else None
+        self._current_statement = None
         self.has_java_import = False
         self.exported_types = []
         self.all_class_names = []
@@ -325,6 +345,31 @@ class MicronautTransformer(ast.NodeTransformer):
         self.uses_builtin_exception = False
         self.uses_java_interface_defaults = False
         self.uses_java_base = False
+
+    def _span_of(self, node):
+        """
+        The location of a node in the source, or None for a node without a position. Lines are one-based;
+        columns are one-based character offsets, the end column exclusive.
+        """
+        line = getattr(node, "lineno", None) if node is not None else None
+        if line is None:
+            return None
+        end_line = getattr(node, "end_lineno", None) or line
+        column = self._char_column(line, getattr(node, "col_offset", 0))
+        end_offset = getattr(node, "end_col_offset", None)
+        end_column = self._char_column(end_line, end_offset) if end_offset is not None else column + 1
+        return _SourceSpan(self.source_path, line, column + 1, end_line, end_column + 1)
+
+    def _char_column(self, line, column):
+        if not column or not ast_columns_are_bytes() or self._source_lines is None or line < 1 or line > len(self._source_lines):
+            return column or 0
+        return len(self._source_lines[line - 1].encode("utf-8")[:column].decode("utf-8", "replace"))
+
+    def _error(self, rule, message, node=None):
+        """
+        Record a problem of the module, located at the given node or at the statement being visited.
+        """
+        self.validation_errors.append(_Diagnostic.error(rule, message, self._span_of(node if node is not None else self._current_statement)))
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -335,6 +380,7 @@ class MicronautTransformer(ast.NodeTransformer):
         """
         if not node.module:
             return node
+        self._current_statement = node
 
         if node.module == 'pyronaut.build':
             return None
@@ -361,7 +407,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     transformed_any = True
                     bindings.extend(ast.copy_location(binding, node) for binding in star_bindings if isinstance(binding, ast.stmt))
                 elif java_io_package and not self.callback_get_class_elements(java_module):
-                    self.validation_errors.append(unresolved_java_io_import_error(java_module, 'package'))
+                    self._error('unresolved-import', unresolved_java_io_import_error(java_module, 'package'), node)
             else:
                 # Handle specific imports
                 binding = self._handle_specific_import(java_module, transformed_module, alias)
@@ -375,7 +421,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     if self._handle_package_import(f'{java_module}.{alias.name}'):
                         imports_java_package = True
                     elif not self._imports_compiled_python_class(java_module, alias.name):
-                        self.validation_errors.append(self._java_io_import_error(node.module, java_module, alias))
+                        self._error('unresolved-import', self._java_io_import_error(node.module, java_module, alias), node)
                 elif node.level == 0:
                     self._check_unresolved_java_import(node.module, java_module, alias.name)
 
@@ -404,18 +450,21 @@ class MicronautTransformer(ast.NodeTransformer):
         or @a.Executable can be recognized at runtime without requiring the module to exist.
         If any decorators are generated, remove the import from the AST.
         """
+        self._current_statement = node
         for alias in node.names:
             java_module_name = self._to_java_import_module(alias.name)
             # Scan the entire package for annotation types
             resolved = self._handle_package_import(java_module_name)
             if is_java_io_package(java_module_name):
                 if not resolved:
-                    self.validation_errors.append(unresolved_java_io_import_error(java_module_name, 'package'))
+                    self._error('unresolved-import', unresolved_java_io_import_error(java_module_name, 'package'), node)
                 elif not alias.asname:
-                    self.validation_errors.append(
+                    self._error(
+                        'import-alias-required',
                         f"Java package import [import {alias.name}] requires an alias such as "
                         f"[import {alias.name} as {alias.name.split('.')[-1]}]: io is Python's built-in module, "
-                        f"so the name io cannot refer to the Java package at runtime."
+                        f"so the name io cannot refer to the Java package at runtime.",
+                        node
                     )
 
         return node
@@ -714,9 +763,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
         if self.class_depth > 0 and self.function_depth == 0:
             if node.name == "__init__":
-                self.validation_errors.append("Async constructors are not supported")
+                self._error('unsupported-async', "Async constructors are not supported", node)
             if self._is_python_property_decorator(node):
-                self.validation_errors.append(f"Async property [{node.name}] is not supported")
+                self._error('unsupported-async', f"Async property [{node.name}] is not supported", node)
         node.decorator_list = [
             self._normalize_decorator(decorator)
             for decorator in node.decorator_list
@@ -892,7 +941,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return None
         if import_name == module_name.rsplit('.', 1)[-1]:
             return outer_element
-        self.validation_errors.append(
+        self._error(
+            'unresolved-import',
             f"Cannot import [{import_name}] from [{module_name}]: Java type [{outer_element.getName()}] "
             f"has no nested type named [{import_name}]"
         )
@@ -946,7 +996,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return
         if java_module_name.split('.')[0] not in JAVA_IMPORT_NAMESPACES and not self._is_java_package(java_module_name):
             return
-        self.validation_errors.append(
+        self._error(
+            'unresolved-import',
             f"Cannot import [{import_name}] from [{python_module_name}]: the Java type "
             f"[{self._java_type_name_of_import(java_module_name, import_name)}] is not on the compile classpath. "
             "Check the imported name, or add the dependency that provides it."

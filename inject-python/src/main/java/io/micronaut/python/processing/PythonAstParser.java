@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.model.ClassDef;
@@ -188,11 +189,13 @@ public final class PythonAstParser {
             }
             return o;
         });
-        evaluateProcessor(bindings, sources, tree, packageName != null ? packageName : "", "Unknown", "Unknown", "", visitorContext);
+        List<PythonDiagnostic> diagnostics = evaluateProcessor(bindings, sources, tree, packageName != null ? packageName : "", "Unknown", "Unknown", "", visitorContext);
         return new PythonEnvironment(
             classes,
             scripts,
             decorators,
+            Map.of(),
+            diagnostics,
             context
         );
     }
@@ -201,15 +204,18 @@ public final class PythonAstParser {
      * Runs the processor over one source. The processor visits the tree the transformer produced
      * when there is one, so every definition keeps the position it has in the original source; the
      * source text is still bound because the positions of the tree refer to it.
+     *
+     * @return The problems the processor found in the source
      */
-    private void evaluateProcessor(Value bindings,
-                                   CharSequence sources,
-                                   @Nullable Value tree,
-                                   String packageName,
-                                   String fileName,
-                                   String sourcePath,
-                                   String srcRoot,
-                                   VisitorContext visitorContext) {
+    @SuppressWarnings("unchecked")
+    private List<PythonDiagnostic> evaluateProcessor(Value bindings,
+                                                     CharSequence sources,
+                                                     @Nullable Value tree,
+                                                     String packageName,
+                                                     String fileName,
+                                                     String sourcePath,
+                                                     String srcRoot,
+                                                     VisitorContext visitorContext) {
         bindings.putMember("src", sources);
         bindings.putMember("has_parsed_tree", tree != null);
         bindings.putMember("parsed_tree", tree != null ? tree : "");
@@ -219,6 +225,22 @@ public final class PythonAstParser {
         bindings.putMember("source_path", sourcePath);
         bindings.putMember("src_root", srcRoot);
         context.eval(PROCESSOR_SOURCE);
+        Value diagnostics = bindings.getMember("diagnostics");
+        return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
+    }
+
+    /**
+     * The path a source is reported under: its path, or its name when it has none.
+     *
+     * @param source The source
+     * @return The path
+     */
+    static String sourcePathOf(Source source) {
+        if (source.getPath() != null) {
+            return source.getPath();
+        }
+        String name = source.getName();
+        return name == null || name.isBlank() ? "Unnamed" : name;
     }
 
     private static @NotNull String resolveQualifiedName(String packageName, ClassDef classDef) {
@@ -296,6 +318,7 @@ public final class PythonAstParser {
         // Java type name in different sources would silently overwrite each other; they are keyed by
         // that name here and resolved once all sources are parsed (see resolveDefinition)
         Map<String, List<Definition>> definitions = new LinkedHashMap<>();
+        List<PythonDiagnostic> diagnostics = new ArrayList<>();
         String[] currentSource = new String[1];
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
@@ -321,11 +344,11 @@ public final class PythonAstParser {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     String fileName = source.getName();
                     String effectiveName = fileName == null || fileName.isBlank() ? "Unnamed" : fileName;
-                    evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, effectiveName, effectiveName, srcDir, visitorContext);
+                    diagnostics.addAll(evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, effectiveName, effectiveName, srcDir, visitorContext));
                     processed = true;
                 } else if (isWithinSourceDir(srcDir, path)) {
                     String packageName = getPackageNameOfSource(srcDir, source);
-                    evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, source.getName(), path, srcDir, visitorContext);
+                    diagnostics.addAll(evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, source.getName(), path, srcDir, visitorContext));
                     processed = true;
                 }
             }
@@ -359,6 +382,7 @@ public final class PythonAstParser {
             scripts,
             decorators,
             shadowedTypes,
+            diagnostics,
             context
         );
     }
@@ -562,6 +586,7 @@ public final class PythonAstParser {
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {
             bindings.putMember("src", source.getCharacters());
+            bindings.putMember("source_path", sourcePathOf(source));
             String sourceRoot = sourceRootOf(srcDirs, source);
             bindings.putMember("source_root", sourceRoot);
             bindings.putMember("package_name", sourceRoot.isEmpty() ? "" : getPackageNameOfSource(sourceRoot, source));
@@ -588,7 +613,7 @@ public final class PythonAstParser {
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
             java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
             java.util.List<String> allClassNames = map.containsKey("allClassNames") ? (java.util.List<String>) map.get("allClassNames") : new ArrayList<>();
-            java.util.List<String> validationErrors = map.containsKey("validationErrors") ? (java.util.List<String>) map.get("validationErrors") : new ArrayList<>();
+            java.util.List<PythonDiagnostic> validationErrors = map.containsKey("validationErrors") ? (java.util.List<PythonDiagnostic>) map.get("validationErrors") : new ArrayList<>();
             TransformResult transformResult = new TransformResult(
                 source,
                 code,
@@ -654,10 +679,12 @@ public final class PythonAstParser {
             from micronaut_processor import MicronautAstVisitor
 
             tree = parsed_tree if has_parsed_tree else ast.parse(src)
-            MicronautAstVisitor(
+            visitor = MicronautAstVisitor(
                 callback, package_name, file_name, visitor_context, src_root,
                 source_path=source_path, source_text=src
-            ).visit(tree)
+            )
+            visitor.visit(tree)
+            diagnostics = visitor.diagnostics
             """;
     }
 
@@ -667,7 +694,7 @@ public final class PythonAstParser {
             from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
 
             tree = ast.parse(src)
-            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs)
+            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs, source_path=source_path, source_text=src)
             transformed_tree = transformer.visit(tree)
             # The diagnostic runtime source is only read by tests and error reports, so it is
             # produced on demand instead of costing a parse, a transformer pass and an unparse per file.
@@ -804,7 +831,7 @@ public final class PythonAstParser {
      * @param javaClassImports The Java class imports
      * @param exportedTypes    The types that have Micronaut decorators
      * @param allClassNames    All class names defined in the source
-     * @param validationErrors Validation errors found while transforming the source
+     * @param validationErrors The problems found while transforming the source, located in it
      */
     @Experimental
     public record TransformResult(
@@ -815,7 +842,7 @@ public final class PythonAstParser {
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
         java.util.List<String> allClassNames,
-        java.util.List<String> validationErrors) {
+        java.util.List<PythonDiagnostic> validationErrors) {
 
         /**
          * Creates a result whose transformed code is already rendered.
@@ -827,7 +854,7 @@ public final class PythonAstParser {
          * @param javaClassImports    The Java class imports
          * @param exportedTypes       The types that have Micronaut decorators
          * @param allClassNames       All class names defined in the source
-         * @param validationErrors    Validation errors found while transforming the source
+         * @param validationErrors    The problems found while transforming the source, located in it
          */
         @SuppressWarnings("checkstyle:ParameterNumber")
         public TransformResult(Source originalSource,
@@ -837,7 +864,7 @@ public final class PythonAstParser {
                                Map<String, java.util.List<Map<String, String>>> javaClassImports,
                                java.util.List<String> exportedTypes,
                                java.util.List<String> allClassNames,
-                               java.util.List<String> validationErrors) {
+                               java.util.List<PythonDiagnostic> validationErrors) {
             this(originalSource, () -> code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors);
         }
 
