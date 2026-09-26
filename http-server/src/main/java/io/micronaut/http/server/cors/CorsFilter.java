@@ -37,6 +37,9 @@ import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.http.server.util.HttpHostResolver;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -49,10 +52,10 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
@@ -94,6 +97,11 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     private final StaticResourceResolver staticResourceResolver;
 
     /**
+     * The {@link CrossOrigin} configuration per route. Routes are fixed at startup, so this stays bounded.
+     */
+    private final Map<RouteInfo<?>, Optional<CorsOriginConfiguration>> routeConfigurations = new ConcurrentHashMap<>();
+
+    /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
      * @param staticResourceResolver Static Resource Resolver
      * @param router  Router
@@ -126,9 +134,10 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     @Internal
     public final HttpResponse<?> filterPreFlightRequest(HttpRequest<?> request) {
         if (isEnabled(request) && CorsUtil.isPreflightRequest(request)) {
-            CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request).orElse(null);
+            List<UriRouteMatch<Object, Object>> routeMatches = router != null ? router.findAny(request) : Collections.emptyList();
+            CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request, routeMatches).orElse(null);
             if (corsOriginConfiguration != null) {
-                return handlePreflightRequest(request, corsOriginConfiguration);
+                return handlePreflightRequest(request, corsOriginConfiguration, routeMatches);
             }
         }
         return null; // proceed
@@ -366,7 +375,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (requestOrigin == null) {
             return Optional.empty();
         }
-        Optional<CorsOriginConfiguration> originConfiguration = CrossOriginUtil.getCorsOriginConfigurationForRequest(request);
+        Optional<CorsOriginConfiguration> originConfiguration = RouteAttributes.getRouteMatch(request)
+            .flatMap(this::getCorsOriginConfiguration);
         if (originConfiguration.isPresent() && matchesOrigin(originConfiguration.get(), requestOrigin)) {
             return originConfiguration;
         }
@@ -378,17 +388,16 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             .findFirst();
     }
 
-    private Optional<CorsOriginConfiguration> getAnyConfiguration(HttpRequest<?> request) {
+    private Optional<CorsOriginConfiguration> getAnyConfiguration(HttpRequest<?> request,
+                                                                  List<UriRouteMatch<Object, Object>> routeMatches) {
         String requestOrigin = request.getOrigin().orElse(null);
         if (requestOrigin == null) {
             return Optional.empty();
         }
-        if (router != null) {
-            for (UriRouteMatch<Object, Object> routeMatch : router.findAny(request)) {
-                Optional<CorsOriginConfiguration> corsOriginConfiguration = CrossOriginUtil.getCorsOriginConfiguration(routeMatch);
-                if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
-                    return corsOriginConfiguration;
-                }
+        for (UriRouteMatch<Object, Object> routeMatch : routeMatches) {
+            Optional<CorsOriginConfiguration> corsOriginConfiguration = getCorsOriginConfiguration(routeMatch);
+            if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
+                return corsOriginConfiguration;
             }
         }
         if (!corsConfiguration.isEnabled()) {
@@ -399,8 +408,17 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             .findFirst();
     }
 
+    /**
+     * The {@link CrossOrigin} configuration of a route, built once per route.
+     * The route annotation metadata does not change for a route, so the configuration does not either.
+     */
+    private Optional<CorsOriginConfiguration> getCorsOriginConfiguration(RouteMatch<?> routeMatch) {
+        return routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
+            routeInfo -> CrossOriginUtil.getCorsOriginConfiguration(routeMatch.getAnnotationMetadata()));
+    }
+
     private static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
-        if (config.getAllowedOriginsRegex().map(regex -> matchesOrigin(regex, requestOrigin)).orElse(false)) {
+        if (config.getAllowedOriginsRegex().map(regex -> config.getAllowedOriginsPattern(regex).matcher(requestOrigin).matches()).orElse(false)) {
             return true;
         }
         List<String> allowedOrigins = config.getAllowedOrigins();
@@ -408,12 +426,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             (config.getAllowedOriginsRegex().isEmpty() && isAny(allowedOrigins)) ||
                 allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
         );
-    }
-
-    private static boolean matchesOrigin(String originRegex, String requestOrigin) {
-        Pattern p = Pattern.compile(originRegex);
-        Matcher m = p.matcher(requestOrigin);
-        return m.matches();
     }
 
     private static boolean isAny(List<String> values) {
@@ -471,8 +483,9 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     private MutableHttpResponse<?> handlePreflightRequest(HttpRequest<?> request,
-                                                          CorsOriginConfiguration corsOriginConfiguration) {
-        boolean isValid = validatePreflightRequest(request, corsOriginConfiguration);
+                                                          CorsOriginConfiguration corsOriginConfiguration,
+                                                          List<UriRouteMatch<Object, Object>> routeMatches) {
+        boolean isValid = validatePreflightRequest(request, corsOriginConfiguration, routeMatches);
         if (!isValid) {
             return HttpResponse.status(HttpStatus.FORBIDDEN);
         }
@@ -483,7 +496,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     private boolean validatePreflightRequest(HttpRequest<?> request,
-                                             CorsOriginConfiguration config) {
+                                             CorsOriginConfiguration config,
+                                             List<UriRouteMatch<Object, Object>> routeMatches) {
         Optional<HttpMethod> methodToMatchOptional = validateMethodToMatch(request, config);
         if (methodToMatchOptional.isEmpty()) {
             return false;
@@ -493,7 +507,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (!CorsUtil.isPreflightRequest(request)) {
             return false;
         }
-        List<HttpMethod> availableHttpMethods = availableHttpMethods(request);
+        List<HttpMethod> availableHttpMethods = availableHttpMethods(request, routeMatches);
         if (availableHttpMethods.stream().noneMatch(method -> method.equals(methodToMatch))) {
             return false;
         }
@@ -511,11 +525,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return true;
     }
 
-    private List<HttpMethod> availableHttpMethods(HttpRequest<?> request) {
-        List<HttpMethod> methods = new ArrayList<>(router != null
-            ? router.findAny(request).stream().map(UriRouteMatch::getHttpMethod).toList()
-            : Collections.emptyList()
-        );
+    private List<HttpMethod> availableHttpMethods(HttpRequest<?> request,
+                                                  List<UriRouteMatch<Object, Object>> routeMatches) {
+        List<HttpMethod> methods = new ArrayList<>(routeMatches.size());
+        for (UriRouteMatch<Object, Object> routeMatch : routeMatches) {
+            methods.add(routeMatch.getHttpMethod());
+        }
         if (CollectionUtils.isEmpty(methods) &&
             staticResourceResolver != null &&
             staticResourceResolver.resolve(request.getUri().getPath()).isPresent()) {
