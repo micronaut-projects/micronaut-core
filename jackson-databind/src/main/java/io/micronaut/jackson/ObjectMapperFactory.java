@@ -23,8 +23,10 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Type;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.jackson.databind.BeanIntrospectionValueInstantiators;
 import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -220,6 +222,10 @@ public class ObjectMapperFactory {
             }
         }
         builder.addModule(module);
+
+        if (jacksonConfiguration == null || jacksonConfiguration.isBeanIntrospectionCreators()) {
+            builder.addModule(BeanIntrospectionValueInstantiators.module(BeanIntrospector.SHARED));
+        }
 
         for (ValueSerializerModifier beanSerializerModifier : beanSerializerModifiers) {
             builder.serializerFactory(

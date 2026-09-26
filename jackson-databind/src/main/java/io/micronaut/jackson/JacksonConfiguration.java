@@ -102,6 +102,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
     private boolean jackson2DatabindAnnotationSupport = true;
+    private boolean beanIntrospectionCreators = true;
 
     /**
      * Whether Jackson modules should be scanned for.
@@ -506,6 +507,30 @@ public class JacksonConfiguration implements JsonConfiguration {
      */
     public void setJackson2DatabindAnnotationSupport(boolean jackson2DatabindAnnotationSupport) {
         this.jackson2DatabindAnnotationSupport = jackson2DatabindAnnotationSupport;
+    }
+
+    /**
+     * Whether Jackson creates a bean through its {@link io.micronaut.core.beans.BeanIntrospection} when the
+     * constructor it binds the properties to is the constructor of the introspection. The introspection calls
+     * the constructor from generated code instead of a method handle. Default value: {@code true}.
+     *
+     * @return Whether to create beans through their introspection
+     * @since 5.3.0
+     */
+    public boolean isBeanIntrospectionCreators() {
+        return beanIntrospectionCreators;
+    }
+
+    /**
+     * Whether Jackson creates a bean through its {@link io.micronaut.core.beans.BeanIntrospection} when the
+     * constructor it binds the properties to is the constructor of the introspection. The introspection calls
+     * the constructor from generated code instead of a method handle. Default value: {@code true}.
+     *
+     * @param beanIntrospectionCreators Whether to create beans through their introspection
+     * @since 5.3.0
+     */
+    public void setBeanIntrospectionCreators(boolean beanIntrospectionCreators) {
+        this.beanIntrospectionCreators = beanIntrospectionCreators;
     }
 
     /**
