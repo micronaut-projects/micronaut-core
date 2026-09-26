@@ -210,6 +210,7 @@ httpServer:
     functionalRoutesConditions: Conditions, Order, Ports and Attributes
     functionalRoutesAnnotations: Annotations on Handler Routes
     functionalRoutesErrors: Error and Status Routes
+    functionalRoutesLocators: Locator Routes
     functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions
   sse: Server Sent Events
