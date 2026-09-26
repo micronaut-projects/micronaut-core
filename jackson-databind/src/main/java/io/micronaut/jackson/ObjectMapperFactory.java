@@ -26,6 +26,7 @@ import io.micronaut.context.annotation.Type;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.jackson.core.util.EventLoopBufferRecyclerPool;
 import io.micronaut.jackson.databind.BeanIntrospectionValueInstantiators;
 import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
@@ -104,6 +105,9 @@ public class ObjectMapperFactory {
     @BootstrapContextCompatible
     public JsonFactory jsonFactory(JacksonConfiguration jacksonConfiguration) {
         final JsonFactoryBuilder jsonFactoryBuilder = JsonFactory.builder();
+        if (jacksonConfiguration.isEventLoopRecyclerPool() && EventLoopBufferRecyclerPool.isSupported()) {
+            jsonFactoryBuilder.recyclerPool(new EventLoopBufferRecyclerPool());
+        }
         jacksonConfiguration.getJsonFactoryFeatures().forEach(jsonFactoryBuilder::configure);
         return jsonFactoryBuilder.build();
     }
