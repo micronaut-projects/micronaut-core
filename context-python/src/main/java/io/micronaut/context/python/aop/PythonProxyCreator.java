@@ -314,6 +314,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         if (proxy == null) {
             throw new IllegalStateException("Python proxy target cannot be null");
         }
+        if (proxy instanceof StaticAdviceTarget advised) {
+            // the compiled methods of the generated class run their interceptor chains in Java, ending on the target
+            advised.bindStaticAdvice(new StaticAdvice<>(proxyDefinition, targetSupplier));
+        }
         // the Python proxy returned to Java resolves to this proxy again, not to a new wrapper of it
         proxyValue.getMember(SCOPED_PROXY_BIND_JAVA_PROXY_METHOD).execute(new ValueCoercible.HostObjectReference(proxy));
         return proxy;

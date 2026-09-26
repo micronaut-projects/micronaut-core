@@ -27,6 +27,9 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticBodyGenerator;
+import io.micronaut.python.processing.staticcompile.Ir;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.sourcegen.model.ClassDef;
@@ -191,13 +194,14 @@ final class PythonPooledStubGenerator {
         boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethodPooledScript(methodElement, builder, pkg, script, allClasses);
+            addBridgeMethodPooledScript(scriptElement, methodElement, builder, pkg, script, allClasses, context);
         }
 
         List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
         for (PropertyElement beanProperty : beanProperties) {
             if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
-                addSetterScriptPooled(beanProperty, builder, pkg, script, hasAsyncBridgeMethod);
+                FieldDef injected = PythonStubGenerator.injectedField(builder, beanProperty, propertyType(beanProperty));
+                addSetterScriptPooled(beanProperty, builder, pkg, script, hasAsyncBridgeMethod, injected);
             }
             if (beanProperty.hasStereotype(Bean.class)) {
                 addGetterScriptPooled(beanProperty, builder, pkg, script, allClasses);
@@ -244,11 +248,13 @@ final class PythonPooledStubGenerator {
 
     }
 
-    private static void addBridgeMethodPooledScript(MethodElement methodElement,
+    private static void addBridgeMethodPooledScript(PythonScriptElement scriptElement,
+                                                    MethodElement methodElement,
                                                     ClassDef.ClassDefBuilder builder,
                                                     String pkg,
                                                     String script,
-                                                    Map<String, ClassElement> allClasses) {
+                                                    Map<String, ClassElement> allClasses,
+                                                    VisitorContext context) {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
@@ -257,6 +263,19 @@ final class PythonPooledStubGenerator {
         for (ParameterElement parameter : methodElement.getParameters()) {
             var parameterType = erasedType(parameter.getGenericType());
             methodBuilder.addParameter(ParameterDef.builder(parameter.getName(), parameterType).build());
+        }
+
+        StaticCompilationPlan plan = PythonStubGenerator.staticCompilationPlan(context);
+        Ir.CompiledBody compiledBody = plan == null || methodElement.isStatic() || isAsyncPythonMethod(methodElement)
+            ? null : plan.body(scriptElement.getName(), pythonFunctionName);
+        if (compiledBody != null && compiledBody.parameterNames().size() == methodElement.getParameters().length) {
+            // the body runs as Java, outside any Python context: no context is leased for the call
+            if (compiledBody.span() != null) {
+                methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
+            }
+            builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
+                StaticBodyGenerator.generate(compiledBody, methodParameters, PythonStubGenerator.pooledScriptAccess(aThis), plan.trace())));
+            return;
         }
 
         builder.addMethod(methodBuilder.build(((aThis, methodParameters) -> {
@@ -336,7 +355,8 @@ final class PythonPooledStubGenerator {
                                               ClassDef.ClassDefBuilder builder,
                                               String pkg,
                                               String script,
-                                              boolean adaptAsyncMembers) {
+                                              boolean adaptAsyncMembers,
+                                              FieldDef injected) {
         TypeDef returnType = beanProperty.getWriteMethod().map(MethodElement::getReturnType).map(TypeDef::of).orElse(TypeDef.VOID);
         String setterName = beanProperty.getWriteMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder propertySetter = MethodDef
@@ -353,10 +373,11 @@ final class PythonPooledStubGenerator {
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             parameters.add(methodParameters.getFirst());
             var result = PYTHON_CONTEXT_RUNTIME.invokeStatic(adaptAsyncMembers ? "injectPooledScriptAsync" : "injectPooledScript", TypeDef.VOID, parameters);
+            StatementDef remember = aThis.field(injected).assign(methodParameters.getFirst());
             if (returnType.equals(TypeDef.VOID)) {
-                return result;
+                return StatementDef.multi(remember, result);
             } else {
-                return StatementDef.multi(result, ExpressionDef.nullValue().returning());
+                return StatementDef.multi(remember, result, ExpressionDef.nullValue().returning());
             }
         })));
     }
