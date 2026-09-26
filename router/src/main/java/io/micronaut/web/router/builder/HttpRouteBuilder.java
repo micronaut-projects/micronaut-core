@@ -21,6 +21,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.form.FormData;
+import io.micronaut.http.uri.RouteTemplate;
 
 import java.util.Objects;
 import java.util.Set;
@@ -844,6 +845,51 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target located at runtime, see {@link #locate(String, LocatorHandler, Function)}. The
+     * prefix is parsed, nested and mounted under the context path by its engine; the router
+     * matches it with the matcher of the engine, followed by the rest of the path, which is empty
+     * or starts with a slash. When the prefix matches more than one part of the path, e.g. with a
+     * variable with a regular expression that matches slashes, the longest part is the prefix.
+     * The located routes of the target may have routes of any engine, see {@link LocatedRoutes}.
+     *
+     * <pre>{@code
+     * routes.locate(RouteTemplate.of("jaxrs", "/orders/{id: [0-9]+}"), (request, pathVariables) -> orders.find(pathVariables.getLong("id")), order -> itemRoutes);
+     * }</pre>
+     *
+     * <p>A Micronaut template is the same as {@link #locate(String, LocatorHandler, Function)}
+     * with its expression. In a group with a prefix, see {@link #path(String, Consumer)}, the
+     * template must be a Micronaut one: the prefix of a group is joined to Micronaut URI templates
+     * only, and the template of another engine is rejected with an
+     * {@link IllegalArgumentException}.</p>
+     *
+     * @param prefix   The template of the prefix
+     * @param locator  Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf The routes of a located target
+     * @param <T>      The type of the target
+     * @since 5.3.0
+     */
+    <T> void locate(RouteTemplate prefix, LocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to one set of
+     * routes of the targets a locator locates, see
+     * {@link #locate(RouteTemplate, LocatorHandler, Function)}.
+     *
+     * @param prefix  The template of the prefix
+     * @param locator Locates the target, or answers {@code null} for {@code 404}
+     * @param routes  The routes of every located target
+     * @param <T>     The type of the target
+     * @since 5.3.0
+     */
+    default <T> void locate(RouteTemplate prefix, LocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locate(prefix, locator, target -> routes);
+    }
+
+    /**
      * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
      * loaded from a database: the same as {@link #locate(String, LocatorHandler, Function)}, but
      * the locator returns a stage of the target, and the router matches the rest of the path with
@@ -886,6 +932,41 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     default <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
         Objects.requireNonNull(routes, "routes");
         locateAsync(prefixUri, locator, target -> routes);
+    }
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target located asynchronously: {@link #locate(RouteTemplate, LocatorHandler, Function)}
+     * with the locator of {@link #locateAsync(String, AsyncLocatorHandler, Function)}.
+     *
+     * <pre>{@code
+     * routes.locateAsync(RouteTemplate.of("jaxrs", "/orders/{id: [0-9]+}"), (request, pathVariables) -> orders.findAsync(pathVariables.getLong("id")), order -> itemRoutes);
+     * }</pre>
+     *
+     * @param prefix   The template of the prefix
+     * @param locator  Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routesOf The routes of a located target
+     * @param <T>      The type of the target
+     * @since 5.3.0
+     */
+    <T> void locateAsync(RouteTemplate prefix, AsyncLocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to one set of
+     * routes of the targets a locator locates asynchronously, see
+     * {@link #locateAsync(RouteTemplate, AsyncLocatorHandler, Function)}.
+     *
+     * @param prefix  The template of the prefix
+     * @param locator Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routes  The routes of every located target
+     * @param <T>     The type of the target
+     * @since 5.3.0
+     */
+    default <T> void locateAsync(RouteTemplate prefix, AsyncLocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locateAsync(prefix, locator, target -> routes);
     }
 
     /**
@@ -946,7 +1027,9 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      *
      * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
      * query or fragment. A {@link RouteDeclaration}, which declares its own full URI template,
-     * cannot be bound in a group with a prefix.</p>
+     * cannot be bound in a group with a prefix, nor can a locator whose prefix is a template of
+     * another {@link io.micronaut.http.uri.spi.RouteTemplateEngine engine}, see
+     * {@link #locate(RouteTemplate, LocatorHandler, Function)}.</p>
      *
      * @param prefix The prefix of the URI templates of the routes of the group
      * @param routes Declares the routes and the filters of the group
