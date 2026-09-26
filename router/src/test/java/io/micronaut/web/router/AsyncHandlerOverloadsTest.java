@@ -22,10 +22,14 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
+import io.micronaut.web.router.builder.DefaultPathVariables;
+import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +38,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
@@ -47,6 +52,7 @@ class AsyncHandlerOverloadsTest {
 
     private static final List<Class<?>> NO_BODY = List.of(HttpRequest.class, PathVariables.class);
     private static final List<Class<?>> BODY = List.of(HttpRequest.class, PathVariables.class, AsyncRequestBody.class);
+
 
     @Test
     void lambdasAreRoutedToTheirHandler() {
@@ -155,6 +161,32 @@ class AsyncHandlerOverloadsTest {
         assertArguments(BODY, router, HttpRequest.create(HttpMethod.CUSTOM, "/named-body", "PROPFIND"));
     }
 
+    @Test
+    void theTypedHandlerOfALocatedTableReceivesTheTargetAndTheBody() throws Exception {
+        LocatedRoutes<?> orders = TestLocatedRoutes.of(Order.class, order -> {
+            // typed: the target and the body
+            order.POST("/typed").body().handleAsync((request, pathVariables, target, body) ->
+                CompletableFuture.completedFuture(HttpResponse.ok("typed " + target.id() + " " + body.hasBody())));
+            order.POST("/").body().handleAsync((request, pathVariables, target, body) ->
+                CompletableFuture.completedFuture(HttpResponse.ok("pathless " + target.id())));
+            order.route(HttpMethod.PUT, "/declared").body().handleAsync(AsyncHandlerOverloadsTest::located);
+            // untyped: with and without the body, the target read from the path variables
+            order.GET("/untyped").handleAsync((request, pathVariables) ->
+                CompletableFuture.completedFuture(HttpResponse.ok("untyped " + LocatedRoutes.locatedTarget(pathVariables, Order.class).id())));
+            order.PATCH("/untyped-body").body().handleAsync((request, pathVariables, body) ->
+                CompletableFuture.completedFuture(HttpResponse.ok("untyped body " + LocatedRoutes.locatedTarget(pathVariables, Order.class).id())));
+            order.POST("/shortcut").body().handleAsync((request, pathVariables, body) -> ok());
+        });
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> new Order(pathVariables.getLong("id")), order -> orders));
+
+        assertEquals("typed 5 true", invoke(router, HttpRequest.POST("/orders/5/typed", ""), body()).body());
+        assertEquals("pathless 5", invoke(router, HttpRequest.POST("/orders/5", ""), body()).body());
+        assertEquals("declared 5", invoke(router, HttpRequest.PUT("/orders/5/declared", ""), body()).body());
+        assertEquals("untyped 5", invoke(router, HttpRequest.GET("/orders/5/untyped")).body());
+        assertEquals("untyped body 5", invoke(router, HttpRequest.PATCH("/orders/5/untyped-body", ""), body()).body());
+        assertArguments(BODY, router, HttpRequest.POST("/orders/5/shortcut", ""));
+    }
+
     private static CompletionStage<HttpResponse<?>> ok() {
         return CompletableFuture.completedFuture(HttpResponse.ok());
     }
@@ -167,6 +199,10 @@ class AsyncHandlerOverloadsTest {
         return ok();
     }
 
+    private static CompletionStage<? extends HttpResponse<?>> located(HttpRequest<?> request, PathVariables pathVariables, Order order, AsyncRequestBody body) {
+        return CompletableFuture.completedFuture(HttpResponse.ok("declared " + order.id()));
+    }
+
     private static void assertArguments(List<Class<?>> expected, Router router, HttpRequest<?> request) {
         UriRouteMatch<Object, Object> match = router.findClosest(request);
         assertNotNull(match, request.getMethodName() + " " + request.getPath());
@@ -174,10 +210,37 @@ class AsyncHandlerOverloadsTest {
         assertEquals(expected, types, request.getMethodName() + " " + request.getPath());
     }
 
+    private static HttpResponse<?> invoke(Router router, HttpRequest<?> request, Object... extra) throws Exception {
+        UriRouteMatch<Object, Object> match = router.findClosest(request);
+        assertNotNull(match, request.getPath());
+        Object target = ((RouteLocator.LocatedUriMatchInfo) ((DefaultUriRouteMatch<?, ?>) match).matchInfo()).target();
+        HandlerMethod<?> handler = assertInstanceOf(HandlerMethod.class, ((DefaultUrlRouteInfo<?, ?>) match.getRouteInfo()).getTargetMethod());
+        Object[] arguments = new Object[2 + extra.length];
+        arguments[0] = request;
+        arguments[1] = new DefaultPathVariables(match.getVariableValues(), ConversionService.SHARED, target);
+        System.arraycopy(extra, 0, arguments, 2, extra.length);
+        return (HttpResponse<?>) ((CompletionStage<?>) handler.invoke(arguments)).toCompletableFuture().get();
+    }
+
+    /**
+     * @return A body that has a body, and nothing else
+     */
+    private static AsyncRequestBody body() {
+        return (AsyncRequestBody) Proxy.newProxyInstance(AsyncHandlerOverloadsTest.class.getClassLoader(), new Class<?>[] {AsyncRequestBody.class}, (proxy, method, args) -> {
+            if (method.getName().equals("hasBody")) {
+                return true;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+    }
+
     private static Router router(Consumer<HttpRouteBuilder> routes) {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         return new DefaultRouter(List.of(), List.of(() -> assembly));
+    }
+
+    record Order(long id) {
     }
 
     static final class Handlers {

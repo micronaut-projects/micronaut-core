@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec {
+public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec, LocatedHttpBodyRouteSpec {
 
     /**
      * Declare the type of the body of the responses of the route, see

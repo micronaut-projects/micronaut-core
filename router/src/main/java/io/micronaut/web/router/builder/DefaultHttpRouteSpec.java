@@ -138,6 +138,17 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
         return this;
     }
 
+    /**
+     * Check the handler of a terminal: a terminal without a handler drops the route and fails.
+     *
+     * @param handler The handler
+     * @param <H>     Its type
+     * @return The handler
+     */
+    <H> H checked(@Nullable H handler) {
+        return route.terminal(handler, "handler");
+    }
+
     @Override
     public FilterSpec<HttpRouteSpec> addFilter(FilterRegistration filter) {
         route.filter(filter);
