@@ -120,6 +120,11 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
+    public HttpRequest toHttpRequestWithoutBody(String requestTarget) {
+        return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody(requestTarget);
+    }
+
+    @Override
     public MutableHttpRequest<B> cookie(Cookie cookie) {
         // the relayed request is sent with the headers of the wrapped request: a cookie a client
         // filter adds goes to its Cookie header, like for a client request

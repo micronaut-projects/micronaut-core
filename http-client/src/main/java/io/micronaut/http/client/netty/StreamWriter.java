@@ -22,9 +22,8 @@ import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.LazyUpstream;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import org.jspecify.annotations.Nullable;
@@ -34,29 +33,37 @@ import java.util.function.Consumer;
 
 /**
  * This class is used to write from a {@link StreamingNettyByteBody} to a channel with appropriate
- * backpressure control.
+ * backpressure control. It is not a channel handler: the {@link Http1ResponseHandler} of the
+ * channel forwards {@link #channelWritabilityChanged() writability changes} for the duration of
+ * the request.
  *
  * @author Jonas Konrad
  * @since 4.7.0
  */
 @Internal
-final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferConsumer {
+final class StreamWriter implements BufferConsumer {
+    private final Channel channel;
+    private final EventLoopFlow flow;
     private final StreamingNettyByteBody body;
     private final Consumer<Throwable> errorHandler;
-    @Nullable
-    private ChannelHandlerContext ctx;
-    @Nullable
-    private EventLoopFlow flow;
     @Nullable
     private Upstream upstream;
     private long unwritten = 0;
     private boolean completed = false;
+    /**
+     * Set by {@link #cancel()}. After this point the connection may already be back in the pool
+     * and assigned to another request, so queued writes must not touch the channel anymore.
+     */
+    private volatile boolean closed = false;
 
     /**
+     * @param channel      The channel to write to
      * @param body         The body to read from. This {@link StreamWriter} will immediately take ownership of this body.
      * @param errorHandler Handler to call when the streaming body emits an error
      */
-    StreamWriter(StreamingNettyByteBody body, Consumer<Throwable> errorHandler) {
+    StreamWriter(Channel channel, StreamingNettyByteBody body, Consumer<Throwable> errorHandler) {
+        this.channel = channel;
+        this.flow = new EventLoopFlow(channel.eventLoop());
         this.body = body;
         this.errorHandler = errorHandler;
     }
@@ -65,9 +72,6 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
      * Subscribe to the upstream and start writing bytes.
      */
     void startWriting() {
-        if (ctx == null) {
-            throw new IllegalStateException("Not added to a channel yet");
-        }
         LazyUpstream lazyUpstream = new LazyUpstream();
         // primary() can call other methods here immediately, so we need a replacement upstream
         // until it returns
@@ -82,9 +86,11 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
     }
 
     /**
-     * Cancel writing the body (e.g. because a {@code CONTINUE} response was never received).
+     * Cancel writing the body (e.g. because a {@code CONTINUE} response was never received). Also
+     * called when the request is done.
      */
     void cancel() {
+        closed = true;
         if (upstream != null) {
             upstream.allowDiscard();
             upstream.disregardBackpressure();
@@ -97,31 +103,24 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
     }
 
     @Override
-    public void handlerAdded(ChannelHandlerContext ctx) {
-        this.ctx = ctx;
-        this.flow = new EventLoopFlow(ctx.channel().eventLoop());
-    }
-
-    @Override
     public void add(ReadBuffer buf) {
-        if (Objects.requireNonNull(flow).executeNow(() -> add0(buf))) {
+        if (flow.executeNow(() -> add0(buf))) {
             add0(buf);
         }
     }
 
     private void add0(ReadBuffer buf) {
-        if (ctx == null) {
-            // discarded
+        if (closed) {
+            // cancelled, the connection may be serving another request already
             buf.close();
             return;
         }
 
         int readable = buf.readable();
-        ctx.writeAndFlush(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf))).addListener((ChannelFutureListener) future -> {
-            assert ctx.executor().inEventLoop();
-            Objects.requireNonNull(ctx);
+        channel.writeAndFlush(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf))).addListener((ChannelFutureListener) future -> {
+            assert channel.eventLoop().inEventLoop();
             if (future.isSuccess()) {
-                if (ctx.channel().isWritable()) {
+                if (channel.isWritable()) {
                     Objects.requireNonNull(upstream).onBytesConsumed(readable);
                 } else {
                     unwritten += readable;
@@ -132,30 +131,34 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
         });
     }
 
-    @Override
-    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+    /**
+     * Called on the event loop when the writability of the channel changed.
+     */
+    void channelWritabilityChanged() {
+        if (closed) {
+            return;
+        }
         long unwritten = this.unwritten;
-        if (ctx.channel().isWritable() && unwritten != 0) {
+        if (channel.isWritable() && unwritten != 0) {
             this.unwritten = 0;
             Objects.requireNonNull(upstream).onBytesConsumed(unwritten);
         }
-        super.channelWritabilityChanged(ctx);
     }
 
     @Override
     public void complete() {
-        if (Objects.requireNonNull(flow).executeNow(this::complete0)) {
+        if (flow.executeNow(this::complete0)) {
             complete0();
         }
     }
 
     private void complete0() {
-        if (ctx == null) {
-            // discarded
+        if (closed) {
+            // cancelled, the connection may be serving another request already
             return;
         }
 
-        ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, ctx.voidPromise());
+        channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, channel.voidPromise());
         completed = true;
     }
 
@@ -166,16 +169,10 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
 
     @Override
     public void error(Throwable e) {
-        if (ctx == null) {
-            // discarded
+        if (closed) {
+            // cancelled, the request is already done
             return;
         }
-
         errorHandler.accept(e);
-    }
-
-    @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) {
-        cancel();
     }
 }

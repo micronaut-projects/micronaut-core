@@ -1403,7 +1403,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
-         * to {@code V4_0} for compatibility.
+         * to the deprecated {@code V4_0} for compatibility.
          *
          * @return The pool version
          */
@@ -1413,7 +1413,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
-         * to {@code V4_0} for compatibility.
+         * to the deprecated {@code V4_0} for compatibility.
          *
          * @param version The pool version
          */
@@ -1462,7 +1462,11 @@ public abstract class HttpClientConfiguration {
         public enum PoolVersion {
             /**
              * The connection pool introduced in micronaut-core 4.0.0.
+             *
+             * @deprecated Kept for compatibility only, will be removed in a future release. Use
+             * the default {@link #V4_9} instead. Selecting this version logs a warning.
              */
+            @Deprecated(since = "5.3.0")
             V4_0,
             /**
              * The connection pool introduced in micronaut-core 4.9.0.
