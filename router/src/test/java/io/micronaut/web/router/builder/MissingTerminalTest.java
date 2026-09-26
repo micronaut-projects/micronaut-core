@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -127,6 +128,19 @@ class MissingTerminalTest {
         builder.close();
         Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
         assertNull(router.findClosest(HttpRequest.GET("/dropped")));
+    }
+
+    @Test
+    void aLocatedRouteWithoutATerminalFailsWhenTheLocatedRoutesAreDeclared() {
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        DefaultLocatedHttpRouteBuilder<String> builder = new DefaultLocatedHttpRouteBuilder<>(assembly, Argument.of(String.class), PetRoutes.class);
+        builder.GET("/items", MissingTerminalTest::ok);
+        builder.POST("/items").body(String.class);
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, builder::close);
+
+        assertEquals("The route POST /items declared by MissingTerminalTest.PetRoutes has no handler: "
+            + "end it with handle, handleAsync or respond", failure.getMessage());
     }
 
     private static HttpRoutesAssembly assembly(HttpRoutes... routes) {

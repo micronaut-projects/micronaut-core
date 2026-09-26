@@ -138,6 +138,17 @@ final class DefaultHttpBodyRouteSpec<B> implements HttpBodyRouteSpec<B>, Context
         return this;
     }
 
+    /**
+     * Check the handler of a terminal: a terminal without a handler drops the route and fails.
+     *
+     * @param handler The handler
+     * @param <H>     Its type
+     * @return The handler
+     */
+    <H> H checked(@Nullable H handler) {
+        return route.terminal(handler, "handler");
+    }
+
     @Override
     public FilterSpec<HttpBodyRouteSpec<B>> addFilter(FilterRegistration filter) {
         route.filter(filter);

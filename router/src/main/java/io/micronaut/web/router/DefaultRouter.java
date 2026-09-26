@@ -46,6 +46,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -247,6 +248,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         return routes.findAllClosest(request, ports);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return routes.findAllClosest(request, filter, ports);
     }
 
     /**

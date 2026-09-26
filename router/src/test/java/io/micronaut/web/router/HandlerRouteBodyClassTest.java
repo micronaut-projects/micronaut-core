@@ -25,6 +25,7 @@ import io.micronaut.web.router.builder.BodyRequestHandler;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class HandlerRouteBodyClassTest {
 
+
     @Test
     void theBodyTypeAsAClassIsTheArgumentOfTheClass() {
         Router router = router(routes -> {
@@ -51,6 +53,11 @@ class HandlerRouteBodyClassTest {
             routes.DELETE("/delete").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
             routes.route("PROPFIND", "/propfind").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
             routes.POST("/declared").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+            LocatedRoutes<?> table = TestLocatedRoutes.of(Item.class, items -> {
+                items.POST("/body").body(Item.class).handle((request, pathVariables, target, item) -> HttpResponse.ok());
+                items.PUT("/declared-body").body(Item.class).handle((request, pathVariables, target, item) -> HttpResponse.ok());
+            });
+            routes.locate("/located", (request, pathVariables) -> new Item("t"), target -> table);
         });
         for (HttpRequest<?> request : List.of(HttpRequest.POST("/post", ""), HttpRequest.PUT("/put", ""),
             HttpRequest.PATCH("/patch", ""), HttpRequest.PATCH("/patch-argument", ""), HttpRequest.DELETE("/delete", ""),
