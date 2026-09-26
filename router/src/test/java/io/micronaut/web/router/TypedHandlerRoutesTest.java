@@ -28,7 +28,9 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.DefaultPathVariables;
+import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
@@ -42,16 +44,20 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The generic types of the handler routes: the declared type of the body of the responses.
+ * The generic types of the handler routes: the declared type of the body of the responses, and
+ * the typed locators and located targets.
  */
 class TypedHandlerRoutesTest {
 
     private static final Argument<List<Item>> ITEMS = Argument.listOf(Item.class);
+
 
     @Test
     void theDeclaredResponseTypeIsTheResponseBodyTypeOfTheRouteForEveryKindOfHandler() {
@@ -120,6 +126,106 @@ class TypedHandlerRoutesTest {
     }
 
     @Test
+    void aLocatorRouteHasNoResponseType() {
+        HandlerMethod<?> locator = HandlerMethod.of(new RouteLocator((io.micronaut.web.router.builder.LocatorHandler<String>) (request, pathVariables) -> "target", target -> null,
+            new RouteTableFactory(null, ConversionService.SHARED)));
+        assertThrows(IllegalStateException.class, () -> locator.responseType(ITEMS));
+    }
+
+    @Test
+    void theHandlersOfATypedTableReceiveTheTarget() throws Exception {
+        LocatedRoutes<?> orders = TestLocatedRoutes.of(Order.class, order -> {
+            assertEquals(Argument.of(Order.class), order.targetType());
+            order.handle(HttpMethod.GET, "/id", (request, pathVariables, target) -> HttpResponse.ok(target.id()));
+            order.handle(HttpMethod.POST, "/items", Argument.of(Item.class), (request, pathVariables, target, item) ->
+                HttpResponse.ok(target.id() + " " + item.name()));
+            order.handleAsync(HttpMethod.GET, "/async", (request, pathVariables, target, body) ->
+                CompletableFuture.completedFuture(HttpResponse.ok("async " + target.id())));
+            order.handle(RouteDeclaration.of(HttpMethod.GET, "/declared"), (request, pathVariables, target) ->
+                HttpResponse.ok("declared " + target.id()));
+            // the untyped handlers read the target
+            order.GET("/untyped", (request, pathVariables) -> HttpResponse.ok("untyped " + LocatedRoutes.locatedTarget(pathVariables, Order.class).id()));
+        });
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> {
+            long id = pathVariables.getLong("id");
+            return id == 0 ? null : new Order(id);
+        }, order -> orders));
+
+        assertEquals(5L, invoke(router, HttpRequest.GET("/orders/5/id")).body());
+        assertEquals("5 pen", invoke(router, HttpRequest.POST("/orders/5/items", ""), new Item("pen")).body());
+        // the asynchronous handler of the table is routed, see the TCK for its call
+        assertNotNull(router.findClosest(HttpRequest.GET("/orders/5/async")));
+        assertEquals("declared 5", invoke(router, HttpRequest.GET("/orders/5/declared")).body());
+        assertEquals("untyped 5", invoke(router, HttpRequest.GET("/orders/5/untyped")).body());
+        // no target: no route
+        assertNull(router.findClosest(HttpRequest.GET("/orders/0/id")));
+    }
+
+    @Test
+    void theRoutesFunctionReceivesTheTypeTheLocatorReturns() {
+        LocatedRoutes<?> small = TestLocatedRoutes.of(Order.class, order -> order.GET("/size", (request, pathVariables) -> HttpResponse.ok("small")));
+        LocatedRoutes<?> big = TestLocatedRoutes.of(Order.class, order -> order.GET("/size", (request, pathVariables) -> HttpResponse.ok("big")));
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> new Order(pathVariables.getLong("id")),
+            order -> order.id() > 100 ? big : small));
+        assertEquals("big", invoke(router, HttpRequest.GET("/orders/101/size")).body());
+        assertEquals("small", invoke(router, HttpRequest.GET("/orders/1/size")).body());
+    }
+
+    @Test
+    void theTablesOfTypedTargetsLocateAgainFromTheirTarget() throws Exception {
+        Node tree = new Node("root", Map.of("a", new Node("a", Map.of("b", new Node("b", Map.of())))));
+        LocatedRoutes<?>[] nodes = new LocatedRoutes<?>[1];
+        nodes[0] = TestLocatedRoutes.of(Argument.of(Node.class), node -> {
+            node.handle(HttpMethod.GET, "/name", (request, pathVariables, target) -> HttpResponse.ok(target.name()));
+            node.locate("/{child}", (request, pathVariables, parent) -> parent.children().get(pathVariables.getString("child")), child -> nodes[0]);
+            node.locateAsync("/async/{child}", (request, pathVariables, parent) ->
+                CompletableFuture.completedFuture(parent.children().get(pathVariables.getString("child"))), child -> nodes[0]);
+        });
+        Router router = router(routes -> routes.locate("/tree", (request, pathVariables) -> tree, node -> nodes[0]));
+
+        assertEquals("b", invoke(router, HttpRequest.GET("/tree/a/b/name")).body());
+        assertEquals("b", invoke(router, HttpRequest.GET("/tree/a/async/b/name")).body());
+        assertEquals("root", invoke(router, HttpRequest.GET("/tree/name")).body());
+        assertNull(router.findClosest(HttpRequest.GET("/tree/a/c/name")));
+        assertNull(router.findClosest(HttpRequest.GET("/tree/async/c/name")));
+    }
+
+    @Test
+    void anAsynchronousTypedLocatorLocatesTheTarget() throws Exception {
+        LocatedRoutes<?> orders = TestLocatedRoutes.of(Order.class, order ->
+            order.handle(HttpMethod.GET, "/id", (request, pathVariables, target) -> HttpResponse.ok(target.id())));
+        Router router = router(routes -> routes.locateAsync("/orders/{id}", (request, pathVariables) -> {
+            long id = pathVariables.getLong("id");
+            return CompletableFuture.completedFuture(id == 0 ? null : new Order(id));
+        }, order -> orders));
+        assertEquals(7L, invoke(router, HttpRequest.GET("/orders/7/id")).body());
+        assertNull(router.findClosest(HttpRequest.GET("/orders/0/id")));
+    }
+
+    @Test
+    void aTargetThatIsNotOfTheTypeOfTheTableFails() {
+        LocatedRoutes<?> orders = TestLocatedRoutes.of(Order.class, order ->
+            order.handle(HttpMethod.GET, "/id", (request, pathVariables, target) -> HttpResponse.ok(target.id())));
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order " + pathVariables.getString("id"),
+            target -> orders));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> router.findClosest(HttpRequest.GET("/orders/1/id")));
+        assertTrue(error.getMessage().contains(Order.class.getName()), error.getMessage());
+        assertTrue(error.getMessage().contains("order 1"), error.getMessage());
+    }
+
+    @Test
+    void aTypedHandlerOutsideOfALocatedRouteFails() throws Exception {
+        LocatedRoutes<?> orders = TestLocatedRoutes.of(Order.class, order ->
+            order.handle(HttpMethod.GET, "/id", (request, pathVariables, target) -> HttpResponse.ok(target.id())));
+        UriRouteMatch<Object, Object> match = ((DefaultRouteTable) new RouteTableFactory(null, ConversionService.SHARED).table(orders)).routes().findClosest(HttpRequest.GET("/id"), null);
+        assertNotNull(match);
+        HandlerMethod<?> handler = (HandlerMethod<?>) ((DefaultUrlRouteInfo<?, ?>) match.getRouteInfo()).getTargetMethod();
+        PathVariables pathVariables = new DefaultPathVariables(Map.of(), ConversionService.SHARED);
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> handler.invoke(new Object[]{HttpRequest.GET("/id"), pathVariables}));
+        assertTrue(error.getMessage().contains(Order.class.getName()), error.getMessage());
+    }
+
+    @Test
     void thePathVariablesConvertToGenericTypes() {
         PathVariables pathVariables = new DefaultPathVariables(Map.of("ids", "1,2,3", "id", "4"), ConversionService.SHARED);
         assertEquals(List.of(1, 2, 3), pathVariables.get("ids", Argument.listOf(Integer.class)));
@@ -137,6 +243,18 @@ class TypedHandlerRoutesTest {
         return match.getRouteInfo();
     }
 
+    private static HttpResponse<?> invoke(Router router, HttpRequest<?> request, Object... extra) {
+        UriRouteMatch<Object, Object> match = router.findClosest(request);
+        assertNotNull(match, request.getPath());
+        Object target = ((RouteLocator.LocatedUriMatchInfo) ((DefaultUriRouteMatch<?, ?>) match).matchInfo()).target();
+        HandlerMethod<?> handler = assertInstanceOf(HandlerMethod.class, ((DefaultUrlRouteInfo<?, ?>) match.getRouteInfo()).getTargetMethod());
+        Object[] arguments = new Object[2 + extra.length];
+        arguments[0] = request;
+        arguments[1] = new DefaultPathVariables(match.getVariableValues(), ConversionService.SHARED, target);
+        System.arraycopy(extra, 0, arguments, 2, extra.length);
+        return (HttpResponse<?>) handler.invoke(arguments);
+    }
+
     private static Router router(Consumer<HttpRouteBuilder> routes) {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
         routes.accept(new DefaultHttpRouteBuilder(assembly));
@@ -144,6 +262,12 @@ class TypedHandlerRoutesTest {
         return new DefaultRouter(List.of(), List.of(() -> assembly));
     }
 
+    record Order(long id) {
+    }
+
     record Item(String name) {
+    }
+
+    record Node(String name, Map<String, Node> children) {
     }
 }

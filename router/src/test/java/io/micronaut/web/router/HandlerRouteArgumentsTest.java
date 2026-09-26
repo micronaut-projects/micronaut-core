@@ -100,6 +100,11 @@ class HandlerRouteArgumentsTest {
             IllegalArgumentException noMethod = assertThrows(IllegalArgumentException.class,
                 () -> routes.handle(Set.of(), "/x", HandlerRouteArgumentsTest::ok));
             assertEquals("No HTTP method for route: /x", noMethod.getMessage());
+            assertMissing("locator", () -> routes.locate("/x", null, target -> null));
+            assertMissing("routesOf", () -> routes.locate("/x", (request, pathVariables) -> "target",
+                (java.util.function.Function<Object, io.micronaut.web.router.builder.LocatedRoutes<?>>) null));
+            assertMissing("routes", () -> routes.locate("/x", (request, pathVariables) -> "target",
+                (io.micronaut.web.router.builder.LocatedRoutes<Object>) null));
         });
 
         // no route was added by a failed declaration

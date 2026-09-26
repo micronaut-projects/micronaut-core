@@ -30,7 +30,10 @@ import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import org.slf4j.Logger;
@@ -42,6 +45,7 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 @Internal
@@ -109,6 +113,19 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         } else {
             result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler));
         }
+    }
+
+    @Override
+    protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
+        NettyHttpRequest<?> nettyRequest = this.nettyRequest;
+        if (nettyRequest == null) {
+            return;
+        }
+        // the client closes the connection: no one waits for the target any more
+        ChannelFuture closeFuture = nettyRequest.getChannelHandlerContext().channel().closeFuture();
+        ChannelFutureListener cancel = future -> RouteLocator.cancelPendingLocations(request);
+        closeFuture.addListener(cancel);
+        located.whenComplete((ignored, error) -> closeFuture.removeListener(cancel));
     }
 
     @Nullable
