@@ -19,10 +19,12 @@ class TruncatedBodySpec extends Specification {
         subscriber.onSubscribe(new Flow.Subscription() {
             @Override
             void request(long n) {
+                // the test signals the error itself, there is no data to request
             }
 
             @Override
             void cancel() {
+                // nothing to release: the test owns no upstream
             }
         })
         def body = subscriber.body.toCompletableFuture().get()
