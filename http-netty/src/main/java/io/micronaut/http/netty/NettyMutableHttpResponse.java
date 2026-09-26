@@ -88,12 +88,20 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
      * {@link RouteMetadataAttributes}, by the attribute map and the attribute accessors. So a
      * reader on another thread sees a metadata write as soon as the setter has returned, whether
      * or not the map exists, and neither the setters nor the readers take a lock.
+     * <p>
+     * The fields are volatile only to publish the references safely, including the double-checked
+     * creation of the map, they do not make the referenced objects thread-safe. The route info and
+     * the URI template are immutable. The route match and the attribute map are mutable and, as
+     * before, rely on the request pipeline to hand the message over between threads.
      */
     @Nullable
+    @SuppressWarnings("java:S3077")
     private volatile MutableConvertibleValues<Object> attributes;
     @Nullable
+    @SuppressWarnings("java:S3077")
     private volatile Object routeMatch;
     @Nullable
+    @SuppressWarnings("java:S3077")
     private volatile Object routeInfo;
     @Nullable
     private volatile String uriTemplate;
@@ -276,23 +284,13 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     public MutableConvertibleValues<Object> getAttributes() {
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null) {
-            attributes = createAttributes();
-        }
-        return attributes;
-    }
-
-    /**
-     * Create and publish the attribute map. Only the first materialisation takes the lock, the
-     * hot path that never asks for the map does not. The map reads and writes the route metadata
-     * through the fields, so there is nothing to copy into it.
-     *
-     * @return The map
-     */
-    private synchronized MutableConvertibleValues<Object> createAttributes() {
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
-            attributes = new RouteMetadataAttributes(this, 4);
-            this.attributes = attributes;
+            synchronized (this) { // double check
+                attributes = this.attributes;
+                if (attributes == null) {
+                    attributes = new RouteMetadataAttributes(this, 4);
+                    this.attributes = attributes;
+                }
+            }
         }
         return attributes;
     }
@@ -303,11 +301,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             return Optional.empty();
         }
         String key = name.toString();
-        if (RouteMetadataAttributes.isMetadataKey(key)) {
-            return Optional.ofNullable(RouteMetadataAttributes.getMetadata(this, key));
-        }
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        return attributes == null ? Optional.empty() : Optional.ofNullable(attributes.getValue(key));
+        return RouteMetadataAttributes.getAttribute(this, attributes, key);
     }
 
     @Override

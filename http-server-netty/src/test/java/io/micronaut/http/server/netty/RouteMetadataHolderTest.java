@@ -56,17 +56,13 @@ class RouteMetadataHolderTest {
     }
 
     @Test
-    void routeMetadataIsExposedThroughHolderAndAttributes() {
-        CapturingFilter filter = server.getApplicationContext().getBean(CapturingFilter.class);
-
-        assertEquals("id 123", client.toBlocking().retrieve("/route-metadata/foo/123"));
-
+    void routeMetadataIsExposedThroughHolderBeforeAttributeMapExists() {
+        CapturingFilter filter = exchange("123");
         HttpRequest<?> request = filter.request;
         MutableHttpResponse<?> response = filter.response;
         assertInstanceOf(NettyHttpRequest.class, request);
         assertInstanceOf(NettyMutableHttpResponse.class, response);
 
-        // typed access, before the attribute map exists
         RouteMetadataHolder requestHolder = (RouteMetadataHolder) request;
         UriRouteMatch<?, ?> routeMatch = assertInstanceOf(UriRouteMatch.class, requestHolder.getRouteMatchMetadata());
         RouteInfo<?> routeInfo = assertInstanceOf(RouteInfo.class, requestHolder.getRouteInfoMetadata());
@@ -84,8 +80,17 @@ class RouteMetadataHolderTest {
         assertSame(routeInfo, responseHolder.getRouteInfoMetadata());
         assertSame(routeMatch, RouteAttributes.getRouteMatch(response).orElseThrow());
         assertSame(routeInfo, RouteAttributes.getRouteInfo(response).orElseThrow());
+    }
 
-        // the attribute map, once created, exposes the same metadata
+    @Test
+    void attributeMapExposesRouteMetadata() {
+        CapturingFilter filter = exchange("124");
+        HttpRequest<?> request = filter.request;
+        MutableHttpResponse<?> response = filter.response;
+        RouteMetadataHolder requestHolder = (RouteMetadataHolder) request;
+        Object routeMatch = requestHolder.getRouteMatchMetadata();
+        Object routeInfo = requestHolder.getRouteInfoMetadata();
+
         assertTrue(request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString()));
         assertSame(routeMatch, request.getAttributes().get(HttpAttributes.ROUTE_MATCH.toString(), RouteMatch.class).orElseThrow());
         assertSame(routeInfo, request.getAttributes().get(HttpAttributes.ROUTE_INFO.toString(), RouteInfo.class).orElseThrow());
@@ -93,8 +98,21 @@ class RouteMetadataHolderTest {
         assertSame(routeMatch, request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElseThrow());
         assertSame(routeMatch, response.getAttributes().get(HttpAttributes.ROUTE_MATCH.toString(), RouteMatch.class).orElseThrow());
         assertSame(routeInfo, response.getAttributes().get(HttpAttributes.ROUTE_INFO.toString(), RouteInfo.class).orElseThrow());
+    }
 
-        // and the typed access keeps working after the map was created, in both directions
+    @Test
+    void typedAccessKeepsWorkingAfterAttributeMapIsCreated() {
+        CapturingFilter filter = exchange("125");
+        HttpRequest<?> request = filter.request;
+        MutableHttpResponse<?> response = filter.response;
+        RouteMetadataHolder requestHolder = (RouteMetadataHolder) request;
+        RouteMetadataHolder responseHolder = (RouteMetadataHolder) response;
+        Object routeMatch = requestHolder.getRouteMatchMetadata();
+        Object routeInfo = requestHolder.getRouteInfoMetadata();
+
+        request.getAttributes();
+        response.getAttributes();
+
         assertSame(routeMatch, requestHolder.getRouteMatchMetadata());
         assertSame(routeInfo, requestHolder.getRouteInfoMetadata());
         assertEquals("/route-metadata/foo/{id}", requestHolder.getUriTemplateMetadata());
@@ -108,9 +126,7 @@ class RouteMetadataHolderTest {
 
     @Test
     void mutableViewSharesRouteMetadata() {
-        CapturingFilter filter = server.getApplicationContext().getBean(CapturingFilter.class);
-
-        assertEquals("id 456", client.toBlocking().retrieve("/route-metadata/foo/456"));
+        CapturingFilter filter = exchange("456");
 
         HttpRequest<?> request = filter.request;
         HttpRequest<?> view = request.mutate();
@@ -123,6 +139,12 @@ class RouteMetadataHolderTest {
         view.setAttribute(HttpAttributes.URI_TEMPLATE, "/from-view");
         assertEquals("/from-view", BasicHttpAttributes.getUriTemplate(request).orElseThrow());
         assertEquals("/from-view", view.getAttributes().get(HttpAttributes.URI_TEMPLATE.toString(), String.class).orElseThrow());
+    }
+
+    private CapturingFilter exchange(String id) {
+        CapturingFilter filter = server.getApplicationContext().getBean(CapturingFilter.class);
+        assertEquals("id " + id, client.toBlocking().retrieve("/route-metadata/foo/" + id));
+        return filter;
     }
 
     @Controller("/route-metadata")

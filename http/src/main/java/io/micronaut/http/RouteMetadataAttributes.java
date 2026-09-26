@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import org.jspecify.annotations.Nullable;
 
@@ -82,6 +83,22 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
     }
 
     /**
+     * Read an attribute of a message that stores the route metadata in the holder, without
+     * creating the attribute map of the message.
+     *
+     * @param holder     The holder
+     * @param attributes The attribute map of the message, or {@code null} if not created yet
+     * @param key        The attribute name
+     * @return The value
+     */
+    public static Optional<Object> getAttribute(RouteMetadataHolder holder, @Nullable ConvertibleValues<Object> attributes, String key) {
+        if (isMetadataKey(key)) {
+            return Optional.ofNullable(getMetadata(holder, key));
+        }
+        return attributes == null ? Optional.empty() : Optional.ofNullable(attributes.getValue(key));
+    }
+
+    /**
      * Write one of the metadata attributes to the holder.
      *
      * @param holder The holder
@@ -114,7 +131,7 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
     }
 
     @Override
-    public @Nullable Object getValue(CharSequence name) {
+    public @Nullable Object getValue(@Nullable CharSequence name) {
         if (name == null) {
             return null;
         }
