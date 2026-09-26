@@ -72,18 +72,30 @@ import java.util.stream.Stream;
  */
 public class KotlinCompiler {
 
+    /**
+     * The classpath of the test JVM without the Kotlin compiler and KSP: the compiled sources never
+     * reference them, and they are most of the classpath every compilation indexes.
+     */
+    private static final List<File> SOURCE_CLASSPATH = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+        .filter(path -> !path.isEmpty())
+        .map(File::new)
+        .filter(file -> !file.getName().startsWith("kotlin-compiler-embeddable-")
+            && !file.getName().startsWith("symbol-processing-aa-embeddable-"))
+        .toList();
+
     private static String jvmDefaultMode = "enable";
 
     private static KotlinCompilation newKspCompilation() {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setJvmDefault(jvmDefaultMode);
         Ksp2Kt.useKsp2(compilation);
-        compilation.setInheritClassPath(true);
         compilation.setLanguageVersion("2.0");
         compilation.setKotlincArguments(Arrays.asList("-Xsuppress-version-warnings", "-Xannotation-default-target=first-only"));
-        compilation.setClasspaths(Arrays.asList(
-            new File(compilation.getWorkingDir(), "ksp/classes"),
-            new File(compilation.getWorkingDir(), "ksp/sources/resources")));
+        List<File> classpath = new ArrayList<>();
+        classpath.add(new File(compilation.getWorkingDir(), "ksp/classes"));
+        classpath.add(new File(compilation.getWorkingDir(), "ksp/sources/resources"));
+        classpath.addAll(SOURCE_CLASSPATH);
+        compilation.setClasspaths(classpath);
         return compilation;
     }
 
@@ -133,14 +145,14 @@ public class KotlinCompiler {
             List<URL> classpath = new ArrayList<>();
             classpath.add(sourcesCompileResult.getOutputDirectory().toURI().toURL());
             classpath.add(kspCompileResult.getOutputDirectory().toURI().toURL());
-            classpath.addAll(kspCompilation.component1().getClasspaths().stream().flatMap(f -> {
+            classpath.addAll(kspCompilation.component1().getClasspaths().stream().filter(f -> !SOURCE_CLASSPATH.contains(f)).flatMap(f -> {
                 try {
                     return Stream.of(f.toURI().toURL());
                 } catch (MalformedURLException e) {
                     return Stream.empty();
                 }
             }).toList());
-            classpath.addAll(sourcesCompilation.component1().getClasspaths().stream().flatMap(f -> {
+            classpath.addAll(sourcesCompilation.component1().getClasspaths().stream().filter(f -> !SOURCE_CLASSPATH.contains(f)).flatMap(f -> {
                 try {
                     return Stream.of(f.toURI().toURL());
                 } catch (MalformedURLException e) {
