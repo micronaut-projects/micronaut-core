@@ -97,7 +97,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a static or class method.
 
 |`overriding-java-method`, `intercepted-method`
-|The method implements a method of a Java base or interface, whose bridge keeps the Java signature; or it is an advised method of an introduction, whose chain runs on the Python object. Other advised methods (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method of a class runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, and a module's generated class is proxied by Micronaut like any Java bean; so validation and around advice cost no crossing into Python.
+|The method implements a method of a Java base or interface whose signature the hints do not spell (a method implementing a Java method is compiled when each parameter is hinted with the Java parameter type, or a subtype of it the body reads the parameter as (`exception: ConstraintViolationException` where `ExceptionHandler.handle` takes a `Throwable`), and the return is unhinted, hinted `object`, or hinted with a type the Java method returns: `def intercept(self, context: MethodInvocationContext) -> object` compiles into `Object intercept(MethodInvocationContext)`); or it is a concrete advised method of an introduction class, whose chain runs on the Python object. Other advised methods (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method of a class runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, and a module's generated class is proxied by Micronaut like any Java bean; so validation and around advice cost no crossing into Python.
 
 |`varargs-signature`, `unhinted-parameter`, `unhinted-return`, `java-reserved-name`
 |The signature has no fixed Java layout: `*args`, `**kwargs` or keyword-only parameters, a parameter without a hint, a parameter or return hint resolving to no Java type or class of the compilation, a method, parameter or local named with a Java keyword or a method of `Object`. A missing return hint is not a reason: the method returns `Object`, as its stub declares.
@@ -152,6 +152,9 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 
 |Java calls, constructors, static fields, enum constants, nested types
 |Direct Java calls with the parameter types of the chosen overload, so the generated code never depends on javac's overload pick; an integer argument to an `int` parameter narrows exactly. A returned `List<String>` or `Map<String, Integer>` keeps its element types, so its elements are iterated, joined and compared with their static types.
+
+|Calls on an introduction (`self.repository.find(...)`)
+|A Java call on the generated type of the introduction: a protocol compiles to a Java interface whose proxy Micronaut generates, and the abstract methods of an abstract introduction class run the introduction's interceptors in the generated class, bound by the proxy. With the interceptor's own body compiled, a repository declared in Python, as Micronaut Data declares one, runs as Java from the caller to the interceptor.
 
 |Injected attributes of a module
 |A module-level function of the module's generated class reads an attribute the module injects (`repository: Annotated[BookRepository, Inject]`) from a field of that class, set when the bean is injected, and calls the bean as a Java object.
