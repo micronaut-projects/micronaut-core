@@ -196,6 +196,10 @@ public final class OutlierDetector {
         }
     }
 
+    private Set<URI> members() {
+        return Objects.requireNonNull(members.get());
+    }
+
     /**
      * The state of one instance.
      */
@@ -235,9 +239,5 @@ public final class OutlierDetector {
                 tried = true;
             }
         }
-    }
-
-    private Set<URI> members() {
-        return Objects.requireNonNull(members.get());
     }
 }
