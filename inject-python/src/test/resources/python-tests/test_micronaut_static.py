@@ -101,6 +101,9 @@ class Finder:
     def rename(self, form: Form, name: str) -> None:
         form.name = name
 
+    def first_name(self, forms: list[Form]) -> str:
+        return forms[0].name
+
     def unhinted(self, flag: bool):
         return "x" if flag else "y"
 
@@ -204,6 +207,12 @@ class CorpusFindingsTest(unittest.TestCase):
         self.assertEqual("setName", call.name())
         self.assertEqual(["java.lang.String"], list(call.parameterTypes()))
 
+    def test_an_attribute_of_an_element_of_the_compilation_is_read_through_its_accessor(self):
+        returned = _uncast(self._returned("first_name"))
+        self.assertEqual("InvokeJava", returned.getClass().getSimpleName())
+        self.assertEqual("getName", returned.name())
+        self.assertEqual("Cast", returned.receiver().getClass().getSimpleName())  # the element, cast from the Object the list holds
+
     def test_or_on_an_attribute_of_an_object_yields_the_fallback_when_none(self):
         returned = self._returned("pick")
         self.assertEqual("Conditional", returned.getClass().getSimpleName())
@@ -252,6 +261,180 @@ class CorpusFindingsTest(unittest.TestCase):
         statements = list(body.body().statements())
         self.assertEqual("If", statements[0].getClass().getSimpleName())
         self.assertEqual("Local", list(statements[0].then().statements())[0].getClass().getSimpleName())
+
+
+MODULE = '''
+from jakarta.inject import Singleton
+
+RATE = 2
+
+
+def twice_of(n: int) -> int:
+    return n * RATE
+
+
+def _private(n: int) -> int:
+    return n + 1
+
+
+def unhinted(n: int):
+    return n + 1
+
+
+def chained(n: int) -> int:
+    return twice_of(_private(n))
+
+
+def evens(values: list[int]) -> list[int]:
+    return [v * 2 for v in values if v % 2 == 0]
+
+
+def lengths(forms: list[str]) -> dict[str, int]:
+    return {f: len(f) for f in forms}
+
+
+def has_long(forms: list[str]) -> bool:
+    return any(len(f) > 3 for f in forms)
+
+
+def all_short(forms: list[str]) -> bool:
+    return all(len(f) <= 3 for f in forms)
+
+
+def inner_only(rows: list[str]) -> list[int]:
+    return [len(row) for row in rows]
+
+
+def nested(rows: list[str]) -> list[int]:
+    return [total * 2 for total in [len(row) for row in rows]]
+
+
+def broken(n: int) -> int:
+    return recursive(n)
+
+
+def recursive(n: int) -> int:
+    return broken(n)
+
+
+def guarded(values: list[int], n: int) -> int:
+    while any(v > n for v in values):
+        n += 1
+    return n
+
+
+def after_call(values: list[int]) -> int:
+    return twice_of(1) + len([v for v in values])
+
+
+@Singleton
+class Service:
+    def total(self, n: int) -> int:
+        return twice_of(n) + Service.twice(n) + self.twice(n)
+
+    @staticmethod
+    def twice(n: int) -> int:
+        return n * 2
+
+    @classmethod
+    def make(cls, n: int) -> int:
+        return n
+'''
+
+
+class ModuleFunctionTest(unittest.TestCase):
+    """Plain module-level functions and static methods compile into static methods of the generated classes."""
+
+    def setUp(self):
+        self.decisions, self.planner = plan(MODULE, MODE_ALL, facts=FakeFacts())
+        self.bodies = {body.methodName(): body for body in self.planner.bodies}
+
+    def _compiled(self, name):
+        decision = self.decisions[name]
+        self.assertEqual("COMPILED", decision.outcome().name(), [(r.rule(), r.message()) for r in decision.reasons()])
+        return self.bodies[name.rsplit(".", 1)[-1]]
+
+    def _returned(self, name):
+        return list(self._compiled(name).body().statements())[-1].value()
+
+    def test_a_plain_function_is_a_static_method_of_the_module_class(self):
+        body = self._compiled("twice_of")
+        self.assertTrue(body.staticMethod())
+        self.assertTrue(body.moduleLevel())
+        self.assertEqual("pkg.Module", body.className())
+        self.assertEqual(["int"], list(body.parameterTypes()))
+        # the module's script models its constant but generates no class: the compiled functions give it one
+        self.assertEqual(["Module"], [script.javaSimpleName() for script in self.planner.scripts])
+
+    def test_a_module_without_a_generated_class_gets_one_for_its_compiled_functions(self):
+        decisions, planner = plan("def lone(n: int) -> int:\n    return n + 1\n", MODE_ALL, facts=FakeFacts(), path="lone.py")
+        self.assertEqual("COMPILED", decisions["lone"].outcome().name(), rules(decisions["lone"]))
+        self.assertEqual("pkg.Lone", planner.bodies[0].className())
+        self.assertEqual(["Lone"], [script.javaSimpleName() for script in planner.scripts])
+        self.assertEqual("pkg", planner.scripts[0].packageName())
+
+    def test_a_call_of_a_module_function_is_a_static_java_call(self):
+        returned = _uncast(self._returned("chained"))
+        self.assertEqual("InvokeJava", returned.getClass().getSimpleName())
+        self.assertIsNone(returned.receiver())
+        self.assertEqual("pkg.Module", returned.owner())
+        self.assertEqual("twice_of", returned.name())
+        self.assertEqual("int", returned.type())
+        inner = _uncast(list(returned.arguments())[0])
+        self.assertEqual("_private", inner.name())
+        self.assertEqual("java.lang.Object", self._compiled("unhinted").returnType())
+
+    def test_a_cycle_of_module_function_calls_is_refused(self):
+        outcomes = {name: self.decisions[name].outcome().name() for name in ("broken", "recursive")}
+        self.assertIn("SKIPPED", outcomes.values())
+        skipped = [self.decisions[name] for name in ("broken", "recursive") if self.decisions[name].outcome().name() == "SKIPPED"]
+        self.assertEqual(["dynamic-call"], rules(skipped[0]))
+
+    def test_static_methods_compile_and_are_called_statically(self):
+        twice = self._compiled("Service.twice")
+        self.assertTrue(twice.staticMethod())
+        self.assertFalse(twice.moduleLevel())
+        self.assertEqual("NOT_CANDIDATE", self.decisions["Service.make"].outcome().name())
+        self.assertEqual(["static-method"], rules(self.decisions["Service.make"]))
+        returned = _uncast(self._returned("Service.total"))
+        calls = [_uncast(returned.left().left()), _uncast(returned.left().right()), _uncast(returned.right())]
+        self.assertEqual(["twice_of", "twice", "twice"], [call.name() for call in calls])
+        self.assertEqual(["pkg.Module", "pkg.Service", "pkg.Service"], [call.owner() for call in calls])
+        self.assertTrue(all(call.receiver() is None for call in calls))
+
+    def test_a_list_comprehension_is_a_loop_filling_a_local_declared_before(self):
+        body = self._compiled("evens")
+        statements = list(body.body().statements())
+        self.assertEqual(["Local", "ForEach", "Return"], [statement.getClass().getSimpleName() for statement in statements[-3:]])
+        self.assertEqual("java.util.List<long>", statements[-3].type())
+        self.assertEqual("list", statements[-3].value().name())
+        loop = statements[-2]
+        self.assertEqual("v", loop.variable())
+        branch = list(loop.body().statements())[0]
+        self.assertEqual("If", branch.getClass().getSimpleName())
+        append = list(branch.then().statements())[0].expression()
+        self.assertEqual("append", append.name())
+        self.assertEqual("LocalRef", _uncast(statements[-1].value()).getClass().getSimpleName())
+
+    def test_dict_comprehensions_and_any_and_all_lower_alike(self):
+        statements = list(self._compiled("lengths").body().statements())
+        self.assertEqual("java.util.Map<java.lang.String,long>", statements[-3].type())
+        self.assertEqual("setItem", list(list(statements[-2].body().statements())[0].expression().arguments() and [list(statements[-2].body().statements())[0].expression()])[0].name())
+        for name, initial in (("has_long", False), ("all_short", True)):
+            statements = list(self._compiled(name).body().statements())
+            self.assertEqual("boolean", statements[-3].type())
+            self.assertEqual(initial, statements[-3].value().value())
+            loop = statements[-2]
+            self.assertTrue(loop.hasBreak())
+        self._compiled("inner_only")
+        statements = list(self._compiled("nested").body().statements())
+        # the inner comprehension, the outer loop's iterable, is hoisted before the outer one
+        self.assertEqual(["Local", "ForEach", "Local", "ForEach", "Return"], [statement.getClass().getSimpleName() for statement in statements[-5:]])
+
+    def test_a_comprehension_in_a_repeated_or_reordered_position_is_refused(self):
+        for name in ("guarded", "after_call"):
+            self.assertEqual("SKIPPED", self.decisions[name].outcome().name(), name)
+            self.assertEqual(["unsupported-expression"], rules(self.decisions[name]), name)
 
 
 SOURCE = '''
@@ -399,8 +582,8 @@ class ClassificationTest(unittest.TestCase):
         self.assertNotIn("Plain.doubled", decisions)  # a property is not a function of the model
         self.assertEqual(["async-function"], rules(decisions["Plain.fetch"]))
         self.assertEqual(["generator-function"], rules(decisions["Plain.items"]))
-        self.assertEqual("NOT_CANDIDATE", decisions["helper"].outcome().name())
-        self.assertEqual(["class-not-eligible"], rules(decisions["helper"]))
+        # a plain module-level function is a candidate: a static method of the module's generated class
+        self.assertEqual("CANDIDATE", decisions["helper"].outcome().name())
 
     def test_signatures_without_a_java_layout_are_skipped_with_every_reason(self):
         decisions, _ = plan(SOURCE, MODE_ALL)
@@ -417,10 +600,9 @@ class ClassificationTest(unittest.TestCase):
         decisions, _ = plan(SOURCE, MODE_ALL)
         decision = decisions["Plain.dynamic"]
         self.assertEqual("SKIPPED", decision.outcome().name())
-        self.assertEqual(["unsupported-statement", "unsupported-expression"], rules(decision))
+        self.assertEqual(["unsupported-statement"], rules(decision))
         messages = [reason.message() for reason in decision.reasons()]
         self.assertEqual("a with statement has no static lowering", messages[0])
-        self.assertEqual("a list comprehension has no static lowering", messages[1])
         self.assertEqual(39, decision.reasons()[0].span().line())
         self.assertEqual(["unsupported-statement"], rules(decisions["Aliased.loop"]))
         self.assertEqual("the else clause of a loop has no static lowering", decisions["Aliased.loop"].reasons()[0].message())
@@ -962,8 +1144,9 @@ class LoweringTest(unittest.TestCase):
         # a module without a module-level annotation is served by a context pool: a Python read is out of reach
         self.assertEqual("SKIPPED", self.decisions["peek"].outcome().name())
         self.assertEqual(["pooled-module"], rules(self.decisions["peek"]))
-        self.assertEqual("NOT_CANDIDATE", self.decisions["helper_only"].outcome().name())
-        self.assertEqual(["class-not-eligible"], rules(self.decisions["helper_only"]))
+        # a plain function of the module: a static method of the script class
+        self.assertEqual("COMPILED", self.decisions["helper_only"].outcome().name(), rules(self.decisions["helper_only"]))
+        self.assertTrue(self.bodies["helper_only"].staticMethod())
 
     def test_objects_of_the_compilation_are_reached_through_their_generated_classes(self):
         for name in ("carted", "built"):
@@ -1043,10 +1226,11 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("local [value] is a [long] and then a [java.lang.String]", self.decisions["Pricing.retyped"].reasons()[0].message())
         self.assertEqual("the function does not return a value on every path", self.decisions["Pricing.falls_through"].reasons()[0].message())
 
-    def test_static_methods_are_not_candidates_yet(self):
+    def test_static_methods_compile_into_their_static_bridge(self):
         decision = self.decisions["Pricing.helper"]
-        self.assertEqual("NOT_CANDIDATE", decision.outcome().name())
-        self.assertEqual(["static-method"], rules(decision))
+        self.assertEqual("COMPILED", decision.outcome().name(), rules(decision))
+        self.assertTrue(self.bodies["helper"].staticMethod())
+        self.assertFalse(self.bodies["helper"].moduleLevel())
 
     def test_loops_lower_with_flags_for_break_and_continue(self):
         summed = self.bodies["summed"]
@@ -1136,6 +1320,39 @@ class Calc:
         self.assertEqual(label.lineno, label.body[1].lineno)
         other = tree.body[0].body[2]
         self.assertIsInstance(other.body[0], ast.Return)
+
+    def test_static_methods_and_module_functions_delegate_to_the_generated_class(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+"""The module."""
+from __future__ import annotations
+
+
+def helper(n: int) -> list[int]:
+    return [n]
+
+
+class Calc:
+    @staticmethod
+    def twice(n: int) -> int:
+        return n * 2
+
+    def other(self) -> int:
+        return 1
+''')
+        self.assertEqual(2, apply_delegation(tree, ["#helper#static=pkg.Module#list", "Calc#twice#static=pkg.Calc"]))
+        self.assertEqual(0, apply_delegation(tree, ["#helper#static=pkg.Module#list", "Calc#twice#static=pkg.Calc"]))  # already rewritten
+        source = ast.unparse(tree)
+        self.assertIn("def _mn_static_class(name):", source)
+        self.assertIn("__mn_java = _mn_static_class('pkg.Module')", source)
+        self.assertIn("return list(__mn_java.helper(n))", source)
+        self.assertIn("__mn_java = _mn_static_class('pkg.Calc')", source)
+        self.assertIn("return __mn_java.twice(n)", source)
+        self.assertIsInstance(tree.body[0], ast.Expr)  # the docstring stays first
+        self.assertIsInstance(tree.body[1], ast.ImportFrom)  # then the __future__ import
+        self.assertIsInstance(tree.body[2], ast.Assign)  # then the lookup's cache
+        self.assertIsInstance(tree.body[3], ast.FunctionDef)
+        self.assertEqual("_mn_static_class", tree.body[3].name)
         compile(tree, "delegated.py", "exec")
 
     def test_the_temporary_of_the_rewrite_never_shadows_a_name_of_the_function(self):
