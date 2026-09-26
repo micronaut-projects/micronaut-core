@@ -16,6 +16,8 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -184,6 +186,19 @@ public interface PropagatedContext {
      * @return element if found
      */
     <T extends PropagatedContextElement> Optional<T> find(Class<T> elementType);
+
+    /**
+     * Finds the last added element of the given type, like {@link #find(Class)}, but without
+     * wrapping it in an {@link Optional}.
+     *
+     * @param elementType The element type
+     * @param <T> The element's type
+     * @return the element or {@code null} if there is none
+     * @since 5.3
+     */
+    default <T extends PropagatedContextElement> @Nullable T findOrNull(Class<T> elementType) {
+        return find(elementType).orElse(null);
+    }
 
     /**
      * Find all elements of the given type. The first element in the stream will be the last element added.

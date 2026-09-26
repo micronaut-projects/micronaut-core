@@ -1,5 +1,7 @@
 package io.micronaut.http.context
 
+import io.micronaut.core.propagation.PropagatedContext
+import io.micronaut.core.propagation.PropagatedContextElement
 import io.micronaut.http.HttpRequest
 import spock.lang.Specification
 
@@ -280,5 +282,100 @@ class ServerRequestContextSpec extends Specification {
         firstInstrumentedRequestRestored.isPresent()
         firstInstrumentedRequest.get() is firstRequest
         !ServerRequestContext.currentRequest().isPresent()
+    }
+
+    def "withRequest reuses a context that already holds the same request"() {
+        given:
+        HttpRequest request = HttpRequest.GET("/a")
+        UserElement user = new UserElement("user")
+        PropagatedContext context = PropagatedContext.empty().plus(new ServerHttpRequestContext(request)).plus(user)
+
+        expect:
+        ServerHttpRequestContext.withRequest(context, request).is(context)
+        ServerHttpRequestContext.withRequest(context, request).getAllElements().size() == 2
+    }
+
+    def "withRequest adds the request when it differs from the current one"() {
+        given:
+        HttpRequest outer = HttpRequest.GET("/outer")
+        HttpRequest inner = HttpRequest.GET("/inner")
+        UserElement user = new UserElement("user")
+        PropagatedContext context = PropagatedContext.empty().plus(new ServerHttpRequestContext(outer)).plus(user)
+
+        when:
+        PropagatedContext empty = ServerHttpRequestContext.withRequest(PropagatedContext.empty(), inner)
+        PropagatedContext nested = ServerHttpRequestContext.withRequest(context, inner)
+
+        then:
+        ServerHttpRequestContext.find(empty).get().is(inner)
+        !nested.is(context)
+        ServerHttpRequestContext.find(nested).get().is(inner)
+        nested.findOrNull(UserElement).is(user)
+        ServerHttpRequestContext.find(context).get().is(outer)
+
+        and: "an earlier element holding the request does not count once another request was added"
+        !ServerHttpRequestContext.withRequest(nested, outer).is(nested)
+        ServerHttpRequestContext.find(ServerHttpRequestContext.withRequest(nested, outer)).get().is(outer)
+    }
+
+    def "nested request context restores the outer request and keeps user elements"() {
+        given:
+        HttpRequest outer = HttpRequest.GET("/outer")
+        HttpRequest inner = HttpRequest.GET("/inner")
+        UserElement user = new UserElement("user")
+        PropagatedContext context = PropagatedContext.empty().plus(new ServerHttpRequestContext(outer)).plus(user)
+
+        when:
+        List<Object> seen = context.propagate({
+            List<Object> result = []
+            ServerRequestContext.with(outer, {
+                result << ServerRequestContext.currentRequest().get()
+                result << PropagatedContext.get().is(context)
+            } as Runnable)
+            ServerRequestContext.with(inner, {
+                result << ServerRequestContext.currentRequest().get()
+                result << PropagatedContext.get().findOrNull(UserElement)
+            } as Runnable)
+            result << ServerRequestContext.currentRequest().get()
+            result << PropagatedContext.get().is(context)
+            return result
+        } as Supplier<List<Object>>)
+
+        then:
+        seen[0].is(outer)
+        seen[1] == true
+        seen[2].is(inner)
+        seen[3].is(user)
+        seen[4].is(outer)
+        seen[5] == true
+        !PropagatedContext.exists()
+    }
+
+    def "scope of a reused context restores the previous context"() {
+        given:
+        HttpRequest request = HttpRequest.GET("/a")
+        PropagatedContext context = PropagatedContext.empty().plus(new ServerHttpRequestContext(request))
+
+        when:
+        boolean restored
+        try (PropagatedContext.Scope ignore = context.propagate()) {
+            PropagatedContext same = ServerHttpRequestContext.withRequest(PropagatedContext.get(), request)
+            try (PropagatedContext.Scope ignore2 = same.propagate()) {
+                assert ServerRequestContext.currentRequest().get().is(request)
+            }
+            restored = PropagatedContext.get().is(context)
+        }
+
+        then:
+        restored
+        !PropagatedContext.exists()
+    }
+
+    static class UserElement implements PropagatedContextElement {
+        final String value
+
+        UserElement(String value) {
+            this.value = value
+        }
     }
 }
