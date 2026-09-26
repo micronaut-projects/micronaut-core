@@ -15,7 +15,10 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -38,6 +41,8 @@ import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.runtime.http.scope.RequestScope;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -55,11 +60,13 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -107,6 +114,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * When this is not set, we can do a shortcut for performance.
      */
     boolean supportLoggingHandler = false;
+    private final ApplicationContext applicationContext;
+    /**
+     * Decides whether a {@link HttpRequestTerminatedEvent} has to be published for a request.
+     * Resolved on first use, see {@link #resolveTerminatedEventFilter()}.
+     */
+    private @Nullable Predicate<NettyHttpRequest<?>> terminatedEventFilter;
 
     /**
      * @param serverConfiguration               The Netty HTTP server configuration
@@ -137,6 +150,41 @@ public final class RoutingInBoundHandler implements RequestHandler {
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
         this.conversionService = conversionService;
+        this.applicationContext = embeddedServerContext.getApplicationContext();
+    }
+
+    private boolean shouldPublishTerminatedEvent(NettyHttpRequest<?> request) {
+        Predicate<NettyHttpRequest<?>> filter = terminatedEventFilter;
+        if (filter == null) {
+            filter = resolveTerminatedEventFilter();
+            terminatedEventFilter = filter;
+        }
+        return filter.test(request);
+    }
+
+    /**
+     * The request scope listens for {@link HttpRequestTerminatedEvent} to destroy the request
+     * scoped beans, so the publisher is practically never empty. When the request scope is the
+     * only listener, the event is only published for requests that hold request scoped beans.
+     *
+     * @return The filter deciding whether the event is published for a request
+     */
+    @SuppressWarnings("unchecked")
+    private Predicate<NettyHttpRequest<?>> resolveTerminatedEventFilter() {
+        if (terminateEventPublisher.isEmpty()) {
+            return request -> false;
+        }
+        if (terminateEventPublisher == applicationContext.getEventPublisher(HttpRequestTerminatedEvent.class)) {
+            Collection<ApplicationEventListener> listeners = applicationContext.getBeansOfType(
+                ApplicationEventListener.class, Qualifiers.byTypeArguments(HttpRequestTerminatedEvent.class));
+            if (listeners.size() == 1
+                && listeners.iterator().next() instanceof CustomScope<?> scope
+                && scope.annotationType() == RequestScope.class) {
+                ApplicationEventListener<HttpRequestTerminatedEvent> requestScope = (ApplicationEventListener<HttpRequestTerminatedEvent>) scope;
+                return request -> requestScope.supports(new HttpRequestTerminatedEvent(request));
+            }
+        }
+        return request -> true;
     }
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
@@ -145,7 +193,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         } finally {
             ExecutionFlow<Void> terminatedFlow = ExecutionFlow.empty();
             try {
-                if (!terminateEventPublisher.isEmpty()) {
+                if (shouldPublishTerminatedEvent(request)) {
                     terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
                         PropagatedContext.getOrEmpty()
                             .plus(new ServerHttpRequestContext(request))
