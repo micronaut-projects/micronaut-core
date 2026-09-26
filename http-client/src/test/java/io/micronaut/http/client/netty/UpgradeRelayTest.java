@@ -17,6 +17,9 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
@@ -27,6 +30,7 @@ import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -36,6 +40,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayOutputStream;
@@ -149,6 +154,53 @@ class UpgradeRelayTest {
     }
 
     @Test
+    void clientSendsAndReceivesOnTheSwitchedConnection() throws Exception {
+        try (EchoUpstream upstream = new EchoUpstream();
+             ApplicationContext ctx = ApplicationContext.run();
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            HttpResponse<?> response = Mono.from(client.exchange(upgradeRequest(upstream, "/echo"), null, null, RawRequestOptions.proxy()))
+                .block(Duration.ofSeconds(TIMEOUT_SECONDS));
+            // the raw client returns a mutable response that carries the upgraded one
+            UpgradedHttpResponse<?> upgraded = UpgradedHttpResponse.unwrap(response);
+            Assertions.assertNotNull(upgraded, () -> "Not upgraded: " + response);
+            try (upgraded) {
+                Assertions.assertEquals(101, upgraded.code());
+                Assertions.assertEquals("echo", upgraded.getProtocol());
+                // the outbound body stays open: ending it would close the connection
+                upgraded.send(ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(
+                    Flux.just("hi").map(text -> (ReadBuffer) ReadBufferFactory.getJdkFactory().copyOf(text, StandardCharsets.US_ASCII)).concatWith(Flux.never())));
+                byte[] answer = Flux.from(upgraded.byteBody().toByteArrayPublisher()).blockFirst(Duration.ofSeconds(TIMEOUT_SECONDS));
+                Assertions.assertEquals("HI", new String(answer, StandardCharsets.US_ASCII));
+            }
+            Assertions.assertTrue(upstream.closed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The upstream connection was not closed");
+        }
+    }
+
+    @Test
+    void anIdleSwitchedConnectionIsClosedAfterTheActivityTimeout() throws Exception {
+        try (EchoUpstream upstream = new EchoUpstream();
+             ApplicationContext ctx = ApplicationContext.run();
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            RawRequestOptions options = RawRequestOptions.proxy().toBuilder().activityTimeout(Duration.ofMillis(200)).build();
+            HttpResponse<?> response = Mono.from(client.exchange(upgradeRequest(upstream, "/echo?mode=sink"), null, null, options))
+                .block(Duration.ofSeconds(TIMEOUT_SECONDS));
+            UpgradedHttpResponse<?> upgraded = UpgradedHttpResponse.unwrap(response);
+            Assertions.assertNotNull(upgraded, () -> "Not upgraded: " + response);
+            try (upgraded) {
+                // nothing is sent either way: the connection is closed, which ends the inbound body
+                Assertions.assertTrue(upstream.closed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The idle connection was not closed");
+                upgraded.byteBody().buffer().get(TIMEOUT_SECONDS, TimeUnit.SECONDS).close();
+            }
+        }
+    }
+
+    private static MutableHttpRequest<?> upgradeRequest(EchoUpstream upstream, String path) {
+        return HttpRequest.GET(upstream.uri().resolve(path).toString())
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "echo");
+    }
+
+    @Test
     void switchToAProtocolThatWasNotOfferedFails() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              ApplicationContext ctx = ApplicationContext.run();
@@ -185,12 +237,14 @@ class UpgradeRelayTest {
         Assertions.assertEquals(options.hashCode(), options.toBuilder().build().hashCode());
         Assertions.assertNotEquals(options, RawRequestOptions.proxy());
         Assertions.assertNotEquals(RawRequestOptions.proxy(), RawRequestOptions.proxy().toBuilder().allowUpgrade(false).build());
+        Assertions.assertNotEquals(RawRequestOptions.proxy(), RawRequestOptions.proxy().toBuilder().responseTimeout(Duration.ofSeconds(1)).build());
         Assertions.assertThrows(IllegalArgumentException.class, () -> RawRequestOptions.builder().activityTimeout(Duration.ZERO));
         Assertions.assertThrows(IllegalArgumentException.class, () -> RawRequestOptions.builder().activityTimeout(Duration.ofSeconds(-1)));
     }
 
     @Test
     void aResponseWithoutASwitchCarriesNoUpgrade() {
+        Assertions.assertNull(UpgradedHttpResponse.unwrap(null));
         Assertions.assertNull(UpgradedHttpResponse.unwrap(HttpResponse.ok()));
         Assertions.assertNull(UpgradedHttpResponse.unwrap(new HttpResponseWrapper<>(HttpResponse.ok("body"))));
         Assertions.assertNull(UpgradedHttpResponse.unwrap(new HttpResponseWrapper<>(HttpResponse.ok())));
