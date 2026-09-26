@@ -24,6 +24,8 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -87,10 +89,19 @@ public final class PythonAstParser {
             type_checker = TypeChecker(type_check_mode, list(type_check_annotations))
         else:
             type_checker = None
+        if static_compile_enabled:
+            from micronaut_static import StaticPlanner
+            static_planner = StaticPlanner(static_compile_mode, list(static_compile_annotations), static_compile_strict)
+        else:
+            static_planner = None
         """, "micronaut-typecheck-init.py").cached(true).buildLiteral();
     private static final Source TYPE_CHECK_SOURCE = Source.newBuilder(PYTHON, """
         diagnostics = [] if type_checker is None else type_checker.check(visitor_context)
         """, "micronaut-typecheck-driver.py").cached(true).buildLiteral();
+    private static final Source STATIC_PLAN_SOURCE = Source.newBuilder(PYTHON, """
+        static_decisions = [] if static_planner is None else static_planner.plan(type_checker, visitor_context)
+        static_diagnostics = [] if static_planner is None else list(static_planner.diagnostics)
+        """, "micronaut-static-plan-driver.py").cached(true).buildLiteral();
     private final Context context;
     private final Value runtimeAstCompiler;
     private final IdentityHashMap<TransformResult, TransformArtifacts> transformArtifacts = new IdentityHashMap<>();
@@ -200,7 +211,7 @@ public final class PythonAstParser {
             }
             return o;
         });
-        initializeTypeChecker(null);
+        initializeTypeChecker(null, null);
         List<PythonDiagnostic> diagnostics = evaluateProcessor(bindings, sources, tree, packageName != null ? packageName : "", "Unknown", "Unknown", "", visitorContext);
         return new PythonEnvironment(
             classes,
@@ -291,7 +302,7 @@ public final class PythonAstParser {
      * @return The parsed environment
      */
     public PythonEnvironment parse(List<Source> sources, List<String> srcDirs, VisitorContext visitorContext) {
-        initializeTypeChecker(null);
+        initializeTypeChecker(null, null);
         return parseSources(sources.stream().map(source -> new ParsedSource(source, null)).toList(), srcDirs, visitorContext);
     }
 
@@ -326,25 +337,54 @@ public final class PythonAstParser {
                                               List<String> srcDirs,
                                               VisitorContext visitorContext,
                                               TypeCheckConfiguration typeCheck) {
+        return parseTransformed(transformed, srcDirs, visitorContext, typeCheck, StaticCompilationConfiguration.OFF);
+    }
+
+    /**
+     * Parse the transformed sources located within the given source directories, collecting the
+     * definitions for the type checker and the static compilation planner as configured. The check
+     * runs once every source is modelled, see {@link #typeCheck(VisitorContext)}, and the plan after
+     * it, see {@link #staticPlan(VisitorContext)}.
+     *
+     * @param transformed       The transformed sources, as returned by this parser
+     * @param srcDirs           The source directories
+     * @param visitorContext    The visitor context for constant resolution
+     * @param typeCheck         The type checking requested for the compilation
+     * @param staticCompilation The static compilation requested for the compilation
+     * @return The parsed environment
+     * @since 5.3.0
+     */
+    public PythonEnvironment parseTransformed(List<TransformResult> transformed,
+                                              List<String> srcDirs,
+                                              VisitorContext visitorContext,
+                                              TypeCheckConfiguration typeCheck,
+                                              StaticCompilationConfiguration staticCompilation) {
         List<ParsedSource> sources = new ArrayList<>(transformed.size());
         List<Source> originals = new ArrayList<>(transformed.size());
         for (TransformResult result : transformed) {
             sources.add(new ParsedSource(result.originalSource(), artifacts(result).tree()));
             originals.add(result.originalSource());
         }
-        initializeTypeChecker(typeCheck.isEnabledFor(originals) ? typeCheck : null);
+        // the planner decides over the checker's records, so compiling anything needs the checker
+        boolean planning = staticCompilation.isEnabledFor(originals);
+        boolean checking = planning || typeCheck.isEnabledFor(originals);
+        initializeTypeChecker(checking ? typeCheck : null, planning ? staticCompilation : null);
         return parseSources(sources, srcDirs, visitorContext);
     }
 
     /**
-     * Creates the type checker the processor hands its definitions to, or removes it when nothing
-     * is checked so an unchecked compilation costs nothing.
+     * Creates the type checker the processor hands its definitions to and the planner deciding over
+     * them, or removes them when nothing is checked or compiled so such a compilation costs nothing.
      */
-    private void initializeTypeChecker(@Nullable TypeCheckConfiguration typeCheck) {
+    private void initializeTypeChecker(@Nullable TypeCheckConfiguration typeCheck, @Nullable StaticCompilationConfiguration staticCompilation) {
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("type_check_enabled", typeCheck != null);
         bindings.putMember("type_check_mode", typeCheck != null ? typeCheck.mode().optionValue() : "off");
         bindings.putMember("type_check_annotations", typeCheck != null ? typeCheck.annotationNames().toArray(String[]::new) : new String[0]);
+        bindings.putMember("static_compile_enabled", staticCompilation != null);
+        bindings.putMember("static_compile_mode", staticCompilation != null ? staticCompilation.mode().optionValue() : "off");
+        bindings.putMember("static_compile_strict", staticCompilation != null && staticCompilation.strict());
+        bindings.putMember("static_compile_annotations", staticCompilation != null ? staticCompilation.annotationNames().toArray(String[]::new) : new String[0]);
         context.eval(TYPE_CHECKER_SOURCE);
     }
 
@@ -368,6 +408,32 @@ public final class PythonAstParser {
         context.eval(TYPE_CHECK_SOURCE);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
+    }
+
+    /**
+     * Runs the static compilation planner over the definitions collected by the last
+     * {@link #parseTransformed(List, List, VisitorContext, TypeCheckConfiguration, StaticCompilationConfiguration)},
+     * after {@link #typeCheck(VisitorContext)}, whose inference the planner decides on.
+     *
+     * @param visitorContext The visitor context resolving the Java and Python classes of the compilation
+     * @return The plan: one decision per function, and the diagnostics for explicit switches not honoured
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    public StaticCompilationPlan staticPlan(VisitorContext visitorContext) {
+        Value bindings = context.getBindings(PYTHON);
+        Value planner = bindings.getMember("static_planner");
+        if (planner == null || planner.isNull()) {
+            return StaticCompilationPlan.EMPTY;
+        }
+        bindings.putMember("visitor_context", visitorContext);
+        context.eval(STATIC_PLAN_SOURCE);
+        Value decisions = bindings.getMember("static_decisions");
+        Value diagnostics = bindings.getMember("static_diagnostics");
+        return new StaticCompilationPlan(
+            decisions == null ? List.of() : List.copyOf(decisions.as(List.class)),
+            diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class))
+        );
     }
 
     private TransformArtifacts artifacts(TransformResult transformResult) {

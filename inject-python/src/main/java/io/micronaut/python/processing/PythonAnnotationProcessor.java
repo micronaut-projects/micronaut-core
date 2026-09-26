@@ -26,6 +26,11 @@ import io.micronaut.inject.utils.JsonWriter;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
+import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
+import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticCompilationReport;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.typecheck.TypeCheckMode;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
@@ -233,6 +238,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
     private Consumer<PythonDiagnostic> diagnosticCallback;
+    private Consumer<StaticCompilationDecision> staticDecisionCallback;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -265,13 +271,55 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         this.diagnosticCallback = callback;
     }
 
+    /**
+     * Set the callback to be invoked for each static compilation decision, before the report is written.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setStaticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+        this.staticDecisionCallback = callback;
+    }
+
     @Override
     public Set<String> getSupportedOptions() {
         Set<String> options = new HashSet<>(super.getSupportedOptions());
         options.add(SOURCE_ROOT_OPTION);
         options.add(TypeCheckMode.OPTION);
         options.add(TypeCheckMode.ANNOTATIONS_OPTION);
+        options.add(StaticCompilationMode.OPTION);
+        options.add(StaticCompilationMode.REPORT_OPTION);
+        options.add(StaticCompilationMode.STRICT_OPTION);
+        options.add(StaticCompilationMode.ANNOTATIONS_OPTION);
         return options;
+    }
+
+    /**
+     * The static compilation requested through the processor options.
+     */
+    private StaticCompilationConfiguration staticCompilationConfiguration() {
+        Map<String, String> options = processingEnv.getOptions();
+        StaticCompilationMode mode;
+        try {
+            mode = StaticCompilationMode.fromOption(options.get(StaticCompilationMode.OPTION));
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(null, e.getMessage());
+        }
+        String report = options.get(StaticCompilationMode.REPORT_OPTION);
+        boolean strict = Boolean.parseBoolean(options.get(StaticCompilationMode.STRICT_OPTION));
+        return new StaticCompilationConfiguration(
+            mode,
+            report == null || report.isBlank() ? null : Path.of(report.trim()),
+            strict,
+            optionList(options.get(StaticCompilationMode.ANNOTATIONS_OPTION))
+        );
+    }
+
+    private static List<String> optionList(String value) {
+        return value == null ? List.of() : Arrays.stream(value.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
     }
 
     /**
@@ -571,6 +619,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Every class of the compilation is modelled and registered: check the Python code against
             // the Java types it uses, and stop before any stub is generated when the check fails
             reportDiagnostics(parser.typeCheck(processingEnvironment.visitorContext()), transformedList, element, originatingElement);
+            planStaticCompilation(processingEnvironment, transformedList, element, originatingElement);
 
             Map<String, String> allDecorators = new LinkedHashMap<>();
             Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
@@ -741,13 +790,52 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 transformedList,
                 Arrays.asList(srcDirs),
                 javaVisitorContext,
-                typeCheckConfiguration()
+                typeCheckConfiguration(),
+                staticCompilationConfiguration()
             );
         } catch (ProcessingException e) {
             throw e;
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
         }
+    }
+
+    /**
+     * Decides which function bodies could be compiled statically, hands every decision to the
+     * callback, writes the report when a directory is configured, and reports the explicit
+     * switches that cannot be honoured.
+     */
+    private void planStaticCompilation(PythonProcessingEnvironment processingEnvironment,
+                                       List<PythonAstParser.TransformResult> transformedList,
+                                       TypeElement element,
+                                       ClassElement originatingElement) {
+        StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext());
+        StaticCompilationConfiguration configuration = staticCompilationConfiguration();
+        boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
+        if (!planned && plan.diagnostics().isEmpty()) {
+            return;
+        }
+        if (staticDecisionCallback != null) {
+            plan.decisions().forEach(staticDecisionCallback);
+        }
+        if (planned && configuration.reportDirectory() != null) {
+            // an incremental build planned the affected sources: the ones it was given and the ones
+            // it transformed, so a source whose functions are gone loses its previous decisions
+            Set<String> plannedSources = null;
+            if (incrementalSources != null) {
+                plannedSources = new HashSet<>(incrementalSources);
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            StaticCompilationReport.write(configuration.reportDirectory(), configuration.mode(), plan.decisions(), plannedSources);
+        }
+        reportDiagnostics(plan.diagnostics(), transformedList, element, originatingElement);
     }
 
     /**
