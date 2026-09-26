@@ -1,4 +1,7 @@
 #!/bin/bash
-# The Python CI workflow only runs the Python tests, which need nothing published to the local Maven repository
-[ "$GITHUB_WORKFLOW" = "Python CI" ] && exit 0
+# The JVM, native and Python CI builds never read the local Maven repository: they resolve the
+# modules of this repository as projects of the same build
+case "$GITHUB_WORKFLOW" in
+    "Java CI"|"Python CI"|"GraalVM Latest CI"|"GraalVM Dev CI") exit 0 ;;
+esac
 ./gradlew pTML
