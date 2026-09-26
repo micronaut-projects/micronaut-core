@@ -1840,7 +1840,8 @@ public class ConnectionManager {
             }
 
             void adaptHeaders(Object msg) {
-                if (msg instanceof Http2HeadersFrame hf) {
+                // the request head, not the trailers: pseudo-headers are not allowed in trailers
+                if (msg instanceof Http2HeadersFrame hf && hf.headers().method() != null) {
                     if (requestKey.isSecure()) {
                         hf.headers().scheme(HttpScheme.HTTPS.name());
                     } else {
@@ -1889,7 +1890,8 @@ public class ConnectionManager {
 
             @Override
             void adaptHeaders(Object msg) {
-                if (msg instanceof Http3HeadersFrame hf) {
+                // the request head, not the trailers: pseudo-headers are not allowed in trailers
+                if (msg instanceof Http3HeadersFrame hf && hf.headers().method() != null) {
                     if (requestKey.isSecure()) {
                         hf.headers().scheme(HttpScheme.HTTPS.name());
                     } else {

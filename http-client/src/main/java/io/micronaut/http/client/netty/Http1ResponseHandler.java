@@ -210,20 +210,23 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             } else {
                 msg.release();
             }
-            if (msg instanceof LastHttpContent) {
+            if (msg instanceof LastHttpContent last) {
                 List<ByteBuf> buffered = this.buffered;
                 this.buffered = null;
                 transitionToState(ctx, this, AfterContent.INSTANCE);
                 BodySizeLimits limits = listener.sizeLimits();
+                NettyByteBodyFactory factory = new NettyByteBodyFactory(ctx.channel());
+                CloseableByteBody body;
                 if (buffered == null) {
-                    complete(NettyByteBodyFactory.empty());
+                    body = NettyByteBodyFactory.empty();
                 } else if (buffered.size() == 1) {
-                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, buffered.get(0)));
+                    body = factory.createChecked(limits, buffered.get(0));
                 } else {
                     CompositeByteBuf composite = ctx.alloc().compositeBuffer();
                     composite.addComponents(true, buffered);
-                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, composite));
+                    body = factory.createChecked(limits, composite);
                 }
+                complete(factory.withTrailers(body, last.trailingHeaders()));
                 listener.finish(ctx);
             }
         }
@@ -305,9 +308,9 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void read(ChannelHandlerContext ctx, HttpContent msg) {
             add(NettyReadBufferFactory.of(ctx.alloc()).adapt(msg.content()));
-            if (msg instanceof LastHttpContent) {
+            if (msg instanceof LastHttpContent last) {
                 transitionToState(ctx, this, AfterContent.INSTANCE);
-                streaming.complete();
+                streaming.completeWithTrailers(last.trailingHeaders());
                 listener.finish(ctx);
             }
         }

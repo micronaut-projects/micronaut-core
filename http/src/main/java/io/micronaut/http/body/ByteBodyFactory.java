@@ -30,6 +30,7 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.TrailingByteBody;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -39,6 +40,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -294,6 +296,25 @@ public class ByteBodyFactory {
     }
 
     /**
+     * Create a body with the bytes of the given body and the given trailers, see
+     * {@link ByteBody#trailers()}. The given body is claimed. The trailers are sent after the
+     * last bytes, once the stage completes, so a message with this body uses the chunked
+     * transfer coding on HTTP/1 whatever the length of the bytes. When the stage fails, the
+     * body fails.
+     *
+     * @param body     The bytes
+     * @param trailers The trailers to send after the bytes, empty headers for none
+     * @return The body with the trailers
+     * @since 5.3.0
+     */
+    @NonNull
+    public final CloseableByteBody withTrailers(@NonNull CloseableByteBody body, @NonNull CompletionStage<? extends HttpHeaders> trailers) {
+        @SuppressWarnings("unchecked")
+        CompletionStage<HttpHeaders> stage = (CompletionStage<HttpHeaders>) trailers;
+        return new TrailingByteBody(body.move(), stage);
+    }
+
+    /**
      * Convert a {@link ByteBody} into a {@link BaseStreamingByteBody} with the same content.
      * <b>Internal API.</b>
      *
@@ -308,6 +329,7 @@ public class ByteBodyFactory {
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
+        adapter.setTrailers(body.trailers());
         body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
         return sb.rootBody;
     }

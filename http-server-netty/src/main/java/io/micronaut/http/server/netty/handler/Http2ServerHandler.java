@@ -26,9 +26,12 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
@@ -148,8 +151,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         Http2Stream stream = new Http2Stream(str);
         Http2Stream existing = str.setProperty(streamKey, stream);
         if (existing != null) {
-            // ignore trailer and revert the setProperty. should not be hot path
+            // the trailers of the request. revert the setProperty. should not be hot path
             str.setProperty(streamKey, existing);
+            HttpHeaders trailers = new DefaultHttpHeaders(false);
+            HttpConversionUtil.addHttp2ToHttpHeaders(streamId, headers, trailers, HttpVersion.HTTP_1_1, true, true);
+            existing.onTrailersRead(trailers, endOfStream);
             return;
         }
         stream.onHeadersRead(HttpConversionUtil.toHttpRequest(streamId, headers, true), endOfStream);
@@ -510,6 +516,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise.addListener(future -> closeInput());
             }
             requiredConnectionHandler().encoder().writeData(requiredCtx(), stream.id(), data, 0, endStream, promise);
+        }
+
+        @Override
+        void writeTrailers(HttpHeaders trailers, ChannelPromise promise) {
+            if (closeInput) {
+                promise = promise.unvoid();
+                promise.addListener(future -> closeInput());
+            }
+            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(trailers, true), 0, true, promise);
         }
     }
 

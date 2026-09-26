@@ -193,6 +193,7 @@ httpServer:
     title: Advanced body access
     byteBodyPrimary: Primary operations
     byteBodySplitting: Splitting
+    byteBodyTrailers: Trailers
     byteBodyExample: Example
   sessions: HTTP Sessions
   sse: Server Sent Events

@@ -1762,7 +1762,10 @@ final class NettyHttpClient implements
         poolHandle.channel.attr(ResponseContentDecompressor.SKIP_DECOMPRESSION)
             .set(request.getAttribute(NO_DECOMPRESSION).isPresent() ? Boolean.TRUE : null);
 
-        OptionalLong length = byteBody.expectedLength();
+        // a body whose trailers are known, e.g. a relayed body that was received fully before it
+        // is sent on, may have a known length. The trailers need the chunked transfer coding: a
+        // Content-Length request would drop them
+        OptionalLong length = NettyByteBodyFactory.hasTrailers(byteBody) ? OptionalLong.empty() : byteBody.expectedLength();
 
         // if the body is streamed, we have a StreamWriter, otherwise we have a ByteBuf.
         StreamWriter streamWriter = null;

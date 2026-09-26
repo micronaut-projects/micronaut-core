@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -27,6 +28,7 @@ import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.UpstreamBalancer;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -176,6 +178,26 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
 
         public void setExpectedLengthFrom(HttpHeaders headers) {
             setExpectedLengthFrom(headers.get(HttpHeaderNames.CONTENT_LENGTH));
+        }
+
+        /**
+         * Complete this buffer with the trailing headers of a
+         * {@link io.netty.handler.codec.http.LastHttpContent}.
+         *
+         * @param trailingHeaders The trailing headers, possibly empty
+         * @since 5.3.0
+         */
+        public void completeWithTrailers(HttpHeaders trailingHeaders) {
+            if (trailingHeaders.isEmpty()) {
+                complete();
+            } else {
+                complete(new NettyHttpHeaders(trailingHeaders, ConversionService.SHARED));
+            }
+        }
+
+        @Override
+        protected void submitDeferred(Runnable task) {
+            eventLoop.execute(task);
         }
 
         boolean reserve() {
