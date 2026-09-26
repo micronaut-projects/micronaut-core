@@ -234,7 +234,7 @@ final class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     @Override
     public int indexOf(byte b) {
-        return delegate.bytesBefore(b);
+        return delegate.indexOf(delegate.readerIndex(), delegate.writerIndex(), b);
     }
 
     @Override
