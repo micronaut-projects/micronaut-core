@@ -72,6 +72,21 @@ class GatewayConfigurationBindingTest {
     }
 
     @Test
+    void theSizeFiltersBindTheirLimits() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestSize=5KB", "RequestHeaderSize=1KB, 20")
+        ));
+        assertEquals(List.of("RequestSize=5120", "RequestHeaderSize=1024, 20"), route.getFilters().stream().map(Object::toString).toList());
+        GatewayRoute defaults = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters[0].name", "RequestSize",
+            "micronaut.gateway.routes.r.filters[1].name", "RequestHeaderSize"
+        ));
+        assertEquals(List.of("RequestSize=5242880", "RequestHeaderSize=16000, 0"), defaults.getFilters().stream().map(Object::toString).toList());
+    }
+
+    @Test
     void theShortcutAndTheNameAndArgsSyntaxBindTheSameRoute() {
         GatewayRoute shortcut = bind(Map.of(
             "micronaut.gateway.routes.r.uri", "lb://orders",

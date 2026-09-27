@@ -335,6 +335,54 @@ public final class GatewayFilters {
         return new RedirectTo(HttpStatus.valueOf(status), uri);
     }
 
+    /**
+     * Limit the size of the body of a request, like Spring Cloud Gateway's {@code RequestSize}: a
+     * request whose {@code Content-Length} is over the limit is answered with {@code 413} and an
+     * {@code errorMessage} header, without calling the upstream; a body that streams in fails the
+     * relay with {@code 413} once more bytes than the limit arrive, if no response was relayed
+     * yet. A route filter.
+     *
+     * @param maxBytes The maximum size of the body in bytes
+     * @return The filter
+     */
+    public static GatewayFilter requestSize(long maxBytes) {
+        if (maxBytes < 0) {
+            throw new IllegalArgumentException("RequestSize needs a size of at least 0: " + maxBytes);
+        }
+        return new RequestSize(maxBytes);
+    }
+
+    /**
+     * Limit the headers of a request, like Spring Cloud Gateway's {@code RequestHeaderSize}: a
+     * request whose headers are larger than the limit, the names and the values of all of them,
+     * cookies included, or that has more headers than the count, is answered with {@code 431}
+     * and an {@code errorMessage} header, without calling the upstream. A route filter.
+     *
+     * @param maxBytes The maximum size of the headers in bytes
+     * @param maxCount The maximum number of header lines, {@code 0} for no limit
+     * @return The filter
+     */
+    public static GatewayFilter requestHeaderSize(long maxBytes, int maxCount) {
+        if (maxBytes < 0 || maxCount < 0) {
+            throw new IllegalArgumentException("RequestHeaderSize needs a size and a count of at least 0: " + maxBytes + ", " + maxCount);
+        }
+        return new RequestHeaderSize(maxBytes, maxCount);
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The smallest {@link #requestSize(long) body limit} among them, or {@code -1} for none
+     */
+    static long maxRequestSize(List<GatewayFilter> filters) {
+        long max = -1;
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof RequestSize size && (max < 0 || size.maxBytes() < max)) {
+                max = size.maxBytes();
+            }
+        }
+        return max;
+    }
+
     // ---- helpers
 
     private static String requirePath(String path, String filter) {
@@ -846,6 +894,66 @@ public final class GatewayFilters {
         @Override
         public String toString() {
             return "SetStatus=" + status.getCode();
+        }
+    }
+
+    record RequestSize(long maxBytes) implements GatewayFilter {
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacing(request -> {
+                long length = request.getContentLength();
+                if (length > maxBytes) {
+                    return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+                        .header("errorMessage", "Request size is larger than permissible limit. Request size is " + length
+                            + " bytes where permissible limit is " + maxBytes + " bytes");
+                }
+                return null;
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "RequestSize=" + maxBytes;
+        }
+    }
+
+    private record RequestHeaderSize(long maxBytes, int maxCount) implements GatewayFilter {
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacing(request -> {
+                long size = 0;
+                int count = 0;
+                String largest = null;
+                long largestSize = -1;
+                for (Map.Entry<String, List<String>> header : request.getHeaders()) {
+                    long headerSize = 0;
+                    for (String value : header.getValue()) {
+                        // a header line: its name and its value
+                        headerSize += header.getKey().length() + value.length();
+                        count++;
+                    }
+                    size += headerSize;
+                    if (headerSize > largestSize) {
+                        largestSize = headerSize;
+                        largest = header.getKey();
+                    }
+                }
+                if (size > maxBytes) {
+                    return HttpResponse.status(HttpStatus.REQUEST_HEADER_FIELDS_TOO_LARGE)
+                        .header("errorMessage", "Request Header/s size is larger than permissible limit (" + maxBytes
+                            + " bytes). Request Header/s size is " + size + " bytes, the largest is '" + largest + "' with " + largestSize + " bytes");
+                }
+                if (maxCount > 0 && count > maxCount) {
+                    return HttpResponse.status(HttpStatus.REQUEST_HEADER_FIELDS_TOO_LARGE)
+                        .header("errorMessage", "The request has " + count + " headers, more than the permissible " + maxCount);
+                }
+                return null;
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "RequestHeaderSize=" + maxBytes + ", " + maxCount;
         }
     }
 

@@ -461,6 +461,21 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("RequestSize")
+    GatewayFilterFactory requestSize() {
+        return GatewayFilterFactory.of(List.of("max-size"), args -> GatewayFilters.requestSize(args.bind(RequestSizeArguments.class).maxSize()));
+    }
+
+    @Singleton
+    @Named("RequestHeaderSize")
+    GatewayFilterFactory requestHeaderSize() {
+        return GatewayFilterFactory.of(List.of("max-size", "max-count"), args -> {
+            RequestHeaderSizeArguments bound = args.bind(RequestHeaderSizeArguments.class);
+            return GatewayFilters.requestHeaderSize(bound.maxSize(), bound.maxCount());
+        });
+    }
+
+    @Singleton
     @Named("Retry")
     GatewayFilterFactory retry() {
         return GatewayFilterFactory.of(List.of("retries"), args -> {
@@ -553,6 +568,26 @@ final class BuiltInGatewayFactories {
                           @Bindable(defaultValue = "2") double multiplier,
                           @Bindable(defaultValue = "0") double jitter,
                           @ReadableBytes @Nullable Long maxReplayBytes) {
+    }
+
+    /**
+     * The arguments of the {@code RequestSize} filter.
+     *
+     * @param maxSize The maximum size of the body, e.g. {@code 5MB}; 5 MB by default
+     */
+    @Introspected
+    record RequestSizeArguments(@ReadableBytes @Bindable(defaultValue = "5MB") long maxSize) {
+    }
+
+    /**
+     * The arguments of the {@code RequestHeaderSize} filter.
+     *
+     * @param maxSize  The maximum size of the headers, e.g. {@code 16KB}
+     * @param maxCount The maximum number of headers, {@code 0} for no limit
+     */
+    @Introspected
+    record RequestHeaderSizeArguments(@ReadableBytes @Bindable(defaultValue = "16000") long maxSize,
+                                      @Bindable(defaultValue = "0") int maxCount) {
     }
 
     /**

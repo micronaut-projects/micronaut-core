@@ -42,6 +42,7 @@ import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -169,7 +170,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         RequestBody body;
         try {
-            body = RequestBody.of(request, route.getRetry());
+            body = RequestBody.of(request, route.getRetry(), GatewayFilters.maxRequestSize(route.getFilters()));
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -389,6 +390,10 @@ final class DefaultProxyHandler implements ProxyHandler {
         if (cause instanceof HttpStatusException) {
             return cause;
         }
+        if (cause instanceof ContentLengthExceededException exceeded) {
+            // the body of the client is over the limit of the route
+            return new HttpStatusException(HttpStatus.REQUEST_ENTITY_TOO_LARGE, Objects.requireNonNullElse(exceeded.getMessage(), "The request body is too large"));
+        }
         String id = route.getId();
         if (cause instanceof CircuitOpenException) {
             return new UpstreamException(HttpStatus.SERVICE_UNAVAILABLE, id, "The circuit breaker of the gateway route " + id + " is open", cause);
@@ -403,6 +408,22 @@ final class DefaultProxyHandler implements ProxyHandler {
         // the cause names internal hosts and addresses: it is logged and kept, not sent to the client
         LOG.debug("The upstream of the gateway route {} failed", id, cause);
         return new UpstreamException(HttpStatus.BAD_GATEWAY, id, "The upstream of the gateway route " + id + " failed", cause);
+    }
+
+    /**
+     * @param failure A failure of an attempt
+     * @return Whether the body of the client went over the limit of the route
+     */
+    private static boolean isBodyOverLimit(Throwable failure) {
+        for (Throwable t = failure; t != null; t = t.getCause()) {
+            if (t instanceof ContentLengthExceededException) {
+                return true;
+            }
+            if (t.getCause() == t) {
+                break;
+            }
+        }
+        return false;
     }
 
     private static Throwable unwrap(Throwable failure) {
@@ -499,6 +520,11 @@ final class DefaultProxyHandler implements ProxyHandler {
          * {@code -1} to keep none.
          */
         private final long replayLimit;
+        /**
+         * The maximum number of bytes of the body, or {@code -1} for no limit, see
+         * {@link GatewayFilters#requestSize(long)}.
+         */
+        private final long sizeLimit;
         @Nullable
         private CloseableByteBody body;
         @Nullable
@@ -507,20 +533,22 @@ final class DefaultProxyHandler implements ProxyHandler {
         private boolean replayable = true;
         private boolean moved;
 
-        private RequestBody(HttpRequest<?> request, long replayLimit) {
+        private RequestBody(HttpRequest<?> request, long replayLimit, long sizeLimit) {
             this.request = request;
             this.replayLimit = replayLimit;
+            this.sizeLimit = sizeLimit;
         }
 
         /**
          * @param request The request
          * @param retry   The retries of the route, if any: the body of a request whose method
          *                they send again is kept up to their limit
+         * @param sizeLimit The maximum number of bytes of the body, {@code -1} for no limit
          * @return The body of the request
          */
-        static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry) {
+        static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry, long sizeLimit) {
             long replayLimit = retry != null && retry.retriesMethod(request.getMethodName()) ? retry.maxReplayBytes() : -1;
-            RequestBody body = new RequestBody(request, replayLimit);
+            RequestBody body = new RequestBody(request, replayLimit, sizeLimit);
             if (request instanceof ServerHttpRequest<?> server && server.byteBody().expectedLength().orElse(-1) == 0
                 && request.getBody().isEmpty()) {
                 // nothing to send: the request keeps its empty body
@@ -543,16 +571,19 @@ final class DefaultProxyHandler implements ProxyHandler {
                 taken.close();
                 return;
             }
+            ByteBodyFactory factory = bodyFactory(request);
             // the trailers of the client are sanitized like its headers
-            taken = RelayHeaders.withSanitizedTrailers(bodyFactory(request), taken);
+            taken = RelayHeaders.withSanitizedTrailers(factory, taken);
+            if (sizeLimit >= 0 && !(taken instanceof AvailableByteBody available && available.length() <= sizeLimit)) {
+                // fails the relay once more bytes than the limit arrive
+                taken = factory.limit(taken, sizeLimit);
+            }
             if (taken instanceof AvailableByteBody) {
                 // the bytes are all there: a split is a reference, not a copy
                 body = taken;
                 replayable = true;
             } else if (replayLimit > 0) {
                 // kept while it streams into the first attempt, up to the limit
-                ByteBodyFactory factory = request instanceof ServerHttpRequest<?> server
-                    ? server.byteBodyFactory() : ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
                 replay = factory.replayable(taken, replayLimit);
                 replayable = false;
                 GatewayRequestContext.find(request).ifPresent(GatewayRequestContext::keepBodyForReplay);
@@ -819,6 +850,9 @@ final class DefaultProxyHandler implements ProxyHandler {
                         if (result.isCancelled()) {
                             // the client went away: nothing to hold against the upstream
                             permit.release();
+                        } else if (isBodyOverLimit(cause)) {
+                            // a failure of the client, not of the upstream
+                            permit.onSuccess();
                         } else {
                             permit.onFailure(cause);
                         }
@@ -876,6 +910,9 @@ final class DefaultProxyHandler implements ProxyHandler {
          * @return Whether to send the request again
          */
         private boolean retries(int attempt, Throwable failure) {
+            if (isBodyOverLimit(failure)) {
+                return false;
+            }
             GatewayRetry retry = route.getRetry();
             if (retry == null || attempt > retry.retries() || !body.canResend() || result.isDone()) {
                 return false;

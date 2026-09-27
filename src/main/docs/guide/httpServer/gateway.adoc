@@ -89,6 +89,7 @@ The api:http.gateway.GatewayFilters[] are the proxy transforms, applied once to 
 * the query: `AddRequestParameter`, `RemoveRequestParameter`;
 * the host: `PreserveHostHeader`, `SetRequestHostHeader`;
 * the route filters `SetStatus`, `RedirectTo` and `SecureHeaders`, which apply to every response of the route, including a fallback or an error of the gateway;
+* the size limits: `RequestSize` (`413` with an `errorMessage` header for a `Content-Length` over the limit, before the upstream is called; a body that streams in fails the relay with `413` once it goes over, while no response was relayed) and `RequestHeaderSize` (`431` when the names and values of the headers, cookies included, are larger than the limit, or when there are more headers than an optional count);
 * `Retry` and `CircuitBreaker`.
 
 The path filters work on the raw, percent-encoded path, which they never decode: the rest of the path and the query are relayed byte for byte, and `SetPath` and `PrefixPath` put in the variables as the client sent them. A header value may use the path variables, e.g. `{segment}`; a value that would carry a line break answers `400`. The inbound request, which the server filters see, is never changed.
@@ -140,7 +141,7 @@ Where gateways disagree, this one:
 |A malformed request (conflicting lengths, a transfer coding other than chunked) |rejected by the server before any route
 |An HTTP version other than 1.0 and 1.1 |`505` over HTTP/1.1, with `reject-unsupported-http-versions`, see below
 |A body of unknown length to an HTTP/1.0 client |not chunked: the end of the connection ends it
-|Oversized headers or URIs |`413`, from the server before any route
+|Oversized headers or URIs, a huge method |`413` (a huge method a `4xx`), from the server before any route; `RequestHeaderSize` answers `431` for a route
 |===
 
 WebSocket and other protocol switches are relayed on the Netty server with an HTTP/1.1 upstream: the response timeout of a route applies to the `101` only, and `activityTimeout` closes an idle tunnel.
