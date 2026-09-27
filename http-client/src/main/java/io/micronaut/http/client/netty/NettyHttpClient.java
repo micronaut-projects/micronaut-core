@@ -1516,7 +1516,7 @@ final class NettyHttpClient implements
                 propagatedContext,
                 blockHint,
                 rawRequest
-            ), options.getResponseTimeout(), sent).map(RawHttpClientSupport::toMutableResponse);
+            ), options.getResponseTimeout(), sent, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;

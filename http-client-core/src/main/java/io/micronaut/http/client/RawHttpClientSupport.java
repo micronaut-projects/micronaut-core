@@ -37,6 +37,8 @@ import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -119,6 +121,23 @@ public final class RawHttpClientSupport {
      * @since 5.3.0
      */
     public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow, @Nullable Duration timeout, CompletionStage<?> start) {
+        return withResponseTimeout(flow, timeout, start, null);
+    }
+
+    /**
+     * Like {@link #withResponseTimeout(ExecutionFlow, Duration, CompletionStage)}, with the
+     * timer on a scheduler of the client, e.g. its event loop, so that a timeout fails the flow
+     * there rather than on the shared scheduler of {@link CompletableFuture}.
+     *
+     * @param flow      The response flow
+     * @param timeout   The timeout, or {@code null} for none
+     * @param start     The stage whose completion starts the timeout
+     * @param scheduler The scheduler of the timer, or {@code null} for the one of {@link CompletableFuture}
+     * @return The flow with the timeout applied
+     * @since 5.3.0
+     */
+    public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow, @Nullable Duration timeout, CompletionStage<?> start,
+                                                                     @Nullable ScheduledExecutorService scheduler) {
         if (timeout == null) {
             return flow;
         }
@@ -128,7 +147,16 @@ public final class RawHttpClientSupport {
         // the flows, and the response, reachable until the timeout elapses. The task is only
         // scheduled once the start stage completes; a timer completed before that never is
         CompletableFuture<@Nullable Void> timer = new CompletableFuture<>();
-        start.whenComplete((ignored, error) -> timer.orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS));
+        if (scheduler == null) {
+            start.whenComplete((ignored, error) -> timer.orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS));
+        } else {
+            start.whenComplete((ignored, error) -> {
+                if (!timer.isDone()) {
+                    ScheduledFuture<?> task = scheduler.schedule(() -> timer.completeExceptionally(new TimeoutException()), timeout.toNanos(), TimeUnit.NANOSECONDS);
+                    timer.whenComplete((v, e) -> task.cancel(false));
+                }
+            });
+        }
         timer.whenComplete((ignored, error) -> {
             if (error instanceof TimeoutException && done.compareAndSet(false, true)) {
                 result.completeExceptionally(ReadTimeoutException.TIMEOUT_EXCEPTION);
