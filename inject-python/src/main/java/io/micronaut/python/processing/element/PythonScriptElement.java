@@ -78,9 +78,13 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
                 enclosedElement.hasStereotype(AnnotationUtil.QUALIFIER) ||
                 enclosedElement.hasStereotype(Executable.class)) {
                 // make bean.
-                // Mark pooled to opt the script into pooled stub generation unless
-                // the module already declares an explicit/default scope.
-                if (scriptDef.decorators().isEmpty() && !hasStereotype(Scope.class)) {
+                // Mark pooled to opt the script into pooled stub generation unless the
+                // module declares a scope of its own. Only a declared scope counts: a
+                // module-level decorator that is not a scope — Controller, Secured,
+                // Requires — must not cost the module its pooling, and the @DefaultScope
+                // that @Controller carries is a default rather than a declaration, so
+                // @ContextPooled (itself @Prototype) is free to override it.
+                if (!hasDeclaredStereotype(Scope.class)) {
                     annotate("io.micronaut.context.python.scope.ContextPooled");
                 }
                 annotate(Bean.class);
