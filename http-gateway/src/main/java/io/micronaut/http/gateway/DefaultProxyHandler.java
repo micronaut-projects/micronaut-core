@@ -37,6 +37,7 @@ import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.retry.CircuitBreakerGuard;
 import io.micronaut.retry.RetryOperations;
@@ -575,6 +576,17 @@ final class DefaultProxyHandler implements ProxyHandler {
                     throw cause instanceof RuntimeException re ? re : new CompletionException(cause);
                 }
                 int status = response.code();
+                if (status < 100 || status > 999) {
+                    // not a status of HTTP: nothing of this response can be relayed
+                    if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                        byteBodyResponse.close();
+                    }
+                    InvalidUpstreamResponse invalid = new InvalidUpstreamResponse("The upstream answered the status " + status);
+                    if (permit != null) {
+                        permit.onFailure(invalid);
+                    }
+                    throw invalid;
+                }
                 if (permit != null) {
                     if (status >= HttpStatus.INTERNAL_SERVER_ERROR.getCode()) {
                         permit.onFailure(new UpstreamStatusFailure(status));
@@ -619,6 +631,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         private HttpResponse<?> relay(HttpResponse<?> response) {
             MutableHttpResponse<?> mutable = RawHttpClientSupport.toMutableResponse(response);
             try {
+                // the upstream decided whether to compress the body: relayed as it is
+                mutable.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, true);
                 stripHopByHopHeaders(mutable);
                 for (GatewayFilter filter : route.getFilters()) {
                     filter.filterResponse(exchange, mutable);
@@ -675,6 +689,15 @@ final class DefaultProxyHandler implements ProxyHandler {
     static final class RetryableAttempt extends RuntimeException {
         RetryableAttempt(Throwable cause) {
             super(cause.getMessage(), cause, false, false);
+        }
+    }
+
+    /**
+     * A response that is not one of HTTP, e.g. of a status out of range.
+     */
+    static final class InvalidUpstreamResponse extends RuntimeException {
+        InvalidUpstreamResponse(String message) {
+            super(message, null, false, false);
         }
     }
 
