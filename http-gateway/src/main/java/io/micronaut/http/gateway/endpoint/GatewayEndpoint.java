@@ -22,9 +22,13 @@ import io.micronaut.http.gateway.GatewayFilter;
 import io.micronaut.http.gateway.GatewayRetry;
 import io.micronaut.http.gateway.GatewayRoute;
 import io.micronaut.http.gateway.GatewayRouteRegistry;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
+import io.micronaut.management.endpoint.annotation.Write;
 import io.micronaut.retry.CircuitBreakerRegistry;
 import io.micronaut.retry.CircuitState;
 import io.micronaut.web.router.builder.RequestCondition;
@@ -36,12 +40,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
+import java.util.concurrent.CompletionStage;
 
 /**
- * The read-only gateway endpoint, {@code /gateway}: the gateway routes, with their predicates,
- * filters, upstream and order, the templates of the routes they are registered as, and the states of
- * their circuit breakers. It is sensitive by default, like the {@code routes} endpoint. It has
- * no write operation: routes are added or changed in the code or the configuration only.
+ * The gateway endpoint, {@code /gateway}: the gateway routes, with their predicates, filters,
+ * upstream and order, the templates of the routes they
+ * are registered as, and the states of their
+ * circuit breakers. It is sensitive by default, like the {@code routes} endpoint. Its write
+ * operations are {@code POST /gateway/refresh}, which loads the routes of the route locators
+ * again, see {@link io.micronaut.http.gateway.GatewayRouteLocator}, and
+ * {@code DELETE /gateway/{id}}, which deletes a route of the route repository, see
+ * {@link io.micronaut.http.gateway.InMemoryGatewayRouteRepository}; the other routes are
+ * changed in the code or the configuration only.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -87,6 +97,32 @@ public class GatewayEndpoint {
     @Read
     public @Nullable Map<String, Object> getRoute(@Selector String id) {
         return registry.findRoute(id).map(this::describe).orElse(null);
+    }
+
+    /**
+     * Load the routes of the route locators again: {@code POST /gateway/refresh}.
+     *
+     * @param action The action, {@code refresh}
+     * @return The number of routes of the locators; a failed refresh keeps the last routes and
+     * answers with an error
+     */
+    @Write
+    public CompletionStage<Map<String, Object>> post(@Selector String action) {
+        if (!"refresh".equals(action)) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "No gateway action " + action);
+        }
+        return registry.refresh().thenApply(count -> Map.of("refreshed", count));
+    }
+
+    /**
+     * Delete a route of the route repository: {@code DELETE /gateway/{id}}.
+     *
+     * @param id The id of the route
+     * @return The deleted route id, or {@code null} for a {@code 404}
+     */
+    @Delete
+    public @Nullable Map<String, Object> delete(@Selector String id) {
+        return registry.deleteRoute(id) ? Map.of("deleted", id) : null;
     }
 
     private static String redact(java.net.URI uri) {

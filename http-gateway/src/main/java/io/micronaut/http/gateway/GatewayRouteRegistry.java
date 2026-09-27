@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * The gateway routes the router has, e.g. for the gateway endpoint: those of the
@@ -41,5 +43,30 @@ public interface GatewayRouteRegistry {
      */
     default Optional<GatewayRoute> findRoute(String id) {
         return getRoutes().stream().filter(route -> route.getId().equals(id)).findFirst();
+    }
+
+    /**
+     * Load the routes of the {@link GatewayRouteLocator route locators} again, see
+     * {@link GatewayRouteLocator}.
+     *
+     * @return The stage of the number of routes of the locators, failed if the refresh failed
+     * and the last routes stay
+     * @since 5.3.0
+     */
+    default CompletionStage<Integer> refresh() {
+        return CompletableFuture.completedFuture(0);
+    }
+
+    /**
+     * Delete a route of the {@link InMemoryGatewayRouteRepository route repository}, and
+     * refresh the routes.
+     *
+     * @param id The id of the route
+     * @return Whether the route was deleted: {@code false} if the repository has no such route
+     * or there is no repository
+     * @since 5.3.0
+     */
+    default boolean deleteRoute(String id) {
+        return false;
     }
 }

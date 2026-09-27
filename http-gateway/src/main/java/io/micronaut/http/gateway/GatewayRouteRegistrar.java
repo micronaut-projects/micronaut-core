@@ -19,7 +19,9 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.web.router.RouteConditionContext;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteScope;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
@@ -28,12 +30,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Turns the gateway routes of the {@link GatewayRoutes} beans into functional routes.
@@ -55,19 +59,47 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
     private final GatewayDefaultFilters defaultFilters;
     private final AtomicReference<List<ProxyHandler>> handlers = new AtomicReference<>(List.of());
     private final Map<String, GatewayWeightGroupConfiguration> weightGroups;
+    private final GatewayRouteRefresher refresher;
+    @Nullable
+    private final InMemoryGatewayRouteRepository repository;
 
     GatewayRouteRegistrar(List<GatewayRoutes> sources, ProxyHandlerFactory factory, @Nullable GatewayDefaultFilters defaultFilters,
-                          List<GatewayWeightGroupConfiguration> weightGroups) {
+                          List<GatewayWeightGroupConfiguration> weightGroups, GatewayRouteRefresher refresher,
+                          @Nullable InMemoryGatewayRouteRepository repository) {
         List<GatewayRoutes> ordered = new ArrayList<>(sources);
         OrderUtil.sort(ordered);
         this.sources = ordered;
         this.factory = factory;
         this.defaultFilters = defaultFilters;
+        this.weightGroups = byName(weightGroups);
+        this.refresher = refresher;
+        this.repository = repository;
+    }
+
+    @Override
+    public CompletionStage<Integer> refresh() {
+        return refresher.refresh();
+    }
+
+    @Override
+    public boolean deleteRoute(String id) {
+        if (repository == null || !repository.delete(id)) {
+            return false;
+        }
+        refresher.refresh();
+        return true;
+    }
+
+    /**
+     * @param weightGroups The settings of the weight groups
+     * @return The settings by the name of their group
+     */
+    static Map<String, GatewayWeightGroupConfiguration> byName(List<GatewayWeightGroupConfiguration> weightGroups) {
         Map<String, GatewayWeightGroupConfiguration> byName = new LinkedHashMap<>();
         for (GatewayWeightGroupConfiguration group : weightGroups) {
             byName.put(group.getGroup(), group);
         }
-        this.weightGroups = byName;
+        return byName;
     }
 
     @Override
@@ -77,6 +109,8 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
         for (ProxyHandler handler : current) {
             routes.add(handler.getRoute());
         }
+        // then the routes of the route locators, as last refreshed
+        routes.addAll(refresher.getRoutes());
         return routes;
     }
 
@@ -89,35 +123,78 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
             builder.flush();
         }
         List<GatewayFilter> defaults = defaultFilters == null ? List.of() : defaultFilters.filters();
-        // the groups of the weighted routes, from all the routes: each route matches when the group chooses it
-        Map<String, WeightGroup> groups = WeightGroup.of(declared.values(), weightGroups);
-        List<ProxyHandler> created = new ArrayList<>(declared.size());
-        for (GatewayRoute route : declared.values()) {
-            GatewayRoute withDefaults = route;
-            if (!defaults.isEmpty()) {
-                List<GatewayFilter> filters = new ArrayList<>(defaults);
-                filters.addAll(route.getFilters());
-                GatewayRoute.Builder b = route.toBuilder().replaceFilters(filters);
-                // the retries and the circuit breaker of the route win over the default ones
-                if (route.getRetry() != null) {
-                    b.retry(route.getRetry());
-                }
-                if (route.getCircuitBreaker() != null) {
-                    b.circuitBreaker(route.getCircuitBreaker());
-                }
-                withDefaults = b.build();
-            }
-            ProxyHandler handler = factory.create(withDefaults);
-            register(routes, handler, withDefaults.getWeight() == null ? null : groups.get(withDefaults.getWeight().group()));
-            created.add(handler);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Gateway route {} {} -> {}", withDefaults.getId(), withDefaults.getPaths(), RelayHeaders.redact(withDefaults.getUri()));
-            }
-        }
+        List<ProxyHandler> created = handlers(declared.values(), factory, defaults);
+        register(routes, created, weightGroups, factory.routeConditions());
         handlers.set(Collections.unmodifiableList(created));
+        if (refresher.hasLocators()) {
+            // the routes of the locators, which a refresh replaces: after the other routes, and
+            // only for a path one of them has, so that the other routes are not shadowed
+            routes.group(group -> {
+                group.order(Integer.MAX_VALUE)
+                    .where(request -> refresher.current().matchesPath(request.getPath()));
+                group.locate("/", (request, pathVariables) -> refresher.current(), GatewayRouteRefresher.Snapshot::routes);
+            });
+            refresher.refresh();
+        }
     }
 
-    private static void register(HttpRouteBuilder routes, ProxyHandler handler, @Nullable WeightGroup group) {
+    /**
+     * @param declared The gateway routes
+     * @param factory  The factory of the handlers
+     * @param defaults The default filters, applied before the filters of each route
+     * @return The handlers of the routes
+     */
+    static List<ProxyHandler> handlers(Collection<GatewayRoute> declared, ProxyHandlerFactory factory, List<GatewayFilter> defaults) {
+        List<ProxyHandler> created = new ArrayList<>(declared.size());
+        for (GatewayRoute route : declared) {
+            created.add(factory.create(withDefaults(route, defaults)));
+        }
+        return created;
+    }
+
+    /**
+     * Declare the handlers of gateway routes as functional routes.
+     *
+     * @param routes       The route builder
+     * @param handlers     The handlers of the routes
+     * @param weightGroups The settings of the weight groups
+     * @param conditions   What the server resolves for the conditions of the routes
+     */
+    static void register(HttpRouteScope routes, List<ProxyHandler> handlers, Map<String, GatewayWeightGroupConfiguration> weightGroups,
+                         RouteConditionContext conditions) {
+        List<GatewayRoute> declared = new ArrayList<>(handlers.size());
+        for (ProxyHandler handler : handlers) {
+            declared.add(handler.getRoute());
+        }
+        // the groups of the weighted routes, from all the routes: each route matches when the group chooses it
+        Map<String, WeightGroup> groups = WeightGroup.of(declared, weightGroups, conditions);
+        for (ProxyHandler handler : handlers) {
+            GatewayRoute route = handler.getRoute();
+            register(routes, handler, route.getWeight() == null ? null : groups.get(route.getWeight().group()));
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Gateway route {} {} -> {}", route.getId(), route.getPaths(), RelayHeaders.redact(route.getUri()));
+            }
+        }
+    }
+
+    private static GatewayRoute withDefaults(GatewayRoute route, List<GatewayFilter> defaults) {
+        if (defaults.isEmpty()) {
+            return route;
+        }
+        List<GatewayFilter> filters = new ArrayList<>(defaults);
+        filters.addAll(route.getFilters());
+        GatewayRoute.Builder b = route.toBuilder().replaceFilters(filters);
+        // the retries and the circuit breaker of the route win over the default ones
+        if (route.getRetry() != null) {
+            b.retry(route.getRetry());
+        }
+        if (route.getCircuitBreaker() != null) {
+            b.circuitBreaker(route.getCircuitBreaker());
+        }
+        return b.build();
+    }
+
+    private static void register(HttpRouteScope routes, ProxyHandler handler, @Nullable WeightGroup group) {
         GatewayRoute route = handler.getRoute();
         List<String> paths = route.getPaths().isEmpty() ? List.of("/**") : route.getPaths();
         for (String path : paths) {
