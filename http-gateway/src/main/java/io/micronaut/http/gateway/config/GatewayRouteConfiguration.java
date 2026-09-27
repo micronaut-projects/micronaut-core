@@ -75,6 +75,8 @@ public class GatewayRouteConfiguration {
     @Nullable
     private HttpVersion httpVersion;
     private Map<String, Object> metadata = new LinkedHashMap<>();
+    @Nullable
+    private List<String> upgradeProtocols;
 
     /**
      * @param id The id of the route
@@ -161,7 +163,7 @@ public class GatewayRouteConfiguration {
     }
 
     /**
-     * @return The time to wait for the headers of the upstream response
+     * @return The time to wait for the headers of the upstream response once the request is sent
      */
     public @Nullable Duration getResponseTimeout() {
         return responseTimeout;
@@ -187,6 +189,21 @@ public class GatewayRouteConfiguration {
      */
     public void setActivityTimeout(@Nullable Duration activityTimeout) {
         this.activityTimeout = activityTimeout;
+    }
+
+    /**
+     * @return The protocols a request may switch the connection to, {@code websocket} if not set
+     */
+    public @Nullable List<String> getUpgradeProtocols() {
+        return upgradeProtocols;
+    }
+
+    /**
+     * @param upgradeProtocols The protocols a request may switch the connection to, see
+     *                         {@link io.micronaut.http.gateway.GatewayRoute#getUpgradeProtocols()}
+     */
+    public void setUpgradeProtocols(@Nullable List<String> upgradeProtocols) {
+        this.upgradeProtocols = upgradeProtocols;
     }
 
     /**

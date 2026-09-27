@@ -25,10 +25,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * A gateway route: which requests it matches, and the upstream it relays them to with which
@@ -58,6 +60,8 @@ public final class GatewayRoute {
      */
     public static final String LOAD_BALANCED_SCHEME = "lb";
 
+    private static final String WEBSOCKET = "websocket";
+
     private final String id;
     private final URI uri;
     private final List<String> paths;
@@ -74,6 +78,7 @@ public final class GatewayRoute {
     private final GatewayRetry retry;
     @Nullable
     private final GatewayCircuitBreaker circuitBreaker;
+    private final Set<String> upgradeProtocols;
     private final Map<String, Object> metadata;
 
     private GatewayRoute(Builder builder) {
@@ -89,6 +94,7 @@ public final class GatewayRoute {
         this.retry = builder.retry;
         this.circuitBreaker = builder.circuitBreaker;
         this.metadata = Collections.unmodifiableMap(new LinkedHashMap<>(builder.metadata));
+        this.upgradeProtocols = Set.copyOf(builder.upgradeProtocols);
     }
 
     private static URI validate(URI uri) {
@@ -130,6 +136,8 @@ public final class GatewayRoute {
             .httpVersion(httpVersion)
             .retry(retry)
             .circuitBreaker(circuitBreaker);
+        builder.upgradeProtocols.clear();
+        builder.upgradeProtocols.addAll(upgradeProtocols);
         builder.paths.addAll(paths);
         builder.conditions.addAll(conditions);
         builder.filters.addAll(filters);
@@ -174,6 +182,18 @@ public final class GatewayRoute {
     }
 
     /**
+     * @return The templates of the functional routes the route is registered as, e.g.
+     * {@code /api/orders} and {@code /api/orders/{+path}} for {@code /api/orders/**}
+     */
+    public List<String> getRouteTemplates() {
+        List<String> templates = new ArrayList<>();
+        for (String path : paths.isEmpty() ? List.of("/**") : paths) {
+            templates.addAll(GatewayRouteSpec.templates(path));
+        }
+        return List.copyOf(templates);
+    }
+
+    /**
      * @return The conditions a request meets, all of them
      */
     public List<RequestCondition> getConditions() {
@@ -195,8 +215,8 @@ public final class GatewayRoute {
     }
 
     /**
-     * @return The time to wait for the headers of the upstream response, or {@code null} for the
-     * read timeout of the client
+     * @return The time to wait for the headers of the upstream response once the request is sent,
+     * or {@code null} for the read timeout of the client
      */
     public @Nullable Duration getResponseTimeout() {
         return responseTimeout;
@@ -239,6 +259,18 @@ public final class GatewayRoute {
         return metadata;
     }
 
+    /**
+     * The protocols a request of the route may switch the connection to, {@code websocket} by
+     * default, in lower case. Once the upstream switched protocols, the bytes of the connection
+     * are relayed as they are, past the filters and the limits of the route: a request that asks
+     * for another protocol is relayed without its {@code Upgrade} header.
+     *
+     * @return The protocols
+     */
+    public Set<String> getUpgradeProtocols() {
+        return upgradeProtocols;
+    }
+
     @Override
     public String toString() {
         return "GatewayRoute{id=" + id + ", uri=" + uri + ", paths=" + paths + ", order=" + order + '}';
@@ -266,6 +298,7 @@ public final class GatewayRoute {
         @Nullable
         private GatewayCircuitBreaker circuitBreaker;
         private final Map<String, Object> metadata = new LinkedHashMap<>();
+        private final Set<String> upgradeProtocols = new LinkedHashSet<>(List.of(WEBSOCKET));
 
         private Builder(String id) {
             Objects.requireNonNull(id, "id");
@@ -407,6 +440,18 @@ public final class GatewayRoute {
          */
         public Builder circuitBreaker(@Nullable GatewayCircuitBreaker circuitBreaker) {
             this.circuitBreaker = circuitBreaker;
+            return this;
+        }
+
+        /**
+         * @param protocols See {@link GatewayRoute#getUpgradeProtocols()}, none to relay no upgrade
+         * @return This builder
+         */
+        public Builder upgradeProtocols(String... protocols) {
+            upgradeProtocols.clear();
+            for (String protocol : protocols) {
+                upgradeProtocols.add(Objects.requireNonNull(protocol, "protocol").strip().toLowerCase(Locale.ROOT));
+            }
             return this;
         }
 

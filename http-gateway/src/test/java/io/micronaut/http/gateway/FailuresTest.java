@@ -25,7 +25,6 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -81,6 +80,14 @@ class FailuresTest extends GatewayTestBase {
         // ER-09: the error of the gateway is the error of the server
         assertTrue(response.header("Content-Type").startsWith("application/json"), response.toString());
         assertTrue(response.text().contains("\"message\""), response.toString());
+    }
+
+    @Test
+    void er01bTheErrorOfAFailedUpstreamDoesNotNameItsAddress() throws IOException {
+        RawHttp.Response response = get("/refused/x");
+        assertEquals(502, response.status(), response.toString());
+        assertFalse(response.text().contains("127.0.0.1"), response.toString());
+        assertFalse(response.text().toLowerCase(java.util.Locale.ROOT).contains("refused:"), response.toString());
     }
 
     @Test
@@ -181,9 +188,6 @@ class FailuresTest extends GatewayTestBase {
     }
 
     @Test
-    @Disabled("TO-06: the response timeout of RawRequestOptions starts with the exchange, not once the request is sent: "
-        + "a slow upload counts. Needs the raw client to start the timer when the last byte of the request is written "
-        + "(RawHttpClientSupport.withResponseTimeout and the Netty and JDK clients)")
     void to06TheResponseTimeoutStartsOnceTheRequestIsSent() throws Exception {
         scripted.on("/slow-upload", (request, in, out, socket) -> {
             byte[] body = request.readBody(in);

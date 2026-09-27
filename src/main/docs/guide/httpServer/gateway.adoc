@@ -154,7 +154,7 @@ With the management module present, the sensitive endpoint `/gateway` lists the 
 
 * The gateway runs on the Netty server. On a servlet container, the plain HTTP relay works, but a protocol switch, e.g. a WebSocket, cannot be relayed.
 * A request whose body streams in is never retried, even when it was not processed; a replay buffer is planned.
-* The response timeout of a route counts from the start of the exchange, the upload included.
+* The response timeout of a route counts from the moment the request is sent on the Netty client; on the JDK client it counts from the start of the exchange, the upload included.
 * Bytes a client sends after an upgrade request, before the `101`, may be lost; a client must wait for the `101` (RFC 6455).
 * A half-close of a switched connection closes it in both directions.
 * A fallback is a handler in the application: there is no `forward:` URI, and it cannot read a body an attempt already sent.
