@@ -49,6 +49,7 @@ public final class GatewayRequestContext {
     private int attempts;
     private @Nullable Throwable failure;
     private boolean bodyKeptForReplay;
+    private byte @Nullable [] cachedRequestBody;
     // the state of the route filters of the request, keyed by the filter: one map, not an attribute each
     private @Nullable Map<Object, Object> state;
 
@@ -126,14 +127,19 @@ public final class GatewayRequestContext {
     }
 
     /**
+     * @param owner The filter that kept the state
+     * @return The state it removed, or {@code null}
+     */
+    synchronized @Nullable Object removeState(Object owner) {
+        return state == null ? null : state.remove(owner);
+    }
+
+    /**
      * @param owner The filter that keeps the state
-     * @param value The state, or {@code null} to remove it
+     * @param value The state
      * @return The state it replaced, or {@code null}
      */
-    synchronized @Nullable Object state(Object owner, @Nullable Object value) {
-        if (value == null) {
-            return state == null ? null : state.remove(owner);
-        }
+    synchronized @Nullable Object state(Object owner, Object value) {
         if (state == null) {
             state = new IdentityHashMap<>(4);
         }
@@ -185,6 +191,19 @@ public final class GatewayRequestContext {
      */
     public boolean bodyKeptForReplay() {
         return bodyKeptForReplay;
+    }
+
+    /**
+     * @return The bytes of the body of the request, for the filters of a route with
+     * {@link GatewayFilters#cacheRequestBody(long)}; empty for a request without a body, and
+     * without that filter
+     */
+    public Optional<byte[]> cachedRequestBody() {
+        return Optional.ofNullable(cachedRequestBody);
+    }
+
+    void cachedRequestBody(byte[] bytes) {
+        this.cachedRequestBody = bytes;
     }
 
     void keepBodyForReplay() {

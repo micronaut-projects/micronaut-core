@@ -26,6 +26,7 @@ import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.gateway.ClientAddress;
+import io.micronaut.http.gateway.FailoverHandler;
 import io.micronaut.http.gateway.GatewayCircuitBreaker;
 import io.micronaut.http.gateway.GatewayConfiguration;
 import io.micronaut.http.gateway.GatewayFilters;
@@ -73,6 +74,8 @@ final class BuiltInGatewayFactories {
     private static final String DATETIME = "datetime";
     private static final String REPLACEMENT = "replacement";
     private static final String STATUS = "status";
+    private static final String MAX_SIZE = "max-size";
+    private static final String KEY_RESOLVER = "key-resolver";
     private static final List<String> NAME_VALUE = List.of("name", VALUE);
 
     // ---- predicates
@@ -443,13 +446,19 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("RequestSize")
     GatewayFilterFactory requestSize() {
-        return GatewayFilterFactory.of(List.of("max-size"), args -> GatewayFilters.requestSize(args.bind(RequestSizeArguments.class).maxSize()));
+        return GatewayFilterFactory.of(List.of(MAX_SIZE), args -> GatewayFilters.requestSize(args.bind(RequestSizeArguments.class).maxSize()));
+    }
+
+    @Singleton
+    @Named("CacheRequestBody")
+    GatewayFilterFactory cacheRequestBody() {
+        return GatewayFilterFactory.of(List.of(MAX_SIZE), args -> GatewayFilters.cacheRequestBody(args.bind(RequestSizeArguments.class).maxSize()));
     }
 
     @Singleton
     @Named("RequestHeaderSize")
     GatewayFilterFactory requestHeaderSize() {
-        return GatewayFilterFactory.of(List.of("max-size", "max-count"), args -> {
+        return GatewayFilterFactory.of(List.of(MAX_SIZE, "max-count"), args -> {
             RequestHeaderSizeArguments bound = args.bind(RequestHeaderSizeArguments.class);
             return GatewayFilters.requestHeaderSize(bound.maxSize(), bound.maxCount());
         });
@@ -458,7 +467,7 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("RequestRateLimiter")
     GatewayFilterFactory requestRateLimiter(BeanLocator beanLocator, GatewayConfiguration configuration) {
-        return GatewayFilterFactory.of(List.of("replenish-rate", "burst-capacity", "requested-tokens", "key-resolver"), args -> {
+        return GatewayFilterFactory.of(List.of("replenish-rate", "burst-capacity", "requested-tokens", KEY_RESOLVER), args -> {
             RateLimiterArguments bound = args.bind(RateLimiterArguments.class);
             String limiterName = bound.rateLimiter();
             GatewayRateLimiter limiter = limiterName == null || limiterName.isBlank()
@@ -467,9 +476,13 @@ final class BuiltInGatewayFactories {
                     .orElseThrow(() -> new ConfigurationException("No GatewayRateLimiter bean named " + limiterName));
             long burst = bound.burstCapacity() == null ? bound.replenishRate() : bound.burstCapacity();
             try {
-                return new GatewayRateLimit(bound.replenishRate(), burst, bound.requestedTokens(),
-                    keyResolver(beanLocator, configuration, bound.keyResolver()), bound.denyEmptyKey(), status(bound.emptyKeyStatus()),
-                    bound.includeHeaders(), limiter);
+                return GatewayRateLimit.builder(bound.replenishRate(), burst)
+                    .requestedTokens(bound.requestedTokens())
+                    .keyResolver(keyResolver(beanLocator, configuration, bound.keyResolver()))
+                    .emptyKey(bound.denyEmptyKey(), status(bound.emptyKeyStatus()))
+                    .includeHeaders(bound.includeHeaders())
+                    .limiter(limiter)
+                    .build();
             } catch (IllegalArgumentException e) {
                 throw new ConfigurationException("Invalid RequestRateLimiter: " + e.getMessage(), e);
             }
@@ -479,8 +492,8 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("Bulkhead")
     GatewayFilterFactory bulkhead(BeanLocator beanLocator, GatewayConfiguration configuration) {
-        return GatewayFilterFactory.of(List.of("max-concurrent", "key-resolver"), args -> GatewayFilters.bulkhead(
-            args.get("max-concurrent", Integer.class, 1), keyResolver(beanLocator, configuration, args.find("key-resolver").orElse(null))));
+        return GatewayFilterFactory.of(List.of("max-concurrent", KEY_RESOLVER), args -> GatewayFilters.bulkhead(
+            args.get("max-concurrent", Integer.class, 1), keyResolver(beanLocator, configuration, args.find(KEY_RESOLVER).orElse(null))));
     }
 
     /**
@@ -546,16 +559,17 @@ final class BuiltInGatewayFactories {
                 if (fallback != null && !fallback.isBlank()) {
                     throw new ConfigurationException("The circuit breaker " + bound.name() + " has both a fallback and a fallback-uri");
                 }
-                AsyncRequestHandler handler = new AsyncRequestHandler() {
-                    private volatile io.micronaut.http.gateway.@Nullable ProxyHandler proxy;
+                AsyncRequestHandler handler = new FailoverHandler() {
+                    private final java.util.concurrent.atomic.AtomicReference<io.micronaut.http.gateway.@Nullable ProxyHandler> proxy =
+                        new java.util.concurrent.atomic.AtomicReference<>();
 
                     @Override
                     public java.util.concurrent.CompletionStage<? extends io.micronaut.http.HttpResponse<?>> handle(HttpRequest<?> request,
                                                                                                              io.micronaut.http.PathVariables pathVariables) throws Exception {
-                        io.micronaut.http.gateway.ProxyHandler p = proxy;
+                        io.micronaut.http.gateway.ProxyHandler p = proxy.get();
                         if (p == null) {
                             p = beanLocator.getBean(io.micronaut.http.gateway.ProxyHandlerFactory.class).to(uri);
-                            proxy = p;
+                            proxy.set(p);
                         }
                         return p.handle(request, pathVariables);
                     }

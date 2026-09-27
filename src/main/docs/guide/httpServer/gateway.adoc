@@ -97,6 +97,7 @@ The api:http.gateway.GatewayFilters[] are the proxy transforms, applied once to 
 * the host: `PreserveHostHeader`, `SetRequestHostHeader`;
 * the route filters `SetStatus`, `RedirectTo` and `SecureHeaders`, which apply to every response of the route, including a fallback or an error of the gateway;
 * the size limits: `RequestSize` (`413` with an `errorMessage` header for a `Content-Length` over the limit, before the upstream is called; a body that streams in fails the relay with `413` once it goes over, while no response was relayed) and `RequestHeaderSize` (`431` when the names and values of the headers, cookies included, are larger than the limit, or when there are more headers than an optional count);
+* `CacheRequestBody`, which reads a copy of the body, up to a limit, into `GatewayRequestContext.cachedRequestBody()` for the other filters; the body is still relayed;
 * `Retry` and `CircuitBreaker`.
 
 The path filters work on the raw, percent-encoded path, which they never decode: the rest of the path and the query are relayed byte for byte, and `SetPath` and `PrefixPath` put in the variables as the client sent them. A header value may use the path variables, e.g. `{segment}`; a value that would carry a line break answers `400`. The inbound request, which the server filters see, is never changed.
@@ -124,7 +125,7 @@ micronaut:
 
 == Rate Limits and In-Flight Limits
 
-A api:http.gateway.GatewayRateLimit[] (`RequestRateLimiter` in the configuration) is a token bucket per key of a request, like Spring Cloud Gateway's: `replenish-rate` tokens a second, up to `burst-capacity` (at least the rate; `0` denies every request), `requested-tokens` per request. A request over the limit is answered with `429` without calling the upstream, and the responses carry `X-RateLimit-Remaining`, `-Replenish-Rate`, `-Burst-Capacity` and `-Requested-Tokens` (`include-headers: false` turns them off). A request without a key is answered with `403` (`deny-empty-key`, `empty-key-status`). The key comes from a api:http.gateway.KeyResolver[]: `remoteAddress` (the default: the peer, or the client behind the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`), `principal`, `header:<name>`, or the name of a `KeyResolver` bean. The buckets are in the memory of the gateway (api:http.gateway.InMemoryRateLimiter[]); a api:http.gateway.GatewayRateLimiter[] bean named in `rate-limiter` keeps them elsewhere, and when it fails the request is let through. Each route has its own buckets, also when the limit is a default filter.
+A api:http.gateway.GatewayRateLimit[] (`RequestRateLimiter` in the configuration) is a token bucket per key of a request, like Spring Cloud Gateway's: `replenish-rate` tokens a second, up to `burst-capacity` (at least the rate; `0` denies every request), `requested-tokens` per request. A request over the limit is answered with `429` without calling the upstream, and the responses carry `X-RateLimit-Remaining`, `-Replenish-Rate`, `-Burst-Capacity` and `-Requested-Tokens` (`include-headers: false` turns them off). A request without a key is answered with `403` (`deny-empty-key`, `empty-key-status`). The key comes from a api:http.gateway.KeyResolver[]: `remoteAddress` (the default: the peer, or the client behind the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`; an IPv6 client by its `/64` network), `principal`, `header:<name>`, or the name of a `KeyResolver` bean, which is synchronous: it reads the request and does no IO. The buckets are in the memory of the gateway (api:http.gateway.InMemoryRateLimiter[]), at most 100,000: a new key is denied while they are all taken; a api:http.gateway.GatewayRateLimiter[] bean named in `rate-limiter` keeps them elsewhere, and when it fails the request is let through. Each route has its own buckets, also when the limit is a default filter.
 
 [source,yaml]
 ----
@@ -134,7 +135,7 @@ micronaut:
       - RequestRateLimiter=10, 20, 1, header:X-Api-Key
 ----
 
-`GatewayFilters.bulkhead(max, keyResolver)` (`Bulkhead=max, key-resolver`) answers `429` for a request of a key that has `max` requests in flight, until the headers of their responses.
+`GatewayFilters.bulkhead(max, keyResolver)` (`Bulkhead=max, key-resolver`) answers `429` for a request of a key that has `max` requests in flight, until their responses are done: a streamed body, an event stream or a switched connection counts until it ends.
 
 == Load Balancing, Retries and Circuit Breakers
 

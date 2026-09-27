@@ -387,6 +387,22 @@ public final class GatewayFilters {
     }
 
     /**
+     * Read the body of a request before the other filters of the route, up to a limit, like Spring
+     * Cloud Gateway's {@code CacheRequestBody}: the filters find the bytes in
+     * {@link GatewayRequestContext#cachedRequestBody()}, and the body is still relayed. A body over
+     * the limit is answered with {@code 413}. A route filter.
+     *
+     * @param maxBytes The maximum size of the body
+     * @return The filter
+     */
+    public static GatewayFilter cacheRequestBody(long maxBytes) {
+        if (maxBytes < 0) {
+            throw new IllegalArgumentException("CacheRequestBody needs a size of at least 0: " + maxBytes);
+        }
+        return new CacheRequestBody(maxBytes);
+    }
+
+    /**
      * @param filters The filters of a route
      * @return The smallest {@link #requestSize(long) body limit} among them, or {@code -1} for none
      */
@@ -964,6 +980,37 @@ public final class GatewayFilters {
         @Override
         public String toString() {
             return "Bulkhead=" + maxConcurrent;
+        }
+    }
+
+    private record CacheRequestBody(long maxBytes) implements GatewayFilter {
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacingAsync(request -> {
+                if (!(request instanceof io.micronaut.http.ServerHttpRequest<?> server)) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(null);
+                }
+                if (request.getContentLength() > maxBytes) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE));
+                }
+                // a copy of the bytes, read at the pace of the copy: the body is still relayed
+                io.micronaut.http.body.CloseableByteBody copy = server.byteBodyFactory().limit(
+                    server.byteBody().split(io.micronaut.http.body.ByteBody.SplitBackpressureMode.FASTEST), maxBytes);
+                return copy.buffer().handle((bytes, failure) -> {
+                    if (failure != null) {
+                        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
+                    }
+                    try (bytes) {
+                        GatewayRequestContext.forFilters(request).cachedRequestBody(bytes.toByteArray());
+                    }
+                    return null;
+                });
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "CacheRequestBody=" + maxBytes;
         }
     }
 
