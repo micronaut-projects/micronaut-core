@@ -33,8 +33,15 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.logback.classic)
+    testImplementation(libs.micronaut.test.netty.leak)
+    testImplementation(libs.managed.reactor)
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // the leak extension fails a test class that leaks a buffer
+    systemProperty("io.netty.leakDetection.level", "paranoid")
+    systemProperty("io.netty.leakDetection.targetRecords", "100")
+    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+    maxHeapSize = "1G"
 }
