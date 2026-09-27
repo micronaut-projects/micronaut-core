@@ -218,5 +218,5 @@ With the management module present, the sensitive endpoint `/gateway` lists the 
 * The response timeout of a route counts from the moment the request is sent on the Netty client; on the JDK client it counts from the start of the exchange, the upload included.
 * Bytes a client sends after an upgrade request, before the `101`, may be lost; a client must wait for the `101` (RFC 6455).
 * A half-close of a switched connection is relayed over plain TCP only: over TLS it closes the connection in both directions.
-* A fallback is a handler in the application: there is no `forward:` URI. It reads the body of the request when no attempt sent it, e.g. while the circuit is open; the body an attempt already sent is gone.
+* A fallback is a handler in the application, or an upstream to fail over to (`fallback-uri`, or a `ProxyHandler` in code): there is no `forward:` URI. It reads the body of the request when no attempt sent it, e.g. while the circuit is open, and the body an attempt sent when it was kept (`maxFallbackBodyBytes`, `max-fallback-body`; 1 MiB for a `fallback-uri`, none otherwise); a larger body is gone.
 * A route of a route locator is matched after the others, whatever its order.

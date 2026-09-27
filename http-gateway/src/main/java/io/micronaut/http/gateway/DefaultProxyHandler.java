@@ -170,7 +170,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         RequestBody body;
         try {
-            body = RequestBody.of(request, route.getRetry(), GatewayFilters.maxRequestSize(route.getFilters()));
+            body = RequestBody.of(request, route.getRetry(), route.getCircuitBreaker(), GatewayFilters.maxRequestSize(route.getFilters()));
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -546,8 +546,12 @@ final class DefaultProxyHandler implements ProxyHandler {
          * @param sizeLimit The maximum number of bytes of the body, {@code -1} for no limit
          * @return The body of the request
          */
-        static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry, long sizeLimit) {
+        static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry, @Nullable GatewayCircuitBreaker circuitBreaker, long sizeLimit) {
             long replayLimit = retry != null && retry.retriesMethod(request.getMethodName()) ? retry.maxReplayBytes() : -1;
+            if (circuitBreaker != null && circuitBreaker.fallback() != null) {
+                // kept for the fallback too, e.g. a failover to another upstream
+                replayLimit = Math.max(replayLimit, circuitBreaker.maxFallbackBodyBytes());
+            }
             RequestBody body = new RequestBody(request, replayLimit, sizeLimit);
             if (request instanceof ServerHttpRequest<?> server && server.byteBody().expectedLength().orElse(-1) == 0
                 && request.getBody().isEmpty()) {
@@ -647,6 +651,25 @@ final class DefaultProxyHandler implements ProxyHandler {
             return b;
         }
 
+        /**
+         * @param limit The number of bytes kept for the fallback, see
+         *              {@link GatewayCircuitBreaker#maxFallbackBodyBytes()}
+         * @return The bytes of the body for a fallback, when an attempt took them and they were
+         * kept, or {@code null}: the request still has them, or they are gone
+         */
+        synchronized @Nullable CloseableByteBody forFallback(long limit) {
+            if (!claimed || limit <= 0) {
+                return null;
+            }
+            if (replay != null) {
+                return replay.isReplayable() ? replay.next() : null;
+            }
+            if (body instanceof AvailableByteBody available && available.length() <= limit) {
+                return body.split();
+            }
+            return null;
+        }
+
         synchronized void release() {
             CloseableByteBody b = body;
             body = null;
@@ -714,15 +737,22 @@ final class DefaultProxyHandler implements ProxyHandler {
                 }
             }
             relayed.whenComplete((response, failure) -> {
-                body.release();
                 context.attempts(attempts.get());
                 if (failure == null) {
+                    body.release();
                     if (!result.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                         byteBodyResponse.close();
                     }
-                } else if (!result.isDone()) {
+                } else if (result.isDone()) {
                     // an abandoned relay has no one to answer: no fallback runs for it
-                    fail(failure);
+                    body.release();
+                } else {
+                    // the fallback takes its copy of the body before the kept bytes go
+                    try {
+                        fail(failure);
+                    } finally {
+                        body.release();
+                    }
                 }
             });
             return result;
@@ -745,7 +775,12 @@ final class DefaultProxyHandler implements ProxyHandler {
                 return;
             }
             context.failure(reason);
-            fallback.handle(request, pathVariables).whenComplete((response, error) -> {
+            CloseableByteBody kept = body.forFallback(Objects.requireNonNull(circuitBreaker).maxFallbackBodyBytes());
+            FallbackRequest fallbackRequest = kept == null ? null : new FallbackRequest(request, kept);
+            fallback.handle(fallbackRequest == null ? request : fallbackRequest, pathVariables).whenComplete((response, error) -> {
+                if (fallbackRequest != null) {
+                    fallbackRequest.release();
+                }
                 if (error != null) {
                     result.completeExceptionally(unwrap(error));
                 } else if (!result.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {

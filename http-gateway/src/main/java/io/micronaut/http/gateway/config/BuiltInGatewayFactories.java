@@ -535,11 +535,37 @@ final class BuiltInGatewayFactories {
                 fallbackStatuses.add(status(status));
             }
             String fallback = bound.fallback();
+            String fallbackUri = bound.fallbackUri();
+            boolean failover = fallbackUri != null && !fallbackUri.isBlank();
+            // a failover relays the body: kept up to 1 MiB unless configured
+            long maxBody = bound.maxFallbackBody() != null ? bound.maxFallbackBody() : failover ? GatewayRetry.DEFAULT_MAX_REPLAY_BYTES : 0;
+            if (failover) {
+                String uri = java.util.Objects.requireNonNull(fallbackUri);
+                if (fallback != null && !fallback.isBlank()) {
+                    throw new ConfigurationException("The circuit breaker " + bound.name() + " has both a fallback and a fallback-uri");
+                }
+                AsyncRequestHandler handler = new AsyncRequestHandler() {
+                    private volatile io.micronaut.http.gateway.@Nullable ProxyHandler proxy;
+
+                    @Override
+                    public java.util.concurrent.CompletionStage<? extends io.micronaut.http.HttpResponse<?>> handle(HttpRequest<?> request,
+                                                                                                             io.micronaut.http.PathVariables pathVariables) throws Exception {
+                        io.micronaut.http.gateway.ProxyHandler p = proxy;
+                        if (p == null) {
+                            p = beanLocator.getBean(io.micronaut.http.gateway.ProxyHandlerFactory.class).to(uri);
+                            proxy = p;
+                        }
+                        return p.handle(request, pathVariables);
+                    }
+                };
+                return GatewayCircuitBreaker.builder(bound.name()).fallback(handler)
+                    .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).maxFallbackBodyBytes(maxBody).build();
+            }
             if (fallback == null || fallback.isBlank()) {
                 if (!fallbackStatuses.isEmpty()) {
                     throw new ConfigurationException("The circuit breaker " + bound.name() + " has fallback statuses and no fallback");
                 }
-                return GatewayCircuitBreaker.builder(bound.name()).failureStatuses(failureStatuses).build();
+                return GatewayCircuitBreaker.builder(bound.name()).failureStatuses(failureStatuses).maxFallbackBodyBytes(maxBody).build();
             }
             if (fallback.startsWith("forward:")) {
                 throw new ConfigurationException("A gateway fallback is the name of a handler bean, not a forward: URI: " + fallback);
@@ -547,13 +573,13 @@ final class BuiltInGatewayFactories {
             Optional<AsyncRequestHandler> async = beanLocator.findBean(AsyncRequestHandler.class, Qualifiers.byName(fallback));
             if (async.isPresent()) {
                 return GatewayCircuitBreaker.builder(bound.name()).fallback(async.get())
-                    .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).build();
+                    .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).maxFallbackBodyBytes(maxBody).build();
             }
             RequestHandler handler = beanLocator.findBean(RequestHandler.class, Qualifiers.byName(fallback))
                 .orElseThrow(() -> new ConfigurationException("No AsyncRequestHandler or RequestHandler bean named " + fallback + " for the fallback of the circuit breaker " + bound.name()));
             return GatewayCircuitBreaker.builder(bound.name())
                 .fallback((request, pathVariables) -> CompletableFuture.completedFuture(handler.handle(request, pathVariables)))
-                .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).build();
+                .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).maxFallbackBodyBytes(maxBody).build();
         });
     }
 
@@ -647,12 +673,17 @@ final class BuiltInGatewayFactories {
      * @param fallback         The name of the fallback handler bean, if any
      * @param failureStatuses  The statuses that count as a failure, codes or names; empty for 500 and above
      * @param fallbackStatuses The statuses the fallback answers for, codes or names
+     * @param fallbackUri      The URI of an upstream the requests fail over to, instead of a fallback bean
+     * @param maxFallbackBody  The bytes of a body kept for the fallback, e.g. {@code 64KB}; 1 MiB for
+     *                         a fallback URI, none otherwise, by default
      */
     @Introspected
     record CircuitBreakerArguments(String name,
                                    @Nullable String fallback,
                                    @Bindable(defaultValue = "") List<String> failureStatuses,
-                                   @Bindable(defaultValue = "") List<String> fallbackStatuses) {
+                                   @Bindable(defaultValue = "") List<String> fallbackStatuses,
+                                   @Nullable String fallbackUri,
+                                   @ReadableBytes @Nullable Long maxFallbackBody) {
     }
 
     /**

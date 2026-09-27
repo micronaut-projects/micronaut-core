@@ -44,9 +44,11 @@ import java.util.Set;
  * with an {@link UpstreamException}, {@code 503} for an open circuit, and a response of a
  * fallback status is relayed.</p>
  *
- * <p>The fallback reads the body of the request when no attempt sent it: a request without a
- * body, or a circuit that was open before the first attempt. The body an attempt sent is gone:
- * reading it fails.</p>
+ * <p>The fallback reads the body of the request, with {@code ServerHttpRequest#byteBody()}:
+ * when no attempt sent it, e.g. the circuit was open before the first attempt, and when an
+ * attempt sent it but it was kept, up to {@link #maxFallbackBodyBytes()}, none by default. A
+ * fallback that is a proxy handler, e.g. {@code ProxyHandlerFactory#to(String)}, relays it: a
+ * failover to another upstream. A larger body an attempt sent is gone: reading it fails.</p>
  *
  * <p>Create one with {@link #of(String)}, {@link #of(String, AsyncRequestHandler)} or
  * {@link #builder(String)}.
@@ -61,12 +63,14 @@ public final class GatewayCircuitBreaker implements GatewayFilter {
     private final @Nullable AsyncRequestHandler fallback;
     private final Set<Integer> failureStatuses;
     private final Set<Integer> fallbackStatuses;
+    private final long maxFallbackBodyBytes;
 
     private GatewayCircuitBreaker(Builder builder) {
         this.name = builder.name;
         this.fallback = builder.fallback;
         this.failureStatuses = builder.failureStatuses;
         this.fallbackStatuses = builder.fallbackStatuses;
+        this.maxFallbackBodyBytes = builder.maxFallbackBodyBytes;
     }
 
     /**
@@ -101,7 +105,8 @@ public final class GatewayCircuitBreaker implements GatewayFilter {
         return new Builder(name)
             .fallback(fallback)
             .failureStatuses(failureStatuses)
-            .fallbackStatuses(fallbackStatuses);
+            .fallbackStatuses(fallbackStatuses)
+            .maxFallbackBodyBytes(maxFallbackBodyBytes);
     }
 
     /**
@@ -131,6 +136,22 @@ public final class GatewayCircuitBreaker implements GatewayFilter {
      */
     public Set<Integer> fallbackStatuses() {
         return fallbackStatuses;
+    }
+
+    /**
+     * @return The number of bytes of a body that streams in that are kept for the fallback, when
+     * there is one; {@code 0}, the default, keeps none
+     */
+    public long maxFallbackBodyBytes() {
+        return maxFallbackBodyBytes;
+    }
+
+    /**
+     * @param maxBytes The number of bytes of a body kept for the fallback, see {@link #maxFallbackBodyBytes()}
+     * @return A copy with the limit
+     */
+    public GatewayCircuitBreaker withMaxFallbackBodyBytes(long maxBytes) {
+        return toBuilder().maxFallbackBodyBytes(maxBytes).build();
     }
 
     /**
@@ -171,12 +192,13 @@ public final class GatewayCircuitBreaker implements GatewayFilter {
             && name.equals(that.name)
             && Objects.equals(fallback, that.fallback)
             && failureStatuses.equals(that.failureStatuses)
-            && fallbackStatuses.equals(that.fallbackStatuses);
+            && fallbackStatuses.equals(that.fallbackStatuses)
+            && maxFallbackBodyBytes == that.maxFallbackBodyBytes;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, fallback, failureStatuses, fallbackStatuses);
+        return Objects.hash(name, fallback, failureStatuses, fallbackStatuses, maxFallbackBodyBytes);
     }
 
     @Override
@@ -192,6 +214,7 @@ public final class GatewayCircuitBreaker implements GatewayFilter {
         private @Nullable AsyncRequestHandler fallback;
         private Set<Integer> failureStatuses = Set.of();
         private Set<Integer> fallbackStatuses = Set.of();
+        private long maxFallbackBodyBytes;
 
         private Builder(String name) {
             Objects.requireNonNull(name, "name");
@@ -225,6 +248,18 @@ public final class GatewayCircuitBreaker implements GatewayFilter {
          */
         public Builder fallbackStatuses(Set<Integer> fallbackStatuses) {
             this.fallbackStatuses = Set.copyOf(Objects.requireNonNull(fallbackStatuses, "fallbackStatuses"));
+            return this;
+        }
+
+        /**
+         * @param maxFallbackBodyBytes See {@link GatewayCircuitBreaker#maxFallbackBodyBytes()}
+         * @return This builder
+         */
+        public Builder maxFallbackBodyBytes(long maxFallbackBodyBytes) {
+            if (maxFallbackBodyBytes < 0) {
+                throw new IllegalArgumentException("The maximum fallback body bytes is negative: " + maxFallbackBodyBytes);
+            }
+            this.maxFallbackBodyBytes = maxFallbackBodyBytes;
             return this;
         }
 
