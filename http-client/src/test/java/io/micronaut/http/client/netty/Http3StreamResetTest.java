@@ -184,6 +184,7 @@ class Http3StreamResetTest {
 
                                     @Override
                                     protected void channelInputClosed(ChannelHandlerContext ctx) {
+                                        // the stream is reset once the request headers arrive, the end of the request is not needed
                                     }
                                 });
                             }
