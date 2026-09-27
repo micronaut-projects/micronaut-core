@@ -1,0 +1,153 @@
+In distributed systems and microservice environments, failure is something you have to plan for, and it is common to want to attempt to retry an operation if it fails. If first you don't succeed try again!
+
+With this in mind, the Micronaut framework includes a api:retry.annotation.Retryable[] annotation.
+
+== Retry Dependency
+
+NOTE: Since Micronaut Framework 4.0 to use the Retry functionality you need to add the following dependency:
+
+dependency::micronaut-retry[]
+
+== Simple Retry
+
+The simplest form of retry is just to add the `@Retryable` annotation to a type or method. The default behaviour of `@Retryable` is to retry three times with a linear delay of one second between each retry. (first attempt with 1s delay, second attempt with 2s delay, third attempt with 3s delay).
+
+For example:
+
+snippet::io.micronaut.docs.aop.retry.BookService[tags="simple", indent=0, title="Simple Retry Example"]
+
+With the above example if the `listBooks()` method throws an Exception, it is retried until the maximum number of attempts is reached.
+
+The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, allowing exponential retry support.
+
+To customize retry behaviour, set the `attempts` and `delay` members, For example to configure five attempts with a two seconds delay:
+
+snippet::io.micronaut.docs.aop.retry.BookService[tags="attempts", indent=0, title="Setting Retry Attempts"]
+
+Notice how both `attempts` and `delay` are defined as strings. This is to support configurability through annotation metadata. For example, you can allow the retry policy to be configured using property placeholder resolution:
+
+snippet::io.micronaut.docs.aop.retry.BookService[tags="config", indent=0, title="Setting Retry via Configuration"]
+
+With the above in place, if `book.retry.attempts` is specified in configuration it is bound to the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
+
+== Reactive Retry
+
+`@Retryable` advice can also be applied to methods that return reactive types, such as `Publisher` (https://projectreactor.io[Project Reactor]'s `Flux` or https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`). For example:
+
+snippet::io.micronaut.docs.aop.retry.BookService[tags="reactive", indent=0, title="Applying Retry Policy to Reactive Types"]
+
+In this case `@Retryable` advice applies the retry policy to the reactive type.
+
+== Circuit Breaker
+
+Retry is useful in a microservice environment, but in some cases excessive retries can overwhelm the system as clients repeatedly re-attempt failing operations.
+
+The https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern[Circuit Breaker] pattern is designed to resolve this issue by allowing a certain number of failing requests and then opening a circuit that remains open for a period before allowing additional retry attempts.
+
+The api:retry.annotation.CircuitBreaker[] annotation is a variation of the `@Retryable` annotation that supports a `reset` member which indicates how long the circuit should remain open before it is reset (the default is 20 seconds).
+
+snippet::io.micronaut.docs.aop.retry.BookService[tags="circuit", indent=0, title="Applying CircuitBreaker Advice"]
+
+The above example retries the `findBooks` method three times and then opens the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
+
+== Programmatic Retry
+
+For cases where annotations are not desirable, Micronaut Retry also provides programmatic retry creation through typed policies and injected factory beans.
+
+Create a policy once and derive reusable operations from the injected factory:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-policy", indent=0, title="Creating a Programmatic Retry Policy"]
+
+The programmatic API uses typed values such as `Duration` and `int` instead of annotation strings.
+
+For synchronous work, execute the supplier directly through `RetryOperations`:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-sync", indent=0, title="Programmatic Retry for Synchronous Code"]
+
+Reactive retry is also supported. Pass a supplier so each retry attempt creates a fresh `Publisher`:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-reactive", indent=0, title="Programmatic Retry for Reactive Code"]
+
+For asynchronous work, pass a supplier that creates a new `CompletionStage` for each attempt:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-async", indent=0, title="Programmatic Retry for Asynchronous Code"]
+
+== Programmatic Circuit Breaker
+
+Programmatic circuit breakers are created in the same way, using a typed `CircuitBreakerPolicy` and an injected `CircuitBreakerOperationsFactory`. The resulting `CircuitBreakerOperations` instance owns the shared breaker state.
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-circuit", indent=0, title="Programmatic Circuit Breaker"]
+
+== Named Retry Policies
+
+NOTE: Named retry policies are experimental.
+
+Retry settings shared by several methods can be configured once as a named policy under `micronaut.retry.policies.<name>`, and referenced with the `name` member of ann:retry.annotation.Retryable[]:
+
+[configuration]
+----
+micronaut:
+  retry:
+    policies:
+      orders:
+        attempts: 5
+        delay: 200ms
+        multiplier: 2
+        max-delay: 10s
+        jitter: 0.1
+        includes:
+          - java.io.IOException
+        excludes:
+          - java.io.FileNotFoundException
+----
+
+[source,java]
+----
+@Singleton
+public class OrderClient {
+
+    @Retryable(name = "orders") // <1>
+    public Order find(String id) {
+        // ...
+    }
+
+    @Retryable(name = "orders", attempts = "2") // <2>
+    public void cancel(String id) {
+        // ...
+    }
+}
+----
+<1> The method takes the attempts, delay, multiplier, maximum delay, jitter, includes and excludes of the `orders` policy
+<2> A member set explicitly on the annotation overrides the setting of the policy: here two attempts, with the other settings of the policy. Setting `includes` or `excludes` on the annotation replaces both lists of the policy
+
+A policy member that is not configured takes the default of ann:retry.annotation.Retryable[]. A name that is not configured fails the first call of the method with an `IllegalStateException` naming the missing policy. Without a `name`, the annotation behaves as before.
+
+The policies are also available programmatically through the api:retry.RetryRegistry[] bean, whose `retry(name)` returns the `RetryOperations` of a policy.
+
+== Factory Bean Retry
+
+When ann:retry.annotation.Retryable[] is applied to bean factory methods, it behaves as if the annotation was placed on the type being returned. The retry behavior applies when the methods on the returned object are invoked. Note that the bean factory method itself is *not* retried. If you want the functionality of creating the bean to be retried, it should be delegated to another singleton that has the ann:retry.annotation.Retryable[] annotation applied.
+
+For example:
+
+[source,java]
+----
+@Factory // <1>
+public class Neo4jDriverFactory {
+    ...
+    @Retryable(ServiceUnavailableException.class) // <2>
+    @Bean(preDestroy = "close")
+    public Driver buildDriver() {
+        ...
+    }
+}
+----
+
+<1> A factory bean is created that defines methods that create beans
+<2> The ann:retry.annotation.Retryable[] annotation is used to catch exceptions thrown from methods executed on the `Driver`.
+
+== Retry Events
+
+You can register api:retry.event.RetryEventListener[] instances as beans to listen for api:retry.event.RetryEvent[] events that are published every time an operation is retried.
+
+In addition, you can register event listeners for api:retry.event.CircuitOpenEvent[] to be notified when a circuit breaker circuit is opened, or api:retry.event.CircuitClosedEvent[] for when a circuit is closed.
