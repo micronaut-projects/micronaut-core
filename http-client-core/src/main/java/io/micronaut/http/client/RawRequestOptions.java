@@ -53,6 +53,8 @@ public final class RawRequestOptions {
     @Nullable
     private final Duration activityTimeout;
     private final boolean returnUnsentBody;
+    @Nullable
+    private final Duration readIdleTimeout;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
@@ -62,6 +64,7 @@ public final class RawRequestOptions {
         this.allowUpgrade = builder.allowUpgrade;
         this.activityTimeout = builder.activityTimeout;
         this.returnUnsentBody = builder.returnUnsentBody;
+        this.readIdleTimeout = builder.readIdleTimeout;
     }
 
     /**
@@ -99,7 +102,8 @@ public final class RawRequestOptions {
             .responseTimeout(responseTimeout)
             .allowUpgrade(allowUpgrade)
             .activityTimeout(activityTimeout)
-            .returnUnsentBody(returnUnsentBody);
+            .returnUnsentBody(returnUnsentBody)
+            .readIdleTimeout(readIdleTimeout);
     }
 
     /**
@@ -195,6 +199,21 @@ public final class RawRequestOptions {
         return returnUnsentBody;
     }
 
+    /**
+     * The read timeout of this exchange instead of the read timeout of the client: the exchange
+     * fails with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException} when nothing
+     * is read from the connection for this long while the exchange runs, until the end of the
+     * response. Unlike {@link #getResponseTimeout()}, it can be longer than the read timeout of
+     * the client, e.g. for a slow upstream that streams, and shorter. Supported by the Netty
+     * client over HTTP/1.1 and HTTP/2. Defaults to {@code null}, the read timeout of the client.
+     *
+     * @return The read idle timeout, or {@code null}
+     * @since 5.3.0
+     */
+    public @Nullable Duration getReadIdleTimeout() {
+        return readIdleTimeout;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof RawRequestOptions that &&
@@ -204,12 +223,13 @@ public final class RawRequestOptions {
             Objects.equals(responseTimeout, that.responseTimeout) &&
             allowUpgrade == that.allowUpgrade &&
             Objects.equals(activityTimeout, that.activityTimeout) &&
-            returnUnsentBody == that.returnUnsentBody;
+            returnUnsentBody == that.returnUnsentBody &&
+            Objects.equals(readIdleTimeout, that.readIdleTimeout);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout);
     }
 
     @Override
@@ -222,6 +242,7 @@ public final class RawRequestOptions {
             ", allowUpgrade=" + allowUpgrade +
             ", activityTimeout=" + activityTimeout +
             ", returnUnsentBody=" + returnUnsentBody +
+            ", readIdleTimeout=" + readIdleTimeout +
             '}';
     }
 
@@ -238,8 +259,23 @@ public final class RawRequestOptions {
         @Nullable
         private Duration activityTimeout;
         private boolean returnUnsentBody;
+        @Nullable
+        private Duration readIdleTimeout;
 
         private Builder() {
+        }
+
+        /**
+         * @param readIdleTimeout See {@link RawRequestOptions#getReadIdleTimeout()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder readIdleTimeout(@Nullable Duration readIdleTimeout) {
+            if (readIdleTimeout != null && (readIdleTimeout.isNegative() || readIdleTimeout.isZero())) {
+                throw new IllegalArgumentException("The read idle timeout must be positive");
+            }
+            this.readIdleTimeout = readIdleTimeout;
+            return this;
         }
 
         /**

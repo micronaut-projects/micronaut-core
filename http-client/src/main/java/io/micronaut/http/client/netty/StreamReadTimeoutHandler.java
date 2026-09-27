@@ -63,9 +63,30 @@ final class StreamReadTimeoutHandler extends ReadTimeoutHandler {
     }
 
     /**
+     * @return The connection of the stream
+     */
+    Connection connection() {
+        return connection;
+    }
+
+    /**
      * The connection of the streams.
      */
     interface Connection {
+        /**
+         * No connection to close: a stream that times out only ends itself.
+         */
+        Connection NONE = new Connection() {
+            @Override
+            public int liveRequests() {
+                return Integer.MAX_VALUE;
+            }
+
+            @Override
+            public void closeAfterReadTimeout() {
+            }
+        };
+
         /**
          * @return The number of live requests of the connection
          */
