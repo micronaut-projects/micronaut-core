@@ -44,7 +44,12 @@ import java.util.function.Predicate;
  *     {@code -Prefix} values the first proxy set are kept. If the trusted chain only comes in
  *     one of the two formats, it is translated to the other one before this hop is appended
  *     (RFC 7239 section 7.4), so that both headers describe the same chain: a downstream server
- *     that prefers {@code Forwarded} must not see this hop as the client.</li>
+ *     that prefers {@code Forwarded} must not see this hop as the client. A trusted proxy is
+ *     trusted with the values, not with their syntax: an {@code X-Forwarded-Proto} with a scheme
+ *     that is not {@code http}, {@code https}, {@code ws} or {@code wss}, or an
+ *     {@code X-Forwarded-Port} with a port that is not a number between 1 and 65535, is dropped,
+ *     also from the translated {@code Forwarded} header, and the value of this hop is sent
+ *     instead.</li>
  *     <li>From any other peer, the inbound values could be forged, so they are replaced with the
  *     values of this hop.</li>
  * </ul>
@@ -148,11 +153,13 @@ public final class ForwardedHeaders {
         }
 
         // read the inbound values before the outbound headers change: the two requests can share
-        // their headers, e.g. for a request mutated from a Netty server request
+        // their headers, e.g. for a request mutated from a Netty server request. A trusted proxy
+        // is trusted with the values, not with their syntax: a scheme or a port that is not one
+        // is dropped, before it is translated to Forwarded, and this hop's own value is sent
         String inboundFor = trusted ? join(in.getAll(X_FORWARDED_FOR)) : null;
-        String inboundProto = trusted ? in.get(X_FORWARDED_PROTO) : null;
+        String inboundProto = trusted ? validScheme(in.get(X_FORWARDED_PROTO)) : null;
         String inboundHost = trusted ? in.get(X_FORWARDED_HOST) : null;
-        String inboundPort = trusted ? in.get(X_FORWARDED_PORT) : null;
+        String inboundPort = trusted ? validPort(in.get(X_FORWARDED_PORT)) : null;
         String inboundPrefix = trusted ? in.get(X_FORWARDED_PREFIX) : null;
         String inboundForwarded = trusted ? join(in.getAll(HttpHeaders.FORWARDED)) : null;
         if (trusted) {
@@ -182,14 +189,14 @@ public final class ForwardedHeaders {
                     inboundFor = String.join(", ", addresses);
                 }
                 if (inboundProto == null) {
-                    inboundProto = forwardedProto;
+                    inboundProto = validScheme(forwardedProto);
                 }
                 if (inboundHost == null && firstHost != null) {
                     int portSeparator = portSeparator(firstHost);
                     if (portSeparator >= 0) {
                         inboundHost = firstHost.substring(0, portSeparator);
                         if (inboundPort == null) {
-                            inboundPort = firstHost.substring(portSeparator + 1);
+                            inboundPort = validPort(firstHost.substring(portSeparator + 1));
                         }
                     } else {
                         inboundHost = firstHost;
@@ -387,6 +394,58 @@ public final class ForwardedHeaders {
         }
         Integer defaultPort = defaultPort(forwardedProto == null ? proto : forwardedProto);
         return defaultPort == null ? port : defaultPort;
+    }
+
+    /**
+     * @param value A value of {@code X-Forwarded-Proto}, a scheme or a list of them, one per proxy
+     * @return The value if each scheme is {@code http}, {@code https}, {@code ws} or {@code wss},
+     * else {@code null}
+     */
+    private static @Nullable String validScheme(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        for (String scheme : value.split(",", -1)) {
+            if (defaultPort(scheme) == null) {
+                return null;
+            }
+        }
+        return value;
+    }
+
+    /**
+     * @param value A value of {@code X-Forwarded-Port}, a port or a list of them, one per proxy
+     * @return The value if each port is a number between 1 and 65535, else {@code null}
+     */
+    private static @Nullable String validPort(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        for (String port : value.split(",", -1)) {
+            if (!isPort(port)) {
+                return null;
+            }
+        }
+        return value;
+    }
+
+    /**
+     * @param value A port
+     * @return Whether it is a number between 1 and 65535
+     */
+    private static boolean isPort(String value) {
+        String trimmed = value.trim();
+        if (trimmed.isEmpty() || trimmed.length() > 5) {
+            return false;
+        }
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        int port = Integer.parseInt(trimmed);
+        return port >= 1 && port <= 65535;
     }
 
     private static @Nullable Integer defaultPort(@Nullable String proto) {

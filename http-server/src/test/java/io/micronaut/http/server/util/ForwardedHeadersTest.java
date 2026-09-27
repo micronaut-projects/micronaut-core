@@ -377,6 +377,140 @@ class ForwardedHeadersTest {
         assertEquals(port, parser.getPort());
     }
 
+    @Test
+    void anInvalidSchemeOrPortOfATrustedProxyIsReplacedWithThisHops() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+            ForwardedHeaders.X_FORWARDED_FOR, "203.0.113.7",
+            ForwardedHeaders.X_FORWARDED_PROTO, "javascript",
+            ForwardedHeaders.X_FORWARDED_PORT, "80; drop");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertEquals("203.0.113.7, 10.0.0.2", headers.get(ForwardedHeaders.X_FORWARDED_FOR));
+        assertEquals("http", headers.get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("8080", headers.get(ForwardedHeaders.X_FORWARDED_PORT));
+    }
+
+    @Test
+    void aValidSchemeAndPortOfATrustedProxyAreKept() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+            ForwardedHeaders.X_FORWARDED_PROTO, "WSS",
+            ForwardedHeaders.X_FORWARDED_PORT, "8443");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        assertEquals("WSS", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("8443", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PORT));
+    }
+
+    @Test
+    void aPortOutOfRangeOfATrustedProxyIsReplacedWithThisHops() {
+        for (String port : new String[] {"0", "65536", "99999", "", "-1", "+80"}) {
+            HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+                ForwardedHeaders.X_FORWARDED_PORT, port);
+            MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+            ForwardedHeaders.builder()
+                .trustedProxy(address -> address.getHostString().startsWith("10."))
+                .build()
+                .write(inbound, outbound);
+
+            assertEquals("8080", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PORT), port);
+        }
+    }
+
+    @Test
+    void anInvalidSchemeOrPortOfATrustedProxyIsNotTranslatedToForwarded() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+            ForwardedHeaders.X_FORWARDED_FOR, "203.0.113.7",
+            ForwardedHeaders.X_FORWARDED_PROTO, "javascript",
+            ForwardedHeaders.X_FORWARDED_HOST, "shop.example.com",
+            ForwardedHeaders.X_FORWARDED_PORT, "80; drop");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        assertEquals("for=203.0.113.7;host=shop.example.com, for=10.0.0.2;proto=http;host=\"gateway.internal:8080\"",
+            outbound.getHeaders().get(HttpHeaders.FORWARDED));
+    }
+
+    @Test
+    void anInvalidSchemeOrPortInTheForwardedHeaderOfATrustedProxyIsReplacedWithThisHops() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+            HttpHeaders.FORWARDED, "for=203.0.113.7;proto=javascript;host=\"shop.example.com:99999\"");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertEquals("http", headers.get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("shop.example.com", headers.get(ForwardedHeaders.X_FORWARDED_HOST));
+        assertEquals("80", headers.get(ForwardedHeaders.X_FORWARDED_PORT));
+    }
+
+    @Test
+    void aListOfValidSchemesAndPortsOfTrustedProxiesIsKept() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+            ForwardedHeaders.X_FORWARDED_PROTO, "https, http",
+            ForwardedHeaders.X_FORWARDED_PORT, "443, 8080");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        assertEquals("https, http", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("443, 8080", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PORT));
+    }
+
+    @Test
+    void aListWithAnInvalidSchemeOrPortOfATrustedProxyIsReplacedWithThisHops() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+            ForwardedHeaders.X_FORWARDED_PROTO, "https, javascript",
+            ForwardedHeaders.X_FORWARDED_PORT, "443, 0");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        assertEquals("http", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("8080", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PORT));
+    }
+
+    @Test
+    void anInvalidSchemeOfAnUntrustedPeerIsReplacedAsBefore() {
+        HttpRequest<?> inbound = inbound("192.168.0.9", false, "gateway.internal:8080",
+            ForwardedHeaders.X_FORWARDED_PROTO, "javascript",
+            ForwardedHeaders.X_FORWARDED_PORT, "80; drop");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        assertEquals("http", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("8080", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PORT));
+    }
+
     private static HttpRequest<?> inbound(String remoteAddress, boolean secure, String host, String... headers) {
         MutableHttpRequest<Object> request = HttpRequest.GET("/orders");
         request.header(HttpHeaders.HOST, host);

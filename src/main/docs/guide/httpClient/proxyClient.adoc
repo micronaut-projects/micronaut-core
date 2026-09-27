@@ -14,3 +14,20 @@ snippet::io.micronaut.docs.http.client.proxy.ProxyFilter[tags="imports,class", i
 <6> Additional request and response headers are included
 
 NOTE: The api:http.client.ProxyHttpClient[] API is a low-level API that can be used to build a higher-level abstraction such as an API Gateway.
+
+=== Forwarding Headers
+
+To tell the backend who the original client is, write the forwarding headers of the proxied request with api:http.server.util.ForwardedHeaders[]: `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`, `X-Forwarded-Port`, `X-Forwarded-Prefix` and the RFC 7239 `Forwarded` header.
+
+[source,java]
+----
+ForwardedHeaders forwardedHeaders = ForwardedHeaders.builder()
+    .trustedProxy(address -> address.getAddress().isSiteLocalAddress()) // <1>
+    .build();
+
+forwardedHeaders.write(inboundRequest, proxiedRequest); // <2>
+----
+<1> Only the forwarding headers sent by a trusted peer are kept. By default no peer is trusted, and the inbound values, which could be forged, are replaced with the values of this hop.
+<2> Writes the headers of this hop onto the proxied request.
+
+A trusted proxy is trusted with the values, not with their syntax: an `X-Forwarded-Proto` with a scheme that is not `http`, `https`, `ws` or `wss`, or an `X-Forwarded-Port` with a port that is not a number between 1 and 65535, is dropped, and the value of this hop is sent instead. A list of valid values, one per proxy, is kept.
