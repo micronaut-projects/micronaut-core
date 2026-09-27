@@ -50,6 +50,7 @@ class FilterUnsupportedBodySpec extends Specification {
     static class MapBodyFilter {
         @RequestFilter
         void filter(@Body Map<String, Object> body) {
+            // never called: the body cannot be bound to a map, so the request fails before the filter runs
         }
     }
 
