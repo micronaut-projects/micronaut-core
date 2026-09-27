@@ -62,18 +62,36 @@ final class DefaultCircuitBreakerGuard implements CircuitBreakerGuard {
     }
 
     @Override
-    public void acquire() {
-        retryState.open();
-    }
+    public Permit acquire() {
+        CircuitBreakerRetry.Circuit circuit = retryState.circuit();
+        CircuitBreakerPolicy.Window window = circuit.getWindow();
+        if (window == null) {
+            retryState.open();
+            return new Permit() {
+                @Override
+                public void onSuccess() {
+                    retryState.close(null);
+                }
 
-    @Override
-    public void onSuccess() {
-        retryState.close(null);
-    }
+                @Override
+                public void onFailure(Throwable failure) {
+                    retryState.close(Objects.requireNonNull(failure, "failure"));
+                }
+            };
+        }
+        long generation = retryState.acquirePermit();
+        return new Permit() {
+            @Override
+            public void onSuccess() {
+                retryState.record(generation, null, false);
+            }
 
-    @Override
-    public void onFailure(Throwable failure) {
-        retryState.close(Objects.requireNonNull(failure, "failure"));
+            @Override
+            public void onFailure(Throwable failure) {
+                Objects.requireNonNull(failure, "failure");
+                retryState.record(generation, failure, window.isFailure(failure));
+            }
+        };
     }
 
     @Override

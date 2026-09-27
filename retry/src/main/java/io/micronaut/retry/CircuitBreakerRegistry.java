@@ -80,6 +80,13 @@ public interface CircuitBreakerRegistry {
     Optional<CircuitState> findState(String name);
 
     /**
+     * @param name The name
+     * @return The state and the counters of the circuit of the name, if it exists, e.g. for an
+     * endpoint or metrics
+     */
+    Optional<CircuitBreakerSnapshot> findSnapshot(String name);
+
+    /**
      * @return The names of the circuits that exist: the configured ones and the ones in use
      */
     Set<String> getNames();

@@ -33,4 +33,14 @@ public interface MutableRetryState extends RetryState {
      * @return The next delay in milliseconds
      */
     long nextDelay();
+
+    /**
+     * Called when an attempt fails with an exception this state does not capture, see
+     * {@link #getCapturedException()}, and which is rethrown without a retry.
+     *
+     * @param exception The exception
+     * @since 5.3.0
+     */
+    default void onUncaptured(Throwable exception) {
+    }
 }

@@ -24,7 +24,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
-import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -85,29 +85,29 @@ public final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegist
     }
 
     private CircuitBreakerOperations operations(String name, CircuitBreakerPolicy policy) {
-        return new DefaultCircuitBreakerOperations(policy, sharedCircuit(name, policy.getResetTimeout()), name, retryRunner, NO_OP_EVENT_EMITTER);
+        return new DefaultCircuitBreakerOperations(policy, sharedCircuit(name, policy), name, retryRunner, NO_OP_EVENT_EMITTER);
     }
 
     /**
-     * The circuit of a name: the existing one, or a new one with the configured reset timeout,
-     * or else the given one.
+     * The circuit of a name: the existing one, or a new one with the reset timeout and the
+     * rolling window of the configuration of the name, or else of the given policy.
      *
-     * @param name         The name
-     * @param resetTimeout The reset timeout of a new circuit that is not configured
+     * @param name   The name
+     * @param policy The policy of a new circuit that is not configured
      * @return The circuit
      */
-    public CircuitBreakerRetry.Circuit sharedCircuit(String name, Duration resetTimeout) {
+    public CircuitBreakerRetry.Circuit sharedCircuit(String name, CircuitBreakerPolicy policy) {
         return circuits.computeIfAbsent(name, n -> {
             NamedCircuitBreakerConfiguration configuration = configurations.get(n);
-            Duration reset = configuration == null ? resetTimeout : configuration.getReset();
-            return new CircuitBreakerRetry.Circuit(reset.toMillis());
+            CircuitBreakerPolicy circuitPolicy = configuration == null ? policy : configuration.toPolicy();
+            return new CircuitBreakerRetry.Circuit(circuitPolicy.getResetTimeout().toMillis(), circuitPolicy.window());
         });
     }
 
     @Override
     public CircuitBreakerGuard guard(String name) {
         Objects.requireNonNull(name, "name");
-        return guards.computeIfAbsent(name, n -> new DefaultCircuitBreakerGuard(n, sharedCircuit(n, CircuitBreakerPolicy.DEFAULT_RESET_TIMEOUT)));
+        return guards.computeIfAbsent(name, n -> new DefaultCircuitBreakerGuard(n, sharedCircuit(n, CircuitBreakerPolicy.builder().build())));
     }
 
     @Override
@@ -121,6 +121,25 @@ public final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegist
             return Optional.of(CircuitState.HALF_OPEN);
         }
         return Optional.of(state);
+    }
+
+    @Override
+    public Optional<CircuitBreakerSnapshot> findSnapshot(String name) {
+        CircuitBreakerRetry.Circuit circuit = circuits.get(name);
+        if (circuit == null) {
+            NamedCircuitBreakerConfiguration configuration = configurations.get(name);
+            if (configuration == null) {
+                return Optional.empty();
+            }
+            CircuitBreakerPolicy.Window window = configuration.toPolicy().window();
+            return Optional.of(new CircuitBreakerSnapshot(name, CircuitState.CLOSED, window == null ? 0 : window.requestVolumeThreshold(),
+                0, 0, 0, 0, 0, null));
+        }
+        CircuitState state = findState(name).orElse(CircuitState.CLOSED);
+        long[] counters = circuit.counters();
+        CircuitBreakerPolicy.Window window = circuit.getWindow();
+        return Optional.of(new CircuitBreakerSnapshot(name, state, window == null ? 0 : window.requestVolumeThreshold(),
+            (int) counters[0], (int) counters[1], (int) counters[2], (int) counters[3], counters[4], Instant.ofEpochMilli(counters[5])));
     }
 
     @Override

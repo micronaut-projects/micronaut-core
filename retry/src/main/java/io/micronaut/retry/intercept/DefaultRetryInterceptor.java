@@ -41,7 +41,6 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -143,8 +142,8 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             retryState = circuitContexts.computeIfAbsent(
                 context.getExecutableMethod(),
                 method -> name.isEmpty()
-                    ? new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
-                    : new CircuitBreakerRetry(namedCircuit(name, circuitBreakerPolicy.getResetTimeout()), retryStateBuilder, context, eventPublisher, wrapException)
+                    ? new CircuitBreakerRetry(new CircuitBreakerRetry.Circuit(timeout, circuitBreakerPolicy.window()), retryStateBuilder, context, eventPublisher, wrapException)
+                    : new CircuitBreakerRetry(namedCircuit(name, circuitBreakerPolicy), retryStateBuilder, context, eventPublisher, wrapException)
             );
         } else {
             String name = retry.stringValue("name").orElse("");
@@ -213,11 +212,11 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         }
     }
 
-    private CircuitBreakerRetry.Circuit namedCircuit(String name, Duration resetTimeout) {
+    private CircuitBreakerRetry.Circuit namedCircuit(String name, CircuitBreakerPolicy policy) {
         if (circuitBreakerRegistry != null) {
-            return circuitBreakerRegistry.sharedCircuit(name, resetTimeout);
+            return circuitBreakerRegistry.sharedCircuit(name, policy);
         }
-        return namedCircuits.computeIfAbsent(name, n -> new CircuitBreakerRetry.Circuit(resetTimeout.toMillis()));
+        return namedCircuits.computeIfAbsent(name, n -> new CircuitBreakerRetry.Circuit(policy.getResetTimeout().toMillis(), policy.window()));
     }
 
     private void publishRetryEvent(MethodInvocationContext<Object, Object> context,

@@ -131,4 +131,47 @@ public @interface CircuitBreaker {
      * @since 5.3.0
      */
     String name() default "";
+
+    /**
+     * The size of the rolling window of the calls of a closed circuit, as in MicroProfile Fault
+     * Tolerance, see {@link io.micronaut.retry.CircuitBreakerPolicy.Window}: the circuit opens
+     * when the window is full and the ratio of failures in it reaches {@link #failureRatio()}.
+     * Setting it, or {@link #failureRatio()}, {@link #successThreshold()}, {@link #failOn()} or
+     * {@link #skipOn()}, gives the circuit a rolling window, with the defaults of the others.
+     * Empty, the default, for the circuit breaker of Micronaut: the first failure that survives
+     * the retries opens the circuit, and the first success of a half-open circuit closes it.
+     * The outcome of a call is the outcome after its retries.
+     *
+     * @return The number of calls of the window, e.g. {@code "20"}, or empty
+     * @since 5.3.0
+     */
+    String requestVolumeThreshold() default "";
+
+    /**
+     * @return The ratio of failures of a full window that opens the circuit, between 0 and 1,
+     * default 0.5 when the circuit has a rolling window, see {@link #requestVolumeThreshold()}
+     * @since 5.3.0
+     */
+    String failureRatio() default "";
+
+    /**
+     * @return The number of trial calls of a half-open circuit with a rolling window, which all
+     * succeed to close it, default 1; the other calls of the half-open circuit are rejected
+     * @since 5.3.0
+     */
+    String successThreshold() default "";
+
+    /**
+     * @return The exceptions that count as a failure of a circuit with a rolling window, default
+     * every one
+     * @since 5.3.0
+     */
+    Class<? extends Throwable>[] failOn() default {};
+
+    /**
+     * @return The exceptions that count as a success of a circuit with a rolling window, whatever
+     * {@link #failOn()} says
+     * @since 5.3.0
+     */
+    Class<? extends Throwable>[] skipOn() default {};
 }

@@ -21,6 +21,8 @@ import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The configuration of a named circuit breaker of the {@link CircuitBreakerRegistry}, e.g.
@@ -54,6 +56,14 @@ public class NamedCircuitBreakerConfiguration {
     private double jitter = RetryPolicy.DEFAULT_JITTER;
     private Duration reset = CircuitBreakerPolicy.DEFAULT_RESET_TIMEOUT;
     private boolean throwWrappedException;
+    @Nullable
+    private Integer requestVolumeThreshold;
+    @Nullable
+    private Double failureRatio;
+    @Nullable
+    private Integer successThreshold;
+    private List<Class<? extends Throwable>> failOn = new ArrayList<>();
+    private List<Class<? extends Throwable>> skipOn = new ArrayList<>();
 
     /**
      * @param name The name of the circuit breaker
@@ -168,6 +178,89 @@ public class NamedCircuitBreakerConfiguration {
     }
 
     /**
+     * @return The size of the rolling window, if the circuit has one
+     * @since 5.3.0
+     */
+    public @Nullable Integer getRequestVolumeThreshold() {
+        return requestVolumeThreshold;
+    }
+
+    /**
+     * @param requestVolumeThreshold The number of calls of the rolling window, see
+     *                               {@link CircuitBreakerPolicy.Window}; setting it, or another
+     *                               setting of the window, gives the circuit a rolling window
+     * @since 5.3.0
+     */
+    public void setRequestVolumeThreshold(@Nullable Integer requestVolumeThreshold) {
+        this.requestVolumeThreshold = requestVolumeThreshold;
+    }
+
+    /**
+     * @return The ratio of failures that opens the circuit
+     * @since 5.3.0
+     */
+    public @Nullable Double getFailureRatio() {
+        return failureRatio;
+    }
+
+    /**
+     * @param failureRatio The ratio of failures of a full window that opens the circuit, default 0.5
+     * @since 5.3.0
+     */
+    public void setFailureRatio(@Nullable Double failureRatio) {
+        this.failureRatio = failureRatio;
+    }
+
+    /**
+     * @return The number of trial calls of a half-open circuit
+     * @since 5.3.0
+     */
+    public @Nullable Integer getSuccessThreshold() {
+        return successThreshold;
+    }
+
+    /**
+     * @param successThreshold The number of trial calls of a half-open circuit, which all succeed
+     *                         to close it, default 1
+     * @since 5.3.0
+     */
+    public void setSuccessThreshold(@Nullable Integer successThreshold) {
+        this.successThreshold = successThreshold;
+    }
+
+    /**
+     * @return The exceptions that count as a failure
+     * @since 5.3.0
+     */
+    public List<Class<? extends Throwable>> getFailOn() {
+        return failOn;
+    }
+
+    /**
+     * @param failOn The exceptions that count as a failure, default every one
+     * @since 5.3.0
+     */
+    public void setFailOn(List<Class<? extends Throwable>> failOn) {
+        this.failOn = failOn;
+    }
+
+    /**
+     * @return The exceptions that count as a success
+     * @since 5.3.0
+     */
+    public List<Class<? extends Throwable>> getSkipOn() {
+        return skipOn;
+    }
+
+    /**
+     * @param skipOn The exceptions that count as a success, whatever failOn says
+     * @since 5.3.0
+     */
+    public void setSkipOn(List<Class<? extends Throwable>> skipOn) {
+        this.skipOn = skipOn;
+    }
+
+    /**
      * @return The policy of the configuration
      */
     public CircuitBreakerPolicy toPolicy() {
@@ -180,6 +273,21 @@ public class NamedCircuitBreakerConfiguration {
             .throwWrappedException(throwWrappedException);
         if (maxDelay != null) {
             builder.maxDelay(maxDelay);
+        }
+        if (requestVolumeThreshold != null) {
+            builder.requestVolumeThreshold(requestVolumeThreshold);
+        }
+        if (failureRatio != null) {
+            builder.failureRatio(failureRatio);
+        }
+        if (successThreshold != null) {
+            builder.successThreshold(successThreshold);
+        }
+        if (!failOn.isEmpty()) {
+            builder.failOn(failOn.toArray(new Class[0]));
+        }
+        if (!skipOn.isEmpty()) {
+            builder.skipOn(skipOn.toArray(new Class[0]));
         }
         return builder.build();
     }

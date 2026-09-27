@@ -84,6 +84,7 @@ public final class DefaultRetryRunner {
                 return value;
             } catch (Throwable exception) {
                 if (!isCaptured(retryState, exception)) {
+                    retryState.onUncaptured(exception);
                     throw exception;
                 }
                 if (!retryState.canRetry(exception)) {
@@ -129,6 +130,7 @@ public final class DefaultRetryRunner {
         } catch (Throwable exception) {
             Throwable cause = unwrapCompletionException(exception);
             if (!isCaptured(retryState, cause)) {
+                retryState.onUncaptured(cause);
                 future.completeExceptionally(cause);
                 return future;
             }
@@ -200,6 +202,7 @@ public final class DefaultRetryRunner {
             }
             Throwable cause = unwrapCompletionException(exception);
             if (!isCaptured(retryState, cause)) {
+                retryState.onUncaptured(cause);
                 future.completeExceptionally(cause);
                 return;
             }
@@ -226,6 +229,7 @@ public final class DefaultRetryRunner {
                                                                                                RetryEventEmitter retryEventEmitter) {
         return exception -> {
             if (!isCaptured(retryState, exception)) {
+                retryState.onUncaptured(exception);
                 return Flux.error(exception);
             }
             if (!retryState.canRetry(exception)) {

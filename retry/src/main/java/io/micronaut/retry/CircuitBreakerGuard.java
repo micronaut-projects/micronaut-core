@@ -26,12 +26,12 @@ import io.micronaut.retry.exception.CircuitOpenException;
  *
  * <pre>{@code
  * CircuitBreakerGuard guard = registry.guard("orders");
- * guard.acquire(); // throws CircuitOpenException while the circuit is open
+ * CircuitBreakerGuard.Permit permit = guard.acquire(); // throws while the circuit is open
  * try {
  *     Result result = call();
- *     guard.onSuccess();
+ *     permit.onSuccess();
  * } catch (RuntimeException e) {
- *     guard.onFailure(e);
+ *     permit.onFailure(e);
  *     throw e;
  * }
  * }</pre>
@@ -54,24 +54,36 @@ public interface CircuitBreakerGuard {
     CircuitState getState();
 
     /**
-     * Acquire the circuit for an operation: fail fast while it is open. A half-open circuit lets
-     * operations through: the first outcome reported closes or opens it again.
+     * Acquire the circuit for an operation: fail fast while it is open. Without a rolling window,
+     * a half-open circuit lets every operation through and the first outcome closes or opens it
+     * again; with one, it permits its trial operations only, see
+     * {@link CircuitBreakerPolicy.Window}. Report the outcome of the operation with the permit,
+     * exactly once.
      *
+     * @return The permit of the operation
      * @throws CircuitOpenException while the circuit is open, with the failure that opened it
-     * as the cause
+     * as the cause, or when the trial operations of a half-open circuit are taken
      */
-    void acquire();
+    Permit acquire();
 
     /**
-     * Report that an operation succeeded: a half-open circuit closes.
+     * The permit of one operation, to report its outcome. An outcome reported after the circuit
+     * changed state, e.g. of an operation that took long, counts for nothing.
      */
-    void onSuccess();
+    interface Permit {
 
-    /**
-     * Report that an operation failed: the circuit opens, with the failure as the cause of the
-     * exceptions of {@link #acquire()} until it half-opens.
-     *
-     * @param failure The failure
-     */
-    void onFailure(Throwable failure);
+        /**
+         * Report that the operation succeeded.
+         */
+        void onSuccess();
+
+        /**
+         * Report that the operation failed: with a rolling window, the failure counts as the
+         * {@link CircuitBreakerPolicy.Window#isFailure(Throwable) failOn and skipOn} of the
+         * window decide; without one, it opens the circuit.
+         *
+         * @param failure The failure
+         */
+        void onFailure(Throwable failure);
+    }
 }

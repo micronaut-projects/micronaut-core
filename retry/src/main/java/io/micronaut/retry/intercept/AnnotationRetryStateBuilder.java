@@ -28,6 +28,7 @@ import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.retry.annotation.Retryable;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -51,6 +52,11 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String JITTER = "jitter";
     private static final String RESET = "reset";
     private static final String THROW_WRAPPED_EXCEPTION = "throwWrappedException";
+    private static final String REQUEST_VOLUME_THRESHOLD = "requestVolumeThreshold";
+    private static final String FAILURE_RATIO = "failureRatio";
+    private static final String SUCCESS_THRESHOLD = "successThreshold";
+    private static final String FAIL_ON = "failOn";
+    private static final String SKIP_ON = "skipOn";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -138,7 +144,31 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
             .resetTimeout(circuitBreaker.get(RESET, Duration.class).orElse(Duration.ofSeconds(20)))
             .throwWrappedException(circuitBreaker.booleanValue(THROW_WRAPPED_EXCEPTION).orElse(false));
         retryPolicy.getMaxDelay().ifPresent(builder::maxDelay);
+        circuitBreaker.stringValue(REQUEST_VOLUME_THRESHOLD).filter(v -> !v.isBlank())
+            .ifPresent(v -> builder.requestVolumeThreshold(Integer.parseInt(v.strip())));
+        circuitBreaker.stringValue(FAILURE_RATIO).filter(v -> !v.isBlank())
+            .ifPresent(v -> builder.failureRatio(Double.parseDouble(v.strip())));
+        circuitBreaker.stringValue(SUCCESS_THRESHOLD).filter(v -> !v.isBlank())
+            .ifPresent(v -> builder.successThreshold(Integer.parseInt(v.strip())));
+        List<Class<? extends Throwable>> failOn = resolveThrowables(circuitBreaker, FAIL_ON);
+        if (!failOn.isEmpty()) {
+            builder.failOn(failOn.toArray(new Class[0]));
+        }
+        List<Class<? extends Throwable>> skipOn = resolveThrowables(circuitBreaker, SKIP_ON);
+        if (!skipOn.isEmpty()) {
+            builder.skipOn(skipOn.toArray(new Class[0]));
+        }
         return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Class<? extends Throwable>> resolveThrowables(AnnotationValue<CircuitBreaker> circuitBreaker, String member) {
+        Class<?>[] types = circuitBreaker.classValues(member);
+        List<Class<? extends Throwable>> throwables = new ArrayList<>(types.length);
+        for (Class<?> type : types) {
+            throwables.add((Class<? extends Throwable>) type);
+        }
+        return throwables;
     }
 
     private static RetryPredicate createPredicate(Class<? extends RetryPredicate> predicateClass, AnnotationValue<Retryable> retry) {

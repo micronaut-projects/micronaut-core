@@ -52,7 +52,7 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
         this.retryEventEmitter = retryEventEmitter;
         this.executableMethod = new ProgrammaticExecutableMethod("programmaticCircuitBreaker");
         this.retryState = new CircuitBreakerRetry(
-            circuitBreakerPolicy.getResetTimeout().toMillis(),
+            new CircuitBreakerRetry.Circuit(circuitBreakerPolicy.getResetTimeout().toMillis(), circuitBreakerPolicy.window()),
             new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy()),
             executableMethod,
             null,

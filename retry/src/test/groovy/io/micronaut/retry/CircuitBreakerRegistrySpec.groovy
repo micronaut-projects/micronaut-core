@@ -164,15 +164,13 @@ class CircuitBreakerRegistrySpec extends Specification {
         guard.state == CircuitState.CLOSED
 
         when: "a success keeps it closed"
-        guard.acquire()
-        guard.onSuccess()
+        guard.acquire().onSuccess()
 
         then:
         guard.state == CircuitState.CLOSED
 
         when: "one failure opens it, for the other users of the name too"
-        guard.acquire()
-        guard.onFailure(new IllegalStateException("payments down"))
+        guard.acquire().onFailure(new IllegalStateException("payments down"))
 
         then:
         guard.state == CircuitState.OPEN
@@ -189,18 +187,16 @@ class CircuitBreakerRegistrySpec extends Specification {
         conditions.eventually {
             assert guard.state == CircuitState.HALF_OPEN
         }
-        guard.acquire()
-        guard.onSuccess()
+        guard.acquire().onSuccess()
         guard.state == CircuitState.CLOSED
         registry.findState("payments").get() == CircuitState.CLOSED
 
         when: "a failure of the half-open circuit opens it again"
-        guard.onFailure(new IllegalStateException("again"))
+        guard.acquire().onFailure(new IllegalStateException("again"))
         conditions.eventually {
             assert guard.state == CircuitState.HALF_OPEN
         }
-        guard.acquire()
-        guard.onFailure(new IllegalStateException("still down"))
+        guard.acquire().onFailure(new IllegalStateException("still down"))
 
         then:
         guard.state == CircuitState.OPEN
