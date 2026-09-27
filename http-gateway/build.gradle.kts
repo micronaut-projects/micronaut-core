@@ -1,0 +1,40 @@
+plugins {
+    id("io.micronaut.build.internal.convention-library")
+}
+
+description = "An API gateway built on the functional routes and the raw HTTP client"
+
+micronautBuild {
+    binaryCompatibility {
+        // a new module: nothing to compare with before its first release
+        enabled = false
+    }
+}
+
+dependencies {
+    annotationProcessor(projects.micronautInjectJava)
+
+    api(projects.micronautRouter)
+    api(projects.micronautHttpServer)
+    api(projects.micronautHttpClientCore)
+    api(projects.micronautRetry)
+    api(projects.micronautDiscoveryCore)
+
+    // the read-only gateway endpoint, when the management module is present
+    compileOnly(projects.micronautManagement)
+
+    testAnnotationProcessor(projects.micronautInjectJava)
+    testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpClient)
+    testImplementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautManagement)
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.logback.classic)
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
