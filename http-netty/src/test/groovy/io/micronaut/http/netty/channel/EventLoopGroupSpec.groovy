@@ -3,7 +3,6 @@ package io.micronaut.http.netty.channel
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.netty.buffer.PooledByteBufAllocator
 import io.netty.channel.EventLoopGroup
 import io.netty.util.NettyRuntime
 import io.netty.util.ResourceLeakDetector
@@ -13,17 +12,46 @@ import java.time.Duration
 
 class EventLoopGroupSpec extends Specification {
 
-    void "test default allocator order"() {
+    private static final String ALLOCATOR_TYPE = 'io.netty.allocator.type'
+    private static final String MAX_ORDER = 'io.netty.allocator.maxOrder'
+
+    void "test default allocator max order with allocator type #allocatorType and max order #maxOrder"() {
         given:
+        def previousType = System.getProperty(ALLOCATOR_TYPE)
+        def previousMaxOrder = System.getProperty(MAX_ORDER)
+        def previousLevel = ResourceLeakDetector.level
+        setOrClearProperty(ALLOCATOR_TYPE, allocatorType)
+        setOrClearProperty(MAX_ORDER, maxOrder)
         def context = ApplicationContext.run()
 
         when:
         context.getBean(EventLoopGroup)
+
         then:
-        PooledByteBufAllocator.defaultMaxOrder() == 3
+        System.getProperty(MAX_ORDER) == expectedMaxOrder
 
         cleanup:
         context.close()
+        setOrClearProperty(ALLOCATOR_TYPE, previousType)
+        setOrClearProperty(MAX_ORDER, previousMaxOrder)
+        ResourceLeakDetector.level = previousLevel
+
+        where:
+        allocatorType | maxOrder | expectedMaxOrder
+        null          | null     | null
+        'adaptive'    | null     | null
+        'unpooled'    | null     | null
+        'pooled'      | null     | '3'
+        'pooled'      | '5'      | '5'
+        'unknown'     | null     | '3'
+    }
+
+    private static void setOrClearProperty(String name, String value) {
+        if (value == null) {
+            System.clearProperty(name)
+        } else {
+            System.setProperty(name, value)
+        }
     }
 
     void "test default event loop group"() {
