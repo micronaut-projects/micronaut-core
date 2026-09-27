@@ -40,6 +40,7 @@ import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandl
 import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
@@ -436,6 +437,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 }
                 try (encodedResponse) {
                     closeConnectionIfError(encodedResponse, nettyHttpRequest, outboundAccess);
+                    if (encodedResponse.getAttribute(ServerResponseAttributes.SKIP_COMPRESSION, Boolean.class).orElse(false)) {
+                        outboundAccess.skipCompression();
+                    }
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Response {} - {} {}",
                             encodedResponse.code(),

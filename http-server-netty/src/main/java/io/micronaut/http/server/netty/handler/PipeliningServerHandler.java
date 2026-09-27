@@ -974,6 +974,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Class that allows writing the response for the request this object is associated with.
      */
     public final class OutboundAccessImpl implements OutboundAccess {
+        private boolean skipCompression;
         /**
          * The request that caused this response. This is used for compression decisions.
          */
@@ -1178,8 +1179,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         }
 
+        @Override
+        public void skipCompression() {
+            skipCompression = true;
+        }
+
         private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
-            if (compressor == null) {
+            if (compressor == null || skipCompression) {
                 return;
             }
             assert ctx != null;
