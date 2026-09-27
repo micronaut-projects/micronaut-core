@@ -3,7 +3,6 @@ package io.micronaut.docs.server.functional;
 // tag::imports[]
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
