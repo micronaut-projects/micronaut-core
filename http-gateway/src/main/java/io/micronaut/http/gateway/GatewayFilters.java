@@ -370,6 +370,23 @@ public final class GatewayFilters {
     }
 
     /**
+     * Limit the requests of the route in flight per key, e.g. per client: a request over the
+     * limit is answered with {@code 429} without calling the upstream. A request counts from the
+     * route filters until the headers of its response, of the upstream, a fallback or an error.
+     * A request without a key is not limited. A route filter.
+     *
+     * @param maxConcurrent The maximum number of requests of a key in flight, at least 1
+     * @param keyResolver   The key of a request
+     * @return The filter
+     */
+    public static GatewayFilter bulkhead(int maxConcurrent, KeyResolver keyResolver) {
+        if (maxConcurrent < 1) {
+            throw new IllegalArgumentException("A bulkhead needs at least 1 request in flight: " + maxConcurrent);
+        }
+        return new Bulkhead(maxConcurrent, Objects.requireNonNull(keyResolver, "keyResolver"));
+    }
+
+    /**
      * @param filters The filters of a route
      * @return The smallest {@link #requestSize(long) body limit} among them, or {@code -1} for none
      */
@@ -894,6 +911,59 @@ public final class GatewayFilters {
         @Override
         public String toString() {
             return "SetStatus=" + status.getCode();
+        }
+    }
+
+    /**
+     * The in-flight limit per key, see {@link #bulkhead(int, KeyResolver)}.
+     */
+    static final class Bulkhead implements GatewayFilter {
+        private final int maxConcurrent;
+        private final KeyResolver keyResolver;
+        private final Map<String, java.util.concurrent.atomic.AtomicInteger> inFlight = new java.util.concurrent.ConcurrentHashMap<>();
+
+        Bulkhead(int maxConcurrent, KeyResolver keyResolver) {
+            this.maxConcurrent = maxConcurrent;
+            this.keyResolver = keyResolver;
+        }
+
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacingAsync(request -> keyResolver.resolve(request).thenApply(key -> {
+                if (key == null || key.isEmpty()) {
+                    return null;
+                }
+                java.util.concurrent.atomic.AtomicInteger count = inFlight.computeIfAbsent(key, k -> new java.util.concurrent.atomic.AtomicInteger());
+                if (count.incrementAndGet() > maxConcurrent) {
+                    count.decrementAndGet();
+                    return HttpResponse.status(HttpStatus.TOO_MANY_REQUESTS);
+                }
+                GatewayRequestContext.forFilters(request).state(this, key);
+                return null;
+            }));
+            route.after((request, response) -> {
+                Object key = GatewayRequestContext.forFilters(request).state(this, null);
+                if (key != null) {
+                    java.util.concurrent.atomic.AtomicInteger count = inFlight.get(key.toString());
+                    if (count != null) {
+                        count.decrementAndGet();
+                    }
+                }
+            });
+        }
+
+        /**
+         * @param key A key
+         * @return Its requests in flight
+         */
+        int inFlight(String key) {
+            java.util.concurrent.atomic.AtomicInteger count = inFlight.get(key);
+            return count == null ? 0 : count.get();
+        }
+
+        @Override
+        public String toString() {
+            return "Bulkhead=" + maxConcurrent;
         }
     }
 

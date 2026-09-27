@@ -72,6 +72,23 @@ class GatewayConfigurationBindingTest {
     }
 
     @Test
+    void theRateLimiterBindsAndRejectsABurstBelowTheRate() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=10, 20, 2, header:X-User", "Bulkhead=3, principal")
+        ));
+        assertEquals(List.of("RequestRateLimiter=10, 20, 2", "Bulkhead=3"), route.getFilters().stream().map(Object::toString).toList());
+        ConfigurationException invalid = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=10, 5"))));
+        assertTrue(invalid.getMessage().contains("lower than its replenish rate"), invalid.getMessage());
+        ConfigurationException unknownResolver = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=1, 1, 1, nope"))));
+        assertTrue(unknownResolver.getMessage().contains("No KeyResolver bean named nope"), unknownResolver.getMessage());
+    }
+
+    @Test
     void theSizeFiltersBindTheirLimits() {
         GatewayRoute route = bind(Map.of(
             "micronaut.gateway.routes.r.uri", "http://x",

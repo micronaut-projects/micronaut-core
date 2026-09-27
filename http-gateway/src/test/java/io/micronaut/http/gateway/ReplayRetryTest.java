@@ -143,7 +143,7 @@ class ReplayRetryTest extends GatewayTestBase {
             GatewayFilter kept = new GatewayFilter() {
                 @Override
                 public void filterResponse(ProxyExchange exchange, MutableHttpResponse<?> response) {
-                    response.header("X-Kept", String.valueOf(exchange.request().getAttribute(GatewayAttributes.BODY_KEPT_FOR_REPLAY).isPresent()));
+                    response.header("X-Kept", String.valueOf(GatewayRequestContext.find(exchange.request()).map(GatewayRequestContext::bodyKeptForReplay).orElse(false)));
                 }
             };
             GatewayRetry retryPost = GatewayRetry.of(2).withMethods("POST").withStatuses(503).withBackoff(Duration.ofMillis(1), 1);

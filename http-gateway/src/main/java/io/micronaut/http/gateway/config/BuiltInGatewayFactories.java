@@ -25,11 +25,15 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.gateway.ClientAddress;
 import io.micronaut.http.gateway.GatewayCircuitBreaker;
 import io.micronaut.http.gateway.GatewayConfiguration;
 import io.micronaut.http.gateway.GatewayFilters;
+import io.micronaut.http.gateway.GatewayRateLimit;
+import io.micronaut.http.gateway.GatewayRateLimiter;
+import io.micronaut.http.gateway.InMemoryRateLimiter;
+import io.micronaut.http.gateway.KeyResolver;
 import io.micronaut.http.gateway.GatewayRetry;
-import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.web.router.builder.AsyncRequestHandler;
 import io.micronaut.web.router.builder.Cidr;
@@ -40,7 +44,6 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
-import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -230,37 +233,7 @@ final class BuiltInGatewayFactories {
      * @return The address, or {@code null}
      */
     static byte @Nullable [] clientAddress(HttpRequest<?> request, List<Cidr> trusted) {
-        InetSocketAddress peer = request.getRemoteAddress();
-        byte[] address = peer == null || peer.getAddress() == null ? null : Cidr.address(peer.getAddress().getHostAddress());
-        if (address == null || !isTrusted(address, trusted)) {
-            return address;
-        }
-        List<String> hops = new ArrayList<>();
-        for (String value : request.getHeaders().getAll(ForwardedHeaders.X_FORWARDED_FOR)) {
-            for (String hop : value.split(",")) {
-                hops.add(hop.strip());
-            }
-        }
-        for (int i = hops.size() - 1; i >= 0; i--) {
-            byte[] hop = Cidr.address(hops.get(i));
-            if (hop == null) {
-                return null;
-            }
-            address = hop;
-            if (!isTrusted(hop, trusted)) {
-                return hop;
-            }
-        }
-        return address;
-    }
-
-    private static boolean isTrusted(byte[] address, List<Cidr> trusted) {
-        for (Cidr range : trusted) {
-            if (range.contains(address)) {
-                return true;
-            }
-        }
-        return false;
+        return ClientAddress.of(request, trusted);
     }
 
     @Singleton
@@ -476,6 +449,53 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("RequestRateLimiter")
+    GatewayFilterFactory requestRateLimiter(BeanLocator beanLocator, GatewayConfiguration configuration) {
+        return GatewayFilterFactory.of(List.of("replenish-rate", "burst-capacity", "requested-tokens", "key-resolver"), args -> {
+            RateLimiterArguments bound = args.bind(RateLimiterArguments.class);
+            String limiterName = bound.rateLimiter();
+            GatewayRateLimiter limiter = limiterName == null || limiterName.isBlank()
+                ? new InMemoryRateLimiter()
+                : beanLocator.findBean(GatewayRateLimiter.class, Qualifiers.byName(limiterName))
+                    .orElseThrow(() -> new ConfigurationException("No GatewayRateLimiter bean named " + limiterName));
+            long burst = bound.burstCapacity() == null ? bound.replenishRate() : bound.burstCapacity();
+            try {
+                return new GatewayRateLimit(bound.replenishRate(), burst, bound.requestedTokens(),
+                    keyResolver(beanLocator, configuration, bound.keyResolver()), bound.denyEmptyKey(), status(bound.emptyKeyStatus()),
+                    bound.includeHeaders(), limiter);
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Invalid RequestRateLimiter: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @Singleton
+    @Named("Bulkhead")
+    GatewayFilterFactory bulkhead(BeanLocator beanLocator, GatewayConfiguration configuration) {
+        return GatewayFilterFactory.of(List.of("max-concurrent", "key-resolver"), args -> GatewayFilters.bulkhead(
+            args.get("max-concurrent", Integer.class, 1), keyResolver(beanLocator, configuration, args.find("key-resolver").orElse(null))));
+    }
+
+    /**
+     * The key resolver of a name: {@code remoteAddress}, the default, by the address of the
+     * client behind the trusted proxies of the gateway; {@code principal}; {@code header:<name>};
+     * or the name of a {@link KeyResolver} bean.
+     */
+    private static KeyResolver keyResolver(BeanLocator beanLocator, GatewayConfiguration configuration, @Nullable String name) {
+        if (name == null || name.isBlank() || name.equals("remoteAddress")) {
+            return KeyResolver.remoteAddress(configuration.getForwarded().getTrustedProxies());
+        }
+        if (name.equals("principal")) {
+            return KeyResolver.principalName();
+        }
+        if (name.startsWith("header:")) {
+            return KeyResolver.header(name.substring("header:".length()).strip());
+        }
+        return beanLocator.findBean(KeyResolver.class, Qualifiers.byName(name))
+            .orElseThrow(() -> new ConfigurationException("No KeyResolver bean named " + name));
+    }
+
+    @Singleton
     @Named("Retry")
     GatewayFilterFactory retry() {
         return GatewayFilterFactory.of(List.of("retries"), args -> {
@@ -568,6 +588,29 @@ final class BuiltInGatewayFactories {
                           @Bindable(defaultValue = "2") double multiplier,
                           @Bindable(defaultValue = "0") double jitter,
                           @ReadableBytes @Nullable Long maxReplayBytes) {
+    }
+
+    /**
+     * The arguments of the {@code RequestRateLimiter} filter.
+     *
+     * @param replenishRate   The tokens added per second
+     * @param burstCapacity   The tokens a bucket holds, the replenish rate by default
+     * @param requestedTokens The tokens a request takes
+     * @param keyResolver     The key resolver, see {@link #keyResolver}
+     * @param denyEmptyKey    Whether a request without a key is denied
+     * @param emptyKeyStatus  The status of a request denied for its empty key
+     * @param includeHeaders  Whether the responses carry the rate limit headers
+     * @param rateLimiter     The name of a GatewayRateLimiter bean, the memory of the gateway by default
+     */
+    @Introspected
+    record RateLimiterArguments(long replenishRate,
+                                @Nullable Long burstCapacity,
+                                @Bindable(defaultValue = "1") long requestedTokens,
+                                @Nullable String keyResolver,
+                                @Bindable(defaultValue = "true") boolean denyEmptyKey,
+                                @Bindable(defaultValue = "403") String emptyKeyStatus,
+                                @Bindable(defaultValue = "true") boolean includeHeaders,
+                                @Nullable String rateLimiter) {
     }
 
     /**
