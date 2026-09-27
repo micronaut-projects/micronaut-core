@@ -223,6 +223,7 @@ httpServer:
     functionalRoutesWebSocket: WebSocket Routes
     functionalRoutesStaticResources: Static Resources
     functionalRoutesLimitations: Limitations
+  gateway: API Gateway (Experimental)
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:

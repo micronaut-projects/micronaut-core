@@ -20,6 +20,7 @@ dependencies {
     api(libs.managed.kotlinx.coroutines.jdk8)
     api(libs.managed.kotlinx.coroutines.rx2)
     api(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpGateway)
     api(projects.micronautHttpClient)
     api(projects.micronautRuntime)
 

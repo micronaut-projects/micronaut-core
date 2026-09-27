@@ -16,6 +16,7 @@ dependencies {
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(projects.micronautInjectGroovyTest)
     testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpGateway)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautRuntime)
     testImplementation(platform(libs.test.boms.micronaut.validation))
