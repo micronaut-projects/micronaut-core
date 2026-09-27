@@ -533,7 +533,9 @@ public final class FormBinding {
         Flux<FileUpload> stored = Flux.from(factory.getOrCreateCompleter(request)
                 .subscribeField(name, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, argument)))
             // the files of a name arrive one after the other: each one is stored before the next
-            .concatMap(field -> ReactiveExecutionFlow.toPublisher(store(factory, context, field)));
+            .concatMap(field -> ReactiveExecutionFlow.toPublisher(store(factory, context, field)))
+            // the files waiting behind the one being stored when the argument stops reading
+            .doOnDiscard(RawFormField.class, RawFormField::close);
         CompletableFuture<?> value = all
             // no file of the name leaves the argument unsatisfied, like a single file
             ? stored.collectList().filter(files -> !files.isEmpty()).toFuture()
