@@ -34,7 +34,7 @@ class BodyRoutes(HttpRoutes):
         routes.asyncPOST("/async/items/import", lambda request, path_variables, body:
                          body.elements(Item)  # <2>
                          .forEach(self.items.save_async)
-                         .thenApply(lambda done=None: HttpResponse.accepted()))
+                         .thenApply(lambda done: HttpResponse.accepted()))
         routes.asyncPOST("/async/notes", lambda request, path_variables, body:
                          body.text(1024)  # <3>
                          .thenApply(lambda text: HttpResponse.ok(f"received {len(text)} characters"))) \
@@ -43,7 +43,7 @@ class BodyRoutes(HttpRoutes):
         def transfer(request, path_variables, body):
             destination = self.uploads.resolve(f"{uuid.uuid4()}.bin")
             return (body.transferTo(destination)  # <4>
-                    .thenApply(lambda done=None: HttpResponse.created(str(destination.getFileName()))))
+                    .thenApply(lambda done: HttpResponse.created(str(destination.getFileName()))))
 
         routes.asyncPUT("/async/files", transfer).consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE)
 
