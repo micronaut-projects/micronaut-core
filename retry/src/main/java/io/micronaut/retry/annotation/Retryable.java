@@ -16,6 +16,7 @@
 package io.micronaut.retry.annotation;
 
 import io.micronaut.aop.Around;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.retry.intercept.DefaultRetryInterceptor;
@@ -122,4 +123,18 @@ public @interface Retryable {
      */
     @Digits(integer = 1, fraction = 2)
     String jitter() default "0.0";
+
+    /**
+     * The name of a retry policy of the {@link io.micronaut.retry.RetryRegistry}, configured
+     * under {@code micronaut.retry.policies.<name>}, whose settings the method takes: the
+     * attempts, delay, maximum delay, multiplier, jitter, includes and excludes. A member set
+     * explicitly on this annotation overrides the setting of the policy. A name that is not
+     * configured fails the first call of the method. Empty, the default, for the settings of this
+     * annotation alone.
+     *
+     * @return The name of the retry policy, or empty
+     * @since 5.3.0
+     */
+    @Experimental
+    String name() default "";
 }
