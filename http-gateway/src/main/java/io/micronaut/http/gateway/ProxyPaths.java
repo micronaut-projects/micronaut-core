@@ -182,10 +182,11 @@ final class ProxyPaths {
     /**
      * @param path  The raw path
      * @param query The raw query, or {@code null}
-     * @return The path and the query, as the URI of a request
+     * @return The path and the query, as the URI of a request; an empty query keeps its {@code ?}
      */
     static String pathAndQuery(String path, @Nullable String query) {
-        return query == null || query.isEmpty() ? path : path + '?' + query;
+        // an empty query, a ? alone, is relayed as it was sent
+        return query == null ? path : path + '?' + query;
     }
 
     /**

@@ -59,6 +59,7 @@ import java.util.regex.Pattern;
 public final class GatewayFilters {
 
     private static final Pattern VARIABLE = Pattern.compile("\\{([A-Za-z0-9_.-]+)}");
+    private static final Pattern PATH_VARIABLE = Pattern.compile("\\{(\\+)?([A-Za-z0-9_.-]+)}");
 
     private GatewayFilters() {
     }
@@ -376,6 +377,43 @@ public final class GatewayFilters {
         return result;
     }
 
+    /**
+     * Replace the variables of a path template, {@code {name}} or {@code {+name}}, with their
+     * raw values, as the client sent them, so a value is neither decoded nor encoded twice; a
+     * variable without a raw value, e.g. of a route of the functional routes API, is its decoded
+     * value, encoded once, keeping its slashes for {@code {+name}}.
+     *
+     * @param template The template
+     * @param exchange The exchange
+     * @return The path
+     */
+    static String expandPath(String template, ProxyExchange exchange) {
+        if (template.indexOf('{') < 0) {
+            return template;
+        }
+        Matcher matcher = PATH_VARIABLE.matcher(template);
+        StringBuilder expanded = new StringBuilder();
+        Map<String, String> raw = exchange.rawPathVariables();
+        while (matcher.find()) {
+            boolean reserved = matcher.group(1) != null;
+            String name = matcher.group(2);
+            String value = raw.get(name);
+            if (value == null) {
+                PathVariables variables = exchange.pathVariables();
+                String decoded = variables.contains(name) ? variables.getString(name, "") : "";
+                if (name.equals(GatewayRouteSpec.PATH_VARIABLE)) {
+                    // the rest of a proxy route is raw already
+                    value = decoded;
+                } else {
+                    value = UriTemplate.of(reserved ? "{+v}" : "{v}").expand(Map.of("v", decoded));
+                }
+            }
+            matcher.appendReplacement(expanded, Matcher.quoteReplacement(value));
+        }
+        matcher.appendTail(expanded);
+        return expanded.toString();
+    }
+
     private static MutableHttpRequest<?> withPath(MutableHttpRequest<?> request, String rawPath) {
         return request.uri(URI.create(ProxyPaths.pathAndQuery(rawPath, request.getUri().getRawQuery())));
     }
@@ -436,7 +474,7 @@ public final class GatewayFilters {
     private record PrefixPath(String prefix) implements GatewayFilter {
         @Override
         public void filterRequest(ProxyExchange exchange, MutableHttpRequest<?> request) {
-            String expanded = expand(prefix, exchange.pathVariables());
+            String expanded = expandPath(prefix, exchange);
             withPath(request, ProxyPaths.prefix(expanded, request.getUri().getRawPath()));
         }
 
@@ -449,12 +487,7 @@ public final class GatewayFilters {
     private record SetPath(String template) implements GatewayFilter {
         @Override
         public void filterRequest(ProxyExchange exchange, MutableHttpRequest<?> request) {
-            PathVariables variables = exchange.pathVariables();
-            Map<String, Object> values = new LinkedHashMap<>();
-            for (String name : variables.names()) {
-                variables.find(name, String.class).ifPresent(v -> values.put(name, v));
-            }
-            String path = UriTemplate.of(template).expand(values);
+            String path = expandPath(template, exchange);
             withPath(request, path.startsWith("/") ? path : "/" + path);
         }
 

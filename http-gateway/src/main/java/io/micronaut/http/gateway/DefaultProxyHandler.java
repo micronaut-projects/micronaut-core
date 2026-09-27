@@ -89,6 +89,7 @@ final class DefaultProxyHandler implements ProxyHandler {
     private final RetryOperations retryOperations;
     @Nullable
     private final CircuitBreakerGuard guard;
+    private final List<GatewayPathPattern> patterns;
     @Nullable
     private volatile AsyncRawHttpClient client;
     @Nullable
@@ -97,6 +98,11 @@ final class DefaultProxyHandler implements ProxyHandler {
     DefaultProxyHandler(GatewayRoute route, ProxyHandlerFactory factory) {
         this.route = route;
         this.factory = factory;
+        List<GatewayPathPattern> parsed = new ArrayList<>(route.getPaths().size());
+        for (String path : route.getPaths()) {
+            parsed.add(GatewayPathPattern.parse(path));
+        }
+        this.patterns = List.copyOf(parsed);
         RawRequestOptions.Builder builder = RawRequestOptions.proxy().toBuilder()
             // the retry policy of the route decides on retries, not the client
             .retryStaleConnection(false)
@@ -122,7 +128,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         if (rejected != null) {
             return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.BAD_REQUEST, rejected));
         }
-        ProxyExchange exchange = new ProxyExchange(request, pathVariables, route.getId(), route.getUri(), factory.isXForwarded());
+        ProxyExchange exchange = new ProxyExchange(request, pathVariables, route.getId(), route.getUri(), factory.isXForwarded(), patterns);
         MutableHttpRequest<Object> upstream;
         try {
             upstream = upstreamRequest(request);

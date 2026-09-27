@@ -19,7 +19,13 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.PathVariables;
 
+import org.jspecify.annotations.Nullable;
+
 import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A request a gateway route relays, as the {@link GatewayFilter proxy transforms} see it: the
@@ -39,14 +45,18 @@ public final class ProxyExchange {
     private final URI uri;
     private final boolean xForwarded;
     private boolean retainHostHeader;
-    private volatile URI target;
+    private final AtomicReference<URI> target;
+    private final List<GatewayPathPattern> patterns;
+    @Nullable
+    private Map<String, String> rawPathVariables;
 
-    ProxyExchange(HttpRequest<?> request, PathVariables pathVariables, String routeId, URI uri, boolean xForwarded) {
+    ProxyExchange(HttpRequest<?> request, PathVariables pathVariables, String routeId, URI uri, boolean xForwarded, List<GatewayPathPattern> patterns) {
+        this.patterns = patterns;
         this.request = request;
         this.pathVariables = pathVariables;
         this.routeId = routeId;
         this.uri = uri;
-        this.target = uri;
+        this.target = new AtomicReference<>(uri);
         this.xForwarded = xForwarded;
     }
 
@@ -62,6 +72,31 @@ public final class ProxyExchange {
      */
     public PathVariables pathVariables() {
         return pathVariables;
+    }
+
+    /**
+     * The raw values of the path variables of the route, as the client sent them,
+     * percent-encoded: what the path filters put into a path, so a value is never decoded and
+     * encoded again, e.g. {@code a+b} or {@code a%2Bb}. A route whose patterns do not give the
+     * variable, e.g. a route declared with the functional routes API, has none.
+     *
+     * @return The raw values by name
+     */
+    public Map<String, String> rawPathVariables() {
+        Map<String, String> values = rawPathVariables;
+        if (values == null) {
+            values = Map.of();
+            String path = request.getPath();
+            for (GatewayPathPattern pattern : patterns) {
+                Map<String, String> matched = pattern.rawVariables(path);
+                if (matched != null) {
+                    values = matched;
+                    break;
+                }
+            }
+            rawPathVariables = values;
+        }
+        return values;
     }
 
     /**
@@ -83,11 +118,11 @@ public final class ProxyExchange {
      * the service instance the load balancer selected for the attempt
      */
     public URI target() {
-        return target;
+        return Objects.requireNonNull(target.get());
     }
 
     void target(URI target) {
-        this.target = target;
+        this.target.set(target);
     }
 
     /**
