@@ -181,7 +181,14 @@ public final class ProxyHandlerFactory {
             if (path != null && path.endsWith("/")) {
                 path = path.substring(0, path.length() - 1);
             }
-            clientId = uri.getScheme().toLowerCase(java.util.Locale.ROOT) + "://" + uri.getRawAuthority() + (path == null ? "" : path);
+            String scheme = uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+            // a WebSocket is an upgrade of HTTP
+            scheme = switch (scheme) {
+                case "ws" -> "http";
+                case "wss" -> "https";
+                default -> scheme;
+            };
+            clientId = scheme + "://" + uri.getRawAuthority() + (path == null ? "" : path);
         }
         return clientRegistry.getAsyncRawClient(version, clientId, null);
     }

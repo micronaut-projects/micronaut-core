@@ -40,7 +40,8 @@ import java.util.Objects;
  * <p>The URI is one of:</p>
  * <ul>
  *     <li>{@code http://host:port[/base]} or {@code https://…}: a server, whose base path, if
- *     any, is prepended to the path of each request;</li>
+ *     any, is prepended to the path of each request; {@code ws://} and {@code wss://} are the
+ *     same as {@code http://} and {@code https://}: every route relays WebSocket upgrades;</li>
  *     <li>{@code lb://service-id}: a service, whose instances the load balancer of the service
  *     selects, one per attempt, with the client configuration
  *     {@code micronaut.http.services.<service-id>.*}.</li>
@@ -100,8 +101,8 @@ public final class GatewayRoute {
             if (uri.getHost() == null && uri.getAuthority() == null) {
                 throw new IllegalArgumentException("The URI of a service is lb://service-id: " + uri);
             }
-        } else if (!lower.equals("http") && !lower.equals("https")) {
-            throw new IllegalArgumentException("The URI of a gateway route must be http://, https:// or lb://: " + uri);
+        } else if (!lower.equals("http") && !lower.equals("https") && !lower.equals("ws") && !lower.equals("wss")) {
+            throw new IllegalArgumentException("The URI of a gateway route must be http://, https://, ws://, wss:// or lb://: " + uri);
         } else if (uri.getHost() == null) {
             throw new IllegalArgumentException("The URI of a gateway route has no host: " + uri);
         }
