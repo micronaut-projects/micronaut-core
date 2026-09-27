@@ -20,6 +20,7 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.LoadBalancer;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -194,6 +195,40 @@ public final class OutlierDetector {
             state.ejected = true;
             state.tried = false;
         }
+    }
+
+    /**
+     * A snapshot of the state of the instances of the last selection, and of any other
+     * instance with a reported outcome. Safe to call concurrently with the selection and the
+     * reports; each instance is read consistently, the instances are not read at once.
+     *
+     * @return The state of each instance
+     */
+    public List<OutlierEjectionState> snapshot() {
+        Set<URI> uris = new HashSet<>(members());
+        uris.addAll(states.keySet());
+        long now = clock.getAsLong();
+        Instant wallNow = Instant.now();
+        List<OutlierEjectionState> snapshot = new ArrayList<>(uris.size());
+        for (URI uri : uris) {
+            State state = states.get(uri);
+            if (state == null) {
+                snapshot.add(new OutlierEjectionState(uri, false, 0, null, 0, 0));
+                continue;
+            }
+            synchronized (state) {
+                boolean ejected = state.isEjected(now);
+                snapshot.add(new OutlierEjectionState(
+                    uri,
+                    ejected,
+                    state.ejections,
+                    ejected ? wallNow.plusNanos(state.ejectedUntil - now) : null,
+                    state.consecutiveFailures,
+                    state.consecutiveServerErrors
+                ));
+            }
+        }
+        return snapshot;
     }
 
     private Set<URI> members() {

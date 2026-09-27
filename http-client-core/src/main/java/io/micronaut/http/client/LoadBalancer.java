@@ -19,11 +19,14 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.loadbalance.OutlierEjectionState;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.net.URL;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -53,6 +56,19 @@ public interface LoadBalancer {
      * @since 5.3.0
      */
     default void report(ServiceInstance serviceInstance, Outcome outcome) {
+    }
+
+    /**
+     * A snapshot of the outlier detection state of the instances of this load balancer: which
+     * ones are ejected, and until when. Read only, and safe to call concurrently; the snapshot is
+     * built on each call. Empty for a load balancer without outlier detection.
+     *
+     * @return The state of each known instance
+     * @since 5.3.0
+     */
+    @Experimental
+    default List<OutlierEjectionState> getOutlierEjectionStates() {
+        return List.of();
     }
 
     /**

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
@@ -186,5 +187,45 @@ class OutlierDetectorTest {
             detector.report(instance, Outcome.CONNECT_FAILURE);
         }
         Assertions.assertEquals(ALL, detector.available(ALL));
+    }
+
+    @Test
+    void snapshotShowsAnEjectionUntilItEnds() {
+        OutlierDetector detector = detector(2, 100);
+        detector.available(ALL);
+        detector.report(A, Outcome.CONNECT_FAILURE);
+        detector.report(B, Outcome.SERVER_ERROR);
+
+        OutlierEjectionState a = state(detector, A);
+        Assertions.assertFalse(a.ejected());
+        Assertions.assertEquals(1, a.consecutiveFailures());
+        Assertions.assertEquals(0, a.ejectionCount());
+        Assertions.assertNull(a.ejectedUntil());
+        Assertions.assertEquals(0, state(detector, B).consecutiveServerErrors(), "Server errors are not counted unless configured");
+        Assertions.assertEquals(new OutlierEjectionState(C.getURI(), false, 0, null, 0, 0), state(detector, C));
+
+        Instant before = Instant.now();
+        detector.report(A, Outcome.TIMEOUT);
+        a = state(detector, A);
+        Instant after = Instant.now();
+        Assertions.assertTrue(a.ejected());
+        Assertions.assertEquals(1, a.ejectionCount());
+        Assertions.assertEquals(0, a.consecutiveFailures());
+        Assertions.assertNotNull(a.ejectedUntil());
+        Assertions.assertFalse(a.ejectedUntil().isBefore(before.plusSeconds(10)), a.ejectedUntil().toString());
+        Assertions.assertFalse(a.ejectedUntil().isAfter(after.plusSeconds(10)), a.ejectedUntil().toString());
+
+        advance(10);
+        a = state(detector, A);
+        Assertions.assertFalse(a.ejected(), "The ejection ended");
+        Assertions.assertNull(a.ejectedUntil());
+        Assertions.assertEquals(1, a.ejectionCount(), "Kept until the instance recovers");
+        Assertions.assertEquals(ALL, detector.available(ALL));
+    }
+
+    private static OutlierEjectionState state(OutlierDetector detector, ServiceInstance instance) {
+        List<OutlierEjectionState> snapshot = detector.snapshot();
+        Assertions.assertEquals(3, snapshot.size(), snapshot.toString());
+        return snapshot.stream().filter(s -> s.uri().equals(instance.getURI())).findFirst().orElseThrow();
     }
 }
