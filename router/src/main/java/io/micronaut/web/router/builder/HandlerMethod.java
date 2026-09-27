@@ -45,6 +45,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * A route handler function presented as an executable method, so that a route to it binds
@@ -143,6 +145,40 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             new Argument<?>[]{REQUEST, PATH_VARIABLES},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1])
+        );
+    }
+
+    /**
+     * The method of a route that answers with the response of a supplier, without an argument:
+     * nothing is bound from the request.
+     *
+     * @param response Creates the response
+     * @return The method that calls it
+     */
+    static HandlerMethod<HttpResponse<?>> respond(Supplier<? extends HttpResponse<?>> response) {
+        return new HandlerMethod<>(
+            response,
+            Supplier.class,
+            new Argument<?>[0],
+            returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
+            args -> response.get()
+        );
+    }
+
+    /**
+     * The method of a route that answers with the response a function creates from the path
+     * variables, the only argument bound.
+     *
+     * @param response Creates the response from the path variables
+     * @return The method that calls it
+     */
+    static HandlerMethod<HttpResponse<?>> respond(Function<? super PathVariables, ? extends HttpResponse<?>> response) {
+        return new HandlerMethod<>(
+            response,
+            Function.class,
+            new Argument<?>[]{PATH_VARIABLES},
+            returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
+            args -> response.apply((PathVariables) args[0])
         );
     }
 

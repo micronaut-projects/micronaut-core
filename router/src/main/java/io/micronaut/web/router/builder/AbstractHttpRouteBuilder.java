@@ -19,8 +19,10 @@ import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
@@ -196,6 +198,46 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     public final HttpRouteSpec asyncAny(String uri, AsyncBodyRequestHandler handler) {
         Objects.requireNonNull(handler, "handler");
         return anyMethod(uri, () -> HandlerMethod.of(handler), null);
+    }
+
+    @Override
+    public final HttpRouteSpec respond(HttpMethod method, String uri, HttpResponse<?> response) {
+        ResponseTemplate template = ResponseTemplate.of(response);
+        return respondRoute(method, uri, HandlerMethod.respond(template), template.contentType());
+    }
+
+    @Override
+    public final HttpRouteSpec respond(HttpMethod method, String uri, Supplier<? extends HttpResponse<?>> response) {
+        Objects.requireNonNull(response, "response");
+        return respondRoute(method, uri, HandlerMethod.respond(response), null);
+    }
+
+    @Override
+    public final HttpRouteSpec respond(HttpMethod method, String uri, Function<? super PathVariables, ? extends HttpResponse<?>> response) {
+        Objects.requireNonNull(response, "response");
+        return respondRoute(method, uri, HandlerMethod.respond(response), null);
+    }
+
+    /**
+     * The route of a response: it never reads the body, so it consumes any content type, and
+     * it runs on the event loop.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param handler  Creates the response
+     * @param produces The content type of the response, or {@code null} if it is not known
+     * @return Its spec
+     */
+    private HttpRouteSpec respondRoute(HttpMethod method, String uri, HandlerMethod<?> handler, @Nullable MediaType produces) {
+        RouteSettings route = route(method, uri, handler, null);
+        route.consumesAll();
+        route.nonBlocking();
+        int own = RouteGroupDefaults.CONSUMES | RouteGroupDefaults.EXECUTOR;
+        if (produces != null) {
+            route.produces(new MediaType[]{produces});
+            own |= RouteGroupDefaults.PRODUCES;
+        }
+        return spec(own, route);
     }
 
     /**
