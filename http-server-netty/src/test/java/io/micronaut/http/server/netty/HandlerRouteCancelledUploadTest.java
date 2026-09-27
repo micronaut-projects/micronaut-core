@@ -27,6 +27,7 @@ import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -96,6 +97,13 @@ class HandlerRouteCancelledUploadTest {
         ));
         server = ctx.getBean(EmbeddedServer.class).start();
         outcomes = ctx.getBean(Outcomes.class);
+    }
+
+    @BeforeEach
+    void forgetEarlierOutcomes() {
+        // the outcomes belong to the context, which outlives a test: each test asserts on what
+        // its own request did, not on a stage completed by an earlier run of the route
+        outcomes.reset();
     }
 
     @AfterAll
@@ -298,6 +306,11 @@ class HandlerRouteCancelledUploadTest {
     static final class Outcomes {
         final Map<String, Boolean> started = new ConcurrentHashMap<>();
         private final Map<String, CompletableFuture<Object>> outcomes = new ConcurrentHashMap<>();
+
+        void reset() {
+            started.clear();
+            outcomes.clear();
+        }
 
         CompletionStage<Object> outcome(String route) {
             return outcomes.computeIfAbsent(route, r -> new CompletableFuture<>());
