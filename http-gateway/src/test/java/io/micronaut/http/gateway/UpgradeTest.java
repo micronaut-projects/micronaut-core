@@ -269,6 +269,14 @@ class UpgradeTest extends GatewayTestBase {
     }
 
     @Test
+    void up16AnUpgradeToAProtocolTheRouteDoesNotRelayIsAPlainRequest() throws IOException {
+        // only websocket by default: the bytes of another protocol would pass the filters and limits
+        RawHttp.Response response = get("/inspect/x", "Connection: Upgrade", "Upgrade: tcp");
+        assertEquals(200, response.status(), response.toString());
+        assertNull(response.inspected("h:upgrade"), response.toString());
+    }
+
+    @Test
     void up15AnH2cUpgradeIsNotForwarded() throws IOException {
         RawHttp.Response response = get("/inspect/x", "Connection: Upgrade, HTTP2-Settings", "Upgrade: h2c", "HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA");
         assertEquals(200, response.status(), response.toString());
@@ -277,14 +285,13 @@ class UpgradeTest extends GatewayTestBase {
     }
 
     @Test
-    @Disabled("UP-17: a switched connection ends when either direction ends (UpgradedHttpResponse, RawDuplexHandler): "
-        + "a half-close of the client closes the tunnel. Relaying a half-close needs RawDuplexHandler to shut down one "
-        + "direction only")
     void up17AHalfCloseIsPropagated() throws IOException {
         try (RawHttp http = open("/raw/ws/echo")) {
             http.socket.shutdownOutput();
             WebSockets.Frame after = WebSockets.read(http.in);
             assertEquals("after-half-close", after.text());
+            // the upstream shut down its output too: the tunnel ends
+            assertEquals(-1, http.in.read());
         }
     }
 
