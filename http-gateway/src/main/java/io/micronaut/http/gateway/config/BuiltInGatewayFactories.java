@@ -517,6 +517,8 @@ final class BuiltInGatewayFactories {
                 .backoff(bound.delay(), bound.multiplier())
                 .jitter(bound.jitter())
                 .maxReplayBytes(bound.maxReplayBytes() == null ? GatewayRetry.DEFAULT_MAX_REPLAY_BYTES : bound.maxReplayBytes().longValue())
+                .maxDelay(bound.maxDelay())
+                .responseHeader(bound.responseHeader(), bound.responseHeaderValue() == null ? null : Pattern.compile(bound.responseHeaderValue()))
                 .build();
         });
     }
@@ -612,6 +614,9 @@ final class BuiltInGatewayFactories {
      * @param multiplier The multiplier of the delay
      * @param jitter     The jitter
      * @param maxReplayBytes The number of bytes kept to send a body again, e.g. {@code 64KB}
+     * @param maxDelay       The limit of the sum of the delays
+     * @param responseHeader The header of a response that retries it
+     * @param responseHeaderValue The pattern of the value of the header
      */
     @Introspected
     record RetryArguments(@Bindable(defaultValue = "3") int retries,
@@ -620,7 +625,10 @@ final class BuiltInGatewayFactories {
                           @Bindable(defaultValue = "50ms") Duration delay,
                           @Bindable(defaultValue = "2") double multiplier,
                           @Bindable(defaultValue = "0") double jitter,
-                          @ReadableBytes @Nullable Long maxReplayBytes) {
+                          @ReadableBytes @Nullable Long maxReplayBytes,
+                          @Nullable Duration maxDelay,
+                          @Nullable String responseHeader,
+                          @Nullable String responseHeaderValue) {
     }
 
     /**

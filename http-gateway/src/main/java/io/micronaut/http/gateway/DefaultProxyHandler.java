@@ -395,6 +395,11 @@ final class DefaultProxyHandler implements ProxyHandler {
             return new HttpStatusException(HttpStatus.REQUEST_ENTITY_TOO_LARGE, Objects.requireNonNullElse(exceeded.getMessage(), "The request body is too large"));
         }
         String id = route.getId();
+        if (cause instanceof UpstreamStatusFailure statusFailure) {
+            // a retried status whose retries the total delay stopped: its status, the response is gone
+            HttpStatus status = HttpStatus.valueOf(statusFailure.getStatus());
+            return new UpstreamException(status, id, "The upstream of the gateway route " + id + " answered " + status.getCode(), cause);
+        }
         if (cause instanceof CircuitOpenException) {
             return new UpstreamException(HttpStatus.SERVICE_UNAVAILABLE, id, "The circuit breaker of the gateway route " + id + " is open", cause);
         }
@@ -767,6 +772,8 @@ final class DefaultProxyHandler implements ProxyHandler {
             if (reason instanceof RetryableAttempt attempt && attempt.getCause() != null) {
                 reason = attempt.getCause();
             }
+            // for the fallback, and for the error routes and the filters of the route
+            context.failure(reason);
             if (fallback == null || !isUpstreamFailure(reason)) {
                 // a failure of the gateway or of the client, e.g. of a filter of the response
                 // after the upstream answered, is answered as it is: the fallback stands in for
@@ -774,7 +781,6 @@ final class DefaultProxyHandler implements ProxyHandler {
                 result.completeExceptionally(cause);
                 return;
             }
-            context.failure(reason);
             CloseableByteBody kept = body.forFallback(Objects.requireNonNull(circuitBreaker).maxFallbackBodyBytes());
             FallbackRequest fallbackRequest = kept == null ? null : new FallbackRequest(request, kept);
             fallback.handle(fallbackRequest == null ? request : fallbackRequest, pathVariables).whenComplete((response, error) -> {
@@ -922,7 +928,7 @@ final class DefaultProxyHandler implements ProxyHandler {
                 }
                 GatewayRetry retry = route.getRetry();
                 if (retry != null && attempt <= retry.retries() && body.canResend()
-                    && retry.retriesMethod(request.getMethodName()) && retry.retriesStatus(status)) {
+                    && retry.retriesMethod(request.getMethodName()) && (retry.retriesStatus(status) || retry.retriesHeaders(response.getHeaders()))) {
                     if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                         byteBodyResponse.close();
                     }
@@ -961,7 +967,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             if (failure instanceof ReadTimeoutException timeout && timeout.isHeadersReceived()) {
                 return false;
             }
-            return retry.retriesMethod(request.getMethodName());
+            return retry.retriesMethod(request.getMethodName()) && retry.retriesException(failure);
         }
 
         private HttpResponse<?> relay(HttpResponse<?> response) {
