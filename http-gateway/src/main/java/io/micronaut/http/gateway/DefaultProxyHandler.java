@@ -21,6 +21,7 @@ import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
@@ -149,7 +150,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         RequestBody body;
         try {
-            body = RequestBody.claim(request);
+            body = RequestBody.of(request);
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -438,47 +439,66 @@ final class DefaultProxyHandler implements ProxyHandler {
     }
 
     /**
-     * The body of the inbound request, and whether it can be sent more than once.
+     * The body of the inbound request, and whether it can be sent more than once. The body is
+     * taken from the request by the first attempt that sends it: until then, e.g. while the
+     * circuit is open, the request keeps it, so that a fallback can read it. A request without a
+     * body keeps its empty body.
      */
     private static final class RequestBody {
+        private final HttpRequest<?> request;
         @Nullable
         private CloseableByteBody body;
-        private final boolean replayable;
+        private boolean claimed;
+        private boolean replayable = true;
         private boolean moved;
 
-        private RequestBody(@Nullable CloseableByteBody body, boolean replayable) {
-            this.body = body;
-            this.replayable = replayable;
+        private RequestBody(HttpRequest<?> request) {
+            this.request = request;
         }
 
-        static RequestBody claim(HttpRequest<?> request) {
-            CloseableByteBody claimed = RawHttpClientSupport.claimServerRequestBody(request);
-            if (claimed == null) {
+        static RequestBody of(HttpRequest<?> request) {
+            RequestBody body = new RequestBody(request);
+            if (request instanceof ServerHttpRequest<?> server && server.byteBody().expectedLength().orElse(-1) == 0
+                && request.getBody().isEmpty()) {
+                // nothing to send: the request keeps its empty body
+                body.claimed = true;
+            }
+            return body;
+        }
+
+        private void claim() {
+            claimed = true;
+            CloseableByteBody taken = RawHttpClientSupport.claimServerRequestBody(request);
+            if (taken == null) {
                 if (request.getBody().isPresent()) {
                     throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                         "A gateway route relays the bytes of the body of a request, and a filter replaced the body");
                 }
-                return new RequestBody(null, true);
+                return;
             }
-            if (claimed.expectedLength().orElse(-1) == 0) {
-                claimed.close();
-                return new RequestBody(null, true);
+            if (taken.expectedLength().orElse(-1) == 0) {
+                taken.close();
+                return;
             }
             // the bytes are all there: a split is a reference, not a copy
-            return new RequestBody(claimed, claimed instanceof AvailableByteBody);
+            body = taken;
+            replayable = taken instanceof AvailableByteBody;
         }
 
         /**
          * @return Whether the body can be sent by an attempt after the first
          */
-        boolean canResend() {
-            return body == null || replayable;
+        synchronized boolean canResend() {
+            return !claimed || body == null || replayable;
         }
 
         /**
          * @return The body of the next attempt, or {@code null} for none
          */
         synchronized @Nullable CloseableByteBody next() {
+            if (!claimed) {
+                claim();
+            }
             if (body == null) {
                 return null;
             }
@@ -599,21 +619,24 @@ final class DefaultProxyHandler implements ProxyHandler {
             }
             request.setAttribute(GatewayAttributes.UPSTREAM, target);
             exchange.target(target);
-            CloseableByteBody attemptBody;
-            try {
-                attemptBody = body.next();
-            } catch (RuntimeException e) {
-                return CompletableFuture.failedFuture(e);
-            }
-            // the permit is taken right before the exchange, which always reports its outcome
+            // the permit is taken right before the exchange, which always reports its outcome, and
+            // before the body is taken from the request: while the circuit is open, a fallback
+            // can still read it
             CircuitBreakerGuard.Permit permit;
             try {
                 permit = guard == null ? null : guard.acquire();
             } catch (RuntimeException open) {
-                if (attemptBody != null) {
-                    attemptBody.close();
-                }
                 return CompletableFuture.failedFuture(open);
+            }
+            CloseableByteBody attemptBody;
+            try {
+                attemptBody = body.next();
+            } catch (RuntimeException e) {
+                if (permit != null) {
+                    // the upstream was not called: nothing to hold against it
+                    permit.onSuccess();
+                }
+                return CompletableFuture.failedFuture(e);
             }
             RawRequestOptions attemptOptions = options.toBuilder()
                 .retainHostHeader(exchange.isRetainHostHeader())

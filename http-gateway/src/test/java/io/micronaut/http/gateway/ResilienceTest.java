@@ -306,6 +306,24 @@ class ResilienceTest extends GatewayTestBase {
     }
 
     @Test
+    void cb03AFallbackReadsTheBodyThatNoAttemptSent() throws IOException {
+        // the first request opens the circuit: its attempt took the body, which the fallback cannot read
+        RawHttp.Response first = send("POST", "/cb-body/x", "first", "Content-Type: text/plain");
+        assertEquals(200, first.status(), first.toString());
+        assertTrue(first.text().startsWith("body "), first.toString());
+        assertFalse(first.text().equals("body first"), first.toString());
+        // the circuit is open: no attempt takes the body, the fallback reads it
+        RawHttp.Response second = send("POST", "/cb-body/x", "second", "Content-Type: text/plain");
+        assertEquals("body second", second.text(), second.toString());
+    }
+
+    @Test
+    void cb03AFallbackReadsTheEmptyBodyOfARequestWithoutOne() throws IOException {
+        RawHttp.Response response = get("/cb-body-empty/x");
+        assertEquals("body ", response.text(), response.toString());
+    }
+
+    @Test
     void cb04And08A5xxResponseCountsAsAFailureAndTheFallbackHasNoUpstreamHeader() throws IOException {
         RawHttp.Response error = get("/cb-status/up/status/500");
         assertEquals(500, error.status());
@@ -425,6 +443,27 @@ class ResilienceTest extends GatewayTestBase {
         }
     }
 
+    /**
+     * Answers with the body of the request, or the failure to read it.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    static class BodyFallback implements AsyncRequestHandler {
+        @Override
+        public CompletableFuture<HttpResponse<?>> handle(io.micronaut.http.HttpRequest<?> request, io.micronaut.http.PathVariables pathVariables) {
+            CompletableFuture<HttpResponse<?>> response = new CompletableFuture<>();
+            try {
+                ((io.micronaut.http.ServerHttpRequest<?>) request).byteBody().buffer().whenComplete((body, error) -> {
+                    String text = error == null ? body.toString(java.nio.charset.StandardCharsets.UTF_8) : "unreadable " + error.getClass().getSimpleName();
+                    response.complete(HttpResponse.ok("body " + text).contentType(MediaType.TEXT_PLAIN_TYPE));
+                });
+            } catch (RuntimeException e) {
+                response.complete(HttpResponse.ok("body unreadable " + e.getClass().getSimpleName()).contentType(MediaType.TEXT_PLAIN_TYPE));
+            }
+            return response;
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC)
     static class Routes implements GatewayRoutes {
@@ -432,12 +471,14 @@ class ResilienceTest extends GatewayTestBase {
         private final String scripted;
         private final int deadPort;
         private final EchoFallback fallback;
+        private final BodyFallback bodyFallback;
 
         Routes(@Value("${test.upstream}") String upstream, @Value("${test.scripted}") String scripted, EchoFallback fallback,
-               @Value("${micronaut.http.services.halfdead.urls[0]}") String dead) {
+               BodyFallback bodyFallback, @Value("${micronaut.http.services.halfdead.urls[0]}") String dead) {
             this.upstream = upstream;
             this.scripted = scripted;
             this.fallback = fallback;
+            this.bodyFallback = bodyFallback;
             this.deadPort = URI.create(dead).getPort();
         }
 
@@ -476,6 +517,10 @@ class ResilienceTest extends GatewayTestBase {
                 .circuitBreaker(GatewayCircuitBreaker.of("fallback-status", fallback).withFallbackStatuses(503).withFailureStatuses(504)).uri(upstream);
             gateway.route("cb-windowed").path("/cb-windowed/**")
                 .circuitBreaker(GatewayCircuitBreaker.of("windowed")).uri("http://127.0.0.1:" + deadPort);
+            gateway.route("cb-body").path("/cb-body/**")
+                .circuitBreaker(GatewayCircuitBreaker.of("body", bodyFallback)).uri("http://127.0.0.1:" + deadPort);
+            gateway.route("cb-body-empty").path("/cb-body-empty/**")
+                .circuitBreaker(GatewayCircuitBreaker.of("body-empty", bodyFallback)).uri("http://127.0.0.1:" + deadPort);
             gateway.route("cb-recovering").path("/cb-recovering/**").filters(GatewayFilters.stripPrefix(1))
                 .circuitBreaker(GatewayCircuitBreaker.of("recovering")).uri(upstream);
         }

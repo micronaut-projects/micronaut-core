@@ -39,46 +39,98 @@ import java.util.Set;
  *
  * <p>When the route cannot relay a response, because the circuit is open or the last attempt
  * failed, or when the response has one of the {@link #fallbackStatuses() fallback statuses},
- * none by default, the fallback handler answers the request in process, with the failure as the
- * request attribute {@link GatewayAttributes#FAILURE}. Without a fallback, the request fails
+ * none by default, the fallback handler answers the request in process, with the failure as
+ * {@link GatewayRequestContext#failure()}. Without a fallback, the request fails
  * with an {@link UpstreamException}, {@code 503} for an open circuit, and a response of a
  * fallback status is relayed.</p>
  *
- * @param name             The name of the circuit
- * @param fallback         The fallback handler, or {@code null} for none
- * @param failureStatuses  The statuses of a response that count as a failure of the circuit;
- *                         empty for {@code 500} and above
- * @param fallbackStatuses The statuses of a response that the fallback answers for instead
+ * <p>The fallback reads the body of the request when no attempt sent it: a request without a
+ * body, or a circuit that was open before the first attempt. The body an attempt sent is gone:
+ * reading it fails.</p>
+ *
+ * <p>Create one with {@link #of(String)}, {@link #of(String, AsyncRequestHandler)} or
+ * {@link #builder(String)}.
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public record GatewayCircuitBreaker(String name,
-                                    @Nullable AsyncRequestHandler fallback,
-                                    Set<Integer> failureStatuses,
-                                    Set<Integer> fallbackStatuses) implements GatewayFilter {
+public final class GatewayCircuitBreaker implements GatewayFilter {
+
+    private final String name;
+    private final @Nullable AsyncRequestHandler fallback;
+    private final Set<Integer> failureStatuses;
+    private final Set<Integer> fallbackStatuses;
+
+    private GatewayCircuitBreaker(Builder builder) {
+        this.name = builder.name;
+        this.fallback = builder.fallback;
+        this.failureStatuses = builder.failureStatuses;
+        this.fallbackStatuses = builder.fallbackStatuses;
+    }
 
     /**
-     * @param name             The name of the circuit
-     * @param fallback         The fallback handler
-     * @param failureStatuses  The statuses that count as a failure
-     * @param fallbackStatuses The statuses the fallback answers for
+     * @param name The name of the circuit
+     * @return A circuit breaker without a fallback
      */
-    public GatewayCircuitBreaker {
-        Objects.requireNonNull(name, "name");
-        if (name.isBlank()) {
-            throw new IllegalArgumentException("The name of a circuit breaker is blank");
-        }
-        failureStatuses = Set.copyOf(Objects.requireNonNull(failureStatuses, "failureStatuses"));
-        fallbackStatuses = Set.copyOf(Objects.requireNonNull(fallbackStatuses, "fallbackStatuses"));
+    public static GatewayCircuitBreaker of(String name) {
+        return builder(name).build();
     }
 
     /**
      * @param name     The name of the circuit
-     * @param fallback The fallback handler, or {@code null} for none
+     * @param fallback The fallback handler
+     * @return A circuit breaker with a fallback
      */
-    public GatewayCircuitBreaker(String name, @Nullable AsyncRequestHandler fallback) {
-        this(name, fallback, Set.of(), Set.of());
+    public static GatewayCircuitBreaker of(String name, AsyncRequestHandler fallback) {
+        return builder(name).fallback(Objects.requireNonNull(fallback, "fallback")).build();
+    }
+
+    /**
+     * @param name The name of the circuit
+     * @return A builder
+     */
+    public static Builder builder(String name) {
+        return new Builder(name);
+    }
+
+    /**
+     * @return A builder with the settings of this circuit breaker
+     */
+    public Builder toBuilder() {
+        return new Builder(name)
+            .fallback(fallback)
+            .failureStatuses(failureStatuses)
+            .fallbackStatuses(fallbackStatuses);
+    }
+
+    /**
+     * @return The name of the circuit
+     */
+    public String name() {
+        return name;
+    }
+
+    /**
+     * @return The fallback handler, or {@code null} for none
+     */
+    public @Nullable AsyncRequestHandler fallback() {
+        return fallback;
+    }
+
+    /**
+     * @return The statuses of a response that count as a failure of the circuit; empty for
+     * {@code 500} and above
+     */
+    public Set<Integer> failureStatuses() {
+        return failureStatuses;
+    }
+
+    /**
+     * @return The statuses of a response that the fallback answers for instead
+     */
+    public Set<Integer> fallbackStatuses() {
+        return fallbackStatuses;
     }
 
     /**
@@ -86,7 +138,7 @@ public record GatewayCircuitBreaker(String name,
      * @return A copy with the statuses
      */
     public GatewayCircuitBreaker withFailureStatuses(Integer... statuses) {
-        return new GatewayCircuitBreaker(name, fallback, Set.of(statuses), fallbackStatuses);
+        return toBuilder().failureStatuses(Set.of(statuses)).build();
     }
 
     /**
@@ -94,7 +146,7 @@ public record GatewayCircuitBreaker(String name,
      * @return A copy with the statuses
      */
     public GatewayCircuitBreaker withFallbackStatuses(Integer... statuses) {
-        return new GatewayCircuitBreaker(name, fallback, failureStatuses, Set.of(statuses));
+        return toBuilder().fallbackStatuses(Set.of(statuses)).build();
     }
 
     /**
@@ -113,20 +165,74 @@ public record GatewayCircuitBreaker(String name,
         return fallback != null && fallbackStatuses.contains(status);
     }
 
-    /**
-     * @param name The name of the circuit
-     * @return A circuit breaker without a fallback
-     */
-    public static GatewayCircuitBreaker of(String name) {
-        return new GatewayCircuitBreaker(name, null);
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof GatewayCircuitBreaker that
+            && name.equals(that.name)
+            && Objects.equals(fallback, that.fallback)
+            && failureStatuses.equals(that.failureStatuses)
+            && fallbackStatuses.equals(that.fallbackStatuses);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, fallback, failureStatuses, fallbackStatuses);
+    }
+
+    @Override
+    public String toString() {
+        return "CircuitBreaker=" + name;
     }
 
     /**
-     * @param name     The name of the circuit
-     * @param fallback The fallback handler
-     * @return A circuit breaker with a fallback
+     * The builder of {@link GatewayCircuitBreaker}.
      */
-    public static GatewayCircuitBreaker of(String name, AsyncRequestHandler fallback) {
-        return new GatewayCircuitBreaker(name, Objects.requireNonNull(fallback, "fallback"));
+    public static final class Builder {
+        private final String name;
+        private @Nullable AsyncRequestHandler fallback;
+        private Set<Integer> failureStatuses = Set.of();
+        private Set<Integer> fallbackStatuses = Set.of();
+
+        private Builder(String name) {
+            Objects.requireNonNull(name, "name");
+            if (name.isBlank()) {
+                throw new IllegalArgumentException("The name of a circuit breaker is blank");
+            }
+            this.name = name;
+        }
+
+        /**
+         * @param fallback See {@link GatewayCircuitBreaker#fallback()}
+         * @return This builder
+         */
+        public Builder fallback(@Nullable AsyncRequestHandler fallback) {
+            this.fallback = fallback;
+            return this;
+        }
+
+        /**
+         * @param failureStatuses See {@link GatewayCircuitBreaker#failureStatuses()}
+         * @return This builder
+         */
+        public Builder failureStatuses(Set<Integer> failureStatuses) {
+            this.failureStatuses = Set.copyOf(Objects.requireNonNull(failureStatuses, "failureStatuses"));
+            return this;
+        }
+
+        /**
+         * @param fallbackStatuses See {@link GatewayCircuitBreaker#fallbackStatuses()}
+         * @return This builder
+         */
+        public Builder fallbackStatuses(Set<Integer> fallbackStatuses) {
+            this.fallbackStatuses = Set.copyOf(Objects.requireNonNull(fallbackStatuses, "fallbackStatuses"));
+            return this;
+        }
+
+        /**
+         * @return The circuit breaker
+         */
+        public GatewayCircuitBreaker build() {
+            return new GatewayCircuitBreaker(this);
+        }
     }
 }
