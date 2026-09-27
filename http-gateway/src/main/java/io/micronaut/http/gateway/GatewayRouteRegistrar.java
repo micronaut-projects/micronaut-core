@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Map;
 import java.util.Objects;
 
@@ -44,7 +45,7 @@ import java.util.Objects;
 @Singleton
 @Requires(property = GatewayConfiguration.PREFIX + ".enabled", notEquals = StringUtils.FALSE, defaultValue = StringUtils.TRUE)
 @Requires(beans = ProxyHandlerFactory.class)
-final class GatewayRouteRegistrar implements HttpRoutes {
+final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayRouteRegistrar.class);
 
@@ -52,7 +53,7 @@ final class GatewayRouteRegistrar implements HttpRoutes {
     private final ProxyHandlerFactory factory;
     @Nullable
     private final GatewayDefaultFilters defaultFilters;
-    private volatile List<ProxyHandler> handlers = List.of();
+    private final AtomicReference<List<ProxyHandler>> handlers = new AtomicReference<>(List.of());
 
     GatewayRouteRegistrar(List<GatewayRoutes> sources, ProxyHandlerFactory factory, @Nullable GatewayDefaultFilters defaultFilters) {
         List<GatewayRoutes> ordered = new ArrayList<>(sources);
@@ -62,11 +63,14 @@ final class GatewayRouteRegistrar implements HttpRoutes {
         this.defaultFilters = defaultFilters;
     }
 
-    /**
-     * @return The handlers of the gateway routes, in the order they were declared
-     */
-    List<ProxyHandler> getHandlers() {
-        return handlers;
+    @Override
+    public List<GatewayRoute> getRoutes() {
+        List<ProxyHandler> current = Objects.requireNonNull(handlers.get());
+        List<GatewayRoute> routes = new ArrayList<>(current.size());
+        for (ProxyHandler handler : current) {
+            routes.add(handler.getRoute());
+        }
+        return routes;
     }
 
     @Override
@@ -101,7 +105,7 @@ final class GatewayRouteRegistrar implements HttpRoutes {
                 LOG.debug("Gateway route {} {} -> {}", withDefaults.getId(), withDefaults.getPaths(), withDefaults.getUri());
             }
         }
-        handlers = Collections.unmodifiableList(created);
+        handlers.set(Collections.unmodifiableList(created));
     }
 
     private static void register(HttpRouteBuilder routes, ProxyHandler handler) {
@@ -112,9 +116,7 @@ final class GatewayRouteRegistrar implements HttpRoutes {
             for (RequestCondition condition : route.getConditions()) {
                 spec.where(condition);
             }
-            spec.order(route.getOrder())
-                .attribute(GatewayAttributes.ROUTE_ID, route.getId())
-                .attribute(GatewayAttributes.UPSTREAM, route.getUri());
+            spec.order(route.getOrder());
             for (GatewayFilter filter : route.getFilters()) {
                 spec.configure(filter);
             }
