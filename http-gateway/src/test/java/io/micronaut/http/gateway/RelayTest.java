@@ -56,6 +56,18 @@ class RelayTest extends GatewayTestBase {
         assertTrue(response.inspected("h:content-length").equals(String.valueOf(json.length())), response.toString());
     }
 
+    @Test
+    void rt16NoRouteIsA404OfTheGatewayWithoutReadingTheBody() throws IOException {
+        int before = counters().get("inspect");
+        try (RawHttp http = new RawHttp(gateway.getPort())) {
+            // a POST to a path no route matches, with a large body that is never sent
+            http.send("POST /unknown HTTP/1.1\r\nHost: localhost\r\nContent-Length: 104857600\r\nContent-Type: application/octet-stream\r\n\r\nabc");
+            RawHttp.Response response = http.read(false);
+            assertEquals(404, response.status(), response.toString());
+            assertEquals(before, counters().get("inspect"));
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC)
     static class Routes implements GatewayRoutes {

@@ -99,8 +99,20 @@ final class BuiltInGatewayFactories {
         return GatewayPredicateFactory.of(List.of("header", "regexp"), (route, args) -> {
             String name = args.get("header");
             Optional<String> regexp = args.find("regexp");
-            route.where(regexp.isPresent() ? RequestCondition.header(name, ValueMatcher.regex(regexp.get())) : RequestCondition.header(name));
+            route.where(regexp.isPresent() ? RequestCondition.header(name, listElement(regexp.get())) : RequestCondition.header(name));
         });
+    }
+
+    /**
+     * A value the regular expression matches as a whole, or one of its elements separated by
+     * commas matches, e.g. {@code b} in {@code a, b}, like the header predicate of Spring Cloud
+     * Gateway.
+     *
+     * @param regexp The regular expression
+     * @return The matcher
+     */
+    static ValueMatcher listElement(String regexp) {
+        return ValueMatcher.anyOf(ValueMatcher.regex(regexp), ValueMatcher.regex("(?:.*,\\s*)?(?:" + regexp + ")(?:\\s*,.*)?"));
     }
 
     @Singleton
