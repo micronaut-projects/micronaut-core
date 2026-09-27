@@ -7,6 +7,7 @@ from micronaut.http import HttpRequest, HttpStatus
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.http.client.exceptions import HttpClientResponseException
+from micronaut.http.cookie import Cookie
 from micronaut.runtime.server import EmbeddedServer
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
@@ -46,6 +47,16 @@ class ConditionRoutesTest:
         assert http.retrieve(HttpRequest.GET("/items/5")) == "item 5"
         assert http.retrieve(HttpRequest.GET("/items/lamp")) == "item named lamp"
         assert http.retrieve(HttpRequest.GET("/items/-1")) == "item named -1"
+
+    @Test
+    def declarative_conditions_and_matchers(self):
+        http = self.client.toBlocking()
+        assert http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "Canary")) == "download app.zip"
+        assert http.retrieve(HttpRequest.GET("/downloads/app.zip").cookie(Cookie.of("channel", "beta"))) == "download app.zip"
+        # the address of the peer, not a forwarded one
+        assert http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "beta").header("X-Forwarded-For", "203.0.113.9")) == "download app.zip"
+        assert self._status(HttpRequest.GET("/downloads/app.zip")) == HttpStatus.NOT_FOUND
+        assert self._status(HttpRequest.GET("/downloads/app.txt").header("X-Channel", "beta")) == HttpStatus.NOT_FOUND
 
     @Test
     def a_filter_reads_the_attributes_of_the_route(self):

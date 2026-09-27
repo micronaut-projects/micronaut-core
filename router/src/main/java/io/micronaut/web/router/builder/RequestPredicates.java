@@ -20,17 +20,18 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * Conditions on a request for {@link HttpRouteSpec#where} and {@link HttpRouteGroup#where}: on its
- * headers, query parameters, accepted media types, content type and method. They combine with
- * {@link Predicate#and}, {@link Predicate#or} and {@link Predicate#negate}, or with
+ * Shorthands of {@link RouteCondition} for {@link HttpRouteSpec#where} and
+ * {@link HttpRouteGroup#where}: conditions on the headers, query parameters, accepted media
+ * types, content type and method of a request. Each returns a {@link RouteCondition}, which is
+ * a {@link Predicate} too, so they combine with {@link RouteCondition#and},
+ * {@link RouteCondition#or} and {@link RouteCondition#negate}, with lambdas, or with
  * {@link #all} and {@link #any}.
  *
  * <pre>{@code
@@ -52,6 +53,12 @@ import java.util.function.Predicate;
  * the same media types by another criterion, not to replace {@link HttpRouteSpec#consumes} or
  * {@link HttpRouteSpec#produces}.</p>
  *
+ * <p>{@link #accept} and {@link #contentType} compare media types, with the wildcards of either
+ * side, and read the list of the {@code Accept} header, in which a request without the header
+ * accepts every type: they are {@link RouteCondition.Custom} conditions, since a matcher of the
+ * string of a header does not express that. So is a condition that takes a lambda of a
+ * value.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -66,10 +73,10 @@ public final class RequestPredicates {
      *
      * @param name The name of the header, case-insensitive
      * @return The condition
+     * @see RouteCondition#header(String)
      */
-    public static Predicate<HttpRequest<?>> header(String name) {
-        Objects.requireNonNull(name, "name");
-        return request -> request.getHeaders().contains(name);
+    public static RouteCondition header(String name) {
+        return RouteCondition.header(name);
     }
 
     /**
@@ -79,24 +86,25 @@ public final class RequestPredicates {
      * @param name  The name of the header, case-insensitive
      * @param value The value, case-sensitive
      * @return The condition
+     * @see RouteCondition#header(String, String)
      */
-    public static Predicate<HttpRequest<?>> header(String name, String value) {
-        Objects.requireNonNull(value, "value");
-        return header(name, value::equals);
+    public static RouteCondition header(String name, String value) {
+        return RouteCondition.header(name, value);
     }
 
     /**
      * A request with a header of the name whose value meets a condition, one of its values if
-     * the header is repeated.
+     * the header is repeated. {@link RouteCondition#header(String, ValueMatcher)} is a condition
+     * the router can read.
      *
      * @param name  The name of the header, case-insensitive
      * @param value The condition on the value
-     * @return The condition
+     * @return The condition, a {@link RouteCondition.Custom} one
      */
-    public static Predicate<HttpRequest<?>> header(String name, Predicate<String> value) {
+    public static RouteCondition header(String name, Predicate<String> value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
-        return request -> anyMatch(request.getHeaders().getAll(name), value);
+        return new RouteCondition.Custom(new ValuePredicate(name, value, false));
     }
 
     /**
@@ -105,10 +113,10 @@ public final class RequestPredicates {
      *
      * @param name The name of the query parameter, case-sensitive
      * @return The condition
+     * @see RouteCondition#query(String)
      */
-    public static Predicate<HttpRequest<?>> queryParam(String name) {
-        Objects.requireNonNull(name, "name");
-        return request -> request.getParameters().contains(name);
+    public static RouteCondition queryParam(String name) {
+        return RouteCondition.query(name);
     }
 
     /**
@@ -118,24 +126,25 @@ public final class RequestPredicates {
      * @param name  The name of the query parameter, case-sensitive
      * @param value The decoded value, case-sensitive
      * @return The condition
+     * @see RouteCondition#query(String, String)
      */
-    public static Predicate<HttpRequest<?>> queryParam(String name, String value) {
-        Objects.requireNonNull(value, "value");
-        return queryParam(name, value::equals);
+    public static RouteCondition queryParam(String name, String value) {
+        return RouteCondition.query(name, value);
     }
 
     /**
      * A request with a query parameter of the name whose value meets a condition, one of its
-     * values if the parameter is repeated.
+     * values if the parameter is repeated. {@link RouteCondition#query(String, ValueMatcher)}
+     * is a condition the router can read.
      *
      * @param name  The name of the query parameter, case-sensitive
      * @param value The condition on the decoded value
-     * @return The condition
+     * @return The condition, a {@link RouteCondition.Custom} one
      */
-    public static Predicate<HttpRequest<?>> queryParam(String name, Predicate<String> value) {
+    public static RouteCondition queryParam(String name, Predicate<String> value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
-        return request -> anyMatch(request.getParameters().getAll(name), value);
+        return new RouteCondition.Custom(new ValuePredicate(name, value, true));
     }
 
     /**
@@ -144,22 +153,10 @@ public final class RequestPredicates {
      * an {@code Accept} header accepts every type.
      *
      * @param mediaTypes The media types
-     * @return The condition
+     * @return The condition, a {@link RouteCondition.Custom} one
      */
-    public static Predicate<HttpRequest<?>> accept(MediaType... mediaTypes) {
-        List<MediaType> types = mediaTypes(mediaTypes);
-        return request -> {
-            Collection<MediaType> accepted = request.accept();
-            if (accepted.isEmpty()) {
-                return true;
-            }
-            for (MediaType acceptedType : accepted) {
-                if (compatible(acceptedType, types)) {
-                    return true;
-                }
-            }
-            return false;
-        };
+    public static RouteCondition accept(MediaType... mediaTypes) {
+        return new RouteCondition.Custom(new MediaTypePredicate(mediaTypes(mediaTypes), true));
     }
 
     /**
@@ -168,11 +165,10 @@ public final class RequestPredicates {
      * does not meet the condition.
      *
      * @param mediaTypes The media types
-     * @return The condition
+     * @return The condition, a {@link RouteCondition.Custom} one
      */
-    public static Predicate<HttpRequest<?>> contentType(MediaType... mediaTypes) {
-        List<MediaType> types = mediaTypes(mediaTypes);
-        return request -> request.getContentType().map(contentType -> compatible(contentType, types)).orElse(false);
+    public static RouteCondition contentType(MediaType... mediaTypes) {
+        return new RouteCondition.Custom(new MediaTypePredicate(mediaTypes(mediaTypes), false));
     }
 
     /**
@@ -182,62 +178,42 @@ public final class RequestPredicates {
      *
      * @param methods The methods
      * @return The condition
+     * @see RouteCondition#method(HttpMethod...)
      */
-    public static Predicate<HttpRequest<?>> method(HttpMethod... methods) {
-        Objects.requireNonNull(methods, "methods");
-        if (methods.length == 0) {
-            throw new IllegalArgumentException("A method is required");
-        }
-        // Set.copyOf rejects null elements
-        Set<HttpMethod> set = Set.copyOf(Arrays.asList(methods));
-        return request -> set.contains(request.getMethod());
+    public static RouteCondition method(HttpMethod... methods) {
+        return RouteCondition.method(methods);
     }
 
     /**
-     * A request that meets every condition, evaluated in order until one is not met.
+     * A request that meets every condition. The router evaluates them cheapest first until one
+     * is not met, the lambdas last, in order.
      *
-     * @param conditions The conditions
+     * @param conditions The conditions, a lambda becomes a {@link RouteCondition.Custom} condition
      * @return The condition, met by every request if there are none
      */
     @SafeVarargs
-    public static Predicate<HttpRequest<?>> all(Predicate<HttpRequest<?>>... conditions) {
-        List<Predicate<HttpRequest<?>>> all = List.of(conditions);
-        return request -> {
-            for (Predicate<HttpRequest<?>> condition : all) {
-                if (!condition.test(request)) {
-                    return false;
-                }
-            }
-            return true;
-        };
+    public static RouteCondition all(Predicate<HttpRequest<?>>... conditions) {
+        return new RouteCondition.AllOf(conditions(conditions));
     }
 
     /**
-     * A request that meets one of the conditions, evaluated in order until one is met.
+     * A request that meets one of the conditions. The router evaluates them cheapest first
+     * until one is met, the lambdas last, in order.
      *
-     * @param conditions The conditions
+     * @param conditions The conditions, a lambda becomes a {@link RouteCondition.Custom} condition
      * @return The condition, met by no request if there are none
      */
     @SafeVarargs
-    public static Predicate<HttpRequest<?>> any(Predicate<HttpRequest<?>>... conditions) {
-        List<Predicate<HttpRequest<?>>> any = List.of(conditions);
-        return request -> {
-            for (Predicate<HttpRequest<?>> condition : any) {
-                if (condition.test(request)) {
-                    return true;
-                }
-            }
-            return false;
-        };
+    public static RouteCondition any(Predicate<HttpRequest<?>>... conditions) {
+        return new RouteCondition.AnyOf(conditions(conditions));
     }
 
-    private static boolean anyMatch(List<String> values, Predicate<String> condition) {
-        for (String value : values) {
-            if (value != null && condition.test(value)) {
-                return true;
-            }
+    private static List<RouteCondition> conditions(Predicate<HttpRequest<?>>[] conditions) {
+        List<RouteCondition> result = new ArrayList<>(conditions.length);
+        for (Predicate<HttpRequest<?>> condition : conditions) {
+            result.add(RouteCondition.custom(condition));
         }
-        return false;
+        return result;
     }
 
     private static List<MediaType> mediaTypes(MediaType[] mediaTypes) {
@@ -248,12 +224,67 @@ public final class RequestPredicates {
         return List.of(mediaTypes);
     }
 
-    private static boolean compatible(MediaType type, List<MediaType> types) {
-        for (MediaType candidate : types) {
-            if (type.matches(candidate) || candidate.matches(type)) {
+    /**
+     * A condition on the values of a header or of a query parameter.
+     *
+     * @param name      The name of the header or of the query parameter
+     * @param value     The condition on a value
+     * @param parameter Whether it is a query parameter
+     */
+    private record ValuePredicate(String name, Predicate<String> value, boolean parameter) implements Predicate<HttpRequest<?>> {
+        @Override
+        public boolean test(HttpRequest<?> request) {
+            List<String> values = parameter ? request.getParameters().getAll(name) : request.getHeaders().getAll(name);
+            for (String candidate : values) {
+                if (candidate != null && value.test(candidate)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public String toString() {
+            return (parameter ? "queryParam(" : "header(") + name + ", " + value + ")";
+        }
+    }
+
+    /**
+     * A condition on the accepted media types or on the content type of a request.
+     *
+     * @param types  The media types
+     * @param accept Whether it is on the accepted media types
+     */
+    private record MediaTypePredicate(List<MediaType> types, boolean accept) implements Predicate<HttpRequest<?>> {
+        @Override
+        public boolean test(HttpRequest<?> request) {
+            if (!accept) {
+                return request.getContentType().map(this::compatible).orElse(false);
+            }
+            Collection<MediaType> accepted = request.accept();
+            if (accepted.isEmpty()) {
                 return true;
             }
+            for (MediaType acceptedType : accepted) {
+                if (compatible(acceptedType)) {
+                    return true;
+                }
+            }
+            return false;
         }
-        return false;
+
+        private boolean compatible(MediaType type) {
+            for (MediaType candidate : types) {
+                if (type.matches(candidate) || candidate.matches(type)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public String toString() {
+            return (accept ? "accept" : "contentType") + types;
+        }
     }
 }
