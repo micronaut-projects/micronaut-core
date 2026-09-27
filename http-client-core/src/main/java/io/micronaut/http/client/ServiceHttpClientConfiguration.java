@@ -79,6 +79,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
     @Nullable
     private String path;
+    @Nullable
+    private String loadBalancerStrategy;
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -342,6 +344,27 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      */
     public OutlierDetectionConfiguration getOutlierDetection() {
         return outlierDetection;
+    }
+
+    /**
+     * How the load balancer of the service picks among its available instances: a built-in
+     * {@link io.micronaut.http.client.loadbalance.LoadBalancerStrategy strategy}
+     * ({@code round-robin}, {@code random}, {@code p2c}, {@code weighted}, {@code sticky}) or the
+     * name of a strategy bean. Defaults to {@code null}, round robin.
+     *
+     * @return The name of the strategy, or {@code null}
+     * @since 5.3.0
+     */
+    public @Nullable String getLoadBalancerStrategy() {
+        return loadBalancerStrategy;
+    }
+
+    /**
+     * @param loadBalancerStrategy See {@link #getLoadBalancerStrategy()}
+     * @since 5.3.0
+     */
+    public void setLoadBalancerStrategy(@Nullable String loadBalancerStrategy) {
+        this.loadBalancerStrategy = loadBalancerStrategy;
     }
 
     /**

@@ -22,7 +22,9 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.http.client.loadbalance.AbstractRoundRobinLoadBalancer;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
+import io.micronaut.http.client.loadbalance.LoadBalancerStrategy;
 import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -136,17 +138,24 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         // the factories may be replaced by ones that override only the single-argument create:
         // that is the one to call unless the service enables outlier detection, and even then
         // the two-argument one only adds the detection to what the single-argument one returns
-        OutlierDetectionConfiguration outlierDetection = beanContext.findBean(ServiceHttpClientConfiguration.class, Qualifiers.byName(serviceID))
-            .map(ServiceHttpClientConfiguration::getOutlierDetection)
-            .filter(OutlierDetectionConfiguration::isEnabled)
-            .orElse(null);
+        ServiceHttpClientConfiguration configuration = beanContext.findBean(ServiceHttpClientConfiguration.class, Qualifiers.byName(serviceID)).orElse(null);
+        OutlierDetectionConfiguration outlierDetection = configuration == null || !configuration.getOutlierDetection().isEnabled()
+            ? null : configuration.getOutlierDetection();
+        LoadBalancer loadBalancer;
         if (serviceInstanceLists.containsKey(serviceID)) {
             ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
             ServiceInstanceListLoadBalancerFactory factory = beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class);
-            return outlierDetection == null ? factory.create(serviceInstanceList) : factory.create(serviceInstanceList, outlierDetection);
+            loadBalancer = outlierDetection == null ? factory.create(serviceInstanceList) : factory.create(serviceInstanceList, outlierDetection);
         } else {
             DiscoveryClientLoadBalancerFactory factory = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class);
-            return outlierDetection == null ? factory.create(serviceID) : factory.create(serviceID, outlierDetection);
+            loadBalancer = outlierDetection == null ? factory.create(serviceID) : factory.create(serviceID, outlierDetection);
         }
+        String strategyName = configuration == null ? null : configuration.getLoadBalancerStrategy();
+        if (strategyName != null && !strategyName.isBlank()) {
+            LoadBalancerStrategy strategy = beanContext.findBean(LoadBalancerStrategy.class, Qualifiers.byName(strategyName))
+                .orElseGet(() -> LoadBalancerStrategy.of(strategyName));
+            loadBalancer = AbstractRoundRobinLoadBalancer.withStrategy(loadBalancer, strategy);
+        }
+        return loadBalancer;
     }
 }
