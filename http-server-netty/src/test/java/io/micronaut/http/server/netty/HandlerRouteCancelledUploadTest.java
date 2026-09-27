@@ -82,6 +82,12 @@ class HandlerRouteCancelledUploadTest {
             "spec.name", SPEC_NAME,
             "spec.destination", destination.toString(),
             "micronaut.server.port", -1,
+            // a reset is not always delivered: on the loopback of macOS, a reset sent while the
+            // body is still arriving is often dropped, and the server, which already read what
+            // arrived, waits for more on a connection that looks established. The server finds
+            // the dead connection by its idle timeout, as it would a peer that vanished: keep it
+            // well inside the time the test waits, instead of the default five minutes.
+            "micronaut.server.idle-timeout", "3s",
             "micronaut.server.max-request-size", "32MB",
             "micronaut.server.max-request-buffer-size", "32MB",
             "micronaut.server.multipart.location", multipartLocation.toString(),
