@@ -36,6 +36,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -101,15 +102,33 @@ public final class RawHttpClientSupport {
      * @return The flow with the timeout applied
      */
     public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow, @Nullable Duration timeout) {
+        return withResponseTimeout(flow, timeout, CompletableFuture.completedFuture(null));
+    }
+
+    /**
+     * Fail the given response flow with a {@link ReadTimeoutException} if it does not complete in
+     * time after the given stage completes, e.g. once the request is sent: the time of a slow
+     * upload does not count. A response that arrives before the stage completes ends the wait.
+     * A response that arrives after the timeout, or after the returned flow was cancelled, is
+     * closed. Cancelling the returned flow cancels the given one.
+     *
+     * @param flow    The response flow
+     * @param timeout The timeout, or {@code null} for none
+     * @param start   The stage whose completion starts the timeout
+     * @return The flow with the timeout applied
+     * @since 5.3.0
+     */
+    public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow, @Nullable Duration timeout, CompletionStage<?> start) {
         if (timeout == null) {
             return flow;
         }
         AtomicBoolean done = new AtomicBoolean();
         DelayedExecutionFlow<HttpResponse<?>> result = DelayedExecutionFlow.create();
         // completing the timer early cancels its scheduled task, so that the task does not keep
-        // the flows, and the response, reachable until the timeout elapses
-        CompletableFuture<@Nullable Void> timer = new CompletableFuture<@Nullable Void>()
-            .orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS);
+        // the flows, and the response, reachable until the timeout elapses. The task is only
+        // scheduled once the start stage completes; a timer completed before that never is
+        CompletableFuture<@Nullable Void> timer = new CompletableFuture<>();
+        start.whenComplete((ignored, error) -> timer.orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS));
         timer.whenComplete((ignored, error) -> {
             if (error instanceof TimeoutException && done.compareAndSet(false, true)) {
                 result.completeExceptionally(ReadTimeoutException.TIMEOUT_EXCEPTION);

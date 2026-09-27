@@ -197,6 +197,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -252,6 +253,12 @@ final class NettyHttpClient implements
      * of an upgraded connection.
      */
     private static final String ACTIVITY_TIMEOUT = "micronaut.http.client.raw.activity-timeout";
+
+    /**
+     * Request attribute with a {@link Runnable} to run once the whole request, the body included,
+     * is written to the connection.
+     */
+    private static final String REQUEST_SENT = "micronaut.http.client.raw.request-sent";
 
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1494,11 +1501,16 @@ final class NettyHttpClient implements
             }
             MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
+            // the response timeout starts once the request is sent: a slow upload does not count
+            CompletableFuture<@Nullable Void> sent = new CompletableFuture<>();
+            if (options.getResponseTimeout() != null) {
+                rawRequest.setAttribute(REQUEST_SENT, (Runnable) () -> sent.complete(null));
+            }
             return RawHttpClientSupport.withResponseTimeout(sendRawExchange(
                 propagatedContext,
                 blockHint,
                 rawRequest
-            ), options.getResponseTimeout()).map(RawHttpClientSupport::toMutableResponse);
+            ), options.getResponseTimeout(), sent).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;
@@ -1778,6 +1790,7 @@ final class NettyHttpClient implements
         // is sent on, may have a known length. The trailers need the chunked transfer coding: a
         // Content-Length request would drop them
         OptionalLong length = NettyByteBodyFactory.hasTrailers(byteBody) ? OptionalLong.empty() : byteBody.expectedLength();
+        Runnable onSent = request.getAttribute(REQUEST_SENT, Runnable.class).orElse(null);
 
         // if the body is streamed, we have a StreamWriter, otherwise we have a ByteBuf.
         StreamWriter streamWriter = null;
@@ -1789,10 +1802,10 @@ final class NettyHttpClient implements
                 streamWriter = new StreamWriter(new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
                     poolHandle.taint();
                     completeExceptionallySafe(sink, e);
-                });
+                }, onSent);
                 pipeline.addLast(streamWriter);
             }
-            prepareRequestPipeline(poolHandle, request, instance, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf);
+            prepareRequestPipeline(poolHandle, request, instance, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf, onSent);
         } catch (Throwable t) {
             // the request was not written, but the pipeline may be half built: don't reuse the
             // connection, and make sure the pool handle is released and the caller sees the error
@@ -1828,7 +1841,7 @@ final class NettyHttpClient implements
                     byteBuf,
                     nettyRequest.headers(),
                     EmptyHttpHeaders.INSTANCE
-                ), requestWritePromise(channel, writeTracker, writeMark));
+                ), whenSent(requestWritePromise(channel, writeTracker, writeMark), onSent));
             } else {
                 channel.writeAndFlush(nettyRequest, requestWritePromise(channel, writeTracker, writeMark));
             }
@@ -1854,7 +1867,8 @@ final class NettyHttpClient implements
         @Nullable String requestedUpgrade,
         OptionalLong length,
         @Nullable StreamWriter streamWriter,
-        @Nullable ByteBuf byteBuf
+        @Nullable ByteBuf byteBuf,
+        @Nullable Runnable onSent
     ) {
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
 
@@ -1882,7 +1896,11 @@ final class NettyHttpClient implements
             if (stillExpectingContinue.compareAndSet(true, false)) {
                 cancelContinueFallback.run();
                 if (streamWriter == null) {
-                    poolHandle.channel().writeAndFlush(new DefaultLastHttpContent(byteBuf), poolHandle.channel().voidPromise());
+                    if (onSent == null) {
+                        poolHandle.channel().writeAndFlush(new DefaultLastHttpContent(byteBuf), poolHandle.channel().voidPromise());
+                    } else {
+                        poolHandle.channel().writeAndFlush(new DefaultLastHttpContent(byteBuf), whenSent(poolHandle.channel().newPromise(), onSent));
+                    }
                 } else {
                     streamWriter.startWriting();
                 }
@@ -2118,6 +2136,17 @@ final class NettyHttpClient implements
      *                written
      * @return The promise
      */
+    private static ChannelPromise whenSent(ChannelPromise promise, @Nullable Runnable onSent) {
+        if (onSent != null) {
+            promise.addListener((ChannelFutureListener) future -> {
+                if (future.isSuccess()) {
+                    onSent.run();
+                }
+            });
+        }
+        return promise;
+    }
+
     private static ChannelPromise requestWritePromise(Channel channel, @Nullable TransportWriteTracker tracker, long mark) {
         ChannelPromise promise = channel.newPromise();
         promise.addListener((ChannelFutureListener) future -> {
