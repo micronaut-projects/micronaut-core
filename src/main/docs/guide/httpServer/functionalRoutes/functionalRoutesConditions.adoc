@@ -23,6 +23,14 @@ snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="matchers", in
 
 IMPORTANT: Use `peerAddress(...)` for checks against the actual connection address. `remoteAddress(...)` uses the server's client-address resolver and can read forwarded headers. Use it for access control only behind a trusted proxy that sets the configured client-address header.
 
+Host, cookie, client-address and time conditions can select routes for traffic, for example in a gateway:
+
+snippet::io.micronaut.docs.server.functional.TrafficConditionRoutes[tags="traffic", indent=0, title="Routes for a host, a cookie, a period and client addresses"]
+
+<1> The host as resolved by the server's api:http.server.util.HttpHostResolver[], here from the configured `micronaut.server.host-resolution.host-header`.
+<2> A cookie value, from an instant on.
+<3> The client address in IPv4 or IPv6 CIDR notation, as resolved by the server's api:http.server.util.HttpClientAddressResolver[].
+
 === Route Order
 
 `order(int)` breaks ties between otherwise equally suitable routes. Lower values win; the default is `0`. It does not override media-type matching or URI specificity. Among equally specific matches, a method-specific route wins over `any(...)`, and an explicit `HEAD` route wins over an implicit one before order is considered.
