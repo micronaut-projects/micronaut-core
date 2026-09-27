@@ -178,6 +178,19 @@ class DynamicRoutesTest extends GatewayTestBase {
     }
 
     @Test
+    void to12TheTimeoutOfARouteChangesWithARefresh() throws Exception {
+        locator().routes.add(() -> GatewayRoute.builder("timed").path("/timed/**").filters(GatewayFilters.stripPrefix(1))
+            .responseTimeout(Duration.ofMillis(300)).uri(upstream.getURI()).build());
+        refresh();
+        assertEquals(504, get("/timed/up/slow?ms=1000").status());
+        locator().routes.clear();
+        locator().routes.add(() -> GatewayRoute.builder("timed").path("/timed/**").filters(GatewayFilters.stripPrefix(1))
+            .responseTimeout(Duration.ofSeconds(5)).uri(upstream.getURI()).build());
+        refresh();
+        assertEquals(200, get("/timed/up/slow?ms=1000").status());
+    }
+
+    @Test
     void dr12TheStateOfACircuitBreakerSurvivesARefresh() throws Exception {
         Supplier<GatewayRoute> broken = () -> GatewayRoute.builder("broken").path("/broken/**")
             .circuitBreaker(GatewayCircuitBreaker.of("dynamic-broken")).uri(URI.create("http://127.0.0.1:" + deadPort)).build();
