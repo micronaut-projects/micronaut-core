@@ -22,6 +22,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.gateway.GatewayCircuitBreaker;
@@ -473,6 +474,7 @@ final class BuiltInGatewayFactories {
                 .statuses(statuses)
                 .backoff(bound.delay(), bound.multiplier())
                 .jitter(bound.jitter())
+                .maxReplayBytes(bound.maxReplayBytes() == null ? GatewayRetry.DEFAULT_MAX_REPLAY_BYTES : bound.maxReplayBytes().longValue())
                 .build();
         });
     }
@@ -541,6 +543,7 @@ final class BuiltInGatewayFactories {
      * @param delay      The delay before the first retry
      * @param multiplier The multiplier of the delay
      * @param jitter     The jitter
+     * @param maxReplayBytes The number of bytes kept to send a body again, e.g. {@code 64KB}
      */
     @Introspected
     record RetryArguments(@Bindable(defaultValue = "3") int retries,
@@ -548,7 +551,8 @@ final class BuiltInGatewayFactories {
                           @Bindable(defaultValue = "502,503,504") List<String> statuses,
                           @Bindable(defaultValue = "50ms") Duration delay,
                           @Bindable(defaultValue = "2") double multiplier,
-                          @Bindable(defaultValue = "0") double jitter) {
+                          @Bindable(defaultValue = "0") double jitter,
+                          @ReadableBytes @Nullable Long maxReplayBytes) {
     }
 
     /**

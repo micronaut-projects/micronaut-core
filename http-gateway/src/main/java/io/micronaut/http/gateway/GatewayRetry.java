@@ -34,9 +34,12 @@ import java.util.Set;
  * <p>A request is sent again when all of these hold:</p>
  * <ul>
  *     <li>attempts are left, see {@link #retries()};</li>
- *     <li>its body can be sent again: it has none, or the server had received all of it when the
- *     route was called, e.g. a small body; a body that still streams in is moved into the first
- *     attempt and never sent twice;</li>
+ *     <li>its body can be sent again: it has none, the server had received all of it when the
+ *     route was called, e.g. a small body, or it streams in and no more than
+ *     {@link #maxReplayBytes()} of it arrived. Only the body of a request of one of
+ *     {@link #methods()} is kept for a replay: the body of another request is moved into the
+ *     first attempt, and sent again only when no attempt read it, e.g. the connection was
+ *     refused;</li>
  *     <li>and either the upstream provably did not process it, an
  *     {@link io.micronaut.http.client.exceptions.UnprocessedRequestException}, e.g. the
  *     connection was refused or the request was never written, for any method; or its method is
@@ -71,6 +74,10 @@ public final class GatewayRetry implements GatewayFilter {
      * The default multiplier.
      */
     public static final double DEFAULT_MULTIPLIER = 2;
+    /**
+     * The default {@link #maxReplayBytes()}: 1 MiB.
+     */
+    public static final long DEFAULT_MAX_REPLAY_BYTES = 1024L * 1024;
 
     private final int retries;
     private final Set<String> methods;
@@ -78,6 +85,7 @@ public final class GatewayRetry implements GatewayFilter {
     private final Duration delay;
     private final double multiplier;
     private final double jitter;
+    private final long maxReplayBytes;
 
     private GatewayRetry(Builder builder) {
         this.retries = builder.retries;
@@ -86,6 +94,7 @@ public final class GatewayRetry implements GatewayFilter {
         this.delay = builder.delay;
         this.multiplier = builder.multiplier;
         this.jitter = builder.jitter;
+        this.maxReplayBytes = builder.maxReplayBytes;
     }
 
     /**
@@ -112,7 +121,8 @@ public final class GatewayRetry implements GatewayFilter {
             .methods(methods)
             .statuses(statuses)
             .backoff(delay, multiplier)
-            .jitter(jitter);
+            .jitter(jitter)
+            .maxReplayBytes(maxReplayBytes);
     }
 
     /**
@@ -159,6 +169,22 @@ public final class GatewayRetry implements GatewayFilter {
      */
     public double jitter() {
         return jitter;
+    }
+
+    /**
+     * @return The number of bytes of a body that streams in that are kept to send it again,
+     * default 1 MiB; {@code 0} keeps none
+     */
+    public long maxReplayBytes() {
+        return maxReplayBytes;
+    }
+
+    /**
+     * @param maxReplayBytes The number of bytes kept to send a body again, see {@link #maxReplayBytes()}
+     * @return A copy with the limit
+     */
+    public GatewayRetry withMaxReplayBytes(long maxReplayBytes) {
+        return toBuilder().maxReplayBytes(maxReplayBytes).build();
     }
 
     /**
@@ -224,12 +250,13 @@ public final class GatewayRetry implements GatewayFilter {
             && Double.compare(jitter, that.jitter) == 0
             && methods.equals(that.methods)
             && statuses.equals(that.statuses)
+            && maxReplayBytes == that.maxReplayBytes
             && delay.equals(that.delay);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(retries, methods, statuses, delay, multiplier, jitter);
+        return Objects.hash(retries, methods, statuses, delay, multiplier, jitter, maxReplayBytes);
     }
 
     @Override
@@ -247,6 +274,7 @@ public final class GatewayRetry implements GatewayFilter {
         private Duration delay = DEFAULT_DELAY;
         private double multiplier = DEFAULT_MULTIPLIER;
         private double jitter;
+        private long maxReplayBytes = DEFAULT_MAX_REPLAY_BYTES;
 
         private Builder(int retries) {
             if (retries < 1) {
@@ -304,6 +332,18 @@ public final class GatewayRetry implements GatewayFilter {
                 throw new IllegalArgumentException("The jitter of the retries is not between 0 and 1: " + jitter);
             }
             this.jitter = jitter;
+            return this;
+        }
+
+        /**
+         * @param maxReplayBytes See {@link GatewayRetry#maxReplayBytes()}
+         * @return This builder
+         */
+        public Builder maxReplayBytes(long maxReplayBytes) {
+            if (maxReplayBytes < 0) {
+                throw new IllegalArgumentException("The maximum replay bytes of the retries is negative: " + maxReplayBytes);
+            }
+            this.maxReplayBytes = maxReplayBytes;
             return this;
         }
 

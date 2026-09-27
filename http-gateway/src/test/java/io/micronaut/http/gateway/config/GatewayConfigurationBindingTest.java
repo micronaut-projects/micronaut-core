@@ -56,6 +56,22 @@ class GatewayConfigurationBindingTest {
     }
 
     @Test
+    void theReplayLimitOfTheRetriesBindsAsReadableBytes() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters[0].name", "Retry",
+            "micronaut.gateway.routes.r.filters[0].args.retries", "2",
+            "micronaut.gateway.routes.r.filters[0].args.max-replay-bytes", "64KB"
+        ));
+        assertEquals(64 * 1024, route.getRetry().maxReplayBytes());
+        GatewayRoute defaults = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("Retry=2")
+        ));
+        assertEquals(GatewayRetry.DEFAULT_MAX_REPLAY_BYTES, defaults.getRetry().maxReplayBytes());
+    }
+
+    @Test
     void theShortcutAndTheNameAndArgsSyntaxBindTheSameRoute() {
         GatewayRoute shortcut = bind(Map.of(
             "micronaut.gateway.routes.r.uri", "lb://orders",

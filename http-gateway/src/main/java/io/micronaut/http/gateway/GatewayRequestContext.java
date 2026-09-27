@@ -45,6 +45,7 @@ public final class GatewayRequestContext {
     private @Nullable URI upstream;
     private int attempts;
     private @Nullable Throwable failure;
+    private boolean bodyKeptForReplay;
 
     private GatewayRequestContext(GatewayRoute route) {
         this.route = route;
@@ -112,6 +113,18 @@ public final class GatewayRequestContext {
      */
     public Optional<Throwable> failure() {
         return Optional.ofNullable(failure);
+    }
+
+    /**
+     * @return Whether the body of the request, which streams in, is kept to send it again, see
+     * {@link GatewayRetry#maxReplayBytes()}: only for a method the retries of the route send again
+     */
+    public boolean bodyKeptForReplay() {
+        return bodyKeptForReplay;
+    }
+
+    void keepBodyForReplay() {
+        bodyKeptForReplay = true;
     }
 
     void upstream(URI upstream) {

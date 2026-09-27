@@ -34,6 +34,7 @@ import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.ReplayableByteBody;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -113,6 +114,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         RawRequestOptions.Builder builder = RawRequestOptions.proxy().toBuilder()
             // the retry policy of the route decides on retries, not the client
             .retryStaleConnection(false)
+            // a body no attempt read can be sent again, see RequestBody.giveBack
+            .returnUnsentBody(true)
             .responseTimeout(route.getResponseTimeout())
             .activityTimeout(route.getActivityTimeout());
         this.options = builder.build();
@@ -166,7 +169,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         RequestBody body;
         try {
-            body = RequestBody.of(request);
+            body = RequestBody.of(request, route.getRetry());
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -491,18 +494,33 @@ final class DefaultProxyHandler implements ProxyHandler {
      */
     private static final class RequestBody {
         private final HttpRequest<?> request;
+        /**
+         * The number of bytes of a body that streams in that are kept to send it again, or
+         * {@code -1} to keep none.
+         */
+        private final long replayLimit;
         @Nullable
         private CloseableByteBody body;
+        @Nullable
+        private ReplayableByteBody replay;
         private boolean claimed;
         private boolean replayable = true;
         private boolean moved;
 
-        private RequestBody(HttpRequest<?> request) {
+        private RequestBody(HttpRequest<?> request, long replayLimit) {
             this.request = request;
+            this.replayLimit = replayLimit;
         }
 
-        static RequestBody of(HttpRequest<?> request) {
-            RequestBody body = new RequestBody(request);
+        /**
+         * @param request The request
+         * @param retry   The retries of the route, if any: the body of a request whose method
+         *                they send again is kept up to their limit
+         * @return The body of the request
+         */
+        static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry) {
+            long replayLimit = retry != null && retry.retriesMethod(request.getMethodName()) ? retry.maxReplayBytes() : -1;
+            RequestBody body = new RequestBody(request, replayLimit);
             if (request instanceof ServerHttpRequest<?> server && server.byteBody().expectedLength().orElse(-1) == 0
                 && request.getBody().isEmpty()) {
                 // nothing to send: the request keeps its empty body
@@ -525,18 +543,50 @@ final class DefaultProxyHandler implements ProxyHandler {
                 taken.close();
                 return;
             }
-            replayable = taken instanceof AvailableByteBody;
-            // the trailers of the client are sanitized like its headers; the bytes that are all
-            // there are a split, a reference, not a copy
-            body = RelayHeaders.withSanitizedTrailers(bodyFactory(request), taken);
+            // the trailers of the client are sanitized like its headers
+            taken = RelayHeaders.withSanitizedTrailers(bodyFactory(request), taken);
+            if (taken instanceof AvailableByteBody) {
+                // the bytes are all there: a split is a reference, not a copy
+                body = taken;
+                replayable = true;
+            } else if (replayLimit > 0) {
+                // kept while it streams into the first attempt, up to the limit
+                ByteBodyFactory factory = request instanceof ServerHttpRequest<?> server
+                    ? server.byteBodyFactory() : ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+                replay = factory.replayable(taken, replayLimit);
+                replayable = false;
+                GatewayRequestContext.find(request).ifPresent(GatewayRequestContext::keepBodyForReplay);
+            } else {
+                body = taken;
+                replayable = false;
+            }
+        }
+
+        /**
+         * Take back the body an attempt did not read, see
+         * {@link UnprocessedRequestException#takeUnsentBody()}: a body that cannot be replayed can
+         * be sent again.
+         *
+         * @param unsent The body
+         */
+        synchronized void giveBack(CloseableByteBody unsent) {
+            if (moved && body == null && replay == null && !replayable) {
+                body = unsent;
+                moved = false;
+            } else {
+                unsent.close();
+            }
         }
 
         /**
          * @return Whether the body can be sent by an attempt after the first
          */
         synchronized boolean canResend() {
+            if (replay != null) {
+                return replay.isReplayable();
+            }
             // a streaming body that an attempt took is gone: a retry would send no body
-            return !claimed || replayable || body == null && !moved;
+            return !claimed || replayable || !moved;
         }
 
         /**
@@ -545,6 +595,11 @@ final class DefaultProxyHandler implements ProxyHandler {
         synchronized @Nullable CloseableByteBody next() {
             if (!claimed) {
                 claim();
+            }
+            if (replay != null) {
+                // the bytes from the start, or a failure once more than the limit arrived
+                moved = true;
+                return replay.next();
             }
             if (body == null) {
                 return null;
@@ -566,6 +621,11 @@ final class DefaultProxyHandler implements ProxyHandler {
             body = null;
             if (b != null) {
                 b.close();
+            }
+            ReplayableByteBody r = replay;
+            replay = null;
+            if (r != null) {
+                r.close();
             }
         }
     }
@@ -752,6 +812,9 @@ final class DefaultProxyHandler implements ProxyHandler {
             return exchanged.handle((response, failure) -> {
                 if (failure != null) {
                     Throwable cause = unwrap(failure);
+                    if (cause instanceof UnprocessedRequestException unprocessed) {
+                        unprocessed.takeUnsentBody().ifPresent(body::giveBack);
+                    }
                     if (permit != null) {
                         if (result.isCancelled()) {
                             // the client went away: nothing to hold against the upstream
