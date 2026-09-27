@@ -36,11 +36,14 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -166,6 +169,7 @@ final class Upstream {
         static String describe(HttpRequest<?> request, byte[] body) {
             StringBuilder text = new StringBuilder()
                 .append("method=").append(request.getMethodName()).append('\n')
+                .append("version=").append(request.getHttpVersion()).append('\n')
                 .append("path=").append(request.getPath()).append('\n')
                 .append("query=").append(request.getUri().getRawQuery()).append('\n')
                 .append("uri=").append(request.getUri().getRawPath()).append(request.getUri().getRawQuery() == null ? "" : "?" + request.getUri().getRawQuery()).append('\n');
@@ -188,10 +192,18 @@ final class Upstream {
     static class Endpoints {
         private final BeanProvider<EmbeddedServer> server;
         private final Counters counters;
+        // the timers of the upstream of one test class: the global Reactor schedulers would keep
+        // a thread, and the resource scope of the test that started it, across the test classes
+        private final Scheduler timers = Schedulers.newSingle("upstream-timers");
 
         Endpoints(BeanProvider<EmbeddedServer> server, Counters counters) {
             this.server = server;
             this.counters = counters;
+        }
+
+        @PreDestroy
+        void close() {
+            timers.dispose();
         }
 
         @Get(value = "/status/{code}", produces = MediaType.TEXT_PLAIN)
@@ -251,7 +263,7 @@ final class Upstream {
         @Get(value = "/sse", produces = MediaType.TEXT_EVENT_STREAM)
         Publisher<Event<String>> sse(@QueryValue(defaultValue = "3") int count, @QueryValue(defaultValue = "50") long delay) {
             return Flux.range(1, count)
-                .delayElements(Duration.ofMillis(delay))
+                .delayElements(Duration.ofMillis(delay), timers)
                 .map(i -> Event.of("event " + i).id(String.valueOf(i)));
         }
 
@@ -267,7 +279,7 @@ final class Upstream {
                 sink.next(content(offset, n));
                 return offset + n;
             });
-            return delay > 0 ? flux.delayElements(Duration.ofMillis(delay)) : flux;
+            return delay > 0 ? flux.delayElements(Duration.ofMillis(delay), timers) : flux;
         }
 
         @Post(value = "/upload", consumes = MediaType.ALL, produces = MediaType.TEXT_PLAIN)
@@ -280,7 +292,7 @@ final class Upstream {
         @Get(value = "/slow", produces = MediaType.TEXT_PLAIN)
         CompletableFuture<String> slow(@QueryValue long ms) {
             counters.increment("slow");
-            return Mono.delay(Duration.ofMillis(ms)).map(x -> "slow").toFuture();
+            return Mono.delay(Duration.ofMillis(ms), timers).map(x -> "slow").toFuture();
         }
 
         @Get("/nocontent")
