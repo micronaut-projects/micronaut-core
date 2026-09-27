@@ -19,7 +19,6 @@ import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteAssembly;
@@ -116,7 +115,7 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     }
 
     @Override
-    public HttpRouteGroup where(Predicate<HttpRequest<?>> condition) {
+    public HttpRouteGroup where(RouteCondition condition) {
         settings.where(condition);
         return this;
     }

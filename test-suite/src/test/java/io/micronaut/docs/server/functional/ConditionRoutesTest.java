@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -61,6 +62,21 @@ class ConditionRoutesTest {
         assertEquals("item 5", http.retrieve(HttpRequest.GET("/items/5")));
         assertEquals("item named lamp", http.retrieve(HttpRequest.GET("/items/lamp")));
         assertEquals("item named -1", http.retrieve(HttpRequest.GET("/items/-1")));
+    }
+
+    @Test
+    void declarativeConditionsAndMatchers() {
+        BlockingHttpClient http = client.toBlocking();
+        assertEquals("download app.zip", http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "Canary")));
+        assertEquals("download app.zip", http.retrieve(HttpRequest.GET("/downloads/app.zip").cookie(Cookie.of("channel", "beta"))));
+        // the address of the peer, not a forwarded one
+        assertEquals("download app.zip", http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "beta").header("X-Forwarded-For", "203.0.113.9")));
+        HttpClientResponseException noChannel = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(HttpRequest.GET("/downloads/app.zip")));
+        assertEquals(HttpStatus.NOT_FOUND, noChannel.getStatus());
+        HttpClientResponseException notAZip = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(HttpRequest.GET("/downloads/app.txt").header("X-Channel", "beta")));
+        assertEquals(HttpStatus.NOT_FOUND, notAZip.getStatus());
     }
 
     @Test

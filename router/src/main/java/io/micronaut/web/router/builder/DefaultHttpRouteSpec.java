@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
@@ -153,7 +152,7 @@ record DefaultHttpRouteSpec(List<RouteSettings> routes, ToIntFunction<String> po
     }
 
     @Override
-    public HttpRouteSpec where(Predicate<HttpRequest<?>> condition) {
+    public HttpRouteSpec where(RouteCondition condition) {
         Objects.requireNonNull(condition, "condition");
         for (RouteSettings route : routes) {
             route.where(condition);

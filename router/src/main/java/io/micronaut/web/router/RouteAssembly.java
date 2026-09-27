@@ -32,7 +32,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.RouteCondition;
+import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RouteConditions;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -101,6 +102,7 @@ public final class RouteAssembly {
     private final Consumer<DefaultUriRoute> routeCreated;
     private final List<ServerFilters> serverFilters = new ArrayList<>(0);
     private final @Nullable String contextPath;
+    private final RouteConditionContext conditionContext;
 
     /**
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
@@ -138,7 +140,11 @@ public final class RouteAssembly {
             // like HttpServerConfiguration, which the router does not depend on
             this.threadSelection = environment.get("micronaut.server.thread-selection", ThreadSelection.class).orElse(ThreadSelection.MANUAL);
             this.messageBodyHandlerRegistry = applicationContext.findBean(MessageBodyHandlerRegistry.class).orElse(MessageBodyHandlerRegistry.EMPTY);
+            // looked up when a condition on the host, the client address or the time is first evaluated
+            this.conditionContext = RouteConditionContext.lazy(() -> applicationContext.findBean(RouteConditionContext.class)
+                .orElse(RouteConditionContext.fallback()));
         } else {
+            this.conditionContext = RouteConditionContext.fallback();
             defaultCharset = StandardCharsets.UTF_8;
             this.executorSelector = null;
             this.threadSelection = ThreadSelection.MANUAL;
@@ -934,7 +940,7 @@ public final class RouteAssembly {
     @Internal
     public final class RouteGroup {
         private final @Nullable RouteGroup enclosing;
-        private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
+        private final List<RouteCondition> conditions = new ArrayList<>(0);
         private final List<Predicate<? super PathVariables>> constraints = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
         private final DefaultRouteAnnotations annotations;
@@ -1103,10 +1109,10 @@ public final class RouteAssembly {
          *
          * @param condition The condition
          */
-        public void where(Predicate<HttpRequest<?>> condition) {
+        public void where(RouteCondition condition) {
             Objects.requireNonNull(condition, "condition");
             checkOpen();
-            predicates.add(condition);
+            conditions.add(condition);
         }
 
         /**
@@ -1168,14 +1174,14 @@ public final class RouteAssembly {
         /**
          * Add the conditions of the enclosing groups, then of this group.
          *
-         * @param conditions The conditions to add to
+         * @param routeConditions The conditions to add to
          */
-        void addPredicates(List<Predicate<HttpRequest<?>>> conditions) {
+        void addConditions(List<RouteCondition> routeConditions) {
             RouteGroup group = enclosing;
             if (group != null) {
-                group.addPredicates(conditions);
+                group.addConditions(routeConditions);
             }
-            conditions.addAll(predicates);
+            routeConditions.addAll(conditions);
         }
 
         /**
@@ -1393,27 +1399,36 @@ public final class RouteAssembly {
 
         /**
          * The conditions of the route info: the conditions of the groups of the route, outer group
-         * first, the {@link RouteCondition} of the target method, the conditions of the route, and
-         * a request on the port of the route if it has one. They are read when the route info is
-         * built: the annotations of a handler route may be given after the route is added.
+         * first, and of the route, see {@link RouteSettings#where(RouteCondition)}, as one
+         * normalized condition, the {@code @RouteCondition} of the target method, the conditions
+         * of the route given as predicates, and a request on the port of the route if it has one.
+         * They are read when the route info is built: the annotations of a handler route may be
+         * given after the route is added.
          *
          * @param effectivePort The port of the route, or {@code null}
          * @return The conditions
          */
         private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
-            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + settings.getConditions().size() + 2);
+            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 3);
+            List<RouteCondition> declared = settings.getConditions();
             RouteGroup routeGroup = settings.getGroup();
             if (routeGroup != null) {
-                routeGroup.addPredicates(predicates);
+                List<RouteCondition> all = new ArrayList<>();
+                routeGroup.addConditions(all);
+                all.addAll(declared);
+                declared = all;
             }
-            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
-                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
-                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
+            RouteCondition condition = RouteConditions.normalizeAll(declared);
+            if (!condition.equals(RouteConditions.ALWAYS)) {
+                predicates.add(RouteConditions.predicate(condition, conditionContext));
+            }
+            if (targetMethod.isPresent(io.micronaut.http.annotation.RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
+                AnnotationValue<io.micronaut.http.annotation.RouteCondition> annotation = targetMethod.getAnnotation(io.micronaut.http.annotation.RouteCondition.class);
+                if (annotation instanceof EvaluatedAnnotationValue<io.micronaut.http.annotation.RouteCondition>) {
                     predicates.add(request -> annotation.booleanValue().orElse(false));
                 }
             }
             predicates.addAll(conditions);
-            predicates.addAll(settings.getConditions());
             if (effectivePort != null) {
                 int routePort = effectivePort;
                 predicates.add(httpRequest -> httpRequest.getServerAddress().getPort() == routePort);

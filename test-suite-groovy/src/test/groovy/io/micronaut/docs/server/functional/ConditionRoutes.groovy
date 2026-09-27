@@ -9,8 +9,11 @@ import io.micronaut.http.MediaType
 import io.micronaut.web.router.RouteAttributes
 import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRoutes
-import io.micronaut.web.router.builder.RequestPredicates
+import io.micronaut.web.router.builder.RouteCondition
+import io.micronaut.web.router.builder.ValueMatcher
 import jakarta.inject.Singleton
+
+import java.time.Instant
 // end::imports[]
 
 @Requires(property = "spec.name", value = "ConditionRoutesSpec")
@@ -29,9 +32,9 @@ class ConditionRoutes implements HttpRoutes {
     void routes(HttpRouteBuilder routes) {
         // tag::where[]
         routes.GET("/search") { request, pathVariables -> text("beta search") }
-            .where(RequestPredicates.any( // <1>
-                RequestPredicates.header("X-Beta"),
-                RequestPredicates.queryParam("beta", "true")))
+            .where(RouteCondition.any( // <1>
+                RouteCondition.header("X-Beta"),
+                RouteCondition.query("beta", "true")))
             .order(-1) // <2>
         routes.GET("/search") { request, pathVariables -> text("search") } // <3>
         // end::where[]
@@ -45,6 +48,14 @@ class ConditionRoutes implements HttpRoutes {
             .order(-1)
         routes.GET("/items/{name}") { request, pathVariables -> text("item named " + pathVariables.getString("name")) } // <3>
         // end::constrain[]
+        // tag::matchers[]
+        routes.GET("/downloads/{file}") { request, pathVariables -> text("download " + pathVariables.getString("file")) }
+            .where(RouteCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase()) // <1>
+                .or(RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
+            .where(RouteCondition.peerAddress("127.0.0.0/8", "::1")) // <2>
+            .where(RouteCondition.after(Instant.parse("2026-01-01T00:00:00Z"))) // <3>
+            .constrain("file", ValueMatcher.endsWith(".zip")) // <4>
+        // end::matchers[]
         // tag::attributes[]
         routes.path("/reports") { reports ->
             reports.attribute("role", "auditor") // <1>

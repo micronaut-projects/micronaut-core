@@ -27,6 +27,8 @@ import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -178,7 +180,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * the annotation needs the stereotype in the annotation value, see
      * {@link AnnotationValueBuilder#stereotype(AnnotationValue)}. The expressions of an
      * annotation, e.g. of {@code @RouteCondition}, are compiled with the annotated code: a route
-     * condition is declared with {@link #where(Predicate)}.</p>
+     * condition is declared with {@link #where(RouteCondition)}.</p>
      *
      * @param annotationValue The annotation
      * @param <T>             The annotation type
@@ -281,23 +283,42 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *
      * <pre>{@code
      * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.csv(pathVariables.getLong("id"))))
-     *     .where(RequestPredicates.header("X-Export", "csv"));
+     *     .where(RouteCondition.header("X-Export", "csv"));
      * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.find(pathVariables.getLong("id"))));
      * }</pre>
      *
      * <p>A request both routes of the example match, with the header, is ambiguous: the most
      * specific route answers it, and the two routes are equally specific, so it is answered with
-     * {@code 400}. {@link RequestPredicates} builds conditions on the headers, query parameters,
-     * media types and method of the request.</p>
+     * {@code 400}. {@link RouteCondition} builds conditions on the headers, query parameters,
+     * cookies, method, host, client address and time of the request, and
+     * {@link RequestPredicates} on its media types too.</p>
      *
      * <p>On a group, the condition applies to the routes of the group, including the routes of
-     * its nested groups: a route matches a request that meets the
-     * conditions of its groups, outer group first, and its own, which must all be met.</p>
+     * its nested groups: a route matches a request that meets the conditions of its groups and
+     * its own, which must all be met, as one {@link RouteCondition#all all} condition. Several
+     * conditions of a route or a group must all be met too. The router evaluates them cheapest
+     * first, the {@link RouteCondition#custom custom} conditions last, in the order they were
+     * declared, outer group first.</p>
+     *
+     * @param condition The condition
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    S where(RouteCondition condition);
+
+    /**
+     * Match the requests that meet a condition of a lambda only, see
+     * {@link #where(RouteCondition)}: a {@link RouteCondition#custom custom} condition, which the
+     * router cannot read and evaluates after the others. A {@link RouteCondition} given as a
+     * predicate is that condition.
      *
      * @param condition The condition
      * @return The route or the group
      */
-    S where(Predicate<HttpRequest<?>> condition);
+    default S where(Predicate<HttpRequest<?>> condition) {
+        Objects.requireNonNull(condition, "condition");
+        return where(RouteCondition.custom(condition));
+    }
 
     /**
      * Constrain the path variables of the route: the route matches a request only when the
@@ -315,7 +336,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *
      * <p>A constraint runs while the request is matched, after the URI template of the route
      * matched and bound the variables, before the media types, the conditions, see
-     * {@link #where(Predicate)}, and the ambiguity between the routes are considered. It is given
+     * {@link #where(RouteCondition)}, and the ambiguity between the routes are considered. It is given
      * the same {@link PathVariables} the handler is given. Since a rejected route is not a match,
      * the methods allowed on a path for a {@code 405}, the media types for a {@code 415} or
      * {@code 406}, a CORS preflight request and the implicit {@code HEAD} route consider only
@@ -406,8 +427,55 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      */
     @Experimental
     default S constrain(String variable, Collection<String> values) {
-        Set<String> accepted = Set.copyOf(values);
-        return constrain(variable, accepted::contains);
+        Objects.requireNonNull(values, "values");
+        return constrain(variable, new ValueMatcher.OneOf(Set.copyOf(values), false));
+    }
+
+    /**
+     * Constrain a path variable with a matcher of its value, see {@link #constrain(Predicate)}:
+     * a request whose variable has a value the matcher does not match is not a match of the
+     * route. A variable without a value is given to the matcher as an absent value, which only a
+     * negated matcher, e.g. {@code present().negate()}, matches.
+     *
+     * <pre>{@code
+     * routes.GET("/files/{name}", filesHandler)
+     *     .constrain("name", ValueMatcher.startsWith(".").negate());
+     * }</pre>
+     *
+     * @param variable The name of the variable
+     * @param matcher  The matcher of the value, as a string
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    @Experimental
+    default S constrain(String variable, ValueMatcher matcher) {
+        Objects.requireNonNull(variable, "variable");
+        ValueMatcher normalized = RouteConditions.normalize(Objects.requireNonNull(matcher, "matcher"));
+        return constrain(variables -> normalized.matches(variables.findString(variable).orElse(null)));
+    }
+
+    /**
+     * Constrain path variables with matchers of their values, see
+     * {@link #constrain(String, ValueMatcher)}: every variable must match its matcher.
+     *
+     * @param matchers The matchers of the values, by the name of the variable, copied
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    @Experimental
+    default S constrain(Map<String, ValueMatcher> matchers) {
+        Objects.requireNonNull(matchers, "matchers");
+        Map<String, ValueMatcher> normalized = new LinkedHashMap<>(matchers.size());
+        matchers.forEach((variable, matcher) -> normalized.put(Objects.requireNonNull(variable, "variable"),
+            RouteConditions.normalize(Objects.requireNonNull(matcher, "matcher"))));
+        return constrain(variables -> {
+            for (Map.Entry<String, ValueMatcher> entry : normalized.entrySet()) {
+                if (!entry.getValue().matches(variables.findString(entry.getKey()).orElse(null))) {
+                    return false;
+                }
+            }
+            return true;
+        });
     }
 
     /**
@@ -416,7 +484,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * then by the media types, then prefers an explicit {@code HEAD} route over an implicit one;
      * only the routes still left after that are compared by their order. So the order never
      * makes a less specific route win over a more specific one: it chooses among routes of the
-     * same URI template whose {@link #where(Predicate) conditions} a request both meets, e.g. a
+     * same URI template whose {@link #where(RouteCondition) conditions} a request both meets, e.g. a
      * specialized route and a fallback. Two routes left with the same order still make the
      * request ambiguous, answered with {@code 400}.
      *

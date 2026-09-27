@@ -15,12 +15,14 @@
  */
 package io.micronaut.web.router;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -130,5 +132,21 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     @Experimental
     default int getOrder() {
         return 0;
+    }
+
+    /**
+     * The declarative conditions of the route, of its groups and its own, see
+     * {@link io.micronaut.web.router.builder.RouteSpec#where(io.micronaut.web.router.builder.RouteCondition)}:
+     * normalized, the parts a request must all meet in the order the router evaluates them, e.g.
+     * for the routes endpoint. A condition of a lambda is a
+     * {@link io.micronaut.web.router.builder.RouteCondition.Custom} part.
+     *
+     * @return The conditions, empty if the route has none
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    default List<io.micronaut.web.router.builder.RouteCondition> getConditions() {
+        return List.of();
     }
 }

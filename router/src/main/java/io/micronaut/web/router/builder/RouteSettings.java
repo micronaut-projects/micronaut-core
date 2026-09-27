@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
@@ -53,7 +52,7 @@ import java.util.function.Predicate;
 public final class RouteSettings {
     private final IntConsumer exposePort;
     private final @Nullable HandlerMethod<?> handler;
-    private final List<Predicate<HttpRequest<?>>> conditions;
+    private final List<RouteCondition> conditions;
     private final List<Predicate<? super PathVariables>> constraints;
     private final Map<String, Object> attributes;
     private final List<FilterRegistration> filters;
@@ -229,9 +228,9 @@ public final class RouteSettings {
 
     /**
      * @param condition The condition
-     * @see HttpRouteSpec#where(Predicate)
+     * @see HttpRouteSpec#where(RouteCondition)
      */
-    public void where(Predicate<HttpRequest<?>> condition) {
+    public void where(RouteCondition condition) {
         conditions.add(Objects.requireNonNull(condition, "condition"));
     }
 
@@ -364,7 +363,7 @@ public final class RouteSettings {
     /**
      * @return The conditions of the route, a read-only view
      */
-    public List<Predicate<HttpRequest<?>>> getConditions() {
+    public List<RouteCondition> getConditions() {
         return Collections.unmodifiableList(conditions);
     }
 

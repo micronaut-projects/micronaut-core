@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -62,6 +63,31 @@ class ConditionRoutesSpec extends Specification {
         HttpClientResponseException forbidden = thrown()
         forbidden.status == HttpStatus.FORBIDDEN
         http.retrieve(HttpRequest.GET("/reports/salaries").header("X-Role", "admin")) == "salaries"
+    }
+
+    void "declarative conditions and matchers"() {
+        given:
+        BlockingHttpClient http = client.toBlocking()
+
+        expect:
+        http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "Canary")) == "download app.zip"
+        http.retrieve(HttpRequest.GET("/downloads/app.zip").cookie(Cookie.of("channel", "beta"))) == "download app.zip"
+        // the address of the peer, not a forwarded one
+        http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "beta").header("X-Forwarded-For", "203.0.113.9")) == "download app.zip"
+
+        when:
+        http.retrieve(HttpRequest.GET("/downloads/app.zip"))
+
+        then:
+        HttpClientResponseException noChannel = thrown()
+        noChannel.status == HttpStatus.NOT_FOUND
+
+        when:
+        http.retrieve(HttpRequest.GET("/downloads/app.txt").header("X-Channel", "beta"))
+
+        then:
+        HttpClientResponseException notAZip = thrown()
+        notAZip.status == HttpStatus.NOT_FOUND
     }
 
     void "a route on another port"() {
