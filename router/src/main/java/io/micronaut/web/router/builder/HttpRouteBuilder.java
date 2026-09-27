@@ -18,12 +18,16 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.PathVariables;
 import io.micronaut.http.form.FormData;
 
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Builds routes to handler functions: in an {@link HttpRoutes} bean, which adds them to the
@@ -518,6 +522,119 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @since 5.3.0
      */
     HttpRouteSpec asyncAny(String uri, AsyncBodyRequestHandler handler);
+
+    /**
+     * Answer {@code GET} requests, and the {@code HEAD} requests of its implicit {@code HEAD}
+     * route, with a response computed once, without a handler function: e.g. a constant, a
+     * redirect or a static body.
+     *
+     * <pre>{@code
+     * routes.respond("/robots.txt", HttpResponse.ok("User-agent: *\nDisallow: /\n").contentType(MediaType.TEXT_PLAIN_TYPE));
+     * routes.respond("/old-docs", HttpResponse.permanentRedirect(URI.create("/docs")));
+     * }</pre>
+     *
+     * <p>The route is an ordinary route: server, group and route filters, conditions,
+     * constraints, error routes and CORS apply as for any other route. The response is copied
+     * when the route is declared: its status, reason, headers, attributes and body. Each request
+     * is answered with a new response built from the copy, so a filter that changes the response
+     * of one request does not change the response of the next. The body object itself is shared
+     * by the requests: it must not change, e.g. a {@code String} or a record.</p>
+     *
+     * <p>The route consumes any content type, as it never reads the body, and produces the
+     * content type of the response if it has one. It runs on the event loop, see
+     * {@link RouteSpec#nonBlocking()}, unless {@link RouteSpec#executeOn(String)} is set on the
+     * route: the executor and the media types of its group do not apply to it.</p>
+     *
+     * @param uri      The URI template
+     * @param response The response
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec respond(String uri, HttpResponse<?> response) {
+        return respond(HttpMethod.GET, uri, response);
+    }
+
+    /**
+     * Answer {@code GET} requests, and the {@code HEAD} requests of its implicit {@code HEAD}
+     * route, with a response the supplier creates for each request, without reading the request,
+     * see {@link #respond(String, HttpResponse)}.
+     *
+     * <pre>{@code
+     * routes.respond("/time", () -> HttpResponse.ok(clock.instant().toString()));
+     * }</pre>
+     *
+     * <p>The supplier must return a new response for each request. It is called on the event
+     * loop, so it must not block, unless {@link RouteSpec#executeOn(String)} is set on the
+     * route. A supplier that throws is answered by the error routes, like a handler that throws,
+     * and one that returns {@code null} like a handler that returns {@code null}.</p>
+     *
+     * @param uri      The URI template
+     * @param response Creates the response of a request
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec respond(String uri, Supplier<? extends HttpResponse<?>> response) {
+        return respond(HttpMethod.GET, uri, response);
+    }
+
+    /**
+     * Answer {@code GET} requests, and the {@code HEAD} requests of its implicit {@code HEAD}
+     * route, with a response the function creates from the path variables of the matched route
+     * only, without reading the request, see {@link #respond(String, HttpResponse)}.
+     *
+     * <pre>{@code
+     * routes.respond("/docs/{page}", pathVariables -> HttpResponse.permanentRedirect(URI.create("/guide/" + pathVariables.getString("page"))));
+     * }</pre>
+     *
+     * <p>The function must return a new response for each request. It is called on the event
+     * loop, so it must not block, unless {@link RouteSpec#executeOn(String)} is set on the
+     * route.</p>
+     *
+     * @param uri      The URI template
+     * @param response Creates the response of a request from its path variables
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec respond(String uri, Function<? super PathVariables, ? extends HttpResponse<?>> response) {
+        return respond(HttpMethod.GET, uri, response);
+    }
+
+    /**
+     * Answer the requests of a method with a response computed once, see
+     * {@link #respond(String, HttpResponse)}. A {@code GET} route has an implicit {@code HEAD}
+     * route.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param response The response
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec respond(HttpMethod method, String uri, HttpResponse<?> response);
+
+    /**
+     * Answer the requests of a method with a response the supplier creates for each request, see
+     * {@link #respond(String, Supplier)}.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param response Creates the response of a request
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec respond(HttpMethod method, String uri, Supplier<? extends HttpResponse<?>> response);
+
+    /**
+     * Answer the requests of a method with a response the function creates from the path
+     * variables, see {@link #respond(String, Function)}.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param response Creates the response of a request from its path variables
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec respond(HttpMethod method, String uri, Function<? super PathVariables, ? extends HttpResponse<?>> response);
 
     /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function. Where it is
