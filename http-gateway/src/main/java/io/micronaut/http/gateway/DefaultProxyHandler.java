@@ -182,6 +182,30 @@ final class DefaultProxyHandler implements ProxyHandler {
     }
 
     /**
+     * Remove the hop-by-hop headers of a response. A {@code 101} keeps {@code Upgrade} and
+     * {@code Connection: Upgrade}, which switch the connection of the client too, and a
+     * {@code 426} keeps {@code Upgrade}, which names the protocols the upstream requires.
+     *
+     * @param response The response of the upstream
+     */
+    static void stripHopByHopHeaders(MutableHttpResponse<?> response) {
+        MutableHttpHeaders headers = response.getHeaders();
+        int code = response.code();
+        List<String> upgrade = code == HttpStatus.SWITCHING_PROTOCOLS.getCode() || code == HttpStatus.UPGRADE_REQUIRED.getCode()
+            ? headers.getAll(HttpHeaders.UPGRADE)
+            : List.of();
+        HttpHeadersUtil.stripHopByHopHeaders(headers);
+        if (!upgrade.isEmpty()) {
+            if (code == HttpStatus.SWITCHING_PROTOCOLS.getCode()) {
+                headers.set(HttpHeaders.CONNECTION, "Upgrade");
+            }
+            for (String value : upgrade) {
+                headers.add(HttpHeaders.UPGRADE, value);
+            }
+        }
+    }
+
+    /**
      * Remove the headers whose names are forwarded headers written with underscores, e.g.
      * {@code X_Forwarded_For}, which some servers read as the forwarded headers.
      *
@@ -595,9 +619,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         private HttpResponse<?> relay(HttpResponse<?> response) {
             MutableHttpResponse<?> mutable = RawHttpClientSupport.toMutableResponse(response);
             try {
-                if (mutable.code() != HttpStatus.SWITCHING_PROTOCOLS.getCode()) {
-                    HttpHeadersUtil.stripHopByHopHeaders(mutable.getHeaders());
-                }
+                stripHopByHopHeaders(mutable);
                 for (GatewayFilter filter : route.getFilters()) {
                     filter.filterResponse(exchange, mutable);
                 }
