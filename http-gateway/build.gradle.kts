@@ -35,6 +35,7 @@ dependencies {
     testImplementation(libs.logback.classic)
     testImplementation(libs.micronaut.test.netty.leak)
     testImplementation(libs.managed.reactor)
+    testRuntimeOnly(libs.managed.snakeyaml)
 }
 
 tasks.withType<Test>().configureEach {

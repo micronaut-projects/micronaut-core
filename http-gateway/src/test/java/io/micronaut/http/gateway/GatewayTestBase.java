@@ -60,6 +60,10 @@ abstract class GatewayTestBase {
         all.put("micronaut.server.max-request-size", 256 * 1024 * 1024);
         all.put("micronaut.http.client.read-timeout", "20s");
         all.putAll(properties);
+        Object environments = all.remove("test.environments");
+        if (environments != null) {
+            return ApplicationContext.builder(all).environments(environments.toString().split(",")).run(EmbeddedServer.class);
+        }
         return ApplicationContext.run(EmbeddedServer.class, all);
     }
 
