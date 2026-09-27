@@ -138,6 +138,17 @@ public final class ProxyHandlerFactory {
     }
 
     /**
+     * Use a load balancer for a service id instead of the one the {@link LoadBalancerResolver}
+     * resolves, e.g. in a test.
+     *
+     * @param serviceId    The service id
+     * @param loadBalancer The load balancer
+     */
+    void loadBalancer(String serviceId, LoadBalancer loadBalancer) {
+        loadBalancers.put(serviceId, loadBalancer);
+    }
+
+    /**
      * @param route A route
      * @return The HTTP version of the route, or of the client configuration of its service, or
      * of the default client configuration

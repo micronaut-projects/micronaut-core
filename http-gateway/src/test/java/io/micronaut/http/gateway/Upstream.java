@@ -155,7 +155,9 @@ final class Upstream {
                         if (n <= failures) {
                             return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body("attempt " + n).contentType(MediaType.TEXT_PLAIN_TYPE);
                         }
-                        return HttpResponse.ok("attempt " + n + " " + digest(b.toByteArray())).contentType(MediaType.TEXT_PLAIN_TYPE);
+                        byte[] bytes = b.toByteArray();
+                        return HttpResponse.ok("attempt " + n + " " + digest(bytes) + (request.getParameters().contains("describe") ? "\n" + describe(request, bytes) : ""))
+                            .contentType(MediaType.TEXT_PLAIN_TYPE);
                     }
                 });
             });

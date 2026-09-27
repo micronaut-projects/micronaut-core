@@ -329,6 +329,39 @@ final class DefaultProxyHandler implements ProxyHandler {
     }
 
     /**
+     * The request to send to an instance: an instance whose URI has a path, e.g.
+     * {@code http://10.0.0.1:8080/orders}, gets the path before the path of the request, like
+     * the base path of the URI of a route; otherwise the client resolves the request against the
+     * instance, with the context path of the client of the service.
+     *
+     * @param upstream The upstream request
+     * @param instance The instance, or {@code null}
+     * @return The request to send
+     */
+    private static MutableHttpRequest<?> forInstance(MutableHttpRequest<Object> upstream, @Nullable ServiceInstance instance) {
+        if (instance == null) {
+            return upstream;
+        }
+        URI base = instance.getURI();
+        String basePath = base.getRawPath();
+        if (basePath == null || basePath.isEmpty() || basePath.equals("/")) {
+            return upstream;
+        }
+        URI uri = upstream.getUri();
+        String absolute = base.getScheme() + "://" + base.getRawAuthority()
+            + ProxyPaths.prefix(basePath, uri.getRawPath())
+            + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
+        MutableHttpRequest<Object> copy = HttpRequest.create(upstream.getMethod(), absolute, upstream.getMethodName());
+        MutableHttpHeaders headers = copy.getHeaders();
+        upstream.getHeaders().forEach((name, values) -> {
+            for (String value : values) {
+                headers.add(name, value);
+            }
+        });
+        return copy;
+    }
+
+    /**
      * @param publisher A publisher
      * @param <T>       The type of the items
      * @return Its first item, or {@code null} if it has none
@@ -554,7 +587,7 @@ final class DefaultProxyHandler implements ProxyHandler {
                 .build();
             CompletableFuture<HttpResponse<?>> exchanged;
             try {
-                exchanged = client(upgrade).exchange(upstream, attemptBody, attemptOptions).toCompletableFuture();
+                exchanged = client(upgrade).exchange(forInstance(upstream, instance), attemptBody, attemptOptions).toCompletableFuture();
             } catch (RuntimeException e) {
                 if (attemptBody != null) {
                     attemptBody.close();
