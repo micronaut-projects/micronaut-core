@@ -135,6 +135,8 @@ subprojects { project ->
             jvmArgs(
                     "-XX:+UnlockExperimentalVMOptions",
                     "-XX:-UseJVMCICompiler",
+                    // with compilation off a fifth of the CPU went to G1
+                    "-XX:+UseParallelGC",
                     "-Dpolyglot.engine.AllowExperimentalOptions=true",
                     "-Dpolyglot.engine.Compilation=false"
             )
