@@ -96,6 +96,27 @@ class ReplayRetryTest extends GatewayTestBase {
     }
 
     @Test
+    void rb15TheLastChunkThatArrivesAfterTheFirstAttemptFailedIsReplayed() throws Exception {
+        List<String> bodies = new CopyOnWriteArrayList<>();
+        AtomicInteger calls = new AtomicInteger();
+        scripted.on("/rb15", (request, in, out, socket) -> {
+            if (calls.incrementAndGet() == 1) {
+                // answers before the body ended: the rest of the body is still to come
+                ScriptedUpstream.write(out, "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                return false;
+            }
+            String body = new String(request.readBody(in), StandardCharsets.UTF_8);
+            bodies.add(body);
+            ScriptedUpstream.write(out, "HTTP/1.1 200 OK\r\nContent-Length: " + body.length() + "\r\n\r\n" + body);
+            return true;
+        });
+        RawHttp.Response response = post("/replay/rb15", "early ", "late");
+        assertEquals(200, response.status(), response.toString());
+        assertEquals("early late", response.text());
+        assertEquals(List.of("early late"), bodies);
+    }
+
+    @Test
     void ry08ABodyLargerThanTheReplayLimitIsNotSentAgain() throws Exception {
         List<String> bodies = failFirst("/ry08");
         RawHttp.Response response = post("/replay-small/ry08", "more than ", "eight bytes");
