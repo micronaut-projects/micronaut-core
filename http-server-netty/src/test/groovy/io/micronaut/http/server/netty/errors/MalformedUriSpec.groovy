@@ -45,6 +45,8 @@ class MalformedUriSpec extends Specification {
     void "test filters are called in case of error"() {
         given:
         OncePerFilter filter = embeddedServer.applicationContext.getBean(OncePerFilter)
+        // the filter must have run for an earlier request, independent of which features are selected
+        new URL("$embeddedServer.URL/malformed/[]").text
 
         expect:
         filter.filterCalled
