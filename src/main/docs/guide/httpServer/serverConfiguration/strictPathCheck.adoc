@@ -1,0 +1,32 @@
+The router and the <<filters, filters>> match the raw request path, as the client sent it, without decoding or normalizing it. A proxy, a servlet container or another server in front of or behind the application may resolve an ambiguous path differently, e.g. `/public/..%2Fadmin` or `/public/%2e%2e/admin` to `/admin`. A path like that can reach a route, or pass a filter that secures a path, other than the one that another component sees, which can be used to route around security filters.
+
+The strict path check rejects such a request with `400 Bad Request` before the filters and the routing, for controllers, functional and WebSocket routes and <<staticResources, static resources>> alike. It is off by default.
+
+.Enabling the Strict Path Check
+[configuration]
+----
+micronaut:
+  server:
+    strict-path-check: true
+----
+
+With the check enabled, a request is rejected if its raw path contains:
+
+* A dot segment (`.` or `..`), also percent-encoded, e.g. `%2e%2e`, or in an overlong UTF-8 encoding
+* An encoded slash (`%2F`) or an encoded or raw backslash (`%5C`, `\`)
+* A semicolon (`;`), which some servers treat as the start of path parameters
+* An encoded or raw control character, e.g. `%00` or `%0A`
+* A malformed percent-encoding, e.g. `%zz` or a truncated `%2`
+
+To allow path parameters such as `;jsessionid=...`, enable `strict-path-check-allow-semicolon`. The part of a segment before its first semicolon still must not be a dot segment, so `/..;/admin` stays rejected.
+
+.Allowing Semicolons
+[configuration]
+----
+micronaut:
+  server:
+    strict-path-check: true
+    strict-path-check-allow-semicolon: true
+----
+
+The check is modelled on the strict firewall of Spring Security.

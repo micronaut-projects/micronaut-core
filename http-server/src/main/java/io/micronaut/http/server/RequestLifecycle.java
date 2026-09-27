@@ -149,6 +149,29 @@ public class RequestLifecycle {
     }
 
     /**
+     * Applies the {@link HttpServerConfiguration#isStrictPathCheck() strict path check}, if enabled.
+     * Every entry point that routes a request calls it before routing.
+     *
+     * @param request The request
+     * @return The {@code 400} response flow if the path is rejected, otherwise {@code null}
+     * @since 5.3.0
+     */
+    @Nullable
+    protected final ExecutionFlow<HttpResponse<?>> checkPath(HttpRequest<?> request) {
+        if (!strictPathCheck) {
+            return null;
+        }
+        String rejected = StrictPathCheck.rejection(request.getPath(), strictPathCheckAllowSemicolon);
+        if (rejected == null) {
+            return null;
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Rejected the path of the request {} {}: {}", request.getMethodName(), request.getPath(), rejected);
+        }
+        return onStatusError(request, HttpResponse.status(HttpStatus.BAD_REQUEST), rejected);
+    }
+
+    /**
      * Execute this request normally.
      *
      * @param request The request
@@ -157,14 +180,9 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> normalFlow(@Nullable HttpRequest<?> request) {
         try {
             Objects.requireNonNull(request, "request");
-            if (strictPathCheck) {
-                String rejected = StrictPathCheck.rejection(request.getPath(), strictPathCheckAllowSemicolon);
-                if (rejected != null) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Rejected the path of the request {} {}: {}", request.getMethodName(), request.getPath(), rejected);
-                    }
-                    return onStatusError(request, HttpResponse.status(HttpStatus.BAD_REQUEST), rejected);
-                }
+            ExecutionFlow<HttpResponse<?>> rejectedPath = checkPath(request);
+            if (rejectedPath != null) {
+                return rejectedPath;
             }
             if (!multipartEnabled) {
                 MediaType contentType = request.getContentType().orElse(null);

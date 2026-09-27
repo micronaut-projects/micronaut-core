@@ -24,6 +24,7 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -45,6 +46,8 @@ public class StrictPathCheckTest {
 
     private static final String STRICT = "micronaut.server.strict-path-check";
     private static final String ALLOW_SEMICOLON = "micronaut.server.strict-path-check-allow-semicolon";
+    private static final String STATIC_MAPPING = "micronaut.router.static-resources.assets.mapping";
+    private static final String STATIC_PATHS = "micronaut.router.static-resources.assets.paths";
 
     @ParameterizedTest
     @ValueSource(strings = {"/strict-path/a%2Fb", "/strict-path/%2e%2e/b", "/strict-path/a%5Cb", "/strict-path/a;b", "/strict-path/a%00b"})
@@ -112,6 +115,34 @@ public class StrictPathCheckTest {
             .assertion((server, request) -> AssertionUtils.assertThrows(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.BAD_REQUEST)
+                    .build()))
+            .run();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/assets/%2e%2e/hello.txt", "/assets/a%2F..%2Fhello.txt", "/assets/hello.txt;x"})
+    void withTheStrictCheckAnAmbiguousStaticResourcePathIsABadRequest(String path) throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .configuration(Map.of(STRICT, true, STATIC_MAPPING, "/assets/**", STATIC_PATHS, "classpath:assets"))
+            .request(HttpRequest.GET(path))
+            .assertion((server, request) -> AssertionUtils.assertThrows(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.BAD_REQUEST)
+                    .build()))
+            .run();
+    }
+
+    @Test
+    void withTheStrictCheckAStaticResourceIsServed() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .configuration(Map.of(STRICT, true, STATIC_MAPPING, "/assets/**", STATIC_PATHS, "classpath:assets"))
+            .request(HttpRequest.GET("/assets/hello.txt"))
+            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("Hello World")
                     .build()))
             .run();
     }

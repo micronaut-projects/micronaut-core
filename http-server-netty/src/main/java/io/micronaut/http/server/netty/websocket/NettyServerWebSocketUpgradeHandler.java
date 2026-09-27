@@ -416,6 +416,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         }
 
         ExecutionFlow<HttpResponse<?>> handle(HttpRequest<?> request) {
+            ExecutionFlow<HttpResponse<?>> rejectedPath = checkPath(request);
+            if (rejectedPath != null) {
+                return rejectedPath;
+            }
             MutableHttpResponse<?> proceed = HttpResponse.ok();
 
             if (route != null) {

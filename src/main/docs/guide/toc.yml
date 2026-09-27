@@ -228,6 +228,7 @@ httpServer:
       corsAllowPrivateNetwork: Allow Private Network
       corsMaxAge: Max Age
       corsMultipleHeaderValues: Multiple Header Values
+    strictPathCheck: Strict Request Path Check
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger
