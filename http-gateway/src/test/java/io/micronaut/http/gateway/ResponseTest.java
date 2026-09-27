@@ -307,6 +307,18 @@ class ResponseTest extends GatewayTestBase {
     }
 
     @Test
+    void anInterimResponseOtherThan100IsNotRelayedAndTheFinalOneIs() throws Exception {
+        scripted.on("/early-hints", (request, in, out, socket) -> {
+            ScriptedUpstream.write(out, "HTTP/1.1 103 Early Hints\r\nLink: </style.css>; rel=preload\r\n\r\n"
+                + "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nfinal");
+            return true;
+        });
+        RawHttp.Response response = get("/raw/early-hints");
+        assertEquals(200, response.status(), response.toString());
+        assertEquals("final", response.text());
+    }
+
+    @Test
     void rs26ContentTypesPassThroughAsTheyAre() throws Exception {
         assertEquals("text/plain; charset=utf-8; format=flowed", get("/up/content-type?type=text%2Fplain%3B%20charset%3Dutf-8%3B%20format%3Dflowed").header("Content-Type"));
         assertEquals("foo", get("/up/content-type?type=foo").header("Content-Type"));
