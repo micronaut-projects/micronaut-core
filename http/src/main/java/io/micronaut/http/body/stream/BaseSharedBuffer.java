@@ -100,7 +100,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     @Nullable
     private List<ReadBuffer> buffer;
     @Nullable
-    private Exception bufferSizeExceeded = null;
+    private volatile Exception bufferSizeExceeded = null;
     /**
      * The trailers of the body, see {@link ByteBody#trailers()}. Completed before the
      * subscribers are, so that a subscriber finds them in its {@link BufferConsumer#complete()}.
@@ -151,6 +151,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     public final CompletionStage<HttpHeaders> getTrailers() {
         return trailers;
+    }
+
+    /**
+     * @return Whether more bytes than the buffer limit arrived while bytes were kept for a
+     * reserved reader, so that the kept bytes were dropped
+     * @since 5.3.0
+     */
+    public final boolean isBufferLimitExceeded() {
+        return bufferSizeExceeded != null;
     }
 
     public final void setExpectedLengthFrom(@Nullable String contentLength) {

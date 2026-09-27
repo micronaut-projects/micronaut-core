@@ -347,6 +347,37 @@ public class ByteBodyFactory {
     }
 
     /**
+     * A body that can be read more than once while its bytes arrive, keeping up to the given
+     * number of bytes, e.g. to send a request again after a failed attempt, see
+     * {@link ReplayableByteBody}. The given body is claimed. A body whose bytes are all there is
+     * replayable whatever its size.
+     *
+     * @param body          The body
+     * @param maxBufferSize The maximum number of bytes to keep for the next readers
+     * @return The replayable body
+     * @since 5.3.0
+     */
+    @NonNull
+    public final ReplayableByteBody replayable(@NonNull CloseableByteBody body, long maxBufferSize) {
+        if (maxBufferSize < 0) {
+            throw new IllegalArgumentException("The maximum buffer size is negative");
+        }
+        if (body instanceof AvailableByteBody) {
+            // the bytes are all there: a split is a reference, not a copy
+            return new ReplayableByteBody(body.move(), null, maxBufferSize);
+        }
+        long expected = body.expectedLength().orElse(-1);
+        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        StreamingBody sb = createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, maxBufferSize), adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        adapter.setTrailers(body.trailers());
+        if (expected >= 0) {
+            sb.sharedBuffer.setExpectedLength(expected);
+        }
+        return new ReplayableByteBody(sb.rootBody, sb.sharedBuffer, maxBufferSize);
+    }
+
+    /**
      * Convert a {@link ByteBody} into a {@link BaseStreamingByteBody} with the same content.
      * <b>Internal API.</b>
      *
