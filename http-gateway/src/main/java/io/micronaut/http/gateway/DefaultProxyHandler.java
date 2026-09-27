@@ -300,6 +300,9 @@ final class DefaultProxyHandler implements ProxyHandler {
         if (cause instanceof RetryableAttempt attempt) {
             cause = attempt.getCause() == null ? cause : attempt.getCause();
         }
+        if (cause instanceof FilterFailure filterFailure && filterFailure.getCause() != null) {
+            return filterFailure.getCause();
+        }
         if (cause instanceof HttpStatusException) {
             return cause;
         }
@@ -310,7 +313,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         if (cause instanceof NoAvailableServiceException) {
             return new UpstreamException(HttpStatus.SERVICE_UNAVAILABLE, id, "No available instance of the upstream of the gateway route " + id, cause);
         }
-        if (cause instanceof ReadTimeoutException || cause instanceof TimeoutException) {
+        if (cause instanceof ReadTimeoutException || cause instanceof TimeoutException
+            || cause instanceof UnprocessedRequestException unprocessed && unprocessed.getReason() == UnprocessedRequestException.Reason.CONNECT_TIMEOUT) {
             return new UpstreamException(HttpStatus.GATEWAY_TIMEOUT, id, "The upstream of the gateway route " + id + " did not answer in time", cause);
         }
         return new UpstreamException(HttpStatus.BAD_GATEWAY, id, "The upstream of the gateway route " + id + " failed: " + cause.getMessage(), cause);
@@ -642,7 +646,8 @@ final class DefaultProxyHandler implements ProxyHandler {
                 if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                     byteBodyResponse.close();
                 }
-                throw e instanceof RuntimeException re ? re : new CompletionException(e);
+                // an error of the gateway, not of the upstream
+                throw new FilterFailure(e);
             }
         }
 
@@ -688,6 +693,16 @@ final class DefaultProxyHandler implements ProxyHandler {
      */
     static final class RetryableAttempt extends RuntimeException {
         RetryableAttempt(Throwable cause) {
+            super(cause.getMessage(), cause, false, false);
+        }
+    }
+
+    /**
+     * A failure of a filter of the route on the response: an error of the gateway, answered like
+     * an exception of a route, not as a failure of the upstream.
+     */
+    static final class FilterFailure extends RuntimeException {
+        FilterFailure(Throwable cause) {
             super(cause.getMessage(), cause, false, false);
         }
     }

@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *     <li>{@code 502 Bad Gateway}: the connection was refused or reset, the name of the host did
  *     not resolve, or the upstream closed the connection before the headers;</li>
- *     <li>{@code 504 Gateway Timeout}: the headers did not arrive in time;</li>
+ *     <li>{@code 504 Gateway Timeout}: the connection or the headers did not arrive in time;</li>
  *     <li>{@code 503 Service Unavailable}: the service has no available instance, or the circuit
  *     breaker of the route is open and the route has no fallback.</li>
  * </ul>
