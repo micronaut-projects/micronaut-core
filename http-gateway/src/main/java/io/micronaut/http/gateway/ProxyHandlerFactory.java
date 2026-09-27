@@ -33,7 +33,9 @@ import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.CircuitBreakerRegistry;
 import io.micronaut.retry.RetryOperationsFactory;
+import io.micronaut.web.router.RouteConditionContext;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Map;
@@ -76,6 +78,7 @@ public final class ProxyHandlerFactory {
     private final RawHttpClientRegistry clientRegistry;
     private final LoadBalancerResolver loadBalancerResolver;
     private final BeanLocator beanLocator;
+    private @Nullable RouteConditionContext routeConditions;
     private final ForwardedHeaders forwardedHeaders;
     private final boolean xForwarded;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
@@ -117,6 +120,19 @@ public final class ProxyHandlerFactory {
 
     ForwardedHeaders forwardedHeaders() {
         return forwardedHeaders;
+    }
+
+    /**
+     * @return What the server resolves for the conditions of the routes, e.g. the host and the
+     * client address, looked up on first use
+     */
+    RouteConditionContext routeConditions() {
+        RouteConditionContext c = routeConditions;
+        if (c == null) {
+            c = beanLocator.findBean(RouteConditionContext.class).orElseGet(RouteConditionContext::fallback);
+            routeConditions = c;
+        }
+        return c;
     }
 
     boolean isXForwarded() {

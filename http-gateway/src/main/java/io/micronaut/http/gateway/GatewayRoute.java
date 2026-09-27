@@ -79,6 +79,8 @@ public final class GatewayRoute {
     @Nullable
     private final GatewayCircuitBreaker circuitBreaker;
     private final Set<String> upgradeProtocols;
+    @Nullable
+    private final GatewayWeight weight;
     private final Map<String, Object> metadata;
 
     private GatewayRoute(Builder builder) {
@@ -93,6 +95,7 @@ public final class GatewayRoute {
         this.httpVersion = builder.httpVersion;
         this.retry = builder.retry;
         this.circuitBreaker = builder.circuitBreaker;
+        this.weight = builder.weight;
         this.metadata = Collections.unmodifiableMap(new LinkedHashMap<>(builder.metadata));
         this.upgradeProtocols = Set.copyOf(builder.upgradeProtocols);
     }
@@ -138,6 +141,7 @@ public final class GatewayRoute {
             .circuitBreaker(circuitBreaker);
         builder.upgradeProtocols.clear();
         builder.upgradeProtocols.addAll(upgradeProtocols);
+        builder.weight = weight;
         builder.paths.addAll(paths);
         builder.conditions.addAll(conditions);
         builder.filters.addAll(filters);
@@ -246,7 +250,14 @@ public final class GatewayRoute {
     }
 
     /**
-     * @return The circuit breaker, or {@code null} for none
+     * @return The weight of the route in a group of routes that split the traffic, if any
+     */
+    public @Nullable GatewayWeight getWeight() {
+        return weight;
+    }
+
+    /**
+     * @return The circuit breaker of the route, if any
      */
     public @Nullable GatewayCircuitBreaker getCircuitBreaker() {
         return circuitBreaker;
@@ -297,6 +308,8 @@ public final class GatewayRoute {
         private GatewayRetry retry;
         @Nullable
         private GatewayCircuitBreaker circuitBreaker;
+        @Nullable
+        private GatewayWeight weight;
         private final Map<String, Object> metadata = new LinkedHashMap<>();
         private final Set<String> upgradeProtocols = new LinkedHashSet<>(List.of(WEBSOCKET));
 
@@ -452,6 +465,19 @@ public final class GatewayRoute {
             for (String protocol : protocols) {
                 upgradeProtocols.add(Objects.requireNonNull(protocol, "protocol").strip().toLowerCase(Locale.ROOT));
             }
+            return this;
+        }
+
+        /**
+         * Put the route into a group of routes that split the traffic by weight, see
+         * {@link GatewayWeight}.
+         *
+         * @param group  The name of the group
+         * @param weight The weight of the route in the group
+         * @return This builder
+         */
+        public Builder weight(String group, int weight) {
+            this.weight = GatewayWeight.of(group, weight);
             return this;
         }
 

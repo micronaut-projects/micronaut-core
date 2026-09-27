@@ -237,6 +237,13 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("Weight")
+    GatewayPredicateFactory weight() {
+        return GatewayPredicateFactory.of(List.of("group", "weight"), (route, args) ->
+            route.weight(args.get("group"), args.get("weight", Integer.class, 1)));
+    }
+
+    @Singleton
     @Named("After")
     GatewayPredicateFactory after() {
         return GatewayPredicateFactory.of(List.of(DATETIME), (route, args) -> route.where(RequestCondition.after(instant(args.get(DATETIME)))));

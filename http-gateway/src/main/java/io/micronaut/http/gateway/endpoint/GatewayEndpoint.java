@@ -151,6 +151,9 @@ public class GatewayEndpoint {
         if (route.getResponseTimeout() != null) {
             description.put("responseTimeout", Objects.toString(route.getResponseTimeout()));
         }
+        if (route.getWeight() != null) {
+            description.put("weight", Map.of("group", route.getWeight().group(), "weight", route.getWeight().weight()));
+        }
         if (!route.getMetadata().isEmpty()) {
             Map<String, String> metadata = new LinkedHashMap<>();
             route.getMetadata().forEach((k, v) -> metadata.put(k, String.valueOf(v)));

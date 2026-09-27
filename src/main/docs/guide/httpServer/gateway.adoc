@@ -94,6 +94,27 @@ The api:http.gateway.GatewayFilters[] are the proxy transforms, applied once to 
 
 The path filters work on the raw, percent-encoded path, which they never decode: the rest of the path and the query are relayed byte for byte, and `SetPath` and `PrefixPath` put in the variables as the client sent them. A header value may use the path variables, e.g. `{segment}`; a value that would carry a line break answers `400`. The inbound request, which the server filters see, is never changed.
 
+== Weights and Canaries
+
+Routes with the same paths in a weight group split the traffic by weight, like Spring Cloud Gateway's `Weight` predicate: `.weight("orders", 9)` in code, `Weight=orders, 9` in the configuration. For each request the group chooses one of its routes, at random by weight, and only that route matches. A route of weight `0` only takes requests forced to it. The group can be set up under `micronaut.gateway.weight-groups.<group>`:
+
+[source,yaml]
+----
+micronaut:
+  gateway:
+    weight-groups:
+      orders:
+        override-header: X-Canary # a request with X-Canary: orders-v2 goes to the route orders-v2
+        sticky-header: X-User     # the same user always gets the same route
+    routes:
+      orders-v1:
+        uri: lb://orders-v1
+        predicates: [ "Path=/orders/**", "Weight=orders, 9" ]
+      orders-v2:
+        uri: lb://orders-v2
+        predicates: [ "Path=/orders/**", "Weight=orders, 1" ]
+----
+
 == Rate Limits and In-Flight Limits
 
 A api:http.gateway.GatewayRateLimit[] (`RequestRateLimiter` in the configuration) is a token bucket per key of a request, like Spring Cloud Gateway's: `replenish-rate` tokens a second, up to `burst-capacity` (at least the rate; `0` denies every request), `requested-tokens` per request. A request over the limit is answered with `429` without calling the upstream, and the responses carry `X-RateLimit-Remaining`, `-Replenish-Rate`, `-Burst-Capacity` and `-Requested-Tokens` (`include-headers: false` turns them off). A request without a key is answered with `403` (`deny-empty-key`, `empty-key-status`). The key comes from a api:http.gateway.KeyResolver[]: `remoteAddress` (the default: the peer, or the client behind the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`), `principal`, `header:<name>`, or the name of a `KeyResolver` bean. The buckets are in the memory of the gateway (api:http.gateway.InMemoryRateLimiter[]); a api:http.gateway.GatewayRateLimiter[] bean named in `rate-limiter` keeps them elsewhere, and when it fails the request is let through. Each route has its own buckets, also when the limit is a default filter.
