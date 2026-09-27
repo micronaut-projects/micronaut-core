@@ -22,8 +22,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * A {@code 101 Switching Protocols} response whose connection now carries another protocol,
  * e.g. WebSocket, in both directions: {@link #byteBody()} is what the peer sends after the
- * switch, and {@link #send(CloseableByteBody)} sends bytes to the peer. The connection is
- * closed when either direction ends or fails, or when the response is {@link #close() closed}.
+ * switch, and {@link #send(CloseableByteBody)} sends bytes to the peer. On a plain TCP
+ * connection the end of one direction is a half-close, and the other direction continues until
+ * it ends too; a connection that cannot be half-closed, e.g. over TLS, is closed when either
+ * direction ends. The connection is closed when either direction fails, or when the response is
+ * {@link #close() closed}.
  * <p>The raw HTTP client returns one when a request that allows upgrades is answered with
  * {@code 101}, see {@code RawRequestOptions#isAllowUpgrade()}. A route that returns it relays
  * the switched protocol: the server writes the {@code 101}, streams {@link #byteBody()} to its
