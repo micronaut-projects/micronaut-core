@@ -137,8 +137,10 @@ subprojects { project ->
                     "-XX:-UseJVMCICompiler",
                     // with compilation off a fifth of the CPU went to G1
                     "-XX:+UseParallelGC",
-                    "-Dpolyglot.engine.AllowExperimentalOptions=true",
-                    "-Dpolyglot.engine.Compilation=false"
+                    // Truffle's interpreter-only runtime: unlike polyglot.engine.Compilation=false it exists on
+                    // every GraalVM, including one whose Truffle version doesn't match GraalPy's
+                    "-Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime",
+                    "-Dpolyglot.engine.WarnInterpreterOnly=false"
             )
         }
     }

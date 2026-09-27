@@ -21,7 +21,7 @@ tasks.withType(io.micronaut.build.python.PythonCompile).configureEach {
     jvmArgs.addAll(
             "-XX:+UnlockExperimentalVMOptions",
             "-XX:-UseJVMCICompiler",
-            "-Dpolyglot.engine.AllowExperimentalOptions=true",
-            "-Dpolyglot.engine.Compilation=false"
+            "-Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime",
+            "-Dpolyglot.engine.WarnInterpreterOnly=false"
     )
 }
