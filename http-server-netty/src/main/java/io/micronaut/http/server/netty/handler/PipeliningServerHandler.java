@@ -115,6 +115,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private Compressor compressor;
     private BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private boolean requestDecompressionEnabled = true;
+    private boolean http10KeepAlive;
+    private boolean rejectUnsupportedHttpVersions;
 
     /**
      * Current handler for inbound messages.
@@ -191,6 +193,28 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     public void setRequestDecompressionEnabled(boolean requestDecompressionEnabled) {
         this.requestDecompressionEnabled = requestDecompressionEnabled;
+    }
+
+    /**
+     * Keep the connection of an HTTP/1.0 client that sends {@code Connection: keep-alive} after a
+     * response of known length. Default: false, the connection ends after each response.
+     *
+     * @param http10KeepAlive true to keep the connection
+     * @since 5.3.0
+     */
+    public void setHttp10KeepAlive(boolean http10KeepAlive) {
+        this.http10KeepAlive = http10KeepAlive;
+    }
+
+    /**
+     * Answer a request of an HTTP version other than 1.0 or 1.1 over HTTP/1.1 rather than with its
+     * own version; the request handler rejects it. Default: false.
+     *
+     * @param rejectUnsupportedHttpVersions true to answer such a request over HTTP/1.1
+     * @since 5.3.0
+     */
+    public void setRejectUnsupportedHttpVersions(boolean rejectUnsupportedHttpVersions) {
+        this.rejectUnsupportedHttpVersions = rejectUnsupportedHttpVersions;
     }
 
     public static boolean canHaveBody(HttpResponseStatus status) {
@@ -1035,10 +1059,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void preprocess(HttpResponse message) {
-            if (!message.protocolVersion().equals(request.protocolVersion())) {
+            HttpVersion requestVersion = request.protocolVersion();
+            if (!message.protocolVersion().equals(requestVersion)
+                && (!rejectUnsupportedHttpVersions || requestVersion.majorVersion() == 1 && requestVersion.minorVersion() <= 1)) {
                 // if the response includes features not supported by http/1.0, well that's just too bad, isn't it?
                 // we'll at least handle the connection state properly.
-                message.setProtocolVersion(request.protocolVersion());
+                message.setProtocolVersion(requestVersion);
             }
             if (request.protocolVersion().isKeepAliveDefault()) {
                 if (request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
@@ -1059,7 +1085,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
             } else {
                 if (!message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
-                    closeAfterWrite();
+                    if (http10KeepAlive && !closeAfterWrite && HttpUtil.isContentLengthSet(message)
+                        && !message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
+                        // an HTTP/1.0 client that asked to keep the connection: keep it, since the
+                        // length of the response is known
+                        message.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    } else {
+                        closeAfterWrite();
+                    }
                 } else if (closeAfterWrite) {
                     // remove the keep-alive header
                     message.headers().remove(HttpHeaderNames.CONNECTION);

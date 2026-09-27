@@ -25,6 +25,20 @@ micronaut:
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.adoc[]
 
+=== HTTP/1.x Protocol Settings
+
+Two settings of the Netty server, both off by default, are useful when the server sits in front of other servers as a proxy:
+
+[configuration]
+----
+micronaut:
+  server:
+    http10-keep-alive: true
+    reject-unsupported-http-versions: true
+----
+- `http10-keep-alive` keeps the connection of an HTTP/1.0 client that sends `Connection: keep-alive` after a response of known length, and answers with `Connection: keep-alive`. A response of unknown length still ends with the connection. By default, the connection of an HTTP/1.0 client ends after each response.
+- `reject-unsupported-http-versions` answers a request of an HTTP version other than 1.0 or 1.1, e.g. `HTTP/9.9`, which the request decoder accepts, with `505 HTTP Version Not Supported` over HTTP/1.1 and closes the connection. By default, such a request is served.
+
 === Using Native Transports
 
 The native Netty transports add features specific to a particular platform, generate less garbage, and generally improve performance when compared to the NIO-based transport.

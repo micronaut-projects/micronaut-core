@@ -39,6 +39,7 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -262,6 +263,31 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+        HttpVersion version = request.protocolVersion();
+        // e.g. HTTP/9.9: the decoder takes any version, this server speaks HTTP/1.x only on this path
+        if (serverConfiguration.isRejectUnsupportedHttpVersions()
+            && (version.majorVersion() != 1 || version.minorVersion() > 1)) {
+            body.close();
+            // like an invalid URI, the request is not served: its error is handled for the root path
+            NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                new DefaultHttpRequest(HttpVersion.HTTP_1_1, request.method(), "/"),
+                NettyByteBodyFactory.empty(),
+                ctx,
+                conversionService,
+                serverConfiguration
+            );
+            prepareRequest(ctx, outboundAccess, errorRequest);
+            // the rest of the connection cannot be framed
+            outboundAccess.closeAfterWrite();
+            HttpStatusException error = new HttpStatusException(io.micronaut.http.HttpStatus.HTTP_VERSION_NOT_SUPPORTED, "Unsupported HTTP version: " + version.text());
+            executionFlowForReceivedEvent(errorRequest).onComplete((ignore, throwable) -> {
+                if (throwable != null) {
+                    error.addSuppressed(throwable);
+                }
+                handleException(ctx, outboundAccess, errorRequest, error);
+            });
+            return;
+        }
         NettyHttpRequest<Object> mnRequest;
         try {
             mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);

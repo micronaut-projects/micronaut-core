@@ -193,6 +193,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     private boolean escapeHtmlUrl = false;
     private boolean notFoundOnMissingBody = true;
     private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
+    private boolean http10KeepAlive;
+    private boolean rejectUnsupportedHttpVersions;
     private int maxParams = DEFAULT_MAX_PARAMS;
 
     /**
@@ -745,6 +747,50 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      */
     public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
         this.semicolonIsNormalChar = semicolonIsNormalChar;
+    }
+
+    /**
+     * Whether the server keeps the connection of an HTTP/1.0 client that sends
+     * {@code Connection: keep-alive} after a response of known length, answering with
+     * {@code Connection: keep-alive}. A response of unknown length still ends with the connection.
+     * Supported by the Netty server.
+     *
+     * @return {@code true} to keep such a connection; {@code false}, the default, to end the
+     * connection of an HTTP/1.0 client after each response
+     * @since 5.3.0
+     */
+    public boolean isHttp10KeepAlive() {
+        return http10KeepAlive;
+    }
+
+    /**
+     * @param http10KeepAlive Whether to keep the connection of an HTTP/1.0 keep-alive client
+     * @see #isHttp10KeepAlive()
+     * @since 5.3.0
+     */
+    public void setHttp10KeepAlive(boolean http10KeepAlive) {
+        this.http10KeepAlive = http10KeepAlive;
+    }
+
+    /**
+     * Whether the server answers a request of an HTTP version other than 1.0 or 1.1, e.g.
+     * {@code HTTP/9.9}, which the request decoder accepts, with {@code 505} over HTTP/1.1 and
+     * closes the connection. Supported by the Netty server.
+     *
+     * @return {@code true} to reject such a request; {@code false}, the default, to serve it
+     * @since 5.3.0
+     */
+    public boolean isRejectUnsupportedHttpVersions() {
+        return rejectUnsupportedHttpVersions;
+    }
+
+    /**
+     * @param rejectUnsupportedHttpVersions Whether to reject a request of an unsupported HTTP version
+     * @see #isRejectUnsupportedHttpVersions()
+     * @since 5.3.0
+     */
+    public void setRejectUnsupportedHttpVersions(boolean rejectUnsupportedHttpVersions) {
+        this.rejectUnsupportedHttpVersions = rejectUnsupportedHttpVersions;
     }
 
     /**
