@@ -581,6 +581,11 @@ abstract class MultiplexedServerHandler {
             this.attachment = attachment;
         }
 
+        @Nullable
+        final Object attachment() {
+            return attachment;
+        }
+
         @Override
         public final void closeAfterWrite() {
         }

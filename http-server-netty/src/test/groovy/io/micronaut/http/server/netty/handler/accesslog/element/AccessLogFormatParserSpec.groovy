@@ -70,6 +70,14 @@ class AccessLogFormatParserSpec extends Specification {
 
     }
 
+    def "test access log format parser for request attributes"() {
+        when:
+        AccessLogFormatParser parser = new AccessLogFormatParser("%h \"%r\" %s %{routeId}r")
+
+        then:
+        parser.toString() == "%h \"%r\" %s %{routeId}r"
+    }
+
     def "test access log format parser for invalid formats"() {
         when:
         AccessLogFormatParser parser = new AccessLogFormatParser("%h %l %u %t \"%r\" % %b");

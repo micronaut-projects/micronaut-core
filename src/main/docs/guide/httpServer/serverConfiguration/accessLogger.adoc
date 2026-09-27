@@ -94,6 +94,7 @@ These are the supported markers:
 * *%p* - Local port
 * *%q* - Query string (excluding the '?' character)
 * *%r* - First line of the request
+* *%{<attribute>}r* - Value of a Micronaut request attribute (see `HttpRequest.getAttribute`), read when the response is written, or '-' if the attribute is not set. For example, a gateway that stores its route id in the `routeId` request attribute can log it with `%{routeId}r`
 * *%s* - HTTP status code of the response
 * *%{<format>}t* - Date and time. If the argument is omitted, Common Log Format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
 ** If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.

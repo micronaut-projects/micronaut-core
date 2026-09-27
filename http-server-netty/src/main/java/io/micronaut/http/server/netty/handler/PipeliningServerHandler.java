@@ -32,6 +32,7 @@ import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -70,6 +71,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,6 +157,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private boolean writing = false;
     private boolean quicWritePending = false;
     private boolean shuttingDown = false;
+    private boolean exposeResponseRequest = false;
 
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this(requestHandler, false);
@@ -189,6 +192,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      *
      * @param requestDecompressionEnabled true to enable decompression, false to disable it
      */
+    /**
+     * Expose the attachment of the response being written in the
+     * {@link HttpAccessLogHandler#RESPONSE_REQUEST} channel attribute while its headers are
+     * written, so that the access log can read request attributes.
+     *
+     * @param exposeResponseRequest {@code true} to expose the attachment
+     */
+    public void setExposeResponseRequest(boolean exposeResponseRequest) {
+        this.exposeResponseRequest = exposeResponseRequest;
+    }
+
     public void setRequestDecompressionEnabled(boolean requestDecompressionEnabled) {
         this.requestDecompressionEnabled = requestDecompressionEnabled;
     }
@@ -334,6 +348,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
         assert ctx != null;
+        OutboundHandler current = outboundHandler;
+        if (exposeResponseRequest && current != null && message instanceof HttpResponse) {
+            Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+            attribute.set(current.outboundAccess.attachment);
+            try {
+                return write0(message, flush, close, needsPromise);
+            } finally {
+                attribute.set(null);
+            }
+        }
+        return write0(message, flush, close, needsPromise);
+    }
+
+    private ChannelFuture write0(Object message, boolean flush, boolean close, boolean needsPromise) {
         if (close) {
             return requiredCtx().writeAndFlush(message)
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)
