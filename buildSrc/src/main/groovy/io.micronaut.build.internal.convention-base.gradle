@@ -34,6 +34,11 @@ tasks.withType(Test).configureEach {
     jvmArgs '-Xmx2048m'
     systemProperty "micronaut.cloud.platform", "OTHER"
     jvmArgs "--enable-preview"
+    if (!project.path.contains("python")) {
+        // CI runs on Oracle GraalVM, whose default top tier JIT is the Graal compiler: C2 compiles
+        // the short-lived test JVMs with less CPU. GraalPy needs the Graal compiler for Python code.
+        jvmArgs "-XX:+UnlockExperimentalVMOptions", "-XX:-UseJVMCICompiler"
+    }
 }
 
 pluginManager.withPlugin("jacoco") {
