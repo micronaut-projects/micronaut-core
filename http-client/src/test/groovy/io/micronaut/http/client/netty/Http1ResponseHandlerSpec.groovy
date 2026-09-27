@@ -288,6 +288,7 @@ class Http1ResponseHandlerSpec extends Specification {
 
             @Override
             void complete() {
+                // the test checks the received bytes, not the completion
             }
 
             @Override
