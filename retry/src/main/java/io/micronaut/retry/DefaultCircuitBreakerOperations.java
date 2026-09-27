@@ -43,15 +43,43 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
     private final DefaultRetryRunner retryRunner;
     private final CircuitBreakerRetry retryState;
     private final RetryEventEmitter retryEventEmitter;
-    private final ExecutableMethod<Object, Object> executableMethod = new ProgrammaticExecutableMethod();
+    private final ExecutableMethod<Object, Object> executableMethod;
 
     DefaultCircuitBreakerOperations(CircuitBreakerPolicy circuitBreakerPolicy,
                                     DefaultRetryRunner retryRunner,
                                     RetryEventEmitter retryEventEmitter) {
         this.retryRunner = retryRunner;
         this.retryEventEmitter = retryEventEmitter;
+        this.executableMethod = new ProgrammaticExecutableMethod("programmaticCircuitBreaker");
         this.retryState = new CircuitBreakerRetry(
             circuitBreakerPolicy.getResetTimeout().toMillis(),
+            new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy()),
+            executableMethod,
+            null,
+            circuitBreakerPolicy.isThrowWrappedException()
+        );
+    }
+
+    /**
+     * Operations with the retries of a policy over a shared circuit, e.g. of a named circuit
+     * breaker.
+     *
+     * @param circuitBreakerPolicy The policy of the retries
+     * @param circuit              The circuit
+     * @param name                 The name of the circuit breaker, for the logs and the events
+     * @param retryRunner          The retry runner
+     * @param retryEventEmitter    The retry event emitter
+     */
+    DefaultCircuitBreakerOperations(CircuitBreakerPolicy circuitBreakerPolicy,
+                                    CircuitBreakerRetry.Circuit circuit,
+                                    String name,
+                                    DefaultRetryRunner retryRunner,
+                                    RetryEventEmitter retryEventEmitter) {
+        this.retryRunner = retryRunner;
+        this.retryEventEmitter = retryEventEmitter;
+        this.executableMethod = new ProgrammaticExecutableMethod(name);
+        this.retryState = new CircuitBreakerRetry(
+            circuit,
             new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy()),
             executableMethod,
             null,
@@ -87,6 +115,12 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
 
     private static final class ProgrammaticExecutableMethod implements ExecutableMethod<Object, Object> {
 
+        private final String name;
+
+        private ProgrammaticExecutableMethod(String name) {
+            this.name = name;
+        }
+
         @Override
         public Class<Object> getDeclaringType() {
             return Object.class;
@@ -94,7 +128,7 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
 
         @Override
         public String getMethodName() {
-            return "programmaticCircuitBreaker";
+            return name;
         }
 
         @Override

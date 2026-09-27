@@ -118,4 +118,17 @@ public @interface CircuitBreaker {
      * @return Whether to wrap the original exception in a {@link io.micronaut.retry.exception.CircuitOpenException}
      */
     boolean throwWrappedException() default false;
+
+    /**
+     * The name of a circuit breaker of the {@link io.micronaut.retry.CircuitBreakerRegistry}
+     * whose circuit the method shares, e.g. with other methods and with the programmatic circuit
+     * breakers of the same name: they open, half-open and close together. The method keeps its
+     * own retries, those of this annotation. The reset timeout is the one of the configuration
+     * {@code micronaut.retry.circuit-breakers.<name>.reset}, if any, or else the one of the first
+     * user of the circuit. Empty, the default, for a circuit of the method alone.
+     *
+     * @return The name of the circuit breaker, or empty
+     * @since 5.3.0
+     */
+    String name() default "";
 }

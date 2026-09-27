@@ -45,15 +45,13 @@ public class CircuitBreakerRetry implements MutableRetryState {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
 
     private final RetryStateBuilder retryStateBuilder;
+    private final Circuit circuit;
     private final long openTimeout;
     private final ExecutableMethod<?, ?> method;
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
     private final boolean throwWrappedException;
-    private final AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
-    @Nullable
-    private volatile Throwable lastError;
-    private volatile long time = System.currentTimeMillis();
+    private final AtomicReference<CircuitState> state;
     private volatile MutableRetryState childState;
 
     /**
@@ -70,9 +68,30 @@ public class CircuitBreakerRetry implements MutableRetryState {
                                ExecutableMethod<?, ?> method,
                                @Nullable ApplicationEventPublisher eventPublisher,
                                boolean throwWrappedException) {
+        this(new Circuit(openTimeout), childStateBuilder, method, eventPublisher, throwWrappedException);
+    }
 
+    /**
+     * Creates a circuit breaker retry state over a circuit that other retry states can share,
+     * e.g. the circuit of a named circuit breaker: they open, half-open and close it together,
+     * and each has its own retries.
+     *
+     * @param circuit The circuit
+     * @param childStateBuilder The retry state builder
+     * @param method A compile time produced invocation of a method call
+     * @param eventPublisher To publish circuit events
+     * @param throwWrappedException If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
+     * @since 5.3.0
+     */
+    public CircuitBreakerRetry(Circuit circuit,
+                               RetryStateBuilder childStateBuilder,
+                               ExecutableMethod<?, ?> method,
+                               @Nullable ApplicationEventPublisher eventPublisher,
+                               boolean throwWrappedException) {
+        this.circuit = circuit;
+        this.state = circuit.state;
         this.retryStateBuilder = childStateBuilder;
-        this.openTimeout = openTimeout;
+        this.openTimeout = circuit.openTimeout;
         this.childState = (MutableRetryState) childStateBuilder.build();
         this.eventPublisher = eventPublisher;
         this.method = method;
@@ -88,8 +107,8 @@ public class CircuitBreakerRetry implements MutableRetryState {
                 openCircuit(exception);
             } else {
                 // reset state for successful operation
-                time = System.currentTimeMillis();
-                lastError = null;
+                circuit.time = System.currentTimeMillis();
+                circuit.lastError = null;
                 this.childState = (MutableRetryState) retryStateBuilder.build();
             }
         }
@@ -97,7 +116,10 @@ public class CircuitBreakerRetry implements MutableRetryState {
 
     @Override
     public void open() {
-        if (currentState() == CircuitState.OPEN && lastError != null) {
+        // the state first: an open circuit whose timeout elapsed half-opens, and forgets its error
+        boolean open = currentState() == CircuitState.OPEN;
+        Throwable lastError = circuit.lastError;
+        if (open && lastError != null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Rethrowing existing exception for Open Circuit [{}]: {}", method, lastError.getMessage());
             }
@@ -183,7 +205,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
     public CircuitState currentState() {
         if (state.get() == CircuitState.OPEN) {
             long now = System.currentTimeMillis();
-            long timeout = time + openTimeout;
+            long timeout = circuit.time + openTimeout;
             if (now > timeout) {
                 return halfOpenCircuit();
             }
@@ -206,8 +228,8 @@ public class CircuitBreakerRetry implements MutableRetryState {
             LOG.debug("Opening Circuit Breaker [{}] due to error: {}", method, cause.getMessage());
         }
         this.childState = (MutableRetryState) retryStateBuilder.build();
-        this.lastError = cause;
-        this.time = System.currentTimeMillis();
+        circuit.lastError = cause;
+        circuit.time = System.currentTimeMillis();
         try {
             return state.getAndSet(CircuitState.OPEN);
         } finally {
@@ -233,8 +255,8 @@ public class CircuitBreakerRetry implements MutableRetryState {
             LOG.debug("Closing Circuit Breaker [{}]", method);
         }
 
-        time = System.currentTimeMillis();
-        lastError = null;
+        circuit.time = System.currentTimeMillis();
+        circuit.lastError = null;
         this.childState = (MutableRetryState) retryStateBuilder.build();
         try {
             return state.getAndSet(CircuitState.CLOSED);
@@ -260,8 +282,54 @@ public class CircuitBreakerRetry implements MutableRetryState {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Half Opening Circuit Breaker [{}]", method);
         }
-        lastError = null;
+        circuit.lastError = null;
         this.childState = (MutableRetryState) retryStateBuilder.build();
         return state.getAndSet(CircuitState.HALF_OPEN);
+    }
+
+    /**
+     * The state of a circuit: closed, open or half-open, with the error that opened it. Several
+     * {@link CircuitBreakerRetry} states can share one, e.g. the users of a named circuit
+     * breaker, see {@link io.micronaut.retry.CircuitBreakerRegistry}.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public static final class Circuit {
+        private final long openTimeout;
+        private final AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
+        @Nullable
+        private volatile Throwable lastError;
+        private volatile long time = System.currentTimeMillis();
+
+        /**
+         * @param openTimeout The time the circuit stays open before it half-opens, in millis
+         */
+        public Circuit(long openTimeout) {
+            this.openTimeout = openTimeout;
+        }
+
+        /**
+         * @return The time the circuit stays open before it half-opens, in millis
+         */
+        public long getOpenTimeout() {
+            return openTimeout;
+        }
+
+        /**
+         * @return The state of the circuit, as it was last changed: an open circuit whose timeout
+         * elapsed half-opens on the next use
+         */
+        public CircuitState getState() {
+            CircuitState current = state.get();
+            return current == null ? CircuitState.CLOSED : current;
+        }
+
+        /**
+         * @return Whether the circuit has been open for longer than its timeout
+         */
+        public boolean hasOpenTimeoutElapsed() {
+            return System.currentTimeMillis() > time + openTimeout;
+        }
     }
 }
