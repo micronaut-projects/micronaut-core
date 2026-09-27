@@ -29,6 +29,7 @@ import io.micronaut.http.gateway.GatewayRouteBuilder;
 import io.micronaut.http.gateway.GatewayRoutes;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -51,6 +52,7 @@ final class ConfiguredGatewayRoutes implements GatewayRoutes, GatewayDefaultFilt
     private final GatewayConfiguration configuration;
     private final BeanLocator beanLocator;
     private final ConversionService conversionService;
+    private @Nullable List<GatewayFilter> defaultFilters;
 
     ConfiguredGatewayRoutes(List<GatewayRouteConfiguration> routes, GatewayConfiguration configuration,
                             BeanLocator beanLocator, ConversionService conversionService) {
@@ -61,10 +63,17 @@ final class ConfiguredGatewayRoutes implements GatewayRoutes, GatewayDefaultFilt
     }
 
     @Override
-    public List<GatewayFilter> filters() {
-        List<GatewayFilter> filters = new ArrayList<>();
-        for (String filter : configuration.getDefaultFilters()) {
-            filters.add(filter("the default filters", filter));
+    public synchronized List<GatewayFilter> filters() {
+        // built once: the default filters keep their state, e.g. the buckets of a rate limit or
+        // the entries of a cache, across the registrations of the routes
+        List<GatewayFilter> filters = defaultFilters;
+        if (filters == null) {
+            List<GatewayFilter> built = new ArrayList<>();
+            for (String filter : configuration.getDefaultFilters()) {
+                built.add(filter("the default filters", filter));
+            }
+            filters = List.copyOf(built);
+            defaultFilters = filters;
         }
         return filters;
     }
@@ -92,6 +101,9 @@ final class ConfiguredGatewayRoutes implements GatewayRoutes, GatewayDefaultFilt
             .order(route.getOrder())
             .responseTimeout(route.getResponseTimeout())
             .activityTimeout(route.getActivityTimeout());
+        if (route.getUpgradeProtocols() != null) {
+            builder.upgradeProtocols(route.getUpgradeProtocols().toArray(String[]::new));
+        }
         try {
             builder.uri(uri);
         } catch (IllegalArgumentException e) {
@@ -168,6 +180,13 @@ final class ConfiguredGatewayRoutes implements GatewayRoutes, GatewayDefaultFilt
             } else if (rawArgs != null) {
                 throw new ConfigurationException("The args of " + name + " of " + owner + " are not a map: " + rawArgs);
             }
+            // arguments given as flat properties, e.g. predicates[0].args.patterns
+            map.forEach((k, v) -> {
+                String key = String.valueOf(k);
+                if (key.startsWith("args.")) {
+                    args.put(key.substring("args.".length()), v);
+                }
+            });
             return new Entry(name.toString().strip(), null, args);
         }
         throw new ConfigurationException("A predicate or filter of " + owner + " is neither a string nor a map: " + value);
