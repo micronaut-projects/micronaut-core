@@ -35,6 +35,7 @@ abstract class GatewayTestBase {
 
     EmbeddedServer upstream;
     EmbeddedServer gateway;
+    ScriptedUpstream scripted;
 
     abstract String specName();
 
@@ -47,9 +48,12 @@ abstract class GatewayTestBase {
     }
 
     @BeforeAll
-    void startServers() {
+    void startServers() throws IOException {
         upstream = Upstream.start(upstreamProperties());
-        gateway = startGateway(specName(), upstream, gatewayProperties());
+        scripted = new ScriptedUpstream();
+        Map<String, Object> properties = new HashMap<>(gatewayProperties());
+        properties.put("test.scripted", scripted.uri().toString());
+        gateway = startGateway(specName(), upstream, properties);
     }
 
     static EmbeddedServer startGateway(String specName, EmbeddedServer upstream, Map<String, Object> properties) {
@@ -74,6 +78,13 @@ abstract class GatewayTestBase {
         }
         if (upstream != null) {
             upstream.getApplicationContext().close();
+        }
+        if (scripted != null) {
+            try {
+                scripted.close();
+            } catch (IOException e) {
+                // closed
+            }
         }
     }
 
