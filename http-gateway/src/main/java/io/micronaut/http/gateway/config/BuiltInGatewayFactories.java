@@ -64,7 +64,12 @@ import java.util.regex.Pattern;
 @Factory
 final class BuiltInGatewayFactories {
 
-    private static final List<String> NAME_VALUE = List.of("name", "value");
+    private static final String VALUE = "value";
+    private static final String REGEXP = "regexp";
+    private static final String DATETIME = "datetime";
+    private static final String REPLACEMENT = "replacement";
+    private static final String STATUS = "status";
+    private static final List<String> NAME_VALUE = List.of("name", VALUE);
 
     // ---- predicates
 
@@ -96,9 +101,9 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("Header")
     GatewayPredicateFactory header() {
-        return GatewayPredicateFactory.of(List.of("header", "regexp"), (route, args) -> {
+        return GatewayPredicateFactory.of(List.of("header", REGEXP), (route, args) -> {
             String name = args.get("header");
-            Optional<String> regexp = args.find("regexp");
+            Optional<String> regexp = args.find(REGEXP);
             route.where(regexp.isPresent() ? RequestCondition.header(name, listElement(regexp.get())) : RequestCondition.header(name));
         });
     }
@@ -118,9 +123,9 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("Query")
     GatewayPredicateFactory query() {
-        return GatewayPredicateFactory.of(List.of("param", "regexp"), (route, args) -> {
+        return GatewayPredicateFactory.of(List.of("param", REGEXP), (route, args) -> {
             String name = args.get("param");
-            Optional<String> regexp = args.find("regexp");
+            Optional<String> regexp = args.find(REGEXP);
             route.where(regexp.isPresent() ? RequestCondition.query(name, ValueMatcher.regex(regexp.get())) : RequestCondition.query(name));
         });
     }
@@ -128,9 +133,9 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("Cookie")
     GatewayPredicateFactory cookie() {
-        return GatewayPredicateFactory.of(List.of("name", "regexp"), (route, args) -> {
+        return GatewayPredicateFactory.of(List.of("name", REGEXP), (route, args) -> {
             String name = args.get("name");
-            Optional<String> regexp = args.find("regexp");
+            Optional<String> regexp = args.find(REGEXP);
             route.where(regexp.isPresent() ? RequestCondition.cookie(name, ValueMatcher.regex(regexp.get())) : RequestCondition.cookie(name));
         });
     }
@@ -260,13 +265,13 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("After")
     GatewayPredicateFactory after() {
-        return GatewayPredicateFactory.of(List.of("datetime"), (route, args) -> route.where(RequestCondition.after(instant(args.get("datetime")))));
+        return GatewayPredicateFactory.of(List.of(DATETIME), (route, args) -> route.where(RequestCondition.after(instant(args.get(DATETIME)))));
     }
 
     @Singleton
     @Named("Before")
     GatewayPredicateFactory before() {
-        return GatewayPredicateFactory.of(List.of("datetime"), (route, args) -> route.where(RequestCondition.before(instant(args.get("datetime")))));
+        return GatewayPredicateFactory.of(List.of(DATETIME), (route, args) -> route.where(RequestCondition.before(instant(args.get(DATETIME)))));
     }
 
     @Singleton
@@ -316,13 +321,13 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("RewritePath")
     GatewayFilterFactory rewritePath() {
-        return GatewayFilterFactory.of(List.of("regexp", "replacement"), args -> GatewayFilters.rewritePath(args.get("regexp"), args.find("replacement").orElse("")));
+        return GatewayFilterFactory.of(List.of(REGEXP, REPLACEMENT), args -> GatewayFilters.rewritePath(args.get(REGEXP), args.find(REPLACEMENT).orElse("")));
     }
 
     @Singleton
     @Named("AddRequestHeader")
     GatewayFilterFactory addRequestHeader() {
-        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addRequestHeader(args.get("name"), args.find("value").orElse("")));
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addRequestHeader(args.get("name"), args.find(VALUE).orElse("")));
     }
 
     @Singleton
@@ -345,7 +350,7 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("SetRequestHeader")
     GatewayFilterFactory setRequestHeader() {
-        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.setRequestHeader(args.get("name"), args.find("value").orElse("")));
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.setRequestHeader(args.get("name"), args.find(VALUE).orElse("")));
     }
 
     @Singleton
@@ -363,7 +368,7 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("AddRequestParameter")
     GatewayFilterFactory addRequestParameter() {
-        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addRequestParameter(args.get("name"), args.find("value").orElse("")));
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addRequestParameter(args.get("name"), args.find(VALUE).orElse("")));
     }
 
     @Singleton
@@ -375,13 +380,13 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("AddResponseHeader")
     GatewayFilterFactory addResponseHeader() {
-        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addResponseHeader(args.get("name"), args.find("value").orElse("")));
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addResponseHeader(args.get("name"), args.find(VALUE).orElse("")));
     }
 
     @Singleton
     @Named("SetResponseHeader")
     GatewayFilterFactory setResponseHeader() {
-        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.setResponseHeader(args.get("name"), args.find("value").orElse("")));
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.setResponseHeader(args.get("name"), args.find(VALUE).orElse("")));
     }
 
     @Singleton
@@ -393,8 +398,8 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("RewriteResponseHeader")
     GatewayFilterFactory rewriteResponseHeader() {
-        return GatewayFilterFactory.of(List.of("name", "regexp", "replacement"), args ->
-            GatewayFilters.rewriteResponseHeader(args.get("name"), args.get("regexp"), args.find("replacement").orElse("")));
+        return GatewayFilterFactory.of(List.of("name", REGEXP, REPLACEMENT), args ->
+            GatewayFilters.rewriteResponseHeader(args.get("name"), args.get(REGEXP), args.find(REPLACEMENT).orElse("")));
     }
 
     @Singleton
@@ -445,13 +450,13 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("SetStatus")
     GatewayFilterFactory setStatus() {
-        return GatewayFilterFactory.of(List.of("status"), args -> GatewayFilters.setStatus(status(args.get("status"))));
+        return GatewayFilterFactory.of(List.of(STATUS), args -> GatewayFilters.setStatus(status(args.get(STATUS))));
     }
 
     @Singleton
     @Named("RedirectTo")
     GatewayFilterFactory redirectTo() {
-        return GatewayFilterFactory.of(List.of("status", "url"), args -> GatewayFilters.redirectTo(status(args.get("status")), args.get("url")));
+        return GatewayFilterFactory.of(List.of(STATUS, "url"), args -> GatewayFilters.redirectTo(status(args.get(STATUS)), args.get("url")));
     }
 
     @Singleton
@@ -463,7 +468,12 @@ final class BuiltInGatewayFactories {
             for (String status : bound.statuses()) {
                 statuses.add(status(status));
             }
-            return new GatewayRetry(bound.retries(), Set.copyOf(bound.methods()), statuses, bound.delay(), bound.multiplier(), bound.jitter());
+            return GatewayRetry.builder(bound.retries())
+                .methods(Set.copyOf(bound.methods()))
+                .statuses(statuses)
+                .backoff(bound.delay(), bound.multiplier())
+                .jitter(bound.jitter())
+                .build();
         });
     }
 
@@ -472,20 +482,34 @@ final class BuiltInGatewayFactories {
     GatewayFilterFactory circuitBreaker(BeanLocator beanLocator) {
         return GatewayFilterFactory.of(List.of("name", "fallback"), args -> {
             CircuitBreakerArguments bound = args.bind(CircuitBreakerArguments.class);
+            Set<Integer> failureStatuses = new LinkedHashSet<>();
+            for (String status : bound.failureStatuses()) {
+                failureStatuses.add(status(status));
+            }
+            Set<Integer> fallbackStatuses = new LinkedHashSet<>();
+            for (String status : bound.fallbackStatuses()) {
+                fallbackStatuses.add(status(status));
+            }
             String fallback = bound.fallback();
             if (fallback == null || fallback.isBlank()) {
-                return GatewayCircuitBreaker.of(bound.name());
+                if (!fallbackStatuses.isEmpty()) {
+                    throw new ConfigurationException("The circuit breaker " + bound.name() + " has fallback statuses and no fallback");
+                }
+                return GatewayCircuitBreaker.builder(bound.name()).failureStatuses(failureStatuses).build();
             }
             if (fallback.startsWith("forward:")) {
                 throw new ConfigurationException("A gateway fallback is the name of a handler bean, not a forward: URI: " + fallback);
             }
             Optional<AsyncRequestHandler> async = beanLocator.findBean(AsyncRequestHandler.class, Qualifiers.byName(fallback));
             if (async.isPresent()) {
-                return GatewayCircuitBreaker.of(bound.name(), async.get());
+                return GatewayCircuitBreaker.builder(bound.name()).fallback(async.get())
+                    .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).build();
             }
             RequestHandler handler = beanLocator.findBean(RequestHandler.class, Qualifiers.byName(fallback))
                 .orElseThrow(() -> new ConfigurationException("No AsyncRequestHandler or RequestHandler bean named " + fallback + " for the fallback of the circuit breaker " + bound.name()));
-            return GatewayCircuitBreaker.of(bound.name(), (request, pathVariables) -> CompletableFuture.completedFuture(handler.handle(request, pathVariables)));
+            return GatewayCircuitBreaker.builder(bound.name())
+                .fallback((request, pathVariables) -> CompletableFuture.completedFuture(handler.handle(request, pathVariables)))
+                .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).build();
         });
     }
 
@@ -530,11 +554,16 @@ final class BuiltInGatewayFactories {
     /**
      * The arguments of the {@code CircuitBreaker} filter.
      *
-     * @param name     The name of the circuit
-     * @param fallback The name of the fallback handler bean, if any
+     * @param name             The name of the circuit
+     * @param fallback         The name of the fallback handler bean, if any
+     * @param failureStatuses  The statuses that count as a failure, codes or names; empty for 500 and above
+     * @param fallbackStatuses The statuses the fallback answers for, codes or names
      */
     @Introspected
-    record CircuitBreakerArguments(String name, @Nullable String fallback) {
+    record CircuitBreakerArguments(String name,
+                                   @Nullable String fallback,
+                                   @Bindable(defaultValue = "") List<String> failureStatuses,
+                                   @Bindable(defaultValue = "") List<String> fallbackStatuses) {
     }
 
     /**

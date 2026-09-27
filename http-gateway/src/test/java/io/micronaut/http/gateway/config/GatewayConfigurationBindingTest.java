@@ -96,6 +96,30 @@ class GatewayConfigurationBindingTest {
         assertEquals(Set.of("GET", "PUT"), bound.methods());
         assertEquals(Set.of(503, 500), bound.statuses());
         assertEquals(Duration.ofMillis(10), bound.delay());
+
+        GatewayRoute breaker = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters[0].name", "CircuitBreaker",
+            "micronaut.gateway.routes.r.filters[0].args.name", "orders",
+            "micronaut.gateway.routes.r.filters[0].args.failure-statuses", "SERVICE_UNAVAILABLE, 504",
+            "micronaut.gateway.routes.r.filters[0].args.fallback-statuses", "503",
+            "micronaut.gateway.routes.r.filters[0].args.fallback", "ordersFallback",
+            "test.fallback", true
+        ));
+        assertEquals(Set.of(503, 504), breaker.getCircuitBreaker().failureStatuses());
+        assertEquals(Set.of(503), breaker.getCircuitBreaker().fallbackStatuses());
+        assertTrue(breaker.getCircuitBreaker().isFailure(504));
+        assertFalse(breaker.getCircuitBreaker().isFailure(500));
+    }
+
+    @jakarta.inject.Singleton
+    @jakarta.inject.Named("ordersFallback")
+    @io.micronaut.context.annotation.Requires(property = "test.fallback")
+    static class OrdersFallback implements io.micronaut.web.router.builder.AsyncRequestHandler {
+        @Override
+        public java.util.concurrent.CompletionStage<? extends io.micronaut.http.HttpResponse<?>> handle(HttpRequest<?> request, io.micronaut.http.PathVariables pathVariables) {
+            return java.util.concurrent.CompletableFuture.completedFuture(io.micronaut.http.HttpResponse.ok());
+        }
     }
 
     @Test

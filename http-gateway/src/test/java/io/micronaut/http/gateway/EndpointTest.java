@@ -50,6 +50,7 @@ class EndpointTest extends GatewayTestBase {
         p.put(r + "orders.metadata.team", "orders");
         p.put(r + "catch-all.uri", "${test.upstream}");
         p.put(r + "catch-all.order", 100);
+        p.put("micronaut.retry.circuit-breakers.orders.request-volume-threshold", 4);
         p.put("endpoints.all.port", managementPort);
         p.put("endpoints.gateway.enabled", true);
         p.put("endpoints.gateway.sensitive", false);
@@ -74,6 +75,9 @@ class EndpointTest extends GatewayTestBase {
         assertTrue(json.contains("\"retries\":2"), json);
         assertTrue(json.contains("\"name\":\"orders\""), json);
         assertTrue(json.contains("\"state\":\"CLOSED\""), json);
+        assertTrue(json.contains("\"failureStatuses\":\"5xx\""), json);
+        assertTrue(json.contains("\"requestVolumeThreshold\":4"), json);
+        assertTrue(json.contains("\"opened\":0"), json);
         assertTrue(json.contains("\"team\":\"orders\""), json);
         assertTrue(json.contains("/api/orders/{+path}"), json);
         RawHttp.Response one = management("GET", "/gateway/orders");

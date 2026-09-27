@@ -658,8 +658,9 @@ final class DefaultProxyHandler implements ProxyHandler {
                     }
                     throw invalid;
                 }
-                if (permit != null) {
-                    if (status >= HttpStatus.INTERNAL_SERVER_ERROR.getCode()) {
+                GatewayCircuitBreaker circuitBreaker = route.getCircuitBreaker();
+                if (permit != null && circuitBreaker != null) {
+                    if (circuitBreaker.isFailure(status)) {
                         permit.onFailure(new UpstreamStatusFailure(status));
                     } else {
                         permit.onSuccess();
@@ -672,6 +673,13 @@ final class DefaultProxyHandler implements ProxyHandler {
                         byteBodyResponse.close();
                     }
                     throw new RetryableAttempt(new UpstreamStatusFailure(status));
+                }
+                if (circuitBreaker != null && circuitBreaker.fallsBackOn(status)) {
+                    // the fallback answers: nothing of this response is relayed
+                    if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                        byteBodyResponse.close();
+                    }
+                    throw new UpstreamStatusFailure(status);
                 }
                 return relay(response);
             });

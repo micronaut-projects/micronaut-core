@@ -20,6 +20,7 @@ import io.micronaut.web.router.builder.AsyncRequestHandler;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * The circuit breaker of a gateway route: a named circuit of the
@@ -29,34 +30,87 @@ import java.util.Objects;
  * {@code micronaut.retry.circuit-breakers.<name>}.
  *
  * <p>Each attempt of the route acquires the circuit and reports its outcome once the headers of
- * the response arrive: a success is a response with a status below {@code 500}; a failure is a
- * response of {@code 500} or above, which is still relayed, or an attempt that failed. The
- * circuit never waits for a body. While the circuit is open, the route does not call the
- * upstream.</p>
+ * the response arrive: a failure is an attempt that failed, or a response of one of the
+ * {@link #failureStatuses() failure statuses}, {@code 500} and above by default, which is still
+ * relayed; any other response is a success. The circuit never waits for a body. While the
+ * circuit is open, the route does not call the upstream. The circuit decides when it opens and
+ * closes, see {@link io.micronaut.retry.CircuitBreakerWindow} for a circuit configured
+ * with a rolling window under {@code micronaut.retry.circuit-breakers.<name>}.</p>
  *
  * <p>When the route cannot relay a response, because the circuit is open or the last attempt
- * failed, the fallback handler answers the request in process, with the failure as the request
- * attribute {@link GatewayAttributes#FAILURE}. Without a fallback, the request fails with an
- * {@link UpstreamException}, {@code 503} for an open circuit. A fallback cannot read a body
- * that an attempt already sent.</p>
+ * failed, or when the response has one of the {@link #fallbackStatuses() fallback statuses},
+ * none by default, the fallback handler answers the request in process, with the failure as the
+ * request attribute {@link GatewayAttributes#FAILURE}. Without a fallback, the request fails
+ * with an {@link UpstreamException}, {@code 503} for an open circuit, and a response of a
+ * fallback status is relayed.</p>
  *
- * @param name     The name of the circuit
- * @param fallback The fallback handler, or {@code null} for none
+ * @param name             The name of the circuit
+ * @param fallback         The fallback handler, or {@code null} for none
+ * @param failureStatuses  The statuses of a response that count as a failure of the circuit;
+ *                         empty for {@code 500} and above
+ * @param fallbackStatuses The statuses of a response that the fallback answers for instead
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public record GatewayCircuitBreaker(String name, @Nullable AsyncRequestHandler fallback) implements GatewayFilter {
+public record GatewayCircuitBreaker(String name,
+                                    @Nullable AsyncRequestHandler fallback,
+                                    Set<Integer> failureStatuses,
+                                    Set<Integer> fallbackStatuses) implements GatewayFilter {
 
     /**
-     * @param name     The name of the circuit
-     * @param fallback The fallback handler
+     * @param name             The name of the circuit
+     * @param fallback         The fallback handler
+     * @param failureStatuses  The statuses that count as a failure
+     * @param fallbackStatuses The statuses the fallback answers for
      */
     public GatewayCircuitBreaker {
         Objects.requireNonNull(name, "name");
         if (name.isBlank()) {
             throw new IllegalArgumentException("The name of a circuit breaker is blank");
         }
+        failureStatuses = Set.copyOf(Objects.requireNonNull(failureStatuses, "failureStatuses"));
+        fallbackStatuses = Set.copyOf(Objects.requireNonNull(fallbackStatuses, "fallbackStatuses"));
+    }
+
+    /**
+     * @param name     The name of the circuit
+     * @param fallback The fallback handler, or {@code null} for none
+     */
+    public GatewayCircuitBreaker(String name, @Nullable AsyncRequestHandler fallback) {
+        this(name, fallback, Set.of(), Set.of());
+    }
+
+    /**
+     * @param statuses The statuses of a response that count as a failure, instead of {@code 500} and above
+     * @return A copy with the statuses
+     */
+    public GatewayCircuitBreaker withFailureStatuses(Integer... statuses) {
+        return new GatewayCircuitBreaker(name, fallback, Set.of(statuses), fallbackStatuses);
+    }
+
+    /**
+     * @param statuses The statuses of a response that the fallback answers for
+     * @return A copy with the statuses
+     */
+    public GatewayCircuitBreaker withFallbackStatuses(Integer... statuses) {
+        return new GatewayCircuitBreaker(name, fallback, failureStatuses, Set.of(statuses));
+    }
+
+    /**
+     * @param status The status of a response
+     * @return Whether it counts as a failure of the circuit
+     */
+    public boolean isFailure(int status) {
+        return failureStatuses.isEmpty() ? status >= 500 : failureStatuses.contains(status);
+    }
+
+    /**
+     * @param status The status of a response
+     * @return Whether the fallback answers for it, when there is one
+     */
+    public boolean fallsBackOn(int status) {
+        return fallback != null && fallbackStatuses.contains(status);
     }
 
     /**

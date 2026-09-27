@@ -102,6 +102,9 @@ class ResilienceTest extends GatewayTestBase {
         p.put("micronaut.http.services.stale.urls", List.of("${test.scripted}"));
         p.put("micronaut.http.services.sticky.urls", List.of(dead, one));
         p.put("micronaut.retry.circuit-breakers.recovering.reset", "1s");
+        p.put("micronaut.retry.circuit-breakers.windowed.request-volume-threshold", 3);
+        p.put("micronaut.retry.circuit-breakers.windowed.failure-ratio", 1);
+        p.put("micronaut.retry.circuit-breakers.windowed.reset", "1m");
         p.put("micronaut.retry.circuit-breakers.shared.reset", "1m");
         p.put("micronaut.server.cors.enabled", true);
         p.put("micronaut.server.cors.configurations.web.allowed-origins", List.of("https://app.example"));
@@ -314,6 +317,48 @@ class ResilienceTest extends GatewayTestBase {
     }
 
     @Test
+    void cb04OnlyTheConfiguredStatusesCountAsFailures() throws IOException {
+        // 500 is not a failure of this route: the circuit stays closed
+        for (int i = 0; i < 3; i++) {
+            assertEquals(500, get("/cb-statuses/up/status/500").status());
+        }
+        assertEquals(CircuitState.CLOSED, circuitBreakers().findState("statuses").orElseThrow());
+        assertEquals(503, get("/cb-statuses/up/status/503").status());
+        assertEquals(CircuitState.OPEN, circuitBreakers().findState("statuses").orElseThrow());
+        RawHttp.Response open = get("/cb-statuses/up/status/200");
+        assertEquals(503, open.status(), "an open circuit without a fallback: " + open);
+    }
+
+    @Test
+    void cb08AFallbackStatusIsAnsweredByTheFallbackWithoutTheHeadersOfTheUpstream() throws IOException {
+        RawHttp.Response response = get("/cb-fallback-status/up/status/503");
+        assertEquals(200, response.status(), response.toString());
+        assertTrue(response.text().startsWith("fallback - UpstreamStatusFailure"), response.toString());
+        assertNull(response.header("X-Upstream"));
+        // another 5xx is relayed; only 504 counts for this circuit, which stays closed
+        RawHttp.Response relayed = get("/cb-fallback-status/up/status/500");
+        assertEquals(500, relayed.status());
+        assertEquals("yes", relayed.header("X-Upstream"));
+    }
+
+    @Test
+    void cb02AWindowedCircuitOpensOnTheRatioOfItsWindowAndThenAnswers503() throws IOException {
+        assertEquals(502, get("/cb-windowed/x").status());
+        assertEquals(CircuitState.CLOSED, circuitBreakers().findState("windowed").orElseThrow(), "the window of three is not full");
+        assertEquals(502, get("/cb-windowed/x").status());
+        assertEquals(502, get("/cb-windowed/x").status());
+        assertEquals(CircuitState.OPEN, circuitBreakers().findState("windowed").orElseThrow());
+        var snapshot = circuitBreakers().findSnapshot("windowed").orElseThrow();
+        assertEquals(3, snapshot.requestVolumeThreshold());
+        assertEquals(1, snapshot.openedCount());
+        assertEquals(503, get("/cb-windowed/x").status());
+    }
+
+    private CircuitBreakerRegistry circuitBreakers() {
+        return gateway.getApplicationContext().getBean(CircuitBreakerRegistry.class);
+    }
+
+    @Test
     void cb09TheFallbackResponsePassesTheRouteFiltersAndCors() throws IOException {
         get("/cb-filtered/x");
         RawHttp.Response fallback = get("/cb-filtered/x", "Origin: https://app.example");
@@ -425,6 +470,12 @@ class ResilienceTest extends GatewayTestBase {
                 .circuitBreaker(GatewayCircuitBreaker.of("filtered", fallback)).uri("http://127.0.0.1:" + deadPort);
             gateway.route("cb-shared").path("/cb-shared/**").filters(GatewayFilters.stripPrefix(1))
                 .circuitBreaker(GatewayCircuitBreaker.of("shared")).uri(upstream);
+            gateway.route("cb-statuses").path("/cb-statuses/**").filters(GatewayFilters.stripPrefix(1))
+                .circuitBreaker(GatewayCircuitBreaker.of("statuses").withFailureStatuses(503)).uri(upstream);
+            gateway.route("cb-fallback-status").path("/cb-fallback-status/**").filters(GatewayFilters.stripPrefix(1))
+                .circuitBreaker(GatewayCircuitBreaker.of("fallback-status", fallback).withFallbackStatuses(503).withFailureStatuses(504)).uri(upstream);
+            gateway.route("cb-windowed").path("/cb-windowed/**")
+                .circuitBreaker(GatewayCircuitBreaker.of("windowed")).uri("http://127.0.0.1:" + deadPort);
             gateway.route("cb-recovering").path("/cb-recovering/**").filters(GatewayFilters.stripPrefix(1))
                 .circuitBreaker(GatewayCircuitBreaker.of("recovering")).uri(upstream);
         }

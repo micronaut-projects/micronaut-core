@@ -178,6 +178,8 @@ public final class GatewayArguments {
             }
             if (value == null) {
                 instance[i] = defaultOf(argument.getType());
+            } else if (value instanceof String s && s.isEmpty() && Collection.class.isAssignableFrom(argument.getType())) {
+                instance[i] = List.of();
             } else if (value instanceof String s && s.isEmpty() && !CharSequence.class.isAssignableFrom(argument.getType())) {
                 instance[i] = defaultOf(argument.getType());
             } else {
