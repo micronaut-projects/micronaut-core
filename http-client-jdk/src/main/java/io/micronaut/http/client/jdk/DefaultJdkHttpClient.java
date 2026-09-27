@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.jdk;
 
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
@@ -442,10 +443,23 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * @return The flow of the response
      */
     ExecutionFlow<HttpResponse<?>> rawExchangeFlow(MutableHttpRequest<?> request, @Nullable Thread blockedThread) {
+        return rawExchangeFlow(request, blockedThread, null);
+    }
+
+    /**
+     * The exchange of a raw request, to the service instance the caller selected, if any.
+     *
+     * @param request       The raw request
+     * @param blockedThread The thread that blocks on the response, if any
+     * @param instance      The service instance the caller selected, see
+     *                      {@link io.micronaut.http.client.RawRequestOptions#getServiceInstance()}, or {@code null}
+     * @return The flow of the response
+     */
+    ExecutionFlow<HttpResponse<?>> rawExchangeFlow(MutableHttpRequest<?> request, @Nullable Thread blockedThread, @Nullable ServiceInstance instance) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         request.setAttribute(AbstractJdkHttpClient.RAW_ATTRIBUTE, Boolean.TRUE);
-        return resolveRequestURI(request).flatMap(target -> sendRequestWithRedirects(
+        return (instance == null ? resolveRequestURI(request) : resolveRequestURI(request, instance)).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
             blockedThread,
             request.uri(target.uri()),

@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
@@ -996,7 +997,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         try {
             if (options == null) {
                 NettyRawHttpRequestWrapper<?> rawRequest = new NettyRawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
-                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockedThread, rawRequest));
+                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockedThread, rawRequest, null));
             }
             NettyRawHttpRequestWrapper<Object> rawRequest = new NettyRawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
@@ -1009,7 +1010,8 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             return RawHttpClientSupport.withResponseTimeout(rawRequest.keepReplacedBody(sendRawExchange(
                 propagatedContext,
                 blockedThread,
-                rawRequest
+                rawRequest,
+                options.getServiceInstance()
             )), options.getResponseTimeout(), uploadStarted, uploaded, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
@@ -1019,18 +1021,22 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
     /**
      * Send a raw request. A relative request URI is resolved against the URL of this client
-     * first, like the URI of any other request.
+     * first, like the URI of any other request, or against the service instance the caller
+     * selected.
      *
      * @param propagatedContext The propagated context
      * @param blockedThread     The thread that blocks on the response, if any
      * @param rawRequest        The raw request
+     * @param instance          The service instance the caller selected, see
+     *                          {@link RawRequestOptions#getServiceInstance()}, or {@code null}
      * @return The response flow
      */
-    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
-        if (rawRequest.getUri().getScheme() != null) {
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest,
+                                                           @Nullable ServiceInstance instance) {
+        if (instance == null && rawRequest.getUri().getScheme() != null) {
             return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }
-        return resolveRequestURI(rawRequest).flatMap(target -> sendRequestWithRedirects(
+        return (instance == null ? resolveRequestURI(rawRequest) : resolveRequestURI(rawRequest, instance)).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
             blockedThread,
             rawRequest.uri(target.uri()),

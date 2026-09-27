@@ -265,7 +265,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             uploads = new UploadListener(new CompletableFuture<>(), new CompletableFuture<>());
             request.setAttribute(UPLOAD_LISTENER_ATTRIBUTE, uploads);
         }
-        ExecutionFlow<HttpResponse<?>> flow = pipelineClient().rawExchangeFlow(request, null);
+        ExecutionFlow<HttpResponse<?>> flow = pipelineClient().rawExchangeFlow(request, null, options.getServiceInstance());
         if (uploads != null) {
             flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), uploads.started(), uploads.uploaded());
         }

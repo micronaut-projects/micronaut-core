@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.discovery.ServiceInstance;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -56,6 +57,8 @@ public final class RawRequestOptions {
     @Nullable
     private final Duration readIdleTimeout;
     private final boolean closeOnDiscard;
+    @Nullable
+    private final ServiceInstance serviceInstance;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
@@ -67,6 +70,7 @@ public final class RawRequestOptions {
         this.returnUnsentBody = builder.returnUnsentBody;
         this.readIdleTimeout = builder.readIdleTimeout;
         this.closeOnDiscard = builder.closeOnDiscard;
+        this.serviceInstance = builder.serviceInstance;
     }
 
     /**
@@ -106,7 +110,8 @@ public final class RawRequestOptions {
             .activityTimeout(activityTimeout)
             .returnUnsentBody(returnUnsentBody)
             .readIdleTimeout(readIdleTimeout)
-            .closeOnDiscard(closeOnDiscard);
+            .closeOnDiscard(closeOnDiscard)
+            .serviceInstance(serviceInstance);
     }
 
     /**
@@ -231,6 +236,33 @@ public final class RawRequestOptions {
         return closeOnDiscard;
     }
 
+    /**
+     * The service instance to send the request to, which the caller selected, or {@code null}
+     * for the instance that the load balancer of the client selects. A caller that retries an
+     * exchange selects the instance of each attempt itself, e.g. to leave out the instances it
+     * already tried.
+     *
+     * <p>A relative request URI is resolved against the instance, with the context path of the
+     * client, like against an instance the load balancer of the client selects, and the
+     * {@code Authorization} of the metadata of the instance applies; an absolute request URI is
+     * sent as it is. Either way the exchange is the exchange of the instance: its outcome is
+     * reported to the load balancer of the client, see
+     * {@link LoadBalancer#report(ServiceInstance, LoadBalancer.Outcome)}, and a request that was
+     * not sent fails with an
+     * {@link io.micronaut.http.client.exceptions.UnprocessedRequestException} that names the
+     * instance. Select the instance from the load balancer of the client, e.g. for the client of a
+     * service id, from {@link LoadBalancerResolver#resolve(String...)} of that id, so that the
+     * outcomes count for the instances it selects, e.g. for the outlier detection. A client
+     * without a load balancer, e.g. one created without a URL, reports no outcome. Defaults to
+     * {@code null}.</p>
+     *
+     * @return The service instance, or {@code null}
+     * @since 5.3.0
+     */
+    public @Nullable ServiceInstance getServiceInstance() {
+        return serviceInstance;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof RawRequestOptions that &&
@@ -242,12 +274,13 @@ public final class RawRequestOptions {
             Objects.equals(activityTimeout, that.activityTimeout) &&
             returnUnsentBody == that.returnUnsentBody &&
             Objects.equals(readIdleTimeout, that.readIdleTimeout) &&
-            closeOnDiscard == that.closeOnDiscard;
+            closeOnDiscard == that.closeOnDiscard &&
+            Objects.equals(serviceInstance, that.serviceInstance);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard, serviceInstance);
     }
 
     @Override
@@ -262,6 +295,7 @@ public final class RawRequestOptions {
             ", returnUnsentBody=" + returnUnsentBody +
             ", readIdleTimeout=" + readIdleTimeout +
             ", closeOnDiscard=" + closeOnDiscard +
+            ", serviceInstance=" + (serviceInstance == null ? null : serviceInstance.getId() + " " + serviceInstance.getURI()) +
             '}';
     }
 
@@ -281,6 +315,8 @@ public final class RawRequestOptions {
         @Nullable
         private Duration readIdleTimeout;
         private boolean closeOnDiscard;
+        @Nullable
+        private ServiceInstance serviceInstance;
 
         private Builder() {
         }
@@ -315,6 +351,16 @@ public final class RawRequestOptions {
          */
         public Builder returnUnsentBody(boolean returnUnsentBody) {
             this.returnUnsentBody = returnUnsentBody;
+            return this;
+        }
+
+        /**
+         * @param serviceInstance See {@link RawRequestOptions#getServiceInstance()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder serviceInstance(@Nullable ServiceInstance serviceInstance) {
+            this.serviceInstance = serviceInstance;
             return this;
         }
 

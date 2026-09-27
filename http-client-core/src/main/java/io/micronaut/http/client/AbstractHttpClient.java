@@ -509,6 +509,50 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
+     * Resolve the target of a request to a service instance the caller selected, e.g. a gateway
+     * that selects the instance of each attempt itself, see
+     * {@link RawRequestOptions#getServiceInstance()}. A relative request URI is resolved against
+     * the instance with the context path and the authorization of the client; an absolute one is
+     * sent as it is. Either way the outcome is reported for the instance to the load balancer of
+     * the client, if it has one.
+     *
+     * @param request  The request
+     * @param instance The service instance
+     * @return A flow with the resolved target
+     */
+    public ExecutionFlow<ResolvedTarget> resolveRequestURI(HttpRequest<?> request, ServiceInstance instance) {
+        LoadBalancer balancer = loadBalancer;
+        LoadBalancerSelection selection = balancer == null ? null : new LoadBalancerSelection(balancer, instance);
+        URI requestURI = request.getUri();
+        if (requestURI.getScheme() != null) {
+            return ExecutionFlow.just(new ResolvedTarget(requestURI, selection));
+        }
+        try {
+            applyAuthorization(request, instance);
+            return ExecutionFlow.just(new ResolvedTarget(resolveAgainst(instance, requestURI, true), selection));
+        } catch (RuntimeException e) {
+            if (selection != null) {
+                selection.release();
+            }
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * Give a request the {@code Authorization} of the metadata of the service instance it is sent
+     * to, if it has one.
+     *
+     * @param request The request
+     * @param server  The service instance
+     */
+    private static void applyAuthorization(HttpRequest<?> request, ServiceInstance server) {
+        Optional<String> authInfo = server.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class);
+        if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
+            httpRequest.getHeaders().auth(authInfo.get());
+        }
+    }
+
+    /**
      * @param parentRequest The parent request
      * @param request       The redirect location request
      * @param <I>           The input type
@@ -566,11 +610,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         LoadBalancer balancer = loadBalancer;
         return selected.map(server -> {
                 LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
-                Optional<String> authInfo = server.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class);
-                if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
-                    httpRequest.getHeaders().auth(authInfo.get());
-                }
-
+                applyAuthorization(request, server);
                 try {
                     return new ResolvedTarget(resolveAgainst(server, requestURI, includeContextPath), selection);
                 } catch (RuntimeException e) {
