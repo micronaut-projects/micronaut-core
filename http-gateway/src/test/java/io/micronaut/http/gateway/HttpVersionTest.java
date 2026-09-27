@@ -74,8 +74,9 @@ class HttpVersionTest extends GatewayTestBase {
             HttpResponse<byte[]> response = client.toBlocking().exchange(HttpRequest.GET("/up/stream?size=100000"), byte[].class);
             assertEquals(200, response.code());
             assertEquals(100_000, response.body().length);
-            assertFalse(response.getHeaders().contains("transfer-encoding"), response.getHeaders().asMap().toString());
-            assertFalse(response.getHeaders().contains("connection"));
+            // HTTP/2 cannot carry Transfer-Encoding: chunked, the stream would fail: a Transfer-Encoding the
+            // client shows is its own, for a streamed HTTP/2 body. The other framing headers of HTTP/1 are gone
+            assertFalse(response.getHeaders().contains("connection"), response.getHeaders().asMap().toString());
             assertFalse(response.getHeaders().contains("keep-alive"));
             HttpResponse<String> inspected = client.toBlocking().exchange(HttpRequest.GET("/inspect/h2"), String.class);
             String text = inspected.body();

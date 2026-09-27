@@ -125,7 +125,10 @@ final class DefaultProxyHandler implements ProxyHandler {
     @Override
     public CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables) {
         request.setAttribute(GatewayAttributes.ROUTE_ID, route.getId());
-        String rejected = ProxyPaths.rejection(request.getPath());
+        String rejected = hostRejection(request);
+        if (rejected == null) {
+            rejected = ProxyPaths.rejection(request.getPath());
+        }
         if (rejected != null) {
             return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.BAD_REQUEST, rejected));
         }
@@ -152,6 +155,37 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         Relay relay = new Relay(request, pathVariables, exchange, upstream, body);
         return relay.start();
+    }
+
+    /**
+     * The {@code Host} of a request a gateway relays: at most one, and a host with an optional
+     * port only, so that it cannot be read as another target, e.g. {@code evil.example/path} or
+     * {@code user@evil.example}.
+     *
+     * @param request The request
+     * @return The reason it is rejected, or {@code null}
+     */
+    static @Nullable String hostRejection(HttpRequest<?> request) {
+        List<String> hosts = request.getHeaders().getAll(HttpHeaders.HOST);
+        if (hosts.size() > 1) {
+            return "Several Host headers";
+        }
+        if (hosts.isEmpty()) {
+            return null;
+        }
+        String host = hosts.get(0);
+        if (host.isEmpty()) {
+            return "An empty Host header";
+        }
+        for (int i = 0; i < host.length(); i++) {
+            char c = host.charAt(i);
+            boolean allowed = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
+                || c == '.' || c == '-' || c == '_' || c == ':' || c == '[' || c == ']' || c == '%' || c == '~';
+            if (!allowed) {
+                return "An invalid Host header";
+            }
+        }
+        return null;
     }
 
     /**
