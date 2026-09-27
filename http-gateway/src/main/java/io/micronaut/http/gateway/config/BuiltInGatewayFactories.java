@@ -1,0 +1,560 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.http.gateway.config;
+
+import io.micronaut.context.BeanLocator;
+import io.micronaut.web.router.builder.RouteFilterSpec;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.gateway.GatewayCircuitBreaker;
+import io.micronaut.http.gateway.GatewayConfiguration;
+import io.micronaut.http.gateway.GatewayFilters;
+import io.micronaut.http.gateway.GatewayRetry;
+import io.micronaut.http.server.util.ForwardedHeaders;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.web.router.builder.AsyncRequestHandler;
+import io.micronaut.web.router.builder.Cidr;
+import io.micronaut.web.router.builder.RequestHandler;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.ValueMatcher;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
+
+import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
+
+/**
+ * The predicates and filters of the gateway routes of the configuration, named after their
+ * Spring Cloud Gateway equivalents.
+ *
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Internal
+@Factory
+final class BuiltInGatewayFactories {
+
+    private static final List<String> NAME_VALUE = List.of("name", "value");
+
+    // ---- predicates
+
+    @Singleton
+    @Named("Path")
+    GatewayPredicateFactory path() {
+        return GatewayPredicateFactory.of(List.of("*patterns"), (route, args) -> {
+            List<String> patterns = args.getList("patterns");
+            if (patterns.isEmpty()) {
+                throw new ConfigurationException("The Path predicate needs a pattern: " + args);
+            }
+            route.path(patterns.toArray(String[]::new));
+        });
+    }
+
+    @Singleton
+    @Named("Method")
+    GatewayPredicateFactory method() {
+        return GatewayPredicateFactory.of(List.of("*methods"), (route, args) -> {
+            List<String> methods = args.getList("methods");
+            List<String> upper = new ArrayList<>(methods.size());
+            for (String method : methods) {
+                upper.add(method.toUpperCase(Locale.ROOT));
+            }
+            route.where(RequestCondition.method(upper.toArray(String[]::new)));
+        });
+    }
+
+    @Singleton
+    @Named("Header")
+    GatewayPredicateFactory header() {
+        return GatewayPredicateFactory.of(List.of("header", "regexp"), (route, args) -> {
+            String name = args.get("header");
+            Optional<String> regexp = args.find("regexp");
+            route.where(regexp.isPresent() ? RequestCondition.header(name, ValueMatcher.regex(regexp.get())) : RequestCondition.header(name));
+        });
+    }
+
+    @Singleton
+    @Named("Query")
+    GatewayPredicateFactory query() {
+        return GatewayPredicateFactory.of(List.of("param", "regexp"), (route, args) -> {
+            String name = args.get("param");
+            Optional<String> regexp = args.find("regexp");
+            route.where(regexp.isPresent() ? RequestCondition.query(name, ValueMatcher.regex(regexp.get())) : RequestCondition.query(name));
+        });
+    }
+
+    @Singleton
+    @Named("Cookie")
+    GatewayPredicateFactory cookie() {
+        return GatewayPredicateFactory.of(List.of("name", "regexp"), (route, args) -> {
+            String name = args.get("name");
+            Optional<String> regexp = args.find("regexp");
+            route.where(regexp.isPresent() ? RequestCondition.cookie(name, ValueMatcher.regex(regexp.get())) : RequestCondition.cookie(name));
+        });
+    }
+
+    @Singleton
+    @Named("Host")
+    GatewayPredicateFactory host() {
+        return GatewayPredicateFactory.of(List.of("*patterns"), (route, args) -> {
+            List<String> patterns = args.getList("patterns");
+            if (patterns.isEmpty()) {
+                throw new ConfigurationException("The Host predicate needs a pattern: " + args);
+            }
+            List<ValueMatcher> matchers = new ArrayList<>(patterns.size());
+            for (String pattern : patterns) {
+                matchers.add(hostMatcher(pattern));
+            }
+            route.where(RequestCondition.host(matchers.size() == 1 ? matchers.get(0) : ValueMatcher.anyOf(matchers.toArray(ValueMatcher[]::new))));
+        });
+    }
+
+    /**
+     * A host pattern of Spring Cloud Gateway: {@code **} any labels, {@code *} or
+     * {@code {name}} one label, e.g. {@code **.example.org} or {@code {sub}.example.org}. A port
+     * in the pattern is ignored: the condition compares the host without its port.
+     *
+     * @param pattern The pattern
+     * @return The matcher of the host
+     */
+    static ValueMatcher hostMatcher(String pattern) {
+        String p = pattern.strip().toLowerCase(Locale.ROOT);
+        int colon = p.lastIndexOf(':');
+        if (colon > p.lastIndexOf(']')) {
+            p = p.substring(0, colon);
+        }
+        if (p.endsWith(".")) {
+            p = p.substring(0, p.length() - 1);
+        }
+        if (p.indexOf('*') < 0 && p.indexOf('{') < 0) {
+            return ValueMatcher.equalTo(p);
+        }
+        StringBuilder regex = new StringBuilder();
+        String[] labels = p.split("\\.", -1);
+        for (int i = 0; i < labels.length; i++) {
+            String label = labels[i];
+            if (label.equals("**")) {
+                regex.append("(?:[^.]+\\.)*[^.]+");
+            } else if (label.equals("*") || label.startsWith("{") && label.endsWith("}")) {
+                regex.append("[^.]+");
+            } else {
+                regex.append(Pattern.quote(label));
+            }
+            if (i < labels.length - 1) {
+                regex.append("\\.");
+            }
+        }
+        return ValueMatcher.regex(regex.toString());
+    }
+
+    @Singleton
+    @Named("RemoteAddr")
+    GatewayPredicateFactory remoteAddr() {
+        return GatewayPredicateFactory.of(List.of("*sources"), (route, args) -> route.where(RequestCondition.peerAddress(args.getList("sources").toArray(String[]::new))));
+    }
+
+    @Singleton
+    @Named("XForwardedRemoteAddr")
+    GatewayPredicateFactory xForwardedRemoteAddr(GatewayConfiguration configuration) {
+        List<Cidr> trusted = new ArrayList<>();
+        for (String range : configuration.getForwarded().getTrustedProxies()) {
+            trusted.add(Cidr.parse(range));
+        }
+        return GatewayPredicateFactory.of(List.of("*sources"), (route, args) -> {
+            List<Cidr> sources = new ArrayList<>();
+            for (String source : args.getList("sources")) {
+                sources.add(Cidr.parse(source));
+            }
+            route.where(RequestCondition.custom(request -> {
+                byte[] client = clientAddress(request, trusted);
+                return client != null && sources.stream().anyMatch(range -> range.contains(client));
+            }));
+        });
+    }
+
+    /**
+     * The address of the client: the right-most address of {@code X-Forwarded-For} that is not a
+     * trusted proxy, walking from the right while the addresses are trusted proxies, when the
+     * peer is a trusted proxy; otherwise the peer.
+     *
+     * @param request The request
+     * @param trusted The trusted proxies
+     * @return The address, or {@code null}
+     */
+    static byte @Nullable [] clientAddress(HttpRequest<?> request, List<Cidr> trusted) {
+        InetSocketAddress peer = request.getRemoteAddress();
+        byte[] address = peer == null || peer.getAddress() == null ? null : Cidr.address(peer.getAddress().getHostAddress());
+        if (address == null || !isTrusted(address, trusted)) {
+            return address;
+        }
+        List<String> hops = new ArrayList<>();
+        for (String value : request.getHeaders().getAll(ForwardedHeaders.X_FORWARDED_FOR)) {
+            for (String hop : value.split(",")) {
+                hops.add(hop.strip());
+            }
+        }
+        for (int i = hops.size() - 1; i >= 0; i--) {
+            byte[] hop = Cidr.address(hops.get(i));
+            if (hop == null) {
+                return null;
+            }
+            address = hop;
+            if (!isTrusted(hop, trusted)) {
+                return hop;
+            }
+        }
+        return address;
+    }
+
+    private static boolean isTrusted(byte[] address, List<Cidr> trusted) {
+        for (Cidr range : trusted) {
+            if (range.contains(address)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Singleton
+    @Named("After")
+    GatewayPredicateFactory after() {
+        return GatewayPredicateFactory.of(List.of("datetime"), (route, args) -> route.where(RequestCondition.after(instant(args.get("datetime")))));
+    }
+
+    @Singleton
+    @Named("Before")
+    GatewayPredicateFactory before() {
+        return GatewayPredicateFactory.of(List.of("datetime"), (route, args) -> route.where(RequestCondition.before(instant(args.get("datetime")))));
+    }
+
+    @Singleton
+    @Named("Between")
+    GatewayPredicateFactory between() {
+        return GatewayPredicateFactory.of(List.of("datetime1", "datetime2"), (route, args) ->
+            route.where(RequestCondition.between(instant(args.get("datetime1")), instant(args.get("datetime2")))));
+    }
+
+    /**
+     * @param value An ISO date-time with a zone, or epoch millis
+     * @return The instant
+     */
+    static Instant instant(String value) {
+        String v = value.strip();
+        try {
+            return Instant.ofEpochMilli(Long.parseLong(v));
+        } catch (NumberFormatException e) {
+            try {
+                return ZonedDateTime.parse(v).toInstant();
+            } catch (DateTimeParseException ex) {
+                throw new ConfigurationException("Not a date-time with a zone or epoch millis: " + value, ex);
+            }
+        }
+    }
+
+    // ---- filters
+
+    @Singleton
+    @Named("StripPrefix")
+    GatewayFilterFactory stripPrefix() {
+        return GatewayFilterFactory.of(List.of("parts"), args -> GatewayFilters.stripPrefix(args.get("parts", Integer.class, 1)));
+    }
+
+    @Singleton
+    @Named("PrefixPath")
+    GatewayFilterFactory prefixPath() {
+        return GatewayFilterFactory.of(List.of("prefix"), args -> GatewayFilters.prefixPath(args.get("prefix")));
+    }
+
+    @Singleton
+    @Named("SetPath")
+    GatewayFilterFactory setPath() {
+        return GatewayFilterFactory.of(List.of("template"), args -> GatewayFilters.setPath(args.get("template")));
+    }
+
+    @Singleton
+    @Named("RewritePath")
+    GatewayFilterFactory rewritePath() {
+        return GatewayFilterFactory.of(List.of("regexp", "replacement"), args -> GatewayFilters.rewritePath(args.get("regexp"), args.find("replacement").orElse("")));
+    }
+
+    @Singleton
+    @Named("AddRequestHeader")
+    GatewayFilterFactory addRequestHeader() {
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addRequestHeader(args.get("name"), args.find("value").orElse("")));
+    }
+
+    @Singleton
+    @Named("AddRequestHeadersIfNotPresent")
+    GatewayFilterFactory addRequestHeadersIfNotPresent() {
+        // name:value pairs, e.g. AddRequestHeadersIfNotPresent=X-A:1,X-B:2
+        return GatewayFilterFactory.of(List.of("*headers"), args -> {
+            List<io.micronaut.http.gateway.GatewayFilter> filters = new ArrayList<>();
+            for (String pair : args.getList("headers")) {
+                int colon = pair.indexOf(':');
+                if (colon <= 0) {
+                    throw new ConfigurationException("AddRequestHeadersIfNotPresent takes name:value pairs: " + pair);
+                }
+                filters.add(GatewayFilters.addRequestHeaderIfNotPresent(pair.substring(0, colon).strip(), pair.substring(colon + 1).strip()));
+            }
+            return new CompositeFilter(List.copyOf(filters));
+        });
+    }
+
+    @Singleton
+    @Named("SetRequestHeader")
+    GatewayFilterFactory setRequestHeader() {
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.setRequestHeader(args.get("name"), args.find("value").orElse("")));
+    }
+
+    @Singleton
+    @Named("RemoveRequestHeader")
+    GatewayFilterFactory removeRequestHeader() {
+        return GatewayFilterFactory.of(List.of("name"), args -> GatewayFilters.removeRequestHeader(args.get("name")));
+    }
+
+    @Singleton
+    @Named("MapRequestHeader")
+    GatewayFilterFactory mapRequestHeader() {
+        return GatewayFilterFactory.of(List.of("from-header", "to-header"), args -> GatewayFilters.mapRequestHeader(args.get("from-header"), args.get("to-header")));
+    }
+
+    @Singleton
+    @Named("AddRequestParameter")
+    GatewayFilterFactory addRequestParameter() {
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addRequestParameter(args.get("name"), args.find("value").orElse("")));
+    }
+
+    @Singleton
+    @Named("RemoveRequestParameter")
+    GatewayFilterFactory removeRequestParameter() {
+        return GatewayFilterFactory.of(List.of("name"), args -> GatewayFilters.removeRequestParameter(args.get("name")));
+    }
+
+    @Singleton
+    @Named("AddResponseHeader")
+    GatewayFilterFactory addResponseHeader() {
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.addResponseHeader(args.get("name"), args.find("value").orElse("")));
+    }
+
+    @Singleton
+    @Named("SetResponseHeader")
+    GatewayFilterFactory setResponseHeader() {
+        return GatewayFilterFactory.of(NAME_VALUE, args -> GatewayFilters.setResponseHeader(args.get("name"), args.find("value").orElse("")));
+    }
+
+    @Singleton
+    @Named("RemoveResponseHeader")
+    GatewayFilterFactory removeResponseHeader() {
+        return GatewayFilterFactory.of(List.of("name"), args -> GatewayFilters.removeResponseHeader(args.get("name")));
+    }
+
+    @Singleton
+    @Named("RewriteResponseHeader")
+    GatewayFilterFactory rewriteResponseHeader() {
+        return GatewayFilterFactory.of(List.of("name", "regexp", "replacement"), args ->
+            GatewayFilters.rewriteResponseHeader(args.get("name"), args.get("regexp"), args.find("replacement").orElse("")));
+    }
+
+    @Singleton
+    @Named("DedupeResponseHeader")
+    GatewayFilterFactory dedupeResponseHeader() {
+        return GatewayFilterFactory.of(List.of("name", "strategy"), args -> {
+            List<String> names = new ArrayList<>();
+            for (String header : args.get("name").split("\\s+")) {
+                if (!header.isBlank()) {
+                    names.add(header);
+                }
+            }
+            String name = args.find("strategy").orElse("RETAIN_FIRST").strip().toUpperCase(Locale.ROOT);
+            GatewayFilters.DedupeStrategy strategy = switch (name) {
+                case "RETAIN_FIRST" -> GatewayFilters.DedupeStrategy.RETAIN_FIRST;
+                case "RETAIN_LAST" -> GatewayFilters.DedupeStrategy.RETAIN_LAST;
+                case "RETAIN_UNIQUE" -> GatewayFilters.DedupeStrategy.RETAIN_UNIQUE;
+                default -> throw new ConfigurationException("Unknown strategy of DedupeResponseHeader: " + name);
+            };
+            return GatewayFilters.dedupeResponseHeader(names, strategy);
+        });
+    }
+
+    @Singleton
+    @Named("RewriteLocationResponseHeader")
+    GatewayFilterFactory rewriteLocationResponseHeader() {
+        return GatewayFilterFactory.of(List.of(), args -> GatewayFilters.rewriteLocationResponseHeader());
+    }
+
+    @Singleton
+    @Named("PreserveHostHeader")
+    GatewayFilterFactory preserveHostHeader() {
+        return GatewayFilterFactory.of(List.of(), args -> GatewayFilters.preserveHostHeader());
+    }
+
+    @Singleton
+    @Named("SetRequestHostHeader")
+    GatewayFilterFactory setRequestHostHeader() {
+        return GatewayFilterFactory.of(List.of("host"), args -> GatewayFilters.setRequestHostHeader(args.get("host")));
+    }
+
+    @Singleton
+    @Named("SecureHeaders")
+    GatewayFilterFactory secureHeaders() {
+        return GatewayFilterFactory.of(List.of(), args -> GatewayFilters.secureHeaders());
+    }
+
+    @Singleton
+    @Named("SetStatus")
+    GatewayFilterFactory setStatus() {
+        return GatewayFilterFactory.of(List.of("status"), args -> GatewayFilters.setStatus(status(args.get("status"))));
+    }
+
+    @Singleton
+    @Named("RedirectTo")
+    GatewayFilterFactory redirectTo() {
+        return GatewayFilterFactory.of(List.of("status", "url"), args -> GatewayFilters.redirectTo(status(args.get("status")), args.get("url")));
+    }
+
+    @Singleton
+    @Named("Retry")
+    GatewayFilterFactory retry() {
+        return GatewayFilterFactory.of(List.of("retries"), args -> {
+            RetryArguments bound = args.bind(RetryArguments.class);
+            Set<Integer> statuses = new LinkedHashSet<>();
+            for (String status : bound.statuses()) {
+                statuses.add(status(status));
+            }
+            return new GatewayRetry(bound.retries(), Set.copyOf(bound.methods()), statuses, bound.delay(), bound.multiplier(), bound.jitter());
+        });
+    }
+
+    @Singleton
+    @Named("CircuitBreaker")
+    GatewayFilterFactory circuitBreaker(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of("name", "fallback"), args -> {
+            CircuitBreakerArguments bound = args.bind(CircuitBreakerArguments.class);
+            String fallback = bound.fallback();
+            if (fallback == null || fallback.isBlank()) {
+                return GatewayCircuitBreaker.of(bound.name());
+            }
+            if (fallback.startsWith("forward:")) {
+                throw new ConfigurationException("A gateway fallback is the name of a handler bean, not a forward: URI: " + fallback);
+            }
+            Optional<AsyncRequestHandler> async = beanLocator.findBean(AsyncRequestHandler.class, Qualifiers.byName(fallback));
+            if (async.isPresent()) {
+                return GatewayCircuitBreaker.of(bound.name(), async.get());
+            }
+            RequestHandler handler = beanLocator.findBean(RequestHandler.class, Qualifiers.byName(fallback))
+                .orElseThrow(() -> new ConfigurationException("No AsyncRequestHandler or RequestHandler bean named " + fallback + " for the fallback of the circuit breaker " + bound.name()));
+            return GatewayCircuitBreaker.of(bound.name(), (request, pathVariables) -> CompletableFuture.completedFuture(handler.handle(request, pathVariables)));
+        });
+    }
+
+    /**
+     * @param status A status code or the name of a status, e.g. {@code 503} or {@code SERVICE_UNAVAILABLE}
+     * @return The status code
+     */
+    static int status(String status) {
+        String s = status.strip();
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            String name = s.toUpperCase(Locale.ROOT);
+            for (HttpStatus value : HttpStatus.values()) {
+                if (value.name().equals(name)) {
+                    return value.getCode();
+                }
+            }
+            throw new ConfigurationException("Not a status: " + status, e);
+        }
+    }
+
+    /**
+     * The arguments of the {@code Retry} filter.
+     *
+     * @param retries    The number of retries
+     * @param methods    The methods
+     * @param statuses   The statuses, codes or names
+     * @param delay      The delay before the first retry
+     * @param multiplier The multiplier of the delay
+     * @param jitter     The jitter
+     */
+    @Introspected
+    record RetryArguments(@Bindable(defaultValue = "3") int retries,
+                          @Bindable(defaultValue = "GET,HEAD") List<String> methods,
+                          @Bindable(defaultValue = "502,503,504") List<String> statuses,
+                          @Bindable(defaultValue = "50ms") Duration delay,
+                          @Bindable(defaultValue = "2") double multiplier,
+                          @Bindable(defaultValue = "0") double jitter) {
+    }
+
+    /**
+     * The arguments of the {@code CircuitBreaker} filter.
+     *
+     * @param name     The name of the circuit
+     * @param fallback The name of the fallback handler bean, if any
+     */
+    @Introspected
+    record CircuitBreakerArguments(String name, @Nullable String fallback) {
+    }
+
+    /**
+     * Filters applied as one, e.g. the headers of {@code AddRequestHeadersIfNotPresent}.
+     *
+     * @param filters The filters
+     */
+    private record CompositeFilter(List<io.micronaut.http.gateway.GatewayFilter> filters) implements io.micronaut.http.gateway.GatewayFilter {
+        @Override
+        public void filterRequest(io.micronaut.http.gateway.ProxyExchange exchange, io.micronaut.http.MutableHttpRequest<?> request) throws Exception {
+            for (io.micronaut.http.gateway.GatewayFilter filter : filters) {
+                filter.filterRequest(exchange, request);
+            }
+        }
+
+        @Override
+        public void filterResponse(io.micronaut.http.gateway.ProxyExchange exchange, io.micronaut.http.MutableHttpResponse<?> response) throws Exception {
+            for (io.micronaut.http.gateway.GatewayFilter filter : filters) {
+                filter.filterResponse(exchange, response);
+            }
+        }
+
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            for (io.micronaut.http.gateway.GatewayFilter filter : filters) {
+                filter.configure(route);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return filters.toString();
+        }
+    }
+}

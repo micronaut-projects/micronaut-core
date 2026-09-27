@@ -1,0 +1,47 @@
+micronaut:
+  gateway:
+    default-filters:
+      - AddResponseHeader=X-Gateway-Default, on
+    routes:
+      yaml-inspect:
+        uri: ${test.upstream}
+        order: 5
+        predicates:
+          - Path=/yaml/inspect/**
+          - name: Header
+            args:
+              header: X-Yaml
+              regexp: "y.+"
+        filters:
+          - StripPrefix=1
+          - AddRequestHeader=X-Added, from-yaml
+          - name: AddRequestParameter
+            args:
+              name: extra
+              value: "a b"
+          - SetResponseHeader=X-Route, yaml-inspect
+        metadata:
+          team: orders
+      yaml-methods:
+        uri: ${test.upstream}
+        predicates:
+          - Path=/yaml/methods/**
+          - Method=GET,POST
+        filters:
+          - RewritePath=/yaml/methods/(?<rest>.*), /inspect/$\{rest}
+      yaml-retry:
+        uri: ${test.upstream}
+        predicates:
+          - Path=/yaml/flaky/**
+        filters:
+          - StripPrefix=1
+          - name: Retry
+            args:
+              retries: 2
+              statuses: SERVICE_UNAVAILABLE
+              delay: 1ms
+      yaml-disabled:
+        enabled: false
+        uri: ${test.upstream}
+        predicates:
+          - Path=/yaml/disabled/**
