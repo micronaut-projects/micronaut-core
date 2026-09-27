@@ -45,6 +45,7 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.util.StrictPathCheck;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -84,6 +85,8 @@ public class RequestLifecycle {
 
     private final RouteExecutor routeExecutor;
     private final boolean multipartEnabled;
+    private final boolean strictPathCheck;
+    private final boolean strictPathCheckAllowSemicolon;
     @Nullable
     private HttpRequest<?> request;
 
@@ -94,6 +97,8 @@ public class RequestLifecycle {
         this.routeExecutor = Objects.requireNonNull(routeExecutor, "routeExecutor");
         Optional<Boolean> isMultiPartEnabled = routeExecutor.serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
+        this.strictPathCheck = routeExecutor.serverConfiguration.isStrictPathCheck();
+        this.strictPathCheckAllowSemicolon = routeExecutor.serverConfiguration.isStrictPathCheckAllowSemicolon();
     }
 
     /**
@@ -152,6 +157,15 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> normalFlow(@Nullable HttpRequest<?> request) {
         try {
             Objects.requireNonNull(request, "request");
+            if (strictPathCheck) {
+                String rejected = StrictPathCheck.rejection(request.getPath(), strictPathCheckAllowSemicolon);
+                if (rejected != null) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Rejected the path of the request {} {}: {}", request.getMethodName(), request.getPath(), rejected);
+                    }
+                    return onStatusError(request, HttpResponse.status(HttpStatus.BAD_REQUEST), rejected);
+                }
+            }
             if (!multipartEnabled) {
                 MediaType contentType = request.getContentType().orElse(null);
                 if (contentType != null &&

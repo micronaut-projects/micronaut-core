@@ -193,6 +193,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     private boolean escapeHtmlUrl = false;
     private boolean notFoundOnMissingBody = true;
     private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
+    private boolean strictPathCheck;
+    private boolean strictPathCheckAllowSemicolon;
     private int maxParams = DEFAULT_MAX_PARAMS;
 
     /**
@@ -745,6 +747,51 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      */
     public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
         this.semicolonIsNormalChar = semicolonIsNormalChar;
+    }
+
+    /**
+     * Whether the server answers a request whose raw path is ambiguous with {@code 400}, before
+     * the filters and the routing: a dot segment, also percent-encoded, an encoded slash or
+     * backslash, a backslash, a semicolon, an encoded or raw control character or a malformed
+     * percent-encoding, see {@link io.micronaut.http.server.util.StrictPathCheck}. The router
+     * and the filters match the raw path as it is, so such a path could reach a route, or pass a
+     * filter that secures a path, that another server resolving it would not.
+     *
+     * @return {@code true} to reject such a path; {@code false}, the default, to route it
+     * @since 5.3.0
+     */
+    public boolean isStrictPathCheck() {
+        return strictPathCheck;
+    }
+
+    /**
+     * @param strictPathCheck Whether to reject a request whose raw path is ambiguous
+     * @see #isStrictPathCheck()
+     * @since 5.3.0
+     */
+    public void setStrictPathCheck(boolean strictPathCheck) {
+        this.strictPathCheck = strictPathCheck;
+    }
+
+    /**
+     * Whether the {@link #isStrictPathCheck() strict path check} allows a semicolon, the start
+     * of path parameters, e.g. {@code /items;jsessionid=1}. The part of a segment before its
+     * first semicolon still must not be a dot segment, e.g. {@code ..;/}.
+     *
+     * @return {@code true} to allow semicolons; {@code false}, the default, to reject them
+     * @since 5.3.0
+     */
+    public boolean isStrictPathCheckAllowSemicolon() {
+        return strictPathCheckAllowSemicolon;
+    }
+
+    /**
+     * @param strictPathCheckAllowSemicolon Whether the strict path check allows semicolons
+     * @see #isStrictPathCheckAllowSemicolon()
+     * @since 5.3.0
+     */
+    public void setStrictPathCheckAllowSemicolon(boolean strictPathCheckAllowSemicolon) {
+        this.strictPathCheckAllowSemicolon = strictPathCheckAllowSemicolon;
     }
 
     /**
