@@ -18,6 +18,7 @@ package io.micronaut.http.client.exceptions;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
+import io.micronaut.http.body.CloseableByteBody;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
@@ -46,6 +47,8 @@ public class UnprocessedRequestException extends HttpClientException {
     @Nullable
     private transient ServiceInstance serviceInstance;
     private boolean targetSet;
+    @Nullable
+    private transient volatile CloseableByteBody unsentBody;
 
     /**
      * @param reason  Why the request was not sent
@@ -92,6 +95,47 @@ public class UnprocessedRequestException extends HttpClientException {
         targetSet = true;
         this.uri = uri;
         this.serviceInstance = serviceInstance;
+    }
+
+    /**
+     * Take the body of the request that was never read, if the exchange asked for it, see
+     * {@code RawRequestOptions#isReturnUnsentBody()}. The caller owns it and closes it.
+     *
+     * @return The body, empty if there is none or it was taken already
+     * @since 5.3.0
+     */
+    public final Optional<CloseableByteBody> takeUnsentBody() {
+        CloseableByteBody body;
+        synchronized (this) {
+            body = unsentBody;
+            unsentBody = null;
+        }
+        return Optional.ofNullable(body);
+    }
+
+    /**
+     * Hand the body that was never read back to the caller. <b>Internal API.</b>
+     *
+     * @param body The body
+     * @return Whether it was handed back; {@code false} if this exception carries one already
+     * @since 5.3.0
+     */
+    @Internal
+    public final synchronized boolean returnUnsentBody(CloseableByteBody body) {
+        if (unsentBody != null) {
+            return false;
+        }
+        unsentBody = body;
+        return true;
+    }
+
+    /**
+     * @return Whether the request was surely not read at all, e.g. the connection could not be
+     * opened, so that its body is untouched
+     * @since 5.3.0
+     */
+    public final boolean isBodyUntouched() {
+        return reason == Reason.CONNECT || reason == Reason.CONNECT_TIMEOUT || reason == Reason.POOL_ACQUIRE;
     }
 
     /**

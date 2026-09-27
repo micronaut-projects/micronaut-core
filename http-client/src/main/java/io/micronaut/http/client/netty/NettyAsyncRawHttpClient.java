@@ -58,7 +58,8 @@ final class NettyAsyncRawHttpClient implements AsyncRawHttpClient {
 
     private CompletionStage<HttpResponse<?>> exchange0(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable RawRequestOptions options) {
         CloseableByteBody body = requestBody == null ? NettyByteBodyFactory.empty() : requestBody;
-        return RawResponseFuture.of(nettyHttpClient.rawExchangeFlow(PropagatedContext.getOrEmpty(), request, body, null, options), body);
+        return RawResponseFuture.of(nettyHttpClient.rawExchangeFlow(PropagatedContext.getOrEmpty(), request, body, null, options), body,
+            options != null && options.isReturnUnsentBody());
     }
 
     @Override

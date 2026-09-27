@@ -52,6 +52,7 @@ public final class RawRequestOptions {
     private final boolean allowUpgrade;
     @Nullable
     private final Duration activityTimeout;
+    private final boolean returnUnsentBody;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
@@ -60,6 +61,7 @@ public final class RawRequestOptions {
         this.responseTimeout = builder.responseTimeout;
         this.allowUpgrade = builder.allowUpgrade;
         this.activityTimeout = builder.activityTimeout;
+        this.returnUnsentBody = builder.returnUnsentBody;
     }
 
     /**
@@ -96,7 +98,8 @@ public final class RawRequestOptions {
             .decompress(decompress)
             .responseTimeout(responseTimeout)
             .allowUpgrade(allowUpgrade)
-            .activityTimeout(activityTimeout);
+            .activityTimeout(activityTimeout)
+            .returnUnsentBody(returnUnsentBody);
     }
 
     /**
@@ -177,6 +180,21 @@ public final class RawRequestOptions {
         return activityTimeout;
     }
 
+    /**
+     * Whether a request whose body was never read, because no connection could be opened or
+     * acquired, hands its body back to the caller instead of closing it: the exchange fails with
+     * an {@link io.micronaut.http.client.exceptions.UnprocessedRequestException} whose
+     * {@link io.micronaut.http.client.exceptions.UnprocessedRequestException#takeUnsentBody()} is
+     * the body, e.g. to send it to another server. The caller must take and close it. Only the
+     * asynchronous raw client of the Netty client hands a body back. Defaults to {@code false}.
+     *
+     * @return Whether the unsent body is handed back
+     * @since 5.3.0
+     */
+    public boolean isReturnUnsentBody() {
+        return returnUnsentBody;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof RawRequestOptions that &&
@@ -185,12 +203,13 @@ public final class RawRequestOptions {
             decompress == that.decompress &&
             Objects.equals(responseTimeout, that.responseTimeout) &&
             allowUpgrade == that.allowUpgrade &&
-            Objects.equals(activityTimeout, that.activityTimeout);
+            Objects.equals(activityTimeout, that.activityTimeout) &&
+            returnUnsentBody == that.returnUnsentBody;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody);
     }
 
     @Override
@@ -202,6 +221,7 @@ public final class RawRequestOptions {
             ", responseTimeout=" + responseTimeout +
             ", allowUpgrade=" + allowUpgrade +
             ", activityTimeout=" + activityTimeout +
+            ", returnUnsentBody=" + returnUnsentBody +
             '}';
     }
 
@@ -217,8 +237,19 @@ public final class RawRequestOptions {
         private boolean allowUpgrade = false;
         @Nullable
         private Duration activityTimeout;
+        private boolean returnUnsentBody;
 
         private Builder() {
+        }
+
+        /**
+         * @param returnUnsentBody See {@link RawRequestOptions#isReturnUnsentBody()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder returnUnsentBody(boolean returnUnsentBody) {
+            this.returnUnsentBody = returnUnsentBody;
+            return this;
         }
 
         /**
