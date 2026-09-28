@@ -1,0 +1,17 @@
+api:io.micronaut.http.body.ByteBodyFactory[] has two methods that wrap a streamed body without buffering it first.
+
+`limit(body, maxBodySize)` returns a body with the same bytes that fails with a
+api:io.micronaut.http.exceptions.ContentLengthExceededException[] once more than `maxBodySize` bytes arrive. A body
+whose known length is over the limit fails right away, and one whose known length is within the limit is returned
+as is. Use it to apply a size limit to a body that is relayed rather than read, for example a different limit per
+route.
+
+`replayable(body, maxBufferSize)` returns a api:io.micronaut.http.body.ReplayableByteBody[]. Each call to `next()`
+returns a body with all the bytes from the start, so a body can be sent again after a failed attempt while it is
+still arriving. The first reader streams the bytes and up to `maxBufferSize` of them are kept for the next readers.
+Once more bytes arrive, the kept bytes are released: readers that already subscribed still get every byte,
+`isReplayable()` returns `false` and `next()` throws a api:io.micronaut.http.exceptions.BufferLengthExceededException[].
+The bytes kept for a body from `next()` that is not read yet count against the same limit, and a reader holds at most
+`maxBufferSize` bytes it has not consumed yet. A body whose known length is over the limit keeps nothing and is read
+once. A body whose bytes are all available is replayable whatever its size. Close the api:io.micronaut.http.body.ReplayableByteBody[] once no more
+attempts are made, to release the kept bytes, and close every body from `next()` that is not read.
