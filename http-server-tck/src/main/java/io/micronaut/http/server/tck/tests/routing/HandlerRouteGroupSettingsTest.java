@@ -34,6 +34,7 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -139,10 +140,21 @@ public class HandlerRouteGroupSettingsTest {
             // the route runs where a route without an executor runs, e.g. on the event loop
             String nonBlocking = body(server, "/group-threads/non-blocking");
             assertEquals(plainKind, nonBlocking);
-            assertNotEquals(blockingKind, nonBlocking);
             // the nested group runs its routes on its executor
             assertEquals(EXECUTOR_THREAD, body(server, "/group-threads/named/route"));
             assertEquals(plainKind, body(server, "/group-threads/named/non-blocking"));
+        }
+    }
+
+    @Test
+    @Tag("non-blocking-threads") // a runner whose server runs a route without an executor on threads like those of the blocking executor, e.g. virtual threads, can exclude this tag
+    void aNonBlockingRouteOfAGroupDoesNotRunOnTheExecutorOfTheGroup() throws Exception {
+        try (ServerUnderTest server = server()) {
+            ExecutorService blocking = server.getApplicationContext().getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.BLOCKING));
+            String blockingKind = blocking.submit(() -> kind(Thread.currentThread())).get();
+
+            // e.g. on the event loop
+            assertNotEquals(blockingKind, body(server, "/group-threads/non-blocking"));
         }
     }
 
