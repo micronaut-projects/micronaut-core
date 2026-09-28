@@ -141,7 +141,8 @@ class ByteBodyLimitReplayOwnershipTest {
 
     @Test
     void limitClosedUnread() {
-        factory.limit(streamed("abc", "def"), 100).close();
+        CloseableByteBody limited = factory.limit(streamed("abc", "def"), 100);
+        Assertions.assertDoesNotThrow(limited::close);
     }
 
     @Test
@@ -197,13 +198,14 @@ class ByteBodyLimitReplayOwnershipTest {
     void replayableClosedWithAnUnreadNext() {
         ReplayableByteBody replayable = factory.replayable(streamed("abc", "def"), 100);
         CloseableByteBody next = replayable.next();
-        replayable.close();
-        next.close();
+        Assertions.assertDoesNotThrow(replayable::close);
+        Assertions.assertDoesNotThrow(next::close);
     }
 
     @Test
     void replayableClosedUnread() {
-        factory.replayable(streamed("abc", "def"), 100).close();
+        ReplayableByteBody replayable = factory.replayable(streamed("abc", "def"), 100);
+        Assertions.assertDoesNotThrow(replayable::close);
     }
 
     /**

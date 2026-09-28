@@ -45,7 +45,7 @@ class ReplayableByteBodyTest {
     }
 
     @Test
-    void everyReaderGetsTheWholeBody() throws Exception {
+    void everyReaderGetsTheWholeBody() {
         try (ReplayableByteBody replayable = FACTORY.replayable(streamed("abc", "def"), 100)) {
             Assertions.assertEquals("abcdef", read(replayable.next()));
             Assertions.assertTrue(replayable.isReplayable());
@@ -77,7 +77,7 @@ class ReplayableByteBodyTest {
     }
 
     @Test
-    void aBodyOverTheLimitIsReadOnce() throws Exception {
+    void aBodyOverTheLimitIsReadOnce() {
         try (ReplayableByteBody replayable = FACTORY.replayable(streamed("abc", "def"), 4)) {
             Assertions.assertTrue(replayable.isReplayable(), "the length is not known yet");
             Assertions.assertEquals("abcdef", read(replayable.next()));
@@ -87,7 +87,7 @@ class ReplayableByteBodyTest {
     }
 
     @Test
-    void aBodyWhoseKnownLengthIsOverTheLimitIsNotReplayable() throws Exception {
+    void aBodyWhoseKnownLengthIsOverTheLimitIsNotReplayable() {
         try (ReplayableByteBody replayable = FACTORY.replayable(FACTORY.adapt(Flux.just(buf("abc"), buf("def")), OptionalLong.of(6)), 4)) {
             Assertions.assertFalse(replayable.isReplayable());
             Assertions.assertEquals("abcdef", read(replayable.next()));
@@ -95,7 +95,7 @@ class ReplayableByteBodyTest {
     }
 
     @Test
-    void aBodyWhoseBytesAreAllThereIsAlwaysReplayable() throws Exception {
+    void aBodyWhoseBytesAreAllThereIsAlwaysReplayable() {
         try (ReplayableByteBody replayable = FACTORY.replayable(FACTORY.adapt("abcdef".getBytes(StandardCharsets.UTF_8)), 1)) {
             Assertions.assertTrue(replayable.isReplayable());
             Assertions.assertEquals("abcdef", read(replayable.next()));

@@ -62,7 +62,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Any stream error.
      */
     @Nullable
-    private volatile Throwable error;
+    private Throwable error;
+    /**
+     * Whether {@link #error} is set, for {@link #isFailed()} from any thread.
+     */
+    private volatile boolean failed;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -100,7 +104,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     @Nullable
     private List<ReadBuffer> buffer;
     @Nullable
-    private volatile Exception bufferSizeExceeded = null;
+    private Exception bufferSizeExceeded = null;
+    /**
+     * Whether {@link #bufferSizeExceeded} is set, for {@link #isBufferLimitExceeded()} from any
+     * thread.
+     */
+    private volatile boolean bufferLimitExceeded;
     /**
      * The trailers of the body, see {@link ByteBody#trailers()}. Completed before the
      * subscribers are, so that a subscriber finds them in its {@link BufferConsumer#complete()}.
@@ -165,7 +174,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @since 5.3.0
      */
     public final boolean isBufferLimitExceeded() {
-        return bufferSizeExceeded != null;
+        return bufferLimitExceeded;
     }
 
     /**
@@ -173,7 +182,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @since 5.3.0
      */
     public final boolean isFailed() {
-        return error != null;
+        return failed;
     }
 
     /**
@@ -524,6 +533,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 if (bufferSizeExceeded == null) {
                     bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
                     if (bufferSizeExceeded != null) {
+                        bufferLimitExceeded = true;
                         discardBuffer();
                         // new subscribers will recognize that the limit has been exceeded. Streaming
                         // subscribers can proceed normally. Need to notify buffering subscribers
@@ -639,6 +649,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         error = e;
+        failed = true;
         trailers.completeExceptionally(e);
         discardBuffer();
         if (subscribers != null) {
