@@ -79,7 +79,7 @@ class Http2RejectedBodySpec extends Specification {
         bodyErrors.size() == 1
         bodyErrors[0] instanceof ContentLengthExceededException
 
-        and: "the 413 is followed by a reset that does not signal an error, so the client stops uploading"
+        and: "the 413 is followed by a reset, so the client stops uploading"
         client.readInbound() instanceof Http2SettingsFrame
         client.readInbound() instanceof Http2SettingsAckFrame
         Http2HeadersFrame response = client.readInbound()
@@ -88,7 +88,7 @@ class Http2RejectedBodySpec extends Specification {
         def rst = client.readInbound()
         rst instanceof Http2ResetFrame
         rst.stream() == stream
-        rst.errorCode() == Http2Error.NO_ERROR.code()
+        rst.errorCode() == Http2Error.CANCEL.code()
 
         cleanup:
         client.checkException()
