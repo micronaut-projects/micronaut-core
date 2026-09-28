@@ -1112,4 +1112,9 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             }
         });
     }
+
+    @Override
+    boolean cachesAnnotationValuesByName() {
+        return false;
+    }
 }

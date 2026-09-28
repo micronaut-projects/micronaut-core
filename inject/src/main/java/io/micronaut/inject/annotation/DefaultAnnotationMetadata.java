@@ -79,6 +79,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, List<String>> annotationsByStereotype;
 
     private final Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
+    private final Map<String, List> annotationValuesByName = new ConcurrentHashMap<>(2);
 
     private final boolean hasPropertyExpressions;
     private final boolean hasEvaluatedExpressions;
@@ -1010,9 +1011,24 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
-        List<AnnotationValue<T>> results = resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
-        annotationValuesByType.put(annotationType, results);
+        if (!cachesAnnotationValuesByName()) {
+            return resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
+        }
+        List<AnnotationValue<T>> results = annotationValuesByName.get(annotationType);
+        if (results == null) {
+            results = resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
+            annotationValuesByName.put(annotationType, results);
+        }
         return results;
+    }
+
+    /**
+     * Whether the values resolved by {@link #getAnnotationValuesByName(String)} may be cached.
+     *
+     * @return False for metadata that can still change
+     */
+    boolean cachesAnnotationValuesByName() {
+        return true;
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
