@@ -262,6 +262,12 @@ public abstract class ResponseLifecycle {
                 responseMediaType = MediaType.APPLICATION_JSON_TYPE;
             }
         }
+        if (messageBodyWriter != null && responseBodyType.getType() == Object.class) {
+            // the route declares no body type: its writer specializes for the class of the body,
+            // once per class, instead of resolving it on every response
+            responseBodyType = Argument.ofInstance(body);
+            messageBodyWriter = messageBodyWriter.createSpecific(responseBodyType);
+        }
         if (messageBodyWriter == null) {
             // lookup write to use, any logic that hits this path should consider setting
             // a body writer on the response before writing
@@ -377,7 +383,10 @@ public abstract class ResponseLifecycle {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
                 @SuppressWarnings("unchecked")
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
-
+                if (messageBodyWriter != null && responseBodyType.getType() == Object.class) {
+                    responseBodyType = Argument.ofInstance(message);
+                    messageBodyWriter = messageBodyWriter.createSpecific(responseBodyType);
+                }
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
                     responseBodyType = Argument.ofInstance(message);
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
