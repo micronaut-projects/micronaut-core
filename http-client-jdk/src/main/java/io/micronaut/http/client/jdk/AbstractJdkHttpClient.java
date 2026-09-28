@@ -32,6 +32,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -480,7 +481,7 @@ abstract class AbstractJdkHttpClient {
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
      */
     protected Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
-        return request;
+        return LoadBalancerKey.discriminator(request, configuration);
     }
 
     private <I> Mono<ResolvedTarget> resolveURI(io.micronaut.http.HttpRequest<I> request) {

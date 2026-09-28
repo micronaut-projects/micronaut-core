@@ -18,6 +18,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
@@ -81,6 +82,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String path;
     @Nullable
     private String loadBalancerStrategy;
+    @Nullable
+    private String loadBalancerKeyHeader;
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -365,6 +368,29 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      */
     public void setLoadBalancerStrategy(@Nullable String loadBalancerStrategy) {
         this.loadBalancerStrategy = loadBalancerStrategy;
+    }
+
+    /**
+     * The request header that holds the
+     * {@link io.micronaut.http.client.loadbalance.LoadBalancerKey key} of a request for the
+     * load balancer, e.g. a session id for the {@code sticky} strategy, when the request has no
+     * key attribute. Defaults to {@code null}, none.
+     *
+     * @return The name of the header, or {@code null}
+     * @since 5.3.0
+     */
+    @Experimental
+    public @Nullable String getLoadBalancerKeyHeader() {
+        return loadBalancerKeyHeader;
+    }
+
+    /**
+     * @param loadBalancerKeyHeader See {@link #getLoadBalancerKeyHeader()}
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setLoadBalancerKeyHeader(@Nullable String loadBalancerKeyHeader) {
+        this.loadBalancerKeyHeader = loadBalancerKeyHeader;
     }
 
     /**

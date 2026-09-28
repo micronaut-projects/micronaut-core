@@ -54,8 +54,9 @@ public interface LoadBalancerStrategy {
      */
     String WEIGHTED = "weighted";
     /**
-     * The same instance for the same discriminator, e.g. a session key, as long as it is
-     * available (rendezvous hashing); round robin without a discriminator.
+     * The same instance for the same {@link LoadBalancerKey key}, e.g. a session id, as long as
+     * it is available (rendezvous hashing); round robin without a key. A request is never hashed
+     * itself, only its key.
      */
     String STICKY = "sticky";
 
@@ -63,7 +64,9 @@ public interface LoadBalancerStrategy {
      * Pick an instance.
      *
      * @param available     The available instances, never empty
-     * @param discriminator The discriminator given to {@link LoadBalancer#select(Object)}, if any
+     * @param discriminator The key of the selection, if any: the {@link LoadBalancerKey} of a
+     *                      request, or else the discriminator given to
+     *                      {@link LoadBalancer#select(Object)}; never a request
      * @return One of the instances
      */
     ServiceInstance select(List<ServiceInstance> available, @Nullable Object discriminator);

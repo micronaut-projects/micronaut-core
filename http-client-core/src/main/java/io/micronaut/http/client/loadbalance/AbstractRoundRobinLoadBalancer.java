@@ -152,9 +152,9 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         if (detector != null) {
             availableServices = detector.available(availableServices);
         }
-        Object key = discriminator;
+        Object key = LoadBalancerKey.of(discriminator);
         if (discriminator instanceof ExcludedInstances excluded) {
-            key = excluded.discriminator();
+            key = LoadBalancerKey.of(excluded.discriminator());
             List<ServiceInstance> left = availableServices.stream().filter(si -> !excluded.uris().contains(si.getURI())).toList();
             if (!left.isEmpty()) {
                 availableServices = left;

@@ -87,6 +87,7 @@ import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
@@ -1216,7 +1217,7 @@ final class NettyHttpClient implements
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
      */
     Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
-        return request;
+        return LoadBalancerKey.discriminator(request, configuration);
     }
 
     /**

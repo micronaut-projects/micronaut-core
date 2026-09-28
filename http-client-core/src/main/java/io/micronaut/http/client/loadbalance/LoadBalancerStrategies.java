@@ -172,18 +172,20 @@ final class LoadBalancerStrategies {
     }
 
     /**
-     * The same instance for the same discriminator (rendezvous hashing): when an instance goes
-     * away, only its discriminators move. Round robin without a discriminator.
+     * The same instance for the same key (rendezvous hashing): when an instance goes away, only
+     * its keys move. Round robin without a key.
      */
     static final class Sticky implements LoadBalancerStrategy {
         private final RoundRobin fallback = new RoundRobin();
 
         @Override
         public ServiceInstance select(List<ServiceInstance> available, @Nullable Object discriminator) {
-            if (discriminator == null) {
+            // a request is never hashed: its key is the load balancer key, if any
+            Object keyObject = LoadBalancerKey.of(discriminator);
+            if (keyObject == null) {
                 return fallback.select(available, null);
             }
-            String key = discriminator.toString();
+            String key = keyObject.toString();
             ServiceInstance best = available.get(0);
             long bestScore = hash(key, key(best));
             for (ServiceInstance instance : available) {

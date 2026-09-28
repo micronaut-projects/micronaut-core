@@ -26,7 +26,7 @@ import java.util.Set;
  * A discriminator of {@link io.micronaut.http.client.LoadBalancer#select(Object)} that leaves
  * instances out of the selection, e.g. the instances a retry already tried: a round-robin load
  * balancer selects one of them only when every available instance is left out. The
- * discriminator it wraps goes to the {@link LoadBalancerStrategy}.
+ * {@link LoadBalancerKey key} of the discriminator it wraps goes to the {@link LoadBalancerStrategy}.
  *
  * @param uris          The URIs of the instances to leave out
  * @param discriminator The discriminator of the selection, if any
