@@ -32,6 +32,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -400,7 +401,7 @@ abstract class AbstractJdkHttpClient {
     }
 
     protected Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
-        return resolveTarget(request).map(ResolvedTarget::uri);
+        return resolveTarget(request).map(ResolvedTarget::releasedUri);
     }
 
     /**
@@ -434,14 +435,14 @@ abstract class AbstractJdkHttpClient {
         if (filtered.equals(target.uri())) {
             return Mono.just(target);
         }
-        ServiceInstance instance = target.instance();
+        LoadBalancerSelection selection = target.selection();
         if (filtered.getScheme() != null) {
-            return Mono.just(new ResolvedTarget(filtered, sameServer(filtered, target.uri()) ? instance : null));
+            return Mono.just(new ResolvedTarget(filtered, sameServer(filtered, target.uri()) ? selection : null));
         }
-        if (instance == null) {
+        if (selection == null) {
             return resolveTarget(request);
         }
-        return Mono.fromCallable(() -> new ResolvedTarget(resolveAgainst(instance, filtered), instance));
+        return Mono.fromCallable(() -> new ResolvedTarget(resolveAgainst(selection.instance(), filtered), selection));
     }
 
     /**
@@ -488,13 +489,20 @@ abstract class AbstractJdkHttpClient {
             return Mono.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
         }
 
+        LoadBalancer balancer = loadBalancer;
         return Mono.from(loadBalancer.select(getLoadBalancerDiscriminator(request))).map(server -> {
+                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
                     mutableRequest.getHeaders().auth(authInfo.get());
                 }
 
-                return new ResolvedTarget(resolveAgainst(server, requestURI), server);
+                try {
+                    return new ResolvedTarget(resolveAgainst(server, requestURI), selection);
+                } catch (RuntimeException e) {
+                    selection.release();
+                    throw e;
+                }
             }
         );
     }
@@ -505,49 +513,49 @@ abstract class AbstractJdkHttpClient {
      * can send it again; a connection closed before the response arrived is a
      * {@link ResponseClosedException}.
      *
-     * @param instance The service instance the load balancer selected, or {@code null}
-     * @param uri      The URI the request was sent to
-     * @param e        The failure
+     * @param selection The selection of the load balancer, or {@code null}
+     * @param uri       The URI the request was sent to
+     * @param e         The failure
      * @return The client exception
      */
-    HttpClientException sendError(@Nullable ServiceInstance instance, URI uri, IOException e) {
-        return sendError(instance, uri, e, false);
+    HttpClientException sendError(@Nullable LoadBalancerSelection selection, URI uri, IOException e) {
+        return sendError(selection, uri, e, false);
     }
 
     /**
-     * @param instance        The service instance the load balancer selected, or {@code null}
+     * @param selection       The selection of the load balancer, or {@code null}
      * @param uri             The request URI
      * @param e               The failure of {@link HttpClient#sendAsync}
      * @param headersReceived Whether the response headers had arrived, i.e. the failure is one of
      *                        a body read by the JDK client
      * @return The client exception
      */
-    HttpClientException sendError(@Nullable ServiceInstance instance, URI uri, IOException e, boolean headersReceived) {
+    HttpClientException sendError(@Nullable LoadBalancerSelection selection, URI uri, IOException e, boolean headersReceived) {
         HttpClientException result;
         if (e instanceof HttpConnectTimeoutException) {
             result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + e.getMessage(), e);
-            report(instance, LoadBalancer.Outcome.CONNECT_FAILURE);
+            report(selection, LoadBalancer.Outcome.CONNECT_FAILURE);
         } else if (e instanceof ConnectException) {
             result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Connect Error: " + e.getMessage(), e);
-            report(instance, LoadBalancer.Outcome.CONNECT_FAILURE);
+            report(selection, LoadBalancer.Outcome.CONNECT_FAILURE);
         } else if (e.getMessage() != null && e.getMessage().contains("header parser received no bytes")) {
             // the JDK client reports a connection closed before the response headers with this message
             result = new ResponseClosedException("Connection closed before response was received", false);
-            report(instance, LoadBalancer.Outcome.RESET);
+            report(selection, LoadBalancer.Outcome.RESET);
         } else if (e instanceof HttpTimeoutException) {
             // the request timeout of the JDK client is set from the read timeout; up to JDK 25 it
             // only runs until the response headers arrive, a later JDK may extend it to the body
             result = headersReceived ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : ReadTimeoutException.TIMEOUT_EXCEPTION;
-            report(instance, LoadBalancer.Outcome.TIMEOUT);
+            report(selection, LoadBalancer.Outcome.TIMEOUT);
         } else {
             if (ByteBodySubscriber.isTruncatedBody(e)) {
                 // a buffered response whose body was cut off
-                report(instance, LoadBalancer.Outcome.RESET);
+                report(selection, LoadBalancer.Outcome.RESET);
             }
             result = new HttpClientException("Error sending request: " + e.getMessage(), e);
         }
         if (result instanceof UnprocessedRequestException unprocessed) {
-            unprocessed.setTarget(uri, instance);
+            unprocessed.setTarget(uri, selection == null ? null : selection.instance());
         }
         return result;
     }
@@ -555,12 +563,24 @@ abstract class AbstractJdkHttpClient {
     /**
      * Report the outcome of an exchange to the load balancer that selected its instance, if any.
      *
-     * @param instance The service instance the load balancer selected, or {@code null}
-     * @param outcome  The outcome
+     * @param selection The selection of the load balancer, or {@code null}
+     * @param outcome   The outcome
      */
-    void report(@Nullable ServiceInstance instance, LoadBalancer.Outcome outcome) {
-        if (instance != null && loadBalancer != null) {
-            loadBalancer.report(instance, outcome);
+    static void report(@Nullable LoadBalancerSelection selection, LoadBalancer.Outcome outcome) {
+        if (selection != null) {
+            selection.report(outcome);
+        }
+    }
+
+    /**
+     * End an exchange without an outcome, unless one was reported already or the response
+     * handling claimed the selection.
+     *
+     * @param selection The selection of the load balancer, or {@code null}
+     */
+    static void releaseUnclaimed(@Nullable LoadBalancerSelection selection) {
+        if (selection != null) {
+            selection.releaseUnclaimed();
         }
     }
 
@@ -568,19 +588,21 @@ abstract class AbstractJdkHttpClient {
      * Report the outcome of an exchange whose response body ended: the status when the body is
      * complete, or the failure that cut it off.
      *
-     * @param instance   The service instance the load balancer selected, or {@code null}
+     * @param selection  The selection of the load balancer, or {@code null}
      * @param statusCode The response status
      * @param failure    The failure of the body, or {@code null} if it is complete
      */
-    void reportBodyEnd(@Nullable ServiceInstance instance, int statusCode, @Nullable Throwable failure) {
+    void reportBodyEnd(@Nullable LoadBalancerSelection selection, int statusCode, @Nullable Throwable failure) {
         if (failure == null) {
-            report(instance, statusCode >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
+            report(selection, statusCode >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
         } else if (failure instanceof ResponseClosedException) {
-            report(instance, LoadBalancer.Outcome.RESET);
+            report(selection, LoadBalancer.Outcome.RESET);
         } else if (failure instanceof HttpTimeoutException) {
-            report(instance, LoadBalancer.Outcome.TIMEOUT);
+            report(selection, LoadBalancer.Outcome.TIMEOUT);
+        } else if (selection != null) {
+            // any other failure of the body says nothing about the instance, and is not a success either
+            selection.release();
         }
-        // any other failure of the body says nothing about the instance, and is not a success either
     }
 
     /**
@@ -597,7 +619,9 @@ abstract class AbstractJdkHttpClient {
 
     protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
         return resolveTarget(request)
-            .flatMapMany(target -> applyFilterToResponsePublisher(request, target.uri(), responsePublisher(request, target, bodyType)));
+            .flatMapMany(target -> Flux.from(applyFilterToResponsePublisher(request, target.uri(), responsePublisher(request, target, bodyType)))
+                // the selection ends with the exchange, also when a filter answered without it
+                .doFinally(signal -> releaseUnclaimed(target.selection())));
     }
 
     protected <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
@@ -632,7 +656,8 @@ abstract class AbstractJdkHttpClient {
         io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
-        return Flux.defer(() -> resolveTarget(request).flatMapMany(target -> responsePublisher(request, target, bodyType)));
+        return Flux.defer(() -> resolveTarget(request).flatMapMany(target -> Flux.from(responsePublisher(request, target, bodyType))
+            .doFinally(signal -> releaseUnclaimed(target.selection()))));
     }
 
     /**
@@ -674,8 +699,9 @@ abstract class AbstractJdkHttpClient {
                         });
                     })
                     .flatMap(Mono::fromCompletionStage)
-                    .onErrorMap(IOException.class, e -> sendError(sent.instance(), sent.uri(), e, headersReceived.get()))
-                    .doOnNext(netResponse -> report(sent.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS));
+                    .onErrorMap(IOException.class, e -> sendError(sent.selection(), sent.uri(), e, headersReceived.get()))
+                    .doOnNext(netResponse -> report(sent.selection(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS))
+                    .doFinally(signal -> releaseUnclaimed(sent.selection()));
             })
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {
@@ -700,8 +726,26 @@ abstract class AbstractJdkHttpClient {
      * for it, if the request was load balanced.
      *
      * @param uri      The absolute request URI
-     * @param instance The selected instance, or {@code null} if the request URI was absolute
+     * @param selection The selection of the load balancer, or {@code null} if the request URI
+     *                  was absolute
      */
-    record ResolvedTarget(URI uri, @Nullable ServiceInstance instance) {
+    record ResolvedTarget(URI uri, @Nullable LoadBalancerSelection selection) {
+
+        /**
+         * @return The selected instance, or {@code null} if the request URI was absolute
+         */
+        @Nullable ServiceInstance instance() {
+            return selection == null ? null : selection.instance();
+        }
+
+        /**
+         * @return The URI, for a caller that sends no exchange: the selection is released
+         */
+        URI releasedUri() {
+            if (selection != null) {
+                selection.release();
+            }
+            return uri;
+        }
     }
 }
