@@ -64,9 +64,9 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     private static final String OPTIONS_ATTRIBUTE = "micronaut.http.client.raw.options";
     private static final String ALLOW_RESTRICTED_HEADERS_PROPERTY = "jdk.httpclient.allowRestrictedHeaders";
     /**
-     * Request attribute with the future completed once the body of the request is sent.
+     * Request attribute with the {@link UploadListener} of the request body.
      */
-    private static final String REQUEST_SENT_ATTRIBUTE = "micronaut.http.client.jdk.raw.request-sent";
+    private static final String UPLOAD_LISTENER_ATTRIBUTE = "micronaut.http.client.jdk.raw.upload-listener";
     /**
      * The headers {@link java.net.http.HttpClient} manages itself, and refuses to take from the
      * request unless {@value #ALLOW_RESTRICTED_HEADERS_PROPERTY} allows them.
@@ -174,10 +174,10 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         request.setAttribute(OPTIONS_ATTRIBUTE, options);
         ExecutionFlow<HttpResponse<?>> flow = ReactiveExecutionFlow.fromPublisher(Mono.from(exchangeImpl(request, null)).map(r -> (HttpResponse<?>) r));
         if (options.getResponseTimeout() != null) {
-            // the response timeout starts once the body of the request is sent, see toJdkRequest
-            CompletableFuture<@Nullable Void> sent = new CompletableFuture<>();
-            request.setAttribute(REQUEST_SENT_ATTRIBUTE, sent);
-            flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), sent);
+            // the response timeout does not count the upload of the body, see toJdkRequest
+            UploadListener listener = new UploadListener(new CompletableFuture<>(), new CompletableFuture<>());
+            request.setAttribute(UPLOAD_LISTENER_ATTRIBUTE, listener);
+            flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), listener.started(), listener.uploaded());
         }
         Mono<MutableHttpResponse<?>> response = Mono.from(ReactiveExecutionFlow.toPublisher(
             flow.map(RawHttpClientSupport::toMutableResponse)
@@ -211,20 +211,16 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         // that is shared with the other clients of the same configuration
         java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
         java.net.http.HttpRequest built = builder.build();
-        CompletableFuture<?> sent = request.getAttribute(REQUEST_SENT_ATTRIBUTE, CompletableFuture.class).orElse(null);
-        if (sent == null) {
+        UploadListener listener = request.getAttribute(UPLOAD_LISTENER_ATTRIBUTE, UploadListener.class).orElse(null);
+        java.net.http.HttpRequest.BodyPublisher publisher = built.bodyPublisher().orElse(null);
+        if (listener == null || publisher == null || publisher.contentLength() == 0) {
+            // no body, no upload: the whole exchange counts into the response timeout
             return built;
         }
-        // the response timeout of the options runs from the end of the body, see exchangeWithOptions:
-        // the body publisher tells when the client took all of it
-        java.net.http.HttpRequest.BodyPublisher publisher = built.bodyPublisher().orElse(java.net.http.HttpRequest.BodyPublishers.noBody());
-        if (publisher.contentLength() == 0) {
-            // no body: the client may never subscribe to the publisher, the request is sent with its head
-            sent.complete(null);
-            return built;
-        }
+        // the response timeout of the options pauses from the start to the end of the upload of the
+        // body, see exchangeWithOptions: the body publisher tells when the client takes it
         return java.net.http.HttpRequest.newBuilder(built, (name, value) -> true)
-            .method(built.method(), new SentBodyPublisher(publisher, sent))
+            .method(built.method(), new UploadListeningBodyPublisher(publisher, listener))
             .build();
     }
 
@@ -269,12 +265,21 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     /**
-     * A body publisher that completes a future once the client took the whole body.
+     * The upload of the body of a request.
+     *
+     * @param started  Completed when the client subscribes to the body
+     * @param uploaded Completed once the client took the whole body
+     */
+    private record UploadListener(CompletableFuture<@Nullable Void> started, CompletableFuture<@Nullable Void> uploaded) {
+    }
+
+    /**
+     * A body publisher that notifies an {@link UploadListener}.
      *
      * @param delegate The body publisher
-     * @param sent     The future to complete
+     * @param listener The listener
      */
-    private record SentBodyPublisher(java.net.http.HttpRequest.BodyPublisher delegate, CompletableFuture<?> sent)
+    private record UploadListeningBodyPublisher(java.net.http.HttpRequest.BodyPublisher delegate, UploadListener listener)
         implements java.net.http.HttpRequest.BodyPublisher {
 
         @Override
@@ -284,6 +289,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
 
         @Override
         public void subscribe(java.util.concurrent.Flow.Subscriber<? super java.nio.ByteBuffer> subscriber) {
+            listener.started().complete(null);
             delegate.subscribe(new java.util.concurrent.Flow.Subscriber<java.nio.ByteBuffer>() {
                 @Override
                 public void onSubscribe(java.util.concurrent.Flow.Subscription subscription) {
@@ -303,7 +309,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 @Override
                 public void onComplete() {
                     subscriber.onComplete();
-                    sent.complete(null);
+                    listener.uploaded().complete(null);
                 }
             });
         }

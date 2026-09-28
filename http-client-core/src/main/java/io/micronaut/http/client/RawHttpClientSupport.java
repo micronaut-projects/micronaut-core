@@ -104,67 +104,64 @@ public final class RawHttpClientSupport {
      * @return The flow with the timeout applied
      */
     public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow, @Nullable Duration timeout) {
-        return withResponseTimeout(flow, timeout, CompletableFuture.completedFuture(null));
+        CompletableFuture<@Nullable Void> never = new CompletableFuture<>();
+        return withResponseTimeout(flow, timeout, never, never);
     }
 
     /**
      * Fail the given response flow with a {@link ReadTimeoutException} if it does not complete in
-     * time after the given stage completes, e.g. once the request is sent: the time of a slow
-     * upload does not count. A response that arrives before the stage completes ends the wait.
-     * A response that arrives after the timeout, or after the returned flow was cancelled, is
-     * closed. Cancelling the returned flow cancels the given one.
+     * time. The time from the start of the upload of the request body to its end does not count,
+     * so a slow upload does not time out the exchange, while the time to acquire a connection and
+     * the wait for the response do. A response that arrives after the timeout, or after the
+     * returned flow was cancelled, is closed. Cancelling the returned flow cancels the given one.
      *
-     * @param flow    The response flow
-     * @param timeout The timeout, or {@code null} for none
-     * @param start   The stage whose completion starts the timeout
+     * @param flow          The response flow
+     * @param timeout       The timeout, or {@code null} for none
+     * @param uploadStarted The stage that completes when the upload of the body starts
+     * @param uploaded      The stage that completes when the upload of the body ended
      * @return The flow with the timeout applied
      * @since 5.3.0
      */
-    public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow, @Nullable Duration timeout, CompletionStage<?> start) {
-        return withResponseTimeout(flow, timeout, start, null);
+    public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow,
+                                                                      @Nullable Duration timeout,
+                                                                      CompletionStage<?> uploadStarted,
+                                                                      CompletionStage<?> uploaded) {
+        return withResponseTimeout(flow, timeout, uploadStarted, uploaded, null);
     }
 
     /**
-     * Like {@link #withResponseTimeout(ExecutionFlow, Duration, CompletionStage)}, with the
-     * timer on a scheduler of the client, e.g. its event loop, so that a timeout fails the flow
-     * there rather than on the shared scheduler of {@link CompletableFuture}.
+     * Like {@link #withResponseTimeout(ExecutionFlow, Duration, CompletionStage, CompletionStage)},
+     * with the timer on a scheduler of the client, e.g. its event loop, so that a timeout fails
+     * the flow there rather than on the shared scheduler of {@link CompletableFuture}.
      *
-     * @param flow      The response flow
-     * @param timeout   The timeout, or {@code null} for none
-     * @param start     The stage whose completion starts the timeout
-     * @param scheduler The scheduler of the timer, or {@code null} for the one of {@link CompletableFuture}
+     * @param flow          The response flow
+     * @param timeout       The timeout, or {@code null} for none
+     * @param uploadStarted The stage that completes when the upload of the body starts
+     * @param uploaded      The stage that completes when the upload of the body ended
+     * @param scheduler     The scheduler of the timer, or {@code null} for the one of {@link CompletableFuture}
      * @return The flow with the timeout applied
      * @since 5.3.0
      */
-    public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow, @Nullable Duration timeout, CompletionStage<?> start,
-                                                                     @Nullable ScheduledExecutorService scheduler) {
+    public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow,
+                                                                      @Nullable Duration timeout,
+                                                                      CompletionStage<?> uploadStarted,
+                                                                      CompletionStage<?> uploaded,
+                                                                      @Nullable ScheduledExecutorService scheduler) {
         if (timeout == null) {
             return flow;
         }
         AtomicBoolean done = new AtomicBoolean();
         DelayedExecutionFlow<HttpResponse<?>> result = DelayedExecutionFlow.create();
-        // completing the timer early cancels its scheduled task, so that the task does not keep
-        // the flows, and the response, reachable until the timeout elapses. The task is only
-        // scheduled once the start stage completes; a timer completed before that never is
-        CompletableFuture<@Nullable Void> timer = new CompletableFuture<>();
-        if (scheduler == null) {
-            start.whenComplete((ignored, error) -> timer.orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS));
-        } else {
-            start.whenComplete((ignored, error) -> {
-                if (!timer.isDone()) {
-                    ScheduledFuture<?> task = scheduler.schedule(() -> timer.completeExceptionally(new TimeoutException()), timeout.toNanos(), TimeUnit.NANOSECONDS);
-                    timer.whenComplete((v, e) -> task.cancel(false));
-                }
-            });
-        }
-        timer.whenComplete((ignored, error) -> {
-            if (error instanceof TimeoutException && done.compareAndSet(false, true)) {
+        ResponseTimer timer = new ResponseTimer(timeout.toNanos(), scheduler, () -> {
+            if (done.compareAndSet(false, true)) {
                 result.completeExceptionally(ReadTimeoutException.TIMEOUT_EXCEPTION);
                 flow.cancel();
             }
         });
+        uploadStarted.whenComplete((ignored, error) -> timer.pause());
+        uploaded.whenComplete((ignored, error) -> timer.resume());
         flow.onComplete((response, error) -> {
-            timer.complete(null);
+            timer.stop();
             if (done.compareAndSet(false, true)) {
                 result.complete(response, error);
             } else if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
@@ -173,7 +170,7 @@ public final class RawHttpClientSupport {
         });
         // forward a cancel from downstream, and close a response that arrives after it
         result.onCancel(() -> {
-            timer.complete(null);
+            timer.stop();
             if (done.compareAndSet(false, true)) {
                 flow.cancel();
             }
@@ -229,5 +226,75 @@ public final class RawHttpClientSupport {
             current = wrapper.getDelegate();
         }
         return current;
+    }
+
+    /**
+     * A timeout that can be paused once, for the upload of the request body.
+     */
+    private static final class ResponseTimer {
+        private final Runnable onTimeout;
+        @Nullable
+        private final ScheduledExecutorService scheduler;
+        private long remainingNanos;
+        private long startedAt;
+        /**
+         * The running phase. Completing it early cancels its scheduled task, so that the task
+         * does not keep the flows, and the response, reachable until the timeout elapses.
+         */
+        private CompletableFuture<@Nullable Void> phase;
+        private boolean paused;
+        private boolean resumed;
+        private boolean stopped;
+
+        ResponseTimer(long timeoutNanos, @Nullable ScheduledExecutorService scheduler, Runnable onTimeout) {
+            this.onTimeout = onTimeout;
+            this.scheduler = scheduler;
+            this.remainingNanos = timeoutNanos;
+            this.phase = start();
+        }
+
+        private CompletableFuture<@Nullable Void> start() {
+            startedAt = System.nanoTime();
+            CompletableFuture<@Nullable Void> phase = new CompletableFuture<>();
+            if (scheduler == null) {
+                phase.orTimeout(remainingNanos, TimeUnit.NANOSECONDS);
+            } else {
+                ScheduledFuture<?> task = scheduler.schedule(() -> phase.completeExceptionally(new TimeoutException()), remainingNanos, TimeUnit.NANOSECONDS);
+                phase.whenComplete((ignored, error) -> task.cancel(false));
+            }
+            phase.whenComplete((ignored, error) -> {
+                if (error instanceof TimeoutException) {
+                    onTimeout.run();
+                }
+            });
+            return phase;
+        }
+
+        synchronized void pause() {
+            if (stopped || paused || resumed) {
+                return;
+            }
+            paused = true;
+            remainingNanos -= System.nanoTime() - startedAt;
+            phase.complete(null);
+            if (remainingNanos <= 0) {
+                // it elapsed just before the upload started
+                stopped = true;
+                onTimeout.run();
+            }
+        }
+
+        synchronized void resume() {
+            if (stopped || !paused || resumed) {
+                return;
+            }
+            resumed = true;
+            phase = start();
+        }
+
+        synchronized void stop() {
+            stopped = true;
+            phase.complete(null);
+        }
     }
 }

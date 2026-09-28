@@ -145,8 +145,9 @@ public final class RawRequestOptions {
      * The maximum time to wait for the response headers, or {@code null} for no limit other than
      * the client's read timeout. It can only shorten the wait: the read timeout of the client
      * still applies, also to the reads of the response body. When it elapses, the exchange fails
-     * with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException}. The wait starts once
-     * the whole request, the body included, is sent, so the time of a slow upload does not count.
+     * with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException}. It runs from the start
+     * of the exchange, the time to acquire a connection included, and pauses while the request
+     * body is uploaded, so the time of a slow upload does not count.
      *
      * @return The response timeout
      */

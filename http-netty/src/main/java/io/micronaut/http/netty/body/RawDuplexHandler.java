@@ -72,7 +72,10 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
     private ChannelHandlerContext ctx;
     private long demand;
     private boolean inboundDone;
-    private boolean outboundDone;
+    /**
+     * Whether the output was shut down: the last of the sent body is written.
+     */
+    private boolean outputShutdown;
     private boolean halfClosure;
     private boolean closed;
     @Nullable
@@ -197,7 +200,9 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
                 inboundDone = true;
                 inbound.complete();
             }
-            if (outboundDone) {
+            // once the sent body ended, its last write may still be queued: the end of the sent
+            // body closes the connection then, since the inbound bytes ended
+            if (outputShutdown) {
                 ctx.close();
             }
             return;
@@ -385,12 +390,12 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
             // the bytes to the peer ended, i.e. the other side of the relay ended: end this direction, but
             // only once the last of them is written, a close would drop the writes still queued
             done = true;
-            outboundDone = true;
             ChannelFutureListener end = halfClosure && !inboundDone
                 ? future -> {
                     if (inboundDone || !future.isSuccess()) {
                         channel.close();
                     } else {
+                        outputShutdown = true;
                         ((DuplexChannel) channel).shutdownOutput();
                     }
                 }
