@@ -1,4 +1,4 @@
-`respond(...)` declares a route that answers with a fixed or computed response, without a handler function reading the request: a static body and status, a redirect, a constant health answer, or a response built from the path variables only.
+The terminal `respond(...)` ends a route that answers with a fixed or computed response, without a handler function reading the request: a static body and status, a redirect, a constant health answer, or a response built from the path variables only.
 
 snippet::io.micronaut.docs.server.functional.RespondRoutes[tags="imports,clazz", indent=0, title="Routes that respond without a handler"]
 
@@ -7,15 +7,15 @@ snippet::io.micronaut.docs.server.functional.RespondRoutes[tags="imports,clazz",
 <3> A redirect is a response like any other.
 <4> A `Supplier` creates a new response for each request.
 <5> A `Function` creates the response from the api:http.PathVariables[] of the matched route: it never receives the request.
-<6> `respond(HttpMethod, uri, ...)` declares the route for another method.
+<6> Any creator declares the route, here for another method.
 
-The builder has three forms, each for `GET` and, with an `HttpMethod` first, for another method:
+The terminal has three forms:
 
-* `respond(uri, HttpResponse)` answers with a response given as a value;
-* `respond(uri, Supplier<HttpResponse>)` answers with the response the supplier creates for each request;
-* `respond(uri, Function<PathVariables, HttpResponse>)` answers with the response the function creates from the path variables of each request.
+* `respond(HttpResponse)` answers with a response given as a value;
+* `respond(Supplier<HttpResponse>)` answers with the response the supplier creates for each request;
+* `respond(Function<PathVariables, HttpResponse>)` answers with the response the function creates from the path variables of each request.
 
-They return an api:web.router.builder.HttpRouteSpec[], like the other routes, so `where(...)`, `constrain(...)`, `order(...)`, `port(...)`, `attribute(...)`, `annotate(...)` and the route filters apply to them. A `GET` route has an implicit `HEAD` route, which answers `HEAD` requests with the headers of the response and no body, and a request with another method is answered with `405`, as for any route.
+They end a route declared like the other routes, by any creator, e.g. `GET(uri)` or `route(HttpMethod, uri)`, so `where(...)`, `constrain(...)`, `order(...)`, `port(...)`, `attribute(...)`, `annotate(...)` and the route filters apply to them, given before the terminal. A `GET` route has an implicit `HEAD` route, which answers `HEAD` requests with the headers of the response and no body, and a request with another method is answered with `405`, as for any route.
 
 === Each request gets its own response
 

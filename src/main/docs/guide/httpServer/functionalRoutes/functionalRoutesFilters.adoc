@@ -1,6 +1,6 @@
 Functional routes declare filters at three levels, with the same methods, from api:web.router.builder.RouteFilterSpec[]:
 
-* *route filters*, on the api:web.router.builder.HttpRouteSpec[] a route returns: `routes.GET(...).before(...)`;
+* *route filters*, on the api:web.router.builder.HttpRouteSpec[] of a route, before its terminal: `routes.GET(uri).before(...).and().handle(...)`;
 * *group filters*, on an api:web.router.builder.HttpRouteGroup[], for every route of the group;
 * *server filters*, declared with `routes.filter(patterns...)`: the functional form of a `@ServerFilter` bean, see api:web.router.builder.ServerFilterSpec[].
 
@@ -45,7 +45,7 @@ snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="filterExecutor", 
 
 <1> A filter that blocks, e.g. on a database.
 <2> The filter runs on the blocking executor, and the filter chain continues on it. `nonBlocking()` keeps the filter on the thread of the filter chain, the default; the last of the two called wins. An asynchronous filter given an executor is called on it, and the chain continues where its stage completes.
-<3> `and()` returns the route, to declare its next filters or settings.
+<3> `and()` returns the route, to declare its next filters, its settings and its terminal.
 
 A filter chooses its thread with the same methods as a route and a group, from api:web.router.builder.ExecutionSpec[]. Group filters and server filters have them too. The executor of a filter is fixed once the routes are built, or when the lambda of the group that declares the filter returns.
 
