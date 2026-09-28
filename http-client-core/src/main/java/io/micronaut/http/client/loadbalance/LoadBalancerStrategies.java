@@ -156,17 +156,20 @@ final class LoadBalancerStrategies {
 
         /**
          * @param instance An instance
-         * @return Its weight, the {@code weight} metadata, {@code 1} when absent or invalid
+         * @return Its weight, the {@code weight} metadata, {@code 1} when absent or invalid, at most
+         * {@link Integer#MAX_VALUE}
          */
         static int weight(ServiceInstance instance) {
             String value = instance.getMetadata().get("weight", String.class).orElse(null);
             if (value == null) {
                 return 1;
             }
+            String weight = value.strip();
             try {
-                return Math.max(0, Integer.parseInt(value.strip()));
+                return (int) Math.clamp(Long.parseLong(weight), 0, Integer.MAX_VALUE);
             } catch (NumberFormatException e) {
-                return 1;
+                // a number too large even for a long is capped too
+                return weight.matches("\\+?\\d+") ? Integer.MAX_VALUE : 1;
             }
         }
     }

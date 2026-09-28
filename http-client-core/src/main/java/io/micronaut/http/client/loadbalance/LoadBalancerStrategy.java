@@ -21,6 +21,7 @@ import io.micronaut.http.client.LoadBalancer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * How the load balancer of a service picks an instance among the available ones: the instances
@@ -84,12 +85,12 @@ public interface LoadBalancerStrategy {
     /**
      * A new instance of a built-in strategy.
      *
-     * @param name The name of the strategy, see the constants of this interface
+     * @param name The name of the strategy, see the constants of this interface, in any case
      * @return The strategy
      * @throws IllegalArgumentException for an unknown name
      */
     static LoadBalancerStrategy of(String name) {
-        return switch (name) {
+        return switch (name.strip().toLowerCase(Locale.ROOT)) {
             case ROUND_ROBIN -> new LoadBalancerStrategies.RoundRobin();
             case RANDOM -> new LoadBalancerStrategies.Random();
             case POWER_OF_TWO_CHOICES -> new LoadBalancerStrategies.PowerOfTwoChoices();

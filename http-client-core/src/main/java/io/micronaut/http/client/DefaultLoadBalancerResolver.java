@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -153,9 +154,20 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         String strategyName = configuration == null ? null : configuration.getLoadBalancerStrategy();
         if (strategyName != null && !strategyName.isBlank()) {
             LoadBalancerStrategy strategy = beanContext.findBean(LoadBalancerStrategy.class, Qualifiers.byName(strategyName))
-                .orElseGet(() -> LoadBalancerStrategy.of(strategyName));
+                .orElseGet(() -> builtInStrategy(serviceID, strategyName));
             loadBalancer = AbstractRoundRobinLoadBalancer.withStrategy(loadBalancer, strategy);
         }
         return loadBalancer;
+    }
+
+    private static LoadBalancerStrategy builtInStrategy(String serviceID, String strategyName) {
+        try {
+            return LoadBalancerStrategy.of(strategyName);
+        } catch (IllegalArgumentException e) {
+            throw new ConfigurationException("Unknown load balancer strategy '" + strategyName + "' for service '" + serviceID
+                + "': set micronaut.http.services." + serviceID + ".load-balancer-strategy to one of "
+                + String.join(", ", LoadBalancerStrategy.ROUND_ROBIN, LoadBalancerStrategy.RANDOM, LoadBalancerStrategy.POWER_OF_TWO_CHOICES, LoadBalancerStrategy.WEIGHTED, LoadBalancerStrategy.STICKY)
+                + ", or to the name of a LoadBalancerStrategy bean", e);
+        }
     }
 }
