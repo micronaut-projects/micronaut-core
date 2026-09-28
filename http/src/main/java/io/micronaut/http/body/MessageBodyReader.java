@@ -53,6 +53,18 @@ public interface MessageBodyReader<T> {
     }
 
     /**
+     * Prepare a {@link MessageBodyReader} that will read the given type. This can be used for
+     * precomputing some route data.
+     *
+     * @param type The type
+     * @return The specialized reader
+     * @since 5.3.0
+     */
+    default MessageBodyReader<T> createSpecific(Argument<T> type) {
+        return this;
+    }
+
+    /**
      * Reads an object from the given byte buffer.
      *
      * @param type        The type being decoded.

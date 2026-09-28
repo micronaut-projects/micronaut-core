@@ -393,8 +393,10 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public JsonMapper cloneWithViewClass(Class<?> viewClass) {
-        ObjectReader reader = objectMapper.readerWithView(viewClass);
-        ObjectWriter writer = objectMapper.writerWithView(viewClass);
+        ObjectReader reader = specializedReader == null
+            ? objectMapper.readerWithView(viewClass) : specializedReader.withView(viewClass);
+        ObjectWriter writer = specializedWriter == null
+            ? objectMapper.writerWithView(viewClass) : specializedWriter.withView(viewClass);
 
         return new JacksonDatabindMapper(this, reader, writer);
     }
