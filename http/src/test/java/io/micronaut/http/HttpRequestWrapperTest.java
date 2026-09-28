@@ -72,73 +72,6 @@ class HttpRequestWrapperTest {
     }
 
     @Test
-    void aSubclassThatDoesNotOverrideTheBodyKeepsItWithoutDecodingIt() {
-        FreshBodyRequest request = new FreshBodyRequest();
-        HeadersOnlyWrapper wrapper = new HeadersOnlyWrapper(request);
-
-        assertFalse(HttpRequestWrapper.replacesBody(wrapper));
-        assertEquals(0, request.decoded);
-        // looked up once per class: the same again
-        assertFalse(HttpRequestWrapper.replacesBody(new HeadersOnlyWrapper(request)));
-        assertEquals(0, request.decoded);
-    }
-
-    @Test
-    void aSubclassThatDoesNotOverrideTheBodyDoesNotConsumeTheBody() {
-        ConsumingBodyRequest request = new ConsumingBodyRequest();
-
-        assertFalse(HttpRequestWrapper.replacesBody(new HeadersOnlyWrapper(request)));
-        assertEquals(0, request.consumed);
-        // the body is still there to be read
-        assertEquals(Optional.of("body"), request.getBody());
-    }
-
-    @Test
-    void anAnonymousSubclassThatDoesNotOverrideTheBodyKeepsIt() {
-        FreshBodyRequest request = new FreshBodyRequest();
-        HttpRequestWrapper<Object> wrapper = new HttpRequestWrapper<>(request) {
-            @Override
-            public String getPath() {
-                return "/other";
-            }
-        };
-
-        assertFalse(HttpRequestWrapper.replacesBody(wrapper));
-        assertEquals(0, request.decoded);
-    }
-
-    @Test
-    void aSubclassOfTheMutableWrapperThatDoesNotOverrideTheBodyKeepsItUntilItsBodyIsSet() {
-        FreshBodyRequest request = new FreshBodyRequest();
-        MutableHttpRequestWrapper<Object> wrapper = new MutableHttpRequestWrapper<>(ConversionService.SHARED, request) {
-            @Override
-            public MutableHttpHeaders getHeaders() {
-                return super.getHeaders();
-            }
-        };
-
-        assertFalse(HttpRequestWrapper.replacesBody(wrapper));
-        assertEquals(0, request.decoded);
-
-        wrapper.body("set");
-
-        assertTrue(HttpRequestWrapper.replacesBody(wrapper));
-    }
-
-    @Test
-    void aSubclassOfASubclassThatOverridesTheBodyReplacesIt() {
-        FreshBodyRequest request = new FreshBodyRequest();
-        HttpRequestWrapper<Object> sanitized = new SanitizingWrapper(request) {
-            @Override
-            public String getPath() {
-                return "/other";
-            }
-        };
-
-        assertTrue(HttpRequestWrapper.replacesBody(sanitized));
-    }
-
-    @Test
     void aRequestThatIsNotAWrapperReplacesNothing() {
         FreshBodyRequest request = new FreshBodyRequest();
 
@@ -160,54 +93,6 @@ class HttpRequestWrapperTest {
         public Optional<Object> getBody() {
             decoded++;
             return Optional.of(new Object());
-        }
-    }
-
-    /**
-     * A request whose body is decoded from a stream, which the first call consumes, like a
-     * servlet request.
-     */
-    static final class ConsumingBodyRequest extends SimpleHttpRequest<Object> {
-        int consumed;
-
-        ConsumingBodyRequest() {
-            super(HttpMethod.POST, "/items", null);
-        }
-
-        @Override
-        public Optional<Object> getBody() {
-            if (consumed++ > 0) {
-                return Optional.empty();
-            }
-            return Optional.of("body");
-        }
-    }
-
-    /**
-     * A wrapper of a third party that only changes the headers.
-     */
-    static class HeadersOnlyWrapper extends HttpRequestWrapper<Object> {
-        HeadersOnlyWrapper(HttpRequest<Object> delegate) {
-            super(delegate);
-        }
-
-        @Override
-        public HttpHeaders getHeaders() {
-            return super.getHeaders();
-        }
-    }
-
-    /**
-     * A wrapper of a third party that replaces the body.
-     */
-    static class SanitizingWrapper extends HttpRequestWrapper<Object> {
-        SanitizingWrapper(HttpRequest<Object> delegate) {
-            super(delegate);
-        }
-
-        @Override
-        public Optional<Object> getBody() {
-            return Optional.of("sanitized");
         }
     }
 

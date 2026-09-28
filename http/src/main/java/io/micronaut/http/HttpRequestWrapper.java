@@ -39,30 +39,6 @@ import java.util.Optional;
 public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements HttpRequest<B> {
 
     /**
-     * Where the body of each wrapper class comes from.
-     */
-    private static final ClassValue<BodySource> BODY_SOURCES = new ClassValue<>() {
-        @Override
-        protected BodySource computeValue(Class<?> type) {
-            Class<?> declaring;
-            try {
-                declaring = type.getMethod("getBody").getDeclaringClass();
-            } catch (NoSuchMethodException | LinkageError e) {
-                // not looked up, e.g. a native image without the metadata of the class, which
-                // fails with a MissingReflectionRegistrationError: the bodies are compared
-                return BodySource.OVERRIDDEN;
-            }
-            if (declaring == HttpMessageWrapper.class) {
-                return BodySource.DELEGATE;
-            }
-            if (declaring == MutableHttpRequestWrapper.class) {
-                return BodySource.MUTABLE;
-            }
-            return BodySource.OVERRIDDEN;
-        }
-    };
-
-    /**
      * @param delegate The Http Request
      */
     public HttpRequestWrapper(HttpRequest<B> delegate) {
@@ -169,19 +145,14 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
      * e.g. a wrapper a filter continued with that returns a replacement from {@code getBody()}:
      * the bytes of the requests it wraps are then not its body.
      *
-     * <p>A wrapper that cannot have replaced the body is never asked for it: a wrapper whose class
-     * does not override {@code getBody()}, like a plain {@link HttpRequestWrapper} or a subclass
-     * that only overrides e.g. {@code getHeaders()}, a {@link MutableHttpRequestWrapper} whose body
-     * was not set, and a {@link BodyPreservingRequestWrapper}. Asking a wrapper for its body
-     * decodes the body of the request it wraps, and that decoding may consume the bytes of the
-     * request, e.g. the input stream of a servlet request, or produce a new object on each call.
-     * Any other wrapper replaced the body if its body is not, by identity, the body of the request
-     * it wraps.</p>
-     *
-     * <p>Whether a class overrides {@code getBody()} is looked up once per class. Where it cannot
-     * be looked up, e.g. in a native image without the reflection metadata that
-     * micronaut-http registers for the subclasses of {@link HttpMessageWrapper}, the bodies are
-     * compared.</p>
+     * <p>A wrapper that cannot have replaced the body is never asked for it: a plain
+     * {@link HttpRequestWrapper}, a {@link MutableHttpRequestWrapper} whose body was not set and
+     * a {@link BodyPreservingRequestWrapper}. Asking a wrapper for its body decodes the body of
+     * the request it wraps, and that decoding may consume the bytes of the request, e.g. the input
+     * stream of a servlet request, or produce a new object on each call. Any other wrapper replaced
+     * the body if its body is not, by identity, the body of the request it wraps: a subclass is
+     * asked for its body even when it does not override {@code getBody()}, as that is not looked
+     * up, without reflection.</p>
      *
      * @param request The request
      * @return Whether it is a wrapper that replaced the body of the request it wraps
@@ -194,20 +165,15 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
             return false;
         }
         Class<?> type = wrapper.getClass();
-        BodySource source;
         if (type == HttpRequestWrapper.class) {
-            source = BodySource.DELEGATE;
-        } else if (type == MutableHttpRequestWrapper.class) {
-            source = BodySource.MUTABLE;
-        } else {
-            source = BODY_SOURCES.get(type);
+            // does not override getBody
+            return false;
         }
-        return switch (source) {
-            case DELEGATE -> false;
-            case MUTABLE -> ((MutableHttpRequestWrapper<?>) wrapper).isBodySet();
-            // by identity: a replacement that only compares equal, e.g. a sanitized copy, is still a replacement
-            case OVERRIDDEN -> wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null);
-        };
+        if (type == MutableHttpRequestWrapper.class) {
+            return ((MutableHttpRequestWrapper<?>) wrapper).isBodySet();
+        }
+        // by identity: a replacement that only compares equal, e.g. a sanitized copy, is still a replacement
+        return wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null);
     }
 
     /**
@@ -238,25 +204,5 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
                 return current;
             }
         };
-    }
-
-    /**
-     * Where the body of a wrapper class comes from, by the class that declares its
-     * {@code getBody()}.
-     */
-    private enum BodySource {
-        /**
-         * Declared by {@link HttpMessageWrapper}: the body of the delegate.
-         */
-        DELEGATE,
-        /**
-         * Declared by {@link MutableHttpRequestWrapper}: the body that was set, or else the body
-         * of the delegate.
-         */
-        MUTABLE,
-        /**
-         * Declared by a subclass, or not known: it may return anything.
-         */
-        OVERRIDDEN
     }
 }
