@@ -403,9 +403,15 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     private <T> Publisher<? extends T> elementPublisher(Argument<T> type, CloseableByteBody body) {
         MediaType contentType = request.getContentType().orElse(null);
-        MessageBodyReader<T> reader = isJson(contentType) ? binder.bodyHandlerRegistry().findReader(type, List.of(contentType)).orElse(null) : null;
-        if (!(reader instanceof ChunkedMessageBodyReader<T> chunked)) {
+        if (!isJson(contentType)) {
             throw new UnsupportedMediaException(String.valueOf(contentType), ELEMENT_MEDIA_TYPES);
+        }
+        MessageBodyReader<T> reader = binder.bodyHandlerRegistry().findReader(type, List.of(contentType)).orElse(null);
+        if (!(reader instanceof ChunkedMessageBodyReader<T> chunked)) {
+            // a JSON body: the media type is supported, what is missing is the reader, e.g. on a
+            // server that is not the Netty server, without micronaut-http-netty
+            throw new UnsupportedOperationException("Reading the elements of a JSON body [" + contentType
+                + "] needs a chunked JSON message body reader, which micronaut-http-netty provides: add it to the runtime classpath");
         }
         // an element is decoded in memory: it is limited like buffered content
         return chunked.readChunked(type, contentType, request.getHeaders(), body.toByteBufferPublisher(), uploadContext().maxBufferSize());

@@ -212,6 +212,12 @@ public interface AsyncRequestBody {
      * an {@link io.micronaut.http.exceptions.HttpStatusException} with the status
      * {@code 415 Unsupported Media Type}.</p>
      *
+     * <p>The readers that decode the elements of JSON one at a time are those of
+     * {@code micronaut-http-netty}, which the Netty server includes. A server that is not the
+     * Netty server, e.g. a servlet server, needs {@code micronaut-http-netty} on its runtime
+     * classpath to read the elements of JSON: without it, the first {@link BodyElements#next()}
+     * fails with an {@link UnsupportedOperationException} that says so.</p>
+     *
      * <p>An element is decoded in memory: an element larger than the limit of the server for
      * buffered request content ({@code micronaut.server.max-request-buffer-size}) fails
      * {@link BodyElements#next()} with a
