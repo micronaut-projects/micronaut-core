@@ -1,3 +1,5 @@
 The Micronaut framework supports CORS (link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests are rejected.
 
+When CORS is enabled, or a matching route is annotated with ann:http.server.cors.CrossOrigin[], a preflight request from an origin that no configuration allows is answered with `403 Forbidden` and does not reach your routes.
+
 TIP: See the guide for https://guides.micronaut.io/latest/micronaut-cors.html[Configure CORS in a Micronaut Application] to learn more.

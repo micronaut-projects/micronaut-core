@@ -84,7 +84,7 @@ public class CrossOriginTest {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/foo").path("bar"), "https://bar.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .status(HttpStatus.FORBIDDEN)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
     }
@@ -168,7 +168,7 @@ public class CrossOriginTest {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/allowedoriginsregex").path("foobar"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .status(HttpStatus.FORBIDDEN)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
     }
