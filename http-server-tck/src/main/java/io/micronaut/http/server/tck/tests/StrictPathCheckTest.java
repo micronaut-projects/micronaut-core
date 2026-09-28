@@ -64,7 +64,8 @@ public class StrictPathCheckTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/strict-path/a%2Fb", "/strict-path/%2e%2e/b", "/strict-path/.%2E/b", "/strict-path/a%5Cb", "/strict-path/a;b",
-        "/strict-path/a%00b", "/strict-path/%c0%ae/b"})
+        "/strict-path/a%00b", "/strict-path/%c0%ae/b", "/strict-path/a%3Bb", "/strict-path/..%3B/b", "/strict-path/%252e%252e/b",
+        "/strict-path/%E0%80%AE%E0%80%AE/b", "/strict-path/%ED%A0%80", "/strict-path/a%C2%85"})
     void withTheStrictCheckAnAmbiguousPathIsABadRequest(String path) throws IOException {
         TestScenario.builder()
             .specName(SPEC_NAME)
@@ -78,7 +79,7 @@ public class StrictPathCheckTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/strict-path/a", "/strict-path/a/b.txt", "/strict-path/a%20b", "/strict-path/...", "/strict-path/a%3Bb"})
+    @ValueSource(strings = {"/strict-path/a", "/strict-path/a/b.txt", "/strict-path/a%20b", "/strict-path/...", "/strict-path/%C3%A9"})
     void withTheStrictCheckAnUnambiguousPathIsRouted(String path) throws IOException {
         TestScenario.builder()
             .specName(SPEC_NAME)
@@ -106,7 +107,7 @@ public class StrictPathCheckTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/strict-path/%2e%2e;x/b", "/strict-path/.;x/b", "/strict-path/a%2Fb;x"})
+    @ValueSource(strings = {"/strict-path/%2e%2e;x/b", "/strict-path/.;x/b", "/strict-path/a%2Fb;x", "/strict-path/..%3Bx/b"})
     void withSemicolonsAllowedADotSegmentIsStillABadRequest(String path) throws IOException {
         TestScenario.builder()
             .specName(SPEC_NAME)

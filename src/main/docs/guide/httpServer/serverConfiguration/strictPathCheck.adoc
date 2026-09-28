@@ -12,11 +12,15 @@ micronaut:
 
 With the check enabled, a request is rejected if its raw path contains:
 
-* A dot segment (`.` or `..`), also percent-encoded, e.g. `%2e%2e`, or in an overlong UTF-8 encoding
+* A dot segment (`.` or `..`), also percent-encoded, e.g. `%2e%2e`
 * An encoded slash (`%2F`) or an encoded or raw backslash (`%5C`, `\`)
-* A semicolon (`;`), which some servers treat as the start of path parameters
-* An encoded or raw control character, e.g. `%00` or `%0A`
-* A malformed percent-encoding, e.g. `%zz` or a truncated `%2`
+* An encoded percent sign (`%25`), which a second decoding turns into another path, e.g. `%252e%252e`
+* A semicolon (`;`), raw or encoded, which some servers treat as the start of path parameters
+* A raw `#` or a raw character outside ASCII
+* An encoded or raw control character, e.g. `%00`, `%0A` or `%C2%85`
+* A malformed percent-encoding, e.g. `%zz` or a truncated `%2`, or one that is not well-formed UTF-8: overlong forms such as `%C0%AE` or `%E0%80%AE`, surrogates and stray bytes
+
+The server-wide `OPTIONS *` request is not checked.
 
 To allow path parameters such as `;jsessionid=...`, enable `strict-path-check-allow-semicolon`. The part of a segment before its first semicolon still must not be a dot segment, so `/..;/admin` stays rejected.
 
@@ -28,5 +32,7 @@ micronaut:
     strict-path-check: true
     strict-path-check-allow-semicolon: true
 ----
+
+WARNING: With semicolons allowed, the filters still match the raw path: `/admin;x/secret` does not match a filter mapped to `/admin/**`, while a server that strips path parameters serves it as `/admin/secret`. Allow semicolons only if no component behind the application strips them, or if the filters do not secure paths.
 
 The check is modelled on the strict firewall of Spring Security.

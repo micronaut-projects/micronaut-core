@@ -161,7 +161,12 @@ public class RequestLifecycle {
         if (!strictPathCheck) {
             return null;
         }
-        String rejected = StrictPathCheck.rejection(request.getPath(), strictPathCheckAllowSemicolon);
+        String path = request.getPath();
+        if (request.getMethod() == HttpMethod.OPTIONS && "*".equals(path)) {
+            // the asterisk-form of a server-wide OPTIONS request
+            return null;
+        }
+        String rejected = StrictPathCheck.rejection(path, strictPathCheckAllowSemicolon);
         if (rejected == null) {
             return null;
         }

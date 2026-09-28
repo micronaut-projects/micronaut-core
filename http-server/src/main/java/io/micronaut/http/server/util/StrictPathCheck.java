@@ -15,8 +15,14 @@
  */
 package io.micronaut.http.server.util;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 
 /**
  * The strict check of a raw request path: the router matches the raw, percent-encoded path as
@@ -27,8 +33,11 @@ import org.jspecify.annotations.Nullable;
  * @author Denis Stepanov
  * @since 5.3.0
  */
-@Experimental
+@Internal
 public final class StrictPathCheck {
+
+    private static final String MALFORMED = "Malformed percent-encoding in the path";
+    private static final String CONTROL = "A control character in the path";
 
     private StrictPathCheck() {
     }
@@ -38,12 +47,17 @@ public final class StrictPathCheck {
      * <ul>
      *     <li>a {@code .} or {@code ..} segment, also percent-encoded, e.g. {@code %2e%2e};</li>
      *     <li>an encoded slash or backslash, {@code %2F} or {@code %5C}, and a backslash;</li>
-     *     <li>a semicolon, the start of path parameters, e.g. {@code ..;/} that some servers
-     *     resolve as {@code ..}, unless {@code allowSemicolon}: then the part of a segment before
-     *     its first semicolon must not be a dot segment;</li>
-     *     <li>an encoded or raw control character, e.g. {@code %00} or {@code %0A}, a malformed
-     *     percent-encoding, and the first byte of an overlong UTF-8 sequence, {@code %C0} or
-     *     {@code %C1};</li>
+     *     <li>an encoded percent sign, {@code %25}, which a second decoding turns into another
+     *     path, e.g. {@code %252e%252e};</li>
+     *     <li>a semicolon, raw or encoded, the start of path parameters, e.g. {@code ..;/} that
+     *     some servers resolve as {@code ..}, unless {@code allowSemicolon}: then the part of a
+     *     segment before its first semicolon must not be a dot segment;</li>
+     *     <li>a raw {@code #}, the start of a fragment, and any raw character outside ASCII;</li>
+     *     <li>an encoded or raw control character, C0, {@code DEL} or C1, e.g. {@code %00},
+     *     {@code %0A} or {@code %C2%85};</li>
+     *     <li>a malformed percent-encoding and a percent-encoding that is not well-formed UTF-8:
+     *     overlong forms, e.g. {@code %C0%AE} or {@code %E0%80%AE}, surrogates, stray
+     *     continuation bytes and bytes that never occur in UTF-8;</li>
      *     <li>a path that does not start with a slash.</li>
      * </ul>
      *
@@ -56,10 +70,11 @@ public final class StrictPathCheck {
             return "The path must start with a slash";
         }
         int length = rawPath.length();
+        byte[] buffer = new byte[length];
         int segmentStart = 1;
         for (int i = 1; i <= length; i++) {
             if (i == length || rawPath.charAt(i) == '/') {
-                String rejected = segmentRejection(rawPath, segmentStart, i, allowSemicolon);
+                String rejected = segmentRejection(rawPath, segmentStart, i, allowSemicolon, buffer);
                 if (rejected != null) {
                     return rejected;
                 }
@@ -69,61 +84,80 @@ public final class StrictPathCheck {
         return null;
     }
 
-    private static @Nullable String segmentRejection(String path, int start, int end, boolean allowSemicolon) {
-        int dots = 0;
-        int decodedLength = 0;
-        // with path parameters allowed, the name of the segment ends at the first semicolon
-        boolean inParameters = false;
+    private static @Nullable String segmentRejection(String path, int start, int end, boolean allowSemicolon, byte[] buffer) {
+        // the decoded bytes of the segment; nameEnd is where its first semicolon starts the path parameters
+        int size = 0;
+        int nameEnd = -1;
         for (int i = start; i < end; i++) {
             char c = path.charAt(i);
-            char decoded;
+            int b;
             if (c == '%') {
                 if (i + 2 >= end) {
-                    return "Malformed percent-encoding in the path";
+                    return MALFORMED;
                 }
                 int high = Character.digit(path.charAt(i + 1), 16);
                 int low = Character.digit(path.charAt(i + 2), 16);
                 if (high < 0 || low < 0) {
-                    return "Malformed percent-encoding in the path";
+                    return MALFORMED;
                 }
-                decoded = (char) (high * 16 + low);
+                b = high * 16 + low;
                 i += 2;
-                if (decoded == '/' || decoded == '\\') {
+                if (b == '/' || b == '\\') {
                     return "An encoded slash or backslash in the path";
                 }
-                if (decoded == 0xC0 || decoded == 0xC1) {
-                    // the first byte of an overlong UTF-8 sequence, e.g. %C0%AE for a dot
-                    return "An invalid UTF-8 sequence in the path";
-                }
-                if (decoded == ';') {
-                    // decoded, it is a character of the segment, not a path parameter
-                    decoded = 'x';
+                if (b == '%') {
+                    return "An encoded percent sign in the path";
                 }
             } else {
-                decoded = c;
+                if (c >= 0x80) {
+                    return "A character outside ASCII in the path";
+                }
                 if (c == '\\') {
                     return "A backslash in the path";
                 }
-                if (c == ';') {
-                    if (!allowSemicolon) {
-                        return "A path parameter (;) in the path";
-                    }
-                    inParameters = true;
+                if (c == '#') {
+                    return "A fragment (#) in the path";
+                }
+                b = c;
+            }
+            if (b == ';') {
+                // encoded or not: a server that decodes the path first sees path parameters
+                if (!allowSemicolon) {
+                    return "A path parameter (;) in the path";
+                }
+                if (nameEnd < 0) {
+                    nameEnd = size;
                 }
             }
-            if (decoded < 0x20 || decoded == 0x7f) {
-                return "A control character in the path";
+            if (b < 0x20 || b == 0x7f) {
+                return CONTROL;
             }
-            if (!inParameters) {
-                if (decoded == '.') {
-                    dots++;
-                }
-                decodedLength++;
+            buffer[size++] = (byte) b;
+        }
+        String decoded;
+        try {
+            decoded = newDecoder().decode(ByteBuffer.wrap(buffer, 0, size)).toString();
+        } catch (CharacterCodingException e) {
+            return "An invalid UTF-8 sequence in the path";
+        }
+        for (int i = 0; i < decoded.length(); i++) {
+            char c = decoded.charAt(i);
+            if (c >= 0x80 && c <= 0x9f) {
+                return CONTROL;
             }
         }
-        if (decodedLength > 0 && dots == decodedLength && decodedLength <= 2) {
+        // a dot segment is one or two ASCII bytes, so a name of that many bytes is also that many chars
+        int nameLength = nameEnd < 0 ? decoded.length() : nameEnd;
+        if (nameLength == 1 && decoded.charAt(0) == '.'
+            || nameLength == 2 && decoded.charAt(0) == '.' && decoded.charAt(1) == '.') {
             return "A dot segment in the path";
         }
         return null;
+    }
+
+    private static CharsetDecoder newDecoder() {
+        return StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT);
     }
 }
