@@ -297,9 +297,10 @@ final class SingletonScope {
      */
     @SuppressWarnings("ReferenceEquality") // A detached instance must not evict a scoped instance of the same definition.
     synchronized <T> void purgeCacheForBeanInstance(BeanDefinition<T> beanDefinition, T bean) {
-        BeanDefinitionIdentity key = BeanDefinitionIdentity.of(beanDefinition);
-        singletonByBeanDefinition.computeIfPresent(key, (ignored, registration) -> registration.bean() == bean ? null : registration);
-        singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getValue().bean() == bean);
+        // only the registration of this instance: another instance registered under the same definition
+        // (one adopted from a previous context displacing a retained one, or the reverse) stays
+        singletonByBeanDefinition.computeIfPresent(BeanDefinitionIdentity.of(beanDefinition), (identity, registration) -> registration.bean == bean ? null : registration);
+        singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(bean) && entry.getValue().bean == bean);
     }
 
     /**

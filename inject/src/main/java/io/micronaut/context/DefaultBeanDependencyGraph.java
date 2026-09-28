@@ -314,6 +314,16 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
             && qualifier.equals(definition.getDeclaredQualifier());
     }
 
+    /**
+     * Records a dependency carried over from another context, for a bean adopted from it.
+     *
+     * @param edge The dependency, with this context's definitions
+     */
+    void record(BeanDependency edge) {
+        byDependent.computeIfAbsent(Key.of(edge.dependent()), k -> ConcurrentHashMap.newKeySet()).add(edge);
+        byDependency.computeIfAbsent(Key.of(edge.dependency()), k -> ConcurrentHashMap.newKeySet()).add(edge);
+    }
+
     private static InjectionKind kindOf(BeanResolutionContext.Segment<?, ?> segment) {
         // the segments are their own injection points; the constructor segment covers factory methods too
         if (segment instanceof AbstractBeanResolutionContext.FactorySegment) {
