@@ -1,6 +1,12 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== A CORS preflight from a disallowed origin is answered with 403
+
+Starting with 5.3, a CORS preflight request (an `OPTIONS` request with `Origin` and `Access-Control-Request-Method` headers) whose origin no CORS configuration allows is answered with `403 Forbidden` by the CORS filter. This applies when CORS is enabled through `micronaut.server.cors.enabled`, or when a route matching the request path is annotated with ann:http.server.cors.CrossOrigin[].
+
+Previously such a preflight continued to routing, where it was typically answered with `404` or `405`, or was handled by the application's own `OPTIONS` route or by a catch-all route such as `/{+path}`. The new behavior matches the existing `403` for a preflight whose method or headers are not allowed. Applications with CORS disabled and no `@CrossOrigin` routes are unaffected, as are `OPTIONS` requests that are not preflights.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.

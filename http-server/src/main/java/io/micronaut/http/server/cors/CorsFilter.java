@@ -126,9 +126,30 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     @Internal
     public final HttpResponse<?> filterPreFlightRequest(HttpRequest<?> request) {
         if (isEnabled(request) && CorsUtil.isPreflightRequest(request)) {
-            CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request).orElse(null);
-            if (corsOriginConfiguration != null) {
-                return handlePreflightRequest(request, corsOriginConfiguration);
+            String requestOrigin = request.getOrigin().orElse(null);
+            boolean corsApplies = corsConfiguration.isEnabled();
+            if (router != null && requestOrigin != null) {
+                for (UriRouteMatch<Object, Object> routeMatch : router.findAny(request)) {
+                    Optional<CorsOriginConfiguration> corsOriginConfiguration = CrossOriginUtil.getCorsOriginConfiguration(routeMatch);
+                    if (corsOriginConfiguration.isPresent()) {
+                        if (matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
+                            return handlePreflightRequest(request, corsOriginConfiguration.get());
+                        }
+                        corsApplies = true;
+                    }
+                }
+            }
+            if (corsConfiguration.isEnabled() && requestOrigin != null) {
+                Optional<CorsOriginConfiguration> globalConfiguration = corsConfiguration.getConfigurations().values().stream()
+                    .filter(config -> matchesOrigin(config, requestOrigin))
+                    .findFirst();
+                if (globalConfiguration.isPresent()) {
+                    return handlePreflightRequest(request, globalConfiguration.get());
+                }
+            }
+            if (corsApplies) {
+                LOG.trace("No CORS configuration allows the origin {} of the preflight request. The request is forbidden", requestOrigin);
+                return forbidden();
             }
         }
         return null; // proceed
@@ -369,27 +390,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         Optional<CorsOriginConfiguration> originConfiguration = CrossOriginUtil.getCorsOriginConfigurationForRequest(request);
         if (originConfiguration.isPresent() && matchesOrigin(originConfiguration.get(), requestOrigin)) {
             return originConfiguration;
-        }
-        if (!corsConfiguration.isEnabled()) {
-            return Optional.empty();
-        }
-        return corsConfiguration.getConfigurations().values().stream()
-            .filter(config -> matchesOrigin(config, requestOrigin))
-            .findFirst();
-    }
-
-    private Optional<CorsOriginConfiguration> getAnyConfiguration(HttpRequest<?> request) {
-        String requestOrigin = request.getOrigin().orElse(null);
-        if (requestOrigin == null) {
-            return Optional.empty();
-        }
-        if (router != null) {
-            for (UriRouteMatch<Object, Object> routeMatch : router.findAny(request)) {
-                Optional<CorsOriginConfiguration> corsOriginConfiguration = CrossOriginUtil.getCorsOriginConfiguration(routeMatch);
-                if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
-                    return corsOriginConfiguration;
-                }
-            }
         }
         if (!corsConfiguration.isEnabled()) {
             return Optional.empty();
