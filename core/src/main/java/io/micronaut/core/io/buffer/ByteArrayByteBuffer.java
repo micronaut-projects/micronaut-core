@@ -242,7 +242,7 @@ public final class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
 
     @Override
     public byte[] toByteArray() {
-        return Arrays.copyOfRange(underlyingBytes, readerIndex, readableBytes());
+        return Arrays.copyOfRange(underlyingBytes, readerIndex, underlyingBytes.length);
     }
 
     @Override
