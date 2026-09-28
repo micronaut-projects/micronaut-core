@@ -175,9 +175,13 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
         if (onWritten == null) {
             ctx.writeAndFlush(lastContent(), ctx.voidPromise());
         } else {
+            ChannelHandlerContext ctx = this.ctx;
             ctx.writeAndFlush(lastContent()).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     onWritten.run();
+                } else {
+                    // like the void promise of the other case
+                    ctx.channel().pipeline().fireExceptionCaught(future.cause());
                 }
             });
         }
