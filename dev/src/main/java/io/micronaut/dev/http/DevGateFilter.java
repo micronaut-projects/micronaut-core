@@ -50,10 +50,25 @@ import java.util.concurrent.CompletableFuture;
 @Requires(beans = DevRuntime.class)
 public final class DevGateFilter {
 
-    private final DevRuntime runtime;
+    /**
+     * The keys of the JSON body a client that is not a browser receives.
+     */
+    static final String KEY_MESSAGE = "message";
+    static final String KEY_KIND = "kind";
+    static final String KEY_AT = "at";
+    static final String KEY_DIAGNOSTICS = "diagnostics";
+    static final String KEY_SEVERITY = "severity";
+    static final String KEY_FILE = "file";
+    static final String KEY_LINE = "line";
+    static final String KEY_COLUMN = "column";
 
-    DevGateFilter(DevRuntime runtime) {
+    private final DevRuntime runtime;
+    @Nullable
+    private final DevErrorPage errorPage;
+
+    DevGateFilter(DevRuntime runtime, @Nullable DevErrorPage errorPage) {
         this.runtime = runtime;
+        this.errorPage = errorPage;
     }
 
     /**
@@ -67,31 +82,37 @@ public final class DevGateFilter {
         return runtime.whenReady().thenApply(ignored -> runtime.lastFailure().map(failure -> respond(request, failure)).orElse(null));
     }
 
-    private static HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure) {
+    private HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure) {
         boolean html = request.getHeaders().accept().stream().anyMatch(type -> type.getName().equals(MediaType.TEXT_HTML));
         if (html) {
-            return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.TEXT_HTML_TYPE).body(page(failure));
+            HttpResponse<?> unavailable = HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE);
+            // the page the server shows for any other error, when the server is here to render it
+            String body = errorPage != null ? errorPage.render(request, unavailable, failure) : page(failure);
+            return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.TEXT_HTML_TYPE).body(body);
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("message", "Compilation failed");
-        body.put("kind", failure.kind().name().toLowerCase(java.util.Locale.ROOT));
-        body.put("at", failure.at().toString());
+        body.put(KEY_MESSAGE, "Compilation failed");
+        body.put(KEY_KIND, failure.kind().name().toLowerCase(java.util.Locale.ROOT));
+        body.put(KEY_AT, failure.at().toString());
         List<Map<String, Object>> diagnostics = new ArrayList<>();
         for (CompileDiagnostic diagnostic : failure.diagnostics()) {
             Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("severity", diagnostic.severity().name());
-            entry.put("message", diagnostic.message());
+            entry.put(KEY_SEVERITY, diagnostic.severity().name());
+            entry.put(KEY_MESSAGE, diagnostic.message());
             if (diagnostic.file() != null) {
-                entry.put("file", diagnostic.file().toString());
-                entry.put("line", diagnostic.line());
-                entry.put("column", diagnostic.column());
+                entry.put(KEY_FILE, diagnostic.file().toString());
+                entry.put(KEY_LINE, diagnostic.line());
+                entry.put(KEY_COLUMN, diagnostic.column());
             }
             diagnostics.add(entry);
         }
-        body.put("diagnostics", diagnostics);
+        body.put(KEY_DIAGNOSTICS, diagnostics);
         return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.APPLICATION_JSON_TYPE).body(body);
     }
 
+    /**
+     * The page used when no server-side error page provider is available.
+     */
     static String page(CompileFailure failure) {
         StringBuilder page = new StringBuilder("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Compilation failed</title>")
             .append("<style>body{font-family:ui-monospace,Menlo,monospace;margin:2rem;background:#1e1e1e;color:#ddd}h1{color:#f66}pre{background:#111;padding:1rem;overflow:auto}.file{color:#8cf}</style>")

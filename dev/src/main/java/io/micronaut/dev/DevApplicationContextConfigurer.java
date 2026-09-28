@@ -21,6 +21,7 @@ import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 
 import java.util.Map;
 
@@ -49,8 +50,8 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
         builder.properties(Map.of(
             DevelopmentMode.PROPERTY, true,
             // the engine watches; the context's own watcher must neither restart the JVM nor run beside it
-            "micronaut.io.watch.restart", false,
-            "micronaut.io.watch.enabled", false
+            FileWatchConfiguration.RESTART, false,
+            FileWatchConfiguration.ENABLED, false
         ));
         builder.trackBeanDependencies(true);
         builder.retainedRegistrations(runtime.takeRetainedRegistrations());

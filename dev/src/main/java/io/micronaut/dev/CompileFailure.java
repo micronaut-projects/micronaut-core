@@ -64,13 +64,14 @@ public record CompileFailure(SourceKind kind, List<CompileDiagnostic> diagnostic
      * @return The text
      */
     public String describe() {
-        StringBuilder text = new StringBuilder(kind.name().toLowerCase(java.util.Locale.ROOT)).append(" compilation failed:\n");
+        String newline = System.lineSeparator();
+        StringBuilder text = new StringBuilder(kind.name().toLowerCase(java.util.Locale.ROOT)).append(" compilation failed:").append(newline);
         for (CompileDiagnostic diagnostic : diagnostics) {
             text.append("  ").append(diagnostic.severity()).append(' ');
             if (diagnostic.file() != null) {
                 text.append(diagnostic.file()).append(':').append(diagnostic.line()).append(": ");
             }
-            text.append(diagnostic.message().strip()).append('\n');
+            text.append(diagnostic.message().strip()).append(newline);
         }
         return text.toString();
     }
