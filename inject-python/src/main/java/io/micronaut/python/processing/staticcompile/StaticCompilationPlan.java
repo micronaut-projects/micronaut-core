@@ -31,23 +31,36 @@ import java.util.Map;
  * @param decisions   The decisions, in source order
  * @param bodies      The compiled bodies by {@link Ir.CompiledBody#key()}
  * @param diagnostics The warnings (errors in strict mode) for explicit switches that are not honoured
+ * @param trace       Whether the compiled bodies count their entries
  * @author Graeme Rocher
  * @since 5.3.0
  */
 @Experimental
 public record StaticCompilationPlan(List<StaticCompilationDecision> decisions,
                                     Map<String, Ir.CompiledBody> bodies,
-                                    List<PythonDiagnostic> diagnostics) {
+                                    List<PythonDiagnostic> diagnostics,
+                                    boolean trace) {
 
     /**
      * An empty plan.
      */
-    public static final StaticCompilationPlan EMPTY = new StaticCompilationPlan(List.of(), Map.of(), List.of());
+    public static final StaticCompilationPlan EMPTY = new StaticCompilationPlan(List.of(), Map.of(), List.of(), false);
 
     public StaticCompilationPlan {
         decisions = decisions == null ? List.of() : List.copyOf(decisions);
         bodies = bodies == null ? Map.of() : Map.copyOf(bodies);
         diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+    }
+
+    /**
+     * A plan without tracing.
+     *
+     * @param decisions   The decisions
+     * @param bodies      The compiled bodies
+     * @param diagnostics The diagnostics
+     */
+    public StaticCompilationPlan(List<StaticCompilationDecision> decisions, Map<String, Ir.CompiledBody> bodies, List<PythonDiagnostic> diagnostics) {
+        this(decisions, bodies, diagnostics, false);
     }
 
     /**
@@ -58,6 +71,42 @@ public record StaticCompilationPlan(List<StaticCompilationDecision> decisions,
      */
     public StaticCompilationPlan(List<StaticCompilationDecision> decisions, List<PythonDiagnostic> diagnostics) {
         this(decisions, Map.of(), diagnostics);
+    }
+
+    /**
+     * @param trace Whether the compiled bodies count their entries
+     * @return The plan with tracing set
+     */
+    public StaticCompilationPlan withTrace(boolean trace) {
+        return new StaticCompilationPlan(decisions, bodies, diagnostics, trace);
+    }
+
+    /**
+     * @param className The generated class
+     * @return Whether any method of the class is compiled
+     */
+    public boolean compilesAnyMethodOf(String className) {
+        String prefix = className + "#";
+        for (String key : bodies.keySet()) {
+            if (key.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param className The generated class
+     * @return The compiled bodies of the class
+     */
+    public List<Ir.CompiledBody> bodiesOf(String className) {
+        List<Ir.CompiledBody> result = new java.util.ArrayList<>();
+        for (Ir.CompiledBody body : bodies.values()) {
+            if (body.className().equals(className)) {
+                result.add(body);
+            }
+        }
+        return result;
     }
 
     /**
