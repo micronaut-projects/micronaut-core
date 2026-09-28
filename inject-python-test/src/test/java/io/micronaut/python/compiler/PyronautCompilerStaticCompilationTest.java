@@ -23,7 +23,10 @@ import io.micronaut.python.processing.staticcompile.StaticCompilationReport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -69,16 +72,30 @@ class PyronautCompilerStaticCompilationTest {
         List<StaticCompilationDecision> decisions = new ArrayList<>();
         List<PythonDiagnostic> diagnostics = new ArrayList<>();
 
-        ClassLoader classLoader = PyronautCompiler.builder()
-            .pythonCode(SOURCE)
-            .staticCompilation(StaticCompilationMode.ALL)
-            .staticCompilationReport(directory.toFile())
-            .staticCompilationDecisionCallback(decisions::add)
-            .pythonDiagnosticCallback(diagnostics::add)
-            .build()
-            .buildClassLoader();
+        ByteArrayOutputStream console = new ByteArrayOutputStream();
+        PrintStream err = System.err;
+        ClassLoader classLoader;
+        System.setErr(new PrintStream(console, true, StandardCharsets.UTF_8));
+        try {
+            classLoader = PyronautCompiler.builder()
+                .pythonCode(SOURCE)
+                .staticCompilation(StaticCompilationMode.ALL)
+                .staticCompilationReport(directory.toFile())
+                .staticCompilationDecisionCallback(decisions::add)
+                .pythonDiagnosticCallback(diagnostics::add)
+                .build()
+                .buildClassLoader();
+        } finally {
+            System.setErr(err);
+        }
 
         assertNotNull(classLoader);
+        // the compilation says once that the feature is experimental, naming the mode and the report
+        String output = console.toString(StandardCharsets.UTF_8);
+        String note = "Static compilation of Python is experimental and in use (mode all)";
+        assertTrue(output.contains("NOTE: " + note), output);
+        assertEquals(output.indexOf(note), output.lastIndexOf(note), output);
+        assertTrue(output.contains("Review the decisions in " + directory), output);
         Map<String, StaticCompilationDecision> byName = decisions.stream().collect(Collectors.toMap(StaticCompilationDecision::qualifiedName, Function.identity()));
         assertEquals(Outcome.NOT_CANDIDATE, byName.get("PricingService.__init__").outcome());
         assertEquals(Outcome.COMPILED, byName.get("PricingService.total").outcome());
@@ -97,12 +114,13 @@ class PyronautCompilerStaticCompilationTest {
         assertTrue(diagnostics.get(0).message().startsWith("[PricingService.describe] cannot be compiled statically: [varargs-signature]"), diagnostics.get(0).message());
 
         List<String> lines = Files.readAllLines(directory.resolve(StaticCompilationReport.DECISIONS_FILE));
-        assertEquals("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"full\"}", lines.get(0));
+        assertTrue(lines.get(0).startsWith("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"full\",\"written\":\""), lines.get(0));
         assertEquals(decisions.size() + 1, lines.size());
         assertTrue(lines.get(1).startsWith("{\"record\":\"decision\",\"name\":\"PricingService.__init__\""), lines.get(1));
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
         assertTrue(summary.contains("COMPILED      PricingService.total"), summary);
         assertTrue(summary.contains("[unknown-type]"), summary);
+        assertTrue(summary.contains("              fix: "), summary);
         assertTrue(summary.contains("EXCLUDED      1"), summary);
     }
 

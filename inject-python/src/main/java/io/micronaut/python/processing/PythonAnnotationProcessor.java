@@ -239,6 +239,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private Consumer<ClassElement> classElementCallback;
     private Consumer<PythonDiagnostic> diagnosticCallback;
     private Consumer<StaticCompilationDecision> staticDecisionCallback;
+    private boolean experimentalNoteGiven;
     // the sources whose bytecode is compiled once the static compilation plan has rewritten their runtime trees
     private final List<PendingBytecode> pendingBytecode = new ArrayList<>();
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
@@ -832,6 +833,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
         if (!planned && plan.diagnostics().isEmpty()) {
             return;
+        }
+        if (planned && !experimentalNoteGiven) {
+            // once per compilation, whatever the number of rounds and applications
+            experimentalNoteGiven = true;
+            note("Static compilation of Python is experimental and in use (%s): the compiled bodies run as Java, with Python semantics reproduced by the compiler. %s; @CompileStatic(False) keeps a function in Python.",
+                configuration.mode() == StaticCompilationMode.OFF ? "switched on by CompileStatic" : "mode " + configuration.mode().optionValue(),
+                configuration.reportDirectory() != null
+                    ? "Review the decisions in " + configuration.reportDirectory()
+                    : "Set " + StaticCompilationMode.REPORT_OPTION + " to write the report of the decisions");
         }
         if (staticDecisionCallback != null) {
             plan.decisions().forEach(staticDecisionCallback);

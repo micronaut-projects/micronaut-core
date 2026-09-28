@@ -28,6 +28,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,10 +39,10 @@ import java.util.TreeMap;
 
 /**
  * Writes the decisions of a compilation as {@code decisions.jsonl} (one JSON object per line, the
- * first one describing the plan) and {@code summary.txt} (the decisions grouped by outcome with
- * totals per outcome and per reason), and keeps them as {@code decisions.properties}, the state
- * an incremental build reads back to complete its own decisions with those of the sources it did
- * not plan.
+ * first one describing the plan, the input of the page a build tool renders) and {@code summary.txt}
+ * (the decisions grouped by outcome with totals per outcome and per reason), every reason carrying
+ * a hint of what to change, and keeps them as {@code decisions.properties}, the state an incremental
+ * build reads back to complete its own decisions with those of the sources it did not plan.
  *
  * @author Graeme Rocher
  * @since 5.3.0
@@ -99,6 +100,7 @@ public final class StaticCompilationReport {
                 .name("record").value("plan")
                 .name("mode").value(mode.optionValue())
                 .name("coverage").value(plannedSources == null ? "full" : "incremental")
+                .name("written").value(Instant.now().toString())
                 .endObject().toString());
             for (StaticCompilationDecision decision : all) {
                 lines.add(decision.toJson());
@@ -166,8 +168,8 @@ public final class StaticCompilationReport {
     }
 
     /**
-     * The human-readable summary: the decisions grouped by outcome, each with its reasons, then the
-     * totals per outcome and per reason rule.
+     * The human-readable summary: the decisions grouped by outcome, each with its reasons and what to
+     * change for each, then the totals per outcome and per reason rule.
      *
      * @param decisions The decisions
      * @return The summary
@@ -198,6 +200,10 @@ public final class StaticCompilationReport {
                         out.append(reason.span().location()).append("  ");
                     }
                     out.append(reason.message()).append('\n');
+                    String hint = StaticCompilationHints.hint(reason);
+                    if (hint != null) {
+                        out.append("              fix: ").append(hint).append('\n');
+                    }
                 }
             }
         }

@@ -78,8 +78,12 @@ public record StaticCompilationDecision(String qualifiedName,
             json.beginObject()
                 .name("rule").value(reason.rule())
                 .name("message").value(reason.message())
-                .name("location").value(reason.span() == null ? null : reason.span().location())
-                .endObject();
+                .name("location").value(reason.span() == null ? null : reason.span().location());
+            String hint = StaticCompilationHints.hint(reason);
+            if (hint != null) {
+                json.name("hint").value(hint);
+            }
+            json.endObject();
         }
         return json.endArray()
             .name("stats").beginObject()

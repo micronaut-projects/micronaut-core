@@ -928,7 +928,8 @@ public final class PyronautCompiler {
         /**
          * Set how much of the Python code is compiled to Java in the generated stubs. The mode is
          * passed to the annotation processor as the {@code micronaut.python.compile.static} option;
-         * when unset, the option given through {@link #options(List)}, if any, applies.
+         * when unset, the option given through {@link #options(List)}, if any, applies. Static
+         * compilation is experimental: a compilation that uses it prints one note saying so.
          *
          * @param staticCompilationMode The mode
          * @return This builder

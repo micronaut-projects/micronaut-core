@@ -1,4 +1,6 @@
-The compiler can compile the body of a Python method to Java, inside the generated class the method is bridged on, when the type checker proves that every call, attribute read and operation in it resolves to a known target. A Java caller of such a method, which is every HTTP route, every injected service and every executable method, runs Java instead of entering the Python runtime to run the method; the body itself still crosses into Python where it must (an attribute of a class whose state lives in Python, a `@property`, a sibling the generated class cannot call directly), and the report counts those crossings. Python callers of an object the generated class created run the same Java body, so there is one implementation of the method, not two. The feature is experimental and off by default.
+The compiler can compile the body of a Python method to Java, inside the generated class the method is bridged on, when the type checker proves that every call, attribute read and operation in it resolves to a known target. A Java caller of such a method, which is every HTTP route, every injected service and every executable method, runs Java instead of entering the Python runtime to run the method; the body itself still crosses into Python where it must (an attribute of a class whose state lives in Python, a `@property`, a sibling the generated class cannot call directly), and the report counts those crossings. Python callers of an object the generated class created run the same Java body, so there is one implementation of the method, not two.
+
+WARNING: Static compilation is experimental and off by default. It changes how a Python body runs, not what it does: the compiler reproduces Python's semantics for the subset it compiles and refuses the rest, but a compiled body is Java, and a difference in behaviour is a bug to report. A compilation with static compilation in use prints one note saying so, naming the mode and the report; `@CompileStatic(False)` keeps a function in Python.
 
 Static compilation builds on <<typeChecking, type checking>>: the checker's inference decides what is statically dispatched, whether or not its diagnostics are reported. A body the checker flags is a body that will not compile.
 
@@ -25,7 +27,7 @@ The annotation processor option `micronaut.python.compile.static` selects the mo
 |Option |Purpose
 
 |`micronaut.python.compile.static.report`
-|A directory `decisions.jsonl` and `summary.txt` are written to, one record per method, see <<staticCompilationReport, the report>>. Unset, no files are written; the callback still receives every decision.
+|A directory `decisions.jsonl` and `summary.txt` are written to, one record per method, each reason with a suggestion of what to change, see <<staticCompilationReport, the report>>. Unset, no files are written; the callback still receives every decision.
 
 |`micronaut.python.compile.static.strict`
 |`true` makes an explicit `CompileStatic` that cannot be honoured an error instead of a warning.
@@ -81,38 +83,47 @@ A function carrying `CompileStatic` that is skipped, and a class carrying it who
 
 == What Is Compiled
 
-A method is compiled when it is a candidate, its signature has a Java layout, and every statement and expression of its body has a lowering with Python's semantics. Each failing condition is a reason with a stable identifier in the report. The signature and the statement kinds are checked completely, so all of their reasons are listed; the lowering of the body stops at its first refusal, so a body can carry one lowering reason at a time.
+A method is compiled when it is a candidate, its signature has a Java layout, and every statement and expression of its body has a lowering with Python's semantics. Each failing condition is a reason with a stable identifier in the report, and each reason comes with a suggestion of what to change (the third column below, sharpened in the report by what was found: a third-party module, a `dict.get` without a default, an `Optional` hint). The signature and the statement kinds are checked completely, so all of their reasons are listed; the lowering of the body stops at its first refusal, so a body can carry one lowering reason at a time.
 
-[cols="1,3"]
+[cols="1,3,2"]
 |===
-|Reason |Given when
+|Reason |Given when |What to change
 
 |`class-not-eligible`
 |The function has no ordinary Java class to compile into: a function of a `MicronautTest` module (its tests), an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
+|Move the logic into a plain class or a module-level function of an ordinary module.
 
 |`pooled-module`
 |The function belongs to a module without a module-level annotation, which the runtime serves from a pool of Python contexts, and its body reaches a Python object (an attribute of a class of the compilation, a method the generated class does not declare), which no context is leased for. A pooled route that only calls Java and the generated classes of the compilation is compiled and runs without leasing a context at all.
+|Keep the function to Java calls and the generated classes of the compilation, pass the bean it needs as a parameter, or give the module a module-level annotation so it is served as one object.
 
 |`special-method`, `async-function`, `generator-function`, `static-method`
 |The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a class method (a `@staticmethod` is compiled, into the static Java method the stub declares for it).
+|Put the logic in a regular method the special method calls; move the synchronous work of an async function into a plain method it calls; build and return a list instead of yielding; make a class method a `@staticmethod` or an instance method.
 
 |`overriding-java-method`, `intercepted-method`
 |The method implements a method of a Java base or interface whose signature the hints do not spell (a method implementing a Java method is compiled when each parameter is hinted with the Java parameter type, or a subtype of it the body reads the parameter as (`exception: ConstraintViolationException` where `ExceptionHandler.handle` takes a `Throwable`), and the return is unhinted, hinted `object`, or hinted with a type the Java method returns: `def intercept(self, context: MethodInvocationContext) -> object` compiles into `Object intercept(MethodInvocationContext)`); or it is a concrete advised method of an introduction class, whose chain runs on the Python object. Other advised methods (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method of a class runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, and a module's generated class is proxied by Micronaut like any Java bean; so validation and around advice cost no crossing into Python.
+|Spell the Java signature in the hints (each parameter with its Java type or a subtype the body needs, the return unhinted, `object` or a type the Java method returns); move the logic of an advised introduction method into a separate bean it calls.
 
 |`varargs-signature`, `unhinted-parameter`, `unhinted-return`, `java-reserved-name`
 |The signature has no fixed Java layout: `*args`, `**kwargs` or keyword-only parameters, a parameter without a hint, a parameter or return hint resolving to no Java type or class of the compilation, a method, parameter or local named with a Java keyword or a method of `Object`. A missing return hint is not a reason: the method returns `Object`, as its stub declares.
+|Replace `*args`, `**kwargs` and keyword-only parameters with named positional parameters, each hinted with a Java type, a standard type or a class of the compilation; give an optional parameter a default; rename what a Java keyword or a method of `Object` names.
 
 |`unknown-type`, `unknown-self-attribute`
 |An expression has no static type (a value of a third-party module, a local assigned values of different types, a local assigned on some paths only and read after them), or `self.x` names nothing the class declares.
+|Hint the parameter or attribute the value comes from, assign a local values of one type only and on every path before it is read, replace the call of a third-party module with a Java call, and assign `self.x` in `__init__` from a hinted value.
 
 |`dynamic-call`, `ambiguous-overload`, `kwargs-to-java`, `sibling-call`
 |A call resolves to no Java method or constructor (a module-level function that is not compiled, or one in a cycle of calls with its caller), more than one overload fits the argument types equally well, keyword arguments are given to a Java method or a builtin, or a class, async or generator method of the class is called on `self`.
+|Call a Java method, a method the generated class declares or a module-level function that compiles; hint or convert the arguments so that one overload fits best; pass the arguments positionally; break a cycle of calls or keep one side in Python.
 
 |`python-builtin-not-lowered`, `unsupported-statement`, `unsupported-expression`
 |A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below.
+|Rewrite with the supported subset below: a compiled builtin or the Java method of the value, the compiled statements and expressions; pass a default to `dict.get`; replace `Optional[T]` with `T` and test for `None`.
 
 |`unbounded-integer-op`, `equality-on-object`, `truthiness-of-java-object`, `python-exception`
 |An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception that is neither a Java exception nor an exception class of the compilation (a `ValueError`, a bare `except`).
+|Use a literal that fits a `long`, a literal exponent or float arithmetic; compare identifying fields, use `is` or call `equals`; test the value explicitly (`x is not None`, `len(x) > 0`); raise and catch Java exceptions or an exception class of the compilation, with no bare `except`.
 |===
 
 === The Supported Subset
@@ -195,7 +206,7 @@ Introspected classes keep their ownership model: their state lives in Java field
 [[staticCompilationReport]]
 == The Report
 
-One record per candidate method, delivered to the builder callback as `StaticCompilationDecision` and, when a report directory is configured, written to `decisions.jsonl` (one JSON object per line, stable field names, merged incrementally across rounds) and `summary.txt`, with `decisions.properties` alongside them: the state an incremental build reads back to keep both files complete:
+One record per candidate method, delivered to the builder callback as `StaticCompilationDecision` and, when a report directory is configured, written to `decisions.jsonl` (one JSON object per line, stable field names, merged incrementally across rounds) and `summary.txt`, with `decisions.properties` alongside them: the state an incremental build reads back to keep both files complete. Every reason carries a `hint`, what to change so that the function compiles (`StaticCompilationHints` answers the same question for a decision the callback receives):
 
 [source]
 ----
@@ -203,6 +214,7 @@ COMPILED      shop.OrderController.summary  shop/OrderController.py:11:5
               statements 8 · java calls 4 · bridge calls 1 · helpers 2
 SKIPPED       shop.PricingService.describe  shop/PricingService.py:19:5
               [unknown-type] shop/PricingService.py:20:16  [inflect] is a third-party Python module; its members have no static type
+              fix: The value comes from a third-party Python module, whose members have no static type. Call a Java library instead, or keep this function in Python and compile the functions that call it.
 EXCLUDED      shop.LegacyAdapter.convert  shop/LegacyAdapter.py:8:5
 
 COMPILED      1
@@ -213,6 +225,8 @@ unknown-type                     1
 ----
 
 The outcomes are `COMPILED`, `SKIPPED` (a candidate with reasons), `CANDIDATE` (a body that would compile, in mode `off`), `EXCLUDED` (switched off by a decorator) and `NOT_CANDIDATE`. The totals per reason at the end put the most common blocker one glance away.
+
+`decisions.jsonl` is the input of a build tool's own rendering of the report: its first record is the plan (`mode`, `coverage`, `written`), every other one a decision with its `name`, `source`, `line`, `column`, `outcome`, `scope`, `reasons` (`rule`, `message`, `location`, `hint`) and `stats`. Pyronaut renders it as a page in the design of its test report.
 
 == Running the Existing Tests with Compilation On
 
