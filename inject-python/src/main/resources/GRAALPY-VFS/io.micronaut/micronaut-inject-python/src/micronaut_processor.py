@@ -28,6 +28,7 @@ ReturnDef = java.type("io.micronaut.python.processing.model.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
 SourceSpan = java.type("io.micronaut.python.processing.model.SourceSpan")
+PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 SuperArgumentDef = java.type("io.micronaut.python.processing.model.SuperArgumentDef")
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
 _JavaTypes = java.type("io.micronaut.python.processing.util.PythonJavaTypes")
@@ -250,7 +251,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.local_annotation_source_loading = set()
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
-        self.unresolved_member_errors = []  # Decorator members referencing a Java class member that does not exist
+        self.diagnostics = []  # The problems found in the module, as located PythonDiagnostic values
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -664,8 +665,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
                 )
                 result = super().visit(node)
-                if self.unresolved_member_errors:
-                    raise ValueError(self.unresolved_member_errors[0])
 
                 # A MicronautTest module owns all of its top-level functions. Other
                 # scripts retain the existing decorated-function-only behavior.
@@ -2562,10 +2561,12 @@ def convert_annotation_member_value(annotation_name, member_name, node, visitor=
     try:
         return convert_ast_value(node, visitor)
     except UnresolvedAnnotationMemberError as e:
-        # reported once the module is visited; the value stays the dotted name meanwhile
-        visitor.unresolved_member_errors.append(
-            f"Cannot resolve the value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name}: {e}"
-        )
+        # reported with the module's other problems; the value stays the dotted name meanwhile
+        visitor.diagnostics.append(PythonDiagnostic.error(
+            "unresolved-annotation-member",
+            f"Cannot resolve the value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name}: {e}",
+            visitor._span(node) if hasattr(visitor, "_span") else None
+        ))
         return ast.unparse(node)
 
 
