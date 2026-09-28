@@ -40,6 +40,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.codec.CodecException;
@@ -81,9 +82,11 @@ import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
@@ -116,6 +119,13 @@ public final class RouteExecutor {
     private final ExecutorSelector executorSelector;
     private final Optional<CoroutineHelper> coroutineHelper;
     private final ConversionService conversionService;
+    /**
+     * The writers of the bodies of routes that declare no body type, e.g. {@code Object} or
+     * {@code HttpResponse<?>}, resolved and specialized once per body class and media type.
+     */
+    private static final int MAX_SPECIFIC_WRITERS = 1024;
+
+    private final Map<SpecificWriterKey, Optional<SpecificWriter>> specificWriters = new ConcurrentHashMap<>();
 
     /**
      * Default constructor.
@@ -836,4 +846,45 @@ public final class RouteExecutor {
         return ReactiveExecutionFlow.fromPublisher(publisher);
     }
 
+    /**
+     * The writer of a body of a route that declares no body type, specialized once for the class of
+     * the body and the media type.
+     *
+     * @param registry  The message body handler registry
+     * @param type      The class of the body
+     * @param mediaType The media type of the response
+     * @return The specialized writer, or {@code null} if no writer can write the body or the cache is full
+     */
+    @Nullable SpecificWriter specificWriter(MessageBodyHandlerRegistry registry, Class<?> type, MediaType mediaType) {
+        SpecificWriterKey key = new SpecificWriterKey(type, mediaType);
+        Optional<SpecificWriter> writer = specificWriters.get(key);
+        if (writer == null) {
+            if (specificWriters.size() >= MAX_SPECIFIC_WRITERS) {
+                // e.g. generated body classes: leave the body to the writer of the route
+                return null;
+            }
+            writer = specificWriters.computeIfAbsent(key, k -> createSpecificWriter(registry, k));
+        }
+        return writer.orElse(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Optional<SpecificWriter> createSpecificWriter(MessageBodyHandlerRegistry registry, SpecificWriterKey key) {
+        Argument<Object> argument = (Argument<Object>) Argument.of(key.type());
+        return registry.findWriter(argument, List.of(key.mediaType()))
+            .filter(writer -> writer.isWriteable(argument, key.mediaType()))
+            .map(writer -> new SpecificWriter(argument, writer.createSpecific(argument)));
+    }
+
+    private record SpecificWriterKey(Class<?> type, MediaType mediaType) {
+    }
+
+    /**
+     * A writer specialized for the class of a body.
+     *
+     * @param type   The type of the body
+     * @param writer The writer
+     */
+    record SpecificWriter(Argument<Object> type, MessageBodyWriter<Object> writer) {
+    }
 }
