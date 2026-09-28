@@ -108,6 +108,17 @@ public interface BeanIntrospector {
      * @return The introspection
      * @throws IntrospectionException If no introspection data is found and the bean is not annotated with {@link io.micronaut.core.annotation.Introspected}
      */
+    /**
+     * Forgets every introspection this introspector has indexed, so that the next lookup scans the
+     * classpath again. A development launcher calls this after it replaced the application's classes;
+     * an application never needs to.
+     *
+     * @since 5.3.0
+     */
+    default void invalidate() {
+        // an introspector that keeps no index has nothing to forget
+    }
+
     default <T> BeanIntrospection<T> getIntrospection(Class<T> beanType) {
         return findIntrospection(beanType).orElseThrow(() -> new IntrospectionException("No bean introspection available for type [" + beanType + "]. Ensure the class is annotated with io.micronaut.core.annotation.Introspected"));
     }

@@ -16,6 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
@@ -24,6 +25,7 @@ import io.micronaut.core.util.CollectionUtils;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.lang.ref.SoftReference;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.WeakHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -56,6 +59,17 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private volatile List<BeanIntrospectionFallback> fallbacks;
     private final ClassLoader classLoader;
     private final boolean useContextClassLoader;
+    /**
+     * The indexes of loaders other than this introspector's own. The values are held softly because a
+     * generated reference strongly refers to the loader that is the key, so a strongly held value would
+     * keep a retired loader alive; a softly held one is collected under memory pressure and the loader with it.
+     */
+    private final Map<ClassLoader, SoftReference<Map<String, BeanIntrospectionReference<Object>>>> otherIntrospections = Collections.synchronizedMap(new WeakHashMap<>());
+    private final Map<ClassLoader, SoftReference<List<BeanIntrospectionFallback>>> otherFallbacks = Collections.synchronizedMap(new WeakHashMap<>());
+    /**
+     * Counts the invalidations, written under {@code this}, so a resolution that overlapped one is not kept.
+     */
+    private volatile long invalidations;
 
     /**
      * Creates an introspector that uses this class' class loader and may follow the context class loader setting.
@@ -166,7 +180,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         }
         ClassLoader beanClassLoader = beanType.getClassLoader();
         if (beanClassLoader != null && beanClassLoader != effectiveClassLoader && sharesBeanIntrospectionReference(beanClassLoader)) {
-            return resolveIntrospections(beanClassLoader).get(beanTypeName);
+            return getIntrospections(beanClassLoader).get(beanTypeName);
         }
         return null;
     }
@@ -175,9 +189,31 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         return getIntrospections(resolveClassLoader());
     }
 
+    @Override
+    public void invalidate() {
+        synchronized (this) {
+            // the index is rebuilt from the META-INF/micronaut entries, which are cached per loader too
+            MicronautMetaServiceLoaderUtils.invalidate(classLoader);
+            for (ClassLoader other : List.copyOf(otherIntrospections.keySet())) {
+                MicronautMetaServiceLoaderUtils.invalidate(other);
+            }
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            if (contextClassLoader != null) {
+                MicronautMetaServiceLoaderUtils.invalidate(contextClassLoader);
+            }
+            introspectionMap = null;
+            fallbacks = null;
+            otherIntrospections.clear();
+            otherFallbacks.clear();
+            invalidations++;
+        }
+    }
+
     private Map<String, BeanIntrospectionReference<Object>> getIntrospections(ClassLoader effectiveClassLoader) {
         if (effectiveClassLoader != classLoader) {
-            return resolveIntrospections(effectiveClassLoader);
+            // the index of another loader (the thread context loader, or the loader of a bean type) is kept
+            // per loader rather than scanned on every lookup
+            return cached(otherIntrospections, effectiveClassLoader, this::resolveIntrospections);
         }
         Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = this.introspectionMap;
         if (resolvedIntrospectionMap == null) {
@@ -200,7 +236,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
      */
     private List<BeanIntrospectionFallback> getFallbacks(ClassLoader effectiveClassLoader) {
         if (effectiveClassLoader != classLoader) {
-            return resolveFallbacks(effectiveClassLoader);
+            return cached(otherFallbacks, effectiveClassLoader, this::resolveFallbacks);
         }
         List<BeanIntrospectionFallback> resolvedFallbacks = this.fallbacks;
         if (resolvedFallbacks == null) {
@@ -213,6 +249,23 @@ class DefaultBeanIntrospector implements BeanIntrospector {
             }
         }
         return resolvedFallbacks;
+    }
+
+    private <V> V cached(Map<ClassLoader, SoftReference<V>> cache, ClassLoader loader, Function<ClassLoader, V> resolver) {
+        SoftReference<V> reference = cache.get(loader);
+        V value = reference != null ? reference.get() : null;
+        if (value == null) {
+            long invalidationsBefore = invalidations;
+            value = resolver.apply(loader);
+            synchronized (this) {
+                // a resolution that overlapped an invalidation saw the classes before the change: it is
+                // used once but not kept, so the next lookup resolves again
+                if (invalidationsBefore == invalidations) {
+                    cache.put(loader, new SoftReference<>(value));
+                }
+            }
+        }
+        return value;
     }
 
     private List<BeanIntrospectionFallback> resolveFallbacks(ClassLoader classLoader) {

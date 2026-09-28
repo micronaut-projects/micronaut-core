@@ -519,6 +519,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 });
             }
             beanDefinitionProvider.reset();
+            // a restarted context reads its configurations and validator again, as it does its definitions
+            beanConfigurationsList = null;
+            beanValidator = null;
         }
         return this;
     }
@@ -2319,6 +2322,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         beanConcreteCandidateCache.clear();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
+        containsBeanCache.clear();
+        beanProxyTargetCache.clear();
     }
 
     /**

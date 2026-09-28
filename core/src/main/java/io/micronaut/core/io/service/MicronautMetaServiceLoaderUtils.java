@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.RecursiveAction;
 import java.util.function.Predicate;
 import java.util.zip.ZipEntry;
@@ -65,6 +66,7 @@ public final class MicronautMetaServiceLoaderUtils {
 
     @Nullable
     private static volatile CacheEntry cacheEntry;
+    private static final AtomicLong CACHE_GENERATION = new AtomicLong();
 
     /**
      * Find all instantiated Micronaut service entries.
@@ -103,11 +105,33 @@ public final class MicronautMetaServiceLoaderUtils {
             }
         }
         CacheEntry ce = cacheEntry;
-        if (ce == null || ce.classLoader.get() != classLoader) {
-            ce = new CacheEntry(new WeakReference<>(classLoader), findAllMicronautMetaServices(classLoader));
+        long generation = CACHE_GENERATION.get();
+        if (ce == null || ce.classLoader.get() != classLoader || ce.generation != generation) {
+            // the entry records the generation its scan began in: one published by a scan that overlapped
+            // an invalidation is stale by its generation and is scanned again by the next lookup
+            ce = new CacheEntry(new WeakReference<>(classLoader), findAllMicronautMetaServices(classLoader), generation);
             cacheEntry = ce;
         }
         return ce.services.getOrDefault(serviceName, Set.of());
+    }
+
+    /**
+     * Forgets the cached service entries of the given classloader, so that the next lookup scans the
+     * {@code META-INF/micronaut/} index again.
+     *
+     * <p>The cache is keyed by classloader identity. A loader whose visible classes change while its
+     * identity stays the same, as a development launcher's delegating loader does when it swaps the
+     * generation it delegates to, has to call this after every swap.</p>
+     *
+     * @param classLoader The classloader whose entries are stale
+     * @since 5.3.0
+     */
+    public static void invalidate(ClassLoader classLoader) {
+        CACHE_GENERATION.incrementAndGet();
+        CacheEntry ce = cacheEntry;
+        if (ce != null && ce.classLoader.get() == classLoader) {
+            cacheEntry = null;
+        }
     }
 
     /**
@@ -416,7 +440,7 @@ public final class MicronautMetaServiceLoaderUtils {
 
     // Only service names are retained with the weak loader identity; no classes or instances that could
     // indirectly keep the loader alive belong in this cache.
-    private record CacheEntry(WeakReference<ClassLoader> classLoader, Map<String, Set<String>> services) {
+    private record CacheEntry(WeakReference<ClassLoader> classLoader, Map<String, Set<String>> services, long generation) {
     }
 
 }
