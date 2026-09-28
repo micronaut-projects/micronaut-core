@@ -127,7 +127,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                         };
     }
 
-    private Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {
+    protected Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {
         Optional<InputStream> config = readInput(resourceLoader, fileName);
         if (config.isPresent()) {
             log.debug("Found PropertySource for file name: {}", fileName);
