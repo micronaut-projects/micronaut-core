@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
@@ -59,7 +58,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S>, ExecutionSpec<S> permits HttpRouteSpec, HttpRouteGroup {
+public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S>, ExecutionSpec<S> permits HttpRouteSpec, HttpBodyRouteSpec, HttpRouteGroup {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method,
@@ -69,15 +68,16 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * {@code application/json}. A route that declares what it consumes, with this method or
      * {@link #consumesAll()}, and a nested group that does, replace them, like a method-level
      * {@code @Consumes} replaces the one of its controller. So does a form route, e.g.
-     * {@link HttpRouteBuilder#handleForm(HttpMethod, String, FormRequestHandler)}, which consumes
+     * {@link HttpRouteSpec#form()}, which consumes
      * the form media types: a form handler reads a form.</p>
      *
      * <pre>{@code
      * routes.path("/notes", notes -> {
      *     notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE);
-     *     notes.POST("/", String.class, (request, pathVariables, text) -> HttpResponse.ok(notes.save(text)));
-     *     notes.POST("/json", Note.class, (request, pathVariables, note) -> HttpResponse.ok(notes.save(note)))
-     *         .consumes(MediaType.APPLICATION_JSON_TYPE);
+     *     notes.POST("/").body(String.class).handle((request, pathVariables, text) -> HttpResponse.ok(notes.save(text)));
+     *     notes.POST("/json")
+     *         .consumes(MediaType.APPLICATION_JSON_TYPE)
+     *         .body(Note.class).handle((request, pathVariables, note) -> HttpResponse.ok(notes.save(note)));
      * });
      * }</pre>
      *
@@ -126,8 +126,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *
      * <pre>{@code
      * ExecutableMethod<Payments, String> pay = beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class);
-     * routes.POST("/payments/{amount}", (request, pathVariables) -> HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))))
-     *     .annotationMetadata(pay);
+     * routes.POST("/payments/{amount}")
+     *     .annotationMetadata(pay)
+     *     .handle((request, pathVariables) -> HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))));
      * }</pre>
      *
      * <p>The route keeps the element: an integration finds it back on the matched route with
@@ -158,9 +159,10 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * annotations are chained calls.
      *
      * <pre>{@code
-     * routes.POST("/payments/{amount}", payHandler)
+     * routes.POST("/payments/{amount}")
      *     .annotate(Audited.class)
-     *     .annotate(Version.class, version -> version.value("2"));
+     *     .annotate(Version.class, version -> version.value("2"))
+     *     .handle(payHandler);
      * }</pre>
      *
      * <p>If the route already has the annotation, the members of the given one are merged with,
@@ -257,7 +259,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * routes.path("/admin", admin -> {
      *     admin.attribute("role", "admin");
      *     admin.GET("/users", usersHandler);
-     *     admin.GET("/audit", auditHandler).attribute("role", "auditor");
+     *     admin.GET("/audit").attribute("role", "auditor").handle(auditHandler);
      * });
      * routes.filter("/admin/**").beforeReplacing(request -> {
      *     String role = RouteAttributes.getRouteInfo(request)
@@ -282,8 +284,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * route matches: they must be fast and must not block, nor read the body.
      *
      * <pre>{@code
-     * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.csv(pathVariables.getLong("id"))))
-     *     .where(RouteCondition.header("X-Export", "csv"));
+     * routes.GET("/reports/{id}")
+     *     .where(RouteCondition.header("X-Export", "csv"))
+     *     .handle((request, pathVariables) -> HttpResponse.ok(reports.csv(pathVariables.getLong("id"))));
      * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.find(pathVariables.getLong("id"))));
      * }</pre>
      *
@@ -330,8 +333,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * routes.path("/shops/{shop}", shop -> shop
      *     .constrain("shop", SHOPS)
      *     .route(locator));
-     * routes.GET("/orders/{id}", ordersHandler)
-     *     .constrain("id", Long.class, id -> id > 0);
+     * routes.GET("/orders/{id}")
+     *     .constrain("id", Long.class, id -> id > 0)
+     *     .handle(ordersHandler);
      * }</pre>
      *
      * <p>A constraint runs while the request is matched, after the URI template of the route
@@ -364,8 +368,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * no value, or a value the predicate does not accept, is not a match of the route.
      *
      * <pre>{@code
-     * routes.GET("/files/{name}", filesHandler)
-     *     .constrain("name", name -> !name.startsWith("."));
+     * routes.GET("/files/{name}")
+     *     .constrain("name", name -> !name.startsWith("."))
+     *     .handle(filesHandler);
      * }</pre>
      *
      * @param variable The name of the variable
@@ -389,8 +394,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * predicate does not accept, is not a match of the route.
      *
      * <pre>{@code
-     * routes.GET("/orders/{id}", ordersHandler)
-     *     .constrain("id", Long.class, id -> id > 0); // "/orders/abc" is not a match either
+     * routes.GET("/orders/{id}")
+     *     .constrain("id", Long.class, id -> id > 0)
+     *     .handle(ordersHandler); // "/orders/abc" is not a match either
      * }</pre>
      *
      * @param variable The name of the variable
@@ -438,8 +444,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * negated matcher, e.g. {@code present().negate()}, matches.
      *
      * <pre>{@code
-     * routes.GET("/files/{name}", filesHandler)
-     *     .constrain("name", ValueMatcher.startsWith(".").negate());
+     * routes.GET("/files/{name}")
+     *     .constrain("name", ValueMatcher.startsWith(".").negate())
+     *     .handle(filesHandler);
      * }</pre>
      *
      * @param variable The name of the variable
@@ -489,9 +496,10 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * request ambiguous, answered with {@code 400}.
      *
      * <pre>{@code
-     * routes.GET("/reports/{id}", csvHandler)
+     * routes.GET("/reports/{id}")
      *     .where(RequestPredicates.queryParam("format", "csv"))
-     *     .order(-1);
+     *     .order(-1)
+     *     .handle(csvHandler);
      * routes.GET("/reports/{id}", reportHandler); // the order 0: answers the other requests
      * }</pre>
      *
@@ -515,8 +523,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * default ports of the server only, once a route of the application has a port.
      *
      * <pre>{@code
-     * routes.GET("/metrics", (request, pathVariables) -> HttpResponse.ok(metrics.scrape()))
-     *     .port(9090);
+     * routes.GET("/metrics")
+     *     .port(9090)
+     *     .handle((request, pathVariables) -> HttpResponse.ok(metrics.scrape()));
      * }</pre>
      *
      * <p>On a group, the routes of the group, including the routes of its nested groups, inherit
@@ -538,7 +547,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * Otherwise the same as {@link #port(int)}, on a route and on a group.
      *
      * <pre>{@code
-     * routes.GET("/metrics", metricsHandler).port("${management.port:9090}");
+     * routes.GET("/metrics").port("${management.port:9090}").handle(metricsHandler);
      * }</pre>
      *
      * @param port The port, or an expression that resolves to it

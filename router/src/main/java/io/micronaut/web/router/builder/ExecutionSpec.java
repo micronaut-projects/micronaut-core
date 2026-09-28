@@ -36,7 +36,7 @@ import io.micronaut.core.annotation.Experimental;
  *     reports.executeOn(TaskExecutors.BLOCKING);
  *     reports.before(request -> audit.record(request)).executeOn(TaskExecutors.IO);
  *     reports.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(repository.find(pathVariables.getLong("id"))));
- *     reports.GET("/count", (request, pathVariables) -> HttpResponse.ok(cache.count())).nonBlocking();
+ *     reports.GET("/count").nonBlocking().handle((request, pathVariables) -> HttpResponse.ok(cache.count()));
  * });
  * }</pre>
  *

@@ -49,9 +49,7 @@ class GroupRoutes : HttpRoutes {
                 }
                 admin.GET("/users") { request, pathVariables -> text("users") }
             }
-            api.GET("/reports/{id}") { request, pathVariables ->
-                text("report " + pathVariables.getInt("id") + " as " + request.headers["X-Report-Format"])
-            }
+            api.GET("/reports/{id}")
                 .before { request: MutableHttpRequest<*> -> // <5>
                     request.headers.add("X-Report-Format", "summary")
                 }
@@ -60,20 +58,26 @@ class GroupRoutes : HttpRoutes {
                     if (response.status == HttpStatus.OK && request.headers.contains("X-Legacy")) HttpResponse.status<Any>(HttpStatus.GONE)
                     else null
                 }
-            api.GET { request, pathVariables -> text("api of " + PropagatedContext.get().get(Tenant::class.java).id) } // <7>
+                .and()
+                .handle { request, pathVariables ->
+                    text("report " + pathVariables.getInt("id") + " as " + request.headers["X-Report-Format"])
+                }
+            api.GET("/") { request, pathVariables -> text("api of " + PropagatedContext.get().get(Tenant::class.java).id) } // <7>
         }
         // end::groups[]
         // tag::groupSettings[]
         routes.path("/notes") { notes ->
             notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE) // <1>
             notes.executeOn(TaskExecutors.BLOCKING) // <2>
-            notes.POST(String::class.java) { request, pathVariables, text -> HttpResponse.ok("saved $text") }
-            notes.POST("/items", Item::class.java) { request, pathVariables, item -> HttpResponse.ok("saved " + item.name) }
+            notes.POST("/").body(String::class.java).handle { request, pathVariables, text -> HttpResponse.ok("saved $text") }
+            notes.POST("/items")
                 .consumes(MediaType.APPLICATION_JSON_TYPE) // <3>
-            notes.GET("/count") { request, pathVariables -> HttpResponse.ok("1") }
+                .body(Item::class.java).handle { request, pathVariables, item -> HttpResponse.ok("saved " + item.name) }
+            notes.GET("/count")
                 .nonBlocking() // <4>
+                .handle { request, pathVariables -> HttpResponse.ok("1") }
             notes.path("/drafts") { drafts ->
-                drafts.GET { request, pathVariables -> HttpResponse.ok(listOf(Item(1, "draft"))) }
+                drafts.GET("/") { request, pathVariables -> HttpResponse.ok(listOf(Item(1, "draft"))) }
                 drafts.produces(MediaType.APPLICATION_JSON_TYPE) // <5>
             }
         }
@@ -87,15 +91,17 @@ class GroupRoutes : HttpRoutes {
             }
         // end::serverFilters[]
         // tag::filterExecutor[]
-        routes.GET("/audit/{id}") { request, pathVariables ->
-            text("audited on " + request.getAttribute("audit-thread", String::class.java).orElse("none"))
-        }
+        routes.GET("/audit/{id}")
             .before { request: MutableHttpRequest<*> -> // <1>
                 request.setAttribute("audit-thread", Thread.currentThread().name)
             }
             .executeOn(TaskExecutors.BLOCKING) // <2>
             .and() // <3>
             .after { request: HttpRequest<*>, response: MutableHttpResponse<*> -> response.header("X-Audited", "true") }
+            .and()
+            .handle { request, pathVariables ->
+                text("audited on " + request.getAttribute("audit-thread", String::class.java).orElse("none"))
+            }
         // end::filterExecutor[]
     }
 

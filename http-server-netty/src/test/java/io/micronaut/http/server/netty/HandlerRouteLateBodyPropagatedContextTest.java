@@ -154,14 +154,17 @@ class HandlerRouteLateBodyPropagatedContextTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.asyncPOST("/late/text", (request, pathVariables, body) -> reading(body.text()))
+            routes.POST("/late/text")
                 .consumesAll()
-                .before(Routes::addRouteTrace);
-            routes.asyncPOST("/late/body", (request, pathVariables, body) -> reading(body.body(Map.class).thenApply(map -> String.valueOf(map.get("name")))))
-                .before(Routes::addRouteTrace);
-            routes.asyncPOST("/late/form", (request, pathVariables, body) -> reading(body.form().thenApply(form -> form.find("name", String.class).orElse("none"))))
+                .before(Routes::addRouteTrace).and()
+                .body().handleAsync((request, pathVariables, body) -> reading(body.text()));
+            routes.POST("/late/body")
+                .before(Routes::addRouteTrace).and()
+                .body().handleAsync((request, pathVariables, body) -> reading(body.body(Map.class).thenApply(map -> String.valueOf(map.get("name")))));
+            routes.POST("/late/form")
                 .consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
-                .before(Routes::addRouteTrace);
+                .before(Routes::addRouteTrace).and()
+                .body().handleAsync((request, pathVariables, body) -> reading(body.form().thenApply(form -> form.find("name", String.class).orElse("none"))));
         }
 
         private CompletionStage<HttpResponse<String>> reading(CompletionStage<String> read) {

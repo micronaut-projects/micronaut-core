@@ -29,32 +29,32 @@ class BodyRoutes implements HttpRoutes {
 
     @Override
     void routes(HttpRouteBuilder routes) {
-        routes.asyncPOST("/async/items") { request, pathVariables, body ->
+        routes.POST("/async/items").body().handleAsync { request, pathVariables, body ->
             body.body(Item) // <1>
                 .thenCompose(items.&saveAsync)
                 .thenApply { item -> HttpResponse.created(item) }
         }
-        routes.asyncPOST("/async/items/import") { request, pathVariables, body ->
+        routes.POST("/async/items/import").body().handleAsync { request, pathVariables, body ->
             body.elements(Item) // <2>
                 .forEach(items.&saveAsync)
                 .thenApply { done -> HttpResponse.accepted() }
         }
-        routes.asyncPOST("/async/notes") { request, pathVariables, body ->
+        routes.POST("/async/notes").consumes(MediaType.TEXT_PLAIN_TYPE).body().handleAsync { request, pathVariables, body ->
             body.text(1024) // <3>
                 .thenApply { String text -> HttpResponse.ok("received " + text.length() + " characters") }
-        }.consumes(MediaType.TEXT_PLAIN_TYPE)
-        routes.asyncPUT("/async/files") { request, pathVariables, body ->
+        }
+        routes.PUT("/async/files").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync { request, pathVariables, body ->
             Path destination = uploads.resolve(UUID.randomUUID().toString() + ".bin")
             body.transferTo(destination) // <4>
                 .thenApply { done -> HttpResponse.created(destination.fileName.toString()) }
-        }.consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE)
-        routes.asyncPOST("/async/guarded") { request, pathVariables, body ->
+        }
+        routes.POST("/async/guarded").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync { request, pathVariables, body ->
             if (!request.headers.contains("X-Token")) {
                 return CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.UNAUTHORIZED)) // <5>
             }
             body.bytes(64 * 1024)
                 .thenApply { byte[] bytes -> HttpResponse.ok("accepted " + bytes.length + " bytes") }
-        }.consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE)
+        }
     }
 }
 // end::clazz[]

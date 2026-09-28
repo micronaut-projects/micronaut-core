@@ -24,8 +24,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.web.router.builder.BodyRequestHandler;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteSpec;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -43,15 +43,14 @@ class HandlerRouteBodyClassTest {
 
     @Test
     void theBodyTypeAsAClassIsTheArgumentOfTheClass() {
-        RouteDeclaration declared = RouteDeclaration.of(HttpMethod.POST, "/declared");
         Router router = router(routes -> {
-            routes.POST("/post", Item.class, (request, pathVariables, item) -> HttpResponse.ok(item.name()));
-            routes.PUT("/put", Item.class, HandlerRouteBodyClassTest::handle);
-            routes.PATCH("/patch", Item.class, (request, pathVariables, item) -> HttpResponse.ok(item.name()));
-            routes.PATCH("/patch-argument", Argument.of(Item.class), (request, pathVariables, item) -> HttpResponse.ok(item.name()));
-            routes.handle(HttpMethod.DELETE, "/delete", Item.class, (request, pathVariables, item) -> HttpResponse.ok());
-            routes.handle("PROPFIND", "/propfind", Item.class, (request, pathVariables, item) -> HttpResponse.ok());
-            routes.handle(declared, Item.class, (request, pathVariables, item) -> HttpResponse.ok());
+            routes.POST("/post").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok(item.name()));
+            routes.PUT("/put").body(Item.class).handle(HandlerRouteBodyClassTest::handle);
+            routes.PATCH("/patch").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok(item.name()));
+            routes.PATCH("/patch-argument").body(Argument.of(Item.class)).handle((request, pathVariables, item) -> HttpResponse.ok(item.name()));
+            routes.DELETE("/delete").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+            routes.route("PROPFIND", "/propfind").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+            routes.POST("/declared").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
         });
         for (HttpRequest<?> request : List.of(HttpRequest.POST("/post", ""), HttpRequest.PUT("/put", ""),
             HttpRequest.PATCH("/patch", ""), HttpRequest.PATCH("/patch-argument", ""), HttpRequest.DELETE("/delete", ""),
@@ -64,7 +63,7 @@ class HandlerRouteBodyClassTest {
     @Test
     void theResponseTypeAsAClass() {
         Router router = router(routes -> {
-            routes.GET("/typed", (request, pathVariables) -> HttpResponse.ok(new Item("x"))).responseType(Item.class);
+            routes.GET("/typed").responseType(Item.class).handle((request, pathVariables) -> HttpResponse.ok(new Item("x")));
             routes.error(IllegalStateException.class, (request, error) -> HttpResponse.ok()).responseType(Item.class);
             routes.status(HttpStatus.NOT_FOUND, request -> HttpResponse.notFound()).responseType(Item.class);
         });
@@ -74,8 +73,13 @@ class HandlerRouteBodyClassTest {
     @Test
     void theClassIsRequired() {
         router(routes -> {
-            assertThrows(NullPointerException.class, () -> routes.POST("/x", (Class<Item>) null, (request, pathVariables, item) -> HttpResponse.ok()));
-            assertThrows(NullPointerException.class, () -> routes.GET("/y", (request, pathVariables) -> HttpResponse.ok()).responseType((Class<?>) null));
+            // a route stays usable after a setting it rejected
+            HttpRouteSpec x = routes.POST("/x");
+            assertThrows(NullPointerException.class, () -> x.body((Class<Item>) null));
+            x.body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+            HttpRouteSpec y = routes.GET("/y");
+            assertThrows(NullPointerException.class, () -> y.responseType((Class<?>) null));
+            y.handle((request, pathVariables) -> HttpResponse.ok());
         });
     }
 

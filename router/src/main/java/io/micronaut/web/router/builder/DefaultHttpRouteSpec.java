@@ -19,173 +19,193 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.RouteArguments;
-
+import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.form.FormData;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
-import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
+import java.util.function.Supplier;
 
 /**
- * The {@link HttpRouteSpec}: the routes of a handler, one, or one per HTTP method, configured
- * together. The spec holds no state of its own, the routes do: it compares by its routes.
+ * The {@link HttpRouteSpec} of a {@link PendingRoute}.
  *
- * @param routes The routes of the handler
- * @param ports  Resolves a port given as a string, see {@link #port(String)}
- * @param inherited The media types and the executor the routes inherit from their groups, or {@code null}
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record DefaultHttpRouteSpec(List<RouteSettings> routes, ToIntFunction<String> ports,
-                            RouteGroupDefaults.@Nullable Inheriting inherited) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
+final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
+
+    private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class);
+
+    private final PendingRoute route;
+
+    /**
+     * @param route The pending route
+     */
+    DefaultHttpRouteSpec(PendingRoute route) {
+        this.route = route;
+    }
 
     @Override
     public HttpRouteSpec consumes(MediaType... mediaTypes) {
-        MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        own(RouteGroupDefaults.CONSUMES);
-        for (RouteSettings route : routes) {
-            route.consumes(checked);
-        }
+        route.consumes(mediaTypes);
         return this;
     }
 
     @Override
     public HttpRouteSpec consumesAll() {
-        own(RouteGroupDefaults.CONSUMES);
-        for (RouteSettings route : routes) {
-            route.consumesAll();
-        }
+        route.consumesAll();
         return this;
     }
 
     @Override
     public HttpRouteSpec produces(MediaType... mediaTypes) {
-        MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        own(RouteGroupDefaults.PRODUCES);
-        for (RouteSettings route : routes) {
-            route.produces(checked);
-        }
+        route.produces(mediaTypes);
         return this;
     }
 
     @Override
     public HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
-        for (RouteSettings route : routes) {
-            route.annotationMetadata(annotationMetadata);
-        }
+        route.annotationMetadata(annotationMetadata);
         return this;
     }
 
     @Override
     public <T extends Annotation> HttpRouteSpec annotate(AnnotationValue<T> annotationValue) {
-        Objects.requireNonNull(annotationValue, "annotationValue");
-        for (RouteSettings route : routes) {
-            route.annotate(annotationValue);
-        }
+        route.annotate(annotationValue);
         return this;
     }
 
     @Override
     public HttpRouteSpec responseType(Argument<?> responseType) {
-        Objects.requireNonNull(responseType, "responseType");
-        for (RouteSettings route : routes) {
-            route.responseType(responseType);
-        }
+        route.responseType(responseType);
         return this;
     }
 
     @Override
     public HttpRouteSpec executeOn(String executorName) {
-        RouteArguments.executorName(executorName);
-        own(RouteGroupDefaults.EXECUTOR);
-        for (RouteSettings route : routes) {
-            route.executeOn(executorName);
-        }
+        route.executeOn(executorName);
         return this;
     }
 
     @Override
     public HttpRouteSpec nonBlocking() {
-        own(RouteGroupDefaults.EXECUTOR);
-        for (RouteSettings route : routes) {
-            route.nonBlocking();
-        }
+        route.nonBlocking();
         return this;
     }
 
     @Override
     public HttpRouteSpec port(String port) {
-        return port(ports.applyAsInt(port));
+        route.port(port);
+        return this;
     }
 
     @Override
     public HttpRouteSpec port(int port) {
-        int checked = RouteArguments.port(port);
-        for (RouteSettings route : routes) {
-            route.port(checked);
-        }
+        route.port(port);
         return this;
     }
 
     @Override
     public HttpRouteSpec attribute(String name, Object value) {
-        Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(value, "value");
-        for (RouteSettings route : routes) {
-            route.attribute(name, value);
-        }
+        route.attribute(name, value);
         return this;
     }
 
     @Override
     public HttpRouteSpec order(int order) {
-        for (RouteSettings route : routes) {
-            route.order(order);
-        }
+        route.order(order);
         return this;
     }
 
     @Override
     public HttpRouteSpec where(RouteCondition condition) {
-        Objects.requireNonNull(condition, "condition");
-        for (RouteSettings route : routes) {
-            route.where(condition);
-        }
+        route.where(condition);
         return this;
     }
 
     @Override
     public HttpRouteSpec constrain(Predicate<? super PathVariables> accepted) {
-        Objects.requireNonNull(accepted, "accepted");
-        for (RouteSettings route : routes) {
-            route.constrain(accepted);
-        }
+        route.constrain(accepted);
         return this;
     }
 
     @Override
     public FilterSpec<HttpRouteSpec> addFilter(FilterRegistration filter) {
-        for (RouteSettings route : routes) {
-            route.filter(filter);
-        }
+        route.filter(filter);
         return new DefaultFilterSpec<>(this, filter);
     }
 
+    @Override
+    public <B> HttpBodyRouteSpec<B> body(Argument<B> bodyType) {
+        Objects.requireNonNull(bodyType, "bodyType");
+        return new DefaultHttpBodyRouteSpec<>(route, bodyType);
+    }
+
+    @Override
+    public HttpBodyRouteSpec<AsyncRequestBody> body() {
+        return new DefaultHttpBodyRouteSpec<>(route, ASYNC_BODY);
+    }
+
+    @Override
+    public HttpBodyRouteSpec<FormData> form() {
+        return new DefaultHttpBodyRouteSpec<>(route, null);
+    }
+
+    @Override
+    public void handle(RequestHandler handler) {
+        RequestHandler checked = route.terminal(handler, "handler");
+        route.end(() -> HandlerMethod.of(checked), null, 0);
+    }
+
+    @Override
+    public void handleAsync(AsyncRequestHandler handler) {
+        AsyncRequestHandler checked = route.terminal(handler, "handler");
+        route.end(() -> HandlerMethod.of(checked), null, 0);
+    }
+
+    @Override
+    public void respond(HttpResponse<?> response) {
+        ResponseTemplate template = ResponseTemplate.of(route.terminal(response, "response"));
+        respond(() -> HandlerMethod.respond(template), template.contentType());
+    }
+
+    @Override
+    public void respond(Supplier<? extends HttpResponse<?>> response) {
+        Supplier<? extends HttpResponse<?>> checked = route.terminal(response, "response");
+        respond(() -> HandlerMethod.respond(checked), null);
+    }
+
+    @Override
+    public void respond(Function<? super PathVariables, ? extends HttpResponse<?>> response) {
+        Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, "response");
+        respond(() -> HandlerMethod.respond(checked), null);
+    }
+
     /**
-     * The routes set a setting of their own: they no longer inherit the setting of their group.
+     * The route of a response: it never reads the body, so it consumes any content type, and
+     * it runs on the event loop, unless the route says otherwise.
      *
-     * @param setting The setting
+     * @param handler  Creates the response
+     * @param produces The content type of the response, or {@code null} if it is not known
      */
-    private void own(int setting) {
-        RouteGroupDefaults.Inheriting grouped = inherited;
-        if (grouped != null) {
-            grouped.own(setting);
+    private void respond(Supplier<HandlerMethod<?>> handler, @Nullable MediaType produces) {
+        int own = RouteGroupDefaults.CONSUMES | RouteGroupDefaults.EXECUTOR;
+        if (produces != null) {
+            own |= RouteGroupDefaults.PRODUCES;
         }
+        route.end(handler, settings -> {
+            settings.consumesAll();
+            settings.nonBlocking();
+            if (produces != null) {
+                settings.produces(produces);
+            }
+        }, own);
     }
 }

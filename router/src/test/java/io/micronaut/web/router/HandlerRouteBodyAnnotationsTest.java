@@ -47,7 +47,7 @@ class HandlerRouteBodyAnnotationsTest {
     @Test
     void theBodyArgumentKeepsTheAnnotationsOfTheBodyType() {
         Argument<Item> bodyType = Argument.of(Item.class, "item", view("public"));
-        Router router = router(routes -> routes.POST("/items", bodyType, (request, pathVariables, item) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.POST("/items").body(bodyType).handle((request, pathVariables, item) -> HttpResponse.ok()));
 
         Argument<?> body = bodyOf(router, HttpRequest.POST("/items", ""));
 
@@ -60,7 +60,7 @@ class HandlerRouteBodyAnnotationsTest {
     @Test
     void aNullableBodyArgumentKeepsTheAnnotationsOfTheBodyType() {
         Argument<Item> bodyType = HttpRouteBuilder.nullableBody(Argument.of(Item.class, "item", view("public")));
-        Router router = router(routes -> routes.POST("/items", bodyType, (request, pathVariables, item) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.POST("/items").body(bodyType).handle((request, pathVariables, item) -> HttpResponse.ok()));
 
         Argument<?> body = bodyOf(router, HttpRequest.POST("/items", ""));
 

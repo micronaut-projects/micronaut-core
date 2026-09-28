@@ -121,9 +121,10 @@ class HttpRoutesRequestChangesTest {
                 group.before(request -> {
                     request.getHeaders().set("X-Client", "group");
                 });
-                group.GET("/headers", OK).before(request -> {
+                group.GET("/headers").before(request -> {
                     request.getHeaders().add("X-Route", request.getHeaders().get("X-Client") + "-route");
-                });
+                }).and()
+                .handle(OK);
             });
         });
 
@@ -138,9 +139,10 @@ class HttpRoutesRequestChangesTest {
 
     @Test
     void aMutableRequestIsChangedInPlace() {
-        Router router = router(routes -> routes.GET("/x", OK).before(request -> {
+        Router router = router(routes -> routes.GET("/x").before(request -> {
             request.header("X-Changed", "true");
-        }));
+        }).and()
+        .handle(OK));
         MutableHttpRequest<?> request = HttpRequest.GET("/x");
 
         Run run = run(router, request);
@@ -151,7 +153,7 @@ class HttpRoutesRequestChangesTest {
     @Test
     void aRequestFilterContinuesWithTheRequestItReturns() {
         List<HttpRequest<?>> replacements = new ArrayList<>();
-        Router router = router(routes -> routes.GET("/x", OK)
+        Router router = router(routes -> routes.GET("/x")
             .beforeReplacing(request -> {
                 HttpRequest<?> replacement = new HttpRequestWrapper<>(request);
                 replacements.add(replacement);
@@ -170,7 +172,8 @@ class HttpRoutesRequestChangesTest {
                 HttpRequest<?> replacement = withMethod(request, HttpMethod.PATCH);
                 replacements.add(replacement);
                 return replacement;
-            }));
+            }).and()
+            .handle(OK));
 
         Run run = run(router, HttpRequest.GET("/x"));
         assertEquals(List.of("match GET /x", "handler PATCH /x"), run.trace);
@@ -180,12 +183,13 @@ class HttpRoutesRequestChangesTest {
 
     @Test
     void aRequestFilterThatAnswersStopsTheChainLikeBefore() {
-        Router router = router(routes -> routes.GET("/x", OK)
+        Router router = router(routes -> routes.GET("/x")
             .beforeReplacing(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED))
             .and()
             .beforeReplacing(request -> {
                 throw new AssertionError("not called");
-            }));
+            }).and()
+            .handle(OK));
 
         Run run = run(router, HttpRequest.GET("/x"));
         assertEquals(List.of("match GET /x"), run.trace);

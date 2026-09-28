@@ -53,8 +53,12 @@ public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder {
      * {@link HttpRoutes#routes(HttpRouteBuilder)} returned: a route, a group, an error or status
      * route or a server filter declared on it later fails with an
      * {@link IllegalStateException}, instead of being dropped.
+     *
+     * @throws IllegalStateException if a route declared on the builder was not ended with a
+     *                               terminal, see {@link HttpRouteSpec}
      */
     public void close() {
         closeBuilder();
+        checkEnded();
     }
 }

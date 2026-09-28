@@ -26,7 +26,6 @@ import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.junit.jupiter.api.Test;
 
@@ -49,7 +48,7 @@ class RouteOrderTest {
     @Test
     void theLowestOrderAnswersARequestTwoRoutesOfTheSameTemplateMatch() {
         Router router = router(routes -> {
-            routes.GET("/reports/{id}", handler("csv")).where(CSV).order(-1);
+            routes.GET("/reports/{id}").where(CSV).order(-1).handle(handler("csv"));
             routes.GET("/reports/{id}", handler("any"));
         });
 
@@ -60,9 +59,9 @@ class RouteOrderTest {
     @Test
     void routesWithTheSameOrderStayAmbiguous() {
         Router router = router(routes -> {
-            routes.GET("/reports/{id}", handler("a")).order(5);
-            routes.GET("/reports/{id}", handler("b")).order(5);
-            routes.GET("/reports/{id}", handler("c")).order(7);
+            routes.GET("/reports/{id}").order(5).handle(handler("a"));
+            routes.GET("/reports/{id}").order(5).handle(handler("b"));
+            routes.GET("/reports/{id}").order(7).handle(handler("c"));
         });
 
         DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/reports/1")));
@@ -72,10 +71,10 @@ class RouteOrderTest {
     @Test
     void theOrderNeverBeatsSpecificity() {
         Router router = router(routes -> {
-            routes.GET("/reports/latest", handler("literal")).order(10);
-            routes.GET("/reports/{id}", handler("variable")).order(-10);
-            routes.GET("/files/{name}", handler("plain")).order(10);
-            routes.GET("/files/{name:.+}", handler("pattern")).order(-10);
+            routes.GET("/reports/latest").order(10).handle(handler("literal"));
+            routes.GET("/reports/{id}").order(-10).handle(handler("variable"));
+            routes.GET("/files/{name}").order(10).handle(handler("plain"));
+            routes.GET("/files/{name:.+}").order(-10).handle(handler("pattern"));
         });
 
         assertEquals("literal", target(router, HttpRequest.GET("/reports/latest")));
@@ -85,10 +84,10 @@ class RouteOrderTest {
     @Test
     void theOrderNeverBeatsTheMediaTypes() {
         Router router = router(routes -> {
-            routes.GET("/reports/{id}", handler("csv")).produces(MediaType.TEXT_CSV_TYPE).order(10);
-            routes.GET("/reports/{id}", handler("any")).order(-10);
-            routes.POST("/upload", handler("text")).consumes(MediaType.TEXT_PLAIN_TYPE).order(10);
-            routes.POST("/upload", handler("any")).consumesAll().order(-10);
+            routes.GET("/reports/{id}").produces(MediaType.TEXT_CSV_TYPE).order(10).handle(handler("csv"));
+            routes.GET("/reports/{id}").order(-10).handle(handler("any"));
+            routes.POST("/upload").consumes(MediaType.TEXT_PLAIN_TYPE).order(10).handle(handler("text"));
+            routes.POST("/upload").consumesAll().order(-10).handle(handler("any"));
         });
 
         assertEquals("csv", target(router, HttpRequest.GET("/reports/1").accept(MediaType.TEXT_CSV_TYPE)));
@@ -98,8 +97,8 @@ class RouteOrderTest {
     @Test
     void theOrderNeverBeatsAnExplicitHeadRoute() {
         Router router = router(routes -> {
-            routes.GET("/items", handler("get")).order(-10);
-            routes.handle(HttpMethod.HEAD, "/items", handler("head")).order(10);
+            routes.GET("/items").order(-10).handle(handler("get"));
+            routes.route(HttpMethod.HEAD, "/items").order(10).handle(handler("head"));
         });
 
         assertEquals("head", target(router, HttpRequest.HEAD("/items")));
@@ -111,7 +110,7 @@ class RouteOrderTest {
             routes.group(fallbacks -> {
                 fallbacks.GET("/pages/{name}", handler("fallback"));
                 fallbacks.path("/", nested -> nested.GET("/docs/{name}", handler("nested fallback")));
-                fallbacks.GET("/own/{name}", handler("own")).order(-20);
+                fallbacks.GET("/own/{name}").order(-20).handle(handler("own"));
                 // declared after the routes
                 fallbacks.order(100);
             });
@@ -127,13 +126,11 @@ class RouteOrderTest {
 
     @Test
     void aDeclaredRouteIsOrderedBeforeItIsBuilt() {
-        RouteDeclaration first = RouteDeclaration.of(HttpMethod.GET, "/declared/{id}");
-        RouteDeclaration second = RouteDeclaration.of(HttpMethod.GET, "/declared/{name}");
         Router router = router(routes -> {
-            routes.handle(first, handler("first")).order(1);
+            routes.GET("/declared/{id}").order(1).handle(handler("first"));
             routes.group(group -> {
                 group.order(-1);
-                group.handle(second, handler("second"));
+                group.GET("/declared/{name}").handle(handler("second"));
             });
         });
 
@@ -153,7 +150,7 @@ class RouteOrderTest {
     @Test
     void aRouteOfSeveralMethodsHasTheOrderForEachMethod() {
         Router router = router(routes -> {
-            routes.handle(java.util.Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/both", handler("ordered")).order(-1);
+            routes.route(java.util.Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/both").order(-1).handle(handler("ordered"));
             routes.PUT("/both", handler("put"));
             routes.PATCH("/both", handler("patch"));
         });

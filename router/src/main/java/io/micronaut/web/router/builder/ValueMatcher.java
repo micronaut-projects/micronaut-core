@@ -35,10 +35,12 @@ import java.util.regex.Pattern;
  * <pre>{@code
  * import static io.micronaut.web.router.builder.ValueMatcher.*;
  *
- * routes.GET("/search", betaHandler)
- *     .where(RouteCondition.header("X-Channel", oneOf("beta", "canary").ignoringCase()));
- * routes.GET("/files/{name}", filesHandler)
- *     .constrain("name", startsWith(".").negate());
+ * routes.GET("/search")
+ *     .where(RouteCondition.header("X-Channel", oneOf("beta", "canary").ignoringCase()))
+ *     .handle(betaHandler);
+ * routes.GET("/files/{name}")
+ *     .constrain("name", startsWith(".").negate())
+ *     .handle(filesHandler);
  * }</pre>
  *
  * <p>A matcher is given the value as it is, not decoded nor trimmed any further than the source

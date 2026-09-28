@@ -113,8 +113,9 @@ class RequestPredicatesTest {
     void theConditionsSelectAHandlerRoute() {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
         DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(assembly);
-        routes.GET("/reports", (request, pathVariables) -> HttpResponse.ok("csv"))
-            .where(accept(MediaType.TEXT_CSV_TYPE).and(header("X-Export")));
+        routes.GET("/reports")
+            .where(accept(MediaType.TEXT_CSV_TYPE).and(header("X-Export")))
+            .handle((request, pathVariables) -> HttpResponse.ok("csv"));
         assembly.addImplicitHeadRoutes();
         Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
 

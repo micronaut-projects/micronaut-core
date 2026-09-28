@@ -36,8 +36,8 @@
  *         routes.path("/orders", group -> {
  *             group.beforeReplacing(request -> request.getHeaders().contains("X-Tenant") ? null : HttpResponse.badRequest());
  *             group.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(orders.find(pathVariables.getLong("id"))));
- *             group.POST("/", Order.class, (request, pathVariables, order) -> HttpResponse.created(orders.save(order)));
- *             group.asyncPOST("/import", (request, pathVariables, body) -> body.elements(Order.class)
+ *             group.POST("/").body(Order.class).handle((request, pathVariables, order) -> HttpResponse.created(orders.save(order)));
+ *             group.POST("/import").body().handleAsync((request, pathVariables, body) -> body.elements(Order.class)
  *                 .forEach(orders::saveAsync)
  *                 .thenApply(done -> HttpResponse.accepted()));
  *             group.error(NoSuchOrderException.class, (request, error) -> HttpResponse.notFound());
@@ -49,35 +49,34 @@
  *
  * <p>The main types:</p>
  * <ul>
- *     <li>{@link io.micronaut.web.router.builder.HttpRouteBuilder}: routes per HTTP method, by
- *     method name, with a decoded body, a form or an asynchronous handler; error and status
- *     routes; server filters; groups;</li>
- *     <li>{@link io.micronaut.web.router.builder.HttpRouteSpec}: the configuration of a route
+ *     <li>{@link io.micronaut.web.router.builder.HttpRouteBuilder}: the creators of the routes,
+ *     per HTTP method, by method name, for several methods or any method, and a shortcut per
+ *     method for a route with no settings; error and status routes; server filters; groups;</li>
+ *     <li>{@link io.micronaut.web.router.builder.HttpRouteSpec}: a pending route, its settings
  *     (media types, executor, annotations, conditions, port, order, attributes) and its filters,
- *     from {@link io.micronaut.web.router.builder.RouteFilterSpec};</li>
+ *     from {@link io.micronaut.web.router.builder.RouteFilterSpec}, its body stages and its
+ *     terminals, the handler or the response of the route;</li>
+ *     <li>{@link io.micronaut.web.router.builder.HttpBodyRouteSpec}: a pending route whose handler
+ *     receives the body, decoded, the form, or the body the handler reads;</li>
  *     <li>{@link io.micronaut.web.router.builder.HttpRouteGroup}: a group of routes with a path
  *     prefix, filters, conditions, error routes and settings common to its routes;</li>
  *     <li>{@link io.micronaut.web.router.builder.ServerFilterSpec}: the functional form of a
  *     {@code @ServerFilter} bean, optionally pre-matching;</li>
  *     <li>the handler functions ({@link io.micronaut.web.router.builder.RequestHandler},
  *     {@link io.micronaut.web.router.builder.BodyRequestHandler},
- *     {@link io.micronaut.web.router.builder.FormRequestHandler},
  *     {@link io.micronaut.web.router.builder.AsyncRequestHandler},
  *     {@link io.micronaut.web.router.builder.AsyncBodyRequestHandler}, which reads the
  *     {@link io.micronaut.http.body.AsyncRequestBody}, the error and status handlers)
  *     and the route filter functions;</li>
  *     <li>{@link io.micronaut.http.PathVariables}, the typed path variables of the
  *     matched route, and {@link io.micronaut.web.router.builder.RequestPredicates}, conditions
- *     for {@code where(...)};</li>
- *     <li>{@link io.micronaut.web.router.builder.RouteDeclaration}, a route declared apart from
- *     its handler.</li>
+ *     for {@code where(...)}.</li>
  * </ul>
  *
  * <p>The builders, the route, group, error, status and server filter specs and the path
  * variables are sealed: Micronaut implements them, the application uses them. The application
  * implements {@link io.micronaut.web.router.builder.HttpRoutes}, the handler and filter
- * functions, usually as lambdas, and may implement
- * {@link io.micronaut.web.router.builder.RouteDeclaration}.</p>
+ * functions, usually as lambdas.</p>
  *
  * <p>See the "Functional Routes" section of the user guide.</p>
  *

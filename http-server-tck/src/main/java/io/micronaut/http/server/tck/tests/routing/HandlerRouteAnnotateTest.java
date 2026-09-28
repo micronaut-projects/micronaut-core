@@ -187,39 +187,47 @@ public class HandlerRouteAnnotateTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/annotate/audited", (request, pathVariables) -> text("audited")).annotate(Audited.class);
+            routes.GET("/annotate/audited").annotate(Audited.class).handle((request, pathVariables) -> text("audited"));
             routes.GET("/annotate/plain", (request, pathVariables) -> text("plain"));
             routes.path("/annotate/group", group -> {
                 group.annotate(Audited.class);
                 group.annotate(AnnotationValue.builder(Version.class).value("1").build());
                 group.GET("/inner", (request, pathVariables) -> version(request));
-                group.GET("/override", (request, pathVariables) -> version(request))
-                    .annotate(AnnotationValue.builder(Version.class).value("2").build());
+                group.GET("/override")
+                    .annotate(AnnotationValue.builder(Version.class).value("2").build())
+                    .handle((request, pathVariables) -> version(request));
                 group.path("/nested", nested -> {
                     nested.annotate(AnnotationValue.builder(Version.class).value("2").build());
                     nested.GET("/inner", (request, pathVariables) -> version(request));
                 });
             });
-            routes.GET("/annotate/ping", (request, pathVariables) -> text("pong v1"))
-                .annotate(AnnotationValue.builder(Version.class).value("1").build());
-            routes.GET("/annotate/ping", (request, pathVariables) -> text("pong v2"))
-                .annotate(Version.class, version -> version.value("2"));
-            routes.GET("/annotate/replaced", (request, pathVariables) -> version(request))
+            routes.GET("/annotate/ping")
                 .annotate(AnnotationValue.builder(Version.class).value("1").build())
-                .annotate(AnnotationValue.builder(Version.class).value("2").build());
-            routes.GET("/annotate/several", (request, pathVariables) -> version(request))
+                .handle((request, pathVariables) -> text("pong v1"));
+            routes.GET("/annotate/ping")
+                .annotate(Version.class, version -> version.value("2"))
+                .handle((request, pathVariables) -> text("pong v2"));
+            routes.GET("/annotate/replaced")
+                .annotate(AnnotationValue.builder(Version.class).value("1").build())
+                .annotate(AnnotationValue.builder(Version.class).value("2").build())
+                .handle((request, pathVariables) -> version(request));
+            routes.GET("/annotate/several")
                 .annotate(Version.class, version -> version.value("1"))
                 .annotate(Audited.class.getName())
-                .annotate(Version.class.getName(), version -> version.value("2"));
+                .annotate(Version.class.getName(), version -> version.value("2"))
+                .handle((request, pathVariables) -> version(request));
             // the meta-annotations of an annotation type are not known at runtime: the value carries the stereotype
-            routes.GET("/annotate/stereotype", (request, pathVariables) -> text("payment"))
-                .annotate(AnnotationValue.builder(Payment.class).stereotype(AnnotationValue.builder(Audited.class).build()).build());
-            routes.GET("/annotate/method", (request, pathVariables) -> version(request))
+            routes.GET("/annotate/stereotype")
+                .annotate(AnnotationValue.builder(Payment.class).stereotype(AnnotationValue.builder(Audited.class).build()).build())
+                .handle((request, pathVariables) -> text("payment"));
+            routes.GET("/annotate/method")
                 .annotationMetadata(beanContext.getBeanDefinition(VersionedTarget.class).getRequiredMethod("target"))
-                .annotate(Audited.class);
-            routes.GET("/annotate/method-override", (request, pathVariables) -> version(request))
+                .annotate(Audited.class)
+                .handle((request, pathVariables) -> version(request));
+            routes.GET("/annotate/method-override")
                 .annotationMetadata(beanContext.getBeanDefinition(VersionedTarget.class).getRequiredMethod("target"))
-                .annotate(AnnotationValue.builder(Version.class).value("3").build());
+                .annotate(AnnotationValue.builder(Version.class).value("3").build())
+                .handle((request, pathVariables) -> version(request));
         }
     }
 

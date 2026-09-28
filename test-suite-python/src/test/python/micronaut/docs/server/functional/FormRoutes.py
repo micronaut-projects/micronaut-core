@@ -20,7 +20,7 @@ class FormRoutes(HttpRoutes):
         self.uploads = uploads
 
     def routes(self, routes: HttpRouteBuilder) -> None:
-        routes.POST("/forms/signup", lambda request, path_variables, form:  # <1>
+        routes.POST("/forms/signup").form().handle(lambda request, path_variables, form:  # <1>
                     HttpResponse.ok(f"Welcome {form.getString('name')}, {form.getInt('age', 18)}")
                     .contentType(MediaType.TEXT_PLAIN_TYPE))
 
@@ -35,7 +35,7 @@ class FormRoutes(HttpRoutes):
 
             return form_stage.thenCompose(read_avatar)
 
-        routes.asyncPOST("/forms/profile", profile).consumes(MediaType.MULTIPART_FORM_DATA_TYPE)
+        routes.POST("/forms/profile").consumes(MediaType.MULTIPART_FORM_DATA_TYPE).body().handleAsync(profile)
 
         def upload(request, path_variables, body):
             destination = self.uploads.resolve(f"{uuid.uuid4()}.upload")
@@ -45,5 +45,5 @@ class FormRoutes(HttpRoutes):
                                HttpResponse.created(str(destination.getFileName())).contentType(MediaType.TEXT_PLAIN_TYPE)
                                if found else HttpResponse.badRequest("no file")))
 
-        routes.asyncPOST("/forms/upload", upload).consumes(MediaType.MULTIPART_FORM_DATA_TYPE)
+        routes.POST("/forms/upload").consumes(MediaType.MULTIPART_FORM_DATA_TYPE).body().handleAsync(upload)
 # end::clazz[]

@@ -172,19 +172,23 @@ public class HandlerRoutesConcurrencyTest {
                     return null;
                 }, executor));
                 group.after((request, response) -> response.header("X-Group-Filter", request.getAttribute("group-id", String.class).orElse("none")));
-                group.GET("/sync/{id}", (request, pathVariables) -> text("sync " + pathVariables.getString("id")))
+                group.GET("/sync/{id}")
                     .beforeReplacing(request -> id(request).equals(pathVariables(request)) ? null : HttpResponse.badRequest())
                     .and()
-                    .after((request, response) -> response.header("X-Route-Filter", id(request)));
-                group.asyncGET("/async/{id}", (request, pathVariables) -> CompletableFuture.supplyAsync(() -> text("async " + pathVariables.getString("id")), executor))
-                    .after((request, response) -> response.header("X-Route-Filter", id(request))).executeOn(TaskExecutors.BLOCKING);
-                group.asyncPOST("/echo/{id}", (request, pathVariables, body) -> body.text()
-                        .thenApply(value -> text("echo " + pathVariables.getString("id") + ": " + value)))
+                    .after((request, response) -> response.header("X-Route-Filter", id(request))).and()
+                    .handle((request, pathVariables) -> text("sync " + pathVariables.getString("id")));
+                group.GET("/async/{id}")
+                    .after((request, response) -> response.header("X-Route-Filter", id(request))).executeOn(TaskExecutors.BLOCKING).and()
+                    .handleAsync((request, pathVariables) -> CompletableFuture.supplyAsync(() -> text("async " + pathVariables.getString("id")), executor));
+                group.POST("/echo/{id}")
                     .consumes(MediaType.TEXT_PLAIN_TYPE)
-                    .afterAsync((request, response) -> CompletableFuture.runAsync(() -> response.header("X-Route-Filter", id(request)), executor));
-                group.GET("/context/{id}", (request, pathVariables) ->
-                        text("context " + PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")))
-                    .after((request, response) -> response.header("X-Route-Filter", id(request)));
+                    .afterAsync((request, response) -> CompletableFuture.runAsync(() -> response.header("X-Route-Filter", id(request)), executor)).and()
+                    .body().handleAsync((request, pathVariables, body) -> body.text()
+                        .thenApply(value -> text("echo " + pathVariables.getString("id") + ": " + value)));
+                group.GET("/context/{id}")
+                    .after((request, response) -> response.header("X-Route-Filter", id(request))).and()
+                    .handle((request, pathVariables) ->
+                        text("context " + PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
             });
         }
 

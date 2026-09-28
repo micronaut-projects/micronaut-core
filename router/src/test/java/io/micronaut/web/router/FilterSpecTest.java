@@ -22,6 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.FilterSpec;
+import io.micronaut.web.router.builder.HttpBodyRouteSpec;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteGroup;
 import io.micronaut.web.router.builder.HttpRouteSpec;
@@ -56,10 +57,14 @@ class FilterSpecTest {
     @Test
     void andGoesBackToTheRouteTheGroupOrTheServerFilter() {
         router(routes -> {
-            HttpRouteSpec route = routes.GET("/route", FilterSpecTest::ok);
+            HttpRouteSpec route = routes.GET("/route");
             assertSame(route, route.before(request -> { }).and());
             assertSame(route, route.after((request, response) -> { }).executeOn(EXECUTOR).and());
             assertSame(route, route.beforeReplacingAsync(request -> CompletableFuture.completedFuture(null)).nonBlocking().and());
+            HttpBodyRouteSpec<String> body = routes.POST("/body").body(String.class);
+            assertSame(body, body.before(request -> { }).executeOn(EXECUTOR).and());
+            body.handle((request, pathVariables, text) -> HttpResponse.ok());
+            route.handle(FilterSpecTest::ok);
             ServerFilterSpec server = routes.filter("/**");
             assertSame(server, server.beforeReplacing(request -> null).executeOn(EXECUTOR).nonBlocking().and());
             routes.group(group -> {
@@ -72,16 +77,17 @@ class FilterSpecTest {
     @Test
     void aRouteFilterRunsOnTheExecutorItIsGivenTheLastChoiceWinning() {
         Router router = router(routes -> {
-            routes.GET("/executor", FilterSpecTest::ok).before(request -> { }).executeOn(EXECUTOR);
-            routes.GET("/non-blocking", FilterSpecTest::ok).before(request -> { }).nonBlocking();
-            routes.GET("/executor-last", FilterSpecTest::ok).before(request -> { }).nonBlocking().executeOn(EXECUTOR);
-            routes.GET("/non-blocking-last", FilterSpecTest::ok).before(request -> { }).executeOn(EXECUTOR).nonBlocking();
-            routes.GET("/after", FilterSpecTest::ok).after((request, response) -> { }).executeOn(EXECUTOR);
-            routes.GET("/async", FilterSpecTest::ok).afterAsync((request, response) -> CompletableFuture.completedFuture(null)).executeOn(EXECUTOR);
-            routes.GET("/second", FilterSpecTest::ok)
+            routes.GET("/executor").before(request -> { }).executeOn(EXECUTOR).and().handle(FilterSpecTest::ok);
+            routes.GET("/non-blocking").before(request -> { }).nonBlocking().and().handle(FilterSpecTest::ok);
+            routes.GET("/executor-last").before(request -> { }).nonBlocking().executeOn(EXECUTOR).and().handle(FilterSpecTest::ok);
+            routes.GET("/non-blocking-last").before(request -> { }).executeOn(EXECUTOR).nonBlocking().and().handle(FilterSpecTest::ok);
+            routes.GET("/after").after((request, response) -> { }).executeOn(EXECUTOR).and().handle(FilterSpecTest::ok);
+            routes.GET("/async").afterAsync((request, response) -> CompletableFuture.completedFuture(null)).executeOn(EXECUTOR).and().handle(FilterSpecTest::ok);
+            routes.GET("/second")
                 .before(request -> { })
                 .and()
-                .before(request -> { }).executeOn(EXECUTOR);
+                .before(request -> { }).executeOn(EXECUTOR).and()
+                .handle(FilterSpecTest::ok);
         });
 
         assertEquals(NO_EXECUTOR, failure(router, "/executor"));
@@ -137,7 +143,11 @@ class FilterSpecTest {
     @Test
     void theExecutorOfAFilterIsFixedWhenTheRouterIsBuilt() {
         List<FilterSpec<HttpRouteSpec>> kept = new ArrayList<>();
-        Router router = router(routes -> kept.add(routes.GET("/route", FilterSpecTest::ok).before(request -> { })));
+        Router router = router(routes -> {
+            HttpRouteSpec route = routes.GET("/route");
+            kept.add(route.before(request -> { }));
+            route.handle(FilterSpecTest::ok);
+        });
         // the router took the route: the change is ignored, like a change of the settings of the route
         assertNull(failure(router, "/route"));
         kept.getFirst().executeOn(EXECUTOR);
@@ -169,8 +179,10 @@ class FilterSpecTest {
             for (int i = 0; i < methods.size(); i++) {
                 String path = "/method/" + i;
                 paths.add(path);
-                HttpRouteSpec route = routes.GET(path, FilterSpecTest::ok);
+                HttpRouteSpec route = routes.GET(path);
                 assertSame(route, methods.get(i).apply(route).executeOn(EXECUTOR).and());
+                route.handle(FilterSpecTest::ok);
+
             }
         });
         for (String path : paths) {

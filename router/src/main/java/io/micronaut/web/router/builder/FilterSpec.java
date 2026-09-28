@@ -23,10 +23,11 @@ import io.micronaut.core.annotation.Experimental;
  * {@link #and()} to continue the declaration.
  *
  * <pre>{@code
- * routes.GET("/reports/{id}", reportHandler)
+ * routes.GET("/reports/{id}")
  *     .before(request -> audit.record(request)).executeOn(TaskExecutors.BLOCKING)
  *     .and()
- *     .produces(MediaType.TEXT_PLAIN_TYPE);
+ *     .produces(MediaType.TEXT_PLAIN_TYPE)
+ *     .handle(reportHandler);
  * }</pre>
  *
  * <p>A filter runs on the thread of the filter chain unless it is given an executor. The executor

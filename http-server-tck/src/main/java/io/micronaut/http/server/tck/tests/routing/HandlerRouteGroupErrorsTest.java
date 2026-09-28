@@ -144,10 +144,11 @@ public class HandlerRouteGroupErrorsTest {
                 api.GET("/fails", (request, pathVariables) -> {
                     throw new GroupErrorsFailure();
                 });
-                api.GET("/filter-fails", (request, pathVariables) -> text(HttpStatus.OK, "not failed"))
+                api.GET("/filter-fails")
                     .beforeReplacing(request -> {
                         throw new GroupErrorsFailure();
-                    });
+                    }).and()
+                    .handle((request, pathVariables) -> text(HttpStatus.OK, "not failed"));
                 api.GET("/missing", (request, pathVariables) -> HttpResponse.notFound());
                 api.GET("/gone", (request, pathVariables) -> {
                     throw new HttpStatusException(HttpStatus.GONE, "gone");

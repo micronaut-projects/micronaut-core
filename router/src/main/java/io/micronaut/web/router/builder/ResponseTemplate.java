@@ -30,7 +30,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * A copy of the response of a {@link HttpRouteBuilder#respond(String, HttpResponse)} route,
+ * A copy of the response of a {@link HttpRouteSpec#respond(HttpResponse)} route,
  * taken when the route is declared, that creates a new response for each request: the server
  * and the filters change the response they answer with, e.g. add headers, so a response is never
  * shared between requests.

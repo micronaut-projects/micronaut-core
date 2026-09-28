@@ -31,7 +31,6 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteGroup;
 import io.micronaut.web.router.builder.HttpRouteSpec;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -65,8 +64,8 @@ class RouteGroupSettingsTest {
         Router router = router(routes -> routes.path("/notes", notes -> {
             notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE);
             notes.POST("/", RouteGroupSettingsTest::ok);
-            notes.PUT("/{id}", Argument.of(String.class), (request, pathVariables, body) -> HttpResponse.ok(body));
-            notes.GET(RouteGroupSettingsTest::ok);
+            notes.PUT("/{id}").body(Argument.of(String.class)).handle((request, pathVariables, body) -> HttpResponse.ok(body));
+            notes.GET("/", RouteGroupSettingsTest::ok);
         }));
 
         UriRouteInfo<?, ?> post = route(router, HttpRequest.POST("/notes", "x").contentType(MediaType.TEXT_PLAIN_TYPE));
@@ -82,8 +81,8 @@ class RouteGroupSettingsTest {
     void aRouteWithItsOwnMediaTypesReplacesTheOnesOfItsGroup() {
         Router router = router(routes -> routes.path("/notes", notes -> {
             notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE);
-            notes.POST("/json", RouteGroupSettingsTest::ok).consumes(MediaType.APPLICATION_JSON_TYPE).produces(MediaType.APPLICATION_JSON_TYPE);
-            notes.POST("/any", RouteGroupSettingsTest::ok).consumesAll();
+            notes.POST("/json").consumes(MediaType.APPLICATION_JSON_TYPE).produces(MediaType.APPLICATION_JSON_TYPE).handle(RouteGroupSettingsTest::ok);
+            notes.POST("/any").consumesAll().handle(RouteGroupSettingsTest::ok);
         }));
 
         UriRouteInfo<?, ?> json = route(router, HttpRequest.POST("/notes/json", "{}").contentType(MediaType.APPLICATION_JSON_TYPE));
@@ -149,13 +148,12 @@ class RouteGroupSettingsTest {
 
     @Test
     void aFormRouteConsumesFormsWhatTheGroupConsumes() {
-        RouteDeclaration declared = RouteDeclaration.of(HttpMethod.POST, "/forms/declared");
         Router router = router(routes -> routes.group(forms -> {
             forms.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE);
-            forms.handleForm(HttpMethod.POST, "/forms/form", (request, pathVariables, form) -> HttpResponse.ok());
-            forms.handleForm("PROPPATCH", "/forms/custom", (request, pathVariables, form) -> HttpResponse.ok());
-            forms.handleForm(declared, (request, pathVariables, form) -> HttpResponse.ok());
-            forms.handleForm(HttpMethod.PUT, "/forms/json", (request, pathVariables, form) -> HttpResponse.ok()).consumes(MediaType.APPLICATION_JSON_TYPE);
+            forms.POST("/forms/form").form().handle((request, pathVariables, form) -> HttpResponse.ok());
+            forms.route("PROPPATCH", "/forms/custom").form().handle((request, pathVariables, form) -> HttpResponse.ok());
+            forms.route(HttpMethod.POST, "/forms/declared").form().handle((request, pathVariables, form) -> HttpResponse.ok());
+            forms.PUT("/forms/json").consumes(MediaType.APPLICATION_JSON_TYPE).form().handle((request, pathVariables, form) -> HttpResponse.ok());
         }));
 
         UriRouteInfo<?, ?> form = route(router, HttpRequest.POST("/forms/form", "a=b").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
@@ -171,15 +169,14 @@ class RouteGroupSettingsTest {
 
     @Test
     void everyKindOfHandlerRouteOfTheGroupInheritsTheSettings() {
-        RouteDeclaration declared = RouteDeclaration.of(HttpMethod.GET, "/kinds/declared");
         Router router = router(routes -> routes.group(kinds -> {
             kinds.produces(MediaType.TEXT_PLAIN_TYPE);
-            kinds.handle(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/kinds/both", RouteGroupSettingsTest::ok);
-            kinds.handle(declared, RouteGroupSettingsTest::ok);
-            kinds.asyncGET("/kinds/async", (request, pathVariables) -> java.util.concurrent.CompletableFuture.completedFuture(HttpResponse.ok()));
+            kinds.route(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/kinds/both").handle(RouteGroupSettingsTest::ok);
+            kinds.route(HttpMethod.GET, "/kinds/declared").handle(RouteGroupSettingsTest::ok);
+            kinds.GET("/kinds/async").handleAsync((request, pathVariables) -> java.util.concurrent.CompletableFuture.completedFuture(HttpResponse.ok()));
             kinds.GET("/kinds/get", RouteGroupSettingsTest::ok);
-            kinds.handle("PROPFIND", "/kinds/custom", RouteGroupSettingsTest::ok);
-            kinds.path("/kinds/pathless", pathless -> pathless.GET(RouteGroupSettingsTest::ok));
+            kinds.route("PROPFIND", "/kinds/custom").handle(RouteGroupSettingsTest::ok);
+            kinds.path("/kinds/pathless", pathless -> pathless.GET("/", RouteGroupSettingsTest::ok));
         }));
 
         assertEquals(TEXT, route(router, HttpRequest.PUT("/kinds/both", "{}")).getProduces());
@@ -194,17 +191,28 @@ class RouteGroupSettingsTest {
     }
 
     @Test
-    void aRouteChangedAfterTheGroupClosedKeepsItsOwnValue() {
-        HttpRouteSpec[] kept = new HttpRouteSpec[1];
-        Router router = router(routes -> {
-            routes.group(group -> {
-                group.produces(MediaType.TEXT_PLAIN_TYPE);
-                kept[0] = group.GET("/kept", RouteGroupSettingsTest::ok);
-            });
-            kept[0].produces(MediaType.APPLICATION_XML_TYPE);
-        });
+    void aRouteKeepsItsOwnValueOverASettingOfTheGroupDeclaredAfterIt() {
+        Router router = router(routes -> routes.group(group -> {
+            group.GET("/kept").produces(MediaType.APPLICATION_XML_TYPE).handle(RouteGroupSettingsTest::ok);
+            group.produces(MediaType.TEXT_PLAIN_TYPE);
+        }));
         assertEquals(XML, route(router, HttpRequest.GET("/kept")).getProduces());
     }
+
+    @Test
+    void aRouteKeptAfterItsTerminalIsNotChanged() {
+        HttpRouteSpec[] kept = new HttpRouteSpec[1];
+        Router router = router(routes -> routes.group(group -> {
+            group.produces(MediaType.TEXT_PLAIN_TYPE);
+            kept[0] = group.GET("/kept");
+            kept[0].handle(RouteGroupSettingsTest::ok);
+        }));
+        IllegalStateException ended = assertThrows(IllegalStateException.class, () -> kept[0].produces(MediaType.APPLICATION_XML_TYPE));
+        assertEquals("The route GET /kept was already ended: give its settings before its one terminal, handle, handleAsync or respond",
+            ended.getMessage());
+        assertEquals(TEXT, route(router, HttpRequest.GET("/kept")).getProduces());
+    }
+
 
     @Test
     void theRoutesOfAGroupRunOnItsExecutorUnlessTheyChooseTheirThread() {
@@ -213,12 +221,12 @@ class RouteGroupSettingsTest {
             ExecutorService io = context.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO));
             Router router = router(context, routes -> routes.path("/threads", threads -> {
                 threads.GET("/group", RouteGroupSettingsTest::ok);
-                threads.GET("/event-loop", RouteGroupSettingsTest::ok).nonBlocking();
-                threads.GET("/io", RouteGroupSettingsTest::ok).executeOn(TaskExecutors.IO);
+                threads.GET("/event-loop").nonBlocking().handle(RouteGroupSettingsTest::ok);
+                threads.GET("/io").executeOn(TaskExecutors.IO).handle(RouteGroupSettingsTest::ok);
                 threads.path("/non-blocking", nonBlocking -> {
                     nonBlocking.nonBlocking();
                     nonBlocking.GET("/nested", RouteGroupSettingsTest::ok);
-                    nonBlocking.GET("/io", RouteGroupSettingsTest::ok).executeOn(TaskExecutors.IO);
+                    nonBlocking.GET("/io").executeOn(TaskExecutors.IO).handle(RouteGroupSettingsTest::ok);
                 });
                 threads.path("/inherited", inherited -> inherited.GET("/nested", RouteGroupSettingsTest::ok));
                 // after the routes

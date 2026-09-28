@@ -22,7 +22,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.web.router.builder.FormRequestHandler;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
@@ -333,27 +332,27 @@ class HandlerRouteCancelledUploadTest {
         HttpRoutes cancelledUploadRoutes(Outcomes outcomes, @Value("${spec.destination}") String destination) {
             Path directory = Path.of(destination);
             return routes -> {
-                routes.asyncPOST("/cancel/parts", (request, pathVariables, body) -> outcomes.record("parts", body.parts()
+                routes.POST("/cancel/parts").consumesAll().body().handleAsync((request, pathVariables, body) -> outcomes.record("parts", body.parts()
                     .forEach(part -> part.isFile()
                         ? part.file().transferTo(directory.resolve(UUID.randomUUID() + ".bin"))
-                        : part.text()))).consumesAll();
-                routes.asyncPOST("/cancel/form", (request, pathVariables, body) ->
-                    outcomes.record("form", body.form())).consumesAll();
-                routes.asyncPOST("/cancel/form-unawaited", (request, pathVariables, body) -> {
+                        : part.text())));
+                routes.POST("/cancel/form").consumesAll().body().handleAsync((request, pathVariables, body) ->
+                    outcomes.record("form", body.form()));
+                routes.POST("/cancel/form-unawaited").consumesAll().body().handleAsync((request, pathVariables, body) -> {
                     outcomes.record("form-unawaited", body.form());
                     return CompletableFuture.completedFuture(HttpResponse.ok());
-                }).consumesAll();
-                routes.asyncPOST("/cancel/transfer", (request, pathVariables, body) ->
-                    outcomes.record("transfer", body.transferTo(directory.resolve(UUID.randomUUID() + ".bin")))).consumesAll();
-                routes.asyncPOST("/cancel/bytes", (request, pathVariables, body) ->
-                    outcomes.record("bytes", body.bytes(32 * 1024 * 1024))).consumesAll();
-                routes.asyncPOST("/cancel/text", (request, pathVariables, body) ->
-                    outcomes.record("text", body.text())).consumesAll();
-                routes.POST("/cancel/sync-form", (FormRequestHandler) (request, pathVariables, form) -> {
+                });
+                routes.POST("/cancel/transfer").consumesAll().body().handleAsync((request, pathVariables, body) ->
+                    outcomes.record("transfer", body.transferTo(directory.resolve(UUID.randomUUID() + ".bin"))));
+                routes.POST("/cancel/bytes").consumesAll().body().handleAsync((request, pathVariables, body) ->
+                    outcomes.record("bytes", body.bytes(32 * 1024 * 1024)));
+                routes.POST("/cancel/text").consumesAll().body().handleAsync((request, pathVariables, body) ->
+                    outcomes.record("text", body.text()));
+                routes.POST("/cancel/sync-form").consumesAll().form().handle((request, pathVariables, form) -> {
                     outcomes.started.put("sync-form", Boolean.TRUE);
                     return HttpResponse.ok();
-                }).consumesAll();
-                routes.asyncGET("/cancel/ping", (request, pathVariables) ->
+                });
+                routes.GET("/cancel/ping").handleAsync((request, pathVariables) ->
                     CompletableFuture.completedFuture(HttpResponse.ok("pong")));
             };
         }

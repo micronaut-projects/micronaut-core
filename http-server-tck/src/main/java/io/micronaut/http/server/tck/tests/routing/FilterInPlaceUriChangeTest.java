@@ -265,19 +265,17 @@ public class FilterInPlaceUriChangeTest {
             routes.filter("/ipc/fn/**").preMatching().before(request -> {
                 request.uri(URI.create(moved(request.getPath(), "/ipc/fn/")));
             });
-            routes.POST("/ipc/target/form-handler-pojo", Argument.of(Person.class), (request, pathVariables, person) ->
-                HttpResponse.ok("handler pojo " + person.name() + " " + person.age()).contentType(MediaType.TEXT_PLAIN_TYPE)
-            ).consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
-            routes.POST("/ipc/target/form-handler-map", Argument.mapOf(String.class, String.class), (request, pathVariables, form) ->
-                HttpResponse.ok("handler map " + form.get("name") + " " + form.get("age")).contentType(MediaType.TEXT_PLAIN_TYPE)
-            ).consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
-            routes.GET("/ipc/target/handler", (request, pathVariables) ->
-                HttpResponse.ok(describe("handler", request)).contentType(MediaType.TEXT_PLAIN_TYPE)
-            ).before(request -> {
+            routes.POST("/ipc/target/form-handler-pojo").consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE).body(Argument.of(Person.class)).handle((request, pathVariables, person) ->
+                HttpResponse.ok("handler pojo " + person.name() + " " + person.age()).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.POST("/ipc/target/form-handler-map").consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE).body(Argument.mapOf(String.class, String.class)).handle((request, pathVariables, form) ->
+                HttpResponse.ok("handler map " + form.get("name") + " " + form.get("age")).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.GET("/ipc/target/handler").before(request -> {
                 if ("route".equals(request.getHeaders().get(REQUERY))) {
                     request.uri(URI.create(request.getPath() + "?changed=route"));
                 }
-            });
+            }).and()
+            .handle((request, pathVariables) ->
+                HttpResponse.ok(describe("handler", request)).contentType(MediaType.TEXT_PLAIN_TYPE));
         }
     }
 

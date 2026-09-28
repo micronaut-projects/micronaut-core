@@ -57,16 +57,18 @@ class GroupRoutes(HttpRoutes):
                 admin.GET("/users", lambda request, path_variables: text("users"))
 
             api.path("/admin", admin_routes)
-            (api.GET("/reports/{id}", lambda request, path_variables:
-                     text(f"report {path_variables.getInt('id')} as {request.getHeaders().get('X-Report-Format')}"))
+            (api.GET("/reports/{id}")
                 .before(lambda request:  # <5>
                         request.getHeaders().add("X-Report-Format", "summary"))
                 .and_()
                 .afterReplacing(lambda request, response:  # <6>
                                 HttpResponse.status(HttpStatus.GONE)
                                 if response.getStatus() == HttpStatus.OK and request.getHeaders().contains("X-Legacy")
-                                else None))
-            api.GET(lambda request, path_variables:
+                                else None)
+                .and_()
+                .handle(lambda request, path_variables:
+                        text(f"report {path_variables.getInt('id')} as {request.getHeaders().get('X-Report-Format')}")))
+            api.GET("/", lambda request, path_variables:
                     text("api of " + PropagatedContext.get().get(Tenant).id))  # <7>
 
         routes.path("/api", api_routes)
@@ -75,14 +77,16 @@ class GroupRoutes(HttpRoutes):
         def notes_routes(notes):
             notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE)  # <1>
             notes.executeOn(TaskExecutors.BLOCKING)  # <2>
-            notes.POST(String, lambda request, path_variables, text: HttpResponse.ok("saved " + text))
-            notes.POST("/items", Item, lambda request, path_variables, item: HttpResponse.ok("saved " + item.name)) \
+            notes.POST("/").body(String).handle(lambda request, path_variables, text: HttpResponse.ok("saved " + text))
+            (notes.POST("/items")
                 .consumes(MediaType.APPLICATION_JSON_TYPE)  # <3>
-            notes.GET("/count", lambda request, path_variables: HttpResponse.ok("1")) \
+                .body(Item).handle(lambda request, path_variables, item: HttpResponse.ok("saved " + item.name)))
+            (notes.GET("/count")
                 .nonBlocking()  # <4>
+                .handle(lambda request, path_variables: HttpResponse.ok("1")))
 
             def drafts_routes(drafts):
-                drafts.GET(lambda request, path_variables: HttpResponse.ok(List.of(Item(1, "draft"))))
+                drafts.GET("/", lambda request, path_variables: HttpResponse.ok(List.of(Item(1, "draft"))))
                 drafts.produces(MediaType.APPLICATION_JSON_TYPE)  # <5>
 
             notes.path("/drafts", drafts_routes)
@@ -96,11 +100,13 @@ class GroupRoutes(HttpRoutes):
             .before(lambda request: request.uri(URI.create(re.sub("^/v1", "/api", str(request.getUri()))))))
         # end::serverFilters[]
         # tag::filterExecutor[]
-        (routes.GET("/audit/{id}", lambda request, path_variables:
-                    text("audited on " + request.getAttribute("audit-thread", String).orElse("none")))
+        (routes.GET("/audit/{id}")
             .before(lambda request:  # <1>
                     request.setAttribute("audit-thread", Thread.currentThread().getName()))
             .executeOn(TaskExecutors.BLOCKING)  # <2>
             .and_()  # <3>
-            .after(lambda request, response: response.header("X-Audited", "true")))
+            .after(lambda request, response: response.header("X-Audited", "true"))
+            .and_()
+            .handle(lambda request, path_variables:
+                    text("audited on " + request.getAttribute("audit-thread", String).orElse("none"))))
         # end::filterExecutor[]

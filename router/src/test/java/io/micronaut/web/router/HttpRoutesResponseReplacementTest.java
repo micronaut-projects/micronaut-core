@@ -54,10 +54,11 @@ class HttpRoutesResponseReplacementTest {
 
     @Test
     void aRouteResponseFilterReplacesTheResponse() {
-        Router router = router(routes -> routes.GET("/x", OK)
+        Router router = router(routes -> routes.GET("/x")
             .afterReplacing((request, response) -> HttpResponse.status(HttpStatus.ACCEPTED)
                 .header("X-Replaced", "route")
-                .body("replaced")));
+                .body("replaced")).and()
+                .handle(OK));
 
         Run run = run(router, HttpRequest.GET("/x"));
         assertEquals(HttpStatus.ACCEPTED, run.response.getStatus());
@@ -73,12 +74,13 @@ class HttpRoutesResponseReplacementTest {
             routes.filter("/**").order(-10).after((request, response) -> trace.add("server " + response.code() + " " + response.body()));
             routes.group(group -> {
                 group.after((request, response) -> trace.add("group " + response.code() + " " + response.body()));
-                group.GET("/x", OK)
+                group.GET("/x")
                     .after((request, response) -> trace.add("route-before " + response.code()))
                     .and()
                     .afterReplacing((request, response) -> HttpResponse.status(HttpStatus.CREATED).body("replaced"))
                     .and()
-                    .after((request, response) -> trace.add("route-after " + response.code() + " " + response.body()));
+                    .after((request, response) -> trace.add("route-after " + response.code() + " " + response.body())).and()
+                    .handle(OK);
             });
         });
 
@@ -89,13 +91,14 @@ class HttpRoutesResponseReplacementTest {
 
     @Test
     void aReplacementThatIsNotMutableIsMutableForTheFiltersAfterIt() {
-        Router router = router(routes -> routes.GET("/x", OK)
+        Router router = router(routes -> routes.GET("/x")
             .afterReplacing((request, response) -> new HttpResponseWrapper<>(HttpResponse.status(HttpStatus.ACCEPTED).header("X-Wrapped", "true")))
             .and()
             .after((request, response) -> {
                 assertInstanceOf(MutableHttpResponse.class, response);
                 response.header("X-After", "true");
-            }));
+            }).and()
+            .handle(OK));
 
         Run run = run(router, HttpRequest.GET("/x"));
         assertEquals(HttpStatus.ACCEPTED, run.response.getStatus());
@@ -105,7 +108,7 @@ class HttpRoutesResponseReplacementTest {
 
     @Test
     void nullKeepsTheResponseTheFilterChanged() {
-        Router router = router(routes -> routes.GET("/x", OK)
+        Router router = router(routes -> routes.GET("/x")
             .afterReplacing((request, response) -> {
                 response.header("X-Sync", "true");
                 return null;
@@ -124,7 +127,8 @@ class HttpRoutesResponseReplacementTest {
             .afterReplacingAsync((request, response, propagatedContext) -> {
                 response.header("X-Async-Context", "true");
                 return CompletableFuture.completedFuture(null);
-            }));
+            }).and()
+            .handle(OK));
 
         Run run = run(router, HttpRequest.GET("/x"));
         assertSame(run.handlerResponse, run.response);
@@ -140,11 +144,12 @@ class HttpRoutesResponseReplacementTest {
         List<String> trace = new ArrayList<>();
         Router router = router(routes -> routes.group(group -> {
             group.afterAsync((request, response) -> CompletableFuture.completedFuture(trace.add("group " + response.code())));
-            group.GET("/x", OK)
+            group.GET("/x")
                 .afterReplacingAsync((request, response) -> CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.ACCEPTED).header("X-Async", "1")))
                 .and()
                 .afterReplacingAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(
-                    HttpResponse.status(HttpStatus.CREATED).header("X-Async", response.getHeaders().get("X-Async") + ",2")));
+                    HttpResponse.status(HttpStatus.CREATED).header("X-Async", response.getHeaders().get("X-Async") + ",2"))).and()
+                    .handle(OK);
         }));
 
         Run run = run(router, HttpRequest.GET("/x"));
@@ -156,13 +161,14 @@ class HttpRoutesResponseReplacementTest {
     @Test
     void aContextFilterReplacesTheResponseAndChangesTheContextOfTheFiltersAfterIt() {
         List<String> trace = new ArrayList<>();
-        Router router = router(routes -> routes.GET("/x", OK)
+        Router router = router(routes -> routes.GET("/x")
             .afterReplacing((request, response, propagatedContext) -> {
                 propagatedContext.add(new Marker("replacer"));
                 return HttpResponse.status(HttpStatus.ACCEPTED);
             })
             .and()
-            .after((request, response) -> trace.add(response.code() + " " + PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none"))));
+            .after((request, response) -> trace.add(response.code() + " " + PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none"))).and()
+            .handle(OK));
 
         Run run = run(router, HttpRequest.GET("/x"));
         assertEquals(List.of("202 replacer"), trace);

@@ -180,11 +180,12 @@ public class HandlerRouteFilterExecutorTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/fe/route", (request, pathVariables) -> thread(request))
+            routes.GET("/fe/route")
                 .before(HandlerRouteFilterExecutorTest::before).executeOn(EXECUTOR)
                 .and()
-                .after((request, response) -> after(response)).executeOn(EXECUTOR);
-            routes.GET("/fe/async", (request, pathVariables) -> thread(request))
+                .after((request, response) -> after(response)).executeOn(EXECUTOR).and()
+                .handle((request, pathVariables) -> thread(request));
+            routes.GET("/fe/async")
                 .beforeAsync(request -> {
                     before(request);
                     return CompletableFuture.completedFuture(null);
@@ -193,22 +194,28 @@ public class HandlerRouteFilterExecutorTest {
                 .afterAsync((request, response) -> {
                     after(response);
                     return CompletableFuture.completedFuture(null);
-                }).executeOn(EXECUTOR);
-            routes.GET("/fe/non-blocking", (request, pathVariables) -> thread(request))
+                }).executeOn(EXECUTOR).and()
+                .handle((request, pathVariables) -> thread(request));
+            routes.GET("/fe/non-blocking")
                 .before(HandlerRouteFilterExecutorTest::before).nonBlocking()
                 .and()
-                .after((request, response) -> after(response)).nonBlocking();
-            routes.GET("/fe/last/executor", (request, pathVariables) -> thread(request))
-                .before(HandlerRouteFilterExecutorTest::before).nonBlocking().executeOn(EXECUTOR);
-            routes.GET("/fe/last/non-blocking", (request, pathVariables) -> thread(request))
-                .before(HandlerRouteFilterExecutorTest::before).executeOn(EXECUTOR).nonBlocking();
-            routes.GET("/fe/and", (request, pathVariables) -> thread(request))
+                .after((request, response) -> after(response)).nonBlocking().and()
+                .handle((request, pathVariables) -> thread(request));
+            routes.GET("/fe/last/executor")
+                .before(HandlerRouteFilterExecutorTest::before).nonBlocking().executeOn(EXECUTOR).and()
+                .handle((request, pathVariables) -> thread(request));
+            routes.GET("/fe/last/non-blocking")
+                .before(HandlerRouteFilterExecutorTest::before).executeOn(EXECUTOR).nonBlocking().and()
+                .handle((request, pathVariables) -> thread(request));
+            routes.GET("/fe/and")
                 .before(HandlerRouteFilterExecutorTest::before).executeOn(EXECUTOR)
                 .and()
                 .produces(MediaType.TEXT_PLAIN_TYPE)
-                .after((request, response) -> response.header("X-And", "true"));
-            late = routes.GET("/fe/late", (request, pathVariables) -> thread(request))
-                .before(HandlerRouteFilterExecutorTest::before);
+                .after((request, response) -> response.header("X-And", "true")).and()
+                .handle((request, pathVariables) -> thread(request));
+            HttpRouteSpec lateRoute = routes.GET("/fe/late");
+            late = lateRoute.before(HandlerRouteFilterExecutorTest::before);
+            lateRoute.handle((request, pathVariables) -> thread(request));
 
             routes.path("/fe/group", group -> {
                 group.before(HandlerRouteFilterExecutorTest::before).executeOn(EXECUTOR);

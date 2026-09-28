@@ -95,10 +95,12 @@ public class HandlerRouteAttributesTest {
         public void routes(HttpRouteBuilder routes) {
             routes.path("/attributes", admin -> {
                 admin.attribute("role", "admin");
-                admin.GET("/users", (request, pathVariables) -> HttpResponse.ok("handler role=" + role(request)).contentType(MediaType.TEXT_PLAIN_TYPE))
-                    .after((request, response) -> response.header("X-Route-Filter-Role", role(request)));
-                admin.GET("/audit", (request, pathVariables) -> HttpResponse.ok("handler role=" + role(request)).contentType(MediaType.TEXT_PLAIN_TYPE))
-                    .attribute("role", "auditor");
+                admin.GET("/users")
+                    .after((request, response) -> response.header("X-Route-Filter-Role", role(request))).and()
+                    .handle((request, pathVariables) -> HttpResponse.ok("handler role=" + role(request)).contentType(MediaType.TEXT_PLAIN_TYPE));
+                admin.GET("/audit")
+                    .attribute("role", "auditor")
+                    .handle((request, pathVariables) -> HttpResponse.ok("handler role=" + role(request)).contentType(MediaType.TEXT_PLAIN_TYPE));
             });
         }
     }

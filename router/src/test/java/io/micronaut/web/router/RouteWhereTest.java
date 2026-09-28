@@ -49,8 +49,8 @@ class RouteWhereTest {
     @Test
     void aConditionSelectsAmongRoutesOfTheSameUriAndMethod() {
         Router router = router(routes -> {
-            routes.GET("/reports/{id}", handler("csv")).where(CSV);
-            routes.GET("/reports/{id}", handler("json")).where(CSV.negate());
+            routes.GET("/reports/{id}").where(CSV).handle(handler("csv"));
+            routes.GET("/reports/{id}").where(CSV.negate()).handle(handler("json"));
         });
 
         assertEquals("csv", target(router, HttpRequest.GET("/reports/1").header("X-Export", "csv")));
@@ -59,7 +59,7 @@ class RouteWhereTest {
 
     @Test
     void aRequestTheConditionRejectsIsAnsweredAsIfTheRouteDidNotExist() {
-        Router router = router(routes -> routes.GET("/reports/{id}", handler("csv")).where(CSV));
+        Router router = router(routes -> routes.GET("/reports/{id}").where(CSV).handle(handler("csv")));
 
         assertNull(router.findClosest(HttpRequest.GET("/reports/1")));
         // no 405 either: no route of another method matches
@@ -75,7 +75,7 @@ class RouteWhereTest {
         List<String> evaluated = new ArrayList<>();
         Router router = router(routes -> routes.path("/beta", beta -> {
             beta.path("/inner", inner -> {
-                inner.GET("/search", handler("search")).where(record(evaluated, "route", request -> request.getHeaders().contains("X-Q")));
+                inner.GET("/search").where(record(evaluated, "route", request -> request.getHeaders().contains("X-Q"))).handle(handler("search"));
                 inner.where(record(evaluated, "inner", request -> request.getHeaders().contains("X-Inner")));
             });
             // declared after the routes of the group
@@ -92,7 +92,7 @@ class RouteWhereTest {
     @Test
     void twoRoutesWhoseConditionsARequestBothMeetAreAmbiguous() {
         Router router = router(routes -> {
-            routes.GET("/reports/{id}", handler("csv")).where(CSV);
+            routes.GET("/reports/{id}").where(CSV).handle(handler("csv"));
             routes.GET("/reports/{id}", handler("any"));
         });
 
@@ -102,7 +102,7 @@ class RouteWhereTest {
 
     @Test
     void aRouteOfSeveralMethodsHasTheConditionForEachMethod() {
-        Router router = router(routes -> routes.handle(java.util.Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/both", handler("both")).where(CSV));
+        Router router = router(routes -> routes.route(java.util.Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/both").where(CSV).handle(handler("both")));
 
         assertNull(router.findClosest(HttpRequest.PUT("/both", "")));
         assertNull(router.findClosest(HttpRequest.PATCH("/both", "")));

@@ -21,14 +21,24 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
 
 /**
- * A route handler that receives the request body decoded to a type, like a controller method
- * with a {@code @Body} argument: the body is read and decoded by the message body readers
- * before the handler runs.
+ * A route handler that receives the body of the request, see the body stages of
+ * {@link HttpRouteSpec}: decoded to a type, like a controller method with a {@code @Body}
+ * argument, the body is read and decoded by the message body readers before the handler runs,
+ * see {@link HttpRouteSpec#body(io.micronaut.core.type.Argument)}; the whole submitted form,
+ * {@code application/x-www-form-urlencoded} or {@code multipart/form-data}, read before the
+ * handler runs, see {@link HttpRouteSpec#form()}; or the {@link io.micronaut.http.body.AsyncRequestBody}
+ * the handler reads, see {@link HttpRouteSpec#body()}. The executor is selected like for a
+ * blocking controller method.
+ *
+ * <pre>{@code
+ * routes.POST("/pets").body(Pet.class).handle((request, pathVariables, pet) -> HttpResponse.created(pets.save(pet)));
+ * routes.POST("/login").form().handle((request, pathVariables, form) -> login(form.getString("user")));
+ * }</pre>
  *
  * @param <B> The body type
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.HttpRouteBuilder#handle(io.micronaut.http.HttpMethod, String, io.micronaut.core.type.Argument, BodyRequestHandler)
+ * @see HttpBodyRouteSpec#handle(BodyRequestHandler)
  */
 @Experimental
 @FunctionalInterface
@@ -39,7 +49,7 @@ public interface BodyRequestHandler<B> {
      *
      * @param request       The request
      * @param pathVariables The path variables of the matched route
-     * @param body          The decoded body
+     * @param body          The body: decoded, the form, or the body the handler reads
      * @return The response; {@code null} is answered like the {@code null} result of a controller
      * method: with {@code 404}, or with {@code 204} if {@code micronaut.server.not-found-on-missing-body}
      * is {@code false}

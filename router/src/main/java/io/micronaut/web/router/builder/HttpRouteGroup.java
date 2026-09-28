@@ -81,8 +81,9 @@ import io.micronaut.http.MediaType;
  * of the group. The media types, the executor and the annotated element apply to the routes to
  * handlers.</p>
  *
- * <p><b>Declared routes.</b> A {@link RouteDeclaration} is bound with its own URI template. It
- * can be bound in a group without a prefix, whose filters apply to it, but not in a group with a prefix.</p>
+ * <p><b>Pending routes.</b> A route declared on the group is ended with a terminal, see
+ * {@link HttpRouteSpec}, in the lambda of the group: a route of the group with no terminal when
+ * the lambda returns fails with an {@link IllegalStateException} naming it.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0

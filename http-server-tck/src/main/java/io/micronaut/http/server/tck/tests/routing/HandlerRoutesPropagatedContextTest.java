@@ -276,20 +276,22 @@ public class HandlerRoutesPropagatedContextTest {
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/propagation/sync", (request, pathVariables) -> text(describe()));
-            routes.GET("/propagation/blocking", (request, pathVariables) -> text(describe()))
-                .executeOn(TaskExecutors.BLOCKING);
-            routes.asyncGET("/propagation/async", (request, pathVariables) -> CompletableFuture.completedFuture(text(describe())));
-            routes.asyncGET("/propagation/async-io", (request, pathVariables) ->
+            routes.GET("/propagation/blocking")
+                .executeOn(TaskExecutors.BLOCKING)
+                .handle((request, pathVariables) -> text(describe()));
+            routes.GET("/propagation/async").handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(text(describe())));
+            routes.GET("/propagation/async-io").handleAsync((request, pathVariables) ->
                 // the IO executor propagates the context of the thread that submits the task
                 CompletableFuture.supplyAsync(HandlerRoutesPropagatedContextTest::describe, io)
                     .thenApply(onExecutor -> text(onExecutor + ";" + describe())));
-            routes.asyncPOST("/propagation/async-body", (request, pathVariables, body) -> {
+            routes.POST("/propagation/async-body")
+                .consumes(MediaType.TEXT_PLAIN_TYPE)
+                .body().handleAsync((request, pathVariables, body) -> {
                 String handler = describe();
                 return body.text().thenApply(value -> text(value + ":" + handler));
-            })
-                .consumes(MediaType.TEXT_PLAIN_TYPE);
+            });
 
-            routes.GET("/propagation/route-filter", (request, pathVariables) -> text(describe()))
+            routes.GET("/propagation/route-filter")
                 .before(request -> {
                     // a route filter runs with the context of the filters before it in scope
                     request.setAttribute("before", describeContext());
@@ -303,24 +305,27 @@ public class HandlerRoutesPropagatedContextTest {
                 .and()
                 .after((request, response) -> response
                     .header("X-Before", request.getAttribute("before", String.class).orElse("missing"))
-                    .header("X-After", describeContext()));
+                    .header("X-After", describeContext())).and()
+                    .handle((request, pathVariables) -> text(describe()));
 
-            routes.asyncGET("/propagation/route-filter-async", (request, pathVariables) ->
-                    CompletableFuture.supplyAsync(HandlerRoutesPropagatedContextTest::describe, io)
-                        .thenApply(onExecutor -> text(onExecutor + ";" + describe())))
+            routes.GET("/propagation/route-filter-async")
                 .beforeAsync((request, propagatedContext) -> CompletableFuture.supplyAsync(() -> request.getHeaders().get(TRACE), io)
                     .thenApply(trace -> {
                         // added once the filter looked the trace up, on the IO executor
                         propagatedContext.add(new RouteTrace("async-" + trace));
                         return null;
-                    }));
+                    })).and()
+                    .handleAsync((request, pathVariables) ->
+                    CompletableFuture.supplyAsync(HandlerRoutesPropagatedContextTest::describe, io)
+                        .thenApply(onExecutor -> text(onExecutor + ";" + describe())));
 
-            routes.GET("/propagation/route-filter-blocking", (request, pathVariables) -> text(describe()))
+            routes.GET("/propagation/route-filter-blocking")
                 .before((request, propagatedContext) -> {
                     propagatedContext.add(new RouteTrace("blocking-" + request.getHeaders().get(TRACE)));
-                }).executeOn(TaskExecutors.BLOCKING);
+                }).executeOn(TaskExecutors.BLOCKING).and()
+                .handle((request, pathVariables) -> text(describe()));
 
-            routes.GET("/propagation/response-filter", (request, pathVariables) -> text(describe()))
+            routes.GET("/propagation/response-filter")
                 .before(RouteFilters::addRouteTrace)
                 .and()
                 .after((request, response, propagatedContext) -> {
@@ -333,14 +338,15 @@ public class HandlerRoutesPropagatedContextTest {
                     propagatedContext.add(new RouteTrace("async-removed"));
                 }, io))
                 .and()
-                .after((request, response) -> response.header("X-Third", describeContext()));
+                .after((request, response) -> response.header("X-Third", describeContext())).and()
+                .handle((request, pathVariables) -> text(describe()));
 
-            routes.GET("/propagation/fail", (request, pathVariables) -> {
+            routes.GET("/propagation/fail").before(RouteFilters::addRouteTrace).and().handle((request, pathVariables) -> {
                 throw new PropagationFailure();
-            }).before(RouteFilters::addRouteTrace);
-            routes.asyncGET("/propagation/fail-async", (request, pathVariables) -> CompletableFuture.supplyAsync(() -> {
+            });
+            routes.GET("/propagation/fail-async").before(RouteFilters::addRouteTrace).and().handleAsync((request, pathVariables) -> CompletableFuture.supplyAsync(() -> {
                 throw new AsyncPropagationFailure();
-            }, io)).before(RouteFilters::addRouteTrace);
+            }, io));
 
             routes.error(PropagationFailure.class, (request, error) -> text(HttpStatus.I_AM_A_TEAPOT, "error:" + describe()));
             routes.errorAsync(AsyncPropagationFailure.class, (request, error) ->

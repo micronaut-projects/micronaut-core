@@ -29,8 +29,9 @@ import io.micronaut.http.MutableHttpRequest;
  * {@link HttpRouteSpec#beforeReplacing(ReplacingRouteRequestFilter)}.
  *
  * <pre>{@code
- * routes.GET("/reports/{id}", reportHandler)
- *     .before(request -> request.getHeaders().add("X-Report-Format", "summary"));
+ * routes.GET("/reports/{id}")
+ *     .before(request -> request.getHeaders().add("X-Report-Format", "summary")).and()
+ *     .handle(reportHandler);
  * }</pre>
  *
  * @author Denis Stepanov

@@ -153,10 +153,12 @@ public class HandlerRouteAnnotationMetadataProviderTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/provider/method", (request, pathVariables) -> text(describe(request)))
-                .annotationMetadata(beanContext.getBeanDefinition(Target.class).getRequiredMethod("target"));
-            routes.GET("/provider/definition", (request, pathVariables) -> text(describe(request)))
-                .annotationMetadata(beanContext.getBeanDefinition(Target.class));
+            routes.GET("/provider/method")
+                .annotationMetadata(beanContext.getBeanDefinition(Target.class).getRequiredMethod("target"))
+                .handle((request, pathVariables) -> text(describe(request)));
+            routes.GET("/provider/definition")
+                .annotationMetadata(beanContext.getBeanDefinition(Target.class))
+                .handle((request, pathVariables) -> text(describe(request)));
             routes.GET("/provider/none", (request, pathVariables) -> text(describe(request)));
         }
     }

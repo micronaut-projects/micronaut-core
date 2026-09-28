@@ -35,8 +35,9 @@ import org.jspecify.annotations.Nullable;
  * was given, with what it changed in it.</p>
  *
  * <pre>{@code
- * routes.GET("/reports/{id}", handler).afterReplacing((request, response) ->
- *     response.code() == 404 ? HttpResponse.ok(Reports.EMPTY) : null);
+ * routes.GET("/reports/{id}").afterReplacing((request, response) ->
+ *     response.code() == 404 ? HttpResponse.ok(Reports.EMPTY) : null).and()
+ *     .handle(handler);
  * }</pre>
  *
  * <p>It is a separate interface, declared with separate methods, so that a

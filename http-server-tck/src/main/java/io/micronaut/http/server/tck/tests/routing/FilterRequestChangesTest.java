@@ -317,34 +317,34 @@ public class FilterRequestChangesTest {
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/rc/new/handler", (request, pathVariables) -> textResponse(describe("handler", request)));
             for (String prefix : new String[]{"/rc/echo", "/rc/replace"}) {
-                routes.POST(prefix + "/handler", Argument.STRING, (request, pathVariables, body) ->
-                    textResponse(request.getMethodName() + " handler " + body)).consumesAll();
-                routes.PUT(prefix + "/handler", Argument.STRING, (request, pathVariables, body) ->
-                    textResponse(request.getMethodName() + " handler " + body)).consumesAll();
-                routes.handleAsync(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async", (request, pathVariables, body) ->
-                    body.text().thenApply(text -> textResponse(request.getMethodName() + " async " + text))).consumesAll();
-                routes.handleAsync(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async-body", (request, pathVariables, body) ->
-                    body.body(String.class).thenApply(text -> textResponse(request.getMethodName() + " async-body " + text))).consumesAll();
+                routes.POST(prefix + "/handler").consumesAll().body(Argument.STRING).handle((request, pathVariables, body) ->
+                    textResponse(request.getMethodName() + " handler " + body));
+                routes.PUT(prefix + "/handler").consumesAll().body(Argument.STRING).handle((request, pathVariables, body) ->
+                    textResponse(request.getMethodName() + " handler " + body));
+                routes.route(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async").consumesAll().body().handleAsync((request, pathVariables, body) ->
+                    body.text().thenApply(text -> textResponse(request.getMethodName() + " async " + text)));
+                routes.route(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async-body").consumesAll().body().handleAsync((request, pathVariables, body) ->
+                    body.body(String.class).thenApply(text -> textResponse(request.getMethodName() + " async-body " + text)));
             }
-            routes.asyncPOST("/rc/charset/async", (request, pathVariables, body) ->
-                body.text().thenApply(FilterRequestChangesTest::textResponse)).consumesAll();
-            routes.POST("/rc/replace/json", Argument.mapOf(String.class, String.class), (request, pathVariables, body) ->
+            routes.POST("/rc/charset/async").consumesAll().body().handleAsync((request, pathVariables, body) ->
+                body.text().thenApply(FilterRequestChangesTest::textResponse));
+            routes.POST("/rc/replace/json").body(Argument.mapOf(String.class, String.class)).handle((request, pathVariables, body) ->
                 textResponse(body.get("NAME")));
-            routes.PUT("/rc/whole/target", Argument.STRING, (request, pathVariables, body) -> textResponse(request.getMethodName()
+            routes.PUT("/rc/whole/target").consumesAll().body(Argument.STRING).handle((request, pathVariables, body) -> textResponse(request.getMethodName()
                 + " " + request.getPath()
                 + " from=" + request.getParameters().get("from")
                 + " replaced=" + request.getHeaders().get("X-Replaced")
-                + " body=" + body)).consumesAll();
+                + " body=" + body));
             routes.path("/rc/headers", group -> {
                 group.before(request -> {
                     request.getHeaders().set("X-Client", "group");
                 });
-                group.GET("/handler", (request, pathVariables) -> textResponse(request.getHeaders().get("X-Server")
-                    + " " + request.getHeaders().get("X-Client")
-                    + " " + request.getHeaders().get("X-Route"))
-                ).before(request -> {
+                group.GET("/handler").before(request -> {
                     request.getHeaders().add("X-Route", request.getHeaders().get("X-Client") + "-route");
-                });
+                }).and()
+                .handle((request, pathVariables) -> textResponse(request.getHeaders().get("X-Server")
+                    + " " + request.getHeaders().get("X-Client")
+                    + " " + request.getHeaders().get("X-Route")));
             });
         }
     }

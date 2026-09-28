@@ -225,11 +225,13 @@ class RouteConditionTest {
     @Test
     void theConditionsSelectAHandlerRoute() {
         Router router = router(routes -> {
-            routes.GET("/tenant", (request, pathVariables) -> HttpResponse.ok("beta"))
+            routes.GET("/tenant")
                 .where(host(endsWith(".example.com")).and(cookie("beta", equalTo("on"))))
-                .where(header("X-Tenant"));
-            routes.GET("/tenant", (request, pathVariables) -> HttpResponse.ok("internal"))
-                .where(remoteAddress("10.0.0.0/8"));
+                .where(header("X-Tenant"))
+                .handle((request, pathVariables) -> HttpResponse.ok("beta"));
+            routes.GET("/tenant")
+                .where(remoteAddress("10.0.0.0/8"))
+                .handle((request, pathVariables) -> HttpResponse.ok("internal"));
         });
 
         assertNotNull(router.findClosest(withHost("acme.example.com").header("X-Tenant", "a").cookie(Cookie.of("beta", "on"))));
@@ -243,9 +245,10 @@ class RouteConditionTest {
         Predicate<HttpRequest<?>> lambda = request -> true;
         Router router = router(routes -> routes.path("/beta", beta -> {
             beta.where(RouteCondition.custom(lambda).and(header("X-Beta")));
-            beta.GET("/search", (request, pathVariables) -> HttpResponse.ok("search"))
+            beta.GET("/search")
                 .where(method(HttpMethod.GET))
-                .where(query("q", regex("\\w+")));
+                .where(query("q", regex("\\w+")))
+                .handle((request, pathVariables) -> HttpResponse.ok("search"));
             beta.GET("/plain", (request, pathVariables) -> HttpResponse.ok("plain"));
         }));
 

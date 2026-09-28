@@ -42,7 +42,7 @@ class RouteAttributesOfRoutesTest {
     void theMatchedRouteHasTheAttributesOfItsGroupsAndItsOwn() {
         Router router = router(routes -> routes.path("/admin", admin -> {
             admin.GET("/users", RouteAttributesOfRoutesTest::ok);
-            admin.GET("/audit", RouteAttributesOfRoutesTest::ok).attribute("role", "auditor").attribute("audited", true);
+            admin.GET("/audit").attribute("role", "auditor").attribute("audited", true).handle(RouteAttributesOfRoutesTest::ok);
             admin.path("/nested", nested -> {
                 nested.attribute("tier", 2);
                 nested.GET("/route", RouteAttributesOfRoutesTest::ok);
@@ -73,10 +73,10 @@ class RouteAttributesOfRoutesTest {
 
     @Test
     void theAttributesAreReadOnly() {
-        Router router = router(routes -> routes.GET("/x", RouteAttributesOfRoutesTest::ok).attribute("a", 1));
+        Router router = router(routes -> routes.GET("/x").attribute("a", 1).handle(RouteAttributesOfRoutesTest::ok));
         Map<String, Object> attributes = attributes(router, "/x");
         assertThrows(UnsupportedOperationException.class, () -> attributes.put("b", 2));
-        assertThrows(NullPointerException.class, () -> router(routes -> routes.GET("/y", RouteAttributesOfRoutesTest::ok).attribute("a", null)));
+        assertThrows(NullPointerException.class, () -> router(routes -> routes.GET("/y").attribute("a", null).handle(RouteAttributesOfRoutesTest::ok)));
     }
 
     private static Map<String, Object> attributes(Router router, String path) {

@@ -20,14 +20,12 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Retention;
@@ -53,7 +51,7 @@ class HandlerRouteAnnotateTest {
     @Test
     void aMarkerAnnotationIsDeclaredOnTheRoute() {
         Router router = router(routes -> {
-            routes.GET("/marked", (request, pathVariables) -> HttpResponse.ok()).annotate(Marker.class);
+            routes.GET("/marked").annotate(Marker.class).handle((request, pathVariables) -> HttpResponse.ok());
             routes.GET("/plain", (request, pathVariables) -> HttpResponse.ok());
         });
         AnnotationMetadata marked = route(router, "/marked").getAnnotationMetadata();
@@ -67,22 +65,25 @@ class HandlerRouteAnnotateTest {
 
     @Test
     void aLaterAnnotationOfTheSameTypeReplacesAnEarlierOne() {
-        Router router = router(routes -> routes.GET("/ping", (request, pathVariables) -> HttpResponse.ok())
+        Router router = router(routes -> routes.GET("/ping")
             .annotate(AnnotationValue.builder(Version.class).value("1").build())
-            .annotate(AnnotationValue.builder(Version.class).value("2").build()));
+            .annotate(AnnotationValue.builder(Version.class).value("2").build())
+            .handle((request, pathVariables) -> HttpResponse.ok()));
         assertEquals("2", route(router, "/ping").getAnnotationMetadata().stringValue(Version.class).orElseThrow());
     }
 
     @Test
     void theMembersOfAnAnnotationGivenAgainAreMergedLikeOnAnElement() {
         Router router = router(routes -> {
-            routes.GET("/merged", (request, pathVariables) -> HttpResponse.ok())
+            routes.GET("/merged")
                 .annotate(CUSTOM, custom -> custom.member("first", 1).member("second", 1))
-                .annotate(CUSTOM, custom -> custom.member("second", 2));
+                .annotate(CUSTOM, custom -> custom.member("second", 2))
+                .handle((request, pathVariables) -> HttpResponse.ok());
             routes.group(group -> {
                 group.annotate(CUSTOM, custom -> custom.member("first", 1).member("second", 1));
-                group.GET("/grouped-merged", (request, pathVariables) -> HttpResponse.ok())
-                    .annotate(CUSTOM, custom -> custom.member("second", 2));
+                group.GET("/grouped-merged")
+                    .annotate(CUSTOM, custom -> custom.member("second", 2))
+                    .handle((request, pathVariables) -> HttpResponse.ok());
             });
         });
         for (String path : List.of("/merged", "/grouped-merged")) {
@@ -99,8 +100,9 @@ class HandlerRouteAnnotateTest {
             group.annotate(Marker.class);
             group.annotate(AnnotationValue.builder(Version.class).value("1").build());
             group.GET("/group", (request, pathVariables) -> HttpResponse.ok());
-            group.GET("/route", (request, pathVariables) -> HttpResponse.ok())
-                .annotate(AnnotationValue.builder(Version.class).value("3").build());
+            group.GET("/route")
+                .annotate(AnnotationValue.builder(Version.class).value("3").build())
+                .handle((request, pathVariables) -> HttpResponse.ok());
             group.path("/nested", nested -> {
                 nested.annotate(AnnotationValue.builder(Version.class).value("2").build());
                 nested.GET("/ping", (request, pathVariables) -> HttpResponse.ok());
@@ -123,11 +125,12 @@ class HandlerRouteAnnotateTest {
             .stereotype(AnnotationValue.builder(FilterMatcher.class).build())
             .build();
         Router router = router(routes -> {
-            routes.GET("/several", (request, pathVariables) -> HttpResponse.ok())
+            routes.GET("/several")
                 .annotate(Marker.class)
                 .annotate(Version.class, version -> version.value("1"))
                 .annotate(custom)
-                .annotate(Version.class.getName(), version -> version.value("2"));
+                .annotate(Version.class.getName(), version -> version.value("2"))
+                .handle((request, pathVariables) -> HttpResponse.ok());
             routes.group(group -> {
                 group.annotate(Marker.class.getName()).annotate(custom);
                 group.GET("/grouped", (request, pathVariables) -> HttpResponse.ok());
@@ -154,12 +157,14 @@ class HandlerRouteAnnotateTest {
             }
         };
         Router router = router(routes -> {
-            routes.GET("/element", (request, pathVariables) -> HttpResponse.ok())
+            routes.GET("/element")
                 .annotate(Marker.class)
-                .annotationMetadata(element);
-            routes.GET("/override", (request, pathVariables) -> HttpResponse.ok())
                 .annotationMetadata(element)
-                .annotate(AnnotationValue.builder(Version.class).value("2").build());
+                .handle((request, pathVariables) -> HttpResponse.ok());
+            routes.GET("/override")
+                .annotationMetadata(element)
+                .annotate(AnnotationValue.builder(Version.class).value("2").build())
+                .handle((request, pathVariables) -> HttpResponse.ok());
         });
         MethodBasedRouteInfo<?, ?> route = (MethodBasedRouteInfo<?, ?>) route(router, "/element");
         AnnotationMetadata annotations = route.getAnnotationMetadata();
@@ -180,9 +185,10 @@ class HandlerRouteAnnotateTest {
             // declared before the element of the group: the position in the lambda does not matter
             group.GET("/before", (request, pathVariables) -> HttpResponse.ok());
             group.annotationMetadata(outer);
-            group.GET("/own", (request, pathVariables) -> HttpResponse.ok()).annotationMetadata(own);
-            group.GET("/annotated", (request, pathVariables) -> HttpResponse.ok())
-                .annotate(AnnotationValue.builder(Version.class).value("4").build());
+            group.GET("/own").annotationMetadata(own).handle((request, pathVariables) -> HttpResponse.ok());
+            group.GET("/annotated")
+                .annotate(AnnotationValue.builder(Version.class).value("4").build())
+                .handle((request, pathVariables) -> HttpResponse.ok());
             group.path("/nested", nested -> {
                 nested.GET("/ping", (request, pathVariables) -> HttpResponse.ok());
                 nested.annotationMetadata(inner);
@@ -222,11 +228,11 @@ class HandlerRouteAnnotateTest {
 
     @Test
     void aDeclaredRouteHasItsAnnotations() {
-        RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared");
         Router router = router(routes -> routes.group(group -> {
             group.annotate(Marker.class);
-            group.handle(declaration, (request, pathVariables) -> HttpResponse.ok())
-                .annotate(AnnotationValue.builder(Version.class).value("4").build());
+            group.GET("/declared")
+                .annotate(AnnotationValue.builder(Version.class).value("4").build())
+                .handle((request, pathVariables) -> HttpResponse.ok());
         }));
         AnnotationMetadata metadata = route(router, "/declared").getAnnotationMetadata();
         assertTrue(metadata.hasAnnotation(Marker.class));
@@ -245,11 +251,12 @@ class HandlerRouteAnnotateTest {
     @Test
     void theArgumentsAreRequired() {
         router(routes -> {
-            var route = routes.GET("/x", (request, pathVariables) -> HttpResponse.ok());
+            var route = routes.GET("/x");
             assertThrows(NullPointerException.class, () -> route.annotate((AnnotationValue<?>) null));
             assertThrows(NullPointerException.class, () -> route.annotate((Class<Marker>) null));
             assertThrows(NullPointerException.class, () -> route.annotate((String) null));
             assertThrows(NullPointerException.class, () -> route.annotate(Marker.class, null));
+            route.handle((request, pathVariables) -> HttpResponse.ok());
         });
     }
 

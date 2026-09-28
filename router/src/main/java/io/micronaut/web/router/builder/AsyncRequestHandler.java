@@ -30,9 +30,9 @@ import java.util.concurrent.CompletionStage;
  * <p>The handler does not read the body of the request, like a {@link RequestHandler}: a body
  * is discarded when the request ends, and a request that expects {@code 100 Continue} is never
  * sent it. A handler that reads the body is an {@link AsyncBodyRequestHandler}, which receives
- * the body as a parameter.</p>
+ * the body as a parameter, see {@link HttpRouteSpec#body()}.</p>
  * <pre>{@code
- * routes.asyncGET("/people/{id}", (request, pathVariables) -> people.findAsync(pathVariables.getLong("id"))
+ * routes.GET("/people/{id}").handleAsync((request, pathVariables) -> people.findAsync(pathVariables.getLong("id"))
  *     .thenApply(HttpResponse::ok));
  * }</pre>
  *
@@ -48,7 +48,7 @@ import java.util.concurrent.CompletionStage;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.HttpRouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, AsyncRequestHandler)
+ * @see HttpRouteSpec#handleAsync(AsyncRequestHandler)
  */
 @Experimental
 @FunctionalInterface

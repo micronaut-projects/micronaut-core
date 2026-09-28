@@ -23,7 +23,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
@@ -51,7 +50,7 @@ class RoutePortTest {
     @Test
     void aRouteWithAPortMatchesTheRequestsOnThatPortOnly() {
         Router router = router(routes -> {
-            routes.GET("/metrics", RoutePortTest::ok).port(MANAGEMENT_PORT);
+            routes.GET("/metrics").port(MANAGEMENT_PORT).handle(RoutePortTest::ok);
             routes.GET("/orders", RoutePortTest::ok);
         });
 
@@ -77,7 +76,7 @@ class RoutePortTest {
         Router router = router(routes -> routes.path("/management", management -> {
             management.GET("/health", RoutePortTest::ok);
             management.path("/nested", nested -> nested.GET("/info", RoutePortTest::ok));
-            management.GET("/other", RoutePortTest::ok).port(OTHER_PORT);
+            management.GET("/other").port(OTHER_PORT).handle(RoutePortTest::ok);
             management.path("/own", own -> {
                 own.port(OTHER_PORT);
                 own.GET("/route", RoutePortTest::ok);
@@ -103,7 +102,7 @@ class RoutePortTest {
     void theSameTemplateOnTwoPortsIsTwoRoutes() {
         Router router = router(routes -> {
             routes.GET("/status", (request, pathVariables) -> HttpResponse.ok("default"));
-            routes.GET("/status", (request, pathVariables) -> HttpResponse.ok("management")).port(MANAGEMENT_PORT);
+            routes.GET("/status").port(MANAGEMENT_PORT).handle((request, pathVariables) -> HttpResponse.ok("management"));
         });
         router.applyDefaultPorts(List.of(DEFAULT_PORT));
 
@@ -117,8 +116,7 @@ class RoutePortTest {
 
     @Test
     void aDeclaredRouteExposesItsPortWhenItIsDeclared() {
-        RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared/{id}");
-        Router router = router(routes -> routes.handle(declaration, RoutePortTest::ok).port(MANAGEMENT_PORT));
+        Router router = router(routes -> routes.GET("/declared/{id}").port(MANAGEMENT_PORT).handle(RoutePortTest::ok));
 
         // before the route is built
         assertEquals(Set.of(MANAGEMENT_PORT), router.getExposedPorts());
@@ -130,7 +128,7 @@ class RoutePortTest {
     @Test
     void theExposedPortsOfAnAssemblyAreReadOnly() {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
-        new DefaultHttpRouteBuilder(assembly).GET("/metrics", RoutePortTest::ok).port(MANAGEMENT_PORT);
+        new DefaultHttpRouteBuilder(assembly).GET("/metrics").port(MANAGEMENT_PORT).handle(RoutePortTest::ok);
 
         assertEquals(Set.of(MANAGEMENT_PORT), assembly.exposedPorts());
         assertThrows(UnsupportedOperationException.class, () -> assembly.exposedPorts().add(OTHER_PORT));
@@ -139,16 +137,15 @@ class RoutePortTest {
 
     @Test
     void aPortTheServerCannotListenOnIsRejected() {
-        RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared/{id}");
         Router router = router(routes -> {
             for (int port : new int[] {-1, 0, 65_536, Integer.MIN_VALUE}) {
-                assertInvalidPort(port, () -> routes.GET("/metrics", RoutePortTest::ok).port(port));
-                assertInvalidPort(port, () -> routes.handle(Set.of(HttpMethod.GET, HttpMethod.POST), "/multi", RoutePortTest::ok).port(port));
-                assertInvalidPort(port, () -> routes.handle(declaration, RoutePortTest::ok).port(port));
+                assertInvalidPort(port, () -> routes.GET("/metrics").port(port).handle(RoutePortTest::ok));
+                assertInvalidPort(port, () -> routes.route(Set.of(HttpMethod.GET, HttpMethod.POST), "/multi").port(port).handle(RoutePortTest::ok));
+                assertInvalidPort(port, () -> routes.GET("/declared/{id}").port(port).handle(RoutePortTest::ok));
                 routes.group(group -> assertInvalidPort(port, () -> group.port(port)));
             }
-            routes.GET("/lowest", RoutePortTest::ok).port(1);
-            routes.GET("/highest", RoutePortTest::ok).port(65_535);
+            routes.GET("/lowest").port(1).handle(RoutePortTest::ok);
+            routes.GET("/highest").port(65_535).handle(RoutePortTest::ok);
         });
 
         // nothing was exposed by a rejected port

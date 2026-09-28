@@ -17,12 +17,9 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.PathVariables;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
@@ -34,7 +31,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.StringJoiner;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 /**
@@ -49,7 +47,6 @@ import java.util.function.Supplier;
 @Internal
 abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
 
-    private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
 
     final RouteAssembly assembly;
@@ -73,6 +70,15 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      * Whether the routes of the builder were read: see {@link DefaultHttpRouteBuilder#close()}.
      */
     private boolean closed;
+    /**
+     * The routes declared on the builder that were not ended with a terminal yet.
+     */
+    private final List<PendingRoute> pending = new ArrayList<>(0);
+    /**
+     * The bean that declares the routes, for the messages, or {@code null}: see
+     * {@link #declaredBy(Class)}; a group has the one of its builder.
+     */
+    private @Nullable Class<?> declaringBean;
 
     /**
      * @param assembly     The assembly the routes are added to
@@ -110,189 +116,164 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     /**
-     * @param routes The routes of a handler
-     * @return Their spec
-     */
-    private HttpRouteSpec spec(RouteSettings... routes) {
-        return spec(0, routes);
-    }
-
-    /**
      * @param own    The settings the routes have of their own, which they do not inherit from
      *               their group, e.g. {@link RouteGroupDefaults#CONSUMES} for a form handler
      * @param routes The routes of a handler
-     * @return Their spec
+     * @return Their routes, to give the settings of their spec
      */
-    final HttpRouteSpec spec(int own, RouteSettings... routes) {
-        List<RouteSettings> handlerRoutes = List.of(routes);
+    final HandlerRoutes routes(int own, List<RouteSettings> routes) {
         RouteGroupDefaults defaults = groupDefaults();
-        return new DefaultHttpRouteSpec(handlerRoutes, this::resolvePort, defaults == null ? null : defaults.add(handlerRoutes, own));
+        return new HandlerRoutes(routes, defaults == null ? null : defaults.add(routes, own));
     }
 
     @Override
-    public final HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler) {
-        return spec(route(method, uri, HandlerMethod.of(handler), null));
+    public final HttpRouteSpec route(HttpMethod method, String uri) {
+        standardMethod(method);
+        return pending(method.name(), uri, (template, handler) -> List.of(route(method, template, handler.get())));
     }
 
     @Override
-    public final <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        // the body argument is annotated @Body
-        return spec(route(method, uri, HandlerMethod.of(bodyType, handler), null));
+    public final HttpRouteSpec route(Set<HttpMethod> methods, String uri) {
+        Objects.requireNonNull(methods, "methods");
+        if (methods.isEmpty()) {
+            throw new IllegalArgumentException("No HTTP method for route: " + uri);
+        }
+        for (HttpMethod method : methods) {
+            // before the route is declared
+            standardMethod(Objects.requireNonNull(method, "methods must not contain null"));
+        }
+        List<HttpMethod> declared = List.copyOf(methods);
+        StringJoiner names = new StringJoiner(", ");
+        for (HttpMethod method : declared) {
+            names.add(method.name());
+        }
+        return pending(names.toString(), uri, (template, handler) -> {
+            List<RouteSettings> routes = new ArrayList<>(declared.size());
+            for (HttpMethod method : declared) {
+                routes.add(route(method, template, handler.get()));
+            }
+            return routes;
+        });
     }
 
     @Override
-    public final HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
-        return spec(route(method, uri, HandlerMethod.of(handler), null));
+    public final HttpRouteSpec route(String httpMethodName, String uri) {
+        RouteArguments.httpMethodName(httpMethodName);
+        HttpMethod method = HttpMethod.parse(httpMethodName);
+        // a standard method by its canonical name, a custom one by the given name
+        String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
+        return pending(name, uri, (template, handler) ->
+            List.of(grouped(assembly.addRoute(name, method, template, DEFAULT_CONSUMES, handle(handler.get())).settings())));
     }
 
     @Override
-    public final HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncBodyRequestHandler handler) {
-        return spec(route(method, uri, HandlerMethod.of(handler), null));
-    }
-
-    @Override
-    public final HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return spec(RouteGroupDefaults.CONSUMES, route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
-    }
-
-    @Override
-    public final HttpRouteSpec handle(Set<HttpMethod> methods, String uri, RequestHandler handler) {
-        return forEach(methods, uri, method -> route(method, uri, HandlerMethod.of(handler), null));
-    }
-
-    @Override
-    public final HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler) {
-        return forEach(methods, uri, method -> route(method, uri, HandlerMethod.of(handler), null));
-    }
-
-    @Override
-    public final HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncBodyRequestHandler handler) {
-        return forEach(methods, uri, method -> route(method, uri, HandlerMethod.of(handler), null));
-    }
-
-    @Override
-    public final HttpRouteSpec any(String uri, RequestHandler handler) {
-        Objects.requireNonNull(handler, "handler");
-        return anyMethod(uri, () -> HandlerMethod.of(handler), null);
-    }
-
-    @Override
-    public final <B> HttpRouteSpec any(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        Objects.requireNonNull(handler, "handler");
-        return anyMethod(uri, () -> HandlerMethod.of(bodyType, handler), null);
-    }
-
-    @Override
-    public final HttpRouteSpec any(String uri, FormRequestHandler handler) {
-        Objects.requireNonNull(handler, "handler");
-        return anyMethod(uri, () -> HandlerMethod.of(handler), FORM_MEDIA_TYPES);
-    }
-
-    @Override
-    public final HttpRouteSpec asyncAny(String uri, AsyncRequestHandler handler) {
-        Objects.requireNonNull(handler, "handler");
-        return anyMethod(uri, () -> HandlerMethod.of(handler), null);
-    }
-
-    @Override
-    public final HttpRouteSpec asyncAny(String uri, AsyncBodyRequestHandler handler) {
-        Objects.requireNonNull(handler, "handler");
-        return anyMethod(uri, () -> HandlerMethod.of(handler), null);
-    }
-
-    @Override
-    public final HttpRouteSpec respond(HttpMethod method, String uri, HttpResponse<?> response) {
-        ResponseTemplate template = ResponseTemplate.of(response);
-        return respondRoute(method, uri, HandlerMethod.respond(template), template.contentType());
-    }
-
-    @Override
-    public final HttpRouteSpec respond(HttpMethod method, String uri, Supplier<? extends HttpResponse<?>> response) {
-        Objects.requireNonNull(response, "response");
-        return respondRoute(method, uri, HandlerMethod.respond(response), null);
-    }
-
-    @Override
-    public final HttpRouteSpec respond(HttpMethod method, String uri, Function<? super PathVariables, ? extends HttpResponse<?>> response) {
-        Objects.requireNonNull(response, "response");
-        return respondRoute(method, uri, HandlerMethod.respond(response), null);
+    public final HttpRouteSpec any(String uri) {
+        return pending("any", uri, this::anyMethod);
     }
 
     /**
-     * The route of a response: it never reads the body, so it consumes any content type, and
-     * it runs on the event loop.
+     * Declare a pending route, which its terminal adds.
      *
-     * @param method   The HTTP method
-     * @param uri      The URI template
-     * @param handler  Creates the response
-     * @param produces The content type of the response, or {@code null} if it is not known
-     * @return Its spec
+     * @param methods Describes the methods of the route, for the messages
+     * @param uri     The URI template of the route, relative to the prefix of the builder
+     * @param routes  Adds the routes of a handler, given the URI template under the prefix
+     * @return The spec of the pending route
      */
-    private HttpRouteSpec respondRoute(HttpMethod method, String uri, HandlerMethod<?> handler, @Nullable MediaType produces) {
-        RouteSettings route = route(method, uri, handler, null);
-        route.consumesAll();
-        route.nonBlocking();
-        int own = RouteGroupDefaults.CONSUMES | RouteGroupDefaults.EXECUTOR;
-        if (produces != null) {
-            route.produces(new MediaType[]{produces});
-            own |= RouteGroupDefaults.PRODUCES;
+    private HttpRouteSpec pending(String methods, String uri, BiFunction<String, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
+        String template = uri(uri);
+        Class<?> bean = declaringBean;
+        String description = methods + " " + template + (bean == null ? "" : " declared by " + beanName(bean));
+        PendingRoute route = new PendingRoute(this, handler -> routes.apply(template, handler), description);
+        pending.add(route);
+        return new DefaultHttpRouteSpec(route);
+    }
+
+    /**
+     * Add the routes of a pending route that its terminal ended.
+     *
+     * @param route  The pending route
+     * @param routes Adds its routes
+     * @param init   Gives a route the settings of the terminal, or {@code null}
+     * @param own    The settings of the terminal, which the routes do not inherit from their groups
+     * @return The routes, to give the settings of the spec
+     */
+    final HandlerRoutes addRoutes(PendingRoute route, Supplier<List<RouteSettings>> routes, @Nullable Consumer<RouteSettings> init, int own) {
+        checkOpen();
+        pending.remove(route);
+        List<RouteSettings> added = routes.get();
+        if (init != null) {
+            for (RouteSettings settings : added) {
+                init.accept(settings);
+            }
         }
-        return spec(own, route);
+        return routes(own, added);
+    }
+
+    /**
+     * Drop a pending route whose terminal failed.
+     *
+     * @param route The pending route
+     */
+    final void dropPending(PendingRoute route) {
+        pending.remove(route);
     }
 
     /**
      * The routes of any method: one per standard method and one for the custom methods, see
      * {@link AnyMethodRoutes}.
      *
-     * @param uri      The URI template
+     * @param template The URI template, under the prefix
      * @param handler  Creates the handler method of a route
-     * @param consumes The media types the routes consume, or {@code null} for the default
-     * @return Their spec
+     * @return The routes
      */
-    private HttpRouteSpec anyMethod(String uri, Supplier<HandlerMethod<?>> handler, MediaType @Nullable [] consumes) {
-        Objects.requireNonNull(uri, "uri");
+    private List<RouteSettings> anyMethod(String template, Supplier<HandlerMethod<?>> handler) {
         List<RouteSettings> routes = new ArrayList<>(HttpMethod.values().length);
         for (HttpMethod method : HttpMethod.values()) {
             if (method != HttpMethod.CUSTOM) {
-                routes.add(route(method, uri, handler.get(), consumes));
+                routes.add(route(method, template, handler.get()));
             }
         }
-        RouteSettings custom = grouped(assembly.addRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, uri(uri), DEFAULT_CONSUMES,
-            handle(handler.get())).settings());
-        if (consumes != null) {
-            custom.consumes(consumes);
-        }
-        routes.add(custom);
+        routes.add(grouped(assembly.addRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, template, DEFAULT_CONSUMES,
+            handle(handler.get())).settings()));
         for (RouteSettings route : routes) {
             route.anyMethod();
         }
-        // a form route consumes the form media types whatever its group consumes
-        return spec(consumes == null ? 0 : RouteGroupDefaults.CONSUMES, routes.toArray(new RouteSettings[0]));
+        return routes;
     }
 
-    @Override
-    public final HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler) {
-        return spec(declare(route, HandlerMethod.of(handler), null));
+    /**
+     * Name the bean that declares the routes of the builder, in the messages of the routes it
+     * does not end with a terminal.
+     *
+     * @param bean The class of the bean, or {@code null}
+     */
+    final void declaredBy(@Nullable Class<?> bean) {
+        this.declaringBean = bean;
     }
 
-    @Override
-    public final <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return spec(declare(route, HandlerMethod.of(bodyType, handler), null));
+    /**
+     * Fail if a route declared on the builder was not ended with a terminal.
+     *
+     * @throws IllegalStateException naming the routes that were not
+     */
+    final void checkEnded() {
+        if (pending.isEmpty()) {
+            return;
+        }
+        StringJoiner routes = new StringJoiner(", ");
+        for (PendingRoute route : pending) {
+            routes.add(route.description());
+        }
+        boolean one = pending.size() == 1;
+        pending.clear();
+        throw new IllegalStateException((one ? "The route " : "The routes ") + routes
+            + (one ? " has no handler: end it" : " have no handler: end each") + " with handle, handleAsync or respond");
     }
 
-    @Override
-    public final HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
-        return spec(declare(route, HandlerMethod.of(handler), null));
-    }
-
-    @Override
-    public final HttpRouteSpec handleAsync(RouteDeclaration route, AsyncBodyRequestHandler handler) {
-        return spec(declare(route, HandlerMethod.of(handler), null));
-    }
-
-    @Override
-    public final HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler) {
-        return spec(RouteGroupDefaults.CONSUMES, declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
+    private static String beanName(Class<?> bean) {
+        String name = bean.getName();
+        // a nested class by its simple names: ItemRoutes, or Routes.Items
+        return name.substring(name.lastIndexOf('.') + 1).replace('$', '.');
     }
 
     @Override
@@ -318,33 +299,6 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler) {
-        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)));
-    }
-
-    @Override
-    public final <B> HttpRouteSpec handle(String httpMethodName, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return spec(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
-    }
-
-    @Override
-    public final HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler) {
-        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)));
-    }
-
-    @Override
-    public final HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncBodyRequestHandler handler) {
-        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)));
-    }
-
-    @Override
-    public final HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
-        RouteSettings route = route(httpMethodName, uri, HandlerMethod.of(handler));
-        route.consumes(FORM_MEDIA_TYPES);
-        return spec(RouteGroupDefaults.CONSUMES, route);
-    }
-
-    @Override
     public final ServerFilterSpec filter(String... patterns) {
         checkOpen();
         // global: the prefix and the filters of a group do not apply
@@ -367,8 +321,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         checkOpen();
         DefaultHttpRouteGroup group = new DefaultHttpRouteGroup(assembly, assembly.groupFilters(groupFilters),
             assembly.routeGroup(groupSettings), new RouteGroupDefaults(groupDefaults()), groupPrefix, placeholderResolver);
+        group.declaredBy(declaringBean);
         try {
             routes.accept(group);
+            // the routes of the group are ended in its lambda
+            group.checkEnded();
         } finally {
             // the filters of the group are the ones declared in its lambda
             group.close();
@@ -412,17 +369,6 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return route;
     }
 
-    private RouteSettings declare(RouteDeclaration route, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
-        Objects.requireNonNull(route, "route");
-        checkOpen();
-        if (prefix != null) {
-            throw new IllegalArgumentException("The declared route " + route.httpMethodName() + " " + route.uriTemplate()
-                + " cannot be bound in the route group with the prefix " + prefix
-                + ": it declares its own full URI template. Bind it outside the group, or in a group without a prefix");
-        }
-        return grouped(assembly.declare(route, handle(handler), consumes));
-    }
-
     private ErrorRouteSpec errorRoute(Class<? extends Throwable> type, HandlerMethod<?> handler) {
         checkOpen();
         // global on the builder, local to the routes of the group in a group
@@ -443,42 +389,19 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return new DefaultStatusRouteSpec(route, handler);
     }
 
-    private RouteSettings route(String httpMethodName, String uri, HandlerMethod<?> handler) {
-        RouteArguments.httpMethodName(httpMethodName);
-        HttpMethod method = HttpMethod.parse(httpMethodName);
-        // a standard method by its canonical name, a custom one by the given name
-        String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
-        return grouped(assembly.addRoute(name, method, uri(uri), DEFAULT_CONSUMES, handle(handler)).settings());
-    }
-
-    private RouteSettings route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
-        standardMethod(method);
-        RouteSettings route = assembly.addRoute(method.name(), method, uri(uri), DEFAULT_CONSUMES, handle(handler)).settings();
-        if (consumes != null) {
-            route.consumes(consumes);
-        }
-        return grouped(route);
+    /**
+     * @param method   The HTTP method
+     * @param template The URI template, under the prefix
+     * @param handler  The handler method
+     * @return The route
+     */
+    private RouteSettings route(HttpMethod method, String template, HandlerMethod<?> handler) {
+        return grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, handle(handler)).settings());
     }
 
     @SuppressWarnings("unchecked")
     private static MethodExecutionHandle<Object, Object> handle(HandlerMethod<?> method) {
         return (MethodExecutionHandle<Object, Object>) method;
-    }
-
-    private HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, RouteSettings> route) {
-        Objects.requireNonNull(methods, "methods");
-        if (methods.isEmpty()) {
-            throw new IllegalArgumentException("No HTTP method for route: " + uri);
-        }
-        for (HttpMethod method : methods) {
-            // before any route is added
-            standardMethod(Objects.requireNonNull(method, "methods must not contain null"));
-        }
-        List<RouteSettings> routes = new ArrayList<>(methods.size());
-        for (HttpMethod method : methods) {
-            routes.add(route.apply(method));
-        }
-        return spec(routes.toArray(new RouteSettings[0]));
     }
 
     /**
@@ -488,7 +411,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      */
     private static void standardMethod(HttpMethod method) {
         Objects.requireNonNull(method, "method");
-        RouteArguments.standardMethod(method, "handle(\"PROPFIND\", uri, handler)");
+        RouteArguments.standardMethod(method, "route(\"PROPFIND\", uri)");
     }
 
     /**

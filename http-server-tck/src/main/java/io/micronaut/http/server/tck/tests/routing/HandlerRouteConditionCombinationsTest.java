@@ -181,54 +181,71 @@ public class HandlerRouteConditionCombinationsTest {
             RouteCondition beta = any(
                 header("X-Channel", oneOf("beta", "canary").ignoringCase()),
                 query("channel", regex("(beta|canary)(-\\d+)?")));
-            routes.GET("/combinations/search", (request, pathVariables) -> text("beta"))
-                .where(beta.and(not(header("X-Legacy"))));
-            routes.GET("/combinations/search", (request, pathVariables) -> text("stable"))
-                .where(not(beta.and(not(header("X-Legacy")))));
+            routes.GET("/combinations/search")
+                .where(beta.and(not(header("X-Legacy"))))
+                .handle((request, pathVariables) -> text("beta"));
+            routes.GET("/combinations/search")
+                .where(not(beta.and(not(header("X-Legacy")))))
+                .handle((request, pathVariables) -> text("stable"));
 
             routes.path("/combinations/admin", admin -> {
                 admin.where(header("X-Tenant", equalTo("acme")));
                 admin.where(method(HttpMethod.GET).or(header("X-Write-Token")));
-                admin.GET("/report", (request, pathVariables) -> text("csv report"))
-                    .where(query("format", "csv"));
+                admin.GET("/report")
+                    .where(query("format", "csv"))
+                    .handle((request, pathVariables) -> text("csv report"));
                 admin.POST("/report", (request, pathVariables) -> text("saved"));
             });
 
-            routes.GET("/combinations/variant", (request, pathVariables) -> text("variant " + request.getCookies().get("variant").getValue()))
-                .where(cookie("variant", regex("[a-c]")));
-            routes.GET("/combinations/variant", (request, pathVariables) -> text("default"))
-                .where(not(cookie("variant", regex("[a-c]"))));
+            routes.GET("/combinations/variant")
+                .where(cookie("variant", regex("[a-c]")))
+                .handle((request, pathVariables) -> text("variant " + request.getCookies().get("variant").getValue()));
+            routes.GET("/combinations/variant")
+                .where(not(cookie("variant", regex("[a-c]"))))
+                .handle((request, pathVariables) -> text("default"));
 
-            routes.GET("/combinations/host", (request, pathVariables) -> text("example"))
-                .where(host(endsWith(".example.com")));
-            routes.GET("/combinations/host", (request, pathVariables) -> text("other"))
-                .where(not(host(endsWith(".example.com"))));
+            routes.GET("/combinations/host")
+                .where(host(endsWith(".example.com")))
+                .handle((request, pathVariables) -> text("example"));
+            routes.GET("/combinations/host")
+                .where(not(host(endsWith(".example.com"))))
+                .handle((request, pathVariables) -> text("other"));
 
             RouteCondition loopback = remoteAddress("127.0.0.0/8", "::1");
             RouteCondition partner = remoteAddress("198.51.100.0/24");
-            routes.GET("/combinations/address", (request, pathVariables) -> text("loopback"))
-                .where(loopback);
-            routes.GET("/combinations/address", (request, pathVariables) -> text("partner"))
-                .where(partner);
-            routes.GET("/combinations/address", (request, pathVariables) -> text("remote"))
-                .where(all(not(loopback), not(partner)));
+            routes.GET("/combinations/address")
+                .where(loopback)
+                .handle((request, pathVariables) -> text("loopback"));
+            routes.GET("/combinations/address")
+                .where(partner)
+                .handle((request, pathVariables) -> text("partner"));
+            routes.GET("/combinations/address")
+                .where(all(not(loopback), not(partner)))
+                .handle((request, pathVariables) -> text("remote"));
 
-            routes.GET("/combinations/peer", (request, pathVariables) -> text("peer partner"))
-                .where(peerAddress("198.51.100.0/24"));
-            routes.GET("/combinations/resolved", (request, pathVariables) -> text("resolved partner"))
-                .where(remoteAddress("198.51.100.0/24"));
-            routes.GET("/combinations/loopback-peer", (request, pathVariables) -> text("loopback peer"))
-                .where(peerAddress("127.0.0.0/8", "::1"));
+            routes.GET("/combinations/peer")
+                .where(peerAddress("198.51.100.0/24"))
+                .handle((request, pathVariables) -> text("peer partner"));
+            routes.GET("/combinations/resolved")
+                .where(remoteAddress("198.51.100.0/24"))
+                .handle((request, pathVariables) -> text("resolved partner"));
+            routes.GET("/combinations/loopback-peer")
+                .where(peerAddress("127.0.0.0/8", "::1"))
+                .handle((request, pathVariables) -> text("loopback peer"));
 
-            routes.GET("/combinations/launch", (request, pathVariables) -> text("launched"))
-                .where(after(Instant.EPOCH).and(header("X-Never").negate()));
-            routes.GET("/combinations/launch", (request, pathVariables) -> text("pending"))
-                .where(before(Instant.EPOCH));
+            routes.GET("/combinations/launch")
+                .where(after(Instant.EPOCH).and(header("X-Never").negate()))
+                .handle((request, pathVariables) -> text("launched"));
+            routes.GET("/combinations/launch")
+                .where(before(Instant.EPOCH))
+                .handle((request, pathVariables) -> text("pending"));
             // a lambda combined with the declarative conditions
-            routes.GET("/combinations/launch", (request, pathVariables) -> text("never"))
-                .where(header("X-Never").and(request -> request.getPath().startsWith("/combinations")));
-            routes.GET("/combinations/prefixed/{name}", (request, pathVariables) -> text(pathVariables.getString("name")))
-                .constrain("name", startsWith("item-"));
+            routes.GET("/combinations/launch")
+                .where(header("X-Never").and(request -> request.getPath().startsWith("/combinations")))
+                .handle((request, pathVariables) -> text("never"));
+            routes.GET("/combinations/prefixed/{name}")
+                .constrain("name", startsWith("item-"))
+                .handle((request, pathVariables) -> text(pathVariables.getString("name")));
         }
     }
 }

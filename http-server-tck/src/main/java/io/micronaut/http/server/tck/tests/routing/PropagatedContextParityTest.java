@@ -848,84 +848,87 @@ public class PropagatedContextParityTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            filtered(routes.GET("/parity/r/sync", (request, pathVariables) -> text(describe())));
-            filtered(routes.GET("/parity/r/blocking", (request, pathVariables) -> text(describe()))
-                .executeOn(TaskExecutors.BLOCKING));
-            filtered(routes.asyncGET("/parity/r/async", (request, pathVariables) -> CompletableFuture.completedFuture(text(describe()))));
-            filtered(routes.asyncGET("/parity/r/thread", (request, pathVariables) -> continuationOnAPlainThread().thenApply(PropagatedContextParityTest::text)));
-            filtered(routes.asyncGET("/parity/r/io", (request, pathVariables) -> continuationOnTheIoExecutor(io).thenApply(PropagatedContextParityTest::text)));
+            filtered(routes.GET("/parity/r/sync")).handle((request, pathVariables) -> text(describe()));
+            filtered(routes.GET("/parity/r/blocking").executeOn(TaskExecutors.BLOCKING)).handle((request, pathVariables) -> text(describe()));
+            filtered(routes.GET("/parity/r/async")).handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(text(describe())));
+            filtered(routes.GET("/parity/r/thread")).handleAsync((request, pathVariables) -> continuationOnAPlainThread().thenApply(PropagatedContextParityTest::text));
+            filtered(routes.GET("/parity/r/io")).handleAsync((request, pathVariables) -> continuationOnTheIoExecutor(io).thenApply(PropagatedContextParityTest::text));
 
-            filtered(routes.asyncPOST("/parity/r/text", (request, pathVariables, body) -> {
+            filtered(routes.POST("/parity/r/text").consumes(MediaType.TEXT_PLAIN_TYPE)).body().handleAsync((request, pathVariables, body) -> {
                 reading.reading();
                 return body.text().thenApply(value -> text(value + ":" + describe()));
-            }).consumes(MediaType.TEXT_PLAIN_TYPE));
-            filtered(routes.asyncPOST("/parity/r/json", (request, pathVariables, body) -> {
+            });
+            filtered(routes.POST("/parity/r/json").consumes(MediaType.APPLICATION_JSON_TYPE)).body().handleAsync((request, pathVariables, body) -> {
                 reading.reading();
                 return body.body(Argument.mapOf(String.class, String.class)).thenApply(value -> text(value.get("name") + ":" + describe()));
-            }).consumes(MediaType.APPLICATION_JSON_TYPE));
-            filtered(routes.asyncPOST("/parity/r/form", (request, pathVariables, body) -> {
+            });
+            filtered(routes.POST("/parity/r/form").consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).body().handleAsync((request, pathVariables, body) -> {
                 reading.reading();
                 return body.form().thenApply(form -> text(form.find("name", String.class).orElse("none") + ":" + describe()));
-            }).consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
-            filtered(routes.asyncPOST("/parity/r/elements", (request, pathVariables, body) -> {
+            });
+            filtered(routes.POST("/parity/r/elements").consumes(MediaType.APPLICATION_JSON_TYPE)).body().handleAsync((request, pathVariables, body) -> {
                 reading.reading();
                 AtomicReference<String> first = new AtomicReference<>();
                 return body.elements(String.class).forEach(element -> {
                     first.compareAndSet(null, describe());
                     return CompletableFuture.completedFuture(null);
                 }).thenApply(ignored -> text("elem=" + first.get() + ";done=" + describe()));
-            }).consumes(MediaType.APPLICATION_JSON_TYPE));
-            filtered(routes.asyncPOST("/parity/r/parts", (request, pathVariables, body) -> {
+            });
+            filtered(routes.POST("/parity/r/parts").consumes(MediaType.MULTIPART_FORM_DATA_TYPE)).body().handleAsync((request, pathVariables, body) -> {
                 reading.reading();
                 AtomicReference<String> first = new AtomicReference<>();
                 return body.parts().forEach(part -> {
                     first.compareAndSet(null, describe());
                     return part.text();
                 }).thenApply(ignored -> text("elem=" + first.get() + ";done=" + describe()));
-            }).consumes(MediaType.MULTIPART_FORM_DATA_TYPE));
-            filtered(routes.POST("/parity/r/bound-text", Argument.of(String.class), (request, pathVariables, body) -> {
+            });
+            filtered(routes.POST("/parity/r/bound-text").consumes(MediaType.TEXT_PLAIN_TYPE)).body(Argument.of(String.class)).handle((request, pathVariables, body) -> {
                 reading.reading();
                 return text(body + ":" + describe());
-            }).consumes(MediaType.TEXT_PLAIN_TYPE));
-            filtered(routes.POST("/parity/r/bound-form", (request, pathVariables, form) -> {
+            });
+            filtered(routes.POST("/parity/r/bound-form").consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).form().handle((request, pathVariables, form) -> {
                 reading.reading();
                 return text(form.find("name", String.class).orElse("none") + ":" + describe());
-            }).consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+            });
 
-            filtered(routes.GET("/parity/r/fail-local", (request, pathVariables) -> {
+            filtered(routes.GET("/parity/r/fail-local")).handle((request, pathVariables) -> {
                 throw new LocalFailure();
-            }));
-            filtered(routes.GET("/parity/r/fail-global", (request, pathVariables) -> {
+            });
+            filtered(routes.GET("/parity/r/fail-global")).handle((request, pathVariables) -> {
                 throw new GlobalFailure();
-            }));
-            filtered(routes.asyncGET("/parity/r/fail-async", (request, pathVariables) -> failOnTheIoExecutor(io, new AsyncFailure())));
-            filtered(routes.GET("/parity/r/status-response", (request, pathVariables) -> text(HttpStatus.CONFLICT, "conflict")));
-            filtered(routes.GET("/parity/r/status-exception", (request, pathVariables) -> {
+            });
+            filtered(routes.GET("/parity/r/fail-async")).handleAsync((request, pathVariables) -> failOnTheIoExecutor(io, new AsyncFailure()));
+            filtered(routes.GET("/parity/r/status-response")).handle((request, pathVariables) -> text(HttpStatus.CONFLICT, "conflict"));
+            filtered(routes.GET("/parity/r/status-exception")).handle((request, pathVariables) -> {
                 throw new HttpStatusException(HttpStatus.GONE, "gone");
-            }));
-            filtered(routes.GET("/parity/r/handled", (request, pathVariables) -> {
+            });
+            filtered(routes.GET("/parity/r/handled")).handle((request, pathVariables) -> {
                 throw new HandledFailure();
-            }));
-            filtered(routes.asyncGET("/parity/r/handled-async", (request, pathVariables) -> failOnTheIoExecutor(io, new HandledFailure())));
+            });
+            filtered(routes.GET("/parity/r/handled-async")).handleAsync((request, pathVariables) -> failOnTheIoExecutor(io, new HandledFailure()));
 
-            routes.GET("/parity/af/async-request", (request, pathVariables) -> text(describe()))
+            routes.GET("/parity/af/async-request")
                 .beforeAsync((request, propagatedContext) -> RouteFilters.beforeAsync(io, request, propagatedContext))
                 .and()
-                .after((request, response) -> RouteFilters.after2(request, response));
-            routes.GET("/parity/af/executor-request", (request, pathVariables) -> text(describe()))
+                .after((request, response) -> RouteFilters.after2(request, response)).and()
+                .handle((request, pathVariables) -> text(describe()));
+            routes.GET("/parity/af/executor-request")
                 .before((request, propagatedContext) -> {
                     RouteFilters.beforeOnExecutor(request, propagatedContext);
                 }).executeOn(TaskExecutors.BLOCKING)
                 .and()
-                .after((request, response) -> RouteFilters.after2(request, response));
-            routes.GET("/parity/af/async-response", (request, pathVariables) -> text(describe()))
+                .after((request, response) -> RouteFilters.after2(request, response)).and()
+                .handle((request, pathVariables) -> text(describe()));
+            routes.GET("/parity/af/async-response")
                 .afterAsync((request, response, propagatedContext) -> RouteFilters.afterAsync(io, request, response, propagatedContext))
                 .and()
-                .after((request, response) -> RouteFilters.after2(request, response));
-            routes.GET("/parity/af/executor-response", (request, pathVariables) -> text(describe()))
+                .after((request, response) -> RouteFilters.after2(request, response)).and()
+                .handle((request, pathVariables) -> text(describe()));
+            routes.GET("/parity/af/executor-response")
                 .after(RouteFilters::afterOnExecutor).executeOn(TaskExecutors.BLOCKING)
                 .and()
-                .after((request, response) -> RouteFilters.after2(request, response));
+                .after((request, response) -> RouteFilters.after2(request, response)).and()
+                .handle((request, pathVariables) -> text(describe()));
 
             routes.GET("/parity/get-only", (request, pathVariables) -> text(describe()));
 

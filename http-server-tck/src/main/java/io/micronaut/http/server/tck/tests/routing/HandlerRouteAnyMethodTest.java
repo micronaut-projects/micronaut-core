@@ -149,10 +149,12 @@ public class HandlerRouteAnyMethodTest {
     static class AnyRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.any("/any/things/{id}", (request, pathVariables) -> text("any", "any " + request.getMethodName() + " " + pathVariables.getLong("id")))
-                .consumesAll();
-            routes.any("/any/items", (request, pathVariables) -> text("any", "any " + request.getMethodName() + " items"))
-                .consumesAll();
+            routes.any("/any/things/{id}")
+                .consumesAll()
+                .handle((request, pathVariables) -> text("any", "any " + request.getMethodName() + " " + pathVariables.getLong("id")));
+            routes.any("/any/items")
+                .consumesAll()
+                .handle((request, pathVariables) -> text("any", "any " + request.getMethodName() + " items"));
             routes.GET("/any/items", (request, pathVariables) -> text("get", "get items"));
             routes.POST("/any/items", (request, pathVariables) -> text("post", "post items"));
             routes.GET("/any/only-get", (request, pathVariables) -> text("get", "only get"));

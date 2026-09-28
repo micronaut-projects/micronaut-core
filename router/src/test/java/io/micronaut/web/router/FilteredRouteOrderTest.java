@@ -53,10 +53,10 @@ class FilteredRouteOrderTest {
     @Test
     void theOrderBreaksTheTieAmongTheRoutesOfTheRequestedVersion() {
         Router router = versioned(routes -> {
-            routes.GET("/items/{name}", handler("v1 late")).annotate(version("1")).order(5);
-            routes.GET("/items/{name}", handler("v1 early")).annotate(version("1")).order(-5);
+            routes.GET("/items/{name}").annotate(version("1")).order(5).handle(handler("v1 late"));
+            routes.GET("/items/{name}").annotate(version("1")).order(-5).handle(handler("v1 early"));
             // more specific, but another version: it does not hide the version 1 routes
-            routes.GET("/items/special", handler("v2 special")).annotate(version("2")).order(-10);
+            routes.GET("/items/special").annotate(version("2")).order(-10).handle(handler("v2 special"));
         });
 
         assertEquals("v1 early", target(router, HttpRequest.GET("/items/special").header(VERSION, "1")));
@@ -68,10 +68,10 @@ class FilteredRouteOrderTest {
     @Test
     void routesOfTheRequestedVersionWithTheSameOrderStayAmbiguous() {
         Router router = versioned(routes -> {
-            routes.GET("/items/{name}", handler("a")).annotate(version("1")).order(5);
-            routes.GET("/items/{name}", handler("b")).annotate(version("1")).order(5);
+            routes.GET("/items/{name}").annotate(version("1")).order(5).handle(handler("a"));
+            routes.GET("/items/{name}").annotate(version("1")).order(5).handle(handler("b"));
             // a lower order, but another version
-            routes.GET("/items/{name}", handler("c")).annotate(version("2")).order(-5);
+            routes.GET("/items/{name}").annotate(version("2")).order(-5).handle(handler("c"));
         });
 
         DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/items/x").header(VERSION, "1")));

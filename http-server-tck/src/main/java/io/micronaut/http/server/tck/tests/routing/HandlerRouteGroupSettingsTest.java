@@ -205,11 +205,12 @@ public class HandlerRouteGroupSettingsTest {
         public void routes(HttpRouteBuilder routes) {
             routes.path("/group-settings", group -> {
                 group.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE);
-                group.POST("/echo", Argument.of(String.class), (request, pathVariables, body) -> HttpResponse.ok("echo " + body));
-                group.POST("/json", Argument.of(Note.class), (request, pathVariables, note) -> HttpResponse.ok("json " + note.text()))
-                    .consumes(MediaType.APPLICATION_JSON_TYPE);
+                group.POST("/echo").body(Argument.of(String.class)).handle((request, pathVariables, body) -> HttpResponse.ok("echo " + body));
+                group.POST("/json")
+                    .consumes(MediaType.APPLICATION_JSON_TYPE)
+                    .body(Argument.of(Note.class)).handle((request, pathVariables, note) -> HttpResponse.ok("json " + note.text()));
                 group.path("/nested", nested -> {
-                    nested.POST("/echo", Argument.of(String.class), (request, pathVariables, body) -> HttpResponse.ok(new Note(body)));
+                    nested.POST("/echo").body(Argument.of(String.class)).handle((request, pathVariables, body) -> HttpResponse.ok(new Note(body)));
                     // after the routes: it applies to them
                     nested.produces(MediaType.APPLICATION_JSON_TYPE);
                 });
@@ -225,11 +226,11 @@ public class HandlerRouteGroupSettingsTest {
             });
             routes.path("/group-threads", threads -> {
                 threads.GET("/blocking", (request, pathVariables) -> threadKind());
-                threads.GET("/non-blocking", (request, pathVariables) -> threadKind()).nonBlocking();
+                threads.GET("/non-blocking").nonBlocking().handle((request, pathVariables) -> threadKind());
                 threads.path("/named", named -> {
                     named.executeOn(EXECUTOR);
                     named.GET("/route", (request, pathVariables) -> threadKind());
-                    named.GET("/non-blocking", (request, pathVariables) -> threadKind()).nonBlocking();
+                    named.GET("/non-blocking").nonBlocking().handle((request, pathVariables) -> threadKind());
                 });
                 threads.executeOn(TaskExecutors.BLOCKING);
             });

@@ -30,7 +30,6 @@ import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.DefaultPathVariables;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -56,13 +55,13 @@ class TypedHandlerRoutesTest {
     @Test
     void theDeclaredResponseTypeIsTheResponseBodyTypeOfTheRouteForEveryKindOfHandler() {
         Router router = router(routes -> {
-            routes.GET("/sync", (request, pathVariables) -> HttpResponse.ok(List.of())).responseType(ITEMS);
-            routes.POST("/body", Argument.of(Item.class), (request, pathVariables, item) -> HttpResponse.ok(List.of(item))).responseType(ITEMS);
-            routes.PUT("/form", (request, pathVariables, form) -> HttpResponse.ok()).responseType(ITEMS);
-            routes.asyncGET("/async", (request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok())).responseType(ITEMS);
-            routes.handle(Set.of(HttpMethod.GET, HttpMethod.DELETE), "/methods", (request, pathVariables) -> HttpResponse.ok()).responseType(ITEMS);
-            routes.handle(RouteDeclaration.of(HttpMethod.GET, "/declared"), (request, pathVariables) -> HttpResponse.ok()).responseType(ITEMS);
-            routes.handle("PROPFIND", "/custom", (request, pathVariables) -> HttpResponse.ok()).responseType(ITEMS);
+            routes.GET("/sync").responseType(ITEMS).handle((request, pathVariables) -> HttpResponse.ok(List.of()));
+            routes.POST("/body").responseType(ITEMS).body(Argument.of(Item.class)).handle((request, pathVariables, item) -> HttpResponse.ok(List.of(item)));
+            routes.PUT("/form").responseType(ITEMS).form().handle((request, pathVariables, form) -> HttpResponse.ok());
+            routes.GET("/async").responseType(ITEMS).handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+            routes.route(Set.of(HttpMethod.GET, HttpMethod.DELETE), "/methods").responseType(ITEMS).handle((request, pathVariables) -> HttpResponse.ok());
+            routes.GET("/declared").responseType(ITEMS).handle((request, pathVariables) -> HttpResponse.ok());
+            routes.route("PROPFIND", "/custom").responseType(ITEMS).handle((request, pathVariables) -> HttpResponse.ok());
             routes.GET("/untyped", (request, pathVariables) -> HttpResponse.ok());
         });
 
@@ -93,8 +92,8 @@ class TypedHandlerRoutesTest {
             }
         };
         Router router = router(routes -> {
-            routes.GET("/before", (request, pathVariables) -> HttpResponse.ok()).responseType(ITEMS).annotationMetadata(annotated);
-            routes.GET("/after", (request, pathVariables) -> HttpResponse.ok()).annotationMetadata(annotated).responseType(ITEMS);
+            routes.GET("/before").responseType(ITEMS).annotationMetadata(annotated).handle((request, pathVariables) -> HttpResponse.ok());
+            routes.GET("/after").annotationMetadata(annotated).responseType(ITEMS).handle((request, pathVariables) -> HttpResponse.ok());
         });
         for (String path : List.of("/before", "/after")) {
             RouteInfo<?> route = route(router, HttpRequest.GET(path));

@@ -45,8 +45,9 @@ class RouteConstrainMatcherTest {
 
     @Test
     void aVariableConstrainedWithAMatcher() {
-        Router router = router(routes -> routes.GET("/files/{name}", handler("file"))
-            .constrain("name", startsWith(".").negate()));
+        Router router = router(routes -> routes.GET("/files/{name}")
+            .constrain("name", startsWith(".").negate())
+            .handle(handler("file")));
 
         assertEquals("file", target(router, HttpRequest.GET("/files/readme")));
         assertNull(router.findClosest(HttpRequest.GET("/files/.hidden")));
@@ -66,8 +67,8 @@ class RouteConstrainMatcherTest {
     @Test
     void aMissingVariableIsAnAbsentValue() {
         Router router = router(routes -> {
-            routes.GET("/files{/name}", handler("named")).constrain("name", present());
-            routes.GET("/archive{/name}", handler("unnamed")).constrain("name", present().negate());
+            routes.GET("/files{/name}").constrain("name", present()).handle(handler("named"));
+            routes.GET("/archive{/name}").constrain("name", present().negate()).handle(handler("unnamed"));
         });
 
         assertEquals("named", target(router, HttpRequest.GET("/files/readme")));
@@ -81,7 +82,7 @@ class RouteConstrainMatcherTest {
         Map<String, ValueMatcher> matchers = new LinkedHashMap<>();
         matchers.put("shop", oneOf("north", "south"));
         matchers.put("item", regex("\\d{1,3}"));
-        Router router = router(routes -> routes.GET("/shops/{shop}/items/{item}", handler("item")).constrain(matchers));
+        Router router = router(routes -> routes.GET("/shops/{shop}/items/{item}").constrain(matchers).handle(handler("item")));
         matchers.clear(); // copied when declared
 
         assertEquals("item", target(router, HttpRequest.GET("/shops/north/items/42")));
@@ -91,7 +92,7 @@ class RouteConstrainMatcherTest {
 
     @Test
     void theCollectionFormIsAOneOfMatcher() {
-        Router router = router(routes -> routes.GET("/shops/{shop}", handler("shop")).constrain("shop", List.of("north", "south")));
+        Router router = router(routes -> routes.GET("/shops/{shop}").constrain("shop", List.of("north", "south")).handle(handler("shop")));
 
         assertEquals("shop", target(router, HttpRequest.GET("/shops/south")));
         assertNull(router.findClosest(HttpRequest.GET("/shops/North")), "case-sensitive");

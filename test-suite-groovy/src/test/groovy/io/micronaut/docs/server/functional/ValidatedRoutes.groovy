@@ -22,7 +22,7 @@ class ValidatedRoutes implements HttpRoutes {
     @Override
     void routes(HttpRouteBuilder routes) {
         // tag::route[]
-        routes.POST("/products", Product) { request, pathVariables, Product product ->
+        routes.POST("/products").body(Product).handle { request, pathVariables, Product product ->
             HttpResponse.created(products.save(product)) // <2>
         }
         // end::route[]

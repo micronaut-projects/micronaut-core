@@ -113,7 +113,7 @@ public class HandlerRoutePortTest {
                 group.path("/nested", nested -> nested.GET("/", (request, pathVariables) -> text("ported")));
                 group.port(port);
             });
-            routes.GET("/port-routes/route", (request, pathVariables) -> text("ported")).port(port);
+            routes.GET("/port-routes/route").port(port).handle((request, pathVariables) -> text("ported"));
             routes.GET("/port-routes/default", (request, pathVariables) -> text("default"));
         }
     }

@@ -175,16 +175,18 @@ public class FilterResponseReplacementTest {
     static class Routes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/rr/route", ROUTE)
+            routes.GET("/rr/route")
                 .afterReplacing((request, response) -> replacement(HttpStatus.ACCEPTED, "replaced " + response.body())
-                    .header("X-Replaced", "route"));
+                    .header("X-Replaced", "route")).and()
+                    .handle(ROUTE);
             routes.path("/rr/outer", group -> {
                 group.after((request, response) -> response.header("X-Group-After", seen(response)));
-                group.GET("/x", ROUTE)
+                group.GET("/x")
                     // not mutable: the filters after it, e.g. the filter method, get it mutable
                     .afterReplacing((request, response) -> new HttpResponseWrapper<>(replacement(HttpStatus.CREATED, "replaced")))
                     .and()
-                    .after((request, response) -> response.header("X-Route-After", seen(response)));
+                    .after((request, response) -> response.header("X-Route-After", seen(response))).and()
+                    .handle(ROUTE);
             });
             routes.filter("/rr/outer/**").after((request, response) -> response.header("X-Server-After", seen(response)));
             routes.path("/rr/group", group -> {
@@ -195,16 +197,18 @@ public class FilterResponseReplacementTest {
             routes.GET("/rr/server/x", ROUTE);
             routes.filter("/rr/server/**").afterReplacing((request, response) -> replacement(HttpStatus.ACCEPTED, "server replaced " + response.body())
                 .header("X-Replaced", "server"));
-            routes.GET("/rr/async", ROUTE)
+            routes.GET("/rr/async")
                 .afterReplacingAsync((request, response) -> CompletableFuture.completedFuture(replacement(HttpStatus.CREATED, "async replaced")))
                 .and()
                 .afterReplacingAsync((request, response, propagatedContext) -> {
                     response.header("X-Async-Kept", String.valueOf(response.code()));
                     return CompletableFuture.completedFuture(null);
-                });
-            routes.GET("/rr/executor", ROUTE)
-                .afterReplacing((request, response) -> replacement(HttpStatus.ACCEPTED, "executor replaced")).executeOn(TaskExecutors.BLOCKING);
-            routes.GET("/rr/null", ROUTE)
+                }).and()
+                .handle(ROUTE);
+            routes.GET("/rr/executor")
+                .afterReplacing((request, response) -> replacement(HttpStatus.ACCEPTED, "executor replaced")).executeOn(TaskExecutors.BLOCKING).and()
+                .handle(ROUTE);
+            routes.GET("/rr/null")
                 .afterReplacing((request, response) -> {
                     response.header("X-Kept", "true");
                     return null;
@@ -213,15 +217,17 @@ public class FilterResponseReplacementTest {
                 .afterReplacingAsync((request, response) -> {
                     response.header("X-Async-Kept", "true");
                     return CompletableFuture.completedFuture(null);
-                });
-            routes.GET("/rr/context", ROUTE)
+                }).and()
+                .handle(ROUTE);
+            routes.GET("/rr/context")
                 .afterReplacing((request, response, propagatedContext) -> {
                     propagatedContext.add(new Marker("replacer"));
                     return replacement(HttpStatus.ACCEPTED, "context replaced");
                 })
                 .and()
                 .after((request, response) -> response.header("X-Context",
-                    PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none")));
+                    PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none"))).and()
+                    .handle(ROUTE);
             routes.GET("/rr/pre/ok", ROUTE);
             routes.filter("/rr/pre/**").preMatching()
                 .beforeReplacing(request -> request.getPath().equals("/rr/pre/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)

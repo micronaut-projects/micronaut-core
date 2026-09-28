@@ -24,7 +24,6 @@ import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -38,11 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * The asynchronous handlers with and without the body are overloads of the same builder methods,
- * told apart by the number of parameters of the lambda or of the method a method reference names:
- * two for an {@code AsyncRequestHandler}, three for an {@code AsyncBodyRequestHandler}. None of
- * the declarations below is ambiguous, which the compilation of this test checks, and each one is
- * routed to the handler it names, which the arguments of its route show.
+ * The asynchronous handlers with and without the body are the {@code handleAsync} terminals of a
+ * route and of its body stage {@code body()}: an {@code AsyncRequestHandler} takes two parameters,
+ * an {@code AsyncBodyRequestHandler} three, for a lambda or the method a method reference names.
+ * Each declaration below is routed to the handler it names, which the arguments of its route show,
+ * for every creator: per method, by method, for a set of methods and by method name.
  */
 class AsyncHandlerOverloadsTest {
 
@@ -50,26 +49,26 @@ class AsyncHandlerOverloadsTest {
     private static final List<Class<?>> BODY = List.of(HttpRequest.class, PathVariables.class, AsyncRequestBody.class);
 
     @Test
-    void lambdasAreToldApartByTheirNumberOfParameters() {
+    void lambdasAreRoutedToTheirHandler() {
         Router router = router(routes -> {
-            routes.asyncGET("/get", (request, pathVariables) -> ok());
-            routes.asyncGET("/get-body", (request, pathVariables, body) -> body.text().thenApply(HttpResponse::ok));
-            routes.asyncPOST("/post", (request, pathVariables) -> ok());
-            routes.asyncPOST("/post-body", (request, pathVariables, body) -> body.text().thenApply(HttpResponse::ok));
-            routes.asyncPUT("/put", (request, pathVariables) -> ok());
-            routes.asyncPUT("/put-body", (request, pathVariables, body) -> body.discardBody().thenApply(done -> HttpResponse.ok()));
-            routes.asyncPATCH("/patch", (request, pathVariables) -> ok());
-            routes.asyncPATCH("/patch-body", (request, pathVariables, body) -> ok());
-            routes.asyncDELETE("/delete", (request, pathVariables) -> ok());
-            routes.asyncDELETE("/delete-body", (request, pathVariables, body) -> ok());
-            routes.handleAsync(HttpMethod.POST, "/method", (request, pathVariables) -> ok());
-            routes.handleAsync(HttpMethod.POST, "/method-body", (request, pathVariables, body) -> ok());
-            routes.handleAsync(Set.of(HttpMethod.PUT), "/methods", (request, pathVariables) -> ok());
-            routes.handleAsync(Set.of(HttpMethod.PUT), "/methods-body", (request, pathVariables, body) -> ok());
-            routes.handleAsync("PROPFIND", "/named", (request, pathVariables) -> ok());
-            routes.handleAsync("PROPFIND", "/named-body", (request, pathVariables, body) -> ok());
-            routes.handleAsync(RouteDeclaration.of(HttpMethod.POST, "/declared"), (request, pathVariables) -> ok());
-            routes.handleAsync(RouteDeclaration.of(HttpMethod.POST, "/declared-body"), (request, pathVariables, body) -> ok());
+            routes.GET("/get").handleAsync((request, pathVariables) -> ok());
+            routes.GET("/get-body").body().handleAsync((request, pathVariables, body) -> body.text().thenApply(HttpResponse::ok));
+            routes.POST("/post").handleAsync((request, pathVariables) -> ok());
+            routes.POST("/post-body").body().handleAsync((request, pathVariables, body) -> body.text().thenApply(HttpResponse::ok));
+            routes.PUT("/put").handleAsync((request, pathVariables) -> ok());
+            routes.PUT("/put-body").body().handleAsync((request, pathVariables, body) -> body.discardBody().thenApply(done -> HttpResponse.ok()));
+            routes.PATCH("/patch").handleAsync((request, pathVariables) -> ok());
+            routes.PATCH("/patch-body").body().handleAsync((request, pathVariables, body) -> ok());
+            routes.DELETE("/delete").handleAsync((request, pathVariables) -> ok());
+            routes.DELETE("/delete-body").body().handleAsync((request, pathVariables, body) -> ok());
+            routes.route(HttpMethod.POST, "/method").handleAsync((request, pathVariables) -> ok());
+            routes.route(HttpMethod.POST, "/method-body").body().handleAsync((request, pathVariables, body) -> ok());
+            routes.route(Set.of(HttpMethod.PUT), "/methods").handleAsync((request, pathVariables) -> ok());
+            routes.route(Set.of(HttpMethod.PUT), "/methods-body").body().handleAsync((request, pathVariables, body) -> ok());
+            routes.route("PROPFIND", "/named").handleAsync((request, pathVariables) -> ok());
+            routes.route("PROPFIND", "/named-body").body().handleAsync((request, pathVariables, body) -> ok());
+            routes.route("POST", "/declared").handleAsync((request, pathVariables) -> ok());
+            routes.route("POST", "/declared-body").body().handleAsync((request, pathVariables, body) -> ok());
         });
         assertArguments(NO_BODY, router, HttpRequest.GET("/get"));
         assertArguments(BODY, router, HttpRequest.GET("/get-body"));
@@ -92,19 +91,19 @@ class AsyncHandlerOverloadsTest {
     }
 
     @Test
-    void methodReferencesAreToldApartByTheParametersOfTheMethod() {
+    void methodReferencesAreRoutedToTheirHandler() {
         Handlers handlers = new Handlers();
         Router router = router(routes -> {
-            routes.asyncGET("/static", AsyncHandlerOverloadsTest::withoutBody);
-            routes.asyncPOST("/static-body", AsyncHandlerOverloadsTest::withBody);
-            routes.asyncGET("/bound", handlers::find);
-            routes.asyncPOST("/bound-body", handlers::save);
-            routes.handleAsync(HttpMethod.PUT, "/method", AsyncHandlerOverloadsTest::withoutBody);
-            routes.handleAsync(HttpMethod.PUT, "/method-body", handlers::save);
-            routes.handleAsync("PROPFIND", "/named", handlers::find);
-            routes.handleAsync("PROPFIND", "/named-body", AsyncHandlerOverloadsTest::withBody);
-            routes.handleAsync(RouteDeclaration.of(HttpMethod.DELETE, "/declared"), handlers::find);
-            routes.handleAsync(RouteDeclaration.of(HttpMethod.DELETE, "/declared-body"), handlers::save);
+            routes.GET("/static").handleAsync(AsyncHandlerOverloadsTest::withoutBody);
+            routes.POST("/static-body").body().handleAsync(AsyncHandlerOverloadsTest::withBody);
+            routes.GET("/bound").handleAsync(handlers::find);
+            routes.POST("/bound-body").body().handleAsync(handlers::save);
+            routes.route(HttpMethod.PUT, "/method").handleAsync(AsyncHandlerOverloadsTest::withoutBody);
+            routes.route(HttpMethod.PUT, "/method-body").body().handleAsync(handlers::save);
+            routes.route("PROPFIND", "/named").handleAsync(handlers::find);
+            routes.route("PROPFIND", "/named-body").body().handleAsync(AsyncHandlerOverloadsTest::withBody);
+            routes.route("DELETE", "/declared").handleAsync(handlers::find);
+            routes.route("DELETE", "/declared-body").body().handleAsync(handlers::save);
         });
         assertArguments(NO_BODY, router, HttpRequest.GET("/static"));
         assertArguments(BODY, router, HttpRequest.POST("/static-body", ""));
@@ -119,24 +118,24 @@ class AsyncHandlerOverloadsTest {
     }
 
     @Test
-    void thePathlessFormsAreToldApartToo() {
+    void theRoutesAtThePathOfAGroupToo() {
         Router router = router(routes -> {
-            routes.path("/get", group -> group.asyncGET((request, pathVariables) -> ok()));
-            routes.path("/get-body", group -> group.asyncGET((request, pathVariables, body) -> ok()));
-            routes.path("/post", group -> group.asyncPOST(AsyncHandlerOverloadsTest::withoutBody));
-            routes.path("/post-body", group -> group.asyncPOST(AsyncHandlerOverloadsTest::withBody));
-            routes.path("/put", group -> group.asyncPUT((request, pathVariables) -> ok()));
-            routes.path("/put-body", group -> group.asyncPUT((request, pathVariables, body) -> ok()));
-            routes.path("/patch", group -> group.asyncPATCH((request, pathVariables) -> ok()));
-            routes.path("/patch-body", group -> group.asyncPATCH((request, pathVariables, body) -> ok()));
-            routes.path("/delete", group -> group.asyncDELETE((request, pathVariables) -> ok()));
-            routes.path("/delete-body", group -> group.asyncDELETE((request, pathVariables, body) -> ok()));
-            routes.path("/method", group -> group.handleAsync(HttpMethod.POST, (request, pathVariables) -> ok()));
-            routes.path("/method-body", group -> group.handleAsync(HttpMethod.POST, (request, pathVariables, body) -> ok()));
-            routes.path("/methods", group -> group.handleAsync(Set.of(HttpMethod.PUT), (request, pathVariables) -> ok()));
-            routes.path("/methods-body", group -> group.handleAsync(Set.of(HttpMethod.PUT), (request, pathVariables, body) -> ok()));
-            routes.path("/named", group -> group.handleAsync("PROPFIND", (request, pathVariables) -> ok()));
-            routes.path("/named-body", group -> group.handleAsync("PROPFIND", (request, pathVariables, body) -> ok()));
+            routes.path("/get", group -> group.GET("/").handleAsync((request, pathVariables) -> ok()));
+            routes.path("/get-body", group -> group.GET("/").body().handleAsync((request, pathVariables, body) -> ok()));
+            routes.path("/post", group -> group.POST("/").handleAsync(AsyncHandlerOverloadsTest::withoutBody));
+            routes.path("/post-body", group -> group.POST("/").body().handleAsync(AsyncHandlerOverloadsTest::withBody));
+            routes.path("/put", group -> group.PUT("/").handleAsync((request, pathVariables) -> ok()));
+            routes.path("/put-body", group -> group.PUT("/").body().handleAsync((request, pathVariables, body) -> ok()));
+            routes.path("/patch", group -> group.PATCH("/").handleAsync((request, pathVariables) -> ok()));
+            routes.path("/patch-body", group -> group.PATCH("/").body().handleAsync((request, pathVariables, body) -> ok()));
+            routes.path("/delete", group -> group.DELETE("/").handleAsync((request, pathVariables) -> ok()));
+            routes.path("/delete-body", group -> group.DELETE("/").body().handleAsync((request, pathVariables, body) -> ok()));
+            routes.path("/method", group -> group.route(HttpMethod.POST, "/").handleAsync((request, pathVariables) -> ok()));
+            routes.path("/method-body", group -> group.route(HttpMethod.POST, "/").body().handleAsync((request, pathVariables, body) -> ok()));
+            routes.path("/methods", group -> group.route(Set.of(HttpMethod.PUT), "/").handleAsync((request, pathVariables) -> ok()));
+            routes.path("/methods-body", group -> group.route(Set.of(HttpMethod.PUT), "/").body().handleAsync((request, pathVariables, body) -> ok()));
+            routes.path("/named", group -> group.route("PROPFIND", "/").handleAsync((request, pathVariables) -> ok()));
+            routes.path("/named-body", group -> group.route("PROPFIND", "/").body().handleAsync((request, pathVariables, body) -> ok()));
         });
         assertArguments(NO_BODY, router, HttpRequest.GET("/get"));
         assertArguments(BODY, router, HttpRequest.GET("/get-body"));

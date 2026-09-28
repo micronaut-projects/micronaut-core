@@ -356,28 +356,36 @@ public class HandlerRouteAnnotationsTest {
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.path("/fn-annotations", group -> {
-                group.GET("/ping", (request, pathVariables) -> text(targets.pingV1()))
-                    .annotationMetadata(metadataOf("pingV1"));
-                group.GET("/ping", (request, pathVariables) -> text(targets.pingV2()))
-                    .annotationMetadata(metadataOf("pingV2"));
-                group.GET("/cors", (request, pathVariables) -> text(targets.cors()))
-                    .annotationMetadata(metadataOf("cors"));
+                group.GET("/ping")
+                    .annotationMetadata(metadataOf("pingV1"))
+                    .handle((request, pathVariables) -> text(targets.pingV1()));
+                group.GET("/ping")
+                    .annotationMetadata(metadataOf("pingV2"))
+                    .handle((request, pathVariables) -> text(targets.pingV2()));
+                group.GET("/cors")
+                    .annotationMetadata(metadataOf("cors"))
+                    .handle((request, pathVariables) -> text(targets.cors()));
                 group.GET("/items/{id}", (request, pathVariables) -> text("item " + pathVariables.getString("id")));
                 group.POST("/items/{id}", (request, pathVariables) -> text("saved " + pathVariables.getString("id")));
-                group.handle(HttpMethod.OPTIONS, "/options", (request, pathVariables) -> HttpResponse.status(HttpStatus.I_AM_A_TEAPOT));
-                group.GET("/admin", (request, pathVariables) -> text(targets.admin()))
-                    .annotationMetadata(metadataOf("admin"));
-                group.GET("/audited", (request, pathVariables) -> text(targets.audited()))
-                    .annotationMetadata(metadataOf("audited"));
+                group.route(HttpMethod.OPTIONS, "/options").handle((request, pathVariables) -> HttpResponse.status(HttpStatus.I_AM_A_TEAPOT));
+                group.GET("/admin")
+                    .annotationMetadata(metadataOf("admin"))
+                    .handle((request, pathVariables) -> text(targets.admin()));
+                group.GET("/audited")
+                    .annotationMetadata(metadataOf("audited"))
+                    .handle((request, pathVariables) -> text(targets.audited()));
                 group.GET("/plain", (request, pathVariables) -> text("plain"));
             });
             routes.path("/fn-implementing", group -> {
-                group.GET("/ping", (request, pathVariables) -> text(targets.pingV1()))
-                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV1"));
-                group.GET("/ping", (request, pathVariables) -> text(targets.pingV2()))
-                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV2"));
-                group.GET("/admin", (request, pathVariables) -> text(targets.admin()))
-                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("admin"));
+                group.GET("/ping")
+                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV1"))
+                    .handle((request, pathVariables) -> text(targets.pingV1()));
+                group.GET("/ping")
+                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV2"))
+                    .handle((request, pathVariables) -> text(targets.pingV2()));
+                group.GET("/admin")
+                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("admin"))
+                    .handle((request, pathVariables) -> text(targets.admin()));
             });
         }
     }

@@ -29,8 +29,9 @@ import java.util.concurrent.CompletionStage;
  * something up, e.g. the security context of a token it verified:
  *
  * <pre>{@code
- * routes.GET("/orders", handler).beforeAsync((request, propagatedContext) -> tokens.verify(request)
- *     .thenAccept(user -> propagatedContext.add(new UserContext(user))));
+ * routes.GET("/orders").beforeAsync((request, propagatedContext) -> tokens.verify(request)
+ *     .thenAccept(user -> propagatedContext.add(new UserContext(user)))).and()
+ *     .handle(handler);
  * }</pre>
  *
  * <p>The filter chain continues when the stage completes, possibly on another thread, with the

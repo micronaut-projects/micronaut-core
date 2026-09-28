@@ -118,12 +118,10 @@ public class WriterErrorRouteFiltersTest {
         public void routes(HttpRouteBuilder routes) {
             routes.path("/wrf-handler", group -> {
                 group.after((request, response) -> response.header("X-Group-After", "true"));
-                group.GET("/failing", (request, pathVariables) ->
-                    HttpResponse.ok(new FailingBody("failing")).contentType(MediaType.TEXT_PLAIN_TYPE)
-                ).after((request, response) -> response.header("X-Route-After", "true"));
-                group.GET("/ok", (request, pathVariables) ->
-                    HttpResponse.ok("ok").contentType(MediaType.TEXT_PLAIN_TYPE)
-                ).after((request, response) -> response.header("X-Route-After", "true"));
+                group.GET("/failing").after((request, response) -> response.header("X-Route-After", "true")).and().handle((request, pathVariables) ->
+                    HttpResponse.ok(new FailingBody("failing")).contentType(MediaType.TEXT_PLAIN_TYPE));
+                group.GET("/ok").after((request, response) -> response.header("X-Route-After", "true")).and().handle((request, pathVariables) ->
+                    HttpResponse.ok("ok").contentType(MediaType.TEXT_PLAIN_TYPE));
             });
         }
     }

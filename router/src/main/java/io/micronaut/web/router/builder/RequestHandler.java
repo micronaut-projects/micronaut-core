@@ -31,12 +31,12 @@ import io.micronaut.http.PathVariables;
  *
  * <pre>{@code
  * routes.GET("/hello/{name}", (request, pathVariables) -> HttpResponse.ok("Hello " + pathVariables.getString("name")));
- * routes.GET("/report", (request, pathVariables) -> HttpResponse.ok(reports.build())).executeOn(TaskExecutors.BLOCKING);
+ * routes.GET("/report").executeOn(TaskExecutors.BLOCKING).handle((request, pathVariables) -> HttpResponse.ok(reports.build()));
  * }</pre>
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.HttpRouteBuilder#handle(io.micronaut.http.HttpMethod, String, RequestHandler)
+ * @see HttpRouteSpec#handle(RequestHandler)
  */
 @Experimental
 @FunctionalInterface

@@ -206,15 +206,18 @@ public class HandlerRouteStreamingTest {
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.path("/fn-stream", group -> {
-                group.GET("/events", (request, pathVariables) -> HttpResponse.ok(events()))
-                    .produces(MediaType.TEXT_EVENT_STREAM_TYPE);
-                group.asyncGET("/events-async", (request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok(events())))
-                    .produces(MediaType.TEXT_EVENT_STREAM_TYPE);
+                group.GET("/events")
+                    .produces(MediaType.TEXT_EVENT_STREAM_TYPE)
+                    .handle((request, pathVariables) -> HttpResponse.ok(events()));
+                group.GET("/events-async")
+                    .produces(MediaType.TEXT_EVENT_STREAM_TYPE)
+                    .handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok(events())));
                 group.GET("/events-response-type", (request, pathVariables) -> HttpResponse.ok(events()).contentType(MediaType.TEXT_EVENT_STREAM_TYPE));
-                group.GET("/rich", (request, pathVariables) -> HttpResponse.ok(rich()))
-                    .produces(MediaType.TEXT_EVENT_STREAM_TYPE);
+                group.GET("/rich")
+                    .produces(MediaType.TEXT_EVENT_STREAM_TYPE)
+                    .handle((request, pathVariables) -> HttpResponse.ok(rich()));
                 group.GET("/json", (request, pathVariables) -> HttpResponse.ok(json()));
-                group.asyncGET("/json-async", (request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok(json())));
+                group.GET("/json-async").handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok(json())));
                 group.GET("/failing", (request, pathVariables) -> HttpResponse.ok(failing()));
             });
         }

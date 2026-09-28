@@ -46,10 +46,11 @@ import io.micronaut.core.annotation.Experimental;
  * {@link FilterSpec#and()} goes back to the route or the group to continue its declaration.</p>
  *
  * <pre>{@code
- * routes.GET("/orders/{id}", orderHandler)
+ * routes.GET("/orders/{id}")
  *     .before(request -> tenants.check(request)).executeOn(TaskExecutors.BLOCKING)
  *     .and()
- *     .after((request, response) -> response.header("X-Tenant", tenantOf(request)));
+ *     .after((request, response) -> response.header("X-Tenant", tenantOf(request))).and()
+ *     .handle(orderHandler);
  * }</pre>
  *
  * <p><b>Matched routes only.</b> As with the filter methods of a controller, the filters of a

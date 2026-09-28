@@ -125,8 +125,9 @@ class PeerAddressConditionTest {
     void aPeerAddressSelectsAHandlerRoute() {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
         DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(assembly);
-        routes.GET("/admin", (request, pathVariables) -> HttpResponse.ok("admin"))
-            .where(peerAddress("127.0.0.0/8", "::1"));
+        routes.GET("/admin")
+            .where(peerAddress("127.0.0.0/8", "::1"))
+            .handle((request, pathVariables) -> HttpResponse.ok("admin"));
         assembly.addImplicitHeadRoutes();
         Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
 

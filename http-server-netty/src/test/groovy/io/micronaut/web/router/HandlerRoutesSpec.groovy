@@ -145,15 +145,15 @@ class HandlerRoutesSpec extends Specification {
                     text([pathVariables.getInt('n', 5), pathVariables.getString('missing', 'none'),
                           pathVariables.get('other', String, 'x'), pathVariables.getBoolean('flag', false)].join(','))
                 } as RequestHandler)
-                routes.handleAsync(io.micronaut.http.HttpMethod.GET, '/h/executor', { HttpRequest<?> request, PathVariables pathVariables ->
+                routes.route(io.micronaut.http.HttpMethod.GET, '/h/executor').executeOn('handler-test').handleAsync({ HttpRequest<?> request, PathVariables pathVariables ->
                     CompletableFuture.completedFuture(text(Thread.currentThread().name))
-                } as AsyncRequestHandler).executeOn('handler-test')
+                } as AsyncRequestHandler)
                 routes.GET('/h/blocking', { HttpRequest<?> request, PathVariables pathVariables ->
                     text(Thread.currentThread() instanceof FastThreadLocalThread)
                 } as RequestHandler)
-                routes.GET('/h/non-blocking', { HttpRequest<?> request, PathVariables pathVariables ->
+                routes.GET('/h/non-blocking').nonBlocking().handle({ HttpRequest<?> request, PathVariables pathVariables ->
                     text(Thread.currentThread() instanceof FastThreadLocalThread)
-                } as RequestHandler).nonBlocking()
+                } as RequestHandler)
             } as HttpRoutes
         }
 

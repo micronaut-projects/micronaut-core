@@ -269,16 +269,16 @@ public class HandlerRoutesAsyncErrorsTest {
             });
             routes.GET("/async-errors/handler/status/{name}", (request, pathVariables) -> statusResponse(pathVariables.getString("name")));
             routes.GET("/async-errors/handler/gone", (request, pathVariables) -> HttpResponse.status(HttpStatus.GONE));
-            routes.asyncGET("/async-errors/async-thrown/fail/{name}", (request, pathVariables) -> {
+            routes.GET("/async-errors/async-thrown/fail/{name}").handleAsync((request, pathVariables) -> {
                 throw failure(pathVariables.getString("name"));
             });
-            routes.asyncGET("/async-errors/async-thrown/status/{name}", (request, pathVariables) ->
+            routes.GET("/async-errors/async-thrown/status/{name}").handleAsync((request, pathVariables) ->
                 CompletableFuture.completedFuture(statusResponse(pathVariables.getString("name"))));
-            routes.asyncGET("/async-errors/async-stage/fail/{name}", (request, pathVariables) ->
+            routes.GET("/async-errors/async-stage/fail/{name}").handleAsync((request, pathVariables) ->
                 later(() -> {
                     throw failure(pathVariables.getString("name"));
                 }));
-            routes.asyncGET("/async-errors/async-stage/status/{name}", (request, pathVariables) ->
+            routes.GET("/async-errors/async-stage/status/{name}").handleAsync((request, pathVariables) ->
                 later(() -> statusResponse(pathVariables.getString("name"))));
 
             routes.error(SyncHandledFailure.class, (request, error) -> handled(error));

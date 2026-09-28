@@ -2,7 +2,6 @@ package io.micronaut.docs.server.functional
 
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -25,16 +24,17 @@ class RespondRoutes implements HttpRoutes {
 
     @Override
     void routes(HttpRouteBuilder routes) {
-        routes.respond("/ping", HttpResponse.ok("pong").contentType(MediaType.TEXT_PLAIN_TYPE)) // <1>
-            .after { request, response -> response.header("Cache-Control", "max-age=60") } // <2>
-        routes.respond("/old-ping", HttpResponse.permanentRedirect(URI.create("/ping"))) // <3>
-        routes.respond("/visits", {
+        routes.GET("/ping") // <1>
+            .after { request, response -> response.header("Cache-Control", "max-age=60") }.and() // <2>
+            .respond(HttpResponse.ok("pong").contentType(MediaType.TEXT_PLAIN_TYPE))
+        routes.GET("/old-ping").respond(HttpResponse.permanentRedirect(URI.create("/ping"))) // <3>
+        routes.GET("/visits").respond({
             HttpResponse.ok("visit " + visits.incrementAndGet()).contentType(MediaType.TEXT_PLAIN_TYPE)
         } as Supplier<HttpResponse<?>>) // <4>
-        routes.respond("/greetings/{name}", { PathVariables pathVariables ->
+        routes.GET("/greetings/{name}").respond({ PathVariables pathVariables ->
             HttpResponse.ok("Hello " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE)
         } as Function<PathVariables, HttpResponse<?>>) // <5>
-        routes.respond(HttpMethod.POST, "/legacy/webhook", HttpResponse.status(HttpStatus.GONE)) // <6>
+        routes.POST("/legacy/webhook").respond(HttpResponse.status(HttpStatus.GONE)) // <6>
     }
 }
 // end::clazz[]

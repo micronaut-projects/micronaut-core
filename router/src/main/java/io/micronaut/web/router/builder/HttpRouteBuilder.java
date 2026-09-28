@@ -18,16 +18,10 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.PathVariables;
-import io.micronaut.http.form.FormData;
 
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Builds routes to handler functions: in an {@link HttpRoutes} bean, which adds them to the
@@ -35,11 +29,25 @@ import java.util.function.Supplier;
  * controller route: argument binding, filters, error routes, executor selection, 405 / 415 / 406,
  * CORS and implicit {@code HEAD} routes all apply.
  *
+ * <p>A route is declared in stages: a creator, e.g. {@link #GET(String)}, gives the pending
+ * route, an {@link HttpRouteSpec}, which takes the settings of the route, then optionally a body
+ * stage, and one terminal, the handler or the response of the route, which adds the route. A
+ * route with no settings has a shortcut per method, e.g. {@link #GET(String, RequestHandler)}.</p>
+ *
  * <pre>{@code
- * routes.GET("/items/{id}", (request, pathVariables) -> HttpResponse.ok(items.find(pathVariables.getLong("id"))))
- *     .executeOn(TaskExecutors.BLOCKING);
+ * routes.GET("/items/{id}", (request, pathVariables) -> HttpResponse.ok(items.find(pathVariables.getLong("id"))));
+ * routes.GET("/items/{id}/name")
+ *     .produces(MediaType.TEXT_PLAIN_TYPE)
+ *     .executeOn(TaskExecutors.BLOCKING)
+ *     .handle((request, pathVariables) -> HttpResponse.ok(items.find(pathVariables.getLong("id")).name()));
+ * routes.POST("/items").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.created(items.save(item)));
  * routes.error(NoSuchFileException.class, (request, error) -> HttpResponse.notFound());
  * }</pre>
+ *
+ * <p>A pending route that is not ended with a terminal fails the startup: an
+ * {@link IllegalStateException} names the route and the {@link HttpRoutes} bean that declares it,
+ * once {@link HttpRoutes#routes(HttpRouteBuilder)} returned, or once the lambda of the group that
+ * declares it returned.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -49,394 +57,105 @@ import java.util.function.Supplier;
 public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpRouteGroup {
 
     /**
-     * Route a {@code GET} request to a handler function, with an implicit {@code HEAD} route
-     * only if the route builder adds them.
+     * Declare a route of {@code GET} requests, with an implicit {@code HEAD} route in an
+     * {@link HttpRoutes} bean: the pending route, to configure and to end with a terminal, see
+     * {@link HttpRouteSpec}.
      *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @param uri The URI template
+     * @return The pending route
      */
-    default HttpRouteSpec GET(String uri, RequestHandler handler) {
-        return handle(HttpMethod.GET, uri, handler);
+    default HttpRouteSpec GET(String uri) {
+        return route(HttpMethod.GET, uri);
     }
 
     /**
-     * Route a {@code POST} request to a handler function.
+     * Declare a route of {@code POST} requests, see {@link #GET(String)}.
      *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @param uri The URI template
+     * @return The pending route
      */
-    default HttpRouteSpec POST(String uri, RequestHandler handler) {
-        return handle(HttpMethod.POST, uri, handler);
+    default HttpRouteSpec POST(String uri) {
+        return route(HttpMethod.POST, uri);
     }
 
     /**
-     * Route a {@code PUT} request to a handler function.
+     * Declare a route of {@code PUT} requests, see {@link #GET(String)}.
      *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @param uri The URI template
+     * @return The pending route
      */
-    default HttpRouteSpec PUT(String uri, RequestHandler handler) {
-        return handle(HttpMethod.PUT, uri, handler);
+    default HttpRouteSpec PUT(String uri) {
+        return route(HttpMethod.PUT, uri);
     }
 
     /**
-     * Route a {@code PATCH} request to a handler function.
+     * Declare a route of {@code PATCH} requests, see {@link #GET(String)}.
      *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @param uri The URI template
+     * @return The pending route
      */
-    default HttpRouteSpec PATCH(String uri, RequestHandler handler) {
-        return handle(HttpMethod.PATCH, uri, handler);
+    default HttpRouteSpec PATCH(String uri) {
+        return route(HttpMethod.PATCH, uri);
     }
 
     /**
-     * Route a {@code DELETE} request to a handler function.
+     * Declare a route of {@code DELETE} requests, see {@link #GET(String)}.
      *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @param uri The URI template
+     * @return The pending route
      */
-    default HttpRouteSpec DELETE(String uri, RequestHandler handler) {
-        return handle(HttpMethod.DELETE, uri, handler);
+    default HttpRouteSpec DELETE(String uri) {
+        return route(HttpMethod.DELETE, uri);
     }
 
     /**
-     * Route a {@code POST} request to a handler function that receives the decoded body.
+     * Declare a route of the requests of a method. The route runs like a controller method:
+     * filters, error routes, body readers and writers and executor selection apply as they do for
+     * a controller method. Like a controller route it consumes JSON unless
+     * {@link HttpRouteSpec#consumes} says otherwise, and in {@link HttpRoutes} its URI is under
+     * {@code micronaut.server.context-path}. A {@code GET} route gets an implicit {@code HEAD}
+     * route.
      *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     */
-    default <B> HttpRouteSpec POST(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(HttpMethod.POST, uri, bodyType, handler);
-    }
-
-    /**
-     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec POST(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return POST(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
-    }
-
-    /**
-     * Route a {@code PUT} request to a handler function that receives the decoded body.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     */
-    default <B> HttpRouteSpec PUT(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(HttpMethod.PUT, uri, bodyType, handler);
-    }
-
-    /**
-     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec PUT(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return PUT(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
-    }
-
-    /**
-     * Route a {@code PATCH} request to a handler function that receives the decoded body.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec PATCH(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(HttpMethod.PATCH, uri, bodyType, handler);
-    }
-
-    /**
-     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec PATCH(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return PATCH(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
-    }
-
-    /**
-     * Route requests to a handler function. The route runs like a controller method that takes
-     * the request and returns a response: filters, error routes, body writers and executor
-     * selection apply as they do for a blocking controller method. Like a controller route it
-     * consumes JSON unless {@link HttpRouteSpec#consumes} says otherwise, and in {@link HttpRoutes}
-     * its URI is under {@code micronaut.server.context-path}.
-     *
-     * @param method  The HTTP method, not {@link HttpMethod#CUSTOM}: a route of a custom method
-     *                is declared by its name, see {@link #handle(String, String, RequestHandler)}
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @param method The HTTP method, not {@link HttpMethod#CUSTOM}: a route of a custom method
+     *               is declared by its name, see {@link #route(String, String)}
+     * @param uri    The URI template
+     * @return The pending route
      * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}
      */
-    HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler);
+    HttpRouteSpec route(HttpMethod method, String uri);
 
     /**
-     * Route requests to a handler function that receives the body decoded to the given type, like
-     * a controller method with a {@code @Body} argument.
-     * The body is required, unless the type is {@link Argument#isNullable() nullable}: then a
-     * request without a body is handled with {@code null}.
+     * Declare the routes of the requests of several HTTP methods to one handler: a route per
+     * method, which the pending route configures together.
      *
-     * @param method   The HTTP method
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     */
-    <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
-
-    /**
-     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
-     *
-     * @param method   The HTTP method
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec handle(HttpMethod method, String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(method, uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
-    }
-
-    /**
-     * Route a {@code POST} request with a submitted form to a handler function.
-     *
+     * @param methods The HTTP methods, none {@link HttpMethod#CUSTOM}
      * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @return The pending routes, to configure together
+     * @throws IllegalArgumentException if there is no method, or one is {@link HttpMethod#CUSTOM}
+     * @see #route(HttpMethod, String)
      */
-    default HttpRouteSpec POST(String uri, FormRequestHandler handler) {
-        return handleForm(HttpMethod.POST, uri, handler);
-    }
+    HttpRouteSpec route(Set<HttpMethod> methods, String uri);
 
     /**
-     * Route a {@code PUT} request with a submitted form to a handler function.
+     * Declare a route of the requests of a method by its name, including a custom HTTP method
+     * such as {@code PROPFIND}, like a controller method annotated {@code @CustomHttpMethod}.
      *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     */
-    default HttpRouteSpec PUT(String uri, FormRequestHandler handler) {
-        return handleForm(HttpMethod.PUT, uri, handler);
-    }
-
-    /**
-     * Route requests with a submitted form, {@code application/x-www-form-urlencoded} or
-     * {@code multipart/form-data}, to a handler function that receives the whole form as
-     * {@link FormData}. The route consumes both form media types.
+     * <pre>{@code
+     * routes.route("PROPFIND", "/items/{id}").handle((request, pathVariables) -> HttpResponse.ok(properties(pathVariables)));
+     * }</pre>
      *
-     * @param method  The HTTP method
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
+     * @param httpMethodName The name of the HTTP method, a token
+     * @param uri            The URI template
+     * @return The pending route
+     * @throws IllegalArgumentException if the name is empty or not a token, e.g. blank
+     * @see #route(HttpMethod, String)
      */
-    HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler);
+    HttpRouteSpec route(String httpMethodName, String uri);
 
     /**
-     * Route a {@code GET} request to a handler function that completes the response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
-     */
-    default HttpRouteSpec asyncGET(String uri, AsyncRequestHandler handler) {
-        return handleAsync(HttpMethod.GET, uri, handler);
-    }
-
-    /**
-     * Route a {@code GET} request to a handler function that reads the body and completes the
-     * response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncGET(String uri, AsyncBodyRequestHandler handler) {
-        return handleAsync(HttpMethod.GET, uri, handler);
-    }
-
-    /**
-     * Route a {@code POST} request to a handler function that completes the response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
-     */
-    default HttpRouteSpec asyncPOST(String uri, AsyncRequestHandler handler) {
-        return handleAsync(HttpMethod.POST, uri, handler);
-    }
-
-    /**
-     * Route a {@code POST} request to a handler function that reads the body and completes the
-     * response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPOST(String uri, AsyncBodyRequestHandler handler) {
-        return handleAsync(HttpMethod.POST, uri, handler);
-    }
-
-    /**
-     * Route a {@code PUT} request to a handler function that completes the response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
-     */
-    default HttpRouteSpec asyncPUT(String uri, AsyncRequestHandler handler) {
-        return handleAsync(HttpMethod.PUT, uri, handler);
-    }
-
-    /**
-     * Route a {@code PUT} request to a handler function that reads the body and completes the
-     * response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPUT(String uri, AsyncBodyRequestHandler handler) {
-        return handleAsync(HttpMethod.PUT, uri, handler);
-    }
-
-    /**
-     * Route a {@code PATCH} request to a handler function that completes the response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
-     */
-    default HttpRouteSpec asyncPATCH(String uri, AsyncRequestHandler handler) {
-        return handleAsync(HttpMethod.PATCH, uri, handler);
-    }
-
-    /**
-     * Route a {@code PATCH} request to a handler function that reads the body and completes the
-     * response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPATCH(String uri, AsyncBodyRequestHandler handler) {
-        return handleAsync(HttpMethod.PATCH, uri, handler);
-    }
-
-    /**
-     * Route a {@code DELETE} request to a handler function that completes the response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
-     */
-    default HttpRouteSpec asyncDELETE(String uri, AsyncRequestHandler handler) {
-        return handleAsync(HttpMethod.DELETE, uri, handler);
-    }
-
-    /**
-     * Route a {@code DELETE} request to a handler function that reads the body and completes the
-     * response later.
-     *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncDELETE(String uri, AsyncBodyRequestHandler handler) {
-        return handleAsync(HttpMethod.DELETE, uri, handler);
-    }
-
-    /**
-     * Route requests of several HTTP methods to one handler function: a route per method, which
-     * the returned route configures together.
-     *
-     * @param methods The HTTP methods
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The routes, to configure together
-     * @see #handle(HttpMethod, String, RequestHandler)
-     */
-    HttpRouteSpec handle(Set<HttpMethod> methods, String uri, RequestHandler handler);
-
-    /**
-     * Route requests of several HTTP methods to one handler function that completes the response
-     * later.
-     *
-     * @param methods The HTTP methods
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The routes, to configure together
-     * @see #handle(Set, String, RequestHandler)
-     */
-    HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler);
-
-    /**
-     * Route requests of several HTTP methods to one handler function that reads the body and
-     * completes the response later.
-     *
-     * @param methods The HTTP methods
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The routes, to configure together
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncBodyRequestHandler handler);
-
-    /**
-     * Route requests of any HTTP method, standard or custom, to one handler function: a route per
-     * standard method and one for the custom methods, which the returned route configures
-     * together.
+     * Declare the routes of the requests of any HTTP method, standard or custom, to one handler:
+     * a route per standard method and one for the custom methods, which the pending route
+     * configures together.
      *
      * <ul>
      *     <li>A route of a specific method that matches a request as closely as the route of any
@@ -451,190 +170,79 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      *     change that.</li>
      * </ul>
      *
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The routes, to configure together
-     * @see #handle(Set, String, RequestHandler)
+     * @param uri The URI template
+     * @return The pending routes, to configure together
+     * @see #route(Set, String)
      * @since 5.3.0
      */
-    HttpRouteSpec any(String uri, RequestHandler handler);
+    HttpRouteSpec any(String uri);
 
     /**
-     * Route requests of any HTTP method to a handler function that receives the body decoded to
-     * the given type, see {@link #any(String, RequestHandler)} and
-     * {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The routes, to configure together
-     * @since 5.3.0
-     */
-    <B> HttpRouteSpec any(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
-
-    /**
-     * Route requests of any HTTP method to a handler function that receives the body decoded to
-     * the given type, see {@link #any(String, Argument, BodyRequestHandler)}.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The routes, to configure together
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec any(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return any(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
-    }
-
-    /**
-     * Route requests of any HTTP method with a submitted form to a handler function that receives
-     * the whole form, see {@link #any(String, RequestHandler)} and
-     * {@link #handleForm(HttpMethod, String, FormRequestHandler)}. The routes consume both form
-     * media types.
+     * Route {@code GET} requests to a handler function: a route with no settings, the same as
+     * {@code GET(uri).handle(handler)}.
      *
      * @param uri     The URI template
      * @param handler The handler
-     * @return The routes, to configure together
-     * @since 5.3.0
      */
-    HttpRouteSpec any(String uri, FormRequestHandler handler);
+    default void GET(String uri, RequestHandler handler) {
+        GET(uri).handle(handler);
+    }
 
     /**
-     * Route requests of any HTTP method to a handler function that completes the response later,
-     * see {@link #any(String, RequestHandler)}.
+     * Route {@code POST} requests to a handler function: the same as
+     * {@code POST(uri).handle(handler)}.
      *
      * @param uri     The URI template
      * @param handler The handler
-     * @return The routes, to configure together
-     * @since 5.3.0
      */
-    HttpRouteSpec asyncAny(String uri, AsyncRequestHandler handler);
+    default void POST(String uri, RequestHandler handler) {
+        POST(uri).handle(handler);
+    }
 
     /**
-     * Route requests of any HTTP method to a handler function that reads the body and completes
-     * the response later, see {@link #any(String, RequestHandler)}.
+     * Route {@code PUT} requests to a handler function: the same as
+     * {@code PUT(uri).handle(handler)}.
      *
      * @param uri     The URI template
      * @param handler The handler
-     * @return The routes, to configure together
-     * @since 5.3.0
      */
-    HttpRouteSpec asyncAny(String uri, AsyncBodyRequestHandler handler);
-
-    /**
-     * Answer {@code GET} requests, and the {@code HEAD} requests of its implicit {@code HEAD}
-     * route, with a response computed once, without a handler function: e.g. a constant, a
-     * redirect or a static body.
-     *
-     * <pre>{@code
-     * routes.respond("/robots.txt", HttpResponse.ok("User-agent: *\nDisallow: /\n").contentType(MediaType.TEXT_PLAIN_TYPE));
-     * routes.respond("/old-docs", HttpResponse.permanentRedirect(URI.create("/docs")));
-     * }</pre>
-     *
-     * <p>The route is an ordinary route: server, group and route filters, conditions,
-     * constraints, error routes and CORS apply as for any other route. The response is copied
-     * when the route is declared: its status, reason, headers, attributes and body. Each request
-     * is answered with a new response built from the copy, so a filter that changes the response
-     * of one request does not change the response of the next. The body object itself is shared
-     * by the requests: it must not change, e.g. a {@code String} or a record.</p>
-     *
-     * <p>The route consumes any content type, as it never reads the body, and produces the
-     * content type of the response if it has one. It runs on the event loop, see
-     * {@link RouteSpec#nonBlocking()}, unless {@link RouteSpec#executeOn(String)} is set on the
-     * route: the executor and the media types of its group do not apply to it.</p>
-     *
-     * @param uri      The URI template
-     * @param response The response
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec respond(String uri, HttpResponse<?> response) {
-        return respond(HttpMethod.GET, uri, response);
+    default void PUT(String uri, RequestHandler handler) {
+        PUT(uri).handle(handler);
     }
 
     /**
-     * Answer {@code GET} requests, and the {@code HEAD} requests of its implicit {@code HEAD}
-     * route, with a response the supplier creates for each request, without reading the request,
-     * see {@link #respond(String, HttpResponse)}.
+     * Route {@code PATCH} requests to a handler function: the same as
+     * {@code PATCH(uri).handle(handler)}.
      *
-     * <pre>{@code
-     * routes.respond("/time", () -> HttpResponse.ok(clock.instant().toString()));
-     * }</pre>
-     *
-     * <p>The supplier must return a new response for each request. It is called on the event
-     * loop, so it must not block, unless {@link RouteSpec#executeOn(String)} is set on the
-     * route. A supplier that throws is answered by the error routes, like a handler that throws,
-     * and one that returns {@code null} like a handler that returns {@code null}.</p>
-     *
-     * @param uri      The URI template
-     * @param response Creates the response of a request
-     * @return The route
-     * @since 5.3.0
+     * @param uri     The URI template
+     * @param handler The handler
      */
-    default HttpRouteSpec respond(String uri, Supplier<? extends HttpResponse<?>> response) {
-        return respond(HttpMethod.GET, uri, response);
+    default void PATCH(String uri, RequestHandler handler) {
+        PATCH(uri).handle(handler);
     }
 
     /**
-     * Answer {@code GET} requests, and the {@code HEAD} requests of its implicit {@code HEAD}
-     * route, with a response the function creates from the path variables of the matched route
-     * only, without reading the request, see {@link #respond(String, HttpResponse)}.
+     * Route {@code DELETE} requests to a handler function: the same as
+     * {@code DELETE(uri).handle(handler)}.
      *
-     * <pre>{@code
-     * routes.respond("/docs/{page}", pathVariables -> HttpResponse.permanentRedirect(URI.create("/guide/" + pathVariables.getString("page"))));
-     * }</pre>
-     *
-     * <p>The function must return a new response for each request. It is called on the event
-     * loop, so it must not block, unless {@link RouteSpec#executeOn(String)} is set on the
-     * route.</p>
-     *
-     * @param uri      The URI template
-     * @param response Creates the response of a request from its path variables
-     * @return The route
-     * @since 5.3.0
+     * @param uri     The URI template
+     * @param handler The handler
      */
-    default HttpRouteSpec respond(String uri, Function<? super PathVariables, ? extends HttpResponse<?>> response) {
-        return respond(HttpMethod.GET, uri, response);
+    default void DELETE(String uri, RequestHandler handler) {
+        DELETE(uri).handle(handler);
     }
 
     /**
-     * Answer the requests of a method with a response computed once, see
-     * {@link #respond(String, HttpResponse)}. A {@code GET} route has an implicit {@code HEAD}
-     * route.
+     * Route the requests of any HTTP method to a handler function: the same as
+     * {@code any(uri).handle(handler)}, see {@link #any(String)}.
      *
-     * @param method   The HTTP method
-     * @param uri      The URI template
-     * @param response The response
-     * @return The route
+     * @param uri     The URI template
+     * @param handler The handler
      * @since 5.3.0
      */
-    HttpRouteSpec respond(HttpMethod method, String uri, HttpResponse<?> response);
-
-    /**
-     * Answer the requests of a method with a response the supplier creates for each request, see
-     * {@link #respond(String, Supplier)}.
-     *
-     * @param method   The HTTP method
-     * @param uri      The URI template
-     * @param response Creates the response of a request
-     * @return The route
-     * @since 5.3.0
-     */
-    HttpRouteSpec respond(HttpMethod method, String uri, Supplier<? extends HttpResponse<?>> response);
-
-    /**
-     * Answer the requests of a method with a response the function creates from the path
-     * variables, see {@link #respond(String, Function)}.
-     *
-     * @param method   The HTTP method
-     * @param uri      The URI template
-     * @param response Creates the response of a request from its path variables
-     * @return The route
-     * @since 5.3.0
-     */
-    HttpRouteSpec respond(HttpMethod method, String uri, Function<? super PathVariables, ? extends HttpResponse<?>> response);
+    default void any(String uri, RequestHandler handler) {
+        any(uri).handle(handler);
+    }
 
     /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function. Where it is
@@ -720,182 +328,6 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler);
 
     /**
-     * Bind a handler function to a declared route. It is the same as
-     * {@link #handle(HttpMethod, String, RequestHandler)} with the method and URI template of the
-     * declaration.
-     * A {@code GET} route gets an implicit {@code HEAD} route.
-     *
-     * @param route   The declared route
-     * @param handler The handler
-     * @return The route, to configure further
-     */
-    HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler);
-
-    /**
-     * Bind a handler function that receives the decoded body to a declared route.
-     *
-     * @param route    The declared route
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route, to configure further
-     * @see #handle(RouteDeclaration, RequestHandler)
-     */
-    <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler);
-
-    /**
-     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
-     *
-     * @param route    The declaration of the route
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec handle(RouteDeclaration route, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(route, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
-    }
-
-    /**
-     * Bind a handler function that completes the response later to a declared route.
-     *
-     * @param route   The declared route
-     * @param handler The handler
-     * @return The route, to configure further
-     * @see #handle(RouteDeclaration, RequestHandler)
-     */
-    HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler);
-
-    /**
-     * Bind a handler function that reads the body and completes the response later to a
-     * declared route.
-     *
-     * @param route   The declared route
-     * @param handler The handler
-     * @return The route, to configure further
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    HttpRouteSpec handleAsync(RouteDeclaration route, AsyncBodyRequestHandler handler);
-
-    /**
-     * Bind a form handler function to a declared route.
-     *
-     * @param route   The declared route
-     * @param handler The handler
-     * @return The route, to configure further
-     * @see #handle(RouteDeclaration, RequestHandler)
-     */
-    HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler);
-
-    /**
-     * Route requests to a handler function that completes the response later. The executor is
-     * selected like for a controller method returning a {@code CompletionStage}. The handler does
-     * not read the body, like a {@link RequestHandler}, see {@link AsyncRequestHandler}.
-     *
-     * @param method  The HTTP method
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     */
-    HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler);
-
-    /**
-     * Route requests to a handler function that reads the body and completes the response later.
-     * The executor is selected like for a controller method returning a {@code CompletionStage}.
-     * The handler receives no decoded body: it reads the body with the methods of its
-     * {@link io.micronaut.http.body.AsyncRequestBody} parameter, see {@link AsyncBodyRequestHandler}.
-     *
-     * @param method  The HTTP method
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncBodyRequestHandler handler);
-
-    /**
-     * Route requests of a method by its name, including a custom HTTP method such as
-     * {@code PROPFIND}, like a controller method annotated {@code @CustomHttpMethod}.
-     *
-     * @param httpMethodName The name of the HTTP method, a token
-     * @param uri            The URI template
-     * @param handler        The handler
-     * @return The route
-     * @throws IllegalArgumentException if the name is empty or not a token, e.g. blank
-     * @see #handle(HttpMethod, String, RequestHandler)
-     */
-    HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler);
-
-    /**
-     * Route requests of a method by its name, including a custom HTTP method, to a handler function
-     * that receives the decoded body.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri            The URI template
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @see #handle(HttpMethod, String, Argument, BodyRequestHandler)
-     */
-    <B> HttpRouteSpec handle(String httpMethodName, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
-
-    /**
-     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec handle(String httpMethodName, String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(httpMethodName, uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
-    }
-
-    /**
-     * Route requests of a method by its name, including a custom HTTP method, to a handler function
-     * that completes the response later.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri            The URI template
-     * @param handler        The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
-     */
-    HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler);
-
-    /**
-     * Route requests of a method by its name, including a custom HTTP method, to a handler function
-     * that reads the body and completes the response later.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri            The URI template
-     * @param handler        The handler
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
-     * @since 5.3.0
-     */
-    HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncBodyRequestHandler handler);
-
-    /**
-     * Route requests of a method by its name, including a custom HTTP method, with a submitted
-     * form to a handler function that receives the whole form. The route consumes both form
-     * media types.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri            The URI template
-     * @param handler        The handler
-     * @return The route
-     * @see #handleForm(HttpMethod, String, FormRequestHandler)
-     */
-    HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler);
-
-    /**
      * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters
      * every request whose path matches one of the patterns, e.g. {@code /**} or {@code /api/**},
      * whatever answers it, a controller, a handler route or a static resource, including the
@@ -936,7 +368,10 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * });
      * }</pre>
      *
-     * <p>See {@link HttpRouteGroup} for which routes the filters apply to, and in which order.</p>
+     * <p>See {@link HttpRouteGroup} for which routes the filters apply to, and in which order.
+     * A route declared in the lambda is ended with a terminal, see {@link HttpRouteSpec}, before
+     * the lambda returns: otherwise the group fails with an {@link IllegalStateException} naming
+     * the route.</p>
      *
      * @param routes Declares the routes and the filters of the group
      * @since 5.3.0
@@ -952,8 +387,7 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * to every route declared in the lambda, see {@link HttpRouteGroup}.
      *
      * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
-     * query or fragment. A {@link RouteDeclaration}, which declares its own full URI template,
-     * cannot be bound in a group with a prefix.</p>
+     * query or fragment.</p>
      *
      * @param prefix The prefix of the URI templates of the routes of the group
      * @param routes Declares the routes and the filters of the group
@@ -962,472 +396,8 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     void path(String prefix, Consumer<HttpRouteGroup> routes);
 
     /**
-     * Like {@link #GET(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec GET(RequestHandler handler) {
-        return GET("/", handler);
-    }
-
-    /**
-     * Like {@link #any(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler The handler
-     * @return The routes, to configure together
-     * @since 5.3.0
-     */
-    default HttpRouteSpec any(RequestHandler handler) {
-        return any("/", handler);
-    }
-
-    /**
-     * Like {@link #POST(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec POST(RequestHandler handler) {
-        return POST("/", handler);
-    }
-
-    /**
-     * Like {@link #PUT(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec PUT(RequestHandler handler) {
-        return PUT("/", handler);
-    }
-
-    /**
-     * Like {@link #PATCH(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec PATCH(RequestHandler handler) {
-        return PATCH("/", handler);
-    }
-
-    /**
-     * Like {@link #DELETE(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec DELETE(RequestHandler handler) {
-        return DELETE("/", handler);
-    }
-
-    /**
-     * Like {@link #POST(String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec POST(Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return POST("/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #POST(String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec POST(Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return POST("/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #PUT(String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec PUT(Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return PUT("/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #PUT(String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec PUT(Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return PUT("/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #PATCH(String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec PATCH(Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return PATCH("/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #PATCH(String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec PATCH(Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return PATCH("/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #POST(String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec POST(FormRequestHandler handler) {
-        return POST("/", handler);
-    }
-
-    /**
-     * Like {@link #PUT(String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec PUT(FormRequestHandler handler) {
-        return PUT("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncGET(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncGET(AsyncRequestHandler handler) {
-        return asyncGET("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncGET(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncGET(AsyncBodyRequestHandler handler) {
-        return asyncGET("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncPOST(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPOST(AsyncRequestHandler handler) {
-        return asyncPOST("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncPOST(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPOST(AsyncBodyRequestHandler handler) {
-        return asyncPOST("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncPUT(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPUT(AsyncRequestHandler handler) {
-        return asyncPUT("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncPUT(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPUT(AsyncBodyRequestHandler handler) {
-        return asyncPUT("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncPATCH(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPATCH(AsyncRequestHandler handler) {
-        return asyncPATCH("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncPATCH(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncPATCH(AsyncBodyRequestHandler handler) {
-        return asyncPATCH("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncDELETE(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncDELETE(AsyncRequestHandler handler) {
-        return asyncDELETE("/", handler);
-    }
-
-    /**
-     * Like {@link #asyncDELETE(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec asyncDELETE(AsyncBodyRequestHandler handler) {
-        return asyncDELETE("/", handler);
-    }
-
-    /**
-     * Like {@link #handle(HttpMethod, String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param method         The HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handle(HttpMethod method, RequestHandler handler) {
-        return handle(method, "/", handler);
-    }
-
-    /**
-     * Like {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param method         The HTTP method
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec handle(HttpMethod method, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(method, "/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #handle(HttpMethod, String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param method         The HTTP method
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec handle(HttpMethod method, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(method, "/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #handleForm(HttpMethod, String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param method         The HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleForm(HttpMethod method, FormRequestHandler handler) {
-        return handleForm(method, "/", handler);
-    }
-
-    /**
-     * Like {@link #handleAsync(HttpMethod, String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param method         The HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleAsync(HttpMethod method, AsyncRequestHandler handler) {
-        return handleAsync(method, "/", handler);
-    }
-
-    /**
-     * Like {@link #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param method         The HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleAsync(HttpMethod method, AsyncBodyRequestHandler handler) {
-        return handleAsync(method, "/", handler);
-    }
-
-    /**
-     * Like {@link #handle(Set, String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param methods        The HTTP methods
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handle(Set<HttpMethod> methods, RequestHandler handler) {
-        return handle(methods, "/", handler);
-    }
-
-    /**
-     * Like {@link #handleAsync(Set, String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param methods        The HTTP methods
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleAsync(Set<HttpMethod> methods, AsyncRequestHandler handler) {
-        return handleAsync(methods, "/", handler);
-    }
-
-    /**
-     * Like {@link #handleAsync(Set, String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param methods        The HTTP methods
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleAsync(Set<HttpMethod> methods, AsyncBodyRequestHandler handler) {
-        return handleAsync(methods, "/", handler);
-    }
-
-    /**
-     * Like {@link #handle(String, String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handle(String httpMethodName, RequestHandler handler) {
-        return handle(httpMethodName, "/", handler);
-    }
-
-    /**
-     * Like {@link #handle(String, String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec handle(String httpMethodName, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(httpMethodName, "/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #handle(String, String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @since 5.3.0
-     */
-    default <B> HttpRouteSpec handle(String httpMethodName, Class<B> bodyType, BodyRequestHandler<B> handler) {
-        return handle(httpMethodName, "/", bodyType, handler);
-    }
-
-    /**
-     * Like {@link #handleAsync(String, String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleAsync(String httpMethodName, AsyncRequestHandler handler) {
-        return handleAsync(httpMethodName, "/", handler);
-    }
-
-    /**
-     * Like {@link #handleAsync(String, String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleAsync(String httpMethodName, AsyncBodyRequestHandler handler) {
-        return handleAsync(httpMethodName, "/", handler);
-    }
-
-    /**
-     * Like {@link #handleForm(String, String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param handler        The handler
-     * @return The route
-     * @since 5.3.0
-     */
-    default HttpRouteSpec handleForm(String httpMethodName, FormRequestHandler handler) {
-        return handleForm(httpMethodName, "/", handler);
-    }
-
-    /**
      * A body type that is {@code null} when the request has no body, for the handlers that
-     * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)},
+     * receive the decoded body: {@code routes.POST(uri).body(HttpRouteBuilder.nullableBody(Argument.of(Item.class))).handle(handler)},
      * and for the body an asynchronous handler reads:
      * {@code body.body(HttpRouteBuilder.nullableBody(Argument.of(Item.class)))}.
      *

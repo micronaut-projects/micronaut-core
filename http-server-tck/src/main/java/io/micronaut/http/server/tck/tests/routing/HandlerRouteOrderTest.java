@@ -114,19 +114,22 @@ public class HandlerRouteOrderTest {
     static class OrderedRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/order/reports/{id}", (request, pathVariables) -> text("csv " + pathVariables.getLong("id")))
+            routes.GET("/order/reports/{id}")
                 .where(RequestPredicates.queryParam("format", "csv"))
-                .order(-1);
+                .order(-1)
+                .handle((request, pathVariables) -> text("csv " + pathVariables.getLong("id")));
             routes.GET("/order/reports/{id}", (request, pathVariables) -> text("report " + pathVariables.getLong("id")));
-            routes.GET("/order/tie", (request, pathVariables) -> text("a")).order(3);
-            routes.GET("/order/tie", (request, pathVariables) -> text("b")).order(3);
+            routes.GET("/order/tie").order(3).handle((request, pathVariables) -> text("a"));
+            routes.GET("/order/tie").order(3).handle((request, pathVariables) -> text("b"));
             // the same media types as the controller routes: only the order tells them apart
-            routes.GET("/order/controller/first", (request, pathVariables) -> text("handler first"))
+            routes.GET("/order/controller/first")
                 .produces(MediaType.TEXT_PLAIN_TYPE)
-                .order(-1);
-            routes.GET("/order/controller/last", (request, pathVariables) -> text("handler last"))
+                .order(-1)
+                .handle((request, pathVariables) -> text("handler first"));
+            routes.GET("/order/controller/last")
                 .produces(MediaType.TEXT_PLAIN_TYPE)
-                .order(1);
+                .order(1)
+                .handle((request, pathVariables) -> text("handler last"));
             routes.path("/order/pages", fallbacks -> {
                 fallbacks.order(100);
                 fallbacks.GET("/{name}", (request, pathVariables) -> text("fallback " + pathVariables.getString("name")));

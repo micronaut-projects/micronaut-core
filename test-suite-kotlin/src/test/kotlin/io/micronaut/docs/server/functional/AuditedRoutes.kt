@@ -16,7 +16,6 @@ import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRoutes
-import io.micronaut.web.router.builder.RouteDeclaration
 import jakarta.inject.Singleton
 // end::imports[]
 
@@ -54,9 +53,6 @@ class AuditedRoutes(
     // end::annotations[]
 
     companion object {
-        // tag::declaration[]
-        val BALANCE: RouteDeclaration = RouteDeclaration.of(HttpMethod.GET, "/balance/{account}") // <1>
-        // end::declaration[]
     }
 
     override fun routes(routes: HttpRouteBuilder) {
@@ -72,26 +68,31 @@ class AuditedRoutes(
                 HttpResponse.ok("deleted " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE)
             }
         }
-        routes.POST("/payments/{amount}") { request, pathVariables ->
-            HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))).contentType(MediaType.TEXT_PLAIN_TYPE)
-        }.annotationMetadata(beanContext.getBeanDefinition(Payments::class.java).getRequiredMethod<Any>("pay", Long::class.java)) // <6>
-        routes.POST("/refunds/{amount}") { request, pathVariables ->
-            HttpResponse.ok("refunded " + pathVariables.getLong("amount")).contentType(MediaType.TEXT_PLAIN_TYPE)
-        }.annotate(Audited::class.java) // <7>
-        routes.GET("/receipts/{id}") { request, pathVariables ->
-            HttpResponse.ok("receipt v1 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE)
-        }.annotate(AnnotationValue.builder(Version::class.java).value("1").build()) // <8>
-        routes.GET("/receipts/{id}") { request, pathVariables ->
-            HttpResponse.ok("receipt v2 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE)
-        }
+        routes.POST("/payments/{amount}")
+            .annotationMetadata(beanContext.getBeanDefinition(Payments::class.java).getRequiredMethod<Any>("pay", Long::class.java)) // <6>
+            .handle { request, pathVariables ->
+                HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))).contentType(MediaType.TEXT_PLAIN_TYPE)
+            }
+        routes.POST("/refunds/{amount}")
+            .annotate(Audited::class.java) // <7>
+            .handle { request, pathVariables ->
+                HttpResponse.ok("refunded " + pathVariables.getLong("amount")).contentType(MediaType.TEXT_PLAIN_TYPE)
+            }
+        routes.GET("/receipts/{id}")
+            .annotate(AnnotationValue.builder(Version::class.java).value("1").build()) // <8>
+            .handle { request, pathVariables ->
+                HttpResponse.ok("receipt v1 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE)
+            }
+        routes.GET("/receipts/{id}")
             .annotate(Version::class.java) { version -> version.value("2") } // <9>
             .annotate(Audited::class.java)
+            .handle { request, pathVariables ->
+                HttpResponse.ok("receipt v2 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE)
+            }
         routes.GET("/prices") { request, pathVariables -> HttpResponse.ok("prices").contentType(MediaType.TEXT_PLAIN_TYPE) }
         // end::annotationRoutes[]
-        // tag::declared[]
-        routes.handle(BALANCE) { request, pathVariables -> // <2>
+        routes.route(HttpMethod.GET, "/balance/{account}").handle { request, pathVariables ->
             HttpResponse.ok("balance of " + pathVariables.getString("account")).contentType(MediaType.TEXT_PLAIN_TYPE)
         }
-        // end::declared[]
     }
 }

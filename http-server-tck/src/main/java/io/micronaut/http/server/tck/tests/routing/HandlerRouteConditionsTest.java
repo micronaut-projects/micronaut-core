@@ -166,27 +166,33 @@ public class HandlerRouteConditionsTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/conditions/reports/{id}", (request, pathVariables) -> text("csv " + pathVariables.getLong("id")))
-                .where(HandlerRouteConditionsTest::csv);
-            routes.GET("/conditions/reports/{id}", (request, pathVariables) -> text("json " + pathVariables.getLong("id")))
-                .where(request -> !csv(request));
-            routes.GET("/conditions/csv-only", (request, pathVariables) -> text("csv only"))
-                .where(HandlerRouteConditionsTest::csv);
+            routes.GET("/conditions/reports/{id}")
+                .where(HandlerRouteConditionsTest::csv)
+                .handle((request, pathVariables) -> text("csv " + pathVariables.getLong("id")));
+            routes.GET("/conditions/reports/{id}")
+                .where(request -> !csv(request))
+                .handle((request, pathVariables) -> text("json " + pathVariables.getLong("id")));
+            routes.GET("/conditions/csv-only")
+                .where(HandlerRouteConditionsTest::csv)
+                .handle((request, pathVariables) -> text("csv only"));
             routes.path("/conditions/beta", beta -> {
-                beta.GET("/search", (request, pathVariables) -> text("beta search"))
-                    .where(request -> request.getHeaders().contains("X-Search"));
+                beta.GET("/search")
+                    .where(request -> request.getHeaders().contains("X-Search"))
+                    .handle((request, pathVariables) -> text("beta search"));
                 beta.where(request -> request.getHeaders().contains("X-Beta"));
             });
-            routes.GET("/conditions/variant", (request, pathVariables) -> text(target.variantB()))
-                .annotationMetadata(beanContext.getBeanDefinition(VariantTarget.class).getRequiredMethod("variantB"));
-            routes.GET("/conditions/variant", (request, pathVariables) -> text("a"))
-                .where(request -> !"b".equals(request.getHeaders().get("X-Variant")));
+            routes.GET("/conditions/variant")
+                .annotationMetadata(beanContext.getBeanDefinition(VariantTarget.class).getRequiredMethod("variantB"))
+                .handle((request, pathVariables) -> text(target.variantB()));
+            routes.GET("/conditions/variant")
+                .where(request -> !"b".equals(request.getHeaders().get("X-Variant")))
+                .handle((request, pathVariables) -> text("a"));
             Predicate<HttpRequest<?>> csv = RequestPredicates.queryParam("format", "csv")
                 .or(RequestPredicates.all(RequestPredicates.accept(MediaType.TEXT_CSV_TYPE), RequestPredicates.header(HttpHeaders.ACCEPT)));
             Predicate<HttpRequest<?>> debug = RequestPredicates.header("X-Mode", value -> value.startsWith("debug"));
-            routes.GET("/conditions/export", (request, pathVariables) -> text("csv export")).where(csv);
-            routes.GET("/conditions/export", (request, pathVariables) -> text("debug export")).where(debug.and(csv.negate()));
-            routes.GET("/conditions/export", (request, pathVariables) -> text("default export")).where(RequestPredicates.any(csv, debug).negate());
+            routes.GET("/conditions/export").where(csv).handle((request, pathVariables) -> text("csv export"));
+            routes.GET("/conditions/export").where(debug.and(csv.negate())).handle((request, pathVariables) -> text("debug export"));
+            routes.GET("/conditions/export").where(RequestPredicates.any(csv, debug).negate()).handle((request, pathVariables) -> text("default export"));
         }
     }
 }

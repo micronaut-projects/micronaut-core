@@ -29,7 +29,7 @@ import io.micronaut.core.order.Ordered;
  *     HttpRoutes itemRoutes(ItemRepository items) {
  *         return routes -> {
  *             routes.GET("/items/{id}", (request, pathVariables) -> HttpResponse.ok(items.find(pathVariables.getLong("id"))));
- *             routes.POST("/items", Argument.of(Item.class), (request, pathVariables, item) -> HttpResponse.created(items.save(item)));
+ *             routes.POST("/items").body(Argument.of(Item.class)).handle((request, pathVariables, item) -> HttpResponse.created(items.save(item)));
  *         };
  *     }
  * }

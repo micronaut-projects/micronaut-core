@@ -32,14 +32,15 @@ import java.util.concurrent.CompletionStage;
  * something up, e.g. the security context of a token it verified, or reject the request:
  *
  * <pre>{@code
- * routes.GET("/orders", handler).beforeReplacingAsync((request, propagatedContext) -> tokens.verify(request)
+ * routes.GET("/orders").beforeReplacingAsync((request, propagatedContext) -> tokens.verify(request)
  *     .thenApply(user -> {
  *         if (user.isEmpty()) {
  *             return HttpResponse.unauthorized();
  *         }
  *         propagatedContext.add(new UserContext(user.get()));
  *         return null;
- *     }));
+ *     })).and()
+ *     .handle(handler);
  * }</pre>
  *
  * <p>The filter chain continues when the stage completes, possibly on another thread, with the

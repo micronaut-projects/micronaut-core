@@ -29,34 +29,35 @@ public class BodyRoutes implements HttpRoutes {
 
     @Override
     public void routes(HttpRouteBuilder routes) {
-        routes.asyncPOST("/async/items", (request, pathVariables, body) ->
+        routes.POST("/async/items").body().handleAsync((request, pathVariables, body) ->
             body.body(Item.class) // <1>
                 .thenCompose(items::saveAsync)
                 .thenApply(HttpResponse::created));
 
-        routes.asyncPOST("/async/items/import", (request, pathVariables, body) ->
+        routes.POST("/async/items/import").body().handleAsync((request, pathVariables, body) ->
             body.elements(Item.class) // <2>
                 .forEach(items::saveAsync)
                 .thenApply(done -> HttpResponse.accepted()));
 
-        routes.asyncPOST("/async/notes", (request, pathVariables, body) ->
-                body.text(1024) // <3>
-                    .thenApply(text -> HttpResponse.ok("received " + text.length() + " characters")))
-            .consumes(MediaType.TEXT_PLAIN_TYPE);
+        routes.POST("/async/notes")
+            .consumes(MediaType.TEXT_PLAIN_TYPE) // <3>
+            .body().handleAsync((request, pathVariables, body) ->
+                body.text(1024)
+                    .thenApply(text -> HttpResponse.ok("received " + text.length() + " characters")));
 
-        routes.asyncPUT("/async/files", (request, pathVariables, body) -> {
+        routes.PUT("/async/files").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync((request, pathVariables, body) -> {
             Path destination = uploads.resolve(UUID.randomUUID() + ".bin");
             return body.transferTo(destination) // <4>
                 .thenApply(done -> HttpResponse.created(destination.getFileName().toString()));
-        }).consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE);
+        });
 
-        routes.asyncPOST("/async/guarded", (request, pathVariables, body) -> {
+        routes.POST("/async/guarded").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync((request, pathVariables, body) -> {
             if (!request.getHeaders().contains("X-Token")) {
                 return CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.UNAUTHORIZED)); // <5>
             }
             return body.bytes(64 * 1024)
                 .thenApply(bytes -> HttpResponse.ok("accepted " + bytes.length + " bytes"));
-        }).consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE);
+        });
     }
 }
 // end::clazz[]

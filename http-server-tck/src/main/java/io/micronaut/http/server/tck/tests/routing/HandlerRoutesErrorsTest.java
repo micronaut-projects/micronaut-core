@@ -200,17 +200,19 @@ public class HandlerRoutesErrorsTest {
             routes.GET("/errors/handler/unhandled", (request, pathVariables) -> {
                 throw new UnhandledFailure("unhandled failure");
             });
-            routes.asyncGET("/errors/handler/async-checked", (request, pathVariables) -> {
+            routes.GET("/errors/handler/async-checked").handleAsync((request, pathVariables) -> {
                 throw new CheckedFailure("checked failure");
             });
-            routes.GET("/errors/handler/async-filtered", (request, pathVariables) -> HttpResponse.ok("not reached"))
+            routes.GET("/errors/handler/async-filtered")
                 .beforeAsync(request -> {
                     throw new CheckedFailure("checked failure");
-                });
-            routes.GET("/errors/handler/filtered", (request, pathVariables) -> HttpResponse.ok("not reached"))
+                }).and()
+                .handle((request, pathVariables) -> HttpResponse.ok("not reached"));
+            routes.GET("/errors/handler/filtered")
                 .beforeReplacing(request -> {
                     throw new CheckedFailure("checked failure");
-                });
+                }).and()
+                .handle((request, pathVariables) -> HttpResponse.ok("not reached"));
 
             // error and status handler functions, for controller routes and handler routes alike
             routes.error(CheckedFailure.class, (request, error) ->

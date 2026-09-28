@@ -21,11 +21,12 @@ class ConditionRoutes(@Value("\${management.port}") private val managementPort: 
 
     override fun routes(routes: HttpRouteBuilder) {
         // tag::where[]
-        routes.GET("/search") { request, pathVariables -> text("beta search") }
+        routes.GET("/search")
             .where(RouteCondition.any( // <1>
                 RouteCondition.header("X-Beta"),
                 RouteCondition.query("beta", "true")))
             .order(-1) // <2>
+            .handle { request, pathVariables -> text("beta search") }
         routes.GET("/search") { request, pathVariables -> text("search") } // <3>
         // end::where[]
         // tag::constrain[]
@@ -33,18 +34,20 @@ class ConditionRoutes(@Value("\${management.port}") private val managementPort: 
             shop.constrain("shop", SHOPS) // <1>
             shop.GET("/stock") { request, pathVariables -> text("stock of " + pathVariables.getString("shop")) }
         }
-        routes.GET("/items/{id}") { request, pathVariables -> text("item " + pathVariables.getLong("id")) }
+        routes.GET("/items/{id}")
             .constrain("id", Long::class.java) { id -> id > 0 } // <2>
             .order(-1)
+            .handle { request, pathVariables -> text("item " + pathVariables.getLong("id")) }
         routes.GET("/items/{name}") { request, pathVariables -> text("item named " + pathVariables.getString("name")) } // <3>
         // end::constrain[]
         // tag::matchers[]
-        routes.GET("/downloads/{file}") { request, pathVariables -> text("download " + pathVariables.getString("file")) }
+        routes.GET("/downloads/{file}")
             .where(RouteCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase()) // <1>
                 .or(RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
             .where(RouteCondition.peerAddress("127.0.0.0/8", "::1")) // <2>
             .where(RouteCondition.after(Instant.parse("2026-01-01T00:00:00Z"))) // <3>
             .constrain("file", ValueMatcher.endsWith(".zip")) // <4>
+            .handle { request, pathVariables -> text("download " + pathVariables.getString("file")) }
         // end::matchers[]
         // tag::attributes[]
         routes.path("/reports") { reports ->
@@ -56,8 +59,9 @@ class ConditionRoutes(@Value("\${management.port}") private val managementPort: 
                 if (role == request.headers["X-Role"]) null else HttpResponse.status<Any>(HttpStatus.FORBIDDEN)
             }
             reports.GET("/daily") { request, pathVariables -> text("daily report") }
-            reports.GET("/salaries") { request, pathVariables -> text("salaries") }
+            reports.GET("/salaries")
                 .attribute("role", "admin") // <3>
+                .handle { request, pathVariables -> text("salaries") }
         }
         // end::attributes[]
         // tag::port[]

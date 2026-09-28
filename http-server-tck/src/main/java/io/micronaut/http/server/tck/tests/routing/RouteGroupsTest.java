@@ -244,24 +244,26 @@ public class RouteGroupsTest {
                     response.header("X-Outer", "true");
                 });
                 groups.path("/inner", inner -> {
-                    inner.GET("/route", (request, pathVariables) -> text(request.getAttribute(TRACE, String.class).orElse("")))
+                    inner.GET("/route")
                         .before(request -> trace(request, "route1"))
                         .and()
                         .after((request, response) -> trace(response, "route1"))
                         .and()
                         .before(request -> trace(request, "route2"))
                         .and()
-                        .after((request, response) -> trace(response, "route2"));
+                        .after((request, response) -> trace(response, "route2")).and()
+                        .handle((request, pathVariables) -> text(request.getAttribute(TRACE, String.class).orElse("")));
                     inner.before(request -> trace(request, "inner"));
                     inner.after((request, response) -> trace(response, "inner"));
                 });
-                groups.GET("/rejected", (request, pathVariables) -> text("not rejected"))
+                groups.GET("/rejected")
                     .beforeReplacing(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
                     .and()
-                    .after((request, response) -> trace(response, "route-after"));
-                groups.GET("/fails", (request, pathVariables) -> {
+                    .after((request, response) -> trace(response, "route-after")).and()
+                    .handle((request, pathVariables) -> text("not rejected"));
+                groups.GET("/fails").after((request, response) -> response.header("X-Route-After", "true")).and().handle((request, pathVariables) -> {
                     throw new GroupFailure();
-                }).after((request, response) -> response.header("X-Route-After", "true"));
+                });
                 groups.after((request, response) -> response.header("X-Group-After", "true"));
                 groups.before(request -> trace(request, "outer2"));
                 groups.after((request, response) -> trace(response, "outer2"));
@@ -291,7 +293,7 @@ public class RouteGroupsTest {
                     inner.after((request, response, propagatedContext) -> response.header("X-Context-After", describeContext()));
                     inner.afterAsync((request, response) -> CompletableFuture.completedFuture(response.header("X-Async-After", "true")));
                     inner.GET("/sync", (request, pathVariables) -> text(describeContext()));
-                    inner.asyncGET("/async", (request, pathVariables) -> CompletableFuture.completedFuture(text(describeContext())));
+                    inner.GET("/async").handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(text(describeContext())));
                     inner.GET("/fails", (request, pathVariables) -> {
                         throw new ContextFailure();
                     });

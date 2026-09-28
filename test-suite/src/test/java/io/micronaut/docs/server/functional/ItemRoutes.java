@@ -24,24 +24,32 @@ public class ItemRoutes {
         return routes -> {
             routes.GET("/items/{id}", (request, pathVariables) -> // <2>
                 HttpResponse.ok(items.find(pathVariables.getLong("id"))));
-            routes.POST("/items", Item.class, (request, pathVariables, item) -> // <3>
-                HttpResponse.created(items.save(item)));
-            routes.GET("/items/{id}/name", (request, pathVariables) ->
-                    HttpResponse.ok(items.find(pathVariables.getLong("id")).name()))
-                .produces(MediaType.TEXT_PLAIN_TYPE); // <4>
-            routes.DELETE("/items/{id}", (request, pathVariables) -> {
-                items.delete(pathVariables.getLong("id"));
-                return HttpResponse.noContent();
-            }).executeOn(TaskExecutors.BLOCKING); // <5>
-            routes.handle(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/items/{id}/touch", (request, pathVariables) -> // <6>
-                    HttpResponse.ok("touched " + pathVariables.getLong("id") + " with " + request.getMethod()))
-                .produces(MediaType.TEXT_PLAIN_TYPE);
-            routes.handle("PROPFIND", "/items", (request, pathVariables) -> // <7>
+            routes.POST("/items") // <3>
+                .body(Item.class) // <4>
+                .handle((request, pathVariables, item) -> HttpResponse.created(items.save(item)));
+            routes.GET("/items/{id}/name")
+                .produces(MediaType.TEXT_PLAIN_TYPE) // <5>
+                .handle((request, pathVariables) -> HttpResponse.ok(items.find(pathVariables.getLong("id")).name()));
+            routes.DELETE("/items/{id}")
+                .executeOn(TaskExecutors.BLOCKING) // <6>
+                .handle((request, pathVariables) -> {
+                    items.delete(pathVariables.getLong("id"));
+                    return HttpResponse.noContent();
+                });
+            routes.route(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/items/{id}/touch") // <7>
+                .produces(MediaType.TEXT_PLAIN_TYPE)
+                .handle((request, pathVariables) ->
+                    HttpResponse.ok("touched " + pathVariables.getLong("id") + " with " + request.getMethod()));
+            routes.route("PROPFIND", "/items").handle((request, pathVariables) -> // <8>
                 HttpResponse.ok("items: " + request.getMethodName()).contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.asyncGET("/items/count", (request, pathVariables) -> // <8>
+            routes.GET("/items/count").handleAsync((request, pathVariables) -> // <9>
                 items.countAsync().thenApply(HttpResponse::ok));
-            routes.POST("/items/optional", HttpRouteBuilder.nullableBody(Item.class), (request, pathVariables, item) -> // <9>
-                item == null ? HttpResponse.noContent() : HttpResponse.created(items.save(item)));
+            routes.POST("/items/async")
+                .body(Item.class)
+                .handleAsync((request, pathVariables, item) -> items.saveAsync(item).thenApply(HttpResponse::created)); // <10>
+            routes.POST("/items/optional")
+                .body(HttpRouteBuilder.nullableBody(Item.class)) // <11>
+                .handle((request, pathVariables, item) -> item == null ? HttpResponse.noContent() : HttpResponse.created(items.save(item)));
         };
     }
 }

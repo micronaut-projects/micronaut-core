@@ -47,8 +47,9 @@ class RouteConstrainTest {
 
     @Test
     void aConstraintOnAllThePathVariables() {
-        Router router = router(routes -> routes.GET("/shops/{shop}/items/{item}", handler("item"))
-            .constrain(variables -> SHOPS.contains(variables.getString("shop")) && variables.getInt("item") < 100));
+        Router router = router(routes -> routes.GET("/shops/{shop}/items/{item}")
+            .constrain(variables -> SHOPS.contains(variables.getString("shop")) && variables.getInt("item") < 100)
+            .handle(handler("item")));
 
         assertEquals("item", target(router, HttpRequest.GET("/shops/north/items/5")));
         assertNull(router.findClosest(HttpRequest.GET("/shops/west/items/5")));
@@ -57,8 +58,9 @@ class RouteConstrainTest {
 
     @Test
     void aConstraintOnAVariableAsAString() {
-        Router router = router(routes -> routes.GET("/files/{name}", handler("file"))
-            .constrain("name", name -> !name.startsWith(".")));
+        Router router = router(routes -> routes.GET("/files/{name}")
+            .constrain("name", name -> !name.startsWith("."))
+            .handle(handler("file")));
 
         assertEquals("file", target(router, HttpRequest.GET("/files/readme")));
         assertNull(router.findClosest(HttpRequest.GET("/files/.hidden")));
@@ -66,8 +68,9 @@ class RouteConstrainTest {
 
     @Test
     void aConstraintOnAMissingVariableRejects() {
-        Router router = router(routes -> routes.GET("/files{/name}", handler("file"))
-            .constrain("name", name -> true));
+        Router router = router(routes -> routes.GET("/files{/name}")
+            .constrain("name", name -> true)
+            .handle(handler("file")));
 
         assertEquals("file", target(router, HttpRequest.GET("/files/readme")));
         assertNull(router.findClosest(HttpRequest.GET("/files")));
@@ -75,8 +78,9 @@ class RouteConstrainTest {
 
     @Test
     void aConstraintOnATypedVariable() {
-        Router router = router(routes -> routes.GET("/orders/{id}", handler("order"))
-            .constrain("id", Long.class, id -> id > 0));
+        Router router = router(routes -> routes.GET("/orders/{id}")
+            .constrain("id", Long.class, id -> id > 0)
+            .handle(handler("order")));
 
         assertEquals("order", target(router, HttpRequest.GET("/orders/5")));
         assertNull(router.findClosest(HttpRequest.GET("/orders/-5")));
@@ -87,7 +91,7 @@ class RouteConstrainTest {
     @Test
     void aConstraintToACollectionOfValues() {
         List<String> values = new ArrayList<>(SHOPS);
-        Router router = router(routes -> routes.GET("/shops/{shop}", handler("shop")).constrain("shop", values));
+        Router router = router(routes -> routes.GET("/shops/{shop}").constrain("shop", values).handle(handler("shop")));
         values.clear(); // copied when declared
 
         assertEquals("shop", target(router, HttpRequest.GET("/shops/north")));
@@ -98,8 +102,8 @@ class RouteConstrainTest {
     @Test
     void aRejectedRequestGoesOnToAnotherRoute() {
         Router router = router(routes -> {
-            routes.GET("/items/{id}", handler("by id")).constrain("id", Long.class, id -> true);
-            routes.GET("/items/{name}", handler("by name")).constrain("name", name -> !Character.isDigit(name.charAt(0)));
+            routes.GET("/items/{id}").constrain("id", Long.class, id -> true).handle(handler("by id"));
+            routes.GET("/items/{name}").constrain("name", name -> !Character.isDigit(name.charAt(0))).handle(handler("by name"));
         });
 
         assertEquals("by id", target(router, HttpRequest.GET("/items/5")));
@@ -110,8 +114,8 @@ class RouteConstrainTest {
     @Test
     void aRejectedValueIsANotFoundNotAMethodNotAllowed() {
         Router router = router(routes -> {
-            routes.GET("/shops/{shop}", handler("get")).constrain("shop", SHOPS);
-            routes.POST("/shops/{shop}", handler("post")).constrain("shop", SHOPS);
+            routes.GET("/shops/{shop}").constrain("shop", SHOPS).handle(handler("get"));
+            routes.POST("/shops/{shop}").constrain("shop", SHOPS).handle(handler("post"));
         });
 
         assertNull(router.findClosest(HttpRequest.DELETE("/shops/west")));
@@ -132,10 +136,11 @@ class RouteConstrainTest {
         List<String> evaluated = new ArrayList<>();
         Router router = router(routes -> routes.path("/shops/{shop}", shop -> {
             shop.path("/items/{item}", item -> {
-                item.GET("/", handler("item")).constrain("item", Integer.class, i -> {
+                item.GET("/").constrain("item", Integer.class, i -> {
                     evaluated.add("route");
                     return i < 100;
-                });
+                })
+                .handle(handler("item"));
                 item.constrain(variables -> {
                     evaluated.add("inner");
                     return !variables.getString("item").equals("13");
@@ -158,10 +163,11 @@ class RouteConstrainTest {
     @Test
     void aConstraintThatThrowsRejects() {
         Router router = router(routes -> {
-            routes.GET("/boom/{id}", handler("boom")).constrain(variables -> {
+            routes.GET("/boom/{id}").constrain(variables -> {
                 throw new IllegalStateException("boom");
-            });
-            routes.GET("/strict/{id}", handler("strict")).constrain(variables -> variables.getInt("id") > 0);
+            })
+            .handle(handler("boom"));
+            routes.GET("/strict/{id}").constrain(variables -> variables.getInt("id") > 0).handle(handler("strict"));
         });
 
         assertNull(router.findClosest(HttpRequest.GET("/boom/1")));

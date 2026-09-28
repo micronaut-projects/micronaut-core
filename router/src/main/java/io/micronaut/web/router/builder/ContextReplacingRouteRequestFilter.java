@@ -31,14 +31,15 @@ import org.jspecify.annotations.Nullable;
  * handler, synchronous or not, the error and status routes, and the response filters.
  *
  * <pre>{@code
- * routes.GET("/orders", handler).beforeReplacing((request, propagatedContext) -> {
+ * routes.GET("/orders").beforeReplacing((request, propagatedContext) -> {
  *     String user = request.getHeaders().get("X-User");
  *     if (user == null) {
  *         return HttpResponse.unauthorized();
  *     }
  *     propagatedContext.add(new UserContext(user));
  *     return null;
- * });
+ * }).and()
+ * .handle(handler);
  * }</pre>
  *
  * <p>Like every route filter it runs with the propagated context of the filter chain in scope.

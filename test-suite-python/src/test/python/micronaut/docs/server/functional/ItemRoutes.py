@@ -24,26 +24,36 @@ class ItemRoutes:
         def routes(routes: HttpRouteBuilder) -> None:
             routes.GET("/items/{id}", lambda request, path_variables:  # <2>
                        HttpResponse.ok(items.find(path_variables.getLong("id"))))
-            routes.POST("/items", Item, lambda request, path_variables, item:  # <3>
-                        HttpResponse.created(items.save(item)))
-            routes.GET("/items/{id}/name", lambda request, path_variables:
-                       HttpResponse.ok(items.find(path_variables.getLong("id")).name)) \
-                .produces(MediaType.TEXT_PLAIN_TYPE)  # <4>
+            (routes.POST("/items")  # <3>
+                .body(Item)  # <4>
+                .handle(lambda request, path_variables, item: HttpResponse.created(items.save(item))))
+            (routes.GET("/items/{id}/name")
+                .produces(MediaType.TEXT_PLAIN_TYPE)  # <5>
+                .handle(lambda request, path_variables: HttpResponse.ok(items.find(path_variables.getLong("id")).name)))
 
             def delete(request, path_variables):
                 items.delete(path_variables.getLong("id"))
                 return HttpResponse.noContent()
 
-            routes.DELETE("/items/{id}", delete).executeOn(TaskExecutors.BLOCKING)  # <5>
-            routes.handle(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/items/{id}/touch", lambda request, path_variables:  # <6>
-                          HttpResponse.ok(f"touched {path_variables.getLong('id')} with {request.getMethod()}")) \
+            (routes.DELETE("/items/{id}")
+                .executeOn(TaskExecutors.BLOCKING)  # <6>
+                .handle(delete))
+            (routes.route(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/items/{id}/touch")  # <7>
                 .produces(MediaType.TEXT_PLAIN_TYPE)
-            routes.handle("PROPFIND", "/items", lambda request, path_variables:  # <7>
-                          HttpResponse.ok("items: " + request.getMethodName()).contentType(MediaType.TEXT_PLAIN_TYPE))
-            routes.asyncGET("/items/count", lambda request, path_variables:  # <8>
-                            items.count_async().thenApply(lambda count: HttpResponse.ok(count)))
-            routes.POST("/items/optional", HttpRouteBuilder.nullableBody(Item), lambda request, path_variables, item:  # <9>
-                        HttpResponse.noContent() if item is None else HttpResponse.created(items.save(item)))
+                .handle(lambda request, path_variables:
+                        HttpResponse.ok(f"touched {path_variables.getLong('id')} with {request.getMethod()}")))
+            routes.route("PROPFIND", "/items").handle(lambda request, path_variables:  # <8>
+                                                      HttpResponse.ok("items: " + request.getMethodName()).contentType(MediaType.TEXT_PLAIN_TYPE))
+            routes.GET("/items/count").handleAsync(lambda request, path_variables:  # <9>
+                                                   items.count_async().thenApply(lambda count: HttpResponse.ok(count)))
+            (routes.POST("/items/async")
+                .body(Item)
+                .handleAsync(lambda request, path_variables, item:
+                             items.save_async(item).thenApply(lambda saved: HttpResponse.created(saved))))  # <10>
+            (routes.POST("/items/optional")
+                .body(HttpRouteBuilder.nullableBody(Item))  # <11>
+                .handle(lambda request, path_variables, item:
+                        HttpResponse.noContent() if item is None else HttpResponse.created(items.save(item))))
 
         return routes
 # end::clazz[]

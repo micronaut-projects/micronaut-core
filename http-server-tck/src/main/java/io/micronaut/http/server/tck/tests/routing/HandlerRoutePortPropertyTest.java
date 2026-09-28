@@ -107,12 +107,13 @@ public class HandlerRoutePortPropertyTest {
         public void routes(HttpRouteBuilder routes) {
             routes.path("/port-property/group", group -> {
                 group.port("${" + PORT_PROPERTY + "}");
-                group.GET((request, pathVariables) -> text("ported"));
+                group.GET("/", (request, pathVariables) -> text("ported"));
             });
-            routes.GET("/port-property/route", (request, pathVariables) -> text("ported")).port("${" + PORT_PROPERTY + "}");
+            routes.GET("/port-property/route").port("${" + PORT_PROPERTY + "}").handle((request, pathVariables) -> text("ported"));
             // the default of a property that is not set
-            routes.GET("/port-property/default", (request, pathVariables) -> text("ported"))
-                .port("${handler-route-port-property-test.unset:" + port + "}");
+            routes.GET("/port-property/default")
+                .port("${handler-route-port-property-test.unset:" + port + "}")
+                .handle((request, pathVariables) -> text("ported"));
             routes.GET("/port-property/plain", (request, pathVariables) -> text("plain"));
         }
     }

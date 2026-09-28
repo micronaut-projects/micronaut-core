@@ -96,7 +96,7 @@ class HandlerRouteBodyElementLimitTest {
     static class Routes {
         @Singleton
         HttpRoutes routes() {
-            return routes -> routes.asyncPOST("/elements", (request, variables, body) -> {
+            return routes -> routes.POST("/elements").consumes(MediaType.APPLICATION_JSON_TYPE, MediaType.APPLICATION_JSON_STREAM_TYPE).body().handleAsync((request, variables, body) -> {
                 AtomicInteger count = new AtomicInteger();
                 return body.elements(Argument.mapOf(String.class, String.class))
                     .forEach(element -> {
@@ -104,7 +104,7 @@ class HandlerRouteBodyElementLimitTest {
                         return CompletableFuture.completedStage(null);
                     })
                     .thenApply(ignored -> HttpResponse.ok("count=" + count.get()).contentType(MediaType.TEXT_PLAIN_TYPE));
-            }).consumes(MediaType.APPLICATION_JSON_TYPE, MediaType.APPLICATION_JSON_STREAM_TYPE);
+            });
         }
     }
 }

@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The routes of {@link HttpRouteBuilder#any(String, RequestHandler)}: every standard and custom
+ * The routes of {@link HttpRouteBuilder#any(String)}: every standard and custom
  * HTTP method, behind the routes of a specific method and the implicit {@code HEAD} routes.
  */
 class AnyMethodRouteTest {
@@ -65,7 +65,7 @@ class AnyMethodRouteTest {
         Router router = router(routes -> {
             routes.any("/things/{id}", handler("any"));
             routes.GET("/things/{id}", handler("get"));
-            routes.handle("PROPFIND", "/things/{id}", handler("propfind"));
+            routes.route("PROPFIND", "/things/{id}").handle(handler("propfind"));
         });
 
         assertEquals("get", target(router, HttpRequest.GET("/things/1")));
@@ -120,12 +120,12 @@ class AnyMethodRouteTest {
     @Test
     void theBodyFormAndAsyncVariantsRouteEveryMethod() {
         Router router = router(routes -> {
-            routes.any("/body", Argument.STRING, (request, pathVariables, body) -> HttpResponse.ok(body));
-            routes.any("/typed", String.class, (request, pathVariables, body) -> HttpResponse.ok(body));
-            routes.any("/form", (request, pathVariables, form) -> HttpResponse.ok());
-            routes.asyncAny("/async", (request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
-            routes.asyncAny("/async-body", (request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
-            routes.path("/prefix", group -> group.any(handler("pathless")));
+            routes.any("/body").body(Argument.STRING).handle((request, pathVariables, body) -> HttpResponse.ok(body));
+            routes.any("/typed").body(String.class).handle((request, pathVariables, body) -> HttpResponse.ok(body));
+            routes.any("/form").form().handle((request, pathVariables, form) -> HttpResponse.ok());
+            routes.any("/async").handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+            routes.any("/async-body").body().handleAsync((request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+            routes.path("/prefix", group -> group.any("/").handle(handler("pathless")));
         });
 
         for (String path : List.of("/body", "/typed", "/async", "/async-body")) {

@@ -27,8 +27,6 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteGroup;
-import io.micronaut.web.router.builder.HttpRouteSpec;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -128,14 +126,15 @@ class RouteGroupsTest {
         List<String> trace = new ArrayList<>();
         Router router = router(routes -> routes.group(outer -> {
             outer.path("/api", inner -> {
-                inner.GET("/orders", RouteGroupsTest::ok)
+                inner.GET("/orders")
                     .before(request -> record(trace, "route-before1"))
                     .and()
                     .before(request -> record(trace, "route-before2"))
                     .and()
                     .after((request, response) -> trace.add("route-after1"))
                     .and()
-                    .after((request, response) -> trace.add("route-after2"));
+                    .after((request, response) -> trace.add("route-after2")).and()
+                    .handle(RouteGroupsTest::ok);
                 inner.after((request, response) -> trace.add("inner-after1"));
                 inner.before(request -> record(trace, "inner-before1"));
                 inner.after((request, response) -> trace.add("inner-after2"));
@@ -160,15 +159,17 @@ class RouteGroupsTest {
         List<String> trace = new ArrayList<>();
         Router router = router(routes -> routes.path("/api", api -> {
             api.after((request, response) -> trace.add("api-after " + response.code()));
-            api.GET("/route-rejects", RouteGroupsTest::ok)
+            api.GET("/route-rejects")
                 .beforeReplacing(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
                 .and()
-                .after((request, response) -> trace.add("route-after " + response.code()));
+                .after((request, response) -> trace.add("route-after " + response.code())).and()
+                .handle(RouteGroupsTest::ok);
             api.path("/inner", inner -> {
                 inner.beforeReplacing(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED));
                 inner.after((request, response) -> trace.add("inner-after " + response.code()));
-                inner.GET("/group-rejects", RouteGroupsTest::ok)
-                    .after((request, response) -> trace.add("route-after " + response.code()));
+                inner.GET("/group-rejects")
+                    .after((request, response) -> trace.add("route-after " + response.code())).and()
+                    .handle(RouteGroupsTest::ok);
             });
         }));
 
@@ -203,13 +204,13 @@ class RouteGroupsTest {
                 .afterAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(trace.add("async-context-after")))
                 .and();
             assertTrue(same == group);
-            HttpRouteSpec route = group.GET("/all", RouteGroupsTest::ok)
+            group.GET("/all")
                 .before(request -> { })
                 .and()
                 .after((request, response) -> { })
                 .and()
-                .produces(MediaType.TEXT_PLAIN_TYPE);
-            assertNotNull(route);
+                .produces(MediaType.TEXT_PLAIN_TYPE)
+                .handle(RouteGroupsTest::ok);
         }));
 
         run(router, HttpRequest.GET("/all"), trace);
@@ -268,20 +269,15 @@ class RouteGroupsTest {
     }
 
     @Test
-    void aDeclaredRouteIsBoundInAGroupWithoutAPrefixOnly() {
-        RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared/{id}");
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> router(routes ->
-            routes.path("/api", api -> api.handle(declaration, RouteGroupsTest::ok))));
-        assertTrue(error.getMessage().contains("GET /declared/{id}"), error.getMessage());
-        assertTrue(error.getMessage().contains("/api"), error.getMessage());
-
+    void aRouteByMethodIsUnderThePrefixOfItsGroup() {
         List<String> trace = new ArrayList<>();
-        Router router = router(routes -> routes.group(group -> {
-            group.handle(declaration, RouteGroupsTest::ok);
-            group.before(request -> record(trace, "group"));
+        Router router = router(routes -> routes.path("/api", api -> {
+            api.route(HttpMethod.GET, "/declared/{id}").handle(RouteGroupsTest::ok);
+            api.before(request -> record(trace, "group"));
         }));
-        run(router, HttpRequest.GET("/declared/5"), trace);
+        run(router, HttpRequest.GET("/api/declared/5"), trace);
         assertEquals(List.of("group", "handler"), trace);
+        assertNull(router.findClosest(HttpRequest.GET("/declared/5")));
     }
 
     @Test
@@ -342,7 +338,7 @@ class RouteGroupsTest {
     void aRouteOfSeveralMethodsInAGroupHasTheFiltersOfTheGroup() {
         List<String> trace = new ArrayList<>();
         Router router = router(routes -> routes.path("/api", api -> {
-            api.handle(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/both", RouteGroupsTest::ok);
+            api.route(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/both").handle(RouteGroupsTest::ok);
             api.before(request -> record(trace, "api"));
         }));
         run(router, HttpRequest.PUT("/api/both", ""), trace);

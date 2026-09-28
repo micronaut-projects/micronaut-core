@@ -199,7 +199,7 @@ public class HttpRoutesServerFiltersTest {
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/sf/fn", (request, pathVariables) -> text(describe(request)));
-            routes.POST("/sf/fn", (request, pathVariables) -> text(describe(request))).consumesAll();
+            routes.POST("/sf/fn").consumesAll().handle((request, pathVariables) -> text(describe(request)));
             routes.GET("/sf/only/route", (request, pathVariables) -> text(describe(request)));
             routes.GET("/not-filtered", (request, pathVariables) -> text(describe(request)));
         }

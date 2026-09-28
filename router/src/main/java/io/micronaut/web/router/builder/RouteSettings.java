@@ -113,7 +113,7 @@ public final class RouteSettings {
     }
 
     /**
-     * Mark the route as one of the routes of {@link HttpRouteBuilder#any(String, RequestHandler)}:
+     * Mark the route as one of the routes of {@link HttpRouteBuilder#any(String)}:
      * a route of a specific method, or an implicit {@code HEAD} route, that matches a request as
      * closely is preferred to it.
      */
@@ -122,7 +122,7 @@ public final class RouteSettings {
     }
 
     /**
-     * @return Whether the route is one of the routes of {@link HttpRouteBuilder#any(String, RequestHandler)}
+     * @return Whether the route is one of the routes of {@link HttpRouteBuilder#any(String)}
      */
     public boolean isAnyMethod() {
         return anyMethod;

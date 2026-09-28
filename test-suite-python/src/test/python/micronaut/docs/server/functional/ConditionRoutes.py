@@ -31,11 +31,12 @@ class ConditionRoutes(HttpRoutes):
 
     def routes(self, routes: HttpRouteBuilder) -> None:
         # tag::where[]
-        routes.GET("/search", lambda request, path_variables: text("beta search")) \
+        (routes.GET("/search")
             .where(RouteCondition.any(  # <1>
                 RouteCondition.header("X-Beta"),
-                RouteCondition.query("beta", "true"))) \
+                RouteCondition.query("beta", "true")))
             .order(-1)  # <2>
+            .handle(lambda request, path_variables: text("beta search")))
         routes.GET("/search", lambda request, path_variables: text("search"))  # <3>
         # end::where[]
         # tag::constrain[]
@@ -44,19 +45,21 @@ class ConditionRoutes(HttpRoutes):
             shop.GET("/stock", lambda request, path_variables: text("stock of " + path_variables.getString("shop")))
 
         routes.path("/shops/{shop}", shop_routes)
-        (routes.GET("/items/{id}", lambda request, path_variables: text(f"item {path_variables.getLong('id')}"))
+        (routes.GET("/items/{id}")
             .constrain("id", Long, lambda id: id > 0)  # <2>
-            .order(-1))
+            .order(-1)
+            .handle(lambda request, path_variables: text(f"item {path_variables.getLong('id')}")))
         routes.GET("/items/{name}", lambda request, path_variables: text("item named " + path_variables.getString("name")))  # <3>
         # end::constrain[]
         # tag::matchers[]
-        (routes.GET("/downloads/{file}", lambda request, path_variables: text("download " + path_variables.getString("file")))
+        (routes.GET("/downloads/{file}")
             .where(RouteCondition.any(
                 RouteCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase()),  # <1>
                 RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
             .where(RouteCondition.peerAddress("127.0.0.0/8", "::1"))  # <2>
             .where(RouteCondition.after(Instant.parse("2026-01-01T00:00:00Z")))  # <3>
-            .constrain("file", ValueMatcher.endsWith(".zip")))  # <4>
+            .constrain("file", ValueMatcher.endsWith(".zip"))  # <4>
+            .handle(lambda request, path_variables: text("download " + path_variables.getString("file"))))
         # end::matchers[]
         # tag::attributes[]
         def report_routes(reports):
@@ -70,8 +73,9 @@ class ConditionRoutes(HttpRoutes):
 
             reports.beforeReplacing(check_role)
             reports.GET("/daily", lambda request, path_variables: text("daily report"))
-            reports.GET("/salaries", lambda request, path_variables: text("salaries")) \
+            (reports.GET("/salaries")
                 .attribute("role", "admin")  # <3>
+                .handle(lambda request, path_variables: text("salaries")))
 
         routes.path("/reports", report_routes)
         # end::attributes[]

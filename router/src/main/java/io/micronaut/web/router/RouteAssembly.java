@@ -51,7 +51,6 @@ import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RouteSettings;
 import io.micronaut.web.router.builder.DefaultRouteAnnotations;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.jspecify.annotations.Nullable;
 
@@ -284,23 +283,6 @@ public final class RouteAssembly {
             : new DefaultStatusRoute(originatingClass, status, executableHandle, conversionService);
         statusRoutes.add(statusRoute);
         return statusRoute;
-    }
-
-    /**
-     * Bind a target to a declared route, added as an ordinary URI route.
-     *
-     * @param declaration      The declared route
-     * @param executableHandle The target of the route
-     * @param consumes         The media types the route consumes, or {@code null} for the default
-     * @return The route
-     */
-    public RouteSettings declare(RouteDeclaration declaration, MethodExecutionHandle<Object, Object> executableHandle, MediaType @Nullable [] consumes) {
-        RouteSettings settings = addRoute(declaration.httpMethodName(), declaration.httpMethod(), declaration.uriTemplate(),
-            List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle).settings();
-        if (consumes != null) {
-            settings.consumes(consumes);
-        }
-        return settings;
     }
 
     /**

@@ -73,10 +73,12 @@ class HandlerRouteReplacedFormBodyTest {
         @Singleton
         HttpRoutes routes() {
             return routes -> {
-                routes.POST("/form/cleared", (request, variables, form) -> secret(form))
-                    .beforeReplacing(request -> request.body(null));
-                routes.POST("/form/header", (request, variables, form) -> secret(form))
-                    .beforeReplacing(request -> request.header("X-Filtered", "true"));
+                routes.POST("/form/cleared")
+                    .beforeReplacing(request -> request.body(null)).and()
+                    .form().handle((request, variables, form) -> secret(form));
+                routes.POST("/form/header")
+                    .beforeReplacing(request -> request.header("X-Filtered", "true")).and()
+                    .form().handle((request, variables, form) -> secret(form));
             };
         }
     }

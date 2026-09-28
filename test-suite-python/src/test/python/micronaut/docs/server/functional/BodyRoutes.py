@@ -27,25 +27,26 @@ class BodyRoutes(HttpRoutes):
         self.uploads = uploads
 
     def routes(self, routes: HttpRouteBuilder) -> None:
-        routes.asyncPOST("/async/items", lambda request, path_variables, body:
+        routes.POST("/async/items").body().handleAsync(lambda request, path_variables, body:
                          body.body(Item)  # <1>
                          .thenCompose(self.items.save_async)
                          .thenApply(lambda item: HttpResponse.created(item)))
-        routes.asyncPOST("/async/items/import", lambda request, path_variables, body:
+        routes.POST("/async/items/import").body().handleAsync(lambda request, path_variables, body:
                          body.elements(Item)  # <2>
                          .forEach(self.items.save_async)
                          .thenApply(lambda done: HttpResponse.accepted()))
-        routes.asyncPOST("/async/notes", lambda request, path_variables, body:
-                         body.text(1024)  # <3>
-                         .thenApply(lambda text: HttpResponse.ok(f"received {len(text)} characters"))) \
+        (routes.POST("/async/notes")
             .consumes(MediaType.TEXT_PLAIN_TYPE)
+            .body().handleAsync(lambda request, path_variables, body:
+                         body.text(1024)  # <3>
+                         .thenApply(lambda text: HttpResponse.ok(f"received {len(text)} characters"))))
 
         def transfer(request, path_variables, body):
             destination = self.uploads.resolve(f"{uuid.uuid4()}.bin")
             return (body.transferTo(destination)  # <4>
                     .thenApply(lambda done: HttpResponse.created(str(destination.getFileName()))))
 
-        routes.asyncPUT("/async/files", transfer).consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE)
+        routes.PUT("/async/files").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync(transfer)
 
         def guarded(request, path_variables, body):
             if not request.getHeaders().contains("X-Token"):
@@ -53,5 +54,5 @@ class BodyRoutes(HttpRoutes):
             return (body.bytes(64 * 1024)
                     .thenApply(lambda bytes: HttpResponse.ok(f"accepted {len(bytes)} bytes")))
 
-        routes.asyncPOST("/async/guarded", guarded).consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE)
+        routes.POST("/async/guarded").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync(guarded)
 # end::clazz[]

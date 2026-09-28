@@ -25,7 +25,6 @@ import io.micronaut.http.form.FormData;
 import io.micronaut.web.router.builder.AsyncRequestHandler;
 import io.micronaut.web.router.builder.BodyRequestHandler;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
-import io.micronaut.web.router.builder.FormRequestHandler;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
@@ -53,10 +52,10 @@ class HandlerRoutePathlessTest {
     @Test
     void aRouteWithoutAPathIsAtThePrefixOfItsGroup() {
         Router router = router(routes -> routes.path("/users", users -> {
-            users.GET((request, pathVariables) -> HttpResponse.ok("list"));
-            users.POST(Item.class, (request, pathVariables, item) -> HttpResponse.ok());
+            users.GET("/", (request, pathVariables) -> HttpResponse.ok("list"));
+            users.POST("/").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
             users.GET("/{id}", (request, pathVariables) -> HttpResponse.ok());
-            users.path("/admins", admins -> admins.DELETE((request, pathVariables) -> HttpResponse.ok()));
+            users.path("/admins", admins -> admins.DELETE("/", (request, pathVariables) -> HttpResponse.ok()));
         }), uri -> uri);
         assertEquals("/users", route(router, HttpRequest.GET("/users")).getUriMatchTemplate().toString());
         assertNotNull(router.findClosest(HttpRequest.POST("/users", "")));
@@ -68,15 +67,15 @@ class HandlerRoutePathlessTest {
 
     @Test
     void aRouteWithoutAPathIsAtTheRoot() {
-        Router router = router(routes -> routes.GET((request, pathVariables) -> HttpResponse.ok("root")), uri -> uri);
+        Router router = router(routes -> routes.GET("/", (request, pathVariables) -> HttpResponse.ok("root")), uri -> uri);
         assertEquals("/", route(router, HttpRequest.GET("/")).getUriMatchTemplate().toString());
     }
 
     @Test
     void aRouteWithoutAPathIsUnderTheContextPath() {
         Router router = router(routes -> {
-            routes.GET((request, pathVariables) -> HttpResponse.ok("root"));
-            routes.path("/users", users -> users.GET((request, pathVariables) -> HttpResponse.ok("list")));
+            routes.GET("/", (request, pathVariables) -> HttpResponse.ok("root"));
+            routes.path("/users", users -> users.GET("/", (request, pathVariables) -> HttpResponse.ok("list")));
         }, uri -> RouteAssembly.underContextPath("/cp", uri));
         assertEquals(RouteAssembly.underContextPath("/cp", "/"), route(router, HttpRequest.GET("/cp")).getUriMatchTemplate().toString());
         assertEquals("/cp/users", route(router, HttpRequest.GET("/cp/users")).getUriMatchTemplate().toString());
@@ -89,78 +88,78 @@ class HandlerRoutePathlessTest {
     @Test
     void everyShortcutCompilesWithLambdasAndMethodReferences() {
         Router router = router(routes -> routes.path("/all", all -> {
-            all.GET((request, pathVariables) -> HttpResponse.ok());
-            all.GET(HandlerRoutePathlessTest::plain);
+            all.GET("/", (request, pathVariables) -> HttpResponse.ok());
+            all.GET("/", HandlerRoutePathlessTest::plain);
             all.GET("/p", (request, pathVariables) -> HttpResponse.ok());
             all.GET("/p", HandlerRoutePathlessTest::plain);
-            all.POST((request, pathVariables) -> HttpResponse.ok());
-            all.POST(HandlerRoutePathlessTest::plain);
+            all.POST("/", (request, pathVariables) -> HttpResponse.ok());
+            all.POST("/", HandlerRoutePathlessTest::plain);
             all.POST("/p", (request, pathVariables) -> HttpResponse.ok());
             all.POST("/p", HandlerRoutePathlessTest::plain);
-            all.PUT((request, pathVariables) -> HttpResponse.ok());
-            all.PUT(HandlerRoutePathlessTest::plain);
-            all.PATCH((request, pathVariables) -> HttpResponse.ok());
-            all.PATCH(HandlerRoutePathlessTest::plain);
-            all.DELETE((request, pathVariables) -> HttpResponse.ok());
-            all.DELETE(HandlerRoutePathlessTest::plain);
+            all.PUT("/", (request, pathVariables) -> HttpResponse.ok());
+            all.PUT("/", HandlerRoutePathlessTest::plain);
+            all.PATCH("/", (request, pathVariables) -> HttpResponse.ok());
+            all.PATCH("/", HandlerRoutePathlessTest::plain);
+            all.DELETE("/", (request, pathVariables) -> HttpResponse.ok());
+            all.DELETE("/", HandlerRoutePathlessTest::plain);
 
             all.path("/body", body -> {
-                body.POST(Item.class, (request, pathVariables, item) -> HttpResponse.ok());
-                body.POST(Item.class, HandlerRoutePathlessTest::body);
-                body.POST(Argument.of(Item.class), (request, pathVariables, item) -> HttpResponse.ok());
-                body.POST(Argument.of(Item.class), HandlerRoutePathlessTest::body);
-                body.POST("/p", Item.class, (request, pathVariables, item) -> HttpResponse.ok());
-                body.POST("/p", Item.class, HandlerRoutePathlessTest::body);
-                body.POST("/p", Argument.of(Item.class), HandlerRoutePathlessTest::body);
-                body.PUT(Item.class, (request, pathVariables, item) -> HttpResponse.ok());
-                body.PUT(Argument.of(Item.class), HandlerRoutePathlessTest::body);
-                body.PATCH(Item.class, (request, pathVariables, item) -> HttpResponse.ok());
-                body.PATCH(Argument.of(Item.class), HandlerRoutePathlessTest::body);
+                body.POST("/").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+                body.POST("/").body(Item.class).handle(HandlerRoutePathlessTest::body);
+                body.POST("/").body(Argument.of(Item.class)).handle((request, pathVariables, item) -> HttpResponse.ok());
+                body.POST("/").body(Argument.of(Item.class)).handle(HandlerRoutePathlessTest::body);
+                body.POST("/p").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+                body.POST("/p").body(Item.class).handle(HandlerRoutePathlessTest::body);
+                body.POST("/p").body(Argument.of(Item.class)).handle(HandlerRoutePathlessTest::body);
+                body.PUT("/").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+                body.PUT("/").body(Argument.of(Item.class)).handle(HandlerRoutePathlessTest::body);
+                body.PATCH("/").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok());
+                body.PATCH("/").body(Argument.of(Item.class)).handle(HandlerRoutePathlessTest::body);
             });
             all.path("/form", form -> {
-                form.POST((request, pathVariables, data) -> HttpResponse.ok());
-                form.POST(HandlerRoutePathlessTest::form);
-                form.POST("/p", (request, pathVariables, data) -> HttpResponse.ok());
-                form.POST("/p", HandlerRoutePathlessTest::form);
-                form.PUT((request, pathVariables, data) -> HttpResponse.ok());
-                form.PUT(HandlerRoutePathlessTest::form);
+                form.POST("/").form().handle((request, pathVariables, data) -> HttpResponse.ok());
+                form.POST("/").form().handle(HandlerRoutePathlessTest::form);
+                form.POST("/p").form().handle((request, pathVariables, data) -> HttpResponse.ok());
+                form.POST("/p").form().handle(HandlerRoutePathlessTest::form);
+                form.PUT("/").form().handle((request, pathVariables, data) -> HttpResponse.ok());
+                form.PUT("/").form().handle(HandlerRoutePathlessTest::form);
             });
             all.path("/async", async -> {
-                async.asyncGET((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
-                async.asyncGET(HandlerRoutePathlessTest::async);
-                async.asyncPOST(HandlerRoutePathlessTest::async);
-                async.asyncPUT(HandlerRoutePathlessTest::async);
-                async.asyncPATCH(HandlerRoutePathlessTest::async);
-                async.asyncDELETE(HandlerRoutePathlessTest::async);
-                async.asyncGET("/p", HandlerRoutePathlessTest::async);
-                async.asyncPOST((request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
-                async.asyncGET(HandlerRoutePathlessTest::asyncBody);
-                async.asyncPOST(HandlerRoutePathlessTest::asyncBody);
-                async.asyncPUT(HandlerRoutePathlessTest::asyncBody);
-                async.asyncPATCH(HandlerRoutePathlessTest::asyncBody);
-                async.asyncDELETE(HandlerRoutePathlessTest::asyncBody);
-                async.asyncPOST("/p", HandlerRoutePathlessTest::asyncBody);
+                async.GET("/").handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+                async.GET("/").handleAsync(HandlerRoutePathlessTest::async);
+                async.POST("/").handleAsync(HandlerRoutePathlessTest::async);
+                async.PUT("/").handleAsync(HandlerRoutePathlessTest::async);
+                async.PATCH("/").handleAsync(HandlerRoutePathlessTest::async);
+                async.DELETE("/").handleAsync(HandlerRoutePathlessTest::async);
+                async.GET("/p").handleAsync(HandlerRoutePathlessTest::async);
+                async.POST("/").body().handleAsync((request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+                async.GET("/").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
+                async.POST("/").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
+                async.PUT("/").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
+                async.PATCH("/").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
+                async.DELETE("/").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
+                async.POST("/p").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
             });
             all.path("/method", method -> {
-                method.handle(HttpMethod.OPTIONS, (request, pathVariables) -> HttpResponse.ok());
-                method.handle(HttpMethod.OPTIONS, "/p", HandlerRoutePathlessTest::plain);
-                method.handle(HttpMethod.POST, Item.class, HandlerRoutePathlessTest::body);
-                method.handle(HttpMethod.PUT, Argument.of(Item.class), (request, pathVariables, item) -> HttpResponse.ok());
-                method.handleForm(HttpMethod.PATCH, HandlerRoutePathlessTest::form);
-                method.handleAsync(HttpMethod.DELETE, HandlerRoutePathlessTest::async);
-                method.handle(Set.of(HttpMethod.TRACE), HandlerRoutePathlessTest::plain);
-                method.handleAsync(Set.of(HttpMethod.GET), (request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
-                method.handleAsync(HttpMethod.PUT, HandlerRoutePathlessTest::asyncBody);
-                method.handleAsync(Set.of(HttpMethod.PATCH), (request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+                method.route(HttpMethod.OPTIONS, "/").handle((request, pathVariables) -> HttpResponse.ok());
+                method.route(HttpMethod.OPTIONS, "/p").handle(HandlerRoutePathlessTest::plain);
+                method.POST("/").body(Item.class).handle(HandlerRoutePathlessTest::body);
+                method.PUT("/").body(Argument.of(Item.class)).handle((request, pathVariables, item) -> HttpResponse.ok());
+                method.PATCH("/").form().handle(HandlerRoutePathlessTest::form);
+                method.DELETE("/").handleAsync(HandlerRoutePathlessTest::async);
+                method.route(Set.of(HttpMethod.TRACE), "/").handle(HandlerRoutePathlessTest::plain);
+                method.route(Set.of(HttpMethod.GET), "/").handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+                method.PUT("/").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
+                method.route(Set.of(HttpMethod.PATCH), "/").body().handleAsync((request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
             });
             all.path("/named", named -> {
-                named.handle("PROPFIND", (request, pathVariables) -> HttpResponse.ok());
-                named.handle("PROPFIND", "/p", HandlerRoutePathlessTest::plain);
-                named.handle("PROPPATCH", Item.class, HandlerRoutePathlessTest::body);
-                named.handle("COPY", Argument.of(Item.class), (request, pathVariables, item) -> HttpResponse.ok());
-                named.handleAsync("MOVE", HandlerRoutePathlessTest::async);
-                named.handleAsync("MKCOL", HandlerRoutePathlessTest::asyncBody);
-                named.handleForm("LOCK", HandlerRoutePathlessTest::form);
+                named.route("PROPFIND", "/").handle((request, pathVariables) -> HttpResponse.ok());
+                named.route("PROPFIND", "/p").handle(HandlerRoutePathlessTest::plain);
+                named.route("PROPPATCH", "/").body(Item.class).handle(HandlerRoutePathlessTest::body);
+                named.route("COPY", "/").body(Argument.of(Item.class)).handle((request, pathVariables, item) -> HttpResponse.ok());
+                named.route("MOVE", "/").handleAsync(HandlerRoutePathlessTest::async);
+                named.route("MKCOL", "/").body().handleAsync(HandlerRoutePathlessTest::asyncBody);
+                named.route("LOCK", "/").form().handle(HandlerRoutePathlessTest::form);
             });
         }), uri -> uri);
         for (HttpRequest<?> request : List.of(HttpRequest.GET("/all"), HttpRequest.GET("/all/p"), HttpRequest.POST("/all/body", ""),
@@ -211,6 +210,6 @@ class HandlerRoutePathlessTest {
     // the handler types of the method references
     static final RequestHandler PLAIN = HandlerRoutePathlessTest::plain;
     static final BodyRequestHandler<Item> BODY = HandlerRoutePathlessTest::body;
-    static final FormRequestHandler FORM = HandlerRoutePathlessTest::form;
+    static final BodyRequestHandler<FormData> FORM = HandlerRoutePathlessTest::form;
     static final AsyncRequestHandler ASYNC = HandlerRoutePathlessTest::async;
 }

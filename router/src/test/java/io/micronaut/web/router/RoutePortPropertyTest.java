@@ -52,12 +52,12 @@ class RoutePortPropertyTest {
     @Test
     void aPortPropertyIsResolvedLikeTheOneOfAController() {
         Router router = router(routes -> {
-            routes.GET("/metrics", RoutePortPropertyTest::ok).port("${test.admin.port}");
+            routes.GET("/metrics").port("${test.admin.port}").handle(RoutePortPropertyTest::ok);
             routes.path("/management", management -> {
                 management.port("${test.unset.port:9191}");
                 management.GET("/health", RoutePortPropertyTest::ok);
             });
-            routes.GET("/literal", RoutePortPropertyTest::ok).port("9292");
+            routes.GET("/literal").port("9292").handle(RoutePortPropertyTest::ok);
         }, RESOLVER);
         assertEquals(Set.of(9090, 9191, 9292), router.getExposedPorts());
     }
@@ -65,27 +65,27 @@ class RoutePortPropertyTest {
     @Test
     void anUnresolvablePlaceholderFailsWithTheConfigurationError() {
         ConfigurationException error = assertThrows(ConfigurationException.class,
-            () -> router(routes -> routes.GET("/metrics", RoutePortPropertyTest::ok).port("${test.missing.port}"), RESOLVER));
+            () -> router(routes -> routes.GET("/metrics").port("${test.missing.port}").handle(RoutePortPropertyTest::ok), RESOLVER));
         assertTrue(error.getMessage().contains("test.missing.port"), error.getMessage());
     }
 
     @Test
     void aPortThatIsNotANumberOrOutOfRangeIsRejected() {
         IllegalArgumentException notANumber = assertThrows(IllegalArgumentException.class,
-            () -> router(routes -> routes.GET("/metrics", RoutePortPropertyTest::ok).port("${test.bad.port}"), RESOLVER));
+            () -> router(routes -> routes.GET("/metrics").port("${test.bad.port}").handle(RoutePortPropertyTest::ok), RESOLVER));
         assertEquals("The port of a route is not a number: ${test.bad.port}, resolved to: abc", notANumber.getMessage());
         assertThrows(IllegalArgumentException.class,
             () -> router(routes -> routes.group(group -> group.port("70000")), RESOLVER));
         assertThrows(IllegalArgumentException.class,
-            () -> router(routes -> routes.GET("/metrics", RoutePortPropertyTest::ok).port("0"), RESOLVER));
+            () -> router(routes -> routes.GET("/metrics").port("0").handle(RoutePortPropertyTest::ok), RESOLVER));
     }
 
     @Test
     void aPlaceholderNeedsAnEnvironment() {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-            () -> router(routes -> routes.GET("/metrics", RoutePortPropertyTest::ok).port("${test.admin.port}"), null));
+            () -> router(routes -> routes.GET("/metrics").port("${test.admin.port}").handle(RoutePortPropertyTest::ok), null));
         assertTrue(error.getMessage().contains("no environment"), error.getMessage());
-        assertEquals(Set.of(9090), router(routes -> routes.GET("/metrics", RoutePortPropertyTest::ok).port("9090"), null).getExposedPorts());
+        assertEquals(Set.of(9090), router(routes -> routes.GET("/metrics").port("9090").handle(RoutePortPropertyTest::ok), null).getExposedPorts());
     }
 
     private static HttpResponse<?> ok(HttpRequest<?> request, PathVariables pathVariables) {

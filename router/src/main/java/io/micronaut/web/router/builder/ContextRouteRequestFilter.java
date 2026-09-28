@@ -29,8 +29,9 @@ import io.micronaut.http.MutableHttpRequest;
  * the response filters.
  *
  * <pre>{@code
- * routes.GET("/orders", handler).before((request, propagatedContext) ->
- *     propagatedContext.add(new MdcPropagationContext(Map.of("trackingId", request.getHeaders().get("X-TrackingId")))));
+ * routes.GET("/orders").before((request, propagatedContext) ->
+ *     propagatedContext.add(new MdcPropagationContext(Map.of("trackingId", request.getHeaders().get("X-TrackingId"))))).and()
+ *     .handle(handler);
  * }</pre>
  *
  * <p>Like every route filter it runs with the propagated context of the filter chain in scope.

@@ -88,8 +88,8 @@ class HandlerRouteBodyJsonViewTest {
         HttpRoutes routes() {
             Argument<Profile> profile = publicProfile();
             return routes -> {
-                routes.POST("/view/body", profile, (request, variables, body) -> describe(body));
-                routes.asyncPOST("/view/async", (request, variables, body) -> body.body(profile).thenApply(HandlerRouteBodyJsonViewTest::describe));
+                routes.POST("/view/body").body(profile).handle((request, variables, body) -> describe(body));
+                routes.POST("/view/async").body().handleAsync((request, variables, body) -> body.body(profile).thenApply(HandlerRouteBodyJsonViewTest::describe));
             };
         }
     }

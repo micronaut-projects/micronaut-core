@@ -87,12 +87,17 @@ final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledR
         OrderUtil.sort(ordered);
         try {
             for (HttpRoutes httpRoutes : ordered) {
+                // the messages of the routes not ended with a terminal name the bean
+                builder.declaredBy(httpRoutes.getClass());
                 httpRoutes.routes(builder);
             }
-        } finally {
+        } catch (RuntimeException | Error e) {
             // the routes are read now: a route a bean declares later would be dropped
-            builder.close();
+            builder.closeBuilder();
+            throw e;
         }
+        // fails for a route that was not ended with a terminal
+        builder.close();
         assembly.addImplicitHeadRoutes();
         this.filterRoutes = assembly.filterRoutes();
     }

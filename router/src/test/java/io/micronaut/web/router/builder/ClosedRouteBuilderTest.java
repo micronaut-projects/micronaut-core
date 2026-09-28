@@ -66,12 +66,14 @@ public class ClosedRouteBuilderTest {
      */
     public static void assertEveryDeclarationFails(HttpRouteBuilder routes) {
         assertClosed(() -> routes.GET("/late", ClosedRouteBuilderTest::ok));
-        assertClosed(() -> routes.handle(Set.of(HttpMethod.GET, HttpMethod.POST), "/late", ClosedRouteBuilderTest::ok));
-        assertClosed(() -> routes.handle("PROPFIND", "/late", ClosedRouteBuilderTest::ok));
-        assertClosed(() -> routes.POST("/late", Argument.of(String.class), (request, pathVariables, body) -> HttpResponse.ok()));
-        assertClosed(() -> routes.asyncGET("/late", (request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok())));
-        assertClosed(() -> routes.POST("/late", (FormRequestHandler) (request, pathVariables, form) -> HttpResponse.ok()));
-        assertClosed(() -> routes.handle(RouteDeclaration.of(HttpMethod.GET, "/late"), ClosedRouteBuilderTest::ok));
+        assertClosed(() -> routes.route(Set.of(HttpMethod.GET, HttpMethod.POST), "/late").handle(ClosedRouteBuilderTest::ok));
+        assertClosed(() -> routes.route("PROPFIND", "/late").handle(ClosedRouteBuilderTest::ok));
+        assertClosed(() -> routes.POST("/late").body(Argument.of(String.class)).handle((request, pathVariables, body) -> HttpResponse.ok()));
+        assertClosed(() -> routes.GET("/late").handleAsync((request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok())));
+        assertClosed(() -> routes.POST("/late").form().handle((request, pathVariables, form) -> HttpResponse.ok()));
+        assertClosed(() -> routes.GET("/late"));
+        assertClosed(() -> routes.any("/late"));
+        assertClosed(() -> routes.GET("/late").handle(ClosedRouteBuilderTest::ok));
         assertClosed(() -> routes.error(IllegalStateException.class, (request, error) -> HttpResponse.ok()));
         assertClosed(() -> routes.status(HttpStatus.NOT_FOUND, request -> HttpResponse.ok()));
         assertClosed(() -> routes.filter("/**"));

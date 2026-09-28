@@ -36,7 +36,6 @@ import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -283,39 +282,47 @@ public class HandlerRouteResponseTypeTest {
         @Override
         public void routes(HttpRouteBuilder routes) {
             MediaType fooList = MediaType.of(FOO_LIST);
-            routes.GET("/typed/foos", (request, pathVariables) -> HttpResponse.ok(foos("a", "b")))
+            routes.GET("/typed/foos")
                 .produces(fooList, MediaType.APPLICATION_JSON_TYPE)
-                .responseType(FOOS);
-            routes.GET("/untyped/foos", (request, pathVariables) -> HttpResponse.ok(foos("a", "b")))
-                .produces(fooList, MediaType.APPLICATION_JSON_TYPE);
-            routes.POST("/typed/foos", Argument.of(Foo.class), (request, pathVariables, foo) -> {
+                .responseType(FOOS)
+                .handle((request, pathVariables) -> HttpResponse.ok(foos("a", "b")));
+            routes.GET("/untyped/foos")
+                .produces(fooList, MediaType.APPLICATION_JSON_TYPE)
+                .handle((request, pathVariables) -> HttpResponse.ok(foos("a", "b")));
+            routes.POST("/typed/foos").produces(fooList).responseType(FOOS).body(Argument.of(Foo.class)).handle((request, pathVariables, foo) -> {
                 List<Foo> foos = foos("a", "b");
                 foos.add(foo);
                 return HttpResponse.created(foos).header("X-Count", String.valueOf(foos.size()));
-            }).produces(fooList).responseType(FOOS);
-            routes.asyncGET("/typed/async", (request, pathVariables) ->
-                CompletableFuture.supplyAsync(() -> HttpResponse.ok(foos("a", "b")), executor))
-                .produces(fooList).responseType(FOOS);
-            routes.handle(RouteDeclaration.of(HttpMethod.GET, "/typed/declared"),
-                    (request, pathVariables) -> HttpResponse.ok(foos("a", "b")))
-                .produces(fooList).responseType(FOOS);
-            routes.handle(Set.of(HttpMethod.GET, HttpMethod.PUT), "/typed/methods", (request, pathVariables) -> HttpResponse.ok(foos("a", "b")))
-                .consumesAll().produces(fooList).responseType(FOOS);
-            routes.POST("/typed/form", (request, pathVariables, form) ->
-                    HttpResponse.ok(form.get("name", Argument.listOf(String.class)).stream().map(Foo::new).collect(Collectors.toCollection(ArrayList::new))))
-                .produces(fooList).responseType(FOOS);
-            routes.GET("/typed/empty", (request, pathVariables) -> HttpResponse.ok())
-                .produces(fooList, MediaType.APPLICATION_JSON_TYPE).responseType(FOOS);
-            routes.GET("/typed/null", (request, pathVariables) -> null)
-                .produces(fooList, MediaType.APPLICATION_JSON_TYPE).responseType(FOOS);
-            routes.GET("/typed/other", (request, pathVariables) -> HttpResponse.ok("not a list").contentType(MediaType.TEXT_PLAIN_TYPE))
-                .produces(fooList, MediaType.TEXT_PLAIN_TYPE).responseType(FOOS);
-            routes.GET("/typed/fail", (request, pathVariables) -> {
+            });
+            routes.GET("/typed/async")
+                .produces(fooList).responseType(FOOS)
+                .handleAsync((request, pathVariables) ->
+                CompletableFuture.supplyAsync(() -> HttpResponse.ok(foos("a", "b")), executor));
+            routes.route(HttpMethod.GET, "/typed/declared")
+                .produces(fooList).responseType(FOOS)
+                .handle((request, pathVariables) -> HttpResponse.ok(foos("a", "b")));
+            routes.route(Set.of(HttpMethod.GET, HttpMethod.PUT), "/typed/methods")
+                .consumesAll().produces(fooList).responseType(FOOS)
+                .handle((request, pathVariables) -> HttpResponse.ok(foos("a", "b")));
+            routes.POST("/typed/form")
+                .produces(fooList).responseType(FOOS)
+                .form().handle((request, pathVariables, form) ->
+                    HttpResponse.ok(form.get("name", Argument.listOf(String.class)).stream().map(Foo::new).collect(Collectors.toCollection(ArrayList::new))));
+            routes.GET("/typed/empty")
+                .produces(fooList, MediaType.APPLICATION_JSON_TYPE).responseType(FOOS)
+                .handle((request, pathVariables) -> HttpResponse.ok());
+            routes.GET("/typed/null")
+                .produces(fooList, MediaType.APPLICATION_JSON_TYPE).responseType(FOOS)
+                .handle((request, pathVariables) -> null);
+            routes.GET("/typed/other")
+                .produces(fooList, MediaType.TEXT_PLAIN_TYPE).responseType(FOOS)
+                .handle((request, pathVariables) -> HttpResponse.ok("not a list").contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.GET("/typed/fail").produces(fooList).handle((request, pathVariables) -> {
                 throw new FooFailure();
-            }).produces(fooList);
+            });
             routes.error(FooFailure.class, (request, error) -> HttpResponse.status(HttpStatus.CONFLICT).body(foos(error.getMessage())))
                 .produces(fooList).responseType(FOOS);
-            routes.GET("/typed/pay", (request, pathVariables) -> HttpResponse.status(HttpStatus.PAYMENT_REQUIRED)).produces(fooList);
+            routes.GET("/typed/pay").produces(fooList).handle((request, pathVariables) -> HttpResponse.status(HttpStatus.PAYMENT_REQUIRED));
             routes.status(HttpStatus.PAYMENT_REQUIRED, request -> HttpResponse.status(HttpStatus.PAYMENT_REQUIRED).body(foos("pay")))
                 .produces(fooList).responseType(FOOS);
         }

@@ -93,9 +93,10 @@ public class HandlerRouteConstraintsTest {
     static class ConstraintRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/constraints/items/{id}", (request, pathVariables) -> text("item " + pathVariables.getLong("id")))
+            routes.GET("/constraints/items/{id}")
                 .constrain("id", Long.class, id -> id > 0)
-                .order(-1);
+                .order(-1)
+                .handle((request, pathVariables) -> text("item " + pathVariables.getLong("id")));
             routes.GET("/constraints/items/{name}", (request, pathVariables) -> text("item named " + pathVariables.getString("name")));
             routes.path("/constraints/shops/{shop}", shop -> {
                 shop.constrain("shop", SHOPS);

@@ -26,27 +26,26 @@ public class FormRoutes implements HttpRoutes {
 
     @Override
     public void routes(HttpRouteBuilder routes) {
-        routes.POST("/forms/signup", (request, pathVariables, form) -> // <1>
+        routes.POST("/forms/signup").form().handle((request, pathVariables, form) -> // <1>
             HttpResponse.ok("Welcome " + form.getString("name") + ", " + form.getInt("age", 18))
                 .contentType(MediaType.TEXT_PLAIN_TYPE));
 
-        routes.asyncPOST("/forms/profile", (request, pathVariables, body) ->
+        routes.POST("/forms/profile").consumes(MediaType.MULTIPART_FORM_DATA_TYPE).body().handleAsync((request, pathVariables, body) ->
             body.form().thenCompose(form -> { // <2>
                 FileUpload avatar = form.getFile("avatar"); // <3>
                 return avatar.bytes(1024 * 1024)
                     .thenApply(bytes -> HttpResponse.ok(form.getString("name") + " sent " + avatar.fileName() + ", " + bytes.length + " bytes")
                         .contentType(MediaType.TEXT_PLAIN_TYPE));
-            })
-        ).consumes(MediaType.MULTIPART_FORM_DATA_TYPE);
+            }));
 
-        routes.asyncPOST("/forms/upload", (request, pathVariables, body) -> {
+        routes.POST("/forms/upload").consumes(MediaType.MULTIPART_FORM_DATA_TYPE).body().handleAsync((request, pathVariables, body) -> {
             Path destination = uploads.resolve(UUID.randomUUID() + ".upload");
             return body.parts() // <4>
                 .part("file", part -> part.file().transferTo(destination)) // <5>
                 .thenApply(found -> found
                     ? HttpResponse.created(destination.getFileName().toString()).contentType(MediaType.TEXT_PLAIN_TYPE)
                     : HttpResponse.badRequest("no file"));
-        }).consumes(MediaType.MULTIPART_FORM_DATA_TYPE);
+        });
     }
 }
 // end::clazz[]

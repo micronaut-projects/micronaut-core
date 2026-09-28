@@ -198,18 +198,59 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * The method of an asynchronous handler that receives the body: the {@link AsyncRequestBody}
+     * the handler reads itself, which no binder decodes and whose open reads are released when
+     * the stage of the handler completes, or the body decoded to a type, bound like a
+     * {@code @Body} argument, see {@link #bodyArgument(Argument)}.
+     *
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The method that calls it
+     */
+    @SuppressWarnings("unchecked")
+    public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> ofAsync(Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        Objects.requireNonNull(bodyType, "bodyType");
+        if (isAsyncBody(bodyType)) {
+            return new HandlerMethod<>(
+                handler,
+                AsyncBodyRequestHandler.class,
+                // the handler reads the body itself: no binder decodes it
+                new Argument<?>[]{REQUEST, PATH_VARIABLES, ASYNC_BODY},
+                returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+                args -> releaseWhenDone((AsyncRequestBody) args[2], () -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2]))
+            );
+        }
+        return asyncBody(handler, bodyArgument(bodyType));
+    }
+
+    /**
+     * The method of an asynchronous handler that receives the whole submitted form.
+     *
      * @param handler The handler
      * @return The method that calls it
      */
-    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncBodyRequestHandler handler) {
+    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> formAsync(AsyncBodyRequestHandler<FormData> handler) {
+        return asyncBody(handler, FORM);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> asyncBody(AsyncBodyRequestHandler<B> handler, Argument<?> body) {
         return new HandlerMethod<>(
             handler,
             AsyncBodyRequestHandler.class,
-            // the handler reads the body itself: no binder decodes it
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, ASYNC_BODY},
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, body},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> releaseWhenDone((AsyncRequestBody) args[2], () -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (AsyncRequestBody) args[2]))
+            args -> handlerStage(handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2]))
         );
+    }
+
+    /**
+     * @param bodyType The type of the body of a handler
+     * @return Whether the handler reads the body itself, as an {@link AsyncRequestBody}
+     */
+    private static boolean isAsyncBody(Argument<?> bodyType) {
+        return bodyType.getType() == AsyncRequestBody.class;
     }
 
     /**
@@ -224,20 +265,23 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             BodyRequestHandler.class,
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, bodyArgument(bodyType)},
+            // the body a handler reads itself is bound like the body a controller method declares
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, isAsyncBody(bodyType) ? ASYNC_BODY : bodyArgument(bodyType)},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
         );
     }
 
     /**
+     * The method of a handler that receives the whole submitted form.
+     *
      * @param handler The handler
      * @return The method that calls it
      */
-    public static HandlerMethod<HttpResponse<?>> of(FormRequestHandler handler) {
+    static HandlerMethod<HttpResponse<?>> form(BodyRequestHandler<FormData> handler) {
         return new HandlerMethod<>(
             handler,
-            FormRequestHandler.class,
+            BodyRequestHandler.class,
             new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormData) args[2])

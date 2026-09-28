@@ -49,7 +49,7 @@ class HttpRoutesPreMatchingTest {
     @Test
     void preMatchingServerFiltersRunByOrderBeforeTheMatch() {
         Router router = router(routes -> {
-            routes.GET("/x", OK).before(request -> trace(request, "route"));
+            routes.GET("/x").before(request -> trace(request, "route")).and().handle(OK);
             routes.filter("/**").order(10).preMatching().before(request -> trace(request, "pre10"));
             routes.filter("/**").before(request -> trace(request, "server0"));
             routes.filter("/**").preMatching().order(-5)

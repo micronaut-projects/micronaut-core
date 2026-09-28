@@ -88,9 +88,9 @@ class GlobalRouteOrderTest {
     static class FirstRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/global-order/beans", GlobalRouteOrderTest::ok).attribute("name", "first-bean").order(1);
-            routes.GET("/global-order/positive", GlobalRouteOrderTest::ok).attribute("name", "positive").order(1);
-            routes.GET("/global-order/group", GlobalRouteOrderTest::ok).attribute("name", "first-bean").order(-1);
+            routes.GET("/global-order/beans").attribute("name", "first-bean").order(1).handle(GlobalRouteOrderTest::ok);
+            routes.GET("/global-order/positive").attribute("name", "positive").order(1).handle(GlobalRouteOrderTest::ok);
+            routes.GET("/global-order/group").attribute("name", "first-bean").order(-1).handle(GlobalRouteOrderTest::ok);
         }
     }
 
@@ -100,11 +100,11 @@ class GlobalRouteOrderTest {
     static class LastRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/global-order/beans", GlobalRouteOrderTest::ok).attribute("name", "last-bean").order(-1);
-            routes.GET("/global-order/negative", GlobalRouteOrderTest::ok).attribute("name", "negative").order(-1);
+            routes.GET("/global-order/beans").attribute("name", "last-bean").order(-1).handle(GlobalRouteOrderTest::ok);
+            routes.GET("/global-order/negative").attribute("name", "negative").order(-1).handle(GlobalRouteOrderTest::ok);
             routes.path("/global-order", group -> {
                 group.order(-2);
-                group.GET("/group", GlobalRouteOrderTest::ok).attribute("name", "group");
+                group.GET("/group").attribute("name", "group").handle(GlobalRouteOrderTest::ok);
             });
         }
     }

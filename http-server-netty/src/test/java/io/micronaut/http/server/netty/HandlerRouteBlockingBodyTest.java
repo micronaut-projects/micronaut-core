@@ -92,8 +92,8 @@ class HandlerRouteBlockingBodyTest {
     static class EventLoopRoutes {
         @Singleton
         HttpRoutes eventLoopRoutes() {
-            return routes -> routes.POST("/blocking/event-loop", Argument.of(InputStream.class), (request, pathVariables, in) ->
-                HttpResponse.ok(read(in))).consumesAll();
+            return routes -> routes.POST("/blocking/event-loop").consumesAll().body(Argument.of(InputStream.class)).handle((request, pathVariables, in) ->
+                HttpResponse.ok(read(in)));
         }
     }
 
@@ -102,8 +102,8 @@ class HandlerRouteBlockingBodyTest {
     static class ExecutorRoutes {
         @Singleton
         HttpRoutes executorRoutes() {
-            return routes -> routes.POST("/blocking/executor", Argument.of(InputStream.class), (request, pathVariables, in) ->
-                HttpResponse.ok(read(in)).contentType(MediaType.TEXT_PLAIN_TYPE)).consumesAll().executeOn(TaskExecutors.BLOCKING);
+            return routes -> routes.POST("/blocking/executor").consumesAll().executeOn(TaskExecutors.BLOCKING).body(Argument.of(InputStream.class)).handle((request, pathVariables, in) ->
+                HttpResponse.ok(read(in)).contentType(MediaType.TEXT_PLAIN_TYPE));
         }
     }
 }

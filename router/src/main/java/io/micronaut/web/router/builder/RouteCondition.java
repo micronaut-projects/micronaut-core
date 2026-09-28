@@ -40,9 +40,10 @@ import java.util.function.Predicate;
  * import static io.micronaut.web.router.builder.RouteCondition.*;
  * import static io.micronaut.web.router.builder.ValueMatcher.*;
  *
- * routes.GET("/search", betaHandler)
+ * routes.GET("/search")
  *     .where(header("X-Beta").or(query("beta", equalTo("true"))))
- *     .order(-1);
+ *     .order(-1)
+ *     .handle(betaHandler);
  * routes.path("/admin", admin -> admin.where(remoteAddress("10.0.0.0/8")));
  * }</pre>
  *

@@ -31,10 +31,11 @@ import java.util.concurrent.CompletionStage;
  * returned stage completes, so the filter must not block.
  *
  * <pre>{@code
- * routes.GET("/avatars/{id}", handler).afterReplacingAsync((request, response) ->
+ * routes.GET("/avatars/{id}").afterReplacingAsync((request, response) ->
  *     response.code() == 404
  *         ? avatars.fallback().thenApply(HttpResponse::ok)
- *         : CompletableFuture.completedFuture(null));
+ *         : CompletableFuture.completedFuture(null)).and()
+ *         .handle(handler);
  * }</pre>
  *
  * @author Denis Stepanov

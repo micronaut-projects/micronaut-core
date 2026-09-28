@@ -52,8 +52,7 @@ public class GroupRoutes implements HttpRoutes {
                 admin.GET("/users", (request, pathVariables) -> text("users"));
             });
 
-            api.GET("/reports/{id}", (request, pathVariables) ->
-                    text("report " + pathVariables.getInt("id") + " as " + request.getHeaders().get("X-Report-Format")))
+            api.GET("/reports/{id}")
                 .before(request -> { // <5>
                     request.getHeaders().add("X-Report-Format", "summary");
                 })
@@ -61,9 +60,12 @@ public class GroupRoutes implements HttpRoutes {
                 .afterReplacing((request, response) -> // <6>
                     response.getStatus() == HttpStatus.OK && request.getHeaders().contains("X-Legacy")
                         ? HttpResponse.status(HttpStatus.GONE)
-                        : null);
+                        : null)
+                .and()
+                .handle((request, pathVariables) ->
+                    text("report " + pathVariables.getInt("id") + " as " + request.getHeaders().get("X-Report-Format")));
 
-            api.GET((request, pathVariables) -> text("api of " + PropagatedContext.get().get(Tenant.class).id())); // <7>
+            api.GET("/", (request, pathVariables) -> text("api of " + PropagatedContext.get().get(Tenant.class).id())); // <7>
         });
         // end::groups[]
 
@@ -72,14 +74,16 @@ public class GroupRoutes implements HttpRoutes {
             notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE); // <1>
             notes.executeOn(TaskExecutors.BLOCKING); // <2>
 
-            notes.POST(String.class, (request, pathVariables, text) -> HttpResponse.ok("saved " + text));
-            notes.POST("/items", Item.class, (request, pathVariables, item) -> HttpResponse.ok("saved " + item.name()))
-                .consumes(MediaType.APPLICATION_JSON_TYPE); // <3>
-            notes.GET("/count", (request, pathVariables) -> HttpResponse.ok("1"))
-                .nonBlocking(); // <4>
+            notes.POST("/").body(String.class).handle((request, pathVariables, text) -> HttpResponse.ok("saved " + text));
+            notes.POST("/items")
+                .consumes(MediaType.APPLICATION_JSON_TYPE) // <3>
+                .body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok("saved " + item.name()));
+            notes.GET("/count")
+                .nonBlocking() // <4>
+                .handle((request, pathVariables) -> HttpResponse.ok("1"));
 
             notes.path("/drafts", drafts -> {
-                drafts.GET((request, pathVariables) -> HttpResponse.ok(List.of(new Item(1, "draft"))));
+                drafts.GET("/", (request, pathVariables) -> HttpResponse.ok(List.of(new Item(1, "draft"))));
                 drafts.produces(MediaType.APPLICATION_JSON_TYPE); // <5>
             });
         });
@@ -96,14 +100,16 @@ public class GroupRoutes implements HttpRoutes {
         // end::serverFilters[]
 
         // tag::filterExecutor[]
-        routes.GET("/audit/{id}", (request, pathVariables) ->
-                text("audited on " + request.getAttribute("audit-thread", String.class).orElse("none")))
+        routes.GET("/audit/{id}")
             .before(request -> { // <1>
                 request.setAttribute("audit-thread", Thread.currentThread().getName());
             })
             .executeOn(TaskExecutors.BLOCKING) // <2>
             .and() // <3>
-            .after((request, response) -> response.header("X-Audited", "true"));
+            .after((request, response) -> response.header("X-Audited", "true"))
+            .and()
+            .handle((request, pathVariables) ->
+                text("audited on " + request.getAttribute("audit-thread", String.class).orElse("none")));
         // end::filterExecutor[]
     }
 

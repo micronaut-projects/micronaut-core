@@ -27,6 +27,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteSpec;
 import io.micronaut.web.router.builder.RequestPredicates;
 import io.micronaut.web.router.builder.RouteSpec;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,9 @@ class RouteSpecParityTest {
     @Test
     void everySettingOfARouteIsASettingOfAGroupItsRoutesInherit() {
         Router router = router(routes -> {
-            configure(routes.GET("/route", (request, pathVariables) -> HttpResponse.ok()));
+            HttpRouteSpec route = routes.GET("/route");
+            configure(route);
+            route.handle((request, pathVariables) -> HttpResponse.ok());
             routes.group(group -> {
                 group.GET("/grouped", (request, pathVariables) -> HttpResponse.ok());
                 configure(group);

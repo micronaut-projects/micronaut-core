@@ -39,7 +39,7 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteSpec;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
-import io.micronaut.web.router.builder.RouteDeclaration;
+
 import io.micronaut.web.router.builder.RouteRequestFilter;
 import io.micronaut.web.router.builder.StatusRouteHandler;
 import org.junit.jupiter.api.Test;
@@ -63,13 +63,20 @@ class HandlerRouteArgumentsTest {
 
     @Test
     void aRouteRejectsAMissingSetting() {
-        router(routes -> assertEveryMissingSettingFails(routes.GET("/items", HandlerRouteArgumentsTest::ok)));
+        router(routes -> {
+            HttpRouteSpec route = routes.GET("/items");
+            assertEveryMissingSettingFails(route);
+            route.handle(HandlerRouteArgumentsTest::ok);
+        });
     }
 
     @Test
-    void aDeclaredRouteRejectsAMissingSettingWhenItIsGivenNotOnEveryRequest() {
-        RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared/{id}");
-        Router router = router(routes -> assertEveryMissingSettingFails(routes.handle(declaration, HandlerRouteArgumentsTest::ok)));
+    void aRouteByMethodRejectsAMissingSettingWhenItIsGivenNotOnEveryRequest() {
+        Router router = router(routes -> {
+            HttpRouteSpec route = routes.route(HttpMethod.GET, "/declared/{id}");
+            assertEveryMissingSettingFails(route);
+            route.handle(HandlerRouteArgumentsTest::ok);
+        });
 
         // nothing invalid was recorded: the route is built and matched
         assertNotNull(router.findClosest(HttpRequest.GET("/declared/5")));
@@ -79,26 +86,29 @@ class HandlerRouteArgumentsTest {
     @Test
     void theBuilderRejectsAMissingArgument() {
         Router router = router(routes -> {
-            assertMissing("method", () -> routes.handle((HttpMethod) null, "/x", HandlerRouteArgumentsTest::ok));
+            assertMissing("method", () -> routes.route((HttpMethod) null, "/x"));
             assertMissing("uri", () -> routes.GET(null, HandlerRouteArgumentsTest::ok));
             assertMissing("handler", () -> routes.GET("/x", (RequestHandler) null));
-            assertMissing("handler", () -> routes.asyncGET("/x", (AsyncRequestHandler) null));
-            assertMissing("handler", () -> routes.asyncPOST("/x", (AsyncBodyRequestHandler) null));
-            assertMissing("bodyType", () -> routes.POST("/x", (Argument<String>) null, (request, pathVariables, body) -> HttpResponse.ok()));
-            assertMissing("handler", () -> routes.POST("/x", Argument.of(String.class), (BodyRequestHandler<String>) null));
-            assertMissing("httpMethodName", () -> routes.handle((String) null, "/x", HandlerRouteArgumentsTest::ok));
-            assertMissing("route", () -> routes.handle((RouteDeclaration) null, HandlerRouteArgumentsTest::ok));
+            assertMissing("handler", () -> routes.GET("/x").handleAsync((AsyncRequestHandler) null));
+            assertMissing("handler", () -> routes.POST("/x").body().handleAsync((AsyncBodyRequestHandler) null));
+            HttpRouteSpec body = routes.POST("/body");
+            assertMissing("bodyType", () -> body.body((Argument<String>) null));
+            // the route stays usable
+            body.handle(HandlerRouteArgumentsTest::ok);
+            assertMissing("handler", () -> routes.POST("/x").body(Argument.of(String.class)).handle((BodyRequestHandler<String>) null));
+            assertMissing("httpMethodName", () -> routes.route((String) null, "/x"));
+            assertMissing("response", () -> routes.GET("/x").respond((HttpResponse<?>) null));
             assertMissing("type", () -> routes.error((Class<IllegalStateException>) null, (request, error) -> HttpResponse.ok()));
             assertMissing("handler", () -> routes.error(IllegalStateException.class, (ErrorRouteHandler<IllegalStateException>) null));
             assertMissing("status", () -> routes.status(null, request -> HttpResponse.ok()));
             assertMissing("handler", () -> routes.status(HttpStatus.NOT_FOUND, (StatusRouteHandler) null));
-            assertMissing("methods", () -> routes.handle((Set<HttpMethod>) null, "/x", HandlerRouteArgumentsTest::ok));
+            assertMissing("methods", () -> routes.route((Set<HttpMethod>) null, "/x"));
             Set<HttpMethod> withNull = new HashSet<>();
             withNull.add(HttpMethod.PUT);
             withNull.add(null);
-            assertMissing("methods must not contain null", () -> routes.handle(withNull, "/x", HandlerRouteArgumentsTest::ok));
+            assertMissing("methods must not contain null", () -> routes.route(withNull, "/x"));
             IllegalArgumentException noMethod = assertThrows(IllegalArgumentException.class,
-                () -> routes.handle(Set.of(), "/x", HandlerRouteArgumentsTest::ok));
+                () -> routes.route(Set.of(), "/x").handle(HandlerRouteArgumentsTest::ok));
             assertEquals("No HTTP method for route: /x", noMethod.getMessage());
         });
 
@@ -132,17 +142,17 @@ class HandlerRouteArgumentsTest {
     void aRouteOfACustomMethodIsDeclaredByItsName() {
         Router router = router(routes -> {
             IllegalArgumentException custom = assertThrows(IllegalArgumentException.class,
-                () -> routes.handle(HttpMethod.CUSTOM, "/x", HandlerRouteArgumentsTest::ok));
+                () -> routes.route(HttpMethod.CUSTOM, "/x").handle(HandlerRouteArgumentsTest::ok));
             assertEquals("HttpMethod.CUSTOM is not the name of a method: declare a route of a custom HTTP method by its name, "
-                + "e.g. handle(\"PROPFIND\", uri, handler)", custom.getMessage());
-            assertThrows(IllegalArgumentException.class, () -> routes.handleAsync(HttpMethod.CUSTOM, "/x", (request, pathVariables) -> null));
-            assertThrows(IllegalArgumentException.class, () -> routes.handle(Set.of(HttpMethod.GET, HttpMethod.CUSTOM), "/x", HandlerRouteArgumentsTest::ok));
+                + "e.g. route(\"PROPFIND\", uri)", custom.getMessage());
+            assertThrows(IllegalArgumentException.class, () -> routes.route(HttpMethod.CUSTOM, "/x").handleAsync((request, pathVariables) -> null));
+            assertThrows(IllegalArgumentException.class, () -> routes.route(Set.of(HttpMethod.GET, HttpMethod.CUSTOM), "/x").handle(HandlerRouteArgumentsTest::ok));
             for (String name : new String[] {"", " ", "PROP FIND", "GET\r\n", "PROP/FIND"}) {
                 IllegalArgumentException invalid = assertThrows(IllegalArgumentException.class,
-                    () -> routes.handle(name, "/x", HandlerRouteArgumentsTest::ok), name);
+                    () -> routes.route(name, "/x"), name);
                 assertEquals("The name of an HTTP method must be a token, e.g. PROPFIND: '" + name + "'", invalid.getMessage());
             }
-            routes.handle("PROPFIND", "/x", HandlerRouteArgumentsTest::ok);
+            routes.route("PROPFIND", "/x").handle(HandlerRouteArgumentsTest::ok);
         });
 
         // the rejected declarations added no route: GET /x is not routed, PROPFIND /x is
@@ -151,19 +161,21 @@ class HandlerRouteArgumentsTest {
     }
 
     @Test
-    void aDeclarationOfACustomMethodIsDeclaredByItsName() {
-        IllegalArgumentException custom = assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of(HttpMethod.CUSTOM, "/x"));
-        assertEquals("HttpMethod.CUSTOM is not the name of a method: declare a route of a custom HTTP method by its name, "
-            + "e.g. RouteDeclaration.of(\"PROPFIND\", uriTemplate)", custom.getMessage());
-        assertMissing("httpMethod", () -> RouteDeclaration.of((HttpMethod) null, "/x"));
-        assertMissing("httpMethodName", () -> RouteDeclaration.of((String) null, "/x"));
-        assertMissing("uriTemplate", () -> RouteDeclaration.of(HttpMethod.GET, null));
-        assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of(" ", "/x"));
-        assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of("", "/x"));
-        RouteDeclaration propfind = RouteDeclaration.of("PROPFIND", "/x");
-        assertEquals(HttpMethod.CUSTOM, propfind.httpMethod());
-        assertEquals("PROPFIND", propfind.httpMethodName());
-        assertEquals("GET", RouteDeclaration.of("get", "/x").httpMethodName());
+    void aRouteByTheNameOfAStandardMethodIsARouteOfThatMethod() {
+        Router router = router(routes -> {
+            assertMissing("uri", () -> routes.route("PROPFIND", null));
+            routes.route("get", "/x").handle(HandlerRouteArgumentsTest::ok);
+            routes.route("PROPFIND", "/y").handle(HandlerRouteArgumentsTest::ok);
+        });
+
+        UriRouteMatch<Object, Object> get = router.findClosest(HttpRequest.GET("/x"));
+        assertNotNull(get);
+        assertEquals(HttpMethod.GET, get.getRouteInfo().getHttpMethod());
+        assertEquals("GET", get.getRouteInfo().getHttpMethodName());
+        UriRouteMatch<Object, Object> propfind = router.findClosest(HttpRequest.create(HttpMethod.CUSTOM, "/y", "PROPFIND"));
+        assertNotNull(propfind);
+        assertEquals(HttpMethod.CUSTOM, propfind.getRouteInfo().getHttpMethod());
+        assertEquals("PROPFIND", propfind.getRouteInfo().getHttpMethodName());
     }
 
     private static void assertEveryMissingSettingFails(HttpRouteSpec route) {

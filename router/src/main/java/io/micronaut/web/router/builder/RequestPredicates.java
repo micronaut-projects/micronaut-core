@@ -37,8 +37,9 @@ import java.util.function.Predicate;
  * <pre>{@code
  * import static io.micronaut.web.router.builder.RequestPredicates.*;
  *
- * routes.GET("/reports/{id}", csvHandler)
- *     .where(queryParam("format", "csv").or(accept(MediaType.of("text/csv"))));
+ * routes.GET("/reports/{id}")
+ *     .where(queryParam("format", "csv").or(accept(MediaType.of("text/csv"))))
+ *     .handle(csvHandler);
  * routes.path("/beta", beta -> {
  *     beta.where(header("X-Beta", value -> value.equals("on")));
  *     beta.GET("/search", betaSearchHandler);

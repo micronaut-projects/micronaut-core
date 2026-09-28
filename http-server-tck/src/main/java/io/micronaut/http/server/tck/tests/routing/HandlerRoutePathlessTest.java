@@ -107,10 +107,10 @@ public class HandlerRoutePathlessTest {
     static class PathlessRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET((request, pathVariables) -> text("root"));
+            routes.GET("/", (request, pathVariables) -> text("root"));
             routes.path("/pathless/users", users -> {
-                users.GET((request, pathVariables) -> text("users"));
-                users.POST(User.class, (request, pathVariables, user) -> text("created " + user.name()));
+                users.GET("/", (request, pathVariables) -> text("users"));
+                users.POST("/").body(User.class).handle((request, pathVariables, user) -> text("created " + user.name()));
             });
         }
     }

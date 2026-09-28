@@ -17,7 +17,6 @@ package io.micronaut.http.server.tck.tests.routing;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -42,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The routes of {@link HttpRouteBuilder#respond}: ordinary routes that answer with a response
+ * The routes of {@link io.micronaut.web.router.builder.HttpRouteSpec#respond}: ordinary routes that answer with a response
  * computed once, or created by a supplier or from the path variables, without a handler reading
  * the request. Filters, conditions, error routes and implicit {@code HEAD} routes apply, and a
  * response computed once is never shared by the requests.
@@ -211,33 +210,36 @@ public class HandlerRouteRespondTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.respond("/respond/ping", text("pong").header("X-Constant", "yes"));
-            routes.respond("/respond/count", () -> text(String.valueOf(count.incrementAndGet())));
-            routes.respond("/respond/hello/{name}", pathVariables -> text("Hello " + pathVariables.getString("name")));
+            routes.GET("/respond/ping").respond(text("pong").header("X-Constant", "yes"));
+            routes.GET("/respond/count").respond(() -> text(String.valueOf(count.incrementAndGet())));
+            routes.GET("/respond/hello/{name}").respond(pathVariables -> text("Hello " + pathVariables.getString("name")));
 
             routes.filter("/respond/filtered/**").after((request, response) -> response.header("X-Server-Filter", "server"));
             routes.path("/respond/filtered", group -> {
                 group.beforeReplacing(request -> request.getHeaders().contains("X-Allowed") ? null : HttpResponse.status(HttpStatus.FORBIDDEN));
                 group.after((request, response) -> response.header("X-Group-Filter", "group"));
-                group.respond("/ping", text("pong").header("X-Constant", "yes"))
-                    .after((request, response) -> response.header("X-Route-Filter", String.valueOf(filtered.incrementAndGet())));
+                group.GET("/ping")
+                    .after((request, response) -> response.header("X-Route-Filter", String.valueOf(filtered.incrementAndGet()))).and()
+                    .respond(text("pong").header("X-Constant", "yes"));
             });
 
-            routes.respond("/respond/channel", text("beta"))
+            routes.GET("/respond/channel")
                 .where(RouteCondition.header("X-Beta"))
-                .order(-1);
-            routes.respond("/respond/channel", text("stable"));
-            routes.respond("/respond/beta-only", text("beta")).where(RouteCondition.header("X-Beta"));
+                .order(-1)
+                .respond(text("beta"));
+            routes.GET("/respond/channel").respond(text("stable"));
+            routes.GET("/respond/beta-only").where(RouteCondition.header("X-Beta")).respond(text("beta"));
 
-            routes.respond("/respond/status/{shop}", pathVariables -> text(pathVariables.getString("shop") + " is open"))
-                .constrain("shop", List.of("north", "south"));
+            routes.GET("/respond/status/{shop}")
+                .constrain("shop", List.of("north", "south"))
+                .respond(pathVariables -> text(pathVariables.getString("shop") + " is open"));
 
-            routes.respond(HttpMethod.POST, "/respond/accepted", HttpResponse.accepted().body("queued").contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.POST("/respond/accepted").respond(HttpResponse.accepted().body("queued").contentType(MediaType.TEXT_PLAIN_TYPE));
 
             routes.path("/respond/failing", group -> {
                 group.error(IllegalStateException.class, (request, error) -> HttpResponse.status(HttpStatus.CONFLICT)
                     .body("failed: " + error.getMessage()).contentType(MediaType.TEXT_PLAIN_TYPE));
-                group.respond("/", () -> {
+                group.GET("/").respond(() -> {
                     throw new IllegalStateException("unavailable");
                 });
             });
