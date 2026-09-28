@@ -111,7 +111,7 @@ jobs:
           path: "**/build/reports/binary-compatibility-*.html"
 
       - name: "📦 Publish to Sonatype Snapshots"
-        if: success() && github.event_name == 'push' && matrix.java == '25'
+        if: success() && github.event_name == 'push' && matrix.java == '25' && (github.ref_name == 'master' || github.ref_name == 'main' || endsWith(github.ref_name, '.x'))
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
           DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
@@ -129,7 +129,7 @@ jobs:
           if_false: ${{ github.repository }}
 
       - name: "📑 Publish to Github Pages"
-        if: success() && github.event_name == 'push' && matrix.java == '25'
+        if: success() && github.event_name == 'push' && matrix.java == '25' && (github.ref_name == 'master' || github.ref_name == 'main' || endsWith(github.ref_name, '.x'))
         uses: micronaut-projects/github-pages-deploy-action@76d63aafbab7108d74e83be4e5b3b0501382e829 # master
         env:
           TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}
