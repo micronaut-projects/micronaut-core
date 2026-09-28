@@ -44,13 +44,13 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.net.URI;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -63,6 +63,10 @@ import java.util.stream.Collectors;
 final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpClient, ProxyHttpClient {
     private static final String OPTIONS_ATTRIBUTE = "micronaut.http.client.raw.options";
     private static final String ALLOW_RESTRICTED_HEADERS_PROPERTY = "jdk.httpclient.allowRestrictedHeaders";
+    /**
+     * Request attribute with the future completed once the body of the request is sent.
+     */
+    private static final String REQUEST_SENT_ATTRIBUTE = "micronaut.http.client.jdk.raw.request-sent";
     /**
      * The headers {@link java.net.http.HttpClient} manages itself, and refuses to take from the
      * request unless {@value #ALLOW_RESTRICTED_HEADERS_PROPERTY} allows them.
@@ -168,8 +172,13 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             }
         }
         request.setAttribute(OPTIONS_ATTRIBUTE, options);
-        // the response timeout is the timeout of the JDK request, see mapToHttpRequest
         ExecutionFlow<HttpResponse<?>> flow = ReactiveExecutionFlow.fromPublisher(Mono.from(exchangeImpl(request, null)).map(r -> (HttpResponse<?>) r));
+        if (options.getResponseTimeout() != null) {
+            // the response timeout starts once the body of the request is sent, see toJdkRequest
+            CompletableFuture<@Nullable Void> sent = new CompletableFuture<>();
+            request.setAttribute(REQUEST_SENT_ATTRIBUTE, sent);
+            flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), sent);
+        }
         Mono<MutableHttpResponse<?>> response = Mono.from(ReactiveExecutionFlow.toPublisher(
             flow.map(RawHttpClientSupport::toMutableResponse)
         ));
@@ -201,19 +210,22 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         // the request cookies are sent in its Cookie header, and must not reach the cookie store
         // that is shared with the other clients of the same configuration
         java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
-        Duration responseTimeout = responseTimeout(request);
-        if (responseTimeout != null) {
-            // it can only shorten the configured read timeout, like for the Netty client
-            Duration readTimeout = configuration.getReadTimeout().orElse(null);
-            builder.timeout(readTimeout != null && readTimeout.compareTo(responseTimeout) < 0 ? readTimeout : responseTimeout);
+        java.net.http.HttpRequest built = builder.build();
+        CompletableFuture<?> sent = request.getAttribute(REQUEST_SENT_ATTRIBUTE, CompletableFuture.class).orElse(null);
+        if (sent == null) {
+            return built;
         }
-        return builder.build();
-    }
-
-    private static @Nullable Duration responseTimeout(HttpRequest<?> request) {
-        return request.getAttribute(OPTIONS_ATTRIBUTE, RawRequestOptions.class)
-            .map(RawRequestOptions::getResponseTimeout)
-            .orElse(null);
+        // the response timeout of the options runs from the end of the body, see exchangeWithOptions:
+        // the body publisher tells when the client took all of it
+        java.net.http.HttpRequest.BodyPublisher publisher = built.bodyPublisher().orElse(java.net.http.HttpRequest.BodyPublishers.noBody());
+        if (publisher.contentLength() == 0) {
+            // no body: the client may never subscribe to the publisher, the request is sent with its head
+            sent.complete(null);
+            return built;
+        }
+        return java.net.http.HttpRequest.newBuilder(built, (name, value) -> true)
+            .method(built.method(), new SentBodyPublisher(publisher, sent))
+            .build();
     }
 
     @Override
@@ -254,5 +266,46 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 //noinspection unchecked
                 return (HttpResponse<O>) response;
             });
+    }
+
+    /**
+     * A body publisher that completes a future once the client took the whole body.
+     *
+     * @param delegate The body publisher
+     * @param sent     The future to complete
+     */
+    private record SentBodyPublisher(java.net.http.HttpRequest.BodyPublisher delegate, CompletableFuture<?> sent)
+        implements java.net.http.HttpRequest.BodyPublisher {
+
+        @Override
+        public long contentLength() {
+            return delegate.contentLength();
+        }
+
+        @Override
+        public void subscribe(java.util.concurrent.Flow.Subscriber<? super java.nio.ByteBuffer> subscriber) {
+            delegate.subscribe(new java.util.concurrent.Flow.Subscriber<java.nio.ByteBuffer>() {
+                @Override
+                public void onSubscribe(java.util.concurrent.Flow.Subscription subscription) {
+                    subscriber.onSubscribe(subscription);
+                }
+
+                @Override
+                public void onNext(java.nio.ByteBuffer item) {
+                    subscriber.onNext(item);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    subscriber.onError(throwable);
+                }
+
+                @Override
+                public void onComplete() {
+                    subscriber.onComplete();
+                    sent.complete(null);
+                }
+            });
+        }
     }
 }
