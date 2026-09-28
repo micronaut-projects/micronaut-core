@@ -23,6 +23,7 @@ import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
@@ -59,6 +60,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
+    private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
 
@@ -148,9 +150,10 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     Thread mainThread = Thread.currentThread();
                     boolean finalKeepAlive = keepAlive;
                     CountDownLatch countDownLatch = new CountDownLatch(1);
+                    Thread shutdownHook = null;
                     if (embeddedApplication.isShutdownHookNeeded()) {
                         try {
-                            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                            shutdownHook = new Thread(() -> {
                                 if (LOG.isInfoEnabled()) {
                                     LOG.info("Embedded Application shutting down");
                                 }
@@ -163,7 +166,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                         mainThread.interrupt();
                                     }
                                 }
-                            }));
+                            });
+                            Runtime.getRuntime().addShutdownHook(shutdownHook);
                         } catch (IllegalStateException e) {
                             try (applicationContext) {
                                 embeddedApplication.stop();
@@ -175,16 +179,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     }
 
                     if (keepAlive) {
-                        new Thread(() -> {
+                        // release the calling thread once the application stops, however it was stopped: through
+                        // the shutdown hook, or by another component such as a development launcher restarting it
+                        Thread monitor = new Thread(() -> {
                             try {
-                                if (!embeddedApplication.isRunning()) {
-                                    countDownLatch.countDown();
-                                    Thread.sleep(1000);
+                                while (embeddedApplication.isRunning()) {
+                                    Thread.sleep(SHUTDOWN_MONITOR_INTERVAL_MS);
                                 }
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
+                            } finally {
+                                countDownLatch.countDown();
                             }
-                        }, SHUTDOWN_MONITOR_THREAD).start();
+                        }, SHUTDOWN_MONITOR_THREAD);
+                        monitor.setDaemon(true);
+                        monitor.start();
 
                         boolean interrupted = false;
                         while (true) {
@@ -196,15 +205,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                 Thread.currentThread().interrupt();
                             }
                         }
+                        monitor.interrupt();
                         if (interrupted) {
                             Thread.currentThread().interrupt();
                         }
                         if (LOG.isInfoEnabled()) {
                             LOG.info("Embedded Application shutting down");
                         }
+                        removeShutdownHook(shutdownHook);
                     }
 
-                    if (embeddedApplication.isForceExit()) {
+                    if (embeddedApplication.isForceExit() && isExitAllowed(applicationContext.getEnvironment())) {
                         System.exit(0);
                     }
 
@@ -218,6 +229,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                 LOG.info("No embedded container found. Running as CLI application");
             }
             return applicationContext;
+        } catch (ApplicationStartupException e) {
+            // already reported by handleStartupException for the embedded application
+            throw e;
         } catch (Throwable e) {
             handleStartupException(applicationContext.getEnvironment(), e);
             Thread.currentThread().interrupt();
@@ -552,13 +566,38 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     protected void handleStartupException(Environment environment, Throwable exception) {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         int code = exitCodeMapper.apply(exception);
-        if (code > 0 && !environment.getActiveNames().contains(Environment.TEST)) {
+        if (code > 0 && isExitAllowed(environment)) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
             }
             System.exit(code);
         }
         throw new ApplicationStartupException("Error starting Micronaut server: " + exception.getMessage(), exception);
+    }
+
+    /**
+     * Whether this launcher may terminate the JVM, on a startup failure or when the embedded application
+     * asks for a forced exit. It may not while the {@link Environment#TEST test} environment is active,
+     * because the test owns the JVM, and not in {@link DevelopmentMode development mode}, because the
+     * development launcher owns it and keeps serving the previous version of the application instead.
+     *
+     * @param environment The environment
+     * @return True if the launcher may call {@code System.exit}
+     * @since 5.3.0
+     */
+    protected boolean isExitAllowed(Environment environment) {
+        return !environment.getActiveNames().contains(Environment.TEST) && !DevelopmentMode.isEnabled(environment);
+    }
+
+    private static void removeShutdownHook(@Nullable Thread shutdownHook) {
+        if (shutdownHook == null) {
+            return;
+        }
+        try {
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (IllegalStateException e) {
+            // the JVM is already shutting down and the hook is running or about to: leave it be
+        }
     }
 
     @SuppressWarnings("java:S106")

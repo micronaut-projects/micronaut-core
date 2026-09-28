@@ -16,6 +16,7 @@
 package io.micronaut.runtime.server.watch.event;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.EmbeddedApplication;
@@ -30,12 +31,16 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The {@link FileWatchConfiguration#RESTART} property should be set to true to active.</p>
  *
+ * <p>The listener is not active in {@link DevelopmentMode development mode}, where a launcher inside the
+ * process reacts to file changes itself and must not have the JVM exit under it.</p>
+ *
  * @author graemerocher
  * @since 1.1.0
  */
 @Singleton
 @Requires(beans = EmbeddedApplication.class)
 @Requires(property = FileWatchConfiguration.RESTART, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
+@Requires(condition = DevelopmentMode.Inactive.class)
 public class FileWatchRestartListener implements ApplicationEventListener<FileChangedEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileWatchRestartListener.class);
