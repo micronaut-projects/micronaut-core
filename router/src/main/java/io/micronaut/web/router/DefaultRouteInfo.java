@@ -42,7 +42,9 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
@@ -57,6 +59,8 @@ import java.util.concurrent.ExecutorService;
 public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     protected final ReturnType<? extends R> returnType;
+    private static final int MAX_BODY_WRITERS = 64;
+
     protected final List<MediaType> consumesMediaTypes;
     protected final List<MediaType> producesMediaTypes;
     protected final AnnotationMetadata annotationMetadata;
@@ -81,6 +85,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
     private final @Nullable MessageBodyWriter<R> messageBodyWriter;
+    /**
+     * The registry to find the writers of the bodies of a route that declares no body type, or {@code null}.
+     */
+    private final @Nullable MessageBodyHandlerRegistry bodyWriterRegistry;
+    private final Map<BodyWriterKey, Optional<BodyWriter>> bodyWriters;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -104,6 +113,15 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.messageBodyWriter = messageBodyHandlerRegistry.findWriter(argBodyType, producesMediaTypes)
             .map(w -> w.createSpecific(argBodyType))
             .orElse(null);
+        if (bodyType.getType() == Object.class && bodyType.getAnnotationMetadata().isEmpty()) {
+            // no writer is found for Object: the route finds and specializes one per class of body.
+            // A body type with annotation metadata (e.g. a JSON view) is left to the response.
+            this.bodyWriterRegistry = messageBodyHandlerRegistry;
+            this.bodyWriters = new ConcurrentHashMap<>(4);
+        } else {
+            this.bodyWriterRegistry = null;
+            this.bodyWriters = Map.of();
+        }
         single = returnType.isSingleResult() ||
             (isReactive() && returnType.getFirstTypeVariable()
                 .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
@@ -170,6 +188,32 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public @Nullable MessageBodyWriter<R> getMessageBodyWriter() {
         return messageBodyWriter;
+    }
+
+    @Override
+    public @Nullable BodyWriter findBodyWriter(Class<?> bodyClass, MediaType mediaType) {
+        MessageBodyHandlerRegistry registry = bodyWriterRegistry;
+        if (registry == null || bodyClass == Object.class) {
+            return null;
+        }
+        BodyWriterKey key = new BodyWriterKey(bodyClass, mediaType);
+        Optional<BodyWriter> bodyWriter = bodyWriters.get(key);
+        if (bodyWriter == null) {
+            if (bodyWriters.size() >= MAX_BODY_WRITERS) {
+                // e.g. generated body classes: leave the body to the writer of the route
+                return null;
+            }
+            bodyWriter = bodyWriters.computeIfAbsent(key, k -> createBodyWriter(registry, k));
+        }
+        return bodyWriter.orElse(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Optional<BodyWriter> createBodyWriter(MessageBodyHandlerRegistry registry, BodyWriterKey key) {
+        Argument<Object> argument = (Argument<Object>) Argument.of(key.type());
+        return registry.findWriter(argument, List.of(key.mediaType()))
+            .filter(writer -> writer.isWriteable(argument, key.mediaType()))
+            .map(writer -> new BodyWriter(argument, writer.createSpecific(argument)));
     }
 
     private static Argument<?> resolveBodyType(ReturnType<?> returnType) {
@@ -374,5 +418,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean needsRequestBody() {
         return isPermitsBody;
+    }
+
+    private record BodyWriterKey(Class<?> type, MediaType mediaType) {
     }
 }

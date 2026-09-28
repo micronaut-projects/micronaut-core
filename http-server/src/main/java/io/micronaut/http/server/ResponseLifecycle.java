@@ -262,15 +262,12 @@ public abstract class ResponseLifecycle {
                 responseMediaType = MediaType.APPLICATION_JSON_TYPE;
             }
         }
-        if (responseBodyType.getType() == Object.class && body.getClass() != Object.class
-            && responseBodyType.getAnnotationMetadata().isEmpty()
-            && (messageBodyWriter == null || (routeInfo != null && messageBodyWriter == routeInfo.getMessageBodyWriter()))) {
-            // the route declares no body type: use the writer specialized for the class of the body,
-            // instead of letting the writer resolve the class of each body it writes. A body type with
-            // annotation metadata (e.g. a JSON view) keeps the writer of the route.
-            RouteExecutor.SpecificWriter specific = routeExecutor.specificWriter(messageBodyHandlerRegistry, body.getClass(), responseMediaType);
-            if (specific != null) {
-                return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, specific.type(), responseMediaType, body, specific.writer(), false);
+        if (routeInfo != null && (messageBodyWriter == null || messageBodyWriter == routeInfo.getMessageBodyWriter())) {
+            // a route that declares no body type precompiles the writer for the class of the body,
+            // instead of letting its writer resolve the class of each body it writes
+            RouteInfo.BodyWriter bodyWriter = routeInfo.findBodyWriter(body.getClass(), responseMediaType);
+            if (bodyWriter != null) {
+                return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, bodyWriter.type(), responseMediaType, body, bodyWriter.writer(), false);
             }
         }
         if (messageBodyWriter == null) {

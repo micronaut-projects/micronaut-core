@@ -35,18 +35,22 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * A handler route declares no body type, so the writer of its body is specialized for the class of
- * the body once, not on every response.
+ * A handler route declares no body type, so the route finds and specializes the writer for the
+ * class of the body once, not on every response.
  */
 class HandlerRouteSpecificWriterTest {
 
     private static final String SPEC = "HandlerRouteSpecificWriterTest";
+    private static final String COUNTED = "application/x-counted";
 
     @Test
     void theWriterIsSpecializedOncePerBodyClass() {
@@ -59,7 +63,7 @@ class HandlerRouteSpecificWriterTest {
                 }
             }
             assertEquals(5, writer.writes.get());
-            assertEquals(1, writer.specializations.get());
+            assertEquals(List.of(Counted.class), writer.specializedBodyClasses());
         }
     }
 
@@ -72,28 +76,32 @@ class HandlerRouteSpecificWriterTest {
         @Singleton
         HttpRoutes routes() {
             return routes -> routes.GET("/counted/{value}", (request, pathVariables) ->
-                HttpResponse.ok(new Counted(pathVariables.get("value", String.class, ""))).contentType(MediaType.TEXT_PLAIN_TYPE));
+                HttpResponse.ok(new Counted(pathVariables.get("value", String.class, "")))).produces(MediaType.of(COUNTED));
         }
     }
 
     @Requires(property = "spec.name", value = SPEC)
     @Singleton
-    @Produces(MediaType.TEXT_PLAIN)
-    static class CountingWriter implements MessageBodyWriter<Counted> {
-        final AtomicInteger specializations = new AtomicInteger();
+    @Produces(COUNTED)
+    static class CountingWriter implements MessageBodyWriter<Object> {
+        final Queue<Class<?>> specializations = new ConcurrentLinkedQueue<>();
         final AtomicInteger writes = new AtomicInteger();
 
+        List<Class<?>> specializedBodyClasses() {
+            return List.copyOf(specializations);
+        }
+
         @Override
-        public MessageBodyWriter<Counted> createSpecific(Argument<Counted> type) {
-            specializations.incrementAndGet();
+        public MessageBodyWriter<Object> createSpecific(Argument<Object> type) {
+            specializations.add(type.getType());
             return this;
         }
 
         @Override
-        public void writeTo(Argument<Counted> type, MediaType mediaType, Counted object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
             writes.incrementAndGet();
             try {
-                outputStream.write(("counted " + object.value()).getBytes(StandardCharsets.UTF_8));
+                outputStream.write(("counted " + ((Counted) object).value()).getBytes(StandardCharsets.UTF_8));
             } catch (IOException e) {
                 throw new CodecException("write failed", e);
             }

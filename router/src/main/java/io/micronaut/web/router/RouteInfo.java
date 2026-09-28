@@ -65,6 +65,21 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     }
 
     /**
+     * The writer of a body of the given class, for a route that declares no body type, e.g. a
+     * handler route returning {@code HttpResponse<?>}: resolved and specialized for the class once,
+     * not on every response.
+     *
+     * @param bodyClass The class of the body
+     * @param mediaType The media type of the response
+     * @return The writer, or {@code null} if the route declares a body type or no writer can write the body
+     * @since 5.3.0
+     */
+    @Internal
+    default @Nullable BodyWriter findBodyWriter(Class<?> bodyClass, MediaType mediaType) {
+        return null;
+    }
+
+    /**
      * @return The message body reader. if any.
      * @since 4.0.0
      */
@@ -383,5 +398,16 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
         Objects.requireNonNull(type, "type");
         Object value = getAttributes().get(name);
         return type.isInstance(value) ? Optional.of(type.cast(value)) : Optional.empty();
+    }
+
+    /**
+     * A writer specialized for the class of a body.
+     *
+     * @param type   The type of the body
+     * @param writer The writer
+     * @since 5.3.0
+     */
+    @Internal
+    record BodyWriter(Argument<Object> type, MessageBodyWriter<Object> writer) {
     }
 }
