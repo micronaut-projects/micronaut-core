@@ -203,9 +203,8 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
      * @param context The conversion context
      * @param imm     The bytes
      * @return The body
-     * @throws Throwable If the body cannot be read
      */
-    Optional<T> transform(HttpRequest<?> request, ServerHttpRequest<?> server, ArgumentConversionContext<T> context, AvailableByteBody imm) throws Throwable {
+    Optional<T> transform(HttpRequest<?> request, ServerHttpRequest<?> server, ArgumentConversionContext<T> context, AvailableByteBody imm) {
         return transform(request, server, context, findReader(request, context), imm);
     }
 
@@ -222,7 +221,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return reader;
     }
 
-    private Optional<T> transform(HttpRequest<?> request, ServerHttpRequest<?> server, ArgumentConversionContext<T> context, @Nullable MessageBodyReader<T> reader, AvailableByteBody imm) throws Throwable {
+    private Optional<T> transform(HttpRequest<?> request, ServerHttpRequest<?> server, ArgumentConversionContext<T> context, @Nullable MessageBodyReader<T> reader, AvailableByteBody imm) {
         // the form is decoded by the Netty request whose bytes are the body, e.g. of the mutable
         // copy a filter continued with after it changed the URI in place
         NettyHttpRequest<?> formRequest = server instanceof NettyHttpRequest<?> netty ? netty : NettyHttpRequest.findBodyRequest(server);

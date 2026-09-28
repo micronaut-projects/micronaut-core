@@ -145,29 +145,6 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     }
 
     /**
-     * The bytes of the body a request was received with: the bytes of the first request with
-     * direct access to them, or of the first server request, through the wrappers around it.
-     *
-     * @param request The request
-     * @return The bytes, or {@code null} if a request replaced them or there are none
-     */
-    private static @Nullable ByteBody directBytes(HttpRequest<?> request) {
-        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
-            if (current instanceof DirectByteBodyAccess access) {
-                return access.byteBodyDirect();
-            }
-            if (current instanceof ServerHttpRequest<?> server) {
-                return server.byteBody();
-            }
-            if (HttpRequestWrapper.replacesBody(current)) {
-                // e.g. a wrapper a filter continued with that returns a sanitized body
-                return null;
-            }
-        }
-        return null;
-    }
-
-    /**
      * @return The server request this is the mutable copy of
      */
     final ServerHttpRequest<B> request() {
@@ -325,7 +302,7 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
         @Override
         public MutableHttpRequest<B> cookie(Cookie cookie) {
             // the headers are those of the request it wraps, as for the mutable copy of a request
-            getHeaders().add(HttpHeaders.COOKIE, ClientCookieEncoder.INSTANCE.encode(cookie));
+            super.getHeaders().add(HttpHeaders.COOKIE, ClientCookieEncoder.INSTANCE.encode(cookie));
             return this;
         }
 
@@ -363,6 +340,29 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
             URI uri = getUri();
             // the path of a URI that was changed, and otherwise the path of the request
             return uri == getDelegate().getUri() ? super.getPath() : uri.getRawPath();
+        }
+
+        /**
+         * The bytes of the body a request was received with: the bytes of the first request with
+         * direct access to them, or of the first server request, through the wrappers around it.
+         *
+         * @param request The request
+         * @return The bytes, or {@code null} if a request replaced them or there are none
+         */
+        private static @Nullable ByteBody directBytes(HttpRequest<?> request) {
+            for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
+                if (current instanceof DirectByteBodyAccess access) {
+                    return access.byteBodyDirect();
+                }
+                if (current instanceof ServerHttpRequest<?> server) {
+                    return server.byteBody();
+                }
+                if (HttpRequestWrapper.replacesBody(current)) {
+                    // e.g. a wrapper a filter continued with that returns a sanitized body
+                    return null;
+                }
+            }
+            return null;
         }
     }
 }

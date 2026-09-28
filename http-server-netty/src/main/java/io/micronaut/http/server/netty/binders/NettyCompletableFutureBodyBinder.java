@@ -75,15 +75,8 @@ final class NettyCompletableFutureBodyBinder
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
             CompletableFuture<Object> future = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
-                    Optional<Object> value;
-                    try {
-                        //noinspection unchecked
-                        value = nettyBodyAnnotationBinder.transform(source, server, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
-                    } catch (RuntimeException e) {
-                        throw e;
-                    } catch (Throwable e) {
-                        throw new RuntimeException(e);
-                    }
+                    //noinspection unchecked
+                    Optional<Object> value = nettyBodyAnnotationBinder.transform(source, server, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
                     return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
                 }).toCompletableFuture();
             return () -> Optional.of(future);

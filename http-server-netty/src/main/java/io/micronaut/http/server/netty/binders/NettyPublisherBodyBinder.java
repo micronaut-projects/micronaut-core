@@ -89,14 +89,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
             // bind a single result
             ExecutionFlow<Object> flow = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
-                    Optional<Object> value;
-                    try {
-                        value = nettyBodyAnnotationBinder.transform(source, server, context.with(targetType), bytes);
-                    } catch (RuntimeException e) {
-                        throw e;
-                    } catch (Throwable e) {
-                        throw new RuntimeException(e);
-                    }
+                    Optional<Object> value = nettyBodyAnnotationBinder.transform(source, server, context.with(targetType), bytes);
                     return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
                 });
             Publisher<Object> future = ReactiveExecutionFlow.toPublisher(flow);
