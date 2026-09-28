@@ -29,8 +29,11 @@ import io.micronaut.http.simple.SimpleHttpRequest;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,6 +55,34 @@ class AsyncRequestBodyNonNettyServerTest {
 
             assertEquals(Map.of("a", 1), body.body(Map.class).toCompletableFuture().get(10, TimeUnit.SECONDS));
             body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    void theElementsOfAJsonArrayAreReadFromBuffersThatAreNotNettyBuffers() throws Exception {
+        assertEquals(List.of(Map.of("a", 1), Map.of("b", 2)), elements("[{\"a\":1},{\"b\":2}]", MediaType.APPLICATION_JSON_TYPE));
+    }
+
+    @Test
+    void theElementsOfAJsonStreamAreReadFromBuffersThatAreNotNettyBuffers() throws Exception {
+        assertEquals(List.of(Map.of("a", 1), Map.of("b", 2)), elements("{\"a\":1}\n{\"b\":2}\n", MediaType.APPLICATION_JSON_STREAM_TYPE));
+    }
+
+    private static List<Map> elements(String json, MediaType contentType) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request(json, contentType)) {
+            DefaultAsyncRequestBody body = body(ctx, server);
+            List<Map> received = new CopyOnWriteArrayList<>();
+
+            body.elements(Map.class)
+                .forEach(element -> {
+                    received.add(element);
+                    return CompletableFuture.completedStage(null);
+                })
+                .toCompletableFuture()
+                .get(10, TimeUnit.SECONDS);
+            body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            return received;
         }
     }
 

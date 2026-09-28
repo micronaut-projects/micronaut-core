@@ -31,7 +31,6 @@ import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
-import io.netty.buffer.ByteBuf;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -99,12 +98,7 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     @Override
     public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
         JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
-        return processor.process(Flux.from(input).map(bb -> {
-            if (!(bb.asNativeBuffer() instanceof ByteBuf buf)) {
-                throw new IllegalArgumentException("Only netty buffers are supported");
-            }
-            return buf;
-        })).map(bb -> jsonMessageHandler.read(type, mediaType, httpHeaders, bb));
+        return processor.process(Flux.from(input).map(JsonChunkedProcessor::nettyBuffer)).map(bb -> jsonMessageHandler.read(type, mediaType, httpHeaders, bb));
     }
 
     @Override

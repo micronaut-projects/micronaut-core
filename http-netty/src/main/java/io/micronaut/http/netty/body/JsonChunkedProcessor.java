@@ -18,9 +18,11 @@ package io.micronaut.http.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -61,6 +63,27 @@ final class JsonChunkedProcessor {
      */
     JsonChunkedProcessor(long maxElementSize) {
         this.maxElementSize = maxElementSize;
+    }
+
+    /**
+     * The Netty buffer of a buffer of the input. A buffer that is not backed by one, e.g. a
+     * buffer of a server that is not a Netty server, is copied into a new Netty buffer and
+     * released.
+     *
+     * @param buffer The buffer, which the returned buffer takes the ownership of
+     * @return The Netty buffer
+     */
+    static ByteBuf nettyBuffer(ByteBuffer<?> buffer) {
+        if (buffer.asNativeBuffer() instanceof ByteBuf buf) {
+            return buf;
+        }
+        try {
+            return Unpooled.wrappedBuffer(buffer.toByteArray());
+        } finally {
+            if (buffer instanceof ReferenceCounted counted) {
+                counted.release();
+            }
+        }
     }
 
     public Flux<ByteBuffer<?>> process(Flux<ByteBuf> input) {
