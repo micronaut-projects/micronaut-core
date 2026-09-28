@@ -50,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @Internal
 public class CircuitBreakerRetry implements MutableRetryState {
 
+    private static final String CIRCUIT_OPEN = "Circuit Open";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
 
     private final RetryStateBuilder retryStateBuilder;
@@ -60,7 +61,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
     private final ApplicationEventPublisher eventPublisher;
     private final boolean throwWrappedException;
     private final AtomicReference<CircuitState> state;
-    private volatile MutableRetryState childState;
+    private final AtomicReference<MutableRetryState> childState;
 
     /**
      * Creates a circuit breaker retry state.
@@ -100,10 +101,14 @@ public class CircuitBreakerRetry implements MutableRetryState {
         this.state = circuit.state;
         this.retryStateBuilder = childStateBuilder;
         this.openTimeout = circuit.openTimeout;
-        this.childState = (MutableRetryState) childStateBuilder.build();
+        this.childState = new AtomicReference<>((MutableRetryState) childStateBuilder.build());
         this.eventPublisher = eventPublisher;
         this.method = method;
         this.throwWrappedException = throwWrappedException;
+    }
+
+    private MutableRetryState childState() {
+        return Objects.requireNonNull(childState.get());
     }
 
     /**
@@ -132,7 +137,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
                 // reset state for successful operation
                 circuit.time = System.currentTimeMillis();
                 circuit.lastError = null;
-                this.childState = (MutableRetryState) retryStateBuilder.build();
+                this.childState.set((MutableRetryState) retryStateBuilder.build());
             }
         }
     }
@@ -150,14 +155,14 @@ public class CircuitBreakerRetry implements MutableRetryState {
             if (lastError instanceof RuntimeException exception && !throwWrappedException) {
                 throw exception;
             } else {
-                throw new CircuitOpenException("Circuit Open: " + lastError.getMessage(), lastError);
+                throw new CircuitOpenException(CIRCUIT_OPEN + ": " + lastError.getMessage(), lastError);
             }
         }
     }
 
     @Override
     public long nextDelay() {
-        return childState.nextDelay();
+        return childState().nextDelay();
     }
 
     @Override
@@ -167,7 +172,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
         }
         requireNoWindow();
         try {
-            return currentState() != CircuitState.OPEN && childState.canRetry(exception);
+            return currentState() != CircuitState.OPEN && childState().canRetry(exception);
         } finally {
             if (currentState() == CircuitState.HALF_OPEN) {
                 openCircuit(exception);
@@ -177,48 +182,48 @@ public class CircuitBreakerRetry implements MutableRetryState {
 
     @Override
     public int getMaxAttempts() {
-        return childState.getMaxAttempts();
+        return childState().getMaxAttempts();
     }
 
     @Override
     public int currentAttempt() {
-        return childState.currentAttempt();
+        return childState().currentAttempt();
     }
 
     @Override
     public OptionalDouble getMultiplier() {
-        return childState.getMultiplier();
+        return childState().getMultiplier();
     }
 
     @Override
     public Duration getDelay() {
-        return childState.getDelay();
+        return childState().getDelay();
     }
 
     @Override
     public Duration getOverallDelay() {
-        return childState.getOverallDelay();
+        return childState().getOverallDelay();
     }
 
     @Override
     public Optional<Duration> getMaxDelay() {
-        return childState.getMaxDelay();
+        return childState().getMaxDelay();
     }
 
     @Override
     public RetryPredicate getRetryPredicate() {
-        return childState.getRetryPredicate();
+        return childState().getRetryPredicate();
     }
 
     @Override
     @Nullable
     public Class<? extends Throwable> getCapturedException() {
-        return childState.getCapturedException();
+        return childState().getCapturedException();
     }
 
     @Override
     public OptionalDouble getJitter() {
-        return childState.getJitter();
+        return childState().getJitter();
     }
 
     /**
@@ -274,14 +279,14 @@ public class CircuitBreakerRetry implements MutableRetryState {
         if (cause == null) {
             throw new IllegalArgumentException("Exception cause cannot be null");
         }
-        this.childState = (MutableRetryState) retryStateBuilder.build();
+        this.childState.set((MutableRetryState) retryStateBuilder.build());
         circuit.lastError = cause;
         circuit.time = System.currentTimeMillis();
         circuit.changed(true);
         try {
             return state.getAndSet(CircuitState.OPEN);
         } finally {
-            publishOpened(childState, cause);
+            publishOpened(childState(), cause);
         }
     }
 
@@ -333,7 +338,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
         circuit.time = System.currentTimeMillis();
         circuit.lastError = null;
         circuit.changed(false);
-        this.childState = (MutableRetryState) retryStateBuilder.build();
+        this.childState.set((MutableRetryState) retryStateBuilder.build());
         try {
             return state.getAndSet(CircuitState.CLOSED);
         } finally {
@@ -352,7 +357,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
         }
         circuit.lastError = null;
         circuit.changed(false);
-        this.childState = (MutableRetryState) retryStateBuilder.build();
+        this.childState.set((MutableRetryState) retryStateBuilder.build());
         return state.getAndSet(CircuitState.HALF_OPEN);
     }
 
@@ -385,9 +390,6 @@ public class CircuitBreakerRetry implements MutableRetryState {
 
         @Override
         public boolean canRetry(Throwable exception) {
-            if (exception == null) {
-                throw new IllegalArgumentException("Exception cause cannot be null");
-            }
             // the outcome of the call counts once it ends, see close
             return owner.circuit.windowState() != CircuitState.OPEN && childState.canRetry(exception);
         }
@@ -615,7 +617,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
                 if (cause instanceof RuntimeException runtime && !throwWrappedException) {
                     throw runtime;
                 }
-                throw cause == null ? new CircuitOpenException("Circuit Open") : new CircuitOpenException("Circuit Open: " + cause.getMessage(), cause);
+                throw cause == null ? new CircuitOpenException(CIRCUIT_OPEN) : new CircuitOpenException(CIRCUIT_OPEN + ": " + cause.getMessage(), cause);
             }
             if (current == CircuitState.HALF_OPEN) {
                 if (trials >= Objects.requireNonNull(window).successThreshold()) {
@@ -655,7 +657,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
                 opened = lastError;
             }
             if (change == 1) {
-                owner.publishOpened(retryState, opened == null ? new CircuitOpenException("Circuit Open") : opened);
+                owner.publishOpened(retryState, opened == null ? new CircuitOpenException(CIRCUIT_OPEN) : opened);
             } else if (change == -1) {
                 owner.publishClosed();
             }
@@ -705,7 +707,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
         }
 
         private void open(@Nullable Throwable cause) {
-            lastError = cause == null ? new CircuitOpenException("Circuit Open") : cause;
+            lastError = cause == null ? new CircuitOpenException(CIRCUIT_OPEN) : cause;
             time = System.currentTimeMillis();
             newGeneration();
             openedCount.incrementAndGet();

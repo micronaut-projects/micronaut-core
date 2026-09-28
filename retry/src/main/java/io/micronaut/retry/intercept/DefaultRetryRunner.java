@@ -34,6 +34,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -232,7 +233,7 @@ public final class DefaultRetryRunner {
         private final MutableRetryState retryState;
         private final String logContext;
         private final RetryEventEmitter retryEventEmitter;
-        private volatile @Nullable Future<?> pending;
+        private final AtomicReference<@Nullable Future<?>> pending = new AtomicReference<>();
 
         CompletionStageExecution(Supplier<? extends CompletionStage<T>> supplier,
                                  MutableRetryState retryState,
@@ -304,7 +305,7 @@ public final class DefaultRetryRunner {
         }
 
         private void setPending(Future<?> next) {
-            pending = next;
+            pending.set(next);
             // a cancellation that came before the attempt or the retry was pending
             if (future.isCancelled()) {
                 next.cancel(false);
@@ -315,7 +316,7 @@ public final class DefaultRetryRunner {
             if (end()) {
                 retryState.onCancel();
             }
-            Future<?> current = pending;
+            Future<?> current = pending.get();
             if (current != null) {
                 current.cancel(false);
             }

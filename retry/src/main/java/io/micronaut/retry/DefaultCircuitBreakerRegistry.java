@@ -45,6 +45,7 @@ import java.util.concurrent.ScheduledExecutorService;
 @Singleton
 final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
 
+    private static final String CIRCUIT_BREAKER_USER = "CircuitBreakerRegistry.circuitBreaker(\"";
     private static final RetryEventEmitter NO_OP_EVENT_EMITTER = (retryState, exception) -> { };
 
     private final NamedCircuits circuits;
@@ -71,14 +72,14 @@ final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
     @Override
     public CircuitBreakerOperations circuitBreaker(String name) {
         Objects.requireNonNull(name, "name");
-        return configured.computeIfAbsent(name, n -> operations(n, circuits.policy(n), circuits.window(n), "CircuitBreakerRegistry.circuitBreaker(\"" + n + "\")"));
+        return configured.computeIfAbsent(name, n -> operations(n, circuits.policy(n), circuits.window(n), CIRCUIT_BREAKER_USER + n + "\")"));
     }
 
     @Override
     public CircuitBreakerOperations circuitBreaker(String name, CircuitBreakerPolicy policy) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(policy, "policy");
-        return operations(name, policy, null, "CircuitBreakerRegistry.circuitBreaker(\"" + name + "\", policy)");
+        return operations(name, policy, null, CIRCUIT_BREAKER_USER + name + "\", policy)");
     }
 
     @Override
@@ -86,7 +87,7 @@ final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(window, "window");
-        return operations(name, policy, window, "CircuitBreakerRegistry.circuitBreaker(\"" + name + "\", policy, window)");
+        return operations(name, policy, window, CIRCUIT_BREAKER_USER + name + "\", policy, window)");
     }
 
     private CircuitBreakerOperations operations(String name, CircuitBreakerPolicy policy, @Nullable CircuitBreakerWindow window, String user) {
