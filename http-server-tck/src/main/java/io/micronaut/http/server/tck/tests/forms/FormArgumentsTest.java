@@ -259,6 +259,14 @@ public class FormArgumentsTest {
             assertEquals("name=Fred false", text.body());
             Response missing = same(server, prefix -> multipart(prefix + "/optional-part", avatarForm()), FN);
             assertEquals("no cover", missing.body());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    @Tag("streaming-multipart") // a runner whose server reads the whole multipart body before the route runs can exclude this tag
+    void aFieldSentAfterAStreamedFormPartIsNotBound() throws IOException {
+        try (ServerUnderTest server = server()) {
             // like a StreamingFileUpload: the route runs once the part starts, so a field sent
             // after a part that is still arriving cannot be bound
             byte[] large = new byte[256 * 1024];
