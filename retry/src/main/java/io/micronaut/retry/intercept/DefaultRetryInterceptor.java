@@ -26,7 +26,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitBreakerPolicy;
-import io.micronaut.retry.DefaultCircuitBreakerRegistry;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryRegistry;
 import io.micronaut.retry.RetryState;
@@ -38,6 +37,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +46,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Supplier;
 
 /**
  * A {@link MethodInterceptor} that retries an operation according to the specified
@@ -67,9 +68,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     @Nullable
     private final RetryRegistry retryRegistry;
     private final Map<ExecutableMethod, RetryPolicy> namedPolicies = new ConcurrentHashMap<>();
-    @Nullable
-    private final DefaultCircuitBreakerRegistry circuitBreakerRegistry;
-    private final Map<String, CircuitBreakerRetry.Circuit> namedCircuits = new ConcurrentHashMap<>();
+    private final NamedCircuits namedCircuits;
 
     /**
      * Construct a default retry method interceptor with the event publisher.
@@ -95,7 +94,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * @param eventPublisher The event publisher to publish retry events
      * @param executorService The executor service to use for completable futures
      * @param retryRegistry The registry of the named retry policies
-     * @param circuitBreakerRegistry The registry of the named circuit breakers
+     * @param namedCircuits The circuits of the named circuit breakers
      * @since 5.3.0
      */
     @Inject
@@ -104,13 +103,13 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                                    ApplicationEventPublisher eventPublisher,
                                    @Named(TaskExecutors.SCHEDULED) ExecutorService executorService,
                                    @Nullable RetryRegistry retryRegistry,
-                                   @Nullable DefaultCircuitBreakerRegistry circuitBreakerRegistry) {
+                                   @Nullable NamedCircuits namedCircuits) {
         this.retryRegistry = retryRegistry;
         this.conversionService = conversionService;
         this.eventPublisher = eventPublisher;
         this.executorService = (ScheduledExecutorService) executorService;
         this.retryRunner = new DefaultRetryRunner(this.executorService, this::sleep);
-        this.circuitBreakerRegistry = circuitBreakerRegistry;
+        this.namedCircuits = namedCircuits == null ? new NamedCircuits() : namedCircuits;
     }
 
     @Override
@@ -133,18 +132,23 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             context
         );
 
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
+        // a circuit with a rolling window takes the permit of a publisher when it is subscribed
+        CircuitBreakerRetry windowedCircuit = null;
         if (isCircuitBreaker) {
-            CircuitBreakerPolicy circuitBreakerPolicy = annotationRetryStateBuilder.circuitBreakerPolicy();
-            long timeout = circuitBreakerPolicy.getResetTimeout().toMillis();
-            boolean wrapException = circuitBreakerPolicy.isThrowWrappedException();
-            PolicyRetryStateBuilder retryStateBuilder = new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy());
-            String name = context.stringValue(CircuitBreaker.class, "name").orElse("");
-            retryState = circuitContexts.computeIfAbsent(
-                context.getExecutableMethod(),
-                method -> name.isEmpty()
-                    ? new CircuitBreakerRetry(new CircuitBreakerRetry.Circuit(timeout, circuitBreakerPolicy.window()), retryStateBuilder, context, eventPublisher, wrapException)
-                    : new CircuitBreakerRetry(namedCircuit(name, circuitBreakerPolicy), retryStateBuilder, context, eventPublisher, wrapException)
-            );
+            CircuitBreakerRetry circuitBreakerRetry;
+            try {
+                circuitBreakerRetry = circuitContexts.computeIfAbsent(
+                    context.getExecutableMethod(),
+                    method -> circuitBreakerRetry(context, annotationRetryStateBuilder)
+                );
+            } catch (RuntimeException e) {
+                return interceptedMethod.handleException(e);
+            }
+            retryState = circuitBreakerRetry.newInvocation();
+            if (circuitBreakerRetry.circuit().getWindow() != null) {
+                windowedCircuit = circuitBreakerRetry;
+            }
         } else {
             String name = retry.stringValue("name").orElse("");
             if (name.isEmpty()) {
@@ -161,17 +165,25 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         MutableConvertibleValues<Object> attrs = context.getAttributes();
         attrs.put(RetryState.class.getName(), retry);
 
-        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
-            retryState.open();
+            if (windowedCircuit == null || interceptedMethod.resultType() != InterceptedMethod.ResultType.PUBLISHER) {
+                retryState.open();
+            }
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER -> {
-                    Publisher<Object> publisher = retryRunner.executePublisher(
-                        () -> (Publisher<Object>) interceptedMethod.interceptResult(this),
-                        retryState,
-                        context.toString(),
-                        (state, exception) -> publishRetryEvent(context, state, exception)
-                    );
+                    Supplier<Publisher<Object>> supplier = () -> (Publisher<Object>) interceptedMethod.interceptResult(this);
+                    RetryEventEmitter retryEventEmitter = (state, exception) -> publishRetryEvent(context, state, exception);
+                    Publisher<Object> publisher;
+                    if (windowedCircuit == null) {
+                        publisher = retryRunner.executePublisher(supplier, retryState, context.toString(), retryEventEmitter);
+                    } else {
+                        CircuitBreakerRetry circuit = windowedCircuit;
+                        publisher = Flux.defer(() -> {
+                            MutableRetryState invocation = circuit.newInvocation();
+                            invocation.open();
+                            return retryRunner.executePublisher(supplier, invocation, context.toString(), retryEventEmitter);
+                        });
+                    }
                     return interceptedMethod.handleResult(publisher);
                 }
                 case COMPLETION_STAGE -> {
@@ -212,11 +224,30 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         }
     }
 
-    private CircuitBreakerRetry.Circuit namedCircuit(String name, CircuitBreakerPolicy policy) {
-        if (circuitBreakerRegistry != null) {
-            return circuitBreakerRegistry.sharedCircuit(name, policy);
+    /**
+     * The circuit breaker state of a method: its policy is resolved once, and a method with a
+     * name joins the circuit of the name.
+     */
+    private CircuitBreakerRetry circuitBreakerRetry(MethodInvocationContext<Object, Object> context,
+                                                    AnnotationRetryStateBuilder annotationRetryStateBuilder) {
+        CircuitBreakerPolicy circuitBreakerPolicy = annotationRetryStateBuilder.circuitBreakerPolicy();
+        AnnotationValue<CircuitBreaker> circuitBreaker = context.findAnnotation(CircuitBreaker.class).orElse(null);
+        String name = circuitBreaker == null ? "" : circuitBreaker.stringValue("name").orElse("");
+        CircuitBreakerRetry.Circuit circuit;
+        if (circuitBreaker == null || name.isEmpty()) {
+            circuit = new CircuitBreakerRetry.Circuit(circuitBreakerPolicy.getResetTimeout().toMillis(), circuitBreakerPolicy.window());
+        } else {
+            boolean declaresReset = circuitBreaker.contains("reset");
+            String user = "@CircuitBreaker of " + context.getDeclaringType().getName() + "#" + context.getMethodName();
+            circuit = namedCircuits.join(name, circuitBreakerPolicy, declaresReset, user);
         }
-        return namedCircuits.computeIfAbsent(name, n -> new CircuitBreakerRetry.Circuit(policy.getResetTimeout().toMillis(), policy.window()));
+        return new CircuitBreakerRetry(
+            circuit,
+            new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy()),
+            context,
+            eventPublisher,
+            circuitBreakerPolicy.isThrowWrappedException()
+        );
     }
 
     private void publishRetryEvent(MethodInvocationContext<Object, Object> context,

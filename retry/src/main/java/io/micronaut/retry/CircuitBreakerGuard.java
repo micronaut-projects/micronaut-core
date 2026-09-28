@@ -33,6 +33,8 @@ import io.micronaut.retry.exception.CircuitOpenException;
  * } catch (RuntimeException e) {
  *     permit.onFailure(e);
  *     throw e;
+ * } finally {
+ *     permit.release(); // no effect once an outcome is reported
  * }
  * }</pre>
  *
@@ -58,7 +60,7 @@ public interface CircuitBreakerGuard {
      * a half-open circuit lets every operation through and the first outcome closes or opens it
      * again; with one, it permits its trial operations only, see
      * {@link CircuitBreakerPolicy.Window}. Report the outcome of the operation with the permit,
-     * exactly once.
+     * or release it when there is none.
      *
      * @return The permit of the operation
      * @throws CircuitOpenException while the circuit is open, with the failure that opened it
@@ -67,8 +69,11 @@ public interface CircuitBreakerGuard {
     Permit acquire();
 
     /**
-     * The permit of one operation, to report its outcome. An outcome reported after the circuit
-     * changed state, e.g. of an operation that took long, counts for nothing.
+     * The permit of one operation, to report its outcome, or to release it when the operation
+     * ends without one, e.g. it was cancelled. Only the first report of a permit counts. An
+     * outcome reported after the circuit changed state, e.g. of an operation that took long,
+     * counts for nothing. A trial permit of a half-open circuit that is neither reported nor
+     * released is given again once the reset timeout elapses.
      */
     interface Permit {
 
@@ -85,5 +90,11 @@ public interface CircuitBreakerGuard {
          * @param failure The failure
          */
         void onFailure(Throwable failure);
+
+        /**
+         * Release the permit without an outcome, e.g. the operation was cancelled before its
+         * outcome was known: a trial permit of a half-open circuit can be taken again.
+         */
+        void release();
     }
 }

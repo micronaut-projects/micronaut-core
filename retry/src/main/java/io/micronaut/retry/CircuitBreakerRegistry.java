@@ -31,9 +31,13 @@ import java.util.Set;
  * see {@link NamedCircuitBreakerConfiguration}: its reset timeout is the timeout of the circuit,
  * and its attempts, delays and multiplier are the retries of {@link #circuitBreaker(String)}.
  * Each user of the circuit keeps its own retries: an annotated method those of its annotation,
- * {@link #circuitBreaker(String, CircuitBreakerPolicy)} those of the policy. A circuit that is
- * not configured is created on first use, with the reset timeout of the policy of its first
- * user.</p>
+ * {@link #circuitBreaker(String, CircuitBreakerPolicy)} those of the policy.</p>
+ *
+ * <p>The reset timeout and the rolling window of a circuit are those of its configuration. A
+ * circuit that is not configured has those of its users, which must all agree: those of
+ * {@link #circuitBreaker(String)} and {@link #guard(String)} are the defaults of
+ * {@link NamedCircuitBreakerConfiguration}. A user that disagrees fails with an
+ * {@link IllegalStateException} that names the user that created the circuit.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -52,12 +56,15 @@ public interface CircuitBreakerRegistry {
 
     /**
      * The circuit breaker of a name, with the retries of a policy: the circuit is shared with
-     * the other users of the name, the retries are these. The reset timeout of the policy is the
-     * one of the circuit only when the circuit is not configured and does not exist yet.
+     * the other users of the name, the retries are these. The reset timeout of the policy is
+     * ignored when the circuit is configured, and its rolling window, if any, must be the one of
+     * the configuration; when the circuit is not configured, both must be those of the other
+     * users of the name.
      *
      * @param name   The name
-     * @param policy The policy of the retries, and the reset timeout of a new circuit
+     * @param policy The policy of the retries, and the reset timeout and window of the circuit
      * @return The operations over the circuit of the name
+     * @throws IllegalStateException if the policy disagrees with the circuit of the name
      */
     CircuitBreakerOperations circuitBreaker(String name, CircuitBreakerPolicy policy);
 

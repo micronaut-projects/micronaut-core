@@ -43,4 +43,23 @@ public interface MutableRetryState extends RetryState {
      */
     default void onUncaptured(Throwable exception) {
     }
+
+    /**
+     * Called when the subscriber of a publisher cancels it before it produced a value. By
+     * default it is a success, see {@link #close(Throwable)}.
+     *
+     * @since 5.3.0
+     */
+    default void onCancel() {
+        close(null);
+    }
+
+    /**
+     * Called when the operation ends without an outcome, e.g. its thread was interrupted while
+     * it waited for a retry: a state that holds a permit returns it.
+     *
+     * @since 5.3.0
+     */
+    default void release() {
+    }
 }

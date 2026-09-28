@@ -35,7 +35,8 @@ class CircuitBreakerRegistrySpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
         CircuitBreakerRegistry registry = context.getBean(CircuitBreakerRegistry)
         CircuitBreakerOperations once = registry.circuitBreaker("shared", CircuitBreakerPolicy.builder().maxAttempts(1).delay(Duration.ofMillis(1)).resetTimeout(Duration.ofMinutes(1)).build())
-        CircuitBreakerOperations twice = registry.circuitBreaker("shared", CircuitBreakerPolicy.builder().maxAttempts(2).delay(Duration.ofMillis(1)).build())
+        // the users of a name that is not configured agree on the reset timeout of the circuit
+        CircuitBreakerOperations twice = registry.circuitBreaker("shared", CircuitBreakerPolicy.builder().maxAttempts(2).delay(Duration.ofMillis(1)).resetTimeout(Duration.ofMinutes(1)).build())
         AtomicInteger calls = new AtomicInteger()
 
         expect:
@@ -112,7 +113,10 @@ class CircuitBreakerRegistrySpec extends Specification {
 
     void "annotated methods with the same name share the circuit with each other and with the registry"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['spec.name': 'CircuitBreakerRegistrySpec'])
+        ApplicationContext context = ApplicationContext.run([
+            'spec.name'                                         : 'CircuitBreakerRegistrySpec',
+            'micronaut.retry.circuit-breakers.inventory.reset'  : '1m'
+        ])
         SharedBreakerService service = context.getBean(SharedBreakerService)
         CircuitBreakerRegistry registry = context.getBean(CircuitBreakerRegistry)
 
@@ -136,7 +140,8 @@ class CircuitBreakerRegistrySpec extends Specification {
         registry.circuitBreaker("inventory").execute { "ok" }
 
         then:
-        thrown(IllegalStateException)
+        IllegalStateException programmatic = thrown()
+        programmatic.message == "inventory down"
 
         when: "a method without a name keeps its own circuit"
         String result = service.alone()

@@ -15,16 +15,14 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.intercept.CircuitBreakerRetry;
 import io.micronaut.retry.intercept.PolicyRetryStateBuilder;
 import org.jspecify.annotations.Nullable;
 
-import java.lang.reflect.Method;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The default {@link CircuitBreakerGuard}: a {@link CircuitBreakerRetry} over the shared circuit,
@@ -39,13 +37,13 @@ final class DefaultCircuitBreakerGuard implements CircuitBreakerGuard {
     private final String name;
     private final CircuitBreakerRetry retryState;
 
-    DefaultCircuitBreakerGuard(String name, CircuitBreakerRetry.Circuit circuit) {
+    DefaultCircuitBreakerGuard(String name, CircuitBreakerRetry.Circuit circuit, @Nullable ApplicationEventPublisher eventPublisher) {
         this.name = name;
         this.retryState = new CircuitBreakerRetry(
             circuit,
             new PolicyRetryStateBuilder(RetryPolicy.builder().build()),
-            new GuardMethod(name),
-            null,
+            new ProgrammaticExecutableMethod(name),
+            eventPublisher,
             true
         );
     }
@@ -67,29 +65,38 @@ final class DefaultCircuitBreakerGuard implements CircuitBreakerGuard {
         CircuitBreakerPolicy.Window window = circuit.getWindow();
         if (window == null) {
             retryState.open();
-            return new Permit() {
+            return new ReportOnce() {
                 @Override
-                public void onSuccess() {
+                void success() {
                     retryState.close(null);
                 }
 
                 @Override
-                public void onFailure(Throwable failure) {
-                    retryState.close(Objects.requireNonNull(failure, "failure"));
+                void failure(Throwable failure) {
+                    retryState.close(failure);
+                }
+
+                @Override
+                void released() {
+                    // a circuit without a window has no permits
                 }
             };
         }
-        long generation = retryState.acquirePermit();
-        return new Permit() {
+        long generation = circuit.acquire(true);
+        return new ReportOnce() {
             @Override
-            public void onSuccess() {
-                retryState.record(generation, null, false);
+            void success() {
+                circuit.record(generation, null, false, retryState, retryState);
             }
 
             @Override
-            public void onFailure(Throwable failure) {
-                Objects.requireNonNull(failure, "failure");
-                retryState.record(generation, failure, window.isFailure(failure));
+            void failure(Throwable failure) {
+                circuit.record(generation, failure, window.isFailure(failure), retryState, retryState);
+            }
+
+            @Override
+            void released() {
+                circuit.release(generation);
             }
         };
     }
@@ -100,45 +107,38 @@ final class DefaultCircuitBreakerGuard implements CircuitBreakerGuard {
     }
 
     /**
-     * The method the logs and the events of the circuit name.
-     *
-     * @param name The name of the circuit breaker
+     * A permit that reports its first outcome, or its release, and ignores the others.
      */
-    private record GuardMethod(String name) implements ExecutableMethod<Object, Object> {
+    private abstract static class ReportOnce implements Permit {
+
+        private final AtomicBoolean reported = new AtomicBoolean();
 
         @Override
-        public Class<Object> getDeclaringType() {
-            return Object.class;
+        public final void onSuccess() {
+            if (reported.compareAndSet(false, true)) {
+                success();
+            }
         }
 
         @Override
-        public String getMethodName() {
-            return name;
+        public final void onFailure(Throwable failure) {
+            Objects.requireNonNull(failure, "failure");
+            if (reported.compareAndSet(false, true)) {
+                failure(failure);
+            }
         }
 
         @Override
-        public Argument<?>[] getArguments() {
-            return Argument.ZERO_ARGUMENTS;
+        public final void release() {
+            if (reported.compareAndSet(false, true)) {
+                released();
+            }
         }
 
-        @Override
-        public Method getTargetMethod() {
-            throw new UnsupportedOperationException("No target method for the guard of a circuit breaker");
-        }
+        abstract void success();
 
-        @Override
-        public ReturnType<Object> getReturnType() {
-            return ReturnType.of(Object.class);
-        }
+        abstract void failure(Throwable failure);
 
-        @Override
-        public Object invoke(@Nullable Object instance, Object... arguments) {
-            throw new UnsupportedOperationException("No invocation for the guard of a circuit breaker");
-        }
-
-        @Override
-        public String toString() {
-            return "CircuitBreaker(" + name + ")";
-        }
+        abstract void released();
     }
 }

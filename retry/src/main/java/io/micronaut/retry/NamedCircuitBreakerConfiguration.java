@@ -34,6 +34,8 @@ import java.util.List;
  *         reset: 30s
  *         attempts: 1
  * </pre>
+ * The retries capture any {@link Exception}, as those of {@code @CircuitBreaker} do, so that a
+ * checked exception is retried and opens the circuit.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -270,6 +272,7 @@ public class NamedCircuitBreakerConfiguration {
             .multiplier(multiplier)
             .jitter(jitter)
             .resetTimeout(reset)
+            .capturedException(Exception.class)
             .throwWrappedException(throwWrappedException);
         if (maxDelay != null) {
             builder.maxDelay(maxDelay);

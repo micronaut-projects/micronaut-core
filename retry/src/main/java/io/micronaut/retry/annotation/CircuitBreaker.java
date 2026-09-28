@@ -16,6 +16,7 @@
 package io.micronaut.retry.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.Experimental;
 import jakarta.validation.constraints.Digits;
 
 import java.lang.annotation.Documented;
@@ -123,13 +124,17 @@ public @interface CircuitBreaker {
      * The name of a circuit breaker of the {@link io.micronaut.retry.CircuitBreakerRegistry}
      * whose circuit the method shares, e.g. with other methods and with the programmatic circuit
      * breakers of the same name: they open, half-open and close together. The method keeps its
-     * own retries, those of this annotation. The reset timeout is the one of the configuration
-     * {@code micronaut.retry.circuit-breakers.<name>.reset}, if any, or else the one of the first
-     * user of the circuit. Empty, the default, for a circuit of the method alone.
+     * own retries, those of this annotation. The reset timeout and the rolling window of the
+     * circuit are those of the configuration {@code micronaut.retry.circuit-breakers.<name>}, if
+     * any, and a method that declares others fails. Without a configuration, every user of the
+     * name must have the same ones, the defaults included, or its calls fail with an
+     * {@link IllegalStateException} that names both users. Empty, the default, for a circuit of
+     * the method alone.
      *
      * @return The name of the circuit breaker, or empty
      * @since 5.3.0
      */
+    @Experimental
     String name() default "";
 
     /**
@@ -140,11 +145,13 @@ public @interface CircuitBreaker {
      * {@link #skipOn()}, gives the circuit a rolling window, with the defaults of the others.
      * Empty, the default, for the circuit breaker of Micronaut: the first failure that survives
      * the retries opens the circuit, and the first success of a half-open circuit closes it.
-     * The outcome of a call is the outcome after its retries.
+     * The outcome of a call is the outcome after its retries; an exception that
+     * {@link #excludes()} or {@link #predicate()} does not retry counts as a success.
      *
      * @return The number of calls of the window, e.g. {@code "20"}, or empty
      * @since 5.3.0
      */
+    @Experimental
     String requestVolumeThreshold() default "";
 
     /**
@@ -152,6 +159,7 @@ public @interface CircuitBreaker {
      * default 0.5 when the circuit has a rolling window, see {@link #requestVolumeThreshold()}
      * @since 5.3.0
      */
+    @Experimental
     String failureRatio() default "";
 
     /**
@@ -159,6 +167,7 @@ public @interface CircuitBreaker {
      * succeed to close it, default 1; the other calls of the half-open circuit are rejected
      * @since 5.3.0
      */
+    @Experimental
     String successThreshold() default "";
 
     /**
@@ -166,6 +175,7 @@ public @interface CircuitBreaker {
      * every one
      * @since 5.3.0
      */
+    @Experimental
     Class<? extends Throwable>[] failOn() default {};
 
     /**
@@ -173,5 +183,6 @@ public @interface CircuitBreaker {
      * {@link #failOn()} says
      * @since 5.3.0
      */
+    @Experimental
     Class<? extends Throwable>[] skipOn() default {};
 }

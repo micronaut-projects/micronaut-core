@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.retry.annotation.RetryPredicate;
 import org.jspecify.annotations.Nullable;
 
@@ -432,6 +433,7 @@ public record CircuitBreakerPolicy(RetryPolicy retryPolicy,
      * @param skipOn                 The exceptions that count as a success
      * @since 5.3.0
      */
+    @Experimental
     public record Window(int requestVolumeThreshold,
                          double failureRatio,
                          int successThreshold,

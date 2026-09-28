@@ -32,6 +32,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -103,6 +104,7 @@ public final class DefaultRetryRunner {
                     retrySleeper.sleep(delayMillis);
                 } catch (InterruptedException interruptedException) {
                     Thread.currentThread().interrupt();
+                    retryState.release();
                     throw exception;
                 }
             }
@@ -162,18 +164,32 @@ public final class DefaultRetryRunner {
                                              String logContext,
                                              RetryEventEmitter retryEventEmitter) {
         return Flux.defer(() -> {
+            AtomicBoolean emitted = new AtomicBoolean();
+            return attemptPublisher(supplier, retryState, logContext, retryEventEmitter)
+                .doOnNext(value -> emitted.set(true))
+                .doFinally(signalType -> {
+                    // once, whatever the retries: ON_ERROR is reported by retryPublisher, and a
+                    // cancellation is a success only once the publisher produced a value
+                    if (signalType == SignalType.ON_COMPLETE || signalType == SignalType.CANCEL && emitted.get()) {
+                        retryState.close(null);
+                    } else if (signalType == SignalType.CANCEL) {
+                        retryState.onCancel();
+                    }
+                });
+        });
+    }
+
+    private <T> Flux<T> attemptPublisher(Supplier<? extends Publisher<T>> supplier,
+                                         MutableRetryState retryState,
+                                         String logContext,
+                                         RetryEventEmitter retryEventEmitter) {
+        return Flux.<T>defer(() -> {
             try {
                 return Flux.from(Objects.requireNonNull(supplier.get(), "supplier returned null publisher"));
             } catch (Exception exception) {
                 return Flux.error(exception);
             }
-        }).onErrorResume(retryPublisher(supplier, retryState, logContext, retryEventEmitter))
-            .doFinally(signalType -> {
-                // ON_ERROR: retryPublisher already calls retryState.close(exception) when retries are exhausted
-                if (signalType != SignalType.ON_ERROR) {
-                    retryState.close(null);
-                }
-            });
+        }).onErrorResume(retryPublisher(supplier, retryState, logContext, retryEventEmitter));
     }
 
     private <T> void executeScheduledCompletionStage(CompletableFuture<T> future,
@@ -244,7 +260,7 @@ public final class DefaultRetryRunner {
             if (LOG.isDebugEnabled()) {
                 LOG.debug(RETRYING_MESSAGE, logContext, delayMillis, exception.getMessage(), exception);
             }
-            return Flux.defer(() -> executePublisher(supplier, retryState, logContext, retryEventEmitter))
+            return Flux.defer(() -> attemptPublisher(supplier, retryState, logContext, retryEventEmitter))
                 .delaySubscription(Duration.of(delayMillis, ChronoUnit.MILLIS));
         };
     }

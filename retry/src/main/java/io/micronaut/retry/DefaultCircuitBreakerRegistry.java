@@ -15,23 +15,22 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.intercept.CircuitBreakerRetry;
 import io.micronaut.retry.intercept.DefaultRetryRunner;
+import io.micronaut.retry.intercept.NamedCircuits;
 import io.micronaut.retry.intercept.RetryEventEmitter;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -44,108 +43,80 @@ import java.util.concurrent.ScheduledExecutorService;
  */
 @Internal
 @Singleton
-public final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
+final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
 
     private static final RetryEventEmitter NO_OP_EVENT_EMITTER = (retryState, exception) -> { };
 
-    private final Map<String, NamedCircuitBreakerConfiguration> configurations = new ConcurrentHashMap<>();
-    private final Map<String, CircuitBreakerRetry.Circuit> circuits = new ConcurrentHashMap<>();
+    private final NamedCircuits circuits;
+    @Nullable
+    private final ApplicationEventPublisher eventPublisher;
     private final Map<String, CircuitBreakerOperations> configured = new ConcurrentHashMap<>();
     private final Map<String, CircuitBreakerGuard> guards = new ConcurrentHashMap<>();
     private final DefaultRetryRunner retryRunner;
 
     /**
-     * @param configurations  The configured circuit breakers
+     * @param circuits        The named circuits
+     * @param eventPublisher  To publish the events of the circuits
      * @param executorService The scheduler of the delayed retries
      */
     @Inject
-    public DefaultCircuitBreakerRegistry(List<NamedCircuitBreakerConfiguration> configurations,
-                                         @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
-        for (NamedCircuitBreakerConfiguration configuration : configurations) {
-            this.configurations.put(configuration.getName(), configuration);
-        }
+    DefaultCircuitBreakerRegistry(NamedCircuits circuits,
+                                  @Nullable ApplicationEventPublisher eventPublisher,
+                                  @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
+        this.circuits = circuits;
+        this.eventPublisher = eventPublisher;
         this.retryRunner = new DefaultRetryRunner((ScheduledExecutorService) executorService, Thread::sleep);
     }
 
     @Override
     public CircuitBreakerOperations circuitBreaker(String name) {
         Objects.requireNonNull(name, "name");
-        return configured.computeIfAbsent(name, n -> {
-            NamedCircuitBreakerConfiguration configuration = configurations.get(n);
-            CircuitBreakerPolicy policy = configuration == null ? CircuitBreakerPolicy.builder().build() : configuration.toPolicy();
-            return operations(n, policy);
-        });
+        return configured.computeIfAbsent(name, n -> operations(n, circuits.policy(n), "CircuitBreakerRegistry.circuitBreaker(\"" + n + "\")"));
     }
 
     @Override
     public CircuitBreakerOperations circuitBreaker(String name, CircuitBreakerPolicy policy) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(policy, "policy");
-        return operations(name, policy);
+        return operations(name, policy, "CircuitBreakerRegistry.circuitBreaker(\"" + name + "\", policy)");
     }
 
-    private CircuitBreakerOperations operations(String name, CircuitBreakerPolicy policy) {
-        return new DefaultCircuitBreakerOperations(policy, sharedCircuit(name, policy), name, retryRunner, NO_OP_EVENT_EMITTER);
-    }
-
-    /**
-     * The circuit of a name: the existing one, or a new one with the reset timeout and the
-     * rolling window of the configuration of the name, or else of the given policy.
-     *
-     * @param name   The name
-     * @param policy The policy of a new circuit that is not configured
-     * @return The circuit
-     */
-    public CircuitBreakerRetry.Circuit sharedCircuit(String name, CircuitBreakerPolicy policy) {
-        return circuits.computeIfAbsent(name, n -> {
-            NamedCircuitBreakerConfiguration configuration = configurations.get(n);
-            CircuitBreakerPolicy circuitPolicy = configuration == null ? policy : configuration.toPolicy();
-            return new CircuitBreakerRetry.Circuit(circuitPolicy.getResetTimeout().toMillis(), circuitPolicy.window());
-        });
+    private CircuitBreakerOperations operations(String name, CircuitBreakerPolicy policy, String user) {
+        CircuitBreakerRetry.Circuit circuit = circuits.join(name, policy, false, user);
+        return new DefaultCircuitBreakerOperations(policy, circuit, name, eventPublisher, retryRunner, NO_OP_EVENT_EMITTER);
     }
 
     @Override
     public CircuitBreakerGuard guard(String name) {
         Objects.requireNonNull(name, "name");
-        return guards.computeIfAbsent(name, n -> new DefaultCircuitBreakerGuard(n, sharedCircuit(n, CircuitBreakerPolicy.builder().build())));
+        return guards.computeIfAbsent(name, n -> new DefaultCircuitBreakerGuard(
+            n,
+            circuits.join(n, circuits.policy(n), false, "CircuitBreakerRegistry.guard(\"" + n + "\")"),
+            eventPublisher
+        ));
     }
 
     @Override
     public Optional<CircuitState> findState(String name) {
-        CircuitBreakerRetry.Circuit circuit = circuits.get(name);
-        if (circuit == null) {
-            return configurations.containsKey(name) ? Optional.of(CircuitState.CLOSED) : Optional.empty();
-        }
-        CircuitState state = circuit.getState();
-        if (state == CircuitState.OPEN && circuit.hasOpenTimeoutElapsed()) {
-            return Optional.of(CircuitState.HALF_OPEN);
-        }
-        return Optional.of(state);
+        return findSnapshot(name).map(CircuitBreakerSnapshot::state);
     }
 
     @Override
     public Optional<CircuitBreakerSnapshot> findSnapshot(String name) {
-        CircuitBreakerRetry.Circuit circuit = circuits.get(name);
-        if (circuit == null) {
-            NamedCircuitBreakerConfiguration configuration = configurations.get(name);
-            if (configuration == null) {
-                return Optional.empty();
-            }
-            CircuitBreakerPolicy.Window window = configuration.toPolicy().window();
-            return Optional.of(new CircuitBreakerSnapshot(name, CircuitState.CLOSED, window == null ? 0 : window.requestVolumeThreshold(),
-                0, 0, 0, 0, 0, null));
+        CircuitBreakerRetry.Circuit circuit = circuits.find(name);
+        if (circuit != null) {
+            return Optional.of(circuit.snapshot(name));
         }
-        CircuitState state = findState(name).orElse(CircuitState.CLOSED);
-        long[] counters = circuit.counters();
-        CircuitBreakerPolicy.Window window = circuit.getWindow();
-        return Optional.of(new CircuitBreakerSnapshot(name, state, window == null ? 0 : window.requestVolumeThreshold(),
-            (int) counters[0], (int) counters[1], (int) counters[2], (int) counters[3], counters[4], Instant.ofEpochMilli(counters[5])));
+        if (circuits.findConfiguration(name) == null) {
+            return Optional.empty();
+        }
+        CircuitBreakerPolicy.Window window = circuits.policy(name).window();
+        return Optional.of(new CircuitBreakerSnapshot(name, CircuitState.CLOSED, window == null ? 0 : window.requestVolumeThreshold(),
+            0, 0, 0, 0, 0, null));
     }
 
     @Override
     public Set<String> getNames() {
-        Set<String> names = new TreeSet<>(configurations.keySet());
-        names.addAll(circuits.keySet());
-        return Collections.unmodifiableSet(names);
+        return circuits.names();
     }
 }

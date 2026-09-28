@@ -32,7 +32,8 @@ import java.time.Instant;
  * @param trials                 The trial calls a half-open circuit permitted
  * @param successes              The trial calls of a half-open circuit that succeeded
  * @param openedCount            The number of times the circuit opened
- * @param since                  When the circuit last changed state, or {@code null} if it was never used
+ * @param since                  When the circuit was created or last changed state, or {@code null} for a
+ *                               configured circuit that was not used yet
  * @author Denis Stepanov
  * @since 5.3.0
  */
