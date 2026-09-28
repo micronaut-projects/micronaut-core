@@ -851,12 +851,46 @@ class Lowering:
         if node.exc is None or node.cause is not None:
             self._refuse("unsupported-statement", "a bare raise or a raise ... from has no static lowering", node)
         raised = self._typed(node.exc)
+        if raised is not None and raised.kind == PY:
+            # an exception class of the compilation: its generated class is a Throwable
+            self._throwable_model(raised, node)
+            return Throw(self._expression(node.exc))
         if raised is None or raised.kind != JAVA:
-            self._refuse("python-exception", "raising anything but a Java exception has no static lowering", node)
+            self._refuse("python-exception", "raising anything but a Java exception or an exception class of the compilation has no static lowering", node)
         exception = self._expression(node.exc)
         if not self.checker.facts.isAssignable(_erased(exception.type()), "java.lang.Throwable"):
             self._refuse("python-exception", f"raising a [{_erased(exception.type())}] is not raising a Java exception", node)
         return Throw(exception)
+
+    def _throwable_model(self, typed, node):
+        """The model of an exception class of the compilation a class reference or an object is typed with; refused for any other Python class."""
+        model = self.checker.python_classes.of(typed.name)
+        if model is None or not model.is_throwable():
+            name = model.name if model is not None else typed.label()
+            self._refuse("python-exception", f"[{name}] is not an exception class: it extends neither Exception nor a Java Throwable", node)
+        return model
+
+    def _caught_type(self, handler):
+        """The Java type an except clause catches, with the model when it is an exception class of the compilation."""
+        caught = self._typed(handler.type)
+        if caught is not None and caught.kind == PY_REF:
+            model = self._throwable_model(caught, handler)
+            return self._generated_class(model, handler), model
+        if caught is None or caught.kind != JAVA_REF or not self.checker.facts.isAssignable(caught.name, "java.lang.Throwable"):
+            self._refuse("python-exception", "an except clause naming anything but a Java exception type or an exception class of the compilation has no static lowering", handler)
+        return caught.name, None
+
+    def _already_caught(self, later, earlier):
+        """Whether an except clause for `earlier` catches everything the later clause names, which Java refuses."""
+        later_name, later_model = later
+        earlier_name, earlier_model = earlier
+        if later_model is not None:
+            if earlier_model is not None:
+                return later_model.extends(earlier_model)
+            return self.checker.facts.isAssignable(later_model.throwable_base(), earlier_name)
+        if earlier_model is not None:
+            return False  # a Java exception is never an object of a Python class
+        return self.checker.facts.isAssignable(later_name, earlier_name)
 
     def _try(self, node):
         if node.orelse:
@@ -875,22 +909,22 @@ class Lowering:
         body = Body(self._block(node.body))
         self._end_scope(node, declared_before, later, "the try block")
         catches = []
+        caught_types = []
         for handler in node.handlers:
             if handler.type is None:
                 self._refuse("python-exception", "a bare except clause catches Python exceptions", handler)
-            caught = self._typed(handler.type)
-            if caught is None or caught.kind != JAVA_REF or not self.checker.facts.isAssignable(caught.name, "java.lang.Throwable"):
-                self._refuse("python-exception", "an except clause naming anything but a Java exception type has no static lowering", handler)
+            caught = self._caught_type(handler)
             if handler.name is not None and (handler.name in self.locals or handler.name in self.parameters):
                 self._refuse("unsupported-statement", f"the exception variable [{handler.name}] is already a local or a parameter", handler)
-            for earlier in catches:
-                if self.checker.facts.isAssignable(caught.name, earlier.type()):
-                    self._refuse("unsupported-statement", f"the except clause for [{caught.name}] follows one for [{earlier.type()}] that already catches it", handler)
+            for earlier in caught_types:
+                if self._already_caught(caught, earlier):
+                    self._refuse("unsupported-statement", f"the except clause for [{caught[0]}] follows one for [{earlier[0]}] that already catches it", handler)
+            caught_types.append(caught)
             if handler.name is not None:
-                self.locals[handler.name] = caught.name
+                self.locals[handler.name] = caught[0]
             declared_before = set(self.locals)
             try:
-                catches.append(Catch(caught.name, handler.name, Body(self._block(handler.body))))
+                catches.append(Catch(caught[0], handler.name, Body(self._block(handler.body))))
             finally:
                 if handler.name is not None:
                     del self.locals[handler.name]
@@ -1869,6 +1903,15 @@ class Lowering:
         if constructor is UNKNOWN:
             self._refuse("unsupported-expression", f"the constructor of [{model.name}] is not the compilation's own", node)
         if constructor is None:
+            if model.is_throwable():
+                # Exception(*args): the generated class takes the message, or nothing
+                if node.keywords or len(node.args) > 1:
+                    self._refuse("unsupported-expression", f"constructing [{model.name}] with these arguments has no static lowering: the generated exception class takes a message", node)
+                arguments = [self._expression(argument) for argument in node.args]
+                if arguments and _erased(arguments[0].type()) != STRING:
+                    self._refuse("unsupported-expression", f"constructing [{model.name}] with a [{arguments[0].type()}] has no static lowering: the generated exception class takes a str message", node)
+                self.java_calls += 1
+                return NewJava(owner, [STRING] * len(arguments), arguments)
             if node.args or node.keywords:
                 self._refuse("unsupported-expression", f"[{model.name}] takes no constructor arguments", node)
             self.java_calls += 1
@@ -2092,6 +2135,9 @@ class Lowering:
         kind = _erased(expression.type())
         if kind in STANDARD_TYPES and kind not in STANDARD_STR_TYPES:
             self._refuse("unsupported-expression", f"str() of a [{kind}] spells the value as Python does not", node)
+        model = self.checker.python_classes.by_qualified.get(kind)
+        if model is not None and model.is_throwable():
+            self._refuse("unsupported-expression", f"str() of a [{model.name}] spells the exception as Python does not: the Java class names its type", node)
         return expression
 
     def _conditional(self, node):
