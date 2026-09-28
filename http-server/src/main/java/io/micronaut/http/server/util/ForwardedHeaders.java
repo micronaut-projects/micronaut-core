@@ -91,6 +91,10 @@ public final class ForwardedHeaders {
     private static final int HTTP_PORT = 80;
     private static final int HTTPS_PORT = 443;
     private static final String UNKNOWN = "unknown";
+    // the parameters of a Forwarded element (RFC 7239 section 5)
+    private static final String FOR = "for";
+    private static final String PROTO = "proto";
+    private static final String HOST = "host";
 
     private final Predicate<? super InetSocketAddress> trustedProxy;
     private final boolean xForwarded;
@@ -181,13 +185,13 @@ public final class ForwardedHeaders {
                 String forwardedProto = null;
                 String firstHost = null;
                 for (Map<String, String> element : elements) {
-                    String address = element.get("for");
+                    String address = element.get(FOR);
                     addresses.add(address == null ? UNKNOWN : toXForwardedFor(address));
                     if (forwardedProto == null) {
-                        forwardedProto = element.get("proto");
+                        forwardedProto = element.get(PROTO);
                     }
                     if (firstHost == null) {
-                        firstHost = element.get("host");
+                        firstHost = element.get(HOST);
                     }
                 }
                 if (inboundFor == null && !addresses.isEmpty()) {
@@ -452,16 +456,16 @@ public final class ForwardedHeaders {
     private static boolean dropInvalidValues(List<Map<String, String>> elements) {
         boolean dropped = false;
         for (Map<String, String> element : elements) {
-            String proto = element.get("proto");
+            String proto = element.get(PROTO);
             if (proto != null && validScheme(proto) == null) {
-                element.remove("proto");
+                element.remove(PROTO);
                 dropped = true;
             }
-            String host = element.get("host");
+            String host = element.get(HOST);
             if (host != null) {
                 String valid = Objects.requireNonNull(validHost(host));
                 if (!valid.equals(host)) {
-                    element.put("host", valid);
+                    element.put(HOST, valid);
                     dropped = true;
                 }
             }
