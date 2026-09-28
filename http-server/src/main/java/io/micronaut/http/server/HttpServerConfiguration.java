@@ -925,10 +925,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         public static final boolean DEFAULT_ENABLED = false;
         public static final boolean DEFAULT_SINGLE_HEADER = false;
         public static final boolean DEFAULT_LOCALHOST_PASS_THROUGH = false;
+        public static final boolean DEFAULT_REJECT_DISALLOWED_ORIGINS = false;
 
         private boolean enabled = DEFAULT_ENABLED;
         private boolean singleHeader = DEFAULT_SINGLE_HEADER;
         private boolean localhostPassThrough = DEFAULT_LOCALHOST_PASS_THROUGH;
+        private boolean rejectDisallowedOrigins = DEFAULT_REJECT_DISALLOWED_ORIGINS;
         private @Nullable CrossOriginEmbedderPolicy crossOriginEmbedderPolicy;
         private @Nullable CrossOriginResourcePolicy crossOriginResourcePolicy;
 
@@ -950,6 +952,25 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          */
         public boolean isLocalhostPassThrough() {
             return localhostPassThrough;
+        }
+
+        /**
+         * @return Whether a cross-origin request from an origin that no CORS configuration allows is rejected. Defaults to {@value #DEFAULT_REJECT_DISALLOWED_ORIGINS}.
+         * @since 5.3.0
+         */
+        public boolean isRejectDisallowedOrigins() {
+            return rejectDisallowedOrigins;
+        }
+
+        /**
+         * Sets whether a cross-origin request from an origin that no CORS configuration allows is answered with 403.
+         * Default value {@value #DEFAULT_REJECT_DISALLOWED_ORIGINS}. Same-origin requests are never rejected.
+         *
+         * @param rejectDisallowedOrigins True to reject requests from disallowed origins
+         * @since 5.3.0
+         */
+        public void setRejectDisallowedOrigins(boolean rejectDisallowedOrigins) {
+            this.rejectDisallowedOrigins = rejectDisallowedOrigins;
         }
 
         /**

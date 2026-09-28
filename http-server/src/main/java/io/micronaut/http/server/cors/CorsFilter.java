@@ -49,6 +49,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -179,6 +180,10 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             LOG.trace("The request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
             return forbidden();
         }
+        if (shouldRejectDisallowedOrigin(origin, request)) {
+            LOG.trace("No CORS configuration allows the origin {}. The request is forbidden", origin);
+            return forbidden();
+        }
         LOG.trace("CORS configuration not found for {} origin", origin);
         return null; // proceed
     }
@@ -237,6 +242,39 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         }
         String host = httpHostResolver.resolve(request);
         return !isOriginLocal(origin) && isHostLocal(host);
+    }
+
+    private boolean shouldRejectDisallowedOrigin(String origin, HttpRequest<?> request) {
+        if (!corsConfiguration.isRejectDisallowedOrigins() || httpHostResolver == null) {
+            return false;
+        }
+        if (!corsConfiguration.isEnabled() && CrossOriginUtil.getCorsOriginConfigurationForRequest(request).isEmpty()) {
+            return false;
+        }
+        return !isSameOrigin(origin, httpHostResolver.resolve(request));
+    }
+
+    private static boolean isSameOrigin(String origin, String host) {
+        try {
+            URI originUri = URI.create(origin);
+            URI hostUri = URI.create(host);
+            String scheme = originUri.getScheme();
+            return scheme != null
+                && scheme.equalsIgnoreCase(hostUri.getScheme())
+                && originUri.getHost() != null
+                && originUri.getHost().equalsIgnoreCase(hostUri.getHost())
+                && effectivePort(originUri) == effectivePort(hostUri);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+        return scheme.equals("https") || scheme.equals("wss") ? 443 : 80;
     }
 
     /*

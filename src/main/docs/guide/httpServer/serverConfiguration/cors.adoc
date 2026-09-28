@@ -2,4 +2,6 @@ The Micronaut framework supports CORS (link:https://www.w3.org/TR/cors/[Cross Or
 
 When CORS is enabled, or a matching route is annotated with ann:http.server.cors.CrossOrigin[], a preflight request from an origin that no configuration allows is answered with `403 Forbidden` and does not reach your routes.
 
+A browser does not send a preflight for a "simple" request, such as a form `POST`, so such a request from a disallowed origin reaches your route and only its response is hidden from the page. To answer these requests with `403 Forbidden` as well, set `micronaut.server.cors.reject-disallowed-origins` to `true`. It applies where CORS applies, and same-origin requests, determined with the api:http.server.util.HttpHostResolver[], are never rejected, so make sure the resolver reports the host your clients use when the application runs behind a proxy.
+
 TIP: See the guide for https://guides.micronaut.io/latest/micronaut-cors.html[Configure CORS in a Micronaut Application] to learn more.
