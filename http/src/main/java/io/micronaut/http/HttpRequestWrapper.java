@@ -145,6 +145,12 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
      * e.g. a wrapper a filter continued with that returns a replacement from {@code getBody()}:
      * the bytes of the requests it wraps are then not its body.
      *
+     * <p>A wrapper that cannot have replaced the body is never asked for it: a plain
+     * {@link HttpRequestWrapper}, a {@link MutableHttpRequestWrapper} whose body was not set and
+     * a {@link BodyPreservingRequestWrapper}. Asking a wrapper for its body decodes the body of
+     * the request it wraps, and a request may decode a new body on each call. Any other wrapper
+     * replaced the body if its body is not, by identity, the body of the request it wraps.</p>
+     *
      * @param request The request
      * @return Whether it is a wrapper that replaced the body of the request it wraps
      * @since 5.3.0
@@ -152,9 +158,19 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     @Internal
     @SuppressWarnings("ReferenceEquality") // by identity
     public static boolean replacesBody(HttpRequest<?> request) {
+        if (!(request instanceof HttpRequestWrapper<?> wrapper) || request instanceof BodyPreservingRequestWrapper) {
+            return false;
+        }
+        Class<?> type = wrapper.getClass();
+        if (type == HttpRequestWrapper.class) {
+            // does not override getBody
+            return false;
+        }
+        if (type == MutableHttpRequestWrapper.class) {
+            return ((MutableHttpRequestWrapper<?>) wrapper).isBodySet();
+        }
         // by identity: a replacement that only compares equal, e.g. a sanitized copy, is still a replacement
-        return request instanceof HttpRequestWrapper<?> wrapper
-            && wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null);
+        return wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null);
     }
 
     /**

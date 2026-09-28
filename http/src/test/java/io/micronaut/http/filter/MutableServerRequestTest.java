@@ -185,6 +185,16 @@ class MutableServerRequestTest {
     }
 
     @Test
+    void theWrapperKeepsTheBytesOfARequestThatDecodesANewBodyOnEachCall() {
+        // e.g. a server that decodes the body lazily: a plain wrapper around it did not replace the body
+        ServerRequest server = new ServerRequest(new FreshBodyRequest(), "body");
+
+        MutableHttpRequest<?> mutable = MutableServerRequest.mutable(new HttpRequestWrapper<>(server));
+
+        assertSame(server.byteBody(), ((DirectByteBodyAccess) mutable).byteBodyDirect());
+    }
+
+    @Test
     void theWrapperAddsACookieToTheHeadersOfTheRequest() {
         SimpleHttpRequest<Object> request = new SimpleHttpRequest<>(HttpMethod.GET, "/items", null);
         MutableHttpRequest<?> mutable = MutableServerRequest.of(new ImmutableRequest(request));
@@ -233,6 +243,20 @@ class MutableServerRequestTest {
         @SuppressWarnings("unchecked")
         ImmutableRequest(HttpRequest<?> delegate) {
             super((HttpRequest<Object>) delegate);
+        }
+    }
+
+    /**
+     * A request that decodes a new body on each call.
+     */
+    private static final class FreshBodyRequest extends SimpleHttpRequest<Object> {
+        FreshBodyRequest() {
+            super(HttpMethod.POST, "/items", null);
+        }
+
+        @Override
+        public Optional<Object> getBody() {
+            return Optional.of(new Object());
         }
     }
 
