@@ -57,6 +57,7 @@ import java.util.concurrent.ScheduledExecutorService;
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
+    private static final String NAME = "name";
     private final ConversionService conversionService;
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
@@ -65,7 +66,12 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private final DefaultRetryRunner retryRunner;
     @Nullable
     private final RetryRegistry retryRegistry;
-    private final Map<ExecutableMethod, RetryPolicy> namedPolicies = new ConcurrentHashMap<>();
+    /**
+     * The policies of the methods with a named policy, by their {@code @Retryable} value, from
+     * which alone the policy is built: methods of different beans can share an
+     * {@link ExecutableMethod} that is equal, e.g. one inherited from a common superclass.
+     */
+    private final Map<AnnotationValue<Retryable>, RetryPolicy> namedPolicies = new ConcurrentHashMap<>();
 
     /**
      * Construct a default retry method interceptor with the event publisher.
@@ -123,9 +129,25 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         AnnotationRetryStateBuilder annotationRetryStateBuilder = new AnnotationRetryStateBuilder(
             context
         );
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
+
+        String name = retry.stringValue(NAME).orElse("");
+        RetryPolicy namedPolicy = null;
+        if (!name.isEmpty()) {
+            try {
+                namedPolicy = namedPolicies.computeIfAbsent(
+                    retry,
+                    value -> annotationRetryStateBuilder.retryPolicy(namedPolicy(name, context))
+                );
+            } catch (RuntimeException e) {
+                return interceptedMethod.handleException(e);
+            }
+        }
 
         if (isCircuitBreaker) {
-            CircuitBreakerPolicy circuitBreakerPolicy = annotationRetryStateBuilder.circuitBreakerPolicy();
+            CircuitBreakerPolicy circuitBreakerPolicy = namedPolicy == null
+                ? annotationRetryStateBuilder.circuitBreakerPolicy()
+                : annotationRetryStateBuilder.circuitBreakerPolicy(namedPolicy);
             long timeout = circuitBreakerPolicy.getResetTimeout().toMillis();
             boolean wrapException = circuitBreakerPolicy.isThrowWrappedException();
             PolicyRetryStateBuilder retryStateBuilder = new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy());
@@ -133,23 +155,15 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 context.getExecutableMethod(),
                 method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
             );
+        } else if (namedPolicy == null) {
+            retryState = (MutableRetryState) annotationRetryStateBuilder.build();
         } else {
-            String name = retry.stringValue("name").orElse("");
-            if (name.isEmpty()) {
-                retryState = (MutableRetryState) annotationRetryStateBuilder.build();
-            } else {
-                RetryPolicy policy = namedPolicies.computeIfAbsent(
-                    context.getExecutableMethod(),
-                    method -> annotationRetryStateBuilder.retryPolicy(namedPolicy(name, context))
-                );
-                retryState = (MutableRetryState) new PolicyRetryStateBuilder(policy).build();
-            }
+            retryState = (MutableRetryState) new PolicyRetryStateBuilder(namedPolicy).build();
         }
 
         MutableConvertibleValues<Object> attrs = context.getAttributes();
         attrs.put(RetryState.class.getName(), retry);
 
-        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             retryState.open();
             switch (interceptedMethod.resultType()) {

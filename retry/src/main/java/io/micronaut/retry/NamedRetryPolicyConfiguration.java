@@ -18,6 +18,7 @@ package io.micronaut.retry;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.reflect.ClassUtils;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -60,8 +61,8 @@ public class NamedRetryPolicyConfiguration {
     private Duration maxDelay;
     private double multiplier = RetryPolicy.DEFAULT_MULTIPLIER;
     private double jitter = RetryPolicy.DEFAULT_JITTER;
-    private List<Class<?>> includes = new ArrayList<>();
-    private List<Class<?>> excludes = new ArrayList<>();
+    private List<String> includes = new ArrayList<>();
+    private List<String> excludes = new ArrayList<>();
 
     /**
      * @param name The name of the retry policy
@@ -78,14 +79,15 @@ public class NamedRetryPolicyConfiguration {
     }
 
     /**
-     * @return The maximum number of attempts
+     * @return The maximum number of retries, after the first call
      */
     public int getAttempts() {
         return attempts;
     }
 
     /**
-     * @param attempts The maximum number of attempts, default 3
+     * @param attempts The maximum number of retries, after the first call, default 3; e.g. 1
+     *                 calls the method at most twice
      */
     public void setAttempts(int attempts) {
         this.attempts = attempts;
@@ -148,36 +150,43 @@ public class NamedRetryPolicyConfiguration {
     }
 
     /**
-     * @return The exception types to retry, all if empty
+     * @return The fully qualified names of the exception types to retry, all if empty
      */
-    public List<Class<?>> getIncludes() {
+    public List<String> getIncludes() {
         return includes;
     }
 
     /**
-     * @param includes The exception types to retry, default all
+     * The exception types to retry, by fully qualified name. A name that is not a class on the
+     * classpath fails {@link #toPolicy()}, rather than being dropped.
+     *
+     * @param includes The names of the exception types to retry, default all
      */
-    public void setIncludes(List<Class<?>> includes) {
+    public void setIncludes(List<String> includes) {
         this.includes = includes;
     }
 
     /**
-     * @return The exception types not to retry
+     * @return The fully qualified names of the exception types not to retry
      */
-    public List<Class<?>> getExcludes() {
+    public List<String> getExcludes() {
         return excludes;
     }
 
     /**
-     * @param excludes The exception types not to retry, default none
+     * The exception types not to retry, by fully qualified name. A name that is not a class on
+     * the classpath fails {@link #toPolicy()}, rather than being dropped.
+     *
+     * @param excludes The names of the exception types not to retry, default none
      */
-    public void setExcludes(List<Class<?>> excludes) {
+    public void setExcludes(List<String> excludes) {
         this.excludes = excludes;
     }
 
     /**
      * @return The policy of the configuration
-     * @throws IllegalArgumentException if a value is invalid, e.g. an include that is not a {@link Throwable}
+     * @throws IllegalArgumentException if a value is invalid, e.g. an include that is not the
+     * name of a {@link Throwable} class
      */
     public RetryPolicy toPolicy() {
         try {
@@ -197,10 +206,14 @@ public class NamedRetryPolicyConfiguration {
     }
 
     @SuppressWarnings("unchecked")
-    private static Class<? extends Throwable>[] throwables(List<Class<?>> types, String member) {
-        Class<? extends Throwable>[] result = new Class[types.size()];
+    private static Class<? extends Throwable>[] throwables(List<String> typeNames, String member) {
+        ClassLoader classLoader = NamedRetryPolicyConfiguration.class.getClassLoader();
+        Class<? extends Throwable>[] result = new Class[typeNames.size()];
         for (int i = 0; i < result.length; i++) {
-            Class<?> type = types.get(i);
+            String typeName = typeNames.get(i).strip();
+            Class<?> type = ClassUtils.forName(typeName, classLoader).orElseThrow(() ->
+                new IllegalArgumentException(member + " must be exception types, class not found: " + typeName)
+            );
             if (!Throwable.class.isAssignableFrom(type)) {
                 throw new IllegalArgumentException(member + " must be exception types, got " + type.getName());
             }

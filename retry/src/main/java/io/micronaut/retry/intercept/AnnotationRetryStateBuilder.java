@@ -125,9 +125,18 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     }
 
     CircuitBreakerPolicy circuitBreakerPolicy() {
+        return circuitBreakerPolicy(retryPolicy());
+    }
+
+    /**
+     * The policy of the circuit breaker annotation, which retries with the given policy.
+     *
+     * @param retryPolicy The retry policy, e.g. the one of the annotation over a named policy
+     * @return The policy
+     */
+    CircuitBreakerPolicy circuitBreakerPolicy(RetryPolicy retryPolicy) {
         AnnotationValue<CircuitBreaker> circuitBreaker = annotationMetadata.findAnnotation(CircuitBreaker.class)
             .orElseThrow(() -> new IllegalStateException("Missing @CircuitBreaker annotation"));
-        RetryPolicy retryPolicy = retryPolicy();
         CircuitBreakerPolicy.Builder builder = CircuitBreakerPolicy.builder()
             .maxAttempts(retryPolicy.maxAttempts())
             .delay(retryPolicy.delay())

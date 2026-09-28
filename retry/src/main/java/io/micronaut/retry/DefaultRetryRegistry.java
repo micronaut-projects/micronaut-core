@@ -28,7 +28,8 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The default {@link RetryRegistry}.
+ * The default {@link RetryRegistry}. A policy is built from its configuration on first use, so an
+ * invalid policy fails its own users only; {@link NamedRetryPolicyValidator} reports it at startup.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -37,21 +38,26 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 final class DefaultRetryRegistry implements RetryRegistry {
 
-    private final Map<String, RetryPolicy> policies = new TreeMap<>();
+    private final Map<String, NamedRetryPolicyConfiguration> configurations = new TreeMap<>();
+    private final Map<String, RetryPolicy> policies = new ConcurrentHashMap<>();
     private final Map<String, RetryOperations> operations = new ConcurrentHashMap<>();
     private final RetryOperationsFactory retryOperationsFactory;
 
     DefaultRetryRegistry(List<NamedRetryPolicyConfiguration> configurations,
                          RetryOperationsFactory retryOperationsFactory) {
         for (NamedRetryPolicyConfiguration configuration : configurations) {
-            policies.put(configuration.getName(), configuration.toPolicy());
+            this.configurations.put(configuration.getName(), configuration);
         }
         this.retryOperationsFactory = retryOperationsFactory;
     }
 
     @Override
     public Optional<RetryPolicy> findPolicy(String name) {
-        return Optional.ofNullable(policies.get(Objects.requireNonNull(name, "name")));
+        NamedRetryPolicyConfiguration configuration = configurations.get(Objects.requireNonNull(name, "name"));
+        if (configuration == null) {
+            return Optional.empty();
+        }
+        return Optional.of(policies.computeIfAbsent(name, n -> configuration.toPolicy()));
     }
 
     @Override
@@ -62,6 +68,6 @@ final class DefaultRetryRegistry implements RetryRegistry {
 
     @Override
     public Set<String> getNames() {
-        return Collections.unmodifiableSet(policies.keySet());
+        return Collections.unmodifiableSet(configurations.keySet());
     }
 }

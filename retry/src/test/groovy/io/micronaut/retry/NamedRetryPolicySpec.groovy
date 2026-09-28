@@ -182,7 +182,7 @@ class NamedRetryPolicySpec extends Specification {
         when:
         ApplicationContext.run([
             'micronaut.retry.policies.bad.includes': [String.name],
-        ]).withCloseable { it.getBean(RetryRegistry) }
+        ]).close()
 
         then:
         Exception e = thrown()
