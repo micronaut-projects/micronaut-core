@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
@@ -760,6 +761,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      * @return {@code true} to reject such a path; {@code false}, the default, to route it
      * @since 5.3.0
      */
+    @Experimental
     public boolean isStrictPathCheck() {
         return strictPathCheck;
     }
@@ -769,6 +771,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      * @see #isStrictPathCheck()
      * @since 5.3.0
      */
+    @Experimental
     public void setStrictPathCheck(boolean strictPathCheck) {
         this.strictPathCheck = strictPathCheck;
     }
@@ -781,6 +784,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      * @return {@code true} to allow semicolons; {@code false}, the default, to reject them
      * @since 5.3.0
      */
+    @Experimental
     public boolean isStrictPathCheckAllowSemicolon() {
         return strictPathCheckAllowSemicolon;
     }
@@ -790,6 +794,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      * @see #isStrictPathCheckAllowSemicolon()
      * @since 5.3.0
      */
+    @Experimental
     public void setStrictPathCheckAllowSemicolon(boolean strictPathCheckAllowSemicolon) {
         this.strictPathCheckAllowSemicolon = strictPathCheckAllowSemicolon;
     }
