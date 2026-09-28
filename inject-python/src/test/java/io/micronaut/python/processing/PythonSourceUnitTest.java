@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 final class PythonSourceUnitTest {
 
-    private static final List<String> MODULES = List.of("test_micronaut_processor", "test_micronaut_transformer");
+    private static final List<String> MODULES = List.of("test_micronaut_processor", "test_micronaut_transformer", "test_micronaut_typecheck");
 
     @Test
     void pythonUnitTestsPass() throws IOException {
