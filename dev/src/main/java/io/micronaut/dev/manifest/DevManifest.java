@@ -69,7 +69,6 @@ import java.util.Properties;
  * micronaut.dev.build-tool=gradle
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
- * micronaut.dev.livereload.enabled=auto
  * </pre>
  *
  * @author graemerocher
@@ -135,7 +134,6 @@ public final class DevManifest {
         this.buildToolTrigger = trigger == null ? null : path(directory, trigger);
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
         this.liveReload = new LiveReload(
-            properties.getProperty(PREFIX + "livereload.enabled", "auto").trim().toLowerCase(Locale.ROOT),
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
             Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true"))
         );
@@ -458,24 +456,9 @@ public final class DevManifest {
     /**
      * The LiveReload settings.
      *
-     * @param enabled {@code true}, {@code false} or {@code auto} (on when a static or views root is present)
      * @param port The port the LiveReload server listens on
      * @param injectScript Whether the client script is added to HTML responses
      */
-    public record LiveReload(String enabled, int port, boolean injectScript) {
-
-        /**
-         * Whether the server runs, given whether static or view resources are served.
-         *
-         * @param servesStaticOrViews Whether the manifest has a static or views root
-         * @return True if the server runs
-         */
-        public boolean isEnabled(boolean servesStaticOrViews) {
-            return switch (enabled) {
-                case "true" -> true;
-                case "false" -> false;
-                default -> servesStaticOrViews;
-            };
-        }
+    public record LiveReload(int port, boolean injectScript) {
     }
 }

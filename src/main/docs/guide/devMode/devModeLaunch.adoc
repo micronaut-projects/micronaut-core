@@ -24,3 +24,7 @@ java -cp @build/micronaut-dev/runtime.argfile io.micronaut.dev.MicronautDevMain 
 The launcher compiles every language whose class output does not exist yet, so it works from a clean checkout, then runs the application's own `main` on a thread of its own. The application does what it always does, `Micronaut.run(Application.class, args)`; an `ApplicationContextConfigurer` the module ships gives the context the reloadable loader, the `dev` environment, `micronaut.dev.enabled=true`, and the beans retained from the previous generation.
 
 TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property, and api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@Requires(condition = DevelopmentMode.Active.class)`.
+
+=== LiveReload
+
+Add `micronaut-dev-livereload` to the development runtime classpath and the launcher starts a LiveReload server on port 35729 (`micronaut.dev.livereload.port`): browsers reload when the application restarted or a template changed, and swap a stylesheet in place when only a stylesheet changed. Pages get the client script appended before their closing body tag (`micronaut.dev.livereload.inject-script=false` for users of a browser extension), and a api:dev.livereload.LiveReloadTrigger[] bean lets a module ask for a refresh. Adding the module is the switch: there is no other setting to turn it on.
