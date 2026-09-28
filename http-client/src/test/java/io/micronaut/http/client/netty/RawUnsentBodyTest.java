@@ -18,6 +18,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -68,6 +71,34 @@ class RawUnsentBodyTest {
             AtomicBoolean cancelled = new AtomicBoolean();
             UnprocessedRequestException e = exchange(client.toAsyncRaw(), streamed(cancelled), RawRequestOptions.proxy());
             Assertions.assertTrue(e.takeUnsentBody().isEmpty());
+        }
+    }
+
+    @Test
+    void aBodySentBeforeARedirectIsNotHandedBack() throws Exception {
+        int closedPort = SocketUtils.findAvailableTcpPort();
+        try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+             ApplicationContext ctx = ApplicationContext.run();
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            Thread redirector = new Thread(() -> {
+                try (Socket socket = server.accept()) {
+                    // read the request with its body, then redirect to a port nobody listens on
+                    socket.getInputStream().readNBytes(1);
+                    Thread.sleep(200);
+                    socket.getOutputStream().write(("HTTP/1.1 307 Temporary Redirect\r\nLocation: http://127.0.0.1:" + closedPort + "/unsent\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                    socket.getOutputStream().flush();
+                    Thread.sleep(200);
+                } catch (Exception ignored) {
+                }
+            });
+            redirector.start();
+            HttpRequest<?> request = HttpRequest.create(HttpMethod.POST, "http://127.0.0.1:" + server.getLocalPort() + "/unsent");
+            ExecutionException e = Assertions.assertThrows(ExecutionException.class,
+                () -> client.toAsyncRaw().exchange(request, streamed(new AtomicBoolean()), RawRequestOptions.builder().returnUnsentBody(true).build()).toCompletableFuture().get(10, TimeUnit.SECONDS));
+            UnprocessedRequestException unprocessed = Assertions.assertInstanceOf(UnprocessedRequestException.class, e.getCause());
+            Assertions.assertFalse(unprocessed.isBodyUntouched());
+            Assertions.assertTrue(unprocessed.takeUnsentBody().isEmpty(), "the body went to the first server");
+            redirector.join();
         }
     }
 }

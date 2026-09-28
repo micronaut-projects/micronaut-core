@@ -16,7 +16,10 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpStatusClass;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -52,6 +55,32 @@ final class RequestReadIdleTimeoutHandler extends ReadTimeoutHandler {
 
     RequestReadIdleTimeoutHandler(Duration timeout) {
         super(timeout.toNanos(), TimeUnit.NANOSECONDS);
+    }
+
+    /**
+     * Give an exchange its own read timeout. The stream of an HTTP/2 exchange gets it in place
+     * of the read timeout of the client; an HTTP/1 connection suspends its own read timeout while
+     * the exchange runs.
+     *
+     * @param http2           Whether the exchange is an HTTP/2 stream
+     * @param pipeline        The pipeline of the exchange
+     * @param readIdleTimeout The read timeout of the exchange
+     */
+    static void install(boolean http2, ChannelPipeline pipeline, Duration readIdleTimeout) {
+        if (http2) {
+            ChannelHandler current = pipeline.get(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
+            StreamReadTimeoutHandler.Connection connection = current instanceof StreamReadTimeoutHandler stream
+                ? stream.connection() : StreamReadTimeoutHandler.Connection.NONE;
+            StreamReadTimeoutHandler handler = new StreamReadTimeoutHandler(readIdleTimeout, connection);
+            if (current != null) {
+                pipeline.replace(current, ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, handler);
+            } else {
+                pipeline.addFirst(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, handler);
+            }
+        } else {
+            pipeline.addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, RequestReadIdleTimeoutHandler.NAME,
+                new RequestReadIdleTimeoutHandler(readIdleTimeout));
+        }
     }
 
     @Override

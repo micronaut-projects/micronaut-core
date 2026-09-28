@@ -1717,6 +1717,13 @@ final class NettyHttpClient implements
                         .flatMap(target -> {
                             setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
                             return sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(target.uri()), target.instance(), readResponse);
+                        })
+                        .onErrorResume(e -> {
+                            // the body went to the server that redirected, it is not unsent
+                            if (e instanceof UnprocessedRequestException unprocessed) {
+                                unprocessed.markBodySent();
+                            }
+                            return ExecutionFlow.error(e);
                         });
                 } else {
                     io.micronaut.http.HttpHeaders headers = byteBodyResponse.getHeaders();
@@ -1817,7 +1824,7 @@ final class NettyHttpClient implements
             prepareRequestPipeline(poolHandle, request, instance, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf, onSent);
             Duration readIdleTimeout = request.getAttribute(READ_IDLE_TIMEOUT, Duration.class).orElse(null);
             if (readIdleTimeout != null) {
-                applyReadIdleTimeout(poolHandle, pipeline, readIdleTimeout);
+                RequestReadIdleTimeoutHandler.install(poolHandle.http2, pipeline, readIdleTimeout);
             }
         } catch (Throwable t) {
             // the request was not written, but the pipeline may be half built: don't reuse the
@@ -2149,28 +2156,6 @@ final class NettyHttpClient implements
      *                written
      * @return The promise
      */
-    /**
-     * Give an exchange its own read timeout. The stream of an HTTP/2 exchange gets it in place
-     * of the read timeout of the client; an HTTP/1 connection suspends its own read timeout while
-     * the exchange runs.
-     */
-    private static void applyReadIdleTimeout(ConnectionManager.PoolHandle poolHandle, ChannelPipeline pipeline, Duration readIdleTimeout) {
-        if (poolHandle.http2) {
-            ChannelHandler current = pipeline.get(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-            StreamReadTimeoutHandler.Connection connection = current instanceof StreamReadTimeoutHandler stream
-                ? stream.connection() : StreamReadTimeoutHandler.Connection.NONE;
-            StreamReadTimeoutHandler handler = new StreamReadTimeoutHandler(readIdleTimeout, connection);
-            if (current != null) {
-                pipeline.replace(current, ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, handler);
-            } else {
-                pipeline.addFirst(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, handler);
-            }
-        } else {
-            pipeline.addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, RequestReadIdleTimeoutHandler.NAME,
-                new RequestReadIdleTimeoutHandler(readIdleTimeout));
-        }
-    }
-
     private static ChannelPromise whenSent(ChannelPromise promise, @Nullable Runnable onSent) {
         if (onSent != null) {
             promise.addListener((ChannelFutureListener) future -> {

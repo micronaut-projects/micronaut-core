@@ -49,6 +49,7 @@ public class UnprocessedRequestException extends HttpClientException {
     private boolean targetSet;
     @Nullable
     private transient volatile CloseableByteBody unsentBody;
+    private volatile boolean bodySent;
 
     /**
      * @param reason  Why the request was not sent
@@ -130,12 +131,24 @@ public class UnprocessedRequestException extends HttpClientException {
     }
 
     /**
+     * Mark that the body was sent before this request failed, e.g. to a server that redirected
+     * it. <b>Internal API.</b>
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public final void markBodySent() {
+        bodySent = true;
+    }
+
+    /**
      * @return Whether the request was surely not read at all, e.g. the connection could not be
-     * opened, so that its body is untouched
+     * opened, so that its body is untouched. A request that was redirected is not: its body went
+     * to the server that redirected it.
      * @since 5.3.0
      */
     public final boolean isBodyUntouched() {
-        return reason == Reason.CONNECT || reason == Reason.CONNECT_TIMEOUT || reason == Reason.POOL_ACQUIRE;
+        return !bodySent && (reason == Reason.CONNECT || reason == Reason.CONNECT_TIMEOUT || reason == Reason.POOL_ACQUIRE);
     }
 
     /**
