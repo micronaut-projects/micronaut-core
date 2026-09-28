@@ -30,6 +30,7 @@ import spock.util.concurrent.PollingConditions
 
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
@@ -58,6 +59,8 @@ class WindowedCircuitBreakerCallSpec extends Specification {
             'micronaut.retry.circuit-breakers.checked.attempts'                  : 1,
             'micronaut.retry.circuit-breakers.checked.delay'                     : '1ms',
             'micronaut.retry.circuit-breakers.events-window.request-volume-threshold': 1,
+            'micronaut.retry.policies.cancelled.attempts'                        : 3,
+            'micronaut.retry.policies.cancelled.delay'                           : '300ms',
         ])
         registry = context.getBean(CircuitBreakerRegistry)
         service = context.getBean(CallService)
@@ -251,6 +254,89 @@ class WindowedCircuitBreakerCallSpec extends Specification {
         then: "the trial permit can be taken again"
         fast.execute { "ok" } == "ok"
         registry.findState("interrupted").get() == CircuitState.CLOSED
+    }
+
+    void "a cancelled completion stage returns its trial permit"() {
+        given: "a circuit whose half-open state permits one trial call, reset long after the test"
+        CircuitBreakerOperations operations = registry.circuitBreaker("cancelled-stage", CircuitBreakerPolicy.builder()
+            .resetTimeout(Duration.ofSeconds(2)).maxAttempts(1).delay(Duration.ofMillis(1)).build(),
+            CircuitBreakerWindow.builder().requestVolumeThreshold(1).failureRatio(1).successThreshold(1).build())
+
+        when: "a failure opens the circuit, and it half-opens"
+        try {
+            operations.execute { throw new IllegalStateException("down") }
+        } catch (IllegalStateException ignored) {
+        }
+        conditions.eventually {
+            assert registry.findState("cancelled-stage").get() == CircuitState.HALF_OPEN
+        }
+
+        and: "the trial call hangs, and its caller cancels it"
+        CompletableFuture<String> hanging = new CompletableFuture<>()
+        CompletionStage<String> stage = operations.executeCompletionStage { hanging }
+        stage.toCompletableFuture().cancel(false)
+
+        then: "the attempt in progress is cancelled"
+        hanging.isCancelled()
+
+        and: "the trial permit is taken again at once, and its success closes the circuit"
+        operations.execute { "ok" } == "ok"
+        registry.findState("cancelled-stage").get() == CircuitState.CLOSED
+    }
+
+    void "a completion stage cancelled while its retry is scheduled attempts no more, and returns its trial permit"() {
+        given:
+        CircuitBreakerWindow window = CircuitBreakerWindow.builder().requestVolumeThreshold(1).failureRatio(1).successThreshold(1).build()
+        CircuitBreakerOperations fast = registry.circuitBreaker("cancelled-retry", CircuitBreakerPolicy.builder()
+            .resetTimeout(Duration.ofSeconds(2)).maxAttempts(1).delay(Duration.ofMillis(1)).build(), window)
+        CircuitBreakerOperations slow = registry.circuitBreaker("cancelled-retry", CircuitBreakerPolicy.builder()
+            .resetTimeout(Duration.ofSeconds(2)).maxAttempts(3).delay(Duration.ofMillis(300)).build(), window)
+        AtomicInteger attempts = new AtomicInteger()
+
+        when: "a failure opens the circuit, and it half-opens"
+        try {
+            fast.execute { throw new IllegalStateException("down") }
+        } catch (IllegalStateException ignored) {
+        }
+        conditions.eventually {
+            assert registry.findState("cancelled-retry").get() == CircuitState.HALF_OPEN
+        }
+
+        and: "the trial call fails, its retry is scheduled, and its caller cancels it"
+        CompletionStage<String> stage = slow.executeCompletionStage {
+            attempts.incrementAndGet()
+            CompletableFuture.<String>failedFuture(new IllegalStateException("still down"))
+        }
+        stage.toCompletableFuture().cancel(false)
+
+        then: "the trial permit is taken again at once"
+        attempts.get() == 1
+        fast.execute { "ok" } == "ok"
+        registry.findState("cancelled-retry").get() == CircuitState.CLOSED
+
+        when: "the time of the scheduled retries passes"
+        Thread.sleep(1000)
+
+        then: "no further attempt ran"
+        attempts.get() == 1
+    }
+
+    void "a completion stage cancelled while its retry is scheduled attempts no more"() {
+        given:
+        RetryOperations operations = context.getBean(RetryRegistry).retry("cancelled")
+        AtomicInteger attempts = new AtomicInteger()
+
+        when: "the first attempt fails, a retry is scheduled, and the caller cancels"
+        CompletionStage<String> stage = operations.executeCompletionStage {
+            attempts.incrementAndGet()
+            CompletableFuture.<String>failedFuture(new IllegalStateException("down"))
+        }
+        stage.toCompletableFuture().cancel(false)
+        Thread.sleep(1000)
+
+        then:
+        stage.toCompletableFuture().isCancelled()
+        attempts.get() == 1
     }
 
     void "a released guard permit returns its trial permit, and an abandoned one is given again after the reset timeout"() {
