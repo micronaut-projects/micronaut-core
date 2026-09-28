@@ -221,7 +221,8 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
 
         /**
          * Queue an input that arrives while a subscriber is added, or behind the inputs queued
-         * before it. A queued input runs in its turn, so it is given to this buffer directly.
+         * before it. A queued input runs in its turn, so it is given to this buffer directly. It
+         * counts as queued until it has run: an input it triggers is queued behind it.
          *
          * @param input The input
          * @return {@code true} if the input is queued
@@ -232,10 +233,30 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
             }
             deferredInputs++;
             eventLoop.execute(() -> {
-                deferredInputs--;
-                input.run();
+                try {
+                    input.run();
+                } finally {
+                    deferredInputs--;
+                }
             });
             return true;
+        }
+
+        /**
+         * Run a subscribe on the event loop once no {@link #reserve()} is queued from off the
+         * event loop. A reservation is counted before it is queued, so it can be queued behind
+         * this task: the task then moves behind it.
+         *
+         * @param task The subscribe
+         */
+        private void executeAfterReservations(Runnable task) {
+            eventLoop.execute(() -> {
+                if (pendingReservations.get() > 0) {
+                    executeAfterReservations(task);
+                } else {
+                    task.run();
+                }
+            });
         }
 
         @Override
@@ -318,7 +339,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
             if (!forceDelay && pendingReservations.get() == 0 && eventLoop.inEventLoop() && !adding) {
                 subscribeOnLoop(subscriber, specificUpstream);
             } else {
-                eventLoop.execute(() -> subscribeOnLoop(subscriber, specificUpstream));
+                executeAfterReservations(() -> subscribeOnLoop(subscriber, specificUpstream));
             }
         }
 
@@ -346,7 +367,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
             if (!forceDelay && pendingReservations.get() == 0 && eventLoop.inEventLoop() && !adding) {
                 return subscribeFull0(asyncFlow, specificUpstream, true);
             } else {
-                eventLoop.execute(() -> {
+                executeAfterReservations(() -> {
                     ExecutionFlow<ReadBuffer> res = subscribeFull0(asyncFlow, specificUpstream, false);
                     assert res == asyncFlow;
                 });
