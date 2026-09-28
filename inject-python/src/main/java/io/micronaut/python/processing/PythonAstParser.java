@@ -78,6 +78,13 @@ public final class PythonAstParser {
     private static final Source PROCESSOR_SOURCE = Source.newBuilder(PYTHON, getSource(), "micronaut-processor-driver.py").cached(true).buildLiteral();
     private static final Source CALL_EXTRACTION_SOURCE = Source.newBuilder(PYTHON, getCallExtractionSource(), "micronaut-call-extraction.py").cached(true).buildLiteral();
     private static final Source TRANSFORM_SOURCE = Source.newBuilder(PYTHON, getTransformSource(), "micronaut-transform-driver.py").cached(true).buildLiteral();
+    /**
+     * The run time strips a leading {@code io.} from every Java package when it derives the Python
+     * module name, so {@code io.swagger.v3.oas.annotations} is imported as
+     * {@code swagger.v3.oas.annotations}. Compile-time lookups therefore have to try the prefixed
+     * name as well, for any library and not only {@code io.micronaut}.
+     */
+    private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
     private final Context context;
     private final Value runtimeAstCompiler;
     private final IdentityHashMap<TransformResult, RuntimeArtifact> runtimeArtifacts = new IdentityHashMap<>();
@@ -432,14 +439,6 @@ public final class PythonAstParser {
         context.eval(CALL_EXTRACTION_SOURCE);
         return calls;
     }
-
-    /**
-     * The run time strips a leading {@code io.} from every Java package when it derives the Python
-     * module name, so {@code io.swagger.v3.oas.annotations} is imported as
-     * {@code swagger.v3.oas.annotations}. Compile-time lookups therefore have to try the prefixed
-     * name as well, for any library and not only {@code io.micronaut}.
-     */
-    private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
 
     private static boolean isJavaIoPackage(String name) {
         return name.startsWith(JAVA_IO_PACKAGE_PREFIX);
