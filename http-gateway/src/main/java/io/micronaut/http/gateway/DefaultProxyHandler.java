@@ -1313,8 +1313,13 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
 
         private void selectNot(LoadBalancer loadBalancer, CompletableFuture<@Nullable ServiceInstance> selected, @Nullable ServiceInstance first, int selections) {
-            // the key of the request, e.g. for a sticky load balancer, as the client of the service selects with
-            first(loadBalancer.select(factory.loadBalancerDiscriminator(route, request))).whenComplete((instance, failure) -> {
+            // the key of the request, e.g. for a sticky load balancer, as the client of the service
+            // selects with; the instances tried already are left out by the load balancers that
+            // support it, and the backup instances are selected once the others were tried
+            Object key = factory.loadBalancerDiscriminator(route, request);
+            Object discriminator = tried.isEmpty() || !(loadBalancer instanceof io.micronaut.http.client.loadbalance.AbstractRoundRobinLoadBalancer)
+                ? key : new io.micronaut.http.client.loadbalance.ExcludedInstances(java.util.Set.copyOf(tried), key);
+            first(loadBalancer.select(discriminator)).whenComplete((instance, failure) -> {
                 if (failure != null) {
                     if (first != null) {
                         selected.complete(first);
