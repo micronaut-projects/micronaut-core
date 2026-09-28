@@ -74,9 +74,25 @@ class GatewayFiltersTest {
     }
 
     @Test
+    void aTrailingSlashIsKeptOnce() {
+        assertEquals(List.of("/health/"), GatewayRoute.builder("r").uri("http://up").path("/health/").build().getRouteTemplates());
+    }
+
+    @Test
     void theTemplatesOfARoute() {
         assertEquals(List.of("/api/orders", "/api/orders/{+path}", "/health"),
             GatewayRoute.builder("r").uri("http://up").path("/api/orders/**", "/health").build().getRouteTemplates());
+    }
+
+    @Test
+    void aRouteThatRewritesResponseBodiesAsksForTheCodingsItDecodes() {
+        MutableHttpRequest<Object> request = upstream("/x");
+        request.getHeaders().set("Accept-Encoding", "br, gzip;q=0.8, zstd, deflate");
+        DefaultProxyHandler.narrowAcceptEncoding(request.getHeaders());
+        assertEquals("gzip;q=0.8, deflate", request.getHeaders().get("Accept-Encoding"));
+        request.getHeaders().set("Accept-Encoding", "br");
+        DefaultProxyHandler.narrowAcceptEncoding(request.getHeaders());
+        assertEquals("identity", request.getHeaders().get("Accept-Encoding"));
     }
 
     @Test

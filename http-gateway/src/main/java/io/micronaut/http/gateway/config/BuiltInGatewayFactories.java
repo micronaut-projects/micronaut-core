@@ -468,6 +468,19 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("Mirror")
+    GatewayFilterFactory mirror() {
+        return GatewayFilterFactory.of(List.of("uri", "percentage"), args -> {
+            MirrorArguments bound = args.bind(MirrorArguments.class);
+            try {
+                return GatewayFilters.mirror(bound.uri(), bound.percentage(), bound.maxBodySize(), bound.timeout(), bound.shadowHost());
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Invalid Mirror: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @Singleton
     @Named("LocalResponseCache")
     GatewayFilterFactory localResponseCache(BeanLocator beanLocator) {
         return GatewayFilterFactory.of(List.of("time-to-live", "size"), args -> {
@@ -740,6 +753,23 @@ final class BuiltInGatewayFactories {
                                 @Bindable(defaultValue = "403") String emptyKeyStatus,
                                 @Bindable(defaultValue = "true") boolean includeHeaders,
                                 @Nullable String rateLimiter) {
+    }
+
+    /**
+     * The arguments of the {@code Mirror} filter.
+     *
+     * @param uri         The URI of the shadow
+     * @param percentage  The percentage of the requests to mirror, 100 by default
+     * @param maxBodySize The limit of the body of a mirrored request, 64 KiB by default
+     * @param timeout     The response timeout of the shadow, 5 seconds by default
+     * @param shadowHost  Whether the Host of the shadow request gets a -shadow suffix
+     */
+    @Introspected
+    record MirrorArguments(String uri,
+                           @Bindable(defaultValue = "100") double percentage,
+                           @ReadableBytes @Bindable(defaultValue = "65536") long maxBodySize,
+                           @Bindable(defaultValue = "5s") Duration timeout,
+                           @Bindable(defaultValue = "false") boolean shadowHost) {
     }
 
     /**

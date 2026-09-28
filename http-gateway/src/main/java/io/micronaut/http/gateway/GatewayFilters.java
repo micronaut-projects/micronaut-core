@@ -392,6 +392,62 @@ public final class GatewayFilters {
     }
 
     /**
+     * Mirror a percentage of the requests of the route to a shadow upstream, like Envoy's request
+     * mirroring: the shadow gets the request as the proxy transforms of the route made it, with a
+     * copy of the body, and its response is discarded. The copy is read at the pace of the
+     * upstream of the route, never slower, up to a limit of 64 KiB: a body over the limit is not
+     * mirrored, and the request is mirrored once its whole body arrived. The shadow is not
+     * retried, and has a response timeout of 5 seconds. Nothing of the shadow, a failure, a
+     * reset or a timeout, affects the request. A proxy transform.
+     *
+     * @param uri        The URI of the shadow upstream, see {@link GatewayRoute}
+     * @param percentage The percentage of the requests to mirror, from 0 to 100
+     * @return The filter
+     */
+    public static GatewayFilter mirror(String uri, double percentage) {
+        return mirror(uri, percentage, 64 * 1024, Duration.ofSeconds(5), false);
+    }
+
+    /**
+     * Mirror a percentage of the requests of the route to a shadow upstream, see
+     * {@link #mirror(String, double)}.
+     *
+     * @param uri          The URI of the shadow upstream
+     * @param percentage   The percentage of the requests to mirror, from 0 to 100
+     * @param maxBodyBytes The limit of the body of a mirrored request
+     * @param timeout      The response timeout of the shadow
+     * @param shadowHost   Whether the {@code Host} of the shadow request gets a {@code -shadow}
+     *                     suffix, like Envoy, e.g. {@code orders-shadow:8080}
+     * @return The filter
+     */
+    public static GatewayFilter mirror(String uri, double percentage, long maxBodyBytes, Duration timeout, boolean shadowHost) {
+        if (!(percentage >= 0 && percentage <= 100)) {
+            throw new IllegalArgumentException("The percentage of a mirror is not between 0 and 100: " + percentage);
+        }
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isNegative() || timeout.isZero()) {
+            throw new IllegalArgumentException("The timeout of a mirror must be positive: " + timeout);
+        }
+        // validated like the URI of a route
+        URI target = GatewayRoute.builder("mirror").uri(uri).build().getUri();
+        return new Mirror(target, percentage, checkMax(maxBodyBytes, "Mirror"), timeout, shadowHost);
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The mirrors among them
+     */
+    static List<Mirror> mirrors(List<GatewayFilter> filters) {
+        List<Mirror> mirrors = new ArrayList<>(0);
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof Mirror mirror) {
+                mirrors.add(mirror);
+            }
+        }
+        return mirrors;
+    }
+
+    /**
      * Cache the responses of the route, like Spring Cloud Gateway's {@code LocalResponseCache}:
      * a {@code 200} response to a {@code GET} is stored when its {@code Cache-Control} allows it,
      * fresh for its {@code s-maxage}, {@code max-age} or {@code Expires}, or for the time to live
@@ -1221,6 +1277,22 @@ public final class GatewayFilters {
          * @param key     The key
          */
         private record PermitKey(String routeId, String key) {
+        }
+    }
+
+    /**
+     * A mirror, see {@link #mirror(String, double, long, Duration, boolean)}.
+     *
+     * @param uri          The URI of the shadow
+     * @param percentage   The percentage of the requests to mirror
+     * @param maxBodyBytes The limit of the body
+     * @param timeout      The response timeout of the shadow
+     * @param shadowHost   Whether the Host gets a -shadow suffix
+     */
+    record Mirror(URI uri, double percentage, long maxBodyBytes, Duration timeout, boolean shadowHost) implements GatewayFilter {
+        @Override
+        public String toString() {
+            return "Mirror=" + uri + ", " + percentage;
         }
     }
 

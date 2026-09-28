@@ -33,6 +33,7 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReplayableByteBody;
 import io.micronaut.http.MutableByteBodyHttpResponse;
@@ -98,6 +99,10 @@ final class DefaultProxyHandler implements ProxyHandler {
 
     private final GatewayRoute route;
     private final ProxyHandlerFactory factory;
+    /**
+     * The relays to the shadows of the mirrors of the route.
+     */
+    private final java.util.Map<GatewayFilters.Mirror, ProxyHandler> mirrorHandlers = new java.util.concurrent.ConcurrentHashMap<>();
     private final RawRequestOptions options;
     private final RawRequestOptions retainHostOptions;
     @Nullable
@@ -176,6 +181,11 @@ final class DefaultProxyHandler implements ProxyHandler {
             return CompletableFuture.failedFuture(new UpstreamException(HttpStatus.BAD_GATEWAY, route.getId(),
                 "The filters of the route made an upstream path that is not relayed: " + rejected, null));
         }
+        for (GatewayFilters.Mirror mirror : GatewayFilters.mirrors(route.getFilters())) {
+            if (mirror.percentage() > 0 && java.util.concurrent.ThreadLocalRandom.current().nextDouble() * 100 < mirror.percentage()) {
+                mirror(request, pathVariables, mirror);
+            }
+        }
         List<GatewayFilters.ModifyRequestBody> requestRewrites = GatewayFilters.requestRewrites(route.getFilters());
         if (!requestRewrites.isEmpty()) {
             // the whole body is read, rewritten and sent again: the request no longer streams
@@ -201,6 +211,78 @@ final class DefaultProxyHandler implements ProxyHandler {
             server.whenAbandoned(() -> result.cancel(false));
         }
         return result;
+    }
+
+    /**
+     * Send a copy of the request to a shadow, and discard its response. Never fails and never
+     * waits: the request goes on as if there were no mirror.
+     */
+    private void mirror(HttpRequest<?> request, PathVariables pathVariables, GatewayFilters.Mirror mirror) {
+        try {
+            if (request.getContentLength() > mirror.maxBodyBytes() || !(request instanceof ServerHttpRequest<?> server)) {
+                return;
+            }
+            ProxyHandler shadow = mirrorHandlers.computeIfAbsent(mirror, this::mirrorHandler);
+            ByteBodyFactory factory = server.byteBodyFactory();
+            // a copy at the pace of the fastest reader: the upstream of the route is never slowed down
+            CloseableByteBody copy = server.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST);
+            factory.limit(copy, mirror.maxBodyBytes()).buffer().whenComplete((bytes, failure) -> {
+                if (failure != null) {
+                    // over the limit, or the request failed: nothing is mirrored
+                    return;
+                }
+                MirrorRequest copied = new MirrorRequest(request, bytes);
+                CompletionStage<? extends HttpResponse<?>> relayed;
+                try {
+                    relayed = shadow.handle(copied, pathVariables);
+                } catch (Exception e) {
+                    copied.release();
+                    LOG.debug("The mirror {} of the gateway route {} failed", mirror.uri(), route.getId(), e);
+                    return;
+                }
+                relayed.whenComplete((response, error) -> {
+                    copied.release();
+                    if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                        // the response of the shadow is discarded
+                        byteBodyResponse.close();
+                    }
+                    if (error != null && LOG.isDebugEnabled()) {
+                        LOG.debug("The mirror {} of the gateway route {} failed: {}", mirror.uri(), route.getId(), error.toString());
+                    }
+                });
+            });
+        } catch (RuntimeException e) {
+            LOG.debug("The mirror {} of the gateway route {} failed", mirror.uri(), route.getId(), e);
+        }
+    }
+
+    /**
+     * The relay to a shadow: the proxy transforms of the route, no retry, no circuit breaker,
+     * and the timeout of the mirror.
+     */
+    private ProxyHandler mirrorHandler(GatewayFilters.Mirror mirror) {
+        List<GatewayFilter> transforms = new ArrayList<>();
+        for (GatewayFilter filter : route.getFilters()) {
+            if (!(filter instanceof GatewayFilters.Mirror) && !(filter instanceof GatewayFilters.ModifyResponseBody)) {
+                transforms.add(filter);
+            }
+        }
+        if (mirror.shadowHost()) {
+            transforms.add(new GatewayFilter() {
+                @Override
+                public void filterRequest(ProxyExchange exchange, MutableHttpRequest<?> upstreamRequest) {
+                    URI uri = mirror.uri();
+                    String host = uri.getHost() + "-shadow" + (uri.getPort() < 0 ? "" : ":" + uri.getPort());
+                    upstreamRequest.getHeaders().set(HttpHeaders.HOST, host);
+                    exchange.setRetainHostHeader(true);
+                }
+            });
+        }
+        return factory.create(GatewayRoute.builder(route.getId() + "-mirror")
+            .uri(mirror.uri())
+            .filters(transforms)
+            .responseTimeout(mirror.timeout())
+            .build());
     }
 
     private static ByteBodyFactory bodyFactory(HttpRequest<?> request) {

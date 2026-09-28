@@ -126,6 +126,10 @@ micronaut:
         predicates: [ "Path=/orders/**", "Weight=orders, 1" ]
 ----
 
+== Mirroring
+
+`GatewayFilters.mirror(uri, percentage)` (`Mirror=http://shadow:8080, 10` in the configuration) sends a copy of a percentage of the requests of a route to a shadow upstream and discards its responses. The shadow gets the request as the proxy transforms of the route made it, once its whole body arrived, with a copy of the body read at the pace of the upstream of the route, never slower. A body over `max-body-size` (64 KiB by default) is not mirrored. The shadow is never retried and has its own `timeout` (5 seconds by default); `shadow-host: true` adds a `-shadow` suffix to its `Host`. Nothing of the shadow, a failure, a reset or a timeout, affects the request.
+
 == Response Cache
 
 `GatewayFilters.localResponseCache(timeToLive, size)` (`LocalResponseCache=30m, 16MB` in the configuration) caches the `200` responses to `GET` requests in the memory of the gateway, like Spring Cloud Gateway's `LocalResponseCache`, and answers `GET` and `HEAD` requests from it:
