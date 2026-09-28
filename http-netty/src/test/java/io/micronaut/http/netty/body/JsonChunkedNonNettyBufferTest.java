@@ -56,6 +56,22 @@ class JsonChunkedNonNettyBufferTest {
         assertEquals(1, second.released);
     }
 
+    @Test
+    void theValuesStartAtTheReaderIndexOfABuffer() {
+        NettyJsonHandler<Map> handler = new NettyJsonHandler<>(MAPPER);
+        CountedBuffer buffer = buffer("xx[{\"a\":1}]");
+        // the first two bytes were read before
+        buffer.readerIndex(2);
+
+        List<Map> values = Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(buffer), 1024))
+            .collectList()
+            .block();
+
+        // every readable byte, up to the last
+        assertEquals(List.of(Map.of("a", 1)), values);
+        assertEquals(1, buffer.released);
+    }
+
     private static CountedBuffer buffer(String text) {
         return new CountedBuffer(ByteArrayBufferFactory.INSTANCE.wrap(text.getBytes(StandardCharsets.UTF_8)));
     }

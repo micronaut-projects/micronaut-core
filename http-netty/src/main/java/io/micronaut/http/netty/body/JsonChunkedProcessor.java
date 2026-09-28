@@ -78,7 +78,8 @@ final class JsonChunkedProcessor {
             return buf;
         }
         try {
-            return Unpooled.wrappedBuffer(buffer.toByteArray());
+            // the readable bytes, from the reader index: one copy
+            return Unpooled.copiedBuffer(buffer.asNioBuffer());
         } finally {
             if (buffer instanceof ReferenceCounted counted) {
                 counted.release();
