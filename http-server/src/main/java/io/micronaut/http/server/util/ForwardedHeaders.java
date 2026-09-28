@@ -428,10 +428,7 @@ public final class ForwardedHeaders {
      * @return Whether it is {@code http}, {@code https}, {@code ws} or {@code wss}
      */
     private static boolean isScheme(String value) {
-        return switch (value.toLowerCase(Locale.ROOT)) {
-            case "http", "https", "ws", "wss" -> true;
-            default -> false;
-        };
+        return schemePort(value) != null;
     }
 
     /**
@@ -554,7 +551,16 @@ public final class ForwardedHeaders {
         if (proto == null) {
             return null;
         }
-        return switch (first(proto).toLowerCase(Locale.ROOT)) {
+        return schemePort(first(proto));
+    }
+
+    /**
+     * @param scheme A single scheme
+     * @return The default port of {@code http}, {@code https}, {@code ws} or {@code wss}, else
+     * {@code null}
+     */
+    private static @Nullable Integer schemePort(String scheme) {
+        return switch (scheme.toLowerCase(Locale.ROOT)) {
             case "http", "ws" -> HTTP_PORT;
             case "https", "wss" -> HTTPS_PORT;
             default -> null;
