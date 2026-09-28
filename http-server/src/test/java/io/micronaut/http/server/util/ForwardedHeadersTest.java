@@ -547,6 +547,23 @@ class ForwardedHeadersTest {
     }
 
     @Test
+    void aListInTheProtoOrHostOfAForwardedElementOfATrustedProxyIsNotRelayed() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
+            HttpHeaders.FORWARDED, "for=203.0.113.7;proto=\"https,http\";host=\"a.example.com, b.example.com\"");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertEquals("for=203.0.113.7, for=10.0.0.2;proto=http;host=\"gateway.internal:8080\"", headers.get(HttpHeaders.FORWARDED));
+        assertEquals("http", headers.get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("gateway.internal", headers.get(ForwardedHeaders.X_FORWARDED_HOST));
+    }
+
+    @Test
     void aListOfSchemesOfTrustedProxiesIsTranslatedWithTheFirstScheme() {
         HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal:8080",
             ForwardedHeaders.X_FORWARDED_PROTO, "https, http",

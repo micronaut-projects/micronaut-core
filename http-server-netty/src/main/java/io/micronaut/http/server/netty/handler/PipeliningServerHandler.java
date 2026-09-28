@@ -1124,11 +1124,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * @return Whether the HTTP/1.0 request asks to keep the connection. With
          * {@link #http10KeepAlive}, the {@code Connection} header is read as the list of tokens it
-         * is (RFC 9110 section 7.6.1), e.g. {@code Keep-Alive, TE}
+         * is (RFC 9110 section 7.6.1), e.g. {@code Keep-Alive, TE}, and a {@code close} token in
+         * any {@code Connection} field wins over {@code keep-alive}: contradicting options close
          */
         private boolean requestsKeepAlive() {
             if (http10KeepAlive) {
-                return request.headers().containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true);
+                HttpHeaders headers = request.headers();
+                return headers.containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)
+                    && !headers.containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true);
             }
             return request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true);
         }

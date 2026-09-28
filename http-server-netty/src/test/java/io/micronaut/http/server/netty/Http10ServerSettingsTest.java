@@ -185,6 +185,19 @@ class Http10ServerSettingsTest {
     }
 
     @Test
+    void anHttp10ClientThatAsksForKeepAliveAndCloseIsClosed() throws IOException {
+        for (String connection : List.of(
+            "Connection: Keep-Alive, close\r\n",
+            "Connection: close, keep-alive\r\n",
+            "Connection: keep-alive\r\nConnection: close\r\n")) {
+            String response = exchange(optedInServer, "GET /http10-settings/fixed HTTP/1.0\r\n" + connection + "\r\n");
+            assertTrue(response.startsWith("HTTP/1.0 200"), response);
+            assertFalse(response.toLowerCase().contains("keep-alive"), connection + response);
+            assertTrue(response.endsWith("fixed"), response);
+        }
+    }
+
+    @Test
     void aLaterHttp1MinorVersionIsServedAsHttp11WhenUnsupportedVersionsAreRejected() throws IOException {
         String response = exchange(optedInServer, "GET /http10-settings/fixed HTTP/1.2\r\nHost: localhost\r\nConnection: close\r\n\r\n");
         assertTrue(response.startsWith("HTTP/1.1 200"), response);

@@ -198,7 +198,7 @@ public final class ForwardedHeaders {
                     inboundFor = String.join(", ", addresses);
                 }
                 if (inboundProto == null) {
-                    inboundProto = validScheme(forwardedProto);
+                    inboundProto = forwardedProto;
                 }
                 if (inboundHost == null && firstHost != null) {
                     int portSeparator = portSeparator(firstHost);
@@ -416,11 +416,22 @@ public final class ForwardedHeaders {
             return null;
         }
         for (String scheme : value.split(",", -1)) {
-            if (defaultPort(scheme) == null) {
+            if (!isScheme(scheme.trim())) {
                 return null;
             }
         }
         return value;
+    }
+
+    /**
+     * @param value A single scheme, e.g. the {@code proto} of a {@code Forwarded} element
+     * @return Whether it is {@code http}, {@code https}, {@code ws} or {@code wss}
+     */
+    private static boolean isScheme(String value) {
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "http", "https", "ws", "wss" -> true;
+            default -> false;
+        };
     }
 
     /**
@@ -448,7 +459,9 @@ public final class ForwardedHeaders {
 
     /**
      * Drop the invalid values of {@code Forwarded} elements: a {@code proto} that is no scheme,
-     * and the port of a {@code host} that is no port.
+     * a {@code host} that is a list, and the port of a {@code host} that is no port. Each
+     * parameter of an element has a single value (RFC 7239 section 5), unlike the
+     * {@code X-Forwarded-*} lists.
      *
      * @param elements The parsed elements
      * @return Whether a value was dropped
@@ -457,12 +470,15 @@ public final class ForwardedHeaders {
         boolean dropped = false;
         for (Map<String, String> element : elements) {
             String proto = element.get(PROTO);
-            if (proto != null && validScheme(proto) == null) {
+            if (proto != null && !isScheme(proto)) {
                 element.remove(PROTO);
                 dropped = true;
             }
             String host = element.get(HOST);
-            if (host != null) {
+            if (host != null && host.indexOf(',') >= 0) {
+                element.remove(HOST);
+                dropped = true;
+            } else if (host != null) {
                 String valid = Objects.requireNonNull(validHost(host));
                 if (!valid.equals(host)) {
                     element.put(HOST, valid);
