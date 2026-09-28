@@ -48,7 +48,6 @@ import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2Connection;
-import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
 import io.netty.handler.codec.http2.HttpConversionUtil;
@@ -345,12 +344,14 @@ final class HttpPipelineBuilder {
          */
         private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
             Http2Connection connection = new DefaultHttp2Connection(true);
-            final Http2FrameListener http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
+            final StreamingInboundHttp2ToHttpAdapter http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
                     connection,
                     (int) server.getServerConfiguration().getMaxRequestSize(),
                     server.getServerConfiguration().isValidateHeaders(),
                     true
             );
+            // releases the request body of a stream that is closed before its end
+            connection.addListener(http2ToHttpAdapter);
             final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
                     .frameListener(http2ToHttpAdapter)
                     .validateHeaders(server.getServerConfiguration().isValidateHeaders())
