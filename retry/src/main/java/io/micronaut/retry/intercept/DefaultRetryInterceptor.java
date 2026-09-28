@@ -64,7 +64,13 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledExecutorService executorService;
-    private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
+    /**
+     * The circuit breaker states of the methods, by the method and the annotations its circuit
+     * and its policy are resolved from: methods of different beans can share an
+     * {@link ExecutableMethod} that is equal, e.g. one inherited from a common superclass, and
+     * name different circuits or declare different policies on their classes.
+     */
+    private final Map<CircuitKey, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
     private final DefaultRetryRunner retryRunner;
     @Nullable
     private final RetryRegistry retryRegistry;
@@ -156,11 +162,12 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         CircuitBreakerRetry windowedCircuit = null;
         if (isCircuitBreaker) {
             RetryPolicy retryPolicy = namedPolicy;
+            AnnotationValue<CircuitBreaker> circuitBreaker = context.findAnnotation(CircuitBreaker.class).orElse(null);
             CircuitBreakerRetry circuitBreakerRetry;
             try {
                 circuitBreakerRetry = circuitContexts.computeIfAbsent(
-                    context.getExecutableMethod(),
-                    method -> circuitBreakerRetry(context, annotationRetryStateBuilder, retryPolicy)
+                    new CircuitKey(context.getExecutableMethod(), retry, circuitBreaker),
+                    key -> circuitBreakerRetry(context, annotationRetryStateBuilder, retryPolicy, circuitBreaker)
                 );
             } catch (RuntimeException e) {
                 return interceptedMethod.handleException(e);
@@ -243,11 +250,11 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      */
     private CircuitBreakerRetry circuitBreakerRetry(MethodInvocationContext<Object, Object> context,
                                                     AnnotationRetryStateBuilder annotationRetryStateBuilder,
-                                                    @Nullable RetryPolicy namedPolicy) {
+                                                    @Nullable RetryPolicy namedPolicy,
+                                                    @Nullable AnnotationValue<CircuitBreaker> circuitBreaker) {
         CircuitBreakerPolicy circuitBreakerPolicy = namedPolicy == null
             ? annotationRetryStateBuilder.circuitBreakerPolicy()
             : annotationRetryStateBuilder.circuitBreakerPolicy(namedPolicy);
-        AnnotationValue<CircuitBreaker> circuitBreaker = context.findAnnotation(CircuitBreaker.class).orElse(null);
         String name = circuitBreaker == null ? "" : circuitBreaker.stringValue("name").orElse("");
         CircuitBreakerRetry.Circuit circuit;
         if (circuitBreaker == null || name.isEmpty()) {
@@ -286,5 +293,17 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      */
     protected void sleep(long delayMillis) throws InterruptedException {
         Thread.sleep(delayMillis);
+    }
+
+    /**
+     * The key of the circuit breaker state of a method.
+     *
+     * @param method The method
+     * @param retry The {@code @Retryable} value of the method, from which its policy is resolved
+     * @param circuitBreaker The {@code @CircuitBreaker} value of the method, from which its circuit is resolved
+     */
+    private record CircuitKey(ExecutableMethod<?, ?> method,
+                              AnnotationValue<Retryable> retry,
+                              @Nullable AnnotationValue<CircuitBreaker> circuitBreaker) {
     }
 }
