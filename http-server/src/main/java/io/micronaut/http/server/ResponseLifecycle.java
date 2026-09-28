@@ -262,13 +262,11 @@ public abstract class ResponseLifecycle {
                 responseMediaType = MediaType.APPLICATION_JSON_TYPE;
             }
         }
-        if (routeInfo != null && (messageBodyWriter == null || messageBodyWriter == routeInfo.getMessageBodyWriter())) {
-            // a route that declares no body type precompiles the writer for the class of the body,
-            // instead of letting its writer resolve the class of each body it writes
-            RouteInfo.BodyWriter bodyWriter = routeInfo.findBodyWriter(body.getClass(), responseMediaType);
-            if (bodyWriter != null) {
-                return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, bodyWriter.type(), responseMediaType, body, bodyWriter.writer(), false);
-            }
+        if (messageBodyWriter != null && responseBodyType.getType() == Object.class) {
+            // the route declares no body type: its writer specializes for the class of the body,
+            // once per class, instead of resolving it on every response
+            responseBodyType = Argument.ofInstance(body);
+            messageBodyWriter = messageBodyWriter.createSpecific(responseBodyType);
         }
         if (messageBodyWriter == null) {
             // lookup write to use, any logic that hits this path should consider setting
@@ -385,7 +383,10 @@ public abstract class ResponseLifecycle {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
                 @SuppressWarnings("unchecked")
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
-
+                if (messageBodyWriter != null && responseBodyType.getType() == Object.class) {
+                    responseBodyType = Argument.ofInstance(message);
+                    messageBodyWriter = messageBodyWriter.createSpecific(responseBodyType);
+                }
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
                     responseBodyType = Argument.ofInstance(message);
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));

@@ -44,8 +44,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * A handler route declares no body type, so the route finds and specializes the writer for the
- * class of the body once, not on every response.
+ * A handler route declares no body type, so its writer specializes for the class of the body once,
+ * not on every response.
  */
 class HandlerRouteSpecificWriterTest {
 
