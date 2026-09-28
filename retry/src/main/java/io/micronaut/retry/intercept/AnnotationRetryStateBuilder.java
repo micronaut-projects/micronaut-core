@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.retry.CircuitBreakerPolicy;
+import io.micronaut.retry.CircuitBreakerWindow;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.RetryStateBuilder;
@@ -26,11 +27,13 @@ import io.micronaut.retry.annotation.DefaultRetryPredicate;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.retry.annotation.Retryable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Builds a {@link RetryState} from {@link AnnotationMetadata}.
@@ -156,21 +159,45 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
             .resetTimeout(circuitBreaker.get(RESET, Duration.class).orElse(Duration.ofSeconds(20)))
             .throwWrappedException(circuitBreaker.booleanValue(THROW_WRAPPED_EXCEPTION).orElse(false));
         retryPolicy.getMaxDelay().ifPresent(builder::maxDelay);
-        circuitBreaker.stringValue(REQUEST_VOLUME_THRESHOLD).filter(v -> !v.isBlank())
-            .ifPresent(v -> builder.requestVolumeThreshold(Integer.parseInt(v.strip())));
-        circuitBreaker.stringValue(FAILURE_RATIO).filter(v -> !v.isBlank())
-            .ifPresent(v -> builder.failureRatio(Double.parseDouble(v.strip())));
-        circuitBreaker.stringValue(SUCCESS_THRESHOLD).filter(v -> !v.isBlank())
-            .ifPresent(v -> builder.successThreshold(Integer.parseInt(v.strip())));
+        return builder.build();
+    }
+
+    /**
+     * The rolling window of the circuit breaker annotation, if any of its members sets it.
+     *
+     * @return The window, or {@code null} for a circuit without one
+     */
+    @Nullable CircuitBreakerWindow circuitBreakerWindow() {
+        AnnotationValue<CircuitBreaker> circuitBreaker = annotationMetadata.findAnnotation(CircuitBreaker.class)
+            .orElseThrow(() -> new IllegalStateException("Missing @CircuitBreaker annotation"));
+        CircuitBreakerWindow.Builder builder = CircuitBreakerWindow.builder();
+        boolean windowed = false;
+        Optional<String> requestVolumeThreshold = circuitBreaker.stringValue(REQUEST_VOLUME_THRESHOLD).filter(v -> !v.isBlank());
+        if (requestVolumeThreshold.isPresent()) {
+            windowed = true;
+            builder.requestVolumeThreshold(Integer.parseInt(requestVolumeThreshold.get().strip()));
+        }
+        Optional<String> failureRatio = circuitBreaker.stringValue(FAILURE_RATIO).filter(v -> !v.isBlank());
+        if (failureRatio.isPresent()) {
+            windowed = true;
+            builder.failureRatio(Double.parseDouble(failureRatio.get().strip()));
+        }
+        Optional<String> successThreshold = circuitBreaker.stringValue(SUCCESS_THRESHOLD).filter(v -> !v.isBlank());
+        if (successThreshold.isPresent()) {
+            windowed = true;
+            builder.successThreshold(Integer.parseInt(successThreshold.get().strip()));
+        }
         List<Class<? extends Throwable>> failOn = resolveThrowables(circuitBreaker, FAIL_ON);
         if (!failOn.isEmpty()) {
+            windowed = true;
             builder.failOn(failOn.toArray(new Class[0]));
         }
         List<Class<? extends Throwable>> skipOn = resolveThrowables(circuitBreaker, SKIP_ON);
         if (!skipOn.isEmpty()) {
+            windowed = true;
             builder.skipOn(skipOn.toArray(new Class[0]));
         }
-        return builder.build();
+        return windowed ? builder.build() : null;
     }
 
     @SuppressWarnings("unchecked")

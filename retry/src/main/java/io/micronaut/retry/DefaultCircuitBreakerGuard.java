@@ -62,7 +62,7 @@ final class DefaultCircuitBreakerGuard implements CircuitBreakerGuard {
     @Override
     public Permit acquire() {
         CircuitBreakerRetry.Circuit circuit = retryState.circuit();
-        CircuitBreakerPolicy.Window window = circuit.getWindow();
+        CircuitBreakerWindow window = circuit.getWindow();
         if (window == null) {
             retryState.open();
             return new ReportOnce() {

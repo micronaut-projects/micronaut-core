@@ -158,7 +158,7 @@ Without further settings, as for any circuit breaker of Micronaut, the first fai
 
 === Rolling Window
 
-A circuit breaker may instead decide by a rolling window of outcomes, as in MicroProfile Fault Tolerance. Setting any of these, on `@CircuitBreaker`, on `CircuitBreakerPolicy.builder()` or under `micronaut.retry.circuit-breakers.<name>`, gives the circuit a window, with the defaults of the others:
+A circuit breaker may instead decide by a rolling window of outcomes, as in MicroProfile Fault Tolerance. Setting any of these, on `@CircuitBreaker` or under `micronaut.retry.circuit-breakers.<name>`, gives the circuit a window, with the defaults of the others. Programmatically, a api:retry.CircuitBreakerWindow[] built with `CircuitBreakerWindow.builder()` is passed with the policy to `registry.circuitBreaker(name, policy, window)`:
 
 |===
 |Setting |Default |Meaning

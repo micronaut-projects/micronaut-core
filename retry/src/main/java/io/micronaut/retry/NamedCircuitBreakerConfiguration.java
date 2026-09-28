@@ -190,7 +190,7 @@ public class NamedCircuitBreakerConfiguration {
 
     /**
      * @param requestVolumeThreshold The number of calls of the rolling window, see
-     *                               {@link CircuitBreakerPolicy.Window}; setting it, or another
+     *                               {@link CircuitBreakerWindow}; setting it, or another
      *                               setting of the window, gives the circuit a rolling window
      * @since 5.3.0
      */
@@ -241,7 +241,7 @@ public class NamedCircuitBreakerConfiguration {
 
     /**
      * @param failOn The class names of the exceptions that count as a failure, default every
-     *               one; resolved when the policy is built, see {@link #toPolicy()}
+     *               one; resolved when the window is built, see {@link #toWindow()}
      * @since 5.3.0
      */
     public void setFailOn(List<String> failOn) {
@@ -258,7 +258,7 @@ public class NamedCircuitBreakerConfiguration {
 
     /**
      * @param skipOn The class names of the exceptions that count as a success, whatever failOn
-     *               says; resolved when the policy is built, see {@link #toPolicy()}
+     *               says; resolved when the window is built, see {@link #toWindow()}
      * @since 5.3.0
      */
     public void setSkipOn(List<String> skipOn) {
@@ -267,15 +267,32 @@ public class NamedCircuitBreakerConfiguration {
 
     /**
      * @return The policy of the configuration
-     * @throws IllegalArgumentException if the configuration is invalid, e.g. a class name of
-     * {@code fail-on} or {@code skip-on} is not found or is not an exception type
+     * @throws IllegalArgumentException if the configuration is invalid
      */
     public CircuitBreakerPolicy toPolicy() {
         try {
             return buildPolicy();
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid circuit breaker [" + name + "] of " + PREFIX + "." + name + ": " + e.getMessage(), e);
+            throw invalid(e);
         }
+    }
+
+    /**
+     * @return The rolling window of the configuration, or {@code null} if none of its settings is set
+     * @throws IllegalArgumentException if the window is invalid, e.g. a class name of
+     * {@code fail-on} or {@code skip-on} is not found or is not an exception type
+     * @since 5.3.0
+     */
+    public @Nullable CircuitBreakerWindow toWindow() {
+        try {
+            return buildWindow();
+        } catch (IllegalArgumentException e) {
+            throw invalid(e);
+        }
+    }
+
+    private IllegalArgumentException invalid(IllegalArgumentException e) {
+        return new IllegalArgumentException("Invalid circuit breaker [" + name + "] of " + PREFIX + "." + name + ": " + e.getMessage(), e);
     }
 
     private CircuitBreakerPolicy buildPolicy() {
@@ -290,6 +307,14 @@ public class NamedCircuitBreakerConfiguration {
         if (maxDelay != null) {
             builder.maxDelay(maxDelay);
         }
+        return builder.build();
+    }
+
+    private @Nullable CircuitBreakerWindow buildWindow() {
+        if (requestVolumeThreshold == null && failureRatio == null && successThreshold == null && failOn.isEmpty() && skipOn.isEmpty()) {
+            return null;
+        }
+        CircuitBreakerWindow.Builder builder = CircuitBreakerWindow.builder();
         if (requestVolumeThreshold != null) {
             builder.requestVolumeThreshold(requestVolumeThreshold);
         }

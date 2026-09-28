@@ -57,16 +57,29 @@ public interface CircuitBreakerRegistry {
     /**
      * The circuit breaker of a name, with the retries of a policy: the circuit is shared with
      * the other users of the name, the retries are these. The reset timeout of the policy is
-     * ignored when the circuit is configured, and its rolling window, if any, must be the one of
-     * the configuration; when the circuit is not configured, both must be those of the other
-     * users of the name.
+     * ignored when the circuit is configured; when the circuit is not configured, it must be the
+     * one of the other users of the name, which must have no rolling window either.
      *
      * @param name   The name
-     * @param policy The policy of the retries, and the reset timeout and window of the circuit
+     * @param policy The policy of the retries, and the reset timeout of the circuit
      * @return The operations over the circuit of the name
      * @throws IllegalStateException if the policy disagrees with the circuit of the name
      */
     CircuitBreakerOperations circuitBreaker(String name, CircuitBreakerPolicy policy);
+
+    /**
+     * The circuit breaker of a name, with the retries of a policy, over a circuit with a rolling
+     * window. The window must be the one of the configuration when the circuit is configured,
+     * whose reset timeout then applies; when the circuit is not configured, the reset timeout of
+     * the policy and the window must be those of the other users of the name.
+     *
+     * @param name   The name
+     * @param policy The policy of the retries, and the reset timeout of the circuit
+     * @param window The rolling window of the circuit
+     * @return The operations over the circuit of the name
+     * @throws IllegalStateException if the policy or the window disagree with the circuit of the name
+     */
+    CircuitBreakerOperations circuitBreaker(String name, CircuitBreakerPolicy policy, CircuitBreakerWindow window);
 
     /**
      * The guard of the circuit of a name, for a caller that runs the operation itself and

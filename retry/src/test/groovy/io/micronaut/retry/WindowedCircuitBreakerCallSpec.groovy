@@ -115,8 +115,8 @@ class WindowedCircuitBreakerCallSpec extends Specification {
     void "a programmatic call that started while the circuit was closed does not close it once it half-opened"() {
         given:
         CircuitBreakerOperations operations = registry.circuitBreaker("stale-operations", CircuitBreakerPolicy.builder()
-            .maxAttempts(1).delay(Duration.ofMillis(1)).resetTimeout(Duration.ofMillis(200))
-            .requestVolumeThreshold(2).failureRatio(1).build())
+            .maxAttempts(1).delay(Duration.ofMillis(1)).resetTimeout(Duration.ofMillis(200)).build(),
+            CircuitBreakerWindow.builder().requestVolumeThreshold(2).failureRatio(1).build())
         CountDownLatch slowEntered = new CountDownLatch(1)
         CountDownLatch slowRelease = new CountDownLatch(1)
         Thread slow = Thread.start { operations.execute { slowEntered.countDown(); slowRelease.await(5, TimeUnit.SECONDS); "slow" } }
@@ -219,12 +219,12 @@ class WindowedCircuitBreakerCallSpec extends Specification {
 
     void "a call interrupted while it waits for a retry returns its trial permit"() {
         given:
-        CircuitBreakerPolicy.Builder window = CircuitBreakerPolicy.builder()
-            .resetTimeout(Duration.ofMillis(500)).requestVolumeThreshold(1).failureRatio(1)
-        CircuitBreakerOperations fast = registry.circuitBreaker("interrupted", window.maxAttempts(1).delay(Duration.ofMillis(1)).build())
+        CircuitBreakerWindow window = CircuitBreakerWindow.builder().requestVolumeThreshold(1).failureRatio(1).build()
+        CircuitBreakerOperations fast = registry.circuitBreaker("interrupted", CircuitBreakerPolicy.builder()
+            .resetTimeout(Duration.ofMillis(500)).maxAttempts(1).delay(Duration.ofMillis(1)).build(), window)
         CircuitBreakerOperations slow = registry.circuitBreaker("interrupted", CircuitBreakerPolicy.builder()
-            .resetTimeout(Duration.ofMillis(500)).requestVolumeThreshold(1).failureRatio(1)
-            .maxAttempts(3).delay(Duration.ofSeconds(10)).build())
+            .resetTimeout(Duration.ofMillis(500))
+            .maxAttempts(3).delay(Duration.ofSeconds(10)).build(), window)
 
         when: "a failure opens the circuit, and it half-opens"
         try {

@@ -15,12 +15,9 @@
  */
 package io.micronaut.retry;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.retry.annotation.RetryPredicate;
-import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,16 +28,12 @@ import java.util.Optional;
  * @param retryPolicy The retry policy used by the circuit breaker
  * @param resetTimeout The timeout before the circuit transitions to half open
  * @param throwWrappedException Whether open-circuit exceptions should be wrapped
- * @param window The rolling window that decides when the circuit opens and closes, or
- *               {@code null} for the circuit breaker of Micronaut: the first failure that survives
- *               the retries opens it, and the first success of a half-open circuit closes it
  * @author graemerocher
  * @since 5.0.0
  */
 public record CircuitBreakerPolicy(RetryPolicy retryPolicy,
                                    Duration resetTimeout,
-                                   boolean throwWrappedException,
-                                   @Nullable Window window) {
+                                   boolean throwWrappedException) {
 
     public static final Duration DEFAULT_DELAY = Duration.ofMillis(500);
     public static final Duration DEFAULT_MAX_DELAY = Duration.ofSeconds(5);
@@ -53,25 +46,6 @@ public record CircuitBreakerPolicy(RetryPolicy retryPolicy,
         if (resetTimeout.isZero() || resetTimeout.isNegative()) {
             throw new IllegalArgumentException("resetTimeout must be greater than 0");
         }
-    }
-
-    /**
-     * A policy without a rolling window: the circuit breaker of Micronaut.
-     *
-     * @param retryPolicy The retry policy used by the circuit breaker
-     * @param resetTimeout The timeout before the circuit transitions to half open
-     * @param throwWrappedException Whether open-circuit exceptions should be wrapped
-     */
-    public CircuitBreakerPolicy(RetryPolicy retryPolicy, Duration resetTimeout, boolean throwWrappedException) {
-        this(retryPolicy, resetTimeout, throwWrappedException, null);
-    }
-
-    /**
-     * @return The rolling window of the policy, if it has one
-     * @since 5.3.0
-     */
-    public Optional<Window> getWindow() {
-        return Optional.ofNullable(window);
     }
 
     /**
@@ -201,12 +175,6 @@ public record CircuitBreakerPolicy(RetryPolicy retryPolicy,
             .maxDelay(DEFAULT_MAX_DELAY);
         private Duration resetTimeout = DEFAULT_RESET_TIMEOUT;
         private boolean throwWrappedException;
-        private boolean windowed;
-        private int requestVolumeThreshold = Window.DEFAULT_REQUEST_VOLUME_THRESHOLD;
-        private double failureRatio = Window.DEFAULT_FAILURE_RATIO;
-        private int successThreshold = Window.DEFAULT_SUCCESS_THRESHOLD;
-        private final List<Class<? extends Throwable>> failOn = new ArrayList<>();
-        private final List<Class<? extends Throwable>> skipOn = new ArrayList<>();
 
         private Builder() {
         }
@@ -335,171 +303,12 @@ public record CircuitBreakerPolicy(RetryPolicy retryPolicy,
         }
 
         /**
-         * Sets the size of the rolling window of the calls of a closed circuit, see
-         * {@link Window#requestVolumeThreshold()}. Setting it, or any other setting of the window,
-         * gives the policy a rolling window, with the defaults of the other settings.
-         *
-         * @param requestVolumeThreshold The number of calls of the window, at least 1, default 20
-         * @return This builder
-         * @since 5.3.0
-         */
-        public Builder requestVolumeThreshold(int requestVolumeThreshold) {
-            this.windowed = true;
-            this.requestVolumeThreshold = requestVolumeThreshold;
-            return this;
-        }
-
-        /**
-         * @param failureRatio The ratio of failures of a full window that opens the circuit,
-         *                     between 0 and 1, default 0.5, see {@link Window#failureRatio()}
-         * @return This builder
-         * @since 5.3.0
-         */
-        public Builder failureRatio(double failureRatio) {
-            this.windowed = true;
-            this.failureRatio = failureRatio;
-            return this;
-        }
-
-        /**
-         * @param successThreshold The number of trial calls of a half-open circuit, which all
-         *                         succeed to close it, at least 1, default 1, see
-         *                         {@link Window#successThreshold()}
-         * @return This builder
-         * @since 5.3.0
-         */
-        public Builder successThreshold(int successThreshold) {
-            this.windowed = true;
-            this.successThreshold = successThreshold;
-            return this;
-        }
-
-        /**
-         * @param failOn The exceptions that count as a failure, default every one, see
-         *               {@link Window#failOn()}
-         * @return This builder
-         * @since 5.3.0
-         */
-        @SafeVarargs
-        public final Builder failOn(Class<? extends Throwable>... failOn) {
-            this.windowed = true;
-            this.failOn.addAll(List.of(failOn));
-            return this;
-        }
-
-        /**
-         * @param skipOn The exceptions that count as a success, see {@link Window#skipOn()}
-         * @return This builder
-         * @since 5.3.0
-         */
-        @SafeVarargs
-        public final Builder skipOn(Class<? extends Throwable>... skipOn) {
-            this.windowed = true;
-            this.skipOn.addAll(List.of(skipOn));
-            return this;
-        }
-
-        /**
          * Builds the circuit breaker policy.
          *
          * @return The circuit breaker policy
          */
         public CircuitBreakerPolicy build() {
-            Window window = windowed ? new Window(requestVolumeThreshold, failureRatio, successThreshold, failOn, skipOn) : null;
-            return new CircuitBreakerPolicy(retryPolicyBuilder.build(), resetTimeout, throwWrappedException, window);
-        }
-    }
-
-    /**
-     * The rolling window of a circuit breaker, as in MicroProfile Fault Tolerance: the outcomes of
-     * the last {@link #requestVolumeThreshold()} calls of a closed circuit decide when it opens.
-     * <ul>
-     *     <li>A closed circuit opens when its window is full and the ratio of failures in it
-     *     reaches {@link #failureRatio()}; never before the window is full.</li>
-     *     <li>An open circuit half-opens after the reset timeout of the policy, and permits
-     *     {@link #successThreshold()} trial calls: it closes when they all succeed, and any
-     *     failure opens it again. A call beyond the permitted trials is rejected like a call of
-     *     an open circuit, and counts for nothing.</li>
-     *     <li>Every change of state starts a new window.</li>
-     * </ul>
-     * An exception counts as a success if it is one of {@link #skipOn()}, else as a failure if it
-     * is one of {@link #failOn()}, else as a success.
-     *
-     * @param requestVolumeThreshold The number of calls of the window, at least 1
-     * @param failureRatio           The ratio of failures of a full window that opens the circuit,
-     *                               between 0 and 1; a window opens it only with a failure
-     * @param successThreshold       The number of trial calls of a half-open circuit, at least 1
-     * @param failOn                 The exceptions that count as a failure; empty for every one
-     * @param skipOn                 The exceptions that count as a success
-     * @since 5.3.0
-     */
-    @Experimental
-    public record Window(int requestVolumeThreshold,
-                         double failureRatio,
-                         int successThreshold,
-                         List<Class<? extends Throwable>> failOn,
-                         List<Class<? extends Throwable>> skipOn) {
-
-        /**
-         * The default size of the window.
-         */
-        public static final int DEFAULT_REQUEST_VOLUME_THRESHOLD = 20;
-        /**
-         * The default ratio of failures.
-         */
-        public static final double DEFAULT_FAILURE_RATIO = 0.5;
-        /**
-         * The default number of trial calls.
-         */
-        public static final int DEFAULT_SUCCESS_THRESHOLD = 1;
-
-        /**
-         * @param requestVolumeThreshold The number of calls of the window
-         * @param failureRatio           The ratio of failures
-         * @param successThreshold       The number of trial calls
-         * @param failOn                 The exceptions that count as a failure
-         * @param skipOn                 The exceptions that count as a success
-         */
-        public Window {
-            if (requestVolumeThreshold < 1) {
-                throw new IllegalArgumentException("requestVolumeThreshold must be at least 1");
-            }
-            if (failureRatio < 0 || failureRatio > 1 || Double.isNaN(failureRatio)) {
-                throw new IllegalArgumentException("failureRatio must be between 0 and 1");
-            }
-            if (successThreshold < 1) {
-                throw new IllegalArgumentException("successThreshold must be at least 1");
-            }
-            failOn = List.copyOf(Objects.requireNonNull(failOn, "failOn"));
-            skipOn = List.copyOf(Objects.requireNonNull(skipOn, "skipOn"));
-        }
-
-        /**
-         * @param failure An exception of a call
-         * @return Whether it counts as a failure
-         */
-        public boolean isFailure(Throwable failure) {
-            for (Class<? extends Throwable> type : skipOn) {
-                if (type.isInstance(failure)) {
-                    return false;
-                }
-            }
-            if (failOn.isEmpty()) {
-                return true;
-            }
-            for (Class<? extends Throwable> type : failOn) {
-                if (type.isInstance(failure)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * @return The number of failures of a full window that opens the circuit, at least 1
-         */
-        public int failureThreshold() {
-            return Math.max(1, (int) Math.ceil(failureRatio * requestVolumeThreshold - 1e-9));
+            return new CircuitBreakerPolicy(retryPolicyBuilder.build(), resetTimeout, throwWrappedException);
         }
     }
 }

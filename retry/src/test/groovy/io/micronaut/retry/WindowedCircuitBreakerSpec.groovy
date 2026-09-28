@@ -275,8 +275,8 @@ class WindowedCircuitBreakerSpec extends Specification {
     void "a policy with a window, programmatic and annotated"() {
         given:
         CircuitBreakerOperations operations = registry.circuitBreaker("programmatic", CircuitBreakerPolicy.builder()
-            .maxAttempts(1).delay(Duration.ofMillis(1)).resetTimeout(Duration.ofMinutes(1))
-            .requestVolumeThreshold(3).failureRatio(0.6).build())
+            .maxAttempts(1).delay(Duration.ofMillis(1)).resetTimeout(Duration.ofMinutes(1)).build(),
+            CircuitBreakerWindow.builder().requestVolumeThreshold(3).failureRatio(0.6).build())
         WindowedService service = context.getBean(WindowedService)
 
         when: "two failed operations of three: 0.67 reaches 0.6"
@@ -333,19 +333,19 @@ class WindowedCircuitBreakerSpec extends Specification {
 
     void "an invalid window is rejected"() {
         when:
-        CircuitBreakerPolicy.builder().requestVolumeThreshold(0).build()
+        CircuitBreakerWindow.builder().requestVolumeThreshold(0).build()
 
         then:
         thrown(IllegalArgumentException)
 
         when:
-        CircuitBreakerPolicy.builder().failureRatio(1.5).build()
+        CircuitBreakerWindow.builder().failureRatio(1.5).build()
 
         then:
         thrown(IllegalArgumentException)
 
         when:
-        CircuitBreakerPolicy.builder().successThreshold(0).build()
+        CircuitBreakerWindow.builder().successThreshold(0).build()
 
         then:
         thrown(IllegalArgumentException)

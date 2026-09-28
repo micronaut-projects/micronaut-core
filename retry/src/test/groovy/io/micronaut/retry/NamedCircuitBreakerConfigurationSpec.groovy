@@ -32,7 +32,7 @@ class NamedCircuitBreakerConfigurationSpec extends Specification {
         ])
 
         when:
-        CircuitBreakerPolicy.Window window = policy(context, "orders").window()
+        CircuitBreakerWindow window = window(context, "orders")
 
         then:
         window.failOn() == [IOException, IllegalStateException]
@@ -50,7 +50,7 @@ class NamedCircuitBreakerConfigurationSpec extends Specification {
         ])
 
         when:
-        CircuitBreakerPolicy.Window window = policy(context, "orders").window()
+        CircuitBreakerWindow window = window(context, "orders")
 
         then:
         window.failOn() == [IOException, IllegalStateException]
@@ -81,13 +81,13 @@ class NamedCircuitBreakerConfigurationSpec extends Specification {
         property << ['fail-on', 'skip-on']
     }
 
-    void "a #property class that is not an exception fails the policy with the circuit breaker and the property"() {
+    void "a #property class that is not an exception fails the window with the circuit breaker and the property"() {
         given:
         NamedCircuitBreakerConfiguration configuration = new NamedCircuitBreakerConfiguration("bad")
         configuration."$setter"(['java.lang.String'])
 
         when:
-        configuration.toPolicy()
+        configuration.toWindow()
 
         then:
         IllegalArgumentException e = thrown()
@@ -99,8 +99,8 @@ class NamedCircuitBreakerConfigurationSpec extends Specification {
         'skip-on' | 'setSkipOn'
     }
 
-    private static CircuitBreakerPolicy policy(ApplicationContext context, String name) {
-        return context.getBeansOfType(NamedCircuitBreakerConfiguration).find { it.name == name }.toPolicy()
+    private static CircuitBreakerWindow window(ApplicationContext context, String name) {
+        return context.getBeansOfType(NamedCircuitBreakerConfiguration).find { it.name == name }.toWindow()
     }
 
     private static String messages(Throwable e) {

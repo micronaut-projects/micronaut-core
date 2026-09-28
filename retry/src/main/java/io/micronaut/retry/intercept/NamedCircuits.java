@@ -17,6 +17,7 @@ package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.CircuitBreakerPolicy;
+import io.micronaut.retry.CircuitBreakerWindow;
 import io.micronaut.retry.NamedCircuitBreakerConfiguration;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -82,8 +83,20 @@ public final class NamedCircuits {
      * @return The policy of the configuration of the name, or of the defaults of a configuration
      */
     public CircuitBreakerPolicy policy(String name) {
+        return configuration(name).toPolicy();
+    }
+
+    /**
+     * @param name The name
+     * @return The rolling window of the configuration of the name, if it has one
+     */
+    public @Nullable CircuitBreakerWindow window(String name) {
+        return configuration(name).toWindow();
+    }
+
+    private NamedCircuitBreakerConfiguration configuration(String name) {
         NamedCircuitBreakerConfiguration configuration = configurations.get(name);
-        return (configuration == null ? new NamedCircuitBreakerConfiguration(name) : configuration).toPolicy();
+        return configuration == null ? new NamedCircuitBreakerConfiguration(name) : configuration;
     }
 
     /**
@@ -109,40 +122,42 @@ public final class NamedCircuits {
      *
      * @param name          The name
      * @param policy        The policy of the user
+     * @param window        The rolling window of the user, if any
      * @param declaresReset Whether the user declares the reset timeout of the policy, rather than
      *                      takes a default; a policy with a window declares it
      * @param user          The user, for the error of a conflict
      * @return The circuit
      * @throws IllegalStateException if the user disagrees with the circuit
      */
-    public CircuitBreakerRetry.Circuit join(String name, CircuitBreakerPolicy policy, boolean declaresReset, String user) {
+    public CircuitBreakerRetry.Circuit join(String name,
+                                            CircuitBreakerPolicy policy,
+                                            @Nullable CircuitBreakerWindow window,
+                                            boolean declaresReset,
+                                            String user) {
         Objects.requireNonNull(name, "name");
         NamedCircuitBreakerConfiguration configuration = configurations.get(name);
         if (configuration != null) {
             CircuitBreakerPolicy configured = configuration.toPolicy();
+            CircuitBreakerWindow configuredWindow = configuration.toWindow();
             boolean conflict = declaresReset && !configured.getResetTimeout().equals(policy.getResetTimeout())
-                || policy.window() != null && !policy.window().equals(configured.window());
+                || window != null && !window.equals(configuredWindow);
             if (conflict) {
-                throw new IllegalStateException("The circuit breaker [" + name + "] of " + user + " declares " + describe(policy)
-                    + ", but the configuration " + NamedCircuitBreakerConfiguration.PREFIX + "." + name + " has " + describe(configured)
+                throw new IllegalStateException("The circuit breaker [" + name + "] of " + user + " declares " + describe(policy.getResetTimeout(), window)
+                    + ", but the configuration " + NamedCircuitBreakerConfiguration.PREFIX + "." + name + " has " + describe(configured.getResetTimeout(), configuredWindow)
                     + ": remove them from the user, or make them the same");
             }
-            return circuits.computeIfAbsent(name, n -> new Entry(configured, "the configuration " + NamedCircuitBreakerConfiguration.PREFIX + "." + n)).circuit();
+            return circuits.computeIfAbsent(name, n -> new Entry(configured, configuredWindow, "the configuration " + NamedCircuitBreakerConfiguration.PREFIX + "." + n)).circuit();
         }
-        Entry entry = circuits.computeIfAbsent(name, n -> new Entry(policy, user));
-        if (!entry.resetTimeout().equals(policy.getResetTimeout()) || !Objects.equals(entry.circuit().getWindow(), policy.window())) {
-            throw new IllegalStateException("The circuit breaker [" + name + "] of " + user + " has " + describe(policy)
+        Entry entry = circuits.computeIfAbsent(name, n -> new Entry(policy, window, user));
+        if (!entry.resetTimeout().equals(policy.getResetTimeout()) || !Objects.equals(entry.circuit().getWindow(), window)) {
+            throw new IllegalStateException("The circuit breaker [" + name + "] of " + user + " has " + describe(policy.getResetTimeout(), window)
                 + ", but " + entry.user() + " created it with " + describe(entry.resetTimeout(), entry.circuit().getWindow())
                 + ": the users of one name must agree, or configure them once under " + NamedCircuitBreakerConfiguration.PREFIX + "." + name);
         }
         return entry.circuit();
     }
 
-    private static String describe(CircuitBreakerPolicy policy) {
-        return describe(policy.getResetTimeout(), policy.window());
-    }
-
-    private static String describe(Duration resetTimeout, CircuitBreakerPolicy.@Nullable Window window) {
+    private static String describe(Duration resetTimeout, @Nullable CircuitBreakerWindow window) {
         return "the reset " + resetTimeout + " and " + (window == null ? "no rolling window" : "the rolling window " + window);
     }
 
@@ -154,8 +169,8 @@ public final class NamedCircuits {
      * @param user         The user that created it
      */
     private record Entry(CircuitBreakerRetry.Circuit circuit, Duration resetTimeout, String user) {
-        Entry(CircuitBreakerPolicy policy, String user) {
-            this(new CircuitBreakerRetry.Circuit(policy.getResetTimeout().toMillis(), policy.window()), policy.getResetTimeout(), user);
+        Entry(CircuitBreakerPolicy policy, @Nullable CircuitBreakerWindow window, String user) {
+            this(new CircuitBreakerRetry.Circuit(policy.getResetTimeout().toMillis(), window), policy.getResetTimeout(), user);
         }
     }
 }

@@ -71,18 +71,26 @@ final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
     @Override
     public CircuitBreakerOperations circuitBreaker(String name) {
         Objects.requireNonNull(name, "name");
-        return configured.computeIfAbsent(name, n -> operations(n, circuits.policy(n), "CircuitBreakerRegistry.circuitBreaker(\"" + n + "\")"));
+        return configured.computeIfAbsent(name, n -> operations(n, circuits.policy(n), circuits.window(n), "CircuitBreakerRegistry.circuitBreaker(\"" + n + "\")"));
     }
 
     @Override
     public CircuitBreakerOperations circuitBreaker(String name, CircuitBreakerPolicy policy) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(policy, "policy");
-        return operations(name, policy, "CircuitBreakerRegistry.circuitBreaker(\"" + name + "\", policy)");
+        return operations(name, policy, null, "CircuitBreakerRegistry.circuitBreaker(\"" + name + "\", policy)");
     }
 
-    private CircuitBreakerOperations operations(String name, CircuitBreakerPolicy policy, String user) {
-        CircuitBreakerRetry.Circuit circuit = circuits.join(name, policy, false, user);
+    @Override
+    public CircuitBreakerOperations circuitBreaker(String name, CircuitBreakerPolicy policy, CircuitBreakerWindow window) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(policy, "policy");
+        Objects.requireNonNull(window, "window");
+        return operations(name, policy, window, "CircuitBreakerRegistry.circuitBreaker(\"" + name + "\", policy, window)");
+    }
+
+    private CircuitBreakerOperations operations(String name, CircuitBreakerPolicy policy, @Nullable CircuitBreakerWindow window, String user) {
+        CircuitBreakerRetry.Circuit circuit = circuits.join(name, policy, window, false, user);
         return new DefaultCircuitBreakerOperations(policy, circuit, name, eventPublisher, retryRunner, NO_OP_EVENT_EMITTER);
     }
 
@@ -91,7 +99,7 @@ final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
         Objects.requireNonNull(name, "name");
         return guards.computeIfAbsent(name, n -> new DefaultCircuitBreakerGuard(
             n,
-            circuits.join(n, circuits.policy(n), false, "CircuitBreakerRegistry.guard(\"" + n + "\")"),
+            circuits.join(n, circuits.policy(n), circuits.window(n), false, "CircuitBreakerRegistry.guard(\"" + n + "\")"),
             eventPublisher
         ));
     }
@@ -110,7 +118,7 @@ final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
         if (circuits.findConfiguration(name) == null) {
             return Optional.empty();
         }
-        CircuitBreakerPolicy.Window window = circuits.policy(name).window();
+        CircuitBreakerWindow window = circuits.window(name);
         return Optional.of(new CircuitBreakerSnapshot(name, CircuitState.CLOSED, window == null ? 0 : window.requestVolumeThreshold(),
             0, 0, 0, 0, 0, null));
     }

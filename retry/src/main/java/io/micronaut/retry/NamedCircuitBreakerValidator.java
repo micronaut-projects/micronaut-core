@@ -41,6 +41,7 @@ final class NamedCircuitBreakerValidator {
     NamedCircuitBreakerValidator(List<NamedCircuitBreakerConfiguration> configurations) {
         for (NamedCircuitBreakerConfiguration configuration : configurations) {
             configuration.toPolicy();
+            configuration.toWindow();
         }
     }
 }

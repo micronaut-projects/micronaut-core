@@ -139,7 +139,7 @@ public @interface CircuitBreaker {
 
     /**
      * The size of the rolling window of the calls of a closed circuit, as in MicroProfile Fault
-     * Tolerance, see {@link io.micronaut.retry.CircuitBreakerPolicy.Window}: the circuit opens
+     * Tolerance, see {@link io.micronaut.retry.CircuitBreakerWindow}: the circuit opens
      * when the window is full and the ratio of failures in it reaches {@link #failureRatio()}.
      * Setting it, or {@link #failureRatio()}, {@link #successThreshold()}, {@link #failOn()} or
      * {@link #skipOn()}, gives the circuit a rolling window, with the defaults of the others.

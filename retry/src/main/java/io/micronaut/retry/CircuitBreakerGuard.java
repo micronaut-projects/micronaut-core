@@ -59,7 +59,7 @@ public interface CircuitBreakerGuard {
      * Acquire the circuit for an operation: fail fast while it is open. Without a rolling window,
      * a half-open circuit lets every operation through and the first outcome closes or opens it
      * again; with one, it permits its trial operations only, see
-     * {@link CircuitBreakerPolicy.Window}. Report the outcome of the operation with the permit,
+     * {@link CircuitBreakerWindow}. Report the outcome of the operation with the permit,
      * or release it when there is none.
      *
      * @return The permit of the operation
@@ -84,7 +84,7 @@ public interface CircuitBreakerGuard {
 
         /**
          * Report that the operation failed: with a rolling window, the failure counts as the
-         * {@link CircuitBreakerPolicy.Window#isFailure(Throwable) failOn and skipOn} of the
+         * {@link CircuitBreakerWindow#isFailure(Throwable) failOn and skipOn} of the
          * window decide; without one, it opens the circuit.
          *
          * @param failure The failure

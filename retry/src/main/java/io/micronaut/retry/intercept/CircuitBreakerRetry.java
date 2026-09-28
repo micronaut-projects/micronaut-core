@@ -19,8 +19,8 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.retry.CircuitBreakerPolicy;
 import io.micronaut.retry.CircuitBreakerSnapshot;
+import io.micronaut.retry.CircuitBreakerWindow;
 import io.micronaut.retry.CircuitState;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.RetryStateBuilder;
@@ -116,7 +116,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
      * @since 5.3.0
      */
     public MutableRetryState newInvocation() {
-        CircuitBreakerPolicy.Window window = circuit.window;
+        CircuitBreakerWindow window = circuit.window;
         return window == null ? this : new WindowedInvocation(this, window);
     }
 
@@ -367,12 +367,12 @@ public class CircuitBreakerRetry implements MutableRetryState {
         private static final long NO_PERMIT = Long.MIN_VALUE;
 
         private final CircuitBreakerRetry owner;
-        private final CircuitBreakerPolicy.Window window;
+        private final CircuitBreakerWindow window;
         private final MutableRetryState childState;
         private final AtomicBoolean ended = new AtomicBoolean();
         private volatile long permit = NO_PERMIT;
 
-        WindowedInvocation(CircuitBreakerRetry owner, CircuitBreakerPolicy.Window window) {
+        WindowedInvocation(CircuitBreakerRetry owner, CircuitBreakerWindow window) {
             this.owner = owner;
             this.window = window;
             this.childState = (MutableRetryState) owner.retryStateBuilder.build();
@@ -478,9 +478,9 @@ public class CircuitBreakerRetry implements MutableRetryState {
      * {@link CircuitBreakerRetry} states can share one, e.g. the users of a named circuit
      * breaker, see {@link io.micronaut.retry.CircuitBreakerRegistry}.
      *
-     * <p>Without a {@link CircuitBreakerPolicy.Window window}, the circuit behaves as the circuit
+     * <p>Without a {@link CircuitBreakerWindow window}, the circuit behaves as the circuit
      * breaker of Micronaut always did. With one, the outcomes of the last calls decide, see
-     * {@link CircuitBreakerPolicy.Window}; every change of its state happens under the lock of the
+     * {@link CircuitBreakerWindow}; every change of its state happens under the lock of the
      * circuit, and every change starts a new generation, so that the outcome of a call that took
      * a permit of an older state never counts. A half-open circuit whose trial permits have all
      * been taken for longer than the reset timeout, e.g. by calls that never report an outcome,
@@ -493,7 +493,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
 
         private final long openTimeout;
         private final AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
-        private final CircuitBreakerPolicy.@Nullable Window window;
+        private final @Nullable CircuitBreakerWindow window;
         @Nullable
         private volatile Throwable lastError;
         private volatile long time = System.currentTimeMillis();
@@ -520,7 +520,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
          * @param openTimeout The time the circuit stays open before it half-opens, in millis
          * @param window      The rolling window, or {@code null} for the circuit breaker of Micronaut
          */
-        public Circuit(long openTimeout, CircuitBreakerPolicy.@Nullable Window window) {
+        public Circuit(long openTimeout, @Nullable CircuitBreakerWindow window) {
             this.openTimeout = openTimeout;
             this.window = window;
             this.outcomes = new boolean[window == null ? 0 : window.requestVolumeThreshold()];
@@ -536,7 +536,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
         /**
          * @return The rolling window of the circuit, or {@code null}
          */
-        public CircuitBreakerPolicy.@Nullable Window getWindow() {
+        public @Nullable CircuitBreakerWindow getWindow() {
             return window;
         }
 
@@ -665,7 +665,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
          * @return 1 if the circuit opened, -1 if it closed, 0 otherwise
          */
         private int recordLocked(long permit, boolean failure, @Nullable Throwable cause) {
-            CircuitBreakerPolicy.Window w = Objects.requireNonNull(window);
+            CircuitBreakerWindow w = Objects.requireNonNull(window);
             if (permit != generation) {
                 // a call of an older state
                 return 0;

@@ -26,6 +26,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitBreakerPolicy;
+import io.micronaut.retry.CircuitBreakerWindow;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryRegistry;
 import io.micronaut.retry.RetryState;
@@ -255,14 +256,15 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         CircuitBreakerPolicy circuitBreakerPolicy = namedPolicy == null
             ? annotationRetryStateBuilder.circuitBreakerPolicy()
             : annotationRetryStateBuilder.circuitBreakerPolicy(namedPolicy);
+        CircuitBreakerWindow window = annotationRetryStateBuilder.circuitBreakerWindow();
         String name = circuitBreaker == null ? "" : circuitBreaker.stringValue("name").orElse("");
         CircuitBreakerRetry.Circuit circuit;
         if (circuitBreaker == null || name.isEmpty()) {
-            circuit = new CircuitBreakerRetry.Circuit(circuitBreakerPolicy.getResetTimeout().toMillis(), circuitBreakerPolicy.window());
+            circuit = new CircuitBreakerRetry.Circuit(circuitBreakerPolicy.getResetTimeout().toMillis(), window);
         } else {
             boolean declaresReset = circuitBreaker.contains("reset");
             String user = "@CircuitBreaker of " + context.getDeclaringType().getName() + "#" + context.getMethodName();
-            circuit = namedCircuits.join(name, circuitBreakerPolicy, declaresReset, user);
+            circuit = namedCircuits.join(name, circuitBreakerPolicy, window, declaresReset, user);
         }
         return new CircuitBreakerRetry(
             circuit,
