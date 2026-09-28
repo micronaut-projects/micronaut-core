@@ -468,6 +468,20 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("LocalResponseCache")
+    GatewayFilterFactory localResponseCache(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of("time-to-live", "size"), args -> {
+            ResponseCacheArguments bound = args.bind(ResponseCacheArguments.class);
+            String storeName = bound.store();
+            io.micronaut.http.gateway.ResponseCacheStore store = storeName == null || storeName.isBlank()
+                ? new io.micronaut.http.gateway.InMemoryResponseCacheStore(bound.size())
+                : beanLocator.findBean(io.micronaut.http.gateway.ResponseCacheStore.class, Qualifiers.byName(storeName))
+                    .orElseThrow(() -> new ConfigurationException("No ResponseCacheStore bean named " + storeName));
+            return GatewayFilters.localResponseCache(store, bound.timeToLive(), bound.size());
+        });
+    }
+
+    @Singleton
     @Named("ModifyRequestBody")
     GatewayFilterFactory modifyRequestBody(BeanLocator beanLocator) {
         return GatewayFilterFactory.of(List.of("rewriter", "max-size"), args ->
@@ -726,6 +740,19 @@ final class BuiltInGatewayFactories {
                                 @Bindable(defaultValue = "403") String emptyKeyStatus,
                                 @Bindable(defaultValue = "true") boolean includeHeaders,
                                 @Nullable String rateLimiter) {
+    }
+
+    /**
+     * The arguments of the {@code LocalResponseCache} filter.
+     *
+     * @param timeToLive How long a response without its own freshness is fresh, 5 minutes by default
+     * @param size       The capacity of the cache and the maximum size of a response, 16 MiB by default
+     * @param store      The name of a ResponseCacheStore bean, the memory of the gateway by default
+     */
+    @Introspected
+    record ResponseCacheArguments(@Bindable(defaultValue = "5m") Duration timeToLive,
+                                  @ReadableBytes @Bindable(defaultValue = "16777216") long size,
+                                  @Nullable String store) {
     }
 
     /**

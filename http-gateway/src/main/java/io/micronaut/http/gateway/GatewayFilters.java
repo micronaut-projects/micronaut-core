@@ -33,6 +33,7 @@ import io.micronaut.web.router.builder.RouteFilterSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.time.Duration;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -388,6 +389,45 @@ public final class GatewayFilters {
             throw new IllegalArgumentException("A bulkhead needs at least 1 request in flight: " + maxConcurrent);
         }
         return new Bulkhead(maxConcurrent, Objects.requireNonNull(keyResolver, "keyResolver"));
+    }
+
+    /**
+     * Cache the responses of the route, like Spring Cloud Gateway's {@code LocalResponseCache}:
+     * a {@code 200} response to a {@code GET} is stored when its {@code Cache-Control} allows it,
+     * fresh for its {@code s-maxage}, {@code max-age} or {@code Expires}, or for the time to live
+     * when it has none, and answers the next {@code GET} and {@code HEAD} of the same URI, with
+     * the same credentials and the same values of the headers of its {@code Vary}, with an
+     * {@code Age}, or {@code 304} to a matching {@code If-None-Match} or
+     * {@code If-Modified-Since}. The body is copied as it streams to the client, which is never
+     * slowed down; an incomplete body, or one over the maximum size, is not stored. Not stored:
+     * {@code no-store}, {@code private} and {@code no-cache} responses, responses with
+     * {@code Set-Cookie} or {@code Vary: *}, and responses to a request with
+     * {@code Authorization}, unless {@code public} or {@code s-maxage}. A request with
+     * {@code no-cache} or {@code max-age=0} goes to the upstream, and one with {@code no-store}
+     * is not stored; a {@code POST}, {@code PUT}, {@code PATCH} or {@code DELETE} of the URI
+     * removes its responses. Protocol switches and {@code Range} requests are never cached. A
+     * route filter.
+     *
+     * @param store         Where the responses are kept
+     * @param timeToLive    How long a response without its own freshness is fresh; zero to
+     *                      store only responses with their own freshness
+     * @param maxEntryBytes The maximum size of the body of a stored response
+     * @return The filter
+     */
+    public static GatewayFilter localResponseCache(ResponseCacheStore store, Duration timeToLive, long maxEntryBytes) {
+        return new LocalResponseCache(store, timeToLive, maxEntryBytes, System::currentTimeMillis);
+    }
+
+    /**
+     * A response cache in the memory of the gateway, see
+     * {@link #localResponseCache(ResponseCacheStore, Duration, long)}.
+     *
+     * @param timeToLive How long a response without its own freshness is fresh
+     * @param size       The capacity of the cache in bytes, also the maximum size of a response
+     * @return The filter
+     */
+    public static GatewayFilter localResponseCache(Duration timeToLive, long size) {
+        return localResponseCache(new InMemoryResponseCacheStore(size), timeToLive, size);
     }
 
     /**
