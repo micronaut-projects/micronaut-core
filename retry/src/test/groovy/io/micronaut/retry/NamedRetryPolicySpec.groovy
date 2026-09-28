@@ -163,6 +163,51 @@ class NamedRetryPolicySpec extends Specification {
         service.calls.getAndSet(0) == 1
     }
 
+    void "the includes of the annotation keep the excludes of the policy"() {
+        given:
+        NamedRetryService service = context.getBean(NamedRetryService)
+
+        when: "an exception the annotation includes is retried"
+        service.overriddenIncludesOnly(new SocketException("socket"))
+
+        then:
+        thrown(SocketException)
+        service.calls.getAndSet(0) == 6
+
+        when: "an included exception that the policy excludes is not retried"
+        service.overriddenIncludesOnly(new FileNotFoundException("missing"))
+
+        then:
+        thrown(FileNotFoundException)
+        service.calls.getAndSet(0) == 1
+    }
+
+    void "the excludes of the annotation keep the includes of the policy"() {
+        given:
+        NamedRetryService service = context.getBean(NamedRetryService)
+
+        when: "an exception the annotation excludes is not retried"
+        service.overriddenExcludesOnly(new EOFException("eof"))
+
+        then:
+        thrown(EOFException)
+        service.calls.getAndSet(0) == 1
+
+        when: "an exception the policy excludes is retried, the annotation replaced the excludes"
+        service.overriddenExcludesOnly(new FileNotFoundException("missing"))
+
+        then:
+        thrown(FileNotFoundException)
+        service.calls.getAndSet(0) == 6
+
+        when: "an exception the policy does not include is not retried"
+        service.overriddenExcludesOnly(new IllegalStateException("state"))
+
+        then:
+        thrown(IllegalStateException)
+        service.calls.getAndSet(0) == 1
+    }
+
     void "a method with an unknown policy name fails on its first call"() {
         given:
         NamedRetryService service = context.getBean(NamedRetryService)
@@ -216,6 +261,18 @@ class NamedRetryPolicySpec extends Specification {
 
         @Retryable(name = 'io', includes = IllegalStateException)
         void overriddenIncludes(Exception e) {
+            calls.incrementAndGet()
+            throw e
+        }
+
+        @Retryable(name = 'io', includes = [SocketException, FileNotFoundException])
+        void overriddenIncludesOnly(Exception e) {
+            calls.incrementAndGet()
+            throw e
+        }
+
+        @Retryable(name = 'io', excludes = EOFException)
+        void overriddenExcludesOnly(Exception e) {
             calls.incrementAndGet()
             throw e
         }

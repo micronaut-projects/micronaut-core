@@ -39,6 +39,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -199,8 +200,11 @@ class ExpectContinueTest {
 
         void write(String text) throws Exception {
             Assertions.assertTrue(accepted.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The client did not connect");
-            socket.getOutputStream().write(text.getBytes(StandardCharsets.ISO_8859_1));
-            socket.getOutputStream().flush();
+            // the stream is taken once: the client may close the connection as soon as it has the
+            // response, and the reader then closes the socket, after which getOutputStream throws
+            OutputStream out = socket.getOutputStream();
+            out.write(text.getBytes(StandardCharsets.ISO_8859_1));
+            out.flush();
         }
 
         @Override

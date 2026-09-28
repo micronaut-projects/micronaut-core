@@ -342,6 +342,70 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void poolsAModuleWhoseOnlyModuleLevelDecoratorsAreNotScopes(@TempDir Path sourceDirectory) throws Exception {
+        // A module-level decorator that is not a scope must not cost the module its
+        // pooling. @Controller carries @DefaultScope(Singleton), which is a default
+        // rather than a declaration, so @ContextPooled is free to override it.
+        Files.writeString(sourceDirectory.resolve("routes.py"), """
+            from typing import Annotated
+
+            from jakarta.inject import Inject
+            from micronaut.http.annotation import Controller, Get
+
+            from greeter import Greeter
+
+            Controller("/module")
+
+            greeter: Annotated[Greeter, Inject]
+
+            @Get("/")
+            def module_root() -> str:
+                return greeter.greet()
+        """.indent(-4));
+        // The guard it replaces: a module that declares a scope of its own keeps it.
+        Files.writeString(sourceDirectory.resolve("scoped_routes.py"), """
+            from typing import Annotated
+
+            from jakarta.inject import Inject
+            from jakarta.inject import Singleton
+            from micronaut.http.annotation import Controller, Get
+
+            from greeter import Greeter
+
+            Controller("/scoped")
+            Singleton()
+
+            greeter: Annotated[Greeter, Inject]
+
+            @Get("/")
+            def scoped_root() -> str:
+                return greeter.greet()
+        """.indent(-4));
+        Files.writeString(sourceDirectory.resolve("greeter.py"), """
+            from jakarta.inject import Singleton
+
+            @Singleton
+            class Greeter:
+                def greet(self) -> str:
+                    return "hello"
+        """.indent(-4));
+
+        Path outputDirectory = sourceDirectory.resolve("output");
+        Files.createDirectories(outputDirectory);
+        PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .targetDir(outputDirectory.toFile())
+            .build()
+            .compile();
+
+        String pooled = Files.readString(findGeneratedSource(outputDirectory, "Routes.java"));
+        assertTrue(pooled.contains("PooledValueCoercible"), "a module whose decorators are not scopes should be pooled");
+
+        String scoped = Files.readString(findGeneratedSource(outputDirectory, "ScopedRoutes.java"));
+        assertFalse(scoped.contains("PooledValueCoercible"), "a module that declares a scope should keep it");
+    }
+
+    @Test
     void optionallyIncludesPythonBytecodeInTheInMemoryVfs() throws Exception {
         ClassLoader classLoader = PyronautCompiler.builder()
             .pythonCode("answer = 42")

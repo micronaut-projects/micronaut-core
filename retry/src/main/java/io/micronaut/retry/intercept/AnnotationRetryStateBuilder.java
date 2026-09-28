@@ -116,11 +116,14 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
             .multiplier(explicit.containsKey(MULTIPLIER) ? retry.get(MULTIPLIER, Double.class).orElse(namedPolicy.multiplier()) : namedPolicy.multiplier())
             .jitter(explicit.containsKey(JITTER) ? retry.get(JITTER, Double.class).orElse(namedPolicy.jitter()) : namedPolicy.jitter())
             .capturedException(retry.classValue(CAPTURED_EXCEPTION, Throwable.class).orElse(Exception.class));
-        if (explicit.containsKey(INCLUDES) || explicit.containsKey(EXCLUDES) || explicit.containsKey(VALUE)) {
+        if (explicit.containsKey(INCLUDES) || explicit.containsKey(VALUE)) {
             builder.includes(toThrowableClasses(retry.classValues(INCLUDES)));
-            builder.excludes(toThrowableClasses(retry.classValues(EXCLUDES)));
         } else {
             builder.includes(namedPolicy.includes().toArray(new Class[0]));
+        }
+        if (explicit.containsKey(EXCLUDES)) {
+            builder.excludes(toThrowableClasses(retry.classValues(EXCLUDES)));
+        } else {
             builder.excludes(namedPolicy.excludes().toArray(new Class[0]));
         }
         Class<? extends RetryPredicate> predicateClass = (Class<? extends RetryPredicate>) retry.classValue(PREDICATE).orElse(DefaultRetryPredicate.class);
