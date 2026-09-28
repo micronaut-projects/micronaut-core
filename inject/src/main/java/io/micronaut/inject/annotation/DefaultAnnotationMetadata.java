@@ -79,7 +79,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, List<String>> annotationsByStereotype;
 
     private final Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
-    private final Map<String, List> annotationValuesByName = new ConcurrentHashMap<>(2);
 
     private final boolean hasPropertyExpressions;
     private final boolean hasEvaluatedExpressions;
@@ -1011,24 +1010,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
-        if (!cachesAnnotationValuesByName()) {
-            return resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
-        }
-        List<AnnotationValue<T>> results = annotationValuesByName.get(annotationType);
-        if (results == null) {
-            results = resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
-            annotationValuesByName.put(annotationType, results);
-        }
-        return results;
-    }
-
-    /**
-     * Whether the values resolved by {@link #getAnnotationValuesByName(String)} may be cached.
-     *
-     * @return False for metadata that can still change
-     */
-    boolean cachesAnnotationValuesByName() {
-        return true;
+        return resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
@@ -1333,6 +1315,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 return Optional.of(newAnnotationValue(annotation, values));
             }
         }
+        if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+            return Optional.empty();
+        }
         return firstRepeatedValue(getAnnotationValuesByName(annotation));
     }
 
@@ -1630,7 +1615,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
         // a repeatable is stored under its container, so read the member off the first repeated value,
-        // which is the one the Class overloads answer with
+        // which is the one the Class overloads answer with; a miss on any other annotation ends here
+        if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+            return null;
+        }
         List<AnnotationValue<Annotation>> repeated = getAnnotationValuesByName(annotation);
         if (repeated.isEmpty()) {
             return null;
