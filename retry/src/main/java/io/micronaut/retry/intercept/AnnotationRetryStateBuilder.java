@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.retry.CircuitBreakerPolicy;
+import io.micronaut.retry.CircuitBreakerWindow;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.RetryStateBuilder;
@@ -26,10 +27,13 @@ import io.micronaut.retry.annotation.DefaultRetryPredicate;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.retry.annotation.Retryable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Builds a {@link RetryState} from {@link AnnotationMetadata}.
@@ -51,6 +55,11 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String JITTER = "jitter";
     private static final String RESET = "reset";
     private static final String THROW_WRAPPED_EXCEPTION = "throwWrappedException";
+    private static final String REQUEST_VOLUME_THRESHOLD = "requestVolumeThreshold";
+    private static final String FAILURE_RATIO = "failureRatio";
+    private static final String SUCCESS_THRESHOLD = "successThreshold";
+    private static final String FAIL_ON = "failOn";
+    private static final String SKIP_ON = "skipOn";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -151,6 +160,54 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
             .throwWrappedException(circuitBreaker.booleanValue(THROW_WRAPPED_EXCEPTION).orElse(false));
         retryPolicy.getMaxDelay().ifPresent(builder::maxDelay);
         return builder.build();
+    }
+
+    /**
+     * The rolling window of the circuit breaker annotation, if any of its members sets it.
+     *
+     * @return The window, or {@code null} for a circuit without one
+     */
+    @Nullable CircuitBreakerWindow circuitBreakerWindow() {
+        AnnotationValue<CircuitBreaker> circuitBreaker = annotationMetadata.findAnnotation(CircuitBreaker.class)
+            .orElseThrow(() -> new IllegalStateException("Missing @CircuitBreaker annotation"));
+        CircuitBreakerWindow.Builder builder = CircuitBreakerWindow.builder();
+        boolean windowed = false;
+        Optional<String> requestVolumeThreshold = circuitBreaker.stringValue(REQUEST_VOLUME_THRESHOLD).filter(v -> !v.isBlank());
+        if (requestVolumeThreshold.isPresent()) {
+            windowed = true;
+            builder.requestVolumeThreshold(Integer.parseInt(requestVolumeThreshold.get().strip()));
+        }
+        Optional<String> failureRatio = circuitBreaker.stringValue(FAILURE_RATIO).filter(v -> !v.isBlank());
+        if (failureRatio.isPresent()) {
+            windowed = true;
+            builder.failureRatio(Double.parseDouble(failureRatio.get().strip()));
+        }
+        Optional<String> successThreshold = circuitBreaker.stringValue(SUCCESS_THRESHOLD).filter(v -> !v.isBlank());
+        if (successThreshold.isPresent()) {
+            windowed = true;
+            builder.successThreshold(Integer.parseInt(successThreshold.get().strip()));
+        }
+        List<Class<? extends Throwable>> failOn = resolveThrowables(circuitBreaker, FAIL_ON);
+        if (!failOn.isEmpty()) {
+            windowed = true;
+            builder.failOn(failOn.toArray(new Class[0]));
+        }
+        List<Class<? extends Throwable>> skipOn = resolveThrowables(circuitBreaker, SKIP_ON);
+        if (!skipOn.isEmpty()) {
+            windowed = true;
+            builder.skipOn(skipOn.toArray(new Class[0]));
+        }
+        return windowed ? builder.build() : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Class<? extends Throwable>> resolveThrowables(AnnotationValue<CircuitBreaker> circuitBreaker, String member) {
+        Class<?>[] types = circuitBreaker.classValues(member);
+        List<Class<? extends Throwable>> throwables = new ArrayList<>(types.length);
+        for (Class<?> type : types) {
+            throwables.add((Class<? extends Throwable>) type);
+        }
+        return throwables;
     }
 
     private static RetryPredicate createPredicate(Class<? extends RetryPredicate> predicateClass, AnnotationValue<Retryable> retry) {
