@@ -24,6 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
 
@@ -55,6 +56,9 @@ final class BeanDefinitionProcessorListener implements BeanCreatedEventListener<
             final Argument<?> annotation = typeArguments.get(0);
             Collection<BeanDefinition<?>> beanDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype((Class) annotation.getType()));
 
+            if (beanContext instanceof DefaultBeanContext defaultBeanContext) {
+                defaultBeanContext.adaptProcessor((Class<? extends Annotation>) annotation.getType(), beanDefinitionProcessor);
+            }
             for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                 try {
                     beanDefinitionProcessor.process(beanDefinition, beanContext);
