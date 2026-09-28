@@ -26,11 +26,14 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitBreakerPolicy;
+import io.micronaut.retry.RetryPolicy;
+import io.micronaut.retry.RetryRegistry;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -54,12 +57,21 @@ import java.util.concurrent.ScheduledExecutorService;
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
+    private static final String NAME = "name";
     private final ConversionService conversionService;
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledExecutorService executorService;
     private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
     private final DefaultRetryRunner retryRunner;
+    @Nullable
+    private final RetryRegistry retryRegistry;
+    /**
+     * The policies of the methods with a named policy, by their {@code @Retryable} value, from
+     * which alone the policy is built: methods of different beans can share an
+     * {@link ExecutableMethod} that is equal, e.g. one inherited from a common superclass.
+     */
+    private final Map<AnnotationValue<Retryable>, RetryPolicy> namedPolicies = new ConcurrentHashMap<>();
 
     /**
      * Construct a default retry method interceptor with the event publisher.
@@ -72,6 +84,26 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                                    @Nullable
                                    ApplicationEventPublisher eventPublisher,
                                    @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
+        this(conversionService, eventPublisher, executorService, null);
+    }
+
+    /**
+     * Construct a default retry method interceptor with the event publisher and the registry of
+     * the named retry policies, which the methods annotated {@code @Retryable(name = "...")} use.
+     *
+     * @param conversionService The conversion service
+     * @param eventPublisher The event publisher to publish retry events
+     * @param executorService The executor service to use for completable futures
+     * @param retryRegistry The registry of the named retry policies
+     * @since 5.3.0
+     */
+    @Inject
+    public DefaultRetryInterceptor(ConversionService conversionService,
+                                   @Nullable
+                                   ApplicationEventPublisher eventPublisher,
+                                   @Named(TaskExecutors.SCHEDULED) ExecutorService executorService,
+                                   @Nullable RetryRegistry retryRegistry) {
+        this.retryRegistry = retryRegistry;
         this.conversionService = conversionService;
         this.eventPublisher = eventPublisher;
         this.executorService = (ScheduledExecutorService) executorService;
@@ -97,9 +129,25 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         AnnotationRetryStateBuilder annotationRetryStateBuilder = new AnnotationRetryStateBuilder(
             context
         );
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
+
+        String name = retry.stringValue(NAME).orElse("");
+        RetryPolicy namedPolicy = null;
+        if (!name.isEmpty()) {
+            try {
+                namedPolicy = namedPolicies.computeIfAbsent(
+                    retry,
+                    value -> annotationRetryStateBuilder.retryPolicy(namedPolicy(name, context))
+                );
+            } catch (RuntimeException e) {
+                return interceptedMethod.handleException(e);
+            }
+        }
 
         if (isCircuitBreaker) {
-            CircuitBreakerPolicy circuitBreakerPolicy = annotationRetryStateBuilder.circuitBreakerPolicy();
+            CircuitBreakerPolicy circuitBreakerPolicy = namedPolicy == null
+                ? annotationRetryStateBuilder.circuitBreakerPolicy()
+                : annotationRetryStateBuilder.circuitBreakerPolicy(namedPolicy);
             long timeout = circuitBreakerPolicy.getResetTimeout().toMillis();
             boolean wrapException = circuitBreakerPolicy.isThrowWrappedException();
             PolicyRetryStateBuilder retryStateBuilder = new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy());
@@ -107,14 +155,15 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 context.getExecutableMethod(),
                 method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
             );
-        } else {
+        } else if (namedPolicy == null) {
             retryState = (MutableRetryState) annotationRetryStateBuilder.build();
+        } else {
+            retryState = (MutableRetryState) new PolicyRetryStateBuilder(namedPolicy).build();
         }
 
         MutableConvertibleValues<Object> attrs = context.getAttributes();
         attrs.put(RetryState.class.getName(), retry);
 
-        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             retryState.open();
             switch (interceptedMethod.resultType()) {
@@ -151,6 +200,17 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             }
         } catch (Exception e) {
             return interceptedMethod.handleException(e);
+        }
+    }
+
+    private RetryPolicy namedPolicy(String name, MethodInvocationContext<Object, Object> context) {
+        if (retryRegistry == null) {
+            throw new IllegalStateException("No RetryRegistry for the retry policy [" + name + "] of " + context);
+        }
+        try {
+            return retryRegistry.getPolicy(name);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e.getMessage() + ", used by @Retryable(name = \"" + name + "\") of " + context, e);
         }
     }
 
