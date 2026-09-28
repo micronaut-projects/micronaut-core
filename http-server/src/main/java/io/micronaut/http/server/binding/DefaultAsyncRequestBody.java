@@ -24,6 +24,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
+import io.micronaut.http.BodyPreservingRequestWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.LifecycleHttpRequest;
@@ -467,11 +468,12 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     /**
      * A view of a server request for the {@code @Body} binders: they read the bytes of the server
-     * request it wraps, see {@link ServerRequestBody}, and keep no decoded body in it.
+     * request it wraps, see {@link ServerRequestBody}, and keep no decoded body in it. It never
+     * replaces the body, so the bytes are found without decoding the body of the request.
      *
      * @param <B> The body type
      */
-    private static final class BindingView<B> extends HttpRequestWrapper<B> {
+    private static final class BindingView<B> extends HttpRequestWrapper<B> implements BodyPreservingRequestWrapper {
 
         BindingView(HttpRequest<B> request) {
             super(request);
