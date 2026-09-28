@@ -43,9 +43,7 @@ class MalformedUriDisabledValidationSpec extends Specification {
     void "test filters are called in case of error"() {
         given:
         OncePerFilter filter = embeddedServer.applicationContext.getBean(OncePerFilter)
-
-        expect:
-        filter.filterCalled
+        filter.filterCalled = false
 
         when:
         def result = new URL("$embeddedServer.URL/malformed/[]").text
