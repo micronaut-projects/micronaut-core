@@ -77,12 +77,7 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
         if (contentTypeClass == StreamingFileUpload.class) {
             // Publisher<StreamingFileUpload>
             publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
-                .map(f -> {
-                    StreamingFileUpload upload = formFactory.get().streamFileUpload(f);
-                    // close() only discards the upload if the route has not consumed it
-                    request.addDisposalResource(upload::close);
-                    return upload;
-                })
+                .map(f -> formFactory.get().streamFileUpload(f))
                 .doOnDiscard(StreamingFileUpload.class, StreamingFileUpload::close);
         } else if (contentTypeClass == Publisher.class) {
             // Publisher<Publisher<…>>

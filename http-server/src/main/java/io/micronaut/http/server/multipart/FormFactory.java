@@ -117,10 +117,9 @@ public final class FormFactory {
         }
         completer = new FormRouteCompleter(fchr);
         request.setAttribute(COMPLETER, completer);
-        // fields of parameters that are never subscribed to are released when the route is
-        // rejected, or at the latest when the request completes
+        // if the route is never invoked, the fields of parameters that would only be
+        // subscribed to by the route are released
         BasicHttpAttributes.addUnconsumedBodyDiscard(request, completer::discardUnsubscribed);
-        fchr.addDisposalResource(completer::discardUnsubscribed);
         return completer;
     }
 

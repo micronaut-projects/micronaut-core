@@ -514,10 +514,11 @@ public final class RouteExecutor {
                     requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
                     body = routeMatch.execute();
                 } catch (Throwable e) {
-                    // an argument failed to bind, or the invocation failed before returning a
-                    // result (e.g. a @Valid violation). The route can't consume a streaming
-                    // body argument anymore.
-                    BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                    if (!isFulfilled(routeMatch)) {
+                        // an argument failed to bind, so the route was never invoked and a
+                        // streaming body argument that was already bound can't be consumed
+                        BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                    }
                     throw e;
                 }
                 if (body instanceof Optional optional) {
@@ -528,6 +529,20 @@ public final class RouteExecutor {
                 return ExecutionFlow.error(e);
             }
         });
+    }
+
+    /**
+     * Check whether all arguments of the route were bound. If {@link RouteMatch#execute()} fails
+     * and this returns {@code true}, the failure came from the invocation itself, which may
+     * already have handed the arguments to user code.
+     */
+    private static boolean isFulfilled(RouteMatch<?> routeMatch) {
+        try {
+            return routeMatch.isFulfilled();
+        } catch (Exception e) {
+            // a binding result failed conversion
+            return false;
+        }
     }
 
     ExecutionFlow<HttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,

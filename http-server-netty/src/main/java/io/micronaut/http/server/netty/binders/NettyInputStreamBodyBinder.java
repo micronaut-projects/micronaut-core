@@ -58,8 +58,9 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
                 return BindingResult.empty();
             }
             try {
+                InputStream s = nhr.byteBody().toInputStream();
                 // the body is claimed now, but only read once the route reads the stream
-                InputStream s = UnconsumedBodyGuard.guard(nhr, nhr.byteBody().toInputStream());
+                UnconsumedBodyGuard.discardIfNotInvoked(nhr, s);
                 return () -> Optional.of(s);
             } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {

@@ -18,22 +18,19 @@ package io.micronaut.http.server.netty.binders;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.body.ByteBody;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Operators;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Wraps streaming body arguments that claim the request body when they are bound, so that the
- * body is discarded if the request is rejected before the route could consume the argument (see
+ * Registers streaming body arguments that claim the request body when they are bound, so that
+ * the body is discarded if the route is never invoked (see
  * {@link BasicHttpAttributes#discardUnconsumedBodies}). Without this, the data received so far
  * stays buffered and the connection stops reading.
  *
@@ -43,123 +40,38 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class UnconsumedBodyGuard {
     private static final Logger LOG = LoggerFactory.getLogger(UnconsumedBodyGuard.class);
 
-    private static final int UNTOUCHED = 0;
-    private static final int CONSUMED = 1;
-    private static final int DISCARDED = 2;
-
     private UnconsumedBodyGuard() {
     }
 
     /**
-     * Guard a publisher that was bound from the request body.
+     * Discard the given publisher if the route is never invoked.
      *
      * @param request   The request
-     * @param publisher The publisher
-     * @param <T>       The item type
-     * @return The publisher to pass to the route
+     * @param publisher The publisher that was bound from the request body
      */
-    public static <T> Publisher<T> guard(HttpRequest<?> request, Publisher<T> publisher) {
-        GuardedPublisher<T> guarded = new GuardedPublisher<>(publisher);
-        BasicHttpAttributes.addUnconsumedBodyDiscard(request, guarded::discard);
-        return guarded;
+    public static void discardIfNotInvoked(HttpRequest<?> request, Publisher<?> publisher) {
+        // subscribe and cancel right away, this releases what was buffered so far and discards
+        // the rest of the body
+        BasicHttpAttributes.addUnconsumedBodyDiscard(request, () -> publisher.subscribe(new DiscardingSubscriber()));
     }
 
     /**
-     * Guard an input stream that was bound from the request body.
+     * Discard the given stream if the route is never invoked.
      *
      * @param request The request
-     * @param stream  The stream
-     * @return The stream to pass to the route
+     * @param stream  The stream that was bound from the request body
      */
-    public static InputStream guard(HttpRequest<?> request, InputStream stream) {
-        GuardedInputStream guarded = new GuardedInputStream(stream);
-        BasicHttpAttributes.addUnconsumedBodyDiscard(request, guarded::discard);
-        return guarded;
+    public static void discardIfNotInvoked(HttpRequest<?> request, InputStream stream) {
+        BasicHttpAttributes.addUnconsumedBodyDiscard(request, () -> {
+            try {
+                stream.close();
+            } catch (IOException e) {
+                LOG.debug("Failed to discard request body stream", e);
+            }
+        });
     }
 
-    private static final class GuardedPublisher<T> extends AtomicInteger implements Publisher<T> {
-        private final Publisher<T> delegate;
-
-        GuardedPublisher(Publisher<T> delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public void subscribe(Subscriber<? super T> s) {
-            if (get() == CONSUMED || compareAndExchange(UNTOUCHED, CONSUMED) != DISCARDED) {
-                delegate.subscribe(s);
-            } else {
-                Operators.error(s, ByteBody.BodyDiscardedException.create());
-            }
-        }
-
-        void discard() {
-            if (compareAndSet(UNTOUCHED, DISCARDED)) {
-                // subscribe and cancel right away, this releases what was buffered so far and
-                // discards the rest of the body
-                delegate.subscribe(DiscardingSubscriber.INSTANCE);
-            }
-        }
-    }
-
-    private static final class GuardedInputStream extends InputStream {
-        private final InputStream delegate;
-        private final AtomicInteger state = new AtomicInteger(UNTOUCHED);
-
-        GuardedInputStream(InputStream delegate) {
-            this.delegate = delegate;
-        }
-
-        private void touch() throws IOException {
-            if (state.get() != CONSUMED && state.compareAndExchange(UNTOUCHED, CONSUMED) == DISCARDED) {
-                throw ByteBody.BodyDiscardedException.create();
-            }
-        }
-
-        void discard() {
-            if (state.compareAndSet(UNTOUCHED, DISCARDED)) {
-                try {
-                    delegate.close();
-                } catch (IOException e) {
-                    LOG.debug("Failed to discard request body stream", e);
-                }
-            }
-        }
-
-        @Override
-        public int read() throws IOException {
-            touch();
-            return delegate.read();
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            touch();
-            return delegate.read(b, off, len);
-        }
-
-        @Override
-        public long skip(long n) throws IOException {
-            touch();
-            return delegate.skip(n);
-        }
-
-        @Override
-        public int available() throws IOException {
-            touch();
-            return delegate.available();
-        }
-
-        @Override
-        public void close() throws IOException {
-            state.compareAndSet(UNTOUCHED, CONSUMED);
-            delegate.close();
-        }
-    }
-
-    private enum DiscardingSubscriber implements Subscriber<Object> {
-        INSTANCE;
-
+    private static final class DiscardingSubscriber implements Subscriber<Object> {
         @Override
         public void onSubscribe(Subscription s) {
             s.cancel();

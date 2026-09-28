@@ -114,15 +114,15 @@ public final class BasicHttpAttributes {
     }
 
     /**
-     * Register an action that discards a streaming body argument if the route never gets to
-     * consume it. Argument binders that claim the request body before the route executes (e.g.
-     * for a {@code Publisher} or {@code InputStream} argument) use this so that the body is not
-     * left buffered, and the connection stalled, when the request is rejected before the route
-     * could consume the argument. The action must do nothing if the argument was already
-     * consumed.
+     * Register an action that discards a streaming body argument if the route is never invoked.
+     * Argument binders that claim the request body before the route executes (e.g. for a
+     * {@code Publisher} or {@code InputStream} argument) use this so that the body is not left
+     * buffered, and the connection stalled, when the request is rejected before the argument
+     * reaches the route, e.g. because another argument fails to bind. Once the route is invoked,
+     * consuming the argument is its responsibility, so the action is not run.
      *
      * @param request The request
-     * @param discard The action that discards the body if it was not consumed yet
+     * @param discard The action that discards the body
      */
     @Internal
     public static void addUnconsumedBodyDiscard(HttpRequest<?> request, Runnable discard) {
@@ -136,8 +136,8 @@ public final class BasicHttpAttributes {
 
     /**
      * Run the actions registered with {@link #addUnconsumedBodyDiscard}. This is called when the
-     * request is rejected before the route could consume its arguments. Each action runs at most
-     * once.
+     * route will not be invoked for a request whose arguments were (partially) bound. Each action
+     * runs at most once.
      *
      * @param request The request
      */
