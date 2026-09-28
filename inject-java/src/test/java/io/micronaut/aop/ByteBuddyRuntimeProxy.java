@@ -23,10 +23,14 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Singleton
 @NullMarked
 public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
+
+    // Every context defines its own proxy class in the shared application class loader
+    private static final AtomicInteger PROXY_COUNT = new AtomicInteger();
 
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
@@ -39,7 +43,7 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
         } else {
             builder = byteBuddy.subclass(targetType);
         }
-        builder = builder.name(targetType.getName() + "$ByteBuddyProxy");
+        builder = builder.name(targetType.getName() + "$ByteBuddyProxy" + PROXY_COUNT.incrementAndGet());
 
         T proxyTarget = null;
         if (proxyDefinition.proxyTarget()) {
