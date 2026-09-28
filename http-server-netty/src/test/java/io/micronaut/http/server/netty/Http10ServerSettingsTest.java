@@ -18,9 +18,12 @@ package io.micronaut.http.server.netty;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Head;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Singleton;
@@ -140,6 +143,60 @@ class Http10ServerSettingsTest {
         assertEquals(List.of("DELETE"), received);
     }
 
+    @Test
+    void anHttp10ClientThatAsksForKeepAliveKeepsTheConnectionOfAResponseWithoutBody() throws IOException {
+        try (Socket socket = new Socket("127.0.0.1", optedInServer.getPort())) {
+            socket.setSoTimeout(10_000);
+            for (String request : List.of(
+                "GET /http10-settings/no-content HTTP/1.0\r\nConnection: keep-alive\r\n\r\n",
+                "GET /http10-settings/not-modified HTTP/1.0\r\nConnection: keep-alive\r\n\r\n",
+                "HEAD /http10-settings/head HTTP/1.0\r\nConnection: keep-alive\r\n\r\n")) {
+                socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
+                String head = head(socket.getInputStream());
+                assertTrue(head.startsWith("HTTP/1.0 "), head);
+                assertTrue(head.toLowerCase().contains("connection: keep-alive"), request + head);
+            }
+            socket.getOutputStream().write("GET /http10-settings/fixed HTTP/1.0\r\nConnection: keep-alive\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+            String head = head(socket.getInputStream());
+            assertTrue(head.startsWith("HTTP/1.0 200"), head);
+            assertEquals("fixed", new String(socket.getInputStream().readNBytes(5), StandardCharsets.US_ASCII));
+        }
+    }
+
+    @Test
+    void byDefaultAnHttp10ClientIsClosedAfterAResponseWithoutBody() throws IOException {
+        String response = exchange(server, "GET /http10-settings/no-content HTTP/1.0\r\nConnection: keep-alive\r\n\r\n");
+        assertTrue(response.startsWith("HTTP/1.0 204"), response);
+        assertFalse(response.toLowerCase().contains("keep-alive"), response);
+    }
+
+    @Test
+    void anHttp10ClientThatAsksForKeepAliveInATokenListKeepsTheConnection() throws IOException {
+        try (Socket socket = new Socket("127.0.0.1", optedInServer.getPort())) {
+            socket.setSoTimeout(10_000);
+            for (int i = 0; i < 2; i++) {
+                socket.getOutputStream().write("GET /http10-settings/fixed HTTP/1.0\r\nConnection: TE, Keep-Alive\r\nTE: trailers\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                String head = head(socket.getInputStream());
+                assertTrue(head.startsWith("HTTP/1.0 200"), head);
+                assertTrue(head.toLowerCase().contains("connection: keep-alive"), head);
+                assertEquals("fixed", new String(socket.getInputStream().readNBytes(5), StandardCharsets.US_ASCII));
+            }
+        }
+    }
+
+    @Test
+    void aLaterHttp1MinorVersionIsServedAsHttp11WhenUnsupportedVersionsAreRejected() throws IOException {
+        String response = exchange(optedInServer, "GET /http10-settings/fixed HTTP/1.2\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+        assertTrue(response.startsWith("HTTP/1.1 200"), response);
+        assertTrue(response.endsWith("fixed"), response);
+    }
+
+    @Test
+    void anotherMajorHttpVersionIsNotSupported() throws IOException {
+        String response = exchange(optedInServer, "GET /http10-settings/fixed HTTP/0.9\r\nHost: localhost\r\n\r\n");
+        assertTrue(response.startsWith("HTTP/1.1 505"), response);
+    }
+
     private static String head(java.io.InputStream in) throws IOException {
         StringBuilder head = new StringBuilder();
         while (!head.toString().endsWith("\r\n\r\n")) {
@@ -177,6 +234,21 @@ class Http10ServerSettingsTest {
         @Get(value = "/fixed", produces = MediaType.TEXT_PLAIN)
         String fixed() {
             return "fixed";
+        }
+
+        @Get("/no-content")
+        HttpResponse<?> noContent() {
+            return HttpResponse.noContent();
+        }
+
+        @Get("/not-modified")
+        HttpResponse<?> notModified() {
+            return HttpResponse.status(HttpStatus.NOT_MODIFIED);
+        }
+
+        @Head("/head")
+        HttpResponse<?> head() {
+            return HttpResponse.ok();
         }
 
         @Get(value = "/stream", produces = MediaType.APPLICATION_OCTET_STREAM)

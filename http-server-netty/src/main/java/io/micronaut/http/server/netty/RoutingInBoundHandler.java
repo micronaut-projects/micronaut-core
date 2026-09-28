@@ -264,9 +264,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         HttpVersion version = request.protocolVersion();
-        // e.g. HTTP/9.9: the decoder takes any version, this server speaks HTTP/1.x only on this path
-        if (serverConfiguration.isRejectUnsupportedHttpVersions()
-            && (version.majorVersion() != 1 || version.minorVersion() > 1)) {
+        // e.g. HTTP/9.9: the decoder takes any version, this server speaks HTTP/1.x only on this
+        // path. A later minor version of HTTP/1, e.g. HTTP/1.2, is served as HTTP/1.1 (RFC 9112
+        // section 2.3): 505 is for a major version the server does not support
+        if (serverConfiguration.isRejectUnsupportedHttpVersions() && version.majorVersion() != 1) {
             body.close();
             // like an invalid URI, the request is not served: its error is handled for the root path
             NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(

@@ -61,6 +61,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -208,7 +209,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     /**
      * Answer a request of an HTTP version other than 1.0 or 1.1 over HTTP/1.1 rather than with its
-     * own version; the request handler rejects it. Default: false.
+     * own version: a later HTTP/1 minor version, e.g. HTTP/1.2, is served as HTTP/1.1, and the
+     * request handler rejects another major version. Default: false.
      *
      * @param rejectUnsupportedHttpVersions true to answer such a request over HTTP/1.1
      * @since 5.3.0
@@ -1059,19 +1061,24 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void preprocess(HttpResponse message) {
+            boolean http10KeptAlive = false;
             HttpVersion requestVersion = request.protocolVersion();
-            if (!message.protocolVersion().equals(requestVersion)
-                && (!rejectUnsupportedHttpVersions || requestVersion.majorVersion() == 1 && requestVersion.minorVersion() <= 1)) {
+            // with rejectUnsupportedHttpVersions, a version other than 1.0 or 1.1 is answered over
+            // HTTP/1.1: a later HTTP/1 minor version is served as HTTP/1.1, another major version
+            // is rejected by the request handler
+            HttpVersion responseVersion = rejectUnsupportedHttpVersions && !HttpVersion.HTTP_1_0.equals(requestVersion)
+                ? HttpVersion.HTTP_1_1 : requestVersion;
+            if (!message.protocolVersion().equals(responseVersion)) {
                 // if the response includes features not supported by http/1.0, well that's just too bad, isn't it?
                 // we'll at least handle the connection state properly.
-                message.setProtocolVersion(requestVersion);
+                message.setProtocolVersion(responseVersion);
             }
             if (request.protocolVersion().isKeepAliveDefault()) {
                 if (request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                     closeAfterWrite();
                 }
             } else {
-                if (!request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
+                if (!requestsKeepAlive()) {
                     closeAfterWrite();
                 }
             }
@@ -1085,10 +1092,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
             } else {
                 if (!message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
-                    if (http10KeepAlive && !closeAfterWrite && HttpUtil.isContentLengthSet(message)
+                    if (http10KeepAlive && !closeAfterWrite
+                        && (HttpUtil.isContentLengthSet(message) || !canHaveBody(message.status()) || HttpMethod.HEAD.equals(request.method()))
                         && !message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                         // an HTTP/1.0 client that asked to keep the connection: keep it, since the
-                        // length of the response is known
+                        // length of the response is known, or it has no body (e.g. 204, 304, HEAD)
+                        http10KeptAlive = true;
                         message.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
                         closeAfterWrite();
@@ -1100,7 +1109,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             // According to RFC 7230 a server MUST NOT send a Content-Length or a Transfer-Encoding when the status
             // code is 1xx or 204, also a status code 304 may not have a Content-Length or Transfer-Encoding set.
-            if (!HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
+            // A kept HTTP/1.0 connection has a known length: a HEAD response without Content-Length
+            // has no body either
+            if (!http10KeptAlive && !HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
                 HttpUtil.setKeepAlive(message, false);
                 closeAfterWrite();
             }
@@ -1108,6 +1119,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (jfrEvent != null) {
                 jfrEvent.populateResponse(message);
             }
+        }
+
+        /**
+         * @return Whether the HTTP/1.0 request asks to keep the connection. With
+         * {@link #http10KeepAlive}, the {@code Connection} header is read as the list of tokens it
+         * is (RFC 9110 section 7.6.1), e.g. {@code Keep-Alive, TE}
+         */
+        private boolean requestsKeepAlive() {
+            if (http10KeepAlive) {
+                return request.headers().containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true);
+            }
+            return request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true);
         }
 
         /**

@@ -36,8 +36,8 @@ micronaut:
     http10-keep-alive: true
     reject-unsupported-http-versions: true
 ----
-- `http10-keep-alive` keeps the connection of an HTTP/1.0 client that sends `Connection: keep-alive` after a response of known length, and answers with `Connection: keep-alive`. A response of unknown length still ends with the connection. By default, the connection of an HTTP/1.0 client ends after each response.
-- `reject-unsupported-http-versions` answers a request of an HTTP version other than 1.0 or 1.1, e.g. `HTTP/9.9`, which the request decoder accepts, with `505 HTTP Version Not Supported` over HTTP/1.1 and closes the connection. By default, such a request is served.
+- `http10-keep-alive` keeps the connection of an HTTP/1.0 client that sends `Connection: keep-alive` after a response of known length, and answers with `Connection: keep-alive`. A response has a known length when it has a `Content-Length` or has no body, e.g. a `204` or `304` response or the response to a `HEAD` request. A response of unknown length still ends with the connection. By default, the connection of an HTTP/1.0 client ends after each response.
+- `reject-unsupported-http-versions` answers a request of an HTTP major version other than 1, e.g. `HTTP/9.9` or `HTTP/2.0` on an HTTP/1 connection, which the request decoder accepts, with `505 HTTP Version Not Supported` over HTTP/1.1 and closes the connection. A later minor version of HTTP/1, e.g. `HTTP/1.2`, is served as HTTP/1.1 (RFC 9112 section 2.3). By default, such a request is served and answered with its own version.
 
 === Using Native Transports
 

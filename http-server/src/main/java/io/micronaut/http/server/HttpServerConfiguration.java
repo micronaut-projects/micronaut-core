@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
@@ -752,13 +753,16 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     /**
      * Whether the server keeps the connection of an HTTP/1.0 client that sends
      * {@code Connection: keep-alive} after a response of known length, answering with
-     * {@code Connection: keep-alive}. A response of unknown length still ends with the connection.
-     * Supported by the Netty server.
+     * {@code Connection: keep-alive}. A response has a known length when it has a
+     * {@code Content-Length} or has no body, e.g. a {@code 204} or {@code 304} response or the
+     * response to a {@code HEAD} request. A
+     * response of unknown length still ends with the connection. Supported by the Netty server.
      *
      * @return {@code true} to keep such a connection; {@code false}, the default, to end the
      * connection of an HTTP/1.0 client after each response
      * @since 5.3.0
      */
+    @Experimental
     public boolean isHttp10KeepAlive() {
         return http10KeepAlive;
     }
@@ -768,18 +772,23 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      * @see #isHttp10KeepAlive()
      * @since 5.3.0
      */
+    @Experimental
     public void setHttp10KeepAlive(boolean http10KeepAlive) {
         this.http10KeepAlive = http10KeepAlive;
     }
 
     /**
-     * Whether the server answers a request of an HTTP version other than 1.0 or 1.1, e.g.
-     * {@code HTTP/9.9}, which the request decoder accepts, with {@code 505} over HTTP/1.1 and
-     * closes the connection. Supported by the Netty server.
+     * Whether the server answers a request of an HTTP major version other than 1, e.g.
+     * {@code HTTP/9.9} or {@code HTTP/2.0} on an HTTP/1 connection, which the request decoder
+     * accepts, with {@code 505} over HTTP/1.1 and closes the connection. A later minor version of
+     * HTTP/1, e.g. {@code HTTP/1.2}, is served as HTTP/1.1 (RFC 9112 section 2.3). Supported by
+     * the Netty server.
      *
-     * @return {@code true} to reject such a request; {@code false}, the default, to serve it
+     * @return {@code true} to reject such a request; {@code false}, the default, to serve it and
+     * answer with its version
      * @since 5.3.0
      */
+    @Experimental
     public boolean isRejectUnsupportedHttpVersions() {
         return rejectUnsupportedHttpVersions;
     }
@@ -789,6 +798,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      * @see #isRejectUnsupportedHttpVersions()
      * @since 5.3.0
      */
+    @Experimental
     public void setRejectUnsupportedHttpVersions(boolean rejectUnsupportedHttpVersions) {
         this.rejectUnsupportedHttpVersions = rejectUnsupportedHttpVersions;
     }
