@@ -27,6 +27,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.binders.UnconsumedBodyGuard;
 import reactor.core.publisher.Flux;
 
 import java.util.Optional;
@@ -65,6 +66,8 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
         Flux<? extends CompletedPart> parts = Flux.from(fchr.getRawFormFields())
             .flatMap(raw -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(fchr, raw)))
             .doOnDiscard(CompletedPart.class, p -> p.closeAsync(formFactory.get().getDiskWriteExecutor()));
-        return () -> Optional.of(parts::subscribe);
+        // the body is claimed now, but only read once the route subscribes
+        MultipartBody body = UnconsumedBodyGuard.guard(fchr, parts)::subscribe;
+        return () -> Optional.of(body);
     }
 }

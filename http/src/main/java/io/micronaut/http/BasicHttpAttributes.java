@@ -16,9 +16,14 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.uri.UriMatchInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -30,6 +35,8 @@ import java.util.Optional;
 @SuppressWarnings("removal")
 public final class BasicHttpAttributes {
     private static final String ROUTE_WAITS_FOR = BasicHttpAttributes.class.getName() + ".ROUTE_WAITS_FOR";
+    private static final Logger LOG = LoggerFactory.getLogger(BasicHttpAttributes.class);
+    private static final String UNCONSUMED_BODY_DISCARDS = BasicHttpAttributes.class.getName() + ".UNCONSUMED_BODY_DISCARDS";
 
     private BasicHttpAttributes() {
     }
@@ -103,6 +110,66 @@ public final class BasicHttpAttributes {
             request.setAttribute(ROUTE_WAITS_FOR, attr.get().then(() -> flowToAdd));
         } else {
             request.setAttribute(ROUTE_WAITS_FOR, flowToAdd);
+        }
+    }
+
+    /**
+     * Register an action that discards a streaming body argument if the route never gets to
+     * consume it. Argument binders that claim the request body before the route executes (e.g.
+     * for a {@code Publisher} or {@code InputStream} argument) use this so that the body is not
+     * left buffered, and the connection stalled, when the request is rejected before the route
+     * could consume the argument. The action must do nothing if the argument was already
+     * consumed.
+     *
+     * @param request The request
+     * @param discard The action that discards the body if it was not consumed yet
+     */
+    @Internal
+    public static void addUnconsumedBodyDiscard(HttpRequest<?> request, Runnable discard) {
+        UnconsumedBodyDiscards discards = request.getAttribute(UNCONSUMED_BODY_DISCARDS, UnconsumedBodyDiscards.class).orElse(null);
+        if (discards == null) {
+            discards = new UnconsumedBodyDiscards();
+            request.setAttribute(UNCONSUMED_BODY_DISCARDS, discards);
+        }
+        discards.add(discard);
+    }
+
+    /**
+     * Run the actions registered with {@link #addUnconsumedBodyDiscard}. This is called when the
+     * request is rejected before the route could consume its arguments. Each action runs at most
+     * once.
+     *
+     * @param request The request
+     */
+    @Internal
+    public static void discardUnconsumedBodies(HttpRequest<?> request) {
+        Optional<UnconsumedBodyDiscards> discards = request.getAttribute(UNCONSUMED_BODY_DISCARDS, UnconsumedBodyDiscards.class);
+        discards.ifPresent(UnconsumedBodyDiscards::run);
+    }
+
+    private static final class UnconsumedBodyDiscards {
+        private List<Runnable> actions = new ArrayList<>(1);
+
+        synchronized void add(Runnable action) {
+            actions.add(action);
+        }
+
+        void run() {
+            List<Runnable> actions;
+            synchronized (this) {
+                actions = this.actions;
+                if (actions.isEmpty()) {
+                    return;
+                }
+                this.actions = new ArrayList<>(1);
+            }
+            for (Runnable action : actions) {
+                try {
+                    action.run();
+                } catch (Exception e) {
+                    LOG.debug("Failed to discard unconsumed request body", e);
+                }
+            }
         }
     }
 }

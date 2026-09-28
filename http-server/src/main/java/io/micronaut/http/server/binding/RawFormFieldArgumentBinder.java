@@ -71,6 +71,10 @@ public final class RawFormFieldArgumentBinder implements TypedRequestArgumentBin
             .toFuture();
 
         BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
+        // close() only discards the field if the route has not consumed its body
+        Runnable close = () -> future.thenAccept(RawFormField::close);
+        BasicHttpAttributes.addUnconsumedBodyDiscard(source, close);
+        fchr.addDisposalResource(close);
 
         return new PendingRequestBindingResult<>() {
 
