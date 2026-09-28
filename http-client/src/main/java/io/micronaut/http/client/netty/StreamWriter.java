@@ -21,11 +21,15 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.LazyUpstream;
 import io.micronaut.http.netty.EventLoopFlow;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
 import org.jspecify.annotations.Nullable;
 
@@ -155,8 +159,20 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
             return;
         }
 
-        ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, ctx.voidPromise());
+        ctx.writeAndFlush(lastContent(), ctx.voidPromise());
         completed = true;
+    }
+
+    /**
+     * The message that ends the request: with the trailers of the body when it carries any. The
+     * body completes its trailers before it completes this writer.
+     */
+    private LastHttpContent lastContent() {
+        HttpHeaders trailers = NettyByteBodyFactory.trailersToSend(body);
+        if (trailers == null) {
+            return LastHttpContent.EMPTY_LAST_CONTENT;
+        }
+        return new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailers);
     }
 
     @Override

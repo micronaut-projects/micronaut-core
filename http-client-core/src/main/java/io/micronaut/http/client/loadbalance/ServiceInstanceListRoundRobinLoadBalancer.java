@@ -33,6 +33,16 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
      * @param serviceInstanceList The service instance list
      */
     public ServiceInstanceListRoundRobinLoadBalancer(ServiceInstanceList serviceInstanceList) {
+        this(serviceInstanceList, null);
+    }
+
+    /**
+     * @param serviceInstanceList The service instance list
+     * @param outlierDetection    The outlier detection configuration, or {@code null} for none
+     * @since 5.3.0
+     */
+    public ServiceInstanceListRoundRobinLoadBalancer(ServiceInstanceList serviceInstanceList, @Nullable OutlierDetectionConfiguration outlierDetection) {
+        super(outlierDetection);
         this.serviceInstanceList = serviceInstanceList;
     }
 

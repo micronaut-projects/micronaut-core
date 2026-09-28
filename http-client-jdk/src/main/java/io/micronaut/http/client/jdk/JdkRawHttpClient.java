@@ -35,16 +35,15 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.net.http.HttpConnectTimeoutException;
-import java.net.http.HttpTimeoutException;
+import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -145,6 +144,14 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     private Mono<MutableHttpResponse<?>> exchangeWithOptions(MutableHttpRequest<?> request, @Nullable CloseableByteBody requestBody, RawRequestOptions options) {
+        if (options.isAllowUpgrade() && request.getHeaders().contains(HttpHeaders.UPGRADE)) {
+            // the JDK client gives no access to a connection that switched protocols
+            if (requestBody != null) {
+                requestBody.close();
+            }
+            return Mono.error(new HttpClientException("The JDK HTTP client cannot switch a connection to another protocol: the request asks to upgrade to '" +
+                request.getHeaders().get(HttpHeaders.UPGRADE) + "'"));
+        }
         Set<String> allowedRestrictedHeaders = allowedRestrictedHeaders();
         if (request.getHeaders().contains(HttpHeaders.HOST) && !allowedRestrictedHeaders.contains("host")) {
             if (requestBody != null) {
@@ -190,20 +197,17 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     @Override
-    protected <I> Mono<java.net.http.HttpRequest> mapToHttpRequest(HttpRequest<I> request, @Nullable Argument<?> bodyType) {
+    java.net.http.HttpRequest toJdkRequest(URI uri, HttpRequest<?> request, @Nullable Argument<?> bodyType) {
         // the request cookies are sent in its Cookie header, and must not reach the cookie store
         // that is shared with the other clients of the same configuration
-        return resolveRequestUri(request)
-            .map(uri -> {
-                java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
-                Duration responseTimeout = responseTimeout(request);
-                if (responseTimeout != null) {
-                    // it can only shorten the configured read timeout, like for the Netty client
-                    Duration readTimeout = configuration.getReadTimeout().orElse(null);
-                    builder.timeout(readTimeout != null && readTimeout.compareTo(responseTimeout) < 0 ? readTimeout : responseTimeout);
-                }
-                return builder.build();
-            });
+        java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
+        Duration responseTimeout = responseTimeout(request);
+        if (responseTimeout != null) {
+            // it can only shorten the configured read timeout, like for the Netty client
+            Duration readTimeout = configuration.getReadTimeout().orElse(null);
+            builder.timeout(readTimeout != null && readTimeout.compareTo(responseTimeout) < 0 ? readTimeout : responseTimeout);
+        }
+        return builder.build();
     }
 
     private static @Nullable Duration responseTimeout(HttpRequest<?> request) {
@@ -213,9 +217,11 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     @Override
-    protected <O> Publisher<HttpResponse<O>> responsePublisher(HttpRequest<?> request, @Nullable Argument<O> bodyType) {
-        return Mono.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
-            .map(httpRequest -> {
+    <O> Publisher<HttpResponse<O>> responsePublisher(HttpRequest<?> request, ResolvedTarget target, @Nullable Argument<O> bodyType) {
+        // built on subscription, so that any client filter changes are used
+        return Mono.defer(() -> afterFilters(target, request))
+            .flatMap(sent -> {
+                java.net.http.HttpRequest httpRequest = toJdkRequest(sent.uri(), request, bodyType);
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
@@ -228,27 +234,25 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 RawRequestOptions options = request.getAttribute(OPTIONS_ATTRIBUTE, RawRequestOptions.class).orElse(null);
                 // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
                 java.net.http.HttpClient httpClient = options == null || options.isFollowRedirects() ? rawClient.get() : rawNoRedirectClient.get();
-                return httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
+                // the outcome is reported once the body ends: a response whose body is cut off is a failure
+                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits,
+                        failure -> reportBodyEnd(sent.instance(), responseInfo.statusCode(), failure))))
+                    .onErrorMap(IOException.class, e -> sendError(sent.instance(), httpRequest.uri(), e));
             })
-            .flatMap(Mono::fromCompletionStage)
-            .onErrorMap(
-                e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
-                e -> ReadTimeoutException.TIMEOUT_EXCEPTION
-            )
-            .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .map(netResponse -> {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 }
 
-                //noinspection unchecked
-                return (HttpResponse<O>) ByteBodyHttpResponseWrapper.wrap(new BaseHttpResponseAdapter<CloseableByteBody, O>(netResponse, conversionService) {
+                ByteBodyHttpResponse<?> response = ByteBodyHttpResponseWrapper.wrap(new BaseHttpResponseAdapter<CloseableByteBody, O>(netResponse, conversionService) {
                     @Override
                     public Optional<O> getBody() {
                         return Optional.empty();
                     }
                 }, netResponse.body());
+                //noinspection unchecked
+                return (HttpResponse<O>) response;
             });
     }
 }

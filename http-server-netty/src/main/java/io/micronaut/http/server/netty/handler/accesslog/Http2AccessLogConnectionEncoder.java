@@ -68,6 +68,15 @@ public final class Http2AccessLogConnectionEncoder extends DecoratingHttp2Connec
         if (accessLog == null) {
             return promise;
         }
+        if (headers.status() == null) {
+            // trailers: the response headers have been logged already
+            if (endStream) {
+                accessLog.onLastResponseWrite(0);
+                promise = promise.unvoid();
+                finish(accessLog, promise);
+            }
+            return promise;
+        }
         HttpResponse response;
         try {
             response = HttpConversionUtil.toHttpResponse(streamId, headers, false);

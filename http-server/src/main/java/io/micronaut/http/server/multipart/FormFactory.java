@@ -92,7 +92,9 @@ public final class FormFactory {
      */
     @Nullable
     public static FormRouteCompleter getCompleterOrNull(HttpRequest<?> request) {
-        return request.getAttribute(COMPLETER, FormRouteCompleter.class).orElse(null);
+        // getAttribute(name) without a type: the typed lookup allocates a conversion context even
+        // when the attribute is absent, which it is for every non-form request
+        return request.getAttribute(COMPLETER).orElse(null) instanceof FormRouteCompleter completer ? completer : null;
     }
 
     /**

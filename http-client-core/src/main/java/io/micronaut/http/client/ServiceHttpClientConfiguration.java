@@ -23,6 +23,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 
@@ -71,6 +72,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
     private final ServiceHttp2ClientConfiguration http2Configuration;
+    private final ServiceOutlierDetectionConfiguration outlierDetection;
     private List<URI> urls = Collections.emptyList();
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
@@ -103,6 +105,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         }
         this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
         this.http2Configuration = new ServiceHttp2ClientConfiguration();
+        this.outlierDetection = new ServiceOutlierDetectionConfiguration();
     }
 
     /**
@@ -153,7 +156,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
      */
-    @Inject
+    @Deprecated(since = "5.3.0")
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
@@ -161,7 +164,32 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             ServiceHttpClientConfiguration.@Nullable ServiceHttp2ClientConfiguration http2Configuration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             HttpClientConfiguration defaultHttpClientConfiguration) {
+        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, http2Configuration, sslConfiguration, null, defaultHttpClientConfiguration);
+    }
+
+    /**
+     * Creates a new client configuration for the given service ID.
+     *
+     * @param serviceId                         The service id
+     * @param connectionPoolConfiguration       The connection pool configuration
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param http2Configuration                The HTTP/2 configuration
+     * @param sslConfiguration                  The SSL configuration
+     * @param outlierDetection                  The outlier detection configuration
+     * @param defaultHttpClientConfiguration    The default HTTP client configuration
+     * @since 5.3.0
+     */
+    @Inject
+    public ServiceHttpClientConfiguration(
+            @Parameter String serviceId,
+            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+            ServiceHttpClientConfiguration.@Nullable ServiceHttp2ClientConfiguration http2Configuration,
+            @Nullable ServiceSslClientConfiguration sslConfiguration,
+            @Nullable ServiceOutlierDetectionConfiguration outlierDetection,
+            HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);
+        this.outlierDetection = outlierDetection != null ? outlierDetection : new ServiceOutlierDetectionConfiguration();
         this.serviceId = serviceId;
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);
@@ -306,10 +334,30 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     /**
+     * The outlier detection of the service: whether an instance that keeps failing stops being
+     * selected for a while.
+     *
+     * @return The outlier detection configuration
+     * @since 5.3.0
+     */
+    public OutlierDetectionConfiguration getOutlierDetection() {
+        return outlierDetection;
+    }
+
+    /**
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     public static class ServiceConnectionPoolConfiguration extends ConnectionPoolConfiguration {
+    }
+
+    /**
+     * The outlier detection configuration of the service.
+     *
+     * @since 5.3.0
+     */
+    @ConfigurationProperties(OutlierDetectionConfiguration.PREFIX)
+    public static class ServiceOutlierDetectionConfiguration extends OutlierDetectionConfiguration {
     }
 
     /**

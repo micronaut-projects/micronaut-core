@@ -1147,6 +1147,42 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'cancelled pending acquire does not count towards max pending acquires'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-pending-acquires': 1,
+                'micronaut.http.client.pool.max-pending-connections': 1,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+
+        conn.openFuture = new CompletableFuture<>() // delay open
+
+        patch(client, conn)
+
+        def subscription = Mono.from(client.exchange(conn.scheme + '://example.com/foo')).subscribe()
+        conn.advance()
+        subscription.dispose()
+        conn.advance()
+
+        // the cancelled acquire must not block this one
+        def future = conn.testExchangeRequest(client)
+        conn.advance()
+        assert !future.isDone()
+
+        conn.openFuture.complete(null)
+        conn.advance()
+
+        // the new request gets the connection, not the cancelled one
+        conn.testExchangeResponse(future)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'max http1 connections'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.pool.max-pending-connections': 1,

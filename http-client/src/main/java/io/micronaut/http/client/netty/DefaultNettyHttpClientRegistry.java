@@ -124,7 +124,24 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         RefreshEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
-    private final List<DefaultHttpClient> balancedClients = Collections.synchronizedList(new ArrayList<>());
+    /**
+     * The running clients created for a {@link LoadBalancer}, e.g. by
+     * {@code createBean(HttpClient.class, url)}. The caller owns such a client and is expected to
+     * close it, which removes it from this set. The clients still running are refreshed on a
+     * {@link RefreshEvent} and closed with this registry.
+     */
+    private final Set<NettyHttpClient> balancedClients = ConcurrentHashMap.newKeySet();
+    private final NettyHttpClient.LifecycleListener balancedClientTracker = new NettyHttpClient.LifecycleListener() {
+        @Override
+        public void onStart(NettyHttpClient client) {
+            balancedClients.add(client);
+        }
+
+        @Override
+        public void onStop(NettyHttpClient client) {
+            balancedClients.remove(client);
+        }
+    };
     private final LoadBalancerResolver loadBalancerResolver;
     private final ClientSslBuilder nettyClientSslBuilder;
     private final NettyClientSslFactory sslFactory;
@@ -241,15 +258,27 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @PreDestroy
     public void close() {
         for (HttpClient httpClient : unbalancedClients.values()) {
-            try {
-                httpClient.close();
-            } catch (Throwable e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down HTTP client: {}", e.getMessage(), e);
-                }
-            }
+            closeClient(httpClient);
         }
         unbalancedClients.clear();
+        // load-balanced clients (e.g. created via BeanContext#createBean(HttpClient, url)) also
+        // hold resources such as reference-counted SSL contexts, so shut them down as well
+        synchronized (balancedClients) {
+            for (HttpClient httpClient : balancedClients) {
+                closeClient(httpClient);
+            }
+            balancedClients.clear();
+        }
+    }
+
+    private static void closeClient(HttpClient httpClient) {
+        try {
+            httpClient.close();
+        } catch (Throwable e) {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Error shutting down HTTP client: {}", e.getMessage(), e);
+            }
+        }
     }
 
     @Override
@@ -525,8 +554,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             )
                 .loadBalancer(loadBalancer)
                 .contextPath(loadBalancer.getContextPath().orElse(null))
+                .lifecycleListener(balancedClientTracker)
                 .build();
-            balancedClients.add(c);
+            balancedClients.add(c.getNettyHttpClient());
             return c;
         } else {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
@@ -579,8 +609,10 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         for (DefaultHttpClient client : unbalancedClients.values()) {
             client.connectionManager().refresh();
         }
-        for (DefaultHttpClient client : balancedClients) {
-            client.connectionManager().refresh();
+        synchronized (balancedClients) {
+            for (NettyHttpClient client : balancedClients) {
+                client.connectionManager().refresh();
+            }
         }
     }
 

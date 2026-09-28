@@ -42,6 +42,49 @@ public interface LoadBalancer {
     Publisher<ServiceInstance> select(@Nullable Object discriminator);
 
     /**
+     * Report the outcome of an exchange with an instance this load balancer selected, so that
+     * it can stop selecting an instance that keeps failing, see
+     * {@link io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration}. The clients
+     * report every load balanced exchange, except the ones the caller cancelled. Ignored by
+     * default.
+     *
+     * @param serviceInstance The instance the request was sent to
+     * @param outcome         The outcome of the exchange
+     * @since 5.3.0
+     */
+    default void report(ServiceInstance serviceInstance, Outcome outcome) {
+    }
+
+    /**
+     * The outcome of an exchange with a selected instance, see {@link #report}.
+     *
+     * @since 5.3.0
+     */
+    enum Outcome {
+        /**
+         * A response arrived, with a status below 500.
+         */
+        SUCCESS,
+        /**
+         * The connection to the instance could not be opened, or not in time.
+         */
+        CONNECT_FAILURE,
+        /**
+         * The response did not arrive in time.
+         */
+        TIMEOUT,
+        /**
+         * The connection or the stream was closed or reset by the instance before the response
+         * was complete.
+         */
+        RESET,
+        /**
+         * A response with a status of 500 or above.
+         */
+        SERVER_ERROR
+    }
+
+    /**
      * @return The context path to use for requests.
      */
     default Optional<String> getContextPath() {

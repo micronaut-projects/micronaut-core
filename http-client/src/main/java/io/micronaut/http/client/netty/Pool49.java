@@ -22,6 +22,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SingleThreadIoEventLoop;
@@ -430,6 +431,35 @@ final class Pool49 implements Pool {
         }
 
         /**
+         * Remove a cancelled request from the local pending queue.
+         *
+         * @param request The request
+         */
+        private void removeLocalPendingRequest(PendingRequest request) {
+            assert loop.inEventLoop();
+            localPendingRequests.remove(request);
+        }
+
+        /**
+         * Fail the first request of the given queue that is still waiting for a connection.
+         *
+         * @param queue The queue to poll
+         * @param error The error
+         * @return {@code true} if a request was failed
+         */
+        private static boolean failOne(Queue<PendingRequest> queue, Throwable error) {
+            while (true) {
+                PendingRequest request = queue.poll();
+                if (request == null) {
+                    return false;
+                }
+                if (request.tryCompleteExceptionally(error)) {
+                    return true;
+                }
+            }
+        }
+
+        /**
          * Assign any pending requests (local or global) to available connections.
          */
         void dispatchPendingRequests() {
@@ -441,6 +471,10 @@ final class Pool49 implements Pool {
                 }
                 PendingRequest request = localPendingRequests.poll();
                 assert request != null;
+                if (request.get()) {
+                    // cancelled while waiting
+                    continue;
+                }
                 request.dispatchTo(poolEntry);
             }
             needPendingConnection = false;
@@ -456,6 +490,10 @@ final class Pool49 implements Pool {
                 PendingRequest request = globalPendingRequests.poll();
                 if (request == null) {
                     return;
+                }
+                if (request.get()) {
+                    // cancelled while waiting
+                    continue;
                 }
                 request.dispatchTo(poolEntry);
             }
@@ -515,16 +553,8 @@ final class Pool49 implements Pool {
             globalStats.updateAndGet(s -> s.addPendingConnectionCount(-1)); // TODO: is this called for websockets?
             localPendingConnections--;
 
-            PendingRequest local = localPendingRequests.poll();
-            if (local != null) {
-                local.tryCompleteExceptionally(error);
-            } else {
-                PendingRequest global = globalPendingRequests.poll();
-                if (global != null) {
-                    global.tryCompleteExceptionally(error);
-                } else {
-                    log.error("Failed to connect to remote", error);
-                }
+            if (!failOne(localPendingRequests, error) && !failOne(globalPendingRequests, error)) {
+                log.error("Failed to connect to remote", error);
             }
             openLocalConnectionIfNecessary();
             openGlobalConnectionIfNecessary();
@@ -790,6 +820,7 @@ final class Pool49 implements Pool {
 
         @Override
         public void markUnavailable() {
+            checkInEventLoop();
             if (poolPair.http1.removeAvailable(this)) {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became unavailable", this);
@@ -963,6 +994,36 @@ final class Pool49 implements Pool {
             preferredPool = pickPreferredPool();
             permitStealing = preferredPool == null ||
                 connectionPoolConfiguration.getConnectionLocality() == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.PREFERRED;
+            sink.onCancel(this::onCancelled);
+        }
+
+        /**
+         * Called when the caller cancels the acquisition (e.g. the exchange is disposed or the
+         * acquire timeout fires). Stops counting this request towards
+         * {@link HttpClientConfiguration.ConnectionPoolConfiguration#getMaxPendingAcquires()} and
+         * removes it from the pending queues so that it never receives a connection.
+         */
+        private void onCancelled() {
+            if (!compareAndSet(false, true)) {
+                return;
+            }
+            if (globalPending != null) {
+                globalPending.decrement();
+            }
+            if (log.isTraceEnabled()) {
+                log.trace("{}: Cancelled", this);
+            }
+            globalPendingRequests.remove(this);
+            LocalPoolPair pool = destPool;
+            if (pool != null) {
+                if (pool.loop.inEventLoop()) {
+                    pool.removeLocalPendingRequest(this);
+                } else {
+                    pool.loop.execute(() -> pool.removeLocalPendingRequest(this));
+                }
+            }
+            // any request that is still in a queue after this (due to a concurrent move) is
+            // skipped when it is polled, because it is already marked as complete.
         }
 
         private synchronized int debugId() {
@@ -989,7 +1050,7 @@ final class Pool49 implements Pool {
         @Override
         public void dispatch() {
             if (globalPending != null && globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
-                tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
+                tryCompleteExceptionally(new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "Cannot acquire connection, exceeded max pending acquires configuration", null));
                 return;
             }
             if (log.isTraceEnabled()) {
@@ -1028,6 +1089,10 @@ final class Pool49 implements Pool {
          */
         private void dispatchLocal() {
             assert destPool.loop.inEventLoop();
+            if (get()) {
+                // cancelled before we got here
+                return;
+            }
             boolean traceEnabled = log.isTraceEnabled();
             if (traceEnabled) {
                 log.trace("{}: Attempting dispatch on {}", this, destPool);

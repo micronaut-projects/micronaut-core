@@ -118,6 +118,70 @@ class Foo {
         ex.message.contains("Unsupported filter return type: io.micronaut.http.HttpRequest")
     }
 
+    def 'filter body of a type the binder fills: #type'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    void test(@Body $type body) {
+    }
+}
+
+""")
+
+        where:
+        type << ['byte[]', 'String', 'CharSequence', 'Object', 'io.micronaut.core.io.buffer.ByteBuffer<?>']
+    }
+
+    def 'filter body of a type the binder cannot fill: #type'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    void test(@Body $type body) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("The @Body to a filter method can only be a raw type (byte[], String, ByteBuffer etc.)")
+
+        where:
+        type << ['io.micronaut.core.io.buffer.ByteArrayByteBuffer', 'java.util.Map<String, Object>', 'int[]']
+    }
+
+    def 'filter body of a type variable'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo<B extends CharSequence> {
+    @RequestFilter
+    void test(@Body B body) {
+    }
+}
+
+""")
+    }
+
     def 'execution flow return and continuation types'() {
         expect:
         buildTypeElement("""

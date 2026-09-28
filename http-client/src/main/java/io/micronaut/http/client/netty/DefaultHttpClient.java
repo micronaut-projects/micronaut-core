@@ -507,7 +507,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request) {
-        return nettyHttpClient.resolveRequestURI(request);
+        return nettyHttpClient.resolveRequestURI(request).map(NettyHttpClient.ResolvedTarget::uri);
     }
 
     /**
@@ -519,7 +519,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request, boolean includeContextPath) {
-        return nettyHttpClient.resolveRequestURI(request, includeContextPath);
+        return nettyHttpClient.resolveRequestURI(request, includeContextPath).map(NettyHttpClient.ResolvedTarget::uri);
     }
 
     /**
@@ -531,7 +531,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRedirectURI(HttpRequest<?> parentRequest, HttpRequest<I> request) {
-        return nettyHttpClient.resolveRedirectURI(parentRequest, request);
+        return nettyHttpClient.resolveRedirectURI(parentRequest, request).map(NettyHttpClient.ResolvedTarget::uri);
     }
 
     /**

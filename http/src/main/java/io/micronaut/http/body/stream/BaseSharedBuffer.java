@@ -20,6 +20,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.ByteBody;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,6 +33,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -97,6 +101,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private List<ReadBuffer> buffer;
     @Nullable
     private Exception bufferSizeExceeded = null;
+    /**
+     * The trailers of the body, see {@link ByteBody#trailers()}. Completed before the
+     * subscribers are, so that a subscriber finds them in its {@link BufferConsumer#complete()}.
+     */
+    private final CompletableFuture<HttpHeaders> trailers = new CompletableFuture<>();
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
         this.readBufferFactory = readBufferFactory;
@@ -133,6 +142,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
     public final BufferConsumer.Upstream getRootUpstream() {
         return rootUpstream;
+    }
+
+    /**
+     * Get the trailers of the body, see {@link ByteBody#trailers()}.
+     *
+     * @return The trailers
+     */
+    public final CompletionStage<HttpHeaders> getTrailers() {
+        return trailers;
     }
 
     public final void setExpectedLengthFrom(@Nullable String contentLength) {
@@ -500,10 +518,56 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         complete0(true);
     }
 
+    /**
+     * Complete this buffer with the given trailers, see {@link ByteBody#trailers()}.<br>
+     * Not thread safe, caller must handle concurrency.
+     *
+     * @param trailers The trailers
+     */
+    public void complete(HttpHeaders trailers) {
+        this.trailers.complete(trailers);
+        complete0(true);
+    }
+
+    /**
+     * Complete this buffer with the trailers the given stage completes with: immediately if the
+     * stage is already complete, else once it completes. A stage that fails, fails this buffer.
+     * <br>Not thread safe, caller must handle concurrency.
+     *
+     * @param trailers The trailers
+     */
+    public final void complete(CompletionStage<? extends HttpHeaders> trailers) {
+        CompletableFuture<? extends HttpHeaders> future = trailers.toCompletableFuture();
+        if (future.isDone() && !future.isCompletedExceptionally()) {
+            complete(future.join());
+            return;
+        }
+        future.whenComplete((headers, failure) -> submitDeferred(() -> {
+            if (error != null) {
+                return;
+            }
+            if (failure == null) {
+                complete(headers == null ? NoTrailers.HEADERS : headers);
+            } else {
+                error(failure instanceof CompletionException ce && ce.getCause() != null ? ce.getCause() : failure);
+            }
+        }));
+    }
+
+    /**
+     * Run the given task non-concurrently with the other operations on this buffer, like the
+     * subclass runs the {@link BufferConsumer} methods.
+     *
+     * @param task The task
+     */
+    protected abstract void submitDeferred(Runnable task);
+
     private void complete0(boolean notifySubscribers) {
         if (expectedLength > lengthSoFar) {
             throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
         }
+        // no-op if the trailers are known
+        trailers.complete(NoTrailers.HEADERS);
         complete = true;
         expectedLength = lengthSoFar;
         if (notifySubscribers && subscribers != null) {
@@ -537,6 +601,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         error = e;
+        trailers.completeExceptionally(e);
         discardBuffer();
         if (subscribers != null) {
             for (BufferConsumer subscriber : subscribers) {

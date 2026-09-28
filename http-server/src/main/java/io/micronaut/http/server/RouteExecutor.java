@@ -489,7 +489,7 @@ public final class RouteExecutor {
                                                                       boolean isKotlinCoroutine,
                                                                       @Nullable ContextView contextView,
                                                                       @Nullable ExecutorService executorService) {
-        PropagatedContext routePropagatedContext = propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
+        PropagatedContext routePropagatedContext = ServerHttpRequestContext.withRequest(propagatedContext, httpRequest);
         return routePropagatedContext.propagate(() -> {
             try {
                 if (isKotlinCoroutine && contextView != null) {

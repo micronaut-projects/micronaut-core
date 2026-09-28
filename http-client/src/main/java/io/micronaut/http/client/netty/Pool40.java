@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.EventExecutor;
@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import java.util.function.IntUnaryOperator;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
@@ -344,7 +343,7 @@ final class Pool40 implements Pool {
     void addPendingRequest(PendingRequest sink) {
         int maxPendingAcquires = connectionPoolConfiguration.getMaxPendingAcquires();
         if (maxPendingAcquires != Integer.MAX_VALUE && pendingRequests.size() >= maxPendingAcquires) {
-            sink.tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
+            sink.tryCompleteExceptionally(new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "Cannot acquire connection, exceeded max pending acquires configuration", null));
             return;
         }
         pendingRequests.addLast(sink);
@@ -561,15 +560,9 @@ final class Pool40 implements Pool {
 
         @Override
         boolean tryEarmarkForRequest() {
-            IntUnaryOperator upd = old -> {
-                if (old >= Math.min(connectionPoolConfiguration.getMaxConcurrentRequestsPerHttp2Connection(), maxStreamCount)) {
-                    return old;
-                } else {
-                    return old + 1;
-                }
-            };
-            int old = earmarkedOrLiveRequests.updateAndGet(upd);
-            return upd.applyAsInt(old) != old;
+            int limit = Math.min(connectionPoolConfiguration.getMaxConcurrentRequestsPerHttp2Connection(), maxStreamCount);
+            int prev = earmarkedOrLiveRequests.getAndUpdate(old -> old >= limit ? old : old + 1);
+            return prev < limit;
         }
 
         @Override

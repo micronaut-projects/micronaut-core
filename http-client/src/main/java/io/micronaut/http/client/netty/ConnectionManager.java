@@ -969,6 +969,13 @@ public class ConnectionManager {
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
         @Nullable
         NettyClientCustomizer bootstrappedCustomizer;
+
+        @Override
+        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+            // before the pipeline is built, so that the tracker stays first
+            TransportWriteTracker.addFirst(ctx.pipeline());
+            super.handlerAdded(ctx);
+        }
     }
 
     /**
@@ -1116,7 +1123,6 @@ public class ConnectionManager {
             connectionCustomizer.onInitialPipelineBuilt();
         }
     }
-
 
     /**
      * Initializer for H2C prior-knowledge connections. Will proceed with
@@ -1367,14 +1373,7 @@ public class ConnectionManager {
 
         @Override
         public Throwable wrapError(@Nullable Throwable error) {
-            HttpClientException wrapped;
-            if (error == null) {
-                // no failure observed, but channel closed
-                wrapped = new HttpClientException("Unknown connect error");
-            } else {
-                wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
-            }
-            return wrapped;
+            return NettyHttpClient.connectError(error);
         }
 
         @Override
@@ -1678,6 +1677,10 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                if (!channel.eventLoop().inEventLoop()) {
+                    channel.eventLoop().execute(this::windDownConnection);
+                    return;
+                }
                 if (!hasLiveRequest) {
                     channel.close();
                 }
@@ -1775,6 +1778,7 @@ public class ConnectionManager {
                         configuration.getReadTimeout().ifPresent(timeout ->
                             streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, new StreamReadTimeoutHandler(timeout, this)));
                         streamPipeline
+                            .addLast(new StreamResetHandler())
                             .addLast(new ChannelOutboundHandlerAdapter() {
                                 @Override
                                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -1836,7 +1840,8 @@ public class ConnectionManager {
             }
 
             void adaptHeaders(Object msg) {
-                if (msg instanceof Http2HeadersFrame hf) {
+                // the request head, not the trailers: pseudo-headers are not allowed in trailers
+                if (msg instanceof Http2HeadersFrame hf && hf.headers().method() != null) {
                     if (requestKey.isSecure()) {
                         hf.headers().scheme(HttpScheme.HTTPS.name());
                     } else {
@@ -1885,7 +1890,8 @@ public class ConnectionManager {
 
             @Override
             void adaptHeaders(Object msg) {
-                if (msg instanceof Http3HeadersFrame hf) {
+                // the request head, not the trailers: pseudo-headers are not allowed in trailers
+                if (msg instanceof Http3HeadersFrame hf && hf.headers().method() != null) {
                     if (requestKey.isSecure()) {
                         hf.headers().scheme(HttpScheme.HTTPS.name());
                     } else {

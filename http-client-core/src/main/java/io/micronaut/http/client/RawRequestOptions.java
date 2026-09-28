@@ -41,6 +41,7 @@ public final class RawRequestOptions {
         .followRedirects(false)
         .retainHostHeader(false)
         .decompress(false)
+        .allowUpgrade(true)
         .build();
 
     private final boolean followRedirects;
@@ -48,12 +49,17 @@ public final class RawRequestOptions {
     private final boolean decompress;
     @Nullable
     private final Duration responseTimeout;
+    private final boolean allowUpgrade;
+    @Nullable
+    private final Duration activityTimeout;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
         this.retainHostHeader = builder.retainHostHeader;
         this.decompress = builder.decompress;
         this.responseTimeout = builder.responseTimeout;
+        this.allowUpgrade = builder.allowUpgrade;
+        this.activityTimeout = builder.activityTimeout;
     }
 
     /**
@@ -88,7 +94,9 @@ public final class RawRequestOptions {
             .followRedirects(followRedirects)
             .retainHostHeader(retainHostHeader)
             .decompress(decompress)
-            .responseTimeout(responseTimeout);
+            .responseTimeout(responseTimeout)
+            .allowUpgrade(allowUpgrade)
+            .activityTimeout(activityTimeout);
     }
 
     /**
@@ -138,18 +146,49 @@ public final class RawRequestOptions {
         return responseTimeout;
     }
 
+    /**
+     * Whether a request with an {@code Upgrade} header may switch the connection to another
+     * protocol, e.g. WebSocket. If {@code true}, a {@code 101 Switching Protocols} response
+     * whose {@code Upgrade} token matches the request is returned as an
+     * {@link io.micronaut.http.UpgradedHttpResponse} whose connection carries the new protocol.
+     * The request is sent with the {@code Upgrade} and {@code Connection} headers it is given; a
+     * relay that strips the hop-by-hop headers keeps these two when it relays a switch.
+     * The exchange needs an HTTP/1.1 connection. Defaults to {@code false}; the
+     * {@link #proxy()} preset enables it.
+     *
+     * @return Whether upgrades are allowed
+     * @since 5.3.0
+     */
+    public boolean isAllowUpgrade() {
+        return allowUpgrade;
+    }
+
+    /**
+     * The longest a connection that switched protocols may carry no bytes in either direction
+     * before it is closed, or {@code null} for no limit. It replaces the read timeout of the
+     * client, which does not apply after the switch. Defaults to {@code null}.
+     *
+     * @return The activity timeout of an upgraded connection
+     * @since 5.3.0
+     */
+    public @Nullable Duration getActivityTimeout() {
+        return activityTimeout;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof RawRequestOptions that &&
             followRedirects == that.followRedirects &&
             retainHostHeader == that.retainHostHeader &&
             decompress == that.decompress &&
-            Objects.equals(responseTimeout, that.responseTimeout);
+            Objects.equals(responseTimeout, that.responseTimeout) &&
+            allowUpgrade == that.allowUpgrade &&
+            Objects.equals(activityTimeout, that.activityTimeout);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout);
     }
 
     @Override
@@ -159,6 +198,8 @@ public final class RawRequestOptions {
             ", retainHostHeader=" + retainHostHeader +
             ", decompress=" + decompress +
             ", responseTimeout=" + responseTimeout +
+            ", allowUpgrade=" + allowUpgrade +
+            ", activityTimeout=" + activityTimeout +
             '}';
     }
 
@@ -171,8 +212,34 @@ public final class RawRequestOptions {
         private boolean decompress = true;
         @Nullable
         private Duration responseTimeout;
+        private boolean allowUpgrade = false;
+        @Nullable
+        private Duration activityTimeout;
 
         private Builder() {
+        }
+
+        /**
+         * @param allowUpgrade See {@link RawRequestOptions#isAllowUpgrade()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder allowUpgrade(boolean allowUpgrade) {
+            this.allowUpgrade = allowUpgrade;
+            return this;
+        }
+
+        /**
+         * @param activityTimeout See {@link RawRequestOptions#getActivityTimeout()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder activityTimeout(@Nullable Duration activityTimeout) {
+            if (activityTimeout != null && (activityTimeout.isNegative() || activityTimeout.isZero())) {
+                throw new IllegalArgumentException("The activity timeout must be positive: " + activityTimeout);
+            }
+            this.activityTimeout = activityTimeout;
+            return this;
         }
 
         /**

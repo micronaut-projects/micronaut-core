@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.TypeLiteral;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -132,6 +133,13 @@ final class PythonCallables {
 
     /** Bound while a callable is converted with the default host interop conversion. */
     private static final ScopedValue<Boolean> DEFAULT_CONVERSION = ScopedValue.newInstance();
+
+    /**
+     * The parameterized {@link Function} target of the default conversion. Converted to the raw
+     * class, the interop function treats a {@code null} argument as no arguments and spreads an
+     * {@code Object[]} argument into several.
+     */
+    private static final TypeLiteral<Function<Object, Object>> FUNCTION = new TypeLiteral<>() { };
 
     /** {@code CO_VARARGS} of a Python code object. */
     private static final int CO_VARARGS = 0x04;
@@ -277,7 +285,9 @@ final class PythonCallables {
      * @return The proxy
      */
     static <T> T convertWithDefaultConversion(Value callable, Class<T> type) {
-        return ScopedValue.where(DEFAULT_CONVERSION, Boolean.TRUE).call(() -> callable.as(type));
+        return ScopedValue.where(DEFAULT_CONVERSION, Boolean.TRUE).call(() -> type == Function.class
+            ? type.cast(callable.as(FUNCTION))
+            : callable.as(type));
     }
 
     /**
