@@ -83,6 +83,28 @@ class UpgradeHalfCloseTest {
         }
     }
 
+    @Test
+    void aHalfCloseOfThePeerDoesNotTruncateTheSentBody() throws Exception {
+        byte[] large = new byte[8 * 1024 * 1024];
+        java.util.Arrays.fill(large, (byte) 'x');
+        try (HalfClosingUpstream upstream = new HalfClosingUpstream(false, 1000);
+             ApplicationContext ctx = ApplicationContext.run();
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            UpgradedHttpResponse<?> upgraded = upgrade(client, upstream);
+            try (upgraded) {
+                // reading the inbound bytes is what notices the half-close of the upstream
+                CompletableFuture<?> inbound = upgraded.byteBody().buffer();
+                // the body ends while most of it is still queued; the upstream shuts down its
+                // output before it reads: the queued bytes are still written
+                upgraded.send(ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
+                    .adapt(Flux.just("hi".getBytes(StandardCharsets.US_ASCII), large)
+                        .map(bytes -> (ReadBuffer) ReadBufferFactory.getJdkFactory().adapt(bytes))));
+                Assertions.assertEquals(2 + large.length, upstream.received.get(TIMEOUT_SECONDS, TimeUnit.SECONDS).length());
+                inbound.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            }
+        }
+    }
+
     private static UpgradedHttpResponse<?> upgrade(RawHttpClient client, HalfClosingUpstream upstream) {
         HttpResponse<?> response = Mono.from(client.exchange(
                 HttpRequest.GET("http://127.0.0.1:" + upstream.port() + "/half-close")
@@ -108,9 +130,20 @@ class UpgradeHalfCloseTest {
         final CompletableFuture<String> received = new CompletableFuture<>();
         private final ServerSocket serverSocket;
         private final boolean shutdownFirst;
+        private final long shutdownBeforeReadingMillis;
 
         HalfClosingUpstream(boolean shutdownFirst) throws IOException {
+            this(shutdownFirst, -1);
+        }
+
+        /**
+         * @param shutdownBeforeReadingMillis When not negative, the upstream waits this long
+         *                                    without reading, shuts down its output, then reads
+         *                                    to the end
+         */
+        HalfClosingUpstream(boolean shutdownFirst, long shutdownBeforeReadingMillis) throws IOException {
             this.shutdownFirst = shutdownFirst;
+            this.shutdownBeforeReadingMillis = shutdownBeforeReadingMillis;
             serverSocket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
             Thread acceptor = new Thread(this::serve, "half-closing-upstream");
             acceptor.setDaemon(true);
@@ -129,7 +162,11 @@ class UpgradeHalfCloseTest {
                 readHead(in);
                 out.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                 out.flush();
-                if (shutdownFirst) {
+                if (shutdownBeforeReadingMillis >= 0) {
+                    Thread.sleep(shutdownBeforeReadingMillis);
+                    socket.shutdownOutput();
+                    received.complete(new String(in.readAllBytes(), StandardCharsets.US_ASCII));
+                } else if (shutdownFirst) {
                     out.write("first".getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                     socket.shutdownOutput();
@@ -144,6 +181,9 @@ class UpgradeHalfCloseTest {
                     in.read();
                 }
             } catch (IOException e) {
+                received.completeExceptionally(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 received.completeExceptionally(e);
             }
         }
