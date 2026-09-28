@@ -150,20 +150,15 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
      * @return The bytes, or {@code null} if a request replaced them or there are none
      */
     private static @Nullable ByteBody directBytes(HttpRequest<?> request) {
-        HttpRequest<?> current = request;
-        while (true) {
+        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
             if (current instanceof DirectByteBodyAccess access) {
                 return access.byteBodyDirect();
             }
             if (current instanceof ServerHttpRequest<?> server) {
                 return server.byteBody();
             }
-            if (current instanceof HttpRequestWrapper<?> wrapper) {
-                current = wrapper.getDelegate();
-            } else {
-                return null;
-            }
         }
+        return null;
     }
 
     /**

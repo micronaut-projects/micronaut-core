@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.cookie.Cookies;
 import org.jspecify.annotations.Nullable;
 
@@ -23,7 +24,9 @@ import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
@@ -135,5 +138,35 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     @Override
     public boolean isSecure() {
         return getDelegate().isSecure();
+    }
+
+    /**
+     * The layers of a request: the request itself, then the request each
+     * {@link HttpRequestWrapper} wraps, down to the innermost request, which is not a wrapper.
+     *
+     * @param request The request
+     * @return The request and the requests it wraps, outermost first
+     * @since 5.3.0
+     */
+    @Internal
+    public static Iterable<HttpRequest<?>> unwrap(HttpRequest<?> request) {
+        return () -> new Iterator<>() {
+            private @Nullable HttpRequest<?> next = request;
+
+            @Override
+            public boolean hasNext() {
+                return next != null;
+            }
+
+            @Override
+            public HttpRequest<?> next() {
+                HttpRequest<?> current = next;
+                if (current == null) {
+                    throw new NoSuchElementException();
+                }
+                next = current instanceof HttpRequestWrapper<?> wrapper ? wrapper.getDelegate() : null;
+                return current;
+            }
+        };
     }
 }

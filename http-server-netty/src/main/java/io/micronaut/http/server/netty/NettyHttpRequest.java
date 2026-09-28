@@ -276,10 +276,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Internal
     @SuppressWarnings("ReferenceEquality") // the same bytes
     public static @Nullable NettyHttpRequest<?> findBodyRequest(HttpRequest<?> request) {
-        HttpRequest<?> current = request;
         // the first server request: its bytes are the body of the request
         ServerHttpRequest<?> server = null;
-        while (true) {
+        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
             if (current instanceof NettyHttpRequest<?> nettyRequest) {
                 return server == null || server.byteBody() == nettyRequest.byteBody() ? nettyRequest : null;
             }
@@ -294,12 +293,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             if (server == null && current instanceof ServerHttpRequest<?> serverRequest) {
                 server = serverRequest;
             }
-            if (current instanceof HttpRequestWrapper<?> wrapper) {
-                current = wrapper.getDelegate();
-            } else {
-                return null;
-            }
         }
+        return null;
     }
 
     @Override

@@ -52,8 +52,7 @@ public final class ServerRequestBody {
      * a mutable copy of, or {@code null} if there is none or the body of a copy was set
      */
     public static @Nullable ServerHttpRequest<?> of(HttpRequest<?> request) {
-        HttpRequest<?> current = request;
-        while (true) {
+        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
             if (current instanceof DirectByteBodyAccess access && access.byteBodyDirect() == null) {
                 // e.g. a mutable copy whose body a filter set, even to null
                 return null;
@@ -61,11 +60,7 @@ public final class ServerRequestBody {
             if (current instanceof ServerHttpRequest<?> server) {
                 return server;
             }
-            if (current instanceof HttpRequestWrapper<?> wrapper) {
-                current = wrapper.getDelegate();
-            } else {
-                return null;
-            }
         }
+        return null;
     }
 }
