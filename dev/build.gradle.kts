@@ -9,6 +9,7 @@ dependencies {
 
     // the gate filter and the compile-error page exist only when an HTTP server is present
     compileOnly(projects.micronautHttp)
+    compileOnly(projects.micronautHttpServer)
 
     testImplementation(projects.micronautInjectJava)
     testAnnotationProcessor(projects.micronautInjectJava)
