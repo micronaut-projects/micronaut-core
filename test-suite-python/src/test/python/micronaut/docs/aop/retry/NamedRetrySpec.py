@@ -24,7 +24,7 @@ class NamedRetrySpec:
         service = self.service
 
         assert service.find_book("The Stand").get_title() == "The Stand"
-        assert service.reset() == 3
+        assert service.reset() == 5
 
         try:
             service.get_book("The Stand")

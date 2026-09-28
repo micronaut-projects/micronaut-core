@@ -24,6 +24,8 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import java.util.concurrent.atomic.AtomicInteger
 
 class NamedRetryPolicySpec extends Specification {
@@ -73,6 +75,23 @@ class NamedRetryPolicySpec extends Specification {
         thrown(IllegalStateException)
         calls.get() == 5 // the first call and 4 retries
         context.getBean(RetryRegistry).retry('quick').is(operations)
+    }
+
+    void "the registry retries an included checked exception"() {
+        given:
+        RetryOperations operations = context.getBean(RetryRegistry).retry('io')
+        AtomicInteger calls = new AtomicInteger()
+
+        when:
+        operations.executeCompletionStage {
+            calls.incrementAndGet()
+            CompletableFuture.failedFuture(new IOException("down"))
+        }.toCompletableFuture().join()
+
+        then:
+        CompletionException e = thrown()
+        e.cause instanceof IOException
+        calls.get() == 6 // the first call and 5 retries
     }
 
     void "the registry fails clearly for an unknown name"() {

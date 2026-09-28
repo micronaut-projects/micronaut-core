@@ -36,7 +36,7 @@ class NamedRetrySpec extends Specification {
 
         expect:
         service.findBook('The Stand').title == 'The Stand'
-        service.reset() == 3
+        service.reset() == 5
 
         when:
         service.getBook('The Stand')

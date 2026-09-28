@@ -32,7 +32,7 @@ class NamedRetryBookService {
     Book findBook(String title) {
         // ...
     // end::named[]
-        return failTwice(title)
+        return failFourTimes(title)
     }
 
     // tag::override[]
@@ -40,15 +40,15 @@ class NamedRetryBookService {
     Book getBook(String title) {
         // ...
     // end::override[]
-        return failTwice(title)
+        return failFourTimes(title)
     }
 
     int reset() {
         calls.getAndSet(0)
     }
 
-    private Book failTwice(String title) {
-        if (calls.incrementAndGet() < 3) {
+    private Book failFourTimes(String title) {
+        if (calls.incrementAndGet() < 5) {
             throw new UncheckedIOException(new IOException('unavailable'))
         }
         new Book(title)

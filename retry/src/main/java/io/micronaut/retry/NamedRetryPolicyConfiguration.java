@@ -38,6 +38,8 @@ import java.util.List;
  *         jitter: 0.1
  *         includes: java.io.IOException
  * </pre>
+ * The policy captures any {@link Exception}, as {@code @Retryable} does, so that a checked
+ * exception of the includes is retried.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -185,6 +187,7 @@ public class NamedRetryPolicyConfiguration {
                 .maxDelay(maxDelay)
                 .multiplier(multiplier)
                 .jitter(jitter)
+                .capturedException(Exception.class)
                 .includes(throwables(includes, "includes"))
                 .excludes(throwables(excludes, "excludes"))
                 .build();

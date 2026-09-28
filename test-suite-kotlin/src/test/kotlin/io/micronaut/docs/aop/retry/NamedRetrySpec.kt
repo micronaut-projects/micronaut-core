@@ -33,7 +33,7 @@ class NamedRetrySpec {
             val service = context.getBean(NamedRetryBookService::class.java)
 
             assertEquals("The Stand", service.findBook("The Stand").title)
-            assertEquals(3, service.reset())
+            assertEquals(5, service.reset())
 
             assertThrows<UncheckedIOException> { service.getBook("The Stand") }
             assertEquals(2, service.reset())

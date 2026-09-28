@@ -36,7 +36,7 @@ class NamedRetrySpec {
             NamedRetryBookService service = context.getBean(NamedRetryBookService.class);
 
             assertEquals("The Stand", service.findBook("The Stand").getTitle());
-            assertEquals(3, service.reset());
+            assertEquals(5, service.reset());
 
             assertThrows(UncheckedIOException.class, () -> service.getBook("The Stand"));
             assertEquals(2, service.reset());

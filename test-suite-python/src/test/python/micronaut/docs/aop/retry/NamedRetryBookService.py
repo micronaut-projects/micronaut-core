@@ -21,22 +21,22 @@ class NamedRetryBookService:
     def find_book(self, title: str) -> Book:
         # ...
     # end::named[]
-        return self._fail_twice(title)
+        return self._fail_four_times(title)
 
     # tag::override[]
     @Retryable(name="books", attempts="1")  # <1>
     def get_book(self, title: str) -> Book:
         # ...
     # end::override[]
-        return self._fail_twice(title)
+        return self._fail_four_times(title)
 
     def reset(self) -> int:
         calls = self.calls
         self.calls = 0
         return calls
 
-    def _fail_twice(self, title: str) -> Book:
+    def _fail_four_times(self, title: str) -> Book:
         self.calls += 1
-        if self.calls < 3:
+        if self.calls < 5:
             raise UncheckedIOException(IOException("unavailable"))
         return Book(title)
