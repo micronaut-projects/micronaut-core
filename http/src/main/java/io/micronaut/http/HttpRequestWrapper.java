@@ -141,6 +141,23 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     }
 
     /**
+     * Whether the given request is a wrapper whose body is not the body of the request it wraps,
+     * e.g. a wrapper a filter continued with that returns a replacement from {@code getBody()}:
+     * the bytes of the requests it wraps are then not its body.
+     *
+     * @param request The request
+     * @return Whether it is a wrapper that replaced the body of the request it wraps
+     * @since 5.3.0
+     */
+    @Internal
+    @SuppressWarnings("ReferenceEquality") // by identity
+    public static boolean replacesBody(HttpRequest<?> request) {
+        // by identity: a replacement that only compares equal, e.g. a sanitized copy, is still a replacement
+        return request instanceof HttpRequestWrapper<?> wrapper
+            && wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null);
+    }
+
+    /**
      * The layers of a request: the request itself, then the request each
      * {@link HttpRequestWrapper} wraps, down to the innermost request, which is not a wrapper.
      *

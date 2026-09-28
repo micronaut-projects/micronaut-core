@@ -60,6 +60,10 @@ public final class ServerRequestBody {
             if (current instanceof ServerHttpRequest<?> server) {
                 return server;
             }
+            if (HttpRequestWrapper.replacesBody(current)) {
+                // e.g. a wrapper a filter continued with that returns a sanitized body
+                return null;
+            }
         }
         return null;
     }

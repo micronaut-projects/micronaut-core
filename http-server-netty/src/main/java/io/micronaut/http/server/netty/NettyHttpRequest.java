@@ -293,6 +293,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             if (server == null && current instanceof ServerHttpRequest<?> serverRequest) {
                 server = serverRequest;
             }
+            if (HttpRequestWrapper.replacesBody(current)) {
+                // e.g. a wrapper a filter continued with that returns a sanitized body
+                return null;
+            }
         }
         return null;
     }

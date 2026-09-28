@@ -18,6 +18,7 @@ package io.micronaut.http.filter;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpVersion;
@@ -29,6 +30,7 @@ import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.DirectByteBodyAccess;
+import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
@@ -156,6 +158,10 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
             }
             if (current instanceof ServerHttpRequest<?> server) {
                 return server.byteBody();
+            }
+            if (HttpRequestWrapper.replacesBody(current)) {
+                // e.g. a wrapper a filter continued with that returns a sanitized body
+                return null;
             }
         }
         return null;
@@ -314,6 +320,13 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
 
         private Overlay(HttpRequest<B> request) {
             super(ConversionService.SHARED, request);
+        }
+
+        @Override
+        public MutableHttpRequest<B> cookie(Cookie cookie) {
+            // the headers are those of the request it wraps, as for the mutable copy of a request
+            getHeaders().add(HttpHeaders.COOKIE, ClientCookieEncoder.INSTANCE.encode(cookie));
+            return this;
         }
 
         @Override

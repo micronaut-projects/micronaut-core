@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -154,6 +155,44 @@ class MutableServerRequestTest {
         MutableHttpRequest<?> mutable = MutableServerRequest.mutable(new ImmutableRequest(new ImmutableRequest(new SimpleHttpRequest<>(HttpMethod.GET, "/", null))));
 
         assertNull(((DirectByteBodyAccess) mutable).byteBodyDirect());
+    }
+
+    @Test
+    void theWrapperHidesTheBytesOfARequestWhoseWrapperReplacedTheBody() {
+        ServerRequest server = new ServerRequest(new SimpleHttpRequest<>(HttpMethod.POST, "/items", "original"), "body");
+        // a wrapper another filter continued with, which returns a sanitized body
+        HttpRequestWrapper<Object> sanitized = new HttpRequestWrapper<>(server) {
+            @Override
+            public Optional<Object> getBody() {
+                return Optional.of("replacement");
+            }
+        };
+
+        MutableHttpRequest<?> mutable = MutableServerRequest.mutable(sanitized);
+
+        assertNull(((DirectByteBodyAccess) mutable).byteBodyDirect());
+        assertNull(((DirectByteBodyAccess) MutableServerRequest.of(sanitized)).byteBodyDirect());
+        assertEquals("replacement", mutable.getBody().orElseThrow());
+    }
+
+    @Test
+    void theWrapperKeepsTheBytesOfARequestWhoseWrapperKeptTheBody() {
+        ServerRequest server = new ServerRequest(new SimpleHttpRequest<>(HttpMethod.POST, "/items", "original"), "body");
+
+        MutableHttpRequest<?> mutable = MutableServerRequest.mutable(new ImmutableRequest(server));
+
+        assertSame(server.byteBody(), ((DirectByteBodyAccess) mutable).byteBodyDirect());
+    }
+
+    @Test
+    void theWrapperAddsACookieToTheHeadersOfTheRequest() {
+        SimpleHttpRequest<Object> request = new SimpleHttpRequest<>(HttpMethod.GET, "/items", null);
+        MutableHttpRequest<?> mutable = MutableServerRequest.of(new ImmutableRequest(request));
+
+        assertSame(mutable, mutable.cookie(Cookie.of("session", "abc")));
+
+        assertEquals("session=abc", mutable.getHeaders().get("Cookie"));
+        assertEquals("session=abc", request.getHeaders().get("Cookie"));
     }
 
     @Test
