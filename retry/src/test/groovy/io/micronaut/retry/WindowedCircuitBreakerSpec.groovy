@@ -52,7 +52,7 @@ class WindowedCircuitBreakerSpec extends Specification {
             'micronaut.retry.circuit-breakers.concurrent.request-volume-threshold': 10,
             'micronaut.retry.circuit-breakers.concurrent.success-threshold': 5,
             'micronaut.retry.circuit-breakers.concurrent.failure-ratio': 0.1,
-            'micronaut.retry.circuit-breakers.concurrent.reset': '100ms',
+            'micronaut.retry.circuit-breakers.concurrent.reset': '2s',
         ])
         registry = context.getBean(CircuitBreakerRegistry)
     }
@@ -213,16 +213,12 @@ class WindowedCircuitBreakerSpec extends Specification {
         given:
         CircuitBreakerGuard guard = registry.guard("concurrent")
         10.times { fail(guard) }
-        conditions.eventually {
-            assert guard.state == CircuitState.HALF_OPEN
-        }
         def executor = Executors.newFixedThreadPool(32)
         CountDownLatch start = new CountDownLatch(1)
         AtomicInteger permitted = new AtomicInteger()
         AtomicInteger rejected = new AtomicInteger()
         List<CircuitBreakerGuard.Permit> permits = Collections.synchronizedList([])
-
-        when:
+        // the calls wait before the circuit half-opens: trials that take longer than the reset get new permits
         200.times {
             executor.submit {
                 start.await()
@@ -234,6 +230,11 @@ class WindowedCircuitBreakerSpec extends Specification {
                 }
             }
         }
+        conditions.eventually {
+            assert guard.state == CircuitState.HALF_OPEN
+        }
+
+        when:
         start.countDown()
         executor.shutdown()
         executor.awaitTermination(10, TimeUnit.SECONDS)
