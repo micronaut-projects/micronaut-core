@@ -10,6 +10,7 @@ on:
       - master
       - main
       - '[0-9]+.[0-9]+.x'
+      - refresh-skip-replaced-configuration
   pull_request:
     branches:
       - master
