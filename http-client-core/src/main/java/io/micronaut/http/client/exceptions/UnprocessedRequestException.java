@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.exceptions;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
@@ -105,6 +106,7 @@ public class UnprocessedRequestException extends HttpClientException {
      * @return The body, empty if there is none or it was taken already
      * @since 5.3.0
      */
+    @Experimental
     public final Optional<CloseableByteBody> takeUnsentBody() {
         CloseableByteBody body;
         synchronized (this) {
@@ -147,6 +149,7 @@ public class UnprocessedRequestException extends HttpClientException {
      * to the server that redirected it.
      * @since 5.3.0
      */
+    @Experimental
     public final boolean isBodyUntouched() {
         return !bodySent && (reason == Reason.CONNECT || reason == Reason.CONNECT_TIMEOUT || reason == Reason.POOL_ACQUIRE);
     }

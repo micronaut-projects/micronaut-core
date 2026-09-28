@@ -21,6 +21,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpStatusClass;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.ReadTimeoutException;
@@ -52,6 +53,7 @@ final class RequestReadIdleTimeoutHandler extends ReadTimeoutHandler {
     static final AttributeKey<Boolean> SUSPENDS_CONNECTION_READ_TIMEOUT = AttributeKey.valueOf(RequestReadIdleTimeoutHandler.class, "suspends-connection-read-timeout");
 
     private boolean timedOut;
+    private boolean inInterim;
 
     RequestReadIdleTimeoutHandler(Duration timeout) {
         super(timeout.toNanos(), TimeUnit.NANOSECONDS);
@@ -97,9 +99,16 @@ final class RequestReadIdleTimeoutHandler extends ReadTimeoutHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        // an interim response, e.g. 100 Continue, is a full message too, but the exchange goes on
-        boolean last = msg instanceof LastHttpContent
-            && !(msg instanceof HttpResponse response && response.status().codeClass() == HttpStatusClass.INFORMATIONAL);
+        // an interim response, e.g. 100 Continue or 103 Early Hints, ends with its own last
+        // content, but the exchange goes on
+        if (msg instanceof HttpResponse response) {
+            inInterim = response.status().codeClass() == HttpStatusClass.INFORMATIONAL
+                && response.status().code() != HttpResponseStatus.SWITCHING_PROTOCOLS.code();
+        }
+        boolean last = msg instanceof LastHttpContent && !inInterim;
+        if (msg instanceof LastHttpContent) {
+            inInterim = false;
+        }
         super.channelRead(ctx, msg);
         if (last && ctx.pipeline().context(this) != null) {
             // the response ended: the next exchange of the connection has the read timeout of the connection

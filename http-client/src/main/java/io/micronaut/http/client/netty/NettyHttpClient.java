@@ -1713,6 +1713,7 @@ final class NettyHttpClient implements
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                     // the per-exchange options apply to the whole exchange, redirects included
                     request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
+                    request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirectRequest.setAttribute(READ_IDLE_TIMEOUT, timeout));
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(target -> {
                             setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
