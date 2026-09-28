@@ -24,9 +24,11 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.DefaultEventLoopGroup;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.local.LocalChannel;
+import io.netty.channel.local.LocalIoHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -215,8 +217,7 @@ class ByteBodyLimitReplayOwnershipTest {
      */
     @Test
     void replayableReadFromAnotherEventLoopWhileTheBytesArrive() throws Exception {
-        DefaultEventLoopGroup group = new DefaultEventLoopGroup(1);
-        try {
+        try (EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, LocalIoHandler.newFactory())) {
             LocalChannel other = new LocalChannel();
             group.register(other).sync();
             NettyByteBodyFactory otherFactory = new NettyByteBodyFactory(other);
@@ -239,8 +240,6 @@ class ByteBodyLimitReplayOwnershipTest {
                 Assertions.assertFalse(replayable.isReplayable());
             }
             other.close().sync();
-        } finally {
-            group.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
         }
     }
 
@@ -259,11 +258,10 @@ class ByteBodyLimitReplayOwnershipTest {
      */
     @Test
     void replayableNextOffTheEventLoopRacingClose() throws Exception {
-        DefaultEventLoopGroup group = new DefaultEventLoopGroup(1);
-        try {
-            LocalChannel channel = new LocalChannel();
-            group.register(channel).sync();
-            NettyByteBodyFactory loopFactory = new NettyByteBodyFactory(channel);
+        try (EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, LocalIoHandler.newFactory())) {
+            LocalChannel loopChannel = new LocalChannel();
+            group.register(loopChannel).sync();
+            NettyByteBodyFactory loopFactory = new NettyByteBodyFactory(loopChannel);
             ReplayableByteBody replayable = loopFactory.replayable(loopFactory.adaptNetty(Flux.just("abc", "def").map(this::buf)), 100);
             CountDownLatch nextTaken = new CountDownLatch(1);
             Future<?> closed = group.next().submit(() -> {
@@ -278,9 +276,7 @@ class ByteBodyLimitReplayOwnershipTest {
             nextTaken.countDown();
             closed.get(5, TimeUnit.SECONDS);
             Assertions.assertEquals("abcdef", read(next));
-            channel.close().sync();
-        } finally {
-            group.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+            loopChannel.close().sync();
         }
     }
 }

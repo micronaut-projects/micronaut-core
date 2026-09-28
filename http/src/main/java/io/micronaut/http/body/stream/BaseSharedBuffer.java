@@ -689,15 +689,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
-            SizeLimitTracker ownTracker = this.ownTracker;
-            if (ownTracker != null) {
+            SizeLimitTracker readerTracker = ownTracker;
+            if (readerTracker != null) {
                 int size = buf.readable();
-                Exception bufferExceededExc = ownTracker.add(size);
+                Exception bufferExceededExc = readerTracker.add(size);
                 if (bufferExceededExc != null) {
                     sink.tryEmitError(bufferExceededExc);
                     buf.close();
                 } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
-                    ownTracker.subtract(size);
+                    readerTracker.subtract(size);
                     buf.close();
                 }
                 return;
@@ -729,13 +729,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         public Flux<ReadBuffer> asFlux(Upstream upstream) {
-            SizeLimitTracker ownTracker = this.ownTracker;
-            if (ownTracker != null) {
+            SizeLimitTracker readerTracker = ownTracker;
+            if (readerTracker != null) {
                 return sink.asFlux()
                     .doOnSubscribe(s -> upstream.start())
                     .doOnNext(bb -> {
                         int size = bb.readable();
-                        ownTracker.subtract(size);
+                        readerTracker.subtract(size);
                         upstream.onBytesConsumed(size);
                     })
                     .doOnCancel(() -> {
@@ -743,7 +743,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                         upstream.disregardBackpressure();
                     })
                     .doOnDiscard(ReadBuffer.class, rb -> {
-                        ownTracker.subtract(rb.readable());
+                        readerTracker.subtract(rb.readable());
                         rb.close();
                     });
             }
