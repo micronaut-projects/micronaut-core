@@ -55,6 +55,15 @@ class ItemRoutesSpec extends Specification {
         http.exchange(HttpRequest.POST("/items/optional", new Item(0, "cup"))).status == HttpStatus.CREATED
     }
 
+    void "a decoded body handled asynchronously"() {
+        when:
+        HttpResponse<Item> created = client.toBlocking().exchange(HttpRequest.POST("/items/async", new Item(0, "mug")), Item)
+
+        then:
+        created.status == HttpStatus.CREATED
+        created.body().name() == "mug"
+    }
+
     void "an implicit HEAD route and a method not allowed"() {
         given:
         BlockingHttpClient http = client.toBlocking()

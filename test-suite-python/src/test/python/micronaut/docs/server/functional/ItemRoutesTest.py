@@ -46,6 +46,12 @@ class ItemRoutesTest:
         assert http.exchange(HttpRequest.POST("/items/optional", Map.of("id", 0, "name", "cup"))).getStatus() == HttpStatus.CREATED
 
     @Test
+    def a_decoded_body_handled_asynchronously(self):
+        created = self.client.toBlocking().exchange(HttpRequest.POST("/items/async", Map.of("id", 0, "name", "mug")), Map)
+        assert created.getStatus() == HttpStatus.CREATED
+        assert created.body().get("name") == "mug"
+
+    @Test
     def an_implicit_head_route_and_a_method_not_allowed(self):
         http = self.client.toBlocking()
         item = http.retrieve(HttpRequest.POST("/items", Map.of("id", 0, "name", "book")), Map)

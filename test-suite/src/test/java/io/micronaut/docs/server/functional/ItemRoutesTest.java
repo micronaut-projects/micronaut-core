@@ -70,6 +70,13 @@ class ItemRoutesTest {
     }
 
     @Test
+    void aDecodedBodyHandledAsynchronously() {
+        HttpResponse<Item> created = client.toBlocking().exchange(HttpRequest.POST("/items/async", new Item(0, "mug")), Item.class);
+        assertEquals(HttpStatus.CREATED, created.getStatus());
+        assertEquals("mug", created.body().name());
+    }
+
+    @Test
     void anImplicitHeadRouteAndAMethodNotAllowed() {
         BlockingHttpClient http = client.toBlocking();
         Item item = http.retrieve(HttpRequest.POST("/items", new Item(0, "book")), Item.class);

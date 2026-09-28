@@ -64,6 +64,13 @@ class ItemRoutesTest {
     }
 
     @Test
+    fun aDecodedBodyHandledAsynchronously() {
+        val created = client.toBlocking().exchange(HttpRequest.POST("/items/async", Item(0, "mug")), Item::class.java)
+        assertEquals(HttpStatus.CREATED, created.status)
+        assertEquals("mug", created.body()!!.name)
+    }
+
+    @Test
     fun anImplicitHeadRouteAndAMethodNotAllowed() {
         val http = client.toBlocking()
         val item = http.retrieve(HttpRequest.POST("/items", Item(0, "book")), Item::class.java)
