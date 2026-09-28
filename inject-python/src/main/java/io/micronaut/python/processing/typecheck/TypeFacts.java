@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.typecheck;
 
 import io.micronaut.annotation.processing.PostponeToNextRoundException;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -401,7 +402,7 @@ public final class TypeFacts {
         boolean pythonDefined = PythonJavaTypes.isPythonClass(element);
         boolean annotation = element instanceof AnnotationElement || element.isAssignable(Annotation.class);
         if (!annotation) {
-            return new AnnotationDescription(element.getName(), false, pythonDefined, false, false, Map.of(), List.of());
+            return new AnnotationDescription(element.getName(), false, pythonDefined, false, false, false, false, false, Map.of(), List.of());
         }
         // an around or introduction binding applied to a class advises every method of the class,
         // whatever the annotation's own targets say
@@ -426,7 +427,16 @@ public final class TypeFacts {
             ? annotationElement.getTargets().stream().map(ElementType::name).sorted().toList()
             : List.of();
         boolean validationConstraint = element.hasStereotype("jakarta.validation.Constraint") || "jakarta.validation.Valid".equals(element.getName());
-        return new AnnotationDescription(element.getName(), true, pythonDefined, interceptorBinding, validationConstraint, members, targets);
+        // the annotations the stub generator bridges a module-level function for
+        boolean executable = element.hasStereotype("io.micronaut.context.annotation.Executable")
+            || element.hasStereotype("io.micronaut.aop.Around")
+            || element.hasStereotype(AnnotationUtil.SCOPE)
+            || element.hasStereotype("io.micronaut.context.annotation.Bean")
+            || "jakarta.annotation.PostConstruct".equals(element.getName())
+            || "jakarta.annotation.PreDestroy".equals(element.getName());
+        boolean scope = element.hasStereotype(AnnotationUtil.SCOPE);
+        boolean introduction = element.hasStereotype("io.micronaut.aop.Introduction");
+        return new AnnotationDescription(element.getName(), true, pythonDefined, interceptorBinding, validationConstraint, executable, scope, introduction, members, targets);
     }
 
     /**
@@ -550,6 +560,10 @@ public final class TypeFacts {
      * @param pythonDefined      Whether the type is generated from a Python definition
      * @param interceptorBinding Whether the annotation binds around or introduction advice, which a
      *                           class applies to all of its methods
+     * @param executable Whether the annotation makes a module-level function a method of the generated
+     *                   class: an executable, around, scope, bean or lifecycle annotation
+     * @param scope Whether the annotation is a scope
+     * @param introduction Whether the annotation is an introduction binding
      * @param validationConstraint Whether the annotation is a validation constraint or {@code Valid},
      *                           which advises the method it is applied to with validation
      * @param members            The members by name
@@ -561,6 +575,9 @@ public final class TypeFacts {
                                         boolean pythonDefined,
                                         boolean interceptorBinding,
                                         boolean validationConstraint,
+                                        boolean executable,
+                                        boolean scope,
+                                        boolean introduction,
                                         Map<String, MemberDescription> members,
                                         List<String> targets) {
 
