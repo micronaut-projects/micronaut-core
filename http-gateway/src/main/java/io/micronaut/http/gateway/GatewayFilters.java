@@ -392,6 +392,27 @@ public final class GatewayFilters {
     }
 
     /**
+     * The CORS policy of the route, like the per-route {@code cors} metadata of Spring Cloud
+     * Gateway: the route has a {@code @CrossOrigin} with these settings, so that the CORS filter
+     * of the server answers its preflight requests without calling the upstream, a forbidden
+     * origin with {@code 403}, and adds {@code Access-Control-Allow-Origin} to the responses to an
+     * allowed origin. The other routes keep their own policy. A route filter.
+     *
+     * @param allowedOrigins   The allowed origins, none for any
+     * @param allowedMethods   The allowed methods, none for any
+     * @param allowedHeaders   The allowed request headers, none for any
+     * @param exposedHeaders   The response headers exposed to the client
+     * @param allowCredentials Whether credentials are allowed
+     * @param maxAge           How long a preflight response is cached, in seconds; {@code -1} for the default
+     * @return The filter
+     */
+    public static GatewayFilter cors(List<String> allowedOrigins, List<String> allowedMethods, List<String> allowedHeaders,
+                                     List<String> exposedHeaders, boolean allowCredentials, long maxAge) {
+        return new Cors(List.copyOf(allowedOrigins), List.copyOf(allowedMethods), List.copyOf(allowedHeaders), List.copyOf(exposedHeaders),
+            allowCredentials, maxAge);
+    }
+
+    /**
      * Mirror a percentage of the requests of the route to a shadow upstream, like Envoy's request
      * mirroring: the shadow gets the request as the proxy transforms of the route made it, with a
      * copy of the body, and its response is discarded. The copy is read at the pace of the
@@ -1277,6 +1298,38 @@ public final class GatewayFilters {
          * @param key     The key
          */
         private record PermitKey(String routeId, String key) {
+        }
+    }
+
+    private record Cors(List<String> allowedOrigins, List<String> allowedMethods, List<String> allowedHeaders, List<String> exposedHeaders,
+                        boolean allowCredentials, long maxAge) implements GatewayFilter, GatewayRouteSpec.Configurer {
+        @Override
+        public void configure(GatewayRouteSpec route) {
+            io.micronaut.core.annotation.AnnotationValueBuilder<io.micronaut.http.server.cors.CrossOrigin> builder =
+                io.micronaut.core.annotation.AnnotationValue.builder(io.micronaut.http.server.cors.CrossOrigin.class);
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOWED_ORIGINS, allowedOrigins.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOWED_METHODS, allowedMethods.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOWED_HEADERS, allowedHeaders.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_EXPOSED_HEADERS, exposedHeaders.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOW_CREDENTIALS, allowCredentials);
+            if (maxAge >= 0) {
+                builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_MAX_AGE, maxAge);
+            }
+            route.annotate(builder.build());
+        }
+
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            // the CORS filter answers the preflights of the allowed origins: one that reaches the
+            // route is of a forbidden origin, and is not relayed
+            // the local 403 can go once the CORS filter answers such a preflight itself
+            route.beforeReplacing(request -> io.micronaut.http.server.cors.CorsUtil.isPreflightRequest(request)
+                ? HttpResponse.status(HttpStatus.FORBIDDEN) : null);
+        }
+
+        @Override
+        public String toString() {
+            return "Cors=" + String.join(", ", allowedOrigins);
         }
     }
 

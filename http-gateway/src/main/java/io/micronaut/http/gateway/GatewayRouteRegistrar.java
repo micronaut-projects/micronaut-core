@@ -244,6 +244,9 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
             // the route filters of the gateway filters read the route of the request
             spec.context(route);
             for (GatewayFilter filter : route.getFilters()) {
+                if (filter instanceof GatewayRouteSpec.Configurer configurer) {
+                    configurer.configure(spec);
+                }
                 spec.configure(filter);
             }
             spec.handle(handler);

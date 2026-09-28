@@ -468,6 +468,16 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("Cors")
+    GatewayFilterFactory cors() {
+        return GatewayFilterFactory.of(List.of("*allowed-origins"), args -> {
+            CorsArguments bound = args.bind(CorsArguments.class);
+            return GatewayFilters.cors(bound.allowedOrigins(), bound.allowedMethods(), bound.allowedHeaders(), bound.exposedHeaders(),
+                bound.allowCredentials(), bound.maxAge());
+        });
+    }
+
+    @Singleton
     @Named("Mirror")
     GatewayFilterFactory mirror() {
         return GatewayFilterFactory.of(List.of("uri", "percentage"), args -> {
@@ -753,6 +763,25 @@ final class BuiltInGatewayFactories {
                                 @Bindable(defaultValue = "403") String emptyKeyStatus,
                                 @Bindable(defaultValue = "true") boolean includeHeaders,
                                 @Nullable String rateLimiter) {
+    }
+
+    /**
+     * The arguments of the {@code Cors} filter.
+     *
+     * @param allowedOrigins   The allowed origins, any by default
+     * @param allowedMethods   The allowed methods, any by default
+     * @param allowedHeaders   The allowed request headers, any by default
+     * @param exposedHeaders   The exposed response headers
+     * @param allowCredentials Whether credentials are allowed
+     * @param maxAge           The max age of a preflight response in seconds
+     */
+    @Introspected
+    record CorsArguments(@Bindable(defaultValue = "") List<String> allowedOrigins,
+                         @Bindable(defaultValue = "") List<String> allowedMethods,
+                         @Bindable(defaultValue = "") List<String> allowedHeaders,
+                         @Bindable(defaultValue = "") List<String> exposedHeaders,
+                         @Bindable(defaultValue = "false") boolean allowCredentials,
+                         @Bindable(defaultValue = "-1") long maxAge) {
     }
 
     /**
