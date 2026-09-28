@@ -1154,9 +1154,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     }
                 } else {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                    if (canHaveBody(response.status())) {
+                    if (canHaveBody(response.status()) && !request.protocolVersion().equals(HttpVersion.HTTP_1_0)) {
                         response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                     } else {
+                        // HTTP/1.0 has no chunked coding: the end of the connection ends the body
                         response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                     }
                 }
