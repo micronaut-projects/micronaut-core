@@ -156,6 +156,56 @@ public final class RawHttpClientSupport {
     }
 
     /**
+     * Claim the body bytes of the server request that the given request is, or wraps, e.g. a
+     * request a server filter {@link HttpRequest#mutate() mutated} to proxy it. The bytes are only
+     * claimed if the body of the given request was not replaced.
+     *
+     * @param request The request
+     * @return The body bytes, or {@code null} if the request is not a server request or its body
+     * was replaced
+     */
+    public static @Nullable CloseableByteBody claimServerRequestBody(HttpRequest<?> request) {
+        HttpRequest<?> unwrapped = unwrapUnchangedBody(request);
+        if (unwrapped == null) {
+            return null;
+        }
+        if (unwrapped instanceof DirectByteBodyAccess directAccess) {
+            // e.g. a request mutated from a Netty server request, which is no wrapper
+            ByteBody bytes = directAccess.byteBodyDirect();
+            if (bytes != null) {
+                return bytes.move();
+            }
+        }
+        if (unwrapped instanceof ServerHttpRequest<?> serverRequest) {
+            Object body = request.getBody().orElse(null);
+            if (body == null || body == serverRequest.getBody().orElse(null)) {
+                return serverRequest.byteBody().move();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Unwrap the wrappers around a request down to the request that has the body bytes: a server
+     * request, one with direct access to its bytes, or one that is no wrapper.
+     *
+     * @return The request, or {@code null} if a wrapper replaced the body of the request it wraps
+     */
+    private static @Nullable HttpRequest<?> unwrapUnchangedBody(HttpRequest<?> request) {
+        HttpRequest<?> current = request;
+        while (current instanceof HttpRequestWrapper<?> wrapper
+            && !(current instanceof DirectByteBodyAccess)
+            && !(current instanceof ServerHttpRequest<?>)) {
+            // by identity: a replacement that only compares equal (e.g. redacted) is still a replacement
+            if (wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null)) {
+                return null;
+            }
+            current = wrapper.getDelegate();
+        }
+        return current;
+    }
+
+    /**
      * A timeout that can be paused once, for the upload of the request body.
      */
     private static final class ResponseTimer {
@@ -214,55 +264,5 @@ public final class RawHttpClientSupport {
             stopped = true;
             phase.complete(null);
         }
-    }
-
-    /**
-     * Claim the body bytes of the server request that the given request is, or wraps, e.g. a
-     * request a server filter {@link HttpRequest#mutate() mutated} to proxy it. The bytes are only
-     * claimed if the body of the given request was not replaced.
-     *
-     * @param request The request
-     * @return The body bytes, or {@code null} if the request is not a server request or its body
-     * was replaced
-     */
-    public static @Nullable CloseableByteBody claimServerRequestBody(HttpRequest<?> request) {
-        HttpRequest<?> unwrapped = unwrapUnchangedBody(request);
-        if (unwrapped == null) {
-            return null;
-        }
-        if (unwrapped instanceof DirectByteBodyAccess directAccess) {
-            // e.g. a request mutated from a Netty server request, which is no wrapper
-            ByteBody bytes = directAccess.byteBodyDirect();
-            if (bytes != null) {
-                return bytes.move();
-            }
-        }
-        if (unwrapped instanceof ServerHttpRequest<?> serverRequest) {
-            Object body = request.getBody().orElse(null);
-            if (body == null || body == serverRequest.getBody().orElse(null)) {
-                return serverRequest.byteBody().move();
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Unwrap the wrappers around a request down to the request that has the body bytes: a server
-     * request, one with direct access to its bytes, or one that is no wrapper.
-     *
-     * @return The request, or {@code null} if a wrapper replaced the body of the request it wraps
-     */
-    private static @Nullable HttpRequest<?> unwrapUnchangedBody(HttpRequest<?> request) {
-        HttpRequest<?> current = request;
-        while (current instanceof HttpRequestWrapper<?> wrapper
-            && !(current instanceof DirectByteBodyAccess)
-            && !(current instanceof ServerHttpRequest<?>)) {
-            // by identity: a replacement that only compares equal (e.g. redacted) is still a replacement
-            if (wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null)) {
-                return null;
-            }
-            current = wrapper.getDelegate();
-        }
-        return current;
     }
 }
