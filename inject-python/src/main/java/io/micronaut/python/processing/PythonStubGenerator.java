@@ -62,6 +62,9 @@ import io.micronaut.python.processing.model.ArgumentDef;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.model.DefaultFactoryDef;
 import io.micronaut.python.processing.model.FunctionDef;
+import io.micronaut.python.processing.staticcompile.Ir;
+import io.micronaut.python.processing.staticcompile.StaticBodyGenerator;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -1219,7 +1222,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames, model);
         }
         // A class can name its own pre-destroy callback with @Bean(preDestroy), the class-level counterpart of the
         // factory case handled in addBridgeMethod. The generated bean definition invokes the callback directly on the
@@ -1235,7 +1238,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .filter(method -> !method.hasParameters())))
             .ifPresent(method -> addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames));
         for (MethodElement methodElement : publicMethods) {
-            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames, model);
         }
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
@@ -4349,6 +4352,83 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private void addBridgeMethod(BridgeMethodSpec spec, ObjectDefBuilder<?> builder, VisitorContext visitorContext, Set<String> addedMethodNames) {
+        addBridgeMethod(spec, builder, visitorContext, addedMethodNames, null);
+    }
+
+    /**
+     * The statically compiled body of a method of the class being generated, when the plan holds
+     * one for a bridge that can carry it: a plain instance method with its own signature.
+     */
+    private static Ir.@Nullable CompiledBody compiledBody(BridgeMethodSpec spec, @Nullable ClassStubModel model) {
+        if (model == null || spec.junit5Test() || spec.script() || spec.introduced() || spec.returnTypeOverride() != null
+            || spec.signatureMethod() != spec.method() || spec.method().isStatic() || isAsyncPythonMethod(spec.method())) {
+            return null;
+        }
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        return plan == null ? null : plan.body(model.element().getName(), spec.method().getName());
+    }
+
+    /**
+     * How a compiled body reaches the properties of {@code self}: the Java field of an introspected
+     * bean, else the member of the Python object behind the stub, converted as the accessors convert it.
+     */
+    private StaticBodyGenerator.SelfAccess selfAccess(ClassStubModel model, VariableDef.This aThis) {
+        return new StaticBodyGenerator.SelfAccess() {
+            @Override
+            public ExpressionDef read(String property, String typeName, TypeDef type) {
+                FieldDef field = model.propertyFields().get(property);
+                if (field != null) {
+                    return aThis.field(field);
+                }
+                ExpressionDef member = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
+                Optional<PropertyElement> element = propertyElement(model, property);
+                if (element.isPresent()) {
+                    return convertValueForType(element.get().getGenericType(), member);
+                }
+                if (!(type instanceof TypeDef.Primitive) && !ClassTypeDef.STRING.equals(type)) {
+                    // a Java or Python object: converted as a property of that type is converted
+                    Optional<ClassElement> propertyType = model.context().getClassElement(typeName.replace('$', '.'));
+                    if (propertyType.isEmpty()) {
+                        propertyType = model.context().getClassElement(typeName);
+                    }
+                    if (propertyType.isPresent()) {
+                        return convertValueForType(propertyType.get(), member);
+                    }
+                }
+                if (type instanceof TypeDef.Primitive primitive) {
+                    return switch (primitive.name()) {
+                        case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
+                        case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
+                        case "double" -> member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
+                        case "float" -> member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
+                        case "boolean" -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                        case "short" -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
+                        case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
+                        default -> member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                    };
+                }
+                if (ClassTypeDef.STRING.equals(type)) {
+                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
+                }
+                return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, member).cast(type);
+            }
+
+            @Override
+            public StatementDef write(String property, TypeDef type, ExpressionDef value) {
+                FieldDef field = model.propertyFields().get(property);
+                if (field != null) {
+                    return aThis.field(field).assign(value);
+                }
+                return (StatementDef) aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
+            }
+        };
+    }
+
+    private static Optional<PropertyElement> propertyElement(ClassStubModel model, String property) {
+        return model.beanProperties().stream().filter(element -> element.getName().equals(property)).findFirst();
+    }
+
+    private void addBridgeMethod(BridgeMethodSpec spec, ObjectDefBuilder<?> builder, VisitorContext visitorContext, Set<String> addedMethodNames, @Nullable ClassStubModel model) {
         MethodElement methodElement = spec.method();
         ClassElement bridgeOwner = spec.owner();
         boolean isJunit5Test = spec.junit5Test();
@@ -4458,6 +4538,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         int receiverOffset = parameters.length - parameterDefs.size();
 
         boolean spreadsVarargs = spreadsVarargs(methodElement, bridgeOwner);
+        Ir.CompiledBody compiledBody = compiledBody(spec, model);
+        if (compiledBody != null && compiledBody.parameterNames().size() == parameterDefs.size()) {
+            // the body runs as Java: no crossing into Python for callers of the stub
+            if (compiledBody.span() != null) {
+                methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
+            }
+            builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
+                StaticBodyGenerator.generate(compiledBody, methodParameters, selfAccess(model, aThis))));
+            return;
+        }
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> rethrowingCheckedExceptions(checkedExceptions, javaClassType(bridgeOwner), () -> {
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
