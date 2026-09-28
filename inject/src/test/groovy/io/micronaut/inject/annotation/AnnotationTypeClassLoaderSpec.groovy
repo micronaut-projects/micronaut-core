@@ -92,6 +92,32 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         }
     }
 
+    void "a registration by another loader replaces the registered type, one by the same loader does not"() {
+        given: "two generations of an application loader, each defining a copy of an annotation"
+        def first = new OwnCopy(Reloaded.classLoader)
+        def second = new OwnCopy(Reloaded.classLoader)
+        def firstCopy = first.define(Reloaded.name)
+        def secondCopy = second.define(Reloaded.name)
+
+        when: "the first generation registers its copy"
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(firstCopy))
+
+        then:
+        AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(firstCopy)
+
+        when: "the same generation registers again"
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(firstCopy))
+
+        then: "the first registration is kept"
+        AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(firstCopy)
+
+        when: "the next generation registers its copy"
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(secondCopy))
+
+        then: "the registry no longer pins the retired generation's class"
+        AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(secondCopy)
+    }
+
     void "an annotation type of the JDK is served whatever the loader asks"() {
         expect: "a type the bootstrap loader defines cannot be shadowed"
         Deprecated.classLoader == null

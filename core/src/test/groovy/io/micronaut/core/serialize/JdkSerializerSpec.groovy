@@ -41,6 +41,33 @@ class JdkSerializerSpec extends Specification {
         !foo.isPresent()
     }
 
+    void 'a class only the thread context loader can see is resolved when the required type cannot see it'() {
+        given: "a serializable class defined by a loader below the one of the required type"
+        GroovyClassLoader child = new GroovyClassLoader(getClass().classLoader)
+        Class<?> hidden = child.parseClass('''
+            package example
+            class HiddenNamed implements io.micronaut.core.naming.Named, Serializable {
+                String name
+            }
+        ''')
+        def instance = hidden.getDeclaredConstructor().newInstance()
+        instance.name = "hidden"
+        byte[] bytes = ObjectSerializer.JDK.serialize(instance).get()
+        ClassLoader previous = Thread.currentThread().contextClassLoader
+
+        when: "the required type is a core interface whose loader cannot see the class"
+        Thread.currentThread().contextClassLoader = child
+        def result = ObjectSerializer.JDK.deserialize(bytes, io.micronaut.core.naming.Named).get()
+
+        then:
+        result.name == "hidden"
+        result.getClass() == hidden
+
+        cleanup:
+        Thread.currentThread().contextClassLoader = previous
+        child.close()
+    }
+
     static class Foo implements Serializable {
         String name
     }

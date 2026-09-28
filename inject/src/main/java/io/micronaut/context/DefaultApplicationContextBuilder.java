@@ -74,6 +74,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean deducePackage = true;
     private boolean deduceCloudEnvironment = false;
     private ClassLoader classLoader = getClass().getClassLoader();
+    private boolean explicitClassLoader = false;
     private boolean envPropertySource = true;
     private final List<String> envVarIncludes = new ArrayList<>();
     private final List<String> envVarExcludes = new ArrayList<>();
@@ -116,6 +117,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         applicationContextConfigurer.configure(this);
         this.contextConfigurer = applicationContextConfigurer;
         this.classLoader = classLoader;
+        this.explicitClassLoader = true;
     }
 
     @Override
@@ -420,7 +422,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public ApplicationContextBuilder mainClass(@Nullable Class<?> mainClass) {
         if (mainClass != null) {
-            if (this.classLoader == null) {
+            // the loader of the main class is the application's loader unless one was chosen explicitly, by the
+            // caller or by an ApplicationContextConfigurer; the builder's own loader is only the default.
+            // The configurers were service-loaded when the builder was made, from the thread context loader:
+            // a launcher whose main class lives in a loader of its own sets that loader as the context loader
+            // before it builds, so the configurers of that loader are found as well
+            if (!explicitClassLoader && mainClass.getClassLoader() != null) {
                 this.classLoader = mainClass.getClassLoader();
             }
             String name = mainClass.getPackage().getName();
@@ -435,6 +442,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     public ApplicationContextBuilder classLoader(@Nullable ClassLoader classLoader) {
         if (classLoader != null) {
             this.classLoader = classLoader;
+            this.explicitClassLoader = true;
         }
         return this;
     }
