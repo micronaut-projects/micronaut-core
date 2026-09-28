@@ -242,6 +242,17 @@ public record PythonProcessingEnvironment(
     }
 
     /**
+     * Adds the script of a module the static compilation plan gives a generated class: a module
+     * without routes, executable functions or attributes whose plain functions compile into static
+     * methods of that class.
+     *
+     * @param scriptDef The script definition
+     */
+    public void addScript(io.micronaut.python.processing.model.ScriptDef scriptDef) {
+        scripts().putIfAbsent(scriptDef.qualifiedName(), new io.micronaut.python.processing.element.PythonScriptElement(scriptDef, this));
+    }
+
+    /**
      * Returns the script element cache without initializing it.
      *
      * @return The cached script elements, or {@code null} if scripts have not been initialized yet.
@@ -254,7 +265,9 @@ public record PythonProcessingEnvironment(
         return scripts.entrySet().stream()
             .collect(Collectors.toMap(
                 entry -> entry.getValue().qualifiedName(),
-                entry -> new io.micronaut.python.processing.element.PythonScriptElement(entry.getValue(), environment)
+                entry -> new io.micronaut.python.processing.element.PythonScriptElement(entry.getValue(), environment),
+                (first, second) -> first,
+                java.util.LinkedHashMap::new
             ));
     }
 
