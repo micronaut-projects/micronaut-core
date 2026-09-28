@@ -22,8 +22,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -95,16 +97,44 @@ final class LoadBalancerStrategies {
                 ServiceInstance second = available.get(b);
                 selected = inFlight(first) <= inFlight(second) ? first : second;
             }
-            inFlight.computeIfAbsent(key(selected), k -> new AtomicInteger()).incrementAndGet();
+            // changes of an entry go through the map, so that pruning never loses an increment
+            inFlight.compute(key(selected), (k, count) -> {
+                AtomicInteger c = count == null ? new AtomicInteger() : count;
+                c.incrementAndGet();
+                return c;
+            });
+            if (inFlight.size() > size) {
+                prune(available);
+            }
             return selected;
         }
 
         @Override
         public void report(ServiceInstance instance, LoadBalancer.Outcome outcome) {
-            AtomicInteger count = inFlight.get(key(instance));
-            if (count != null) {
+            inFlight.computeIfPresent(key(instance), (k, count) -> {
                 count.updateAndGet(n -> Math.max(0, n - 1));
+                return count;
+            });
+        }
+
+        /**
+         * Forget the instances that are no longer available and have no exchange in flight, so
+         * that the instances of a service that come and go are not retained.
+         */
+        private void prune(List<ServiceInstance> available) {
+            Set<String> keys = new HashSet<>();
+            for (ServiceInstance instance : available) {
+                keys.add(key(instance));
             }
+            for (String key : inFlight.keySet()) {
+                if (!keys.contains(key)) {
+                    inFlight.computeIfPresent(key, (k, count) -> count.get() == 0 ? null : count);
+                }
+            }
+        }
+
+        int size() {
+            return inFlight.size();
         }
 
         int inFlight(ServiceInstance instance) {
