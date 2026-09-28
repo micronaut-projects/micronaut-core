@@ -83,8 +83,11 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
                 // module-level decorator that is not a scope — Controller, Secured,
                 // Requires — must not cost the module its pooling, and the @DefaultScope
                 // that @Controller carries is a default rather than a declaration, so
-                // @ContextPooled (itself @Prototype) is free to override it.
-                if (!hasDeclaredStereotype(Scope.class)) {
+                // @ContextPooled (itself @Prototype) is free to override it. A JUnit test
+                // module is the exception, and has to be named rather than falling out of
+                // the decorator check: JUnit loads the generated class and reads its
+                // annotations, and a pooled stub carries neither.
+                if (!hasDeclaredStereotype(Scope.class) && !isJunitTest()) {
                     annotate("io.micronaut.context.python.scope.ContextPooled");
                 }
                 annotate(Bean.class);
@@ -92,6 +95,22 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
             }
         }
         this.typeAnnotationsKey = scriptDef;
+    }
+
+    /**
+     * Whether this module is a JUnit test, and so must keep an unpooled stub.
+     *
+     * <p>A JUnit 5 test annotation reaches the class through {@code @ExtendWith}, whether
+     * declared directly or carried as a meta-annotation the way {@code @MicronautTest} does,
+     * and a repeated {@code @ExtendWith} is folded into its {@code @Extensions} container.
+     * Those two are therefore the test for it, and the same pair
+     * {@code PythonStubGenerator} uses to recognise a JUnit extension annotation.
+     *
+     * @return Whether the module is a JUnit test
+     */
+    private boolean isJunitTest() {
+        return hasDeclaredStereotype("org.junit.jupiter.api.extension.ExtendWith") ||
+            hasDeclaredStereotype("org.junit.jupiter.api.extension.Extensions");
     }
 
     private void applyTypeLevelDefaultAnnotations(MemberElement enclosedElement) {
