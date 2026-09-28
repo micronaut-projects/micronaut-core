@@ -116,6 +116,10 @@ final class JsonChunkedProcessor {
     private static void release(ByteBuffer<?> buffer) {
         if (buffer.asNativeBuffer() instanceof ByteBuf buf) {
             buf.release();
+        } else if (buffer instanceof ReferenceCounted counted) {
+            // a buffer of the input that is not a Netty buffer, discarded before it was copied,
+            // e.g. one the input still had when the subscriber cancelled
+            counted.release();
         }
     }
 
