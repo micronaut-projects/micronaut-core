@@ -58,6 +58,17 @@ class ByteBodyLimitTest {
     }
 
     @Test
+    void aStreamedBodyWithAKnownLengthOverTheLimitIsReleased() throws Exception {
+        java.util.concurrent.CompletableFuture<reactor.core.publisher.SignalType> released = new java.util.concurrent.CompletableFuture<>();
+        CloseableByteBody source = FACTORY.adapt(Flux.just((ReadBuffer) FACTORY.readBufferFactory().copyOf("abcdef", StandardCharsets.UTF_8))
+            .doFinally(released::complete), OptionalLong.of(6));
+        CloseableByteBody limited = FACTORY.limit(source, 3);
+        Assertions.assertNotNull(released.get(5, TimeUnit.SECONDS), "the source was not released");
+        ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> read(limited));
+        Assertions.assertInstanceOf(ContentLengthExceededException.class, e.getCause());
+    }
+
+    @Test
     void aStreamedBodyWithAKnownLengthOverTheLimitFailsBeforeItsBytes() {
         CloseableByteBody limited = FACTORY.limit(FACTORY.adapt(Flux.just((ReadBuffer) FACTORY.readBufferFactory().copyOf("abcdef", StandardCharsets.UTF_8)), OptionalLong.of(6)), 3);
         ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> read(limited));

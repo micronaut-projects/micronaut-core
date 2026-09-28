@@ -335,14 +335,18 @@ public class ByteBodyFactory {
         if (expected >= 0 && expected <= maxBodySize) {
             return body.move();
         }
+        if (expected > maxBodySize) {
+            // over the limit by its known length: the bytes are never read, so they are released now
+            body.close();
+            StreamingBody failed = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), bytesConsumed -> {
+            });
+            failed.sharedBuffer.setExpectedLengthFrom(Long.toString(expected));
+            return failed.rootBody;
+        }
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
         adapter.setTrailers(body.trailers());
-        if (expected >= 0) {
-            // over the limit: the body fails
-            sb.sharedBuffer.setExpectedLengthFrom(Long.toString(expected));
-        }
         return sb.rootBody;
     }
 
