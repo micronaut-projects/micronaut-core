@@ -194,6 +194,7 @@ httpServer:
     byteBodyPrimary: Primary operations
     byteBodySplitting: Splitting
     byteBodyTrailers: Trailers
+    byteBodyLimitReplay: Limiting and replaying
     byteBodyExample: Example
   sessions: HTTP Sessions
   sse: Server Sent Events
