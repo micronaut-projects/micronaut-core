@@ -49,7 +49,8 @@ import java.util.function.Predicate;
  *     that is not {@code http}, {@code https}, {@code ws} or {@code wss}, or an
  *     {@code X-Forwarded-Port} with a port that is not a number between 1 and 65535, is dropped,
  *     also from the translated {@code Forwarded} header, and the value of this hop is sent
- *     instead.</li>
+ *     instead. Such a port is dropped from an {@code X-Forwarded-Host}, and such a scheme or port
+ *     from the {@code proto} and {@code host} of a {@code Forwarded} element.</li>
  *     <li>From any other peer, the inbound values could be forged, so they are replaced with the
  *     values of this hop.</li>
  * </ul>
@@ -158,7 +159,7 @@ public final class ForwardedHeaders {
         // is dropped, before it is translated to Forwarded, and this hop's own value is sent
         String inboundFor = trusted ? join(in.getAll(X_FORWARDED_FOR)) : null;
         String inboundProto = trusted ? validScheme(in.get(X_FORWARDED_PROTO)) : null;
-        String inboundHost = trusted ? in.get(X_FORWARDED_HOST) : null;
+        String inboundHost = trusted ? validHost(in.get(X_FORWARDED_HOST)) : null;
         String inboundPort = trusted ? validPort(in.get(X_FORWARDED_PORT)) : null;
         String inboundPrefix = trusted ? in.get(X_FORWARDED_PREFIX) : null;
         String inboundForwarded = trusted ? join(in.getAll(HttpHeaders.FORWARDED)) : null;
@@ -172,6 +173,10 @@ public final class ForwardedHeaders {
                 // Forwarded header gives each value the X-Forwarded-* headers do not, e.g. the
                 // client when a proxy only added X-Forwarded-Proto
                 List<Map<String, String>> elements = parseForwarded(inboundForwarded);
+                if (dropInvalidValues(elements)) {
+                    // the other values of the chain are sent as they are
+                    inboundForwarded = formatForwarded(elements);
+                }
                 List<String> addresses = new ArrayList<>(elements.size());
                 String forwardedProto = null;
                 String firstHost = null;
@@ -251,14 +256,15 @@ public final class ForwardedHeaders {
                 elements.add("for=" + forwardedNode(trimmed.isEmpty() ? UNKNOWN : trimmed));
             }
         }
+        // a list of schemes, hosts or ports has one per proxy: the first proxy received the first
         StringBuilder first = new StringBuilder(elements.isEmpty() ? "" : elements.get(0));
         if (proto != null) {
-            first.append(first.isEmpty() ? "" : ";").append("proto=").append(quoteIfNeeded(proto.trim()));
+            first.append(first.isEmpty() ? "" : ";").append("proto=").append(quoteIfNeeded(first(proto)));
         }
         if (host != null) {
-            String hostWithPort = host.trim();
-            if (port != null && portSeparator(hostWithPort) < 0 && !port.trim().equals(String.valueOf(defaultPort(proto)))) {
-                hostWithPort = hostWithPort + ":" + port.trim();
+            String hostWithPort = first(host);
+            if (port != null && portSeparator(hostWithPort) < 0 && !first(port).equals(String.valueOf(defaultPort(proto)))) {
+                hostWithPort = hostWithPort + ":" + first(port);
             }
             first.append(first.isEmpty() ? "" : ";").append("host=").append(quoteIfNeeded(hostWithPort));
         }
@@ -379,7 +385,7 @@ public final class ForwardedHeaders {
      */
     private static int externalPort(@Nullable String forwardedHost, @Nullable String forwardedProto, String proto, int port) {
         if (forwardedHost != null) {
-            String trimmed = forwardedHost.trim();
+            String trimmed = first(forwardedHost);
             int portSeparator = portSeparator(trimmed);
             if (portSeparator >= 0) {
                 try {
@@ -411,6 +417,82 @@ public final class ForwardedHeaders {
             }
         }
         return value;
+    }
+
+    /**
+     * @param value A value of {@code X-Forwarded-Host}, a host or a list of them, one per proxy
+     * @return The value, without the port of a host whose port is not a number between 1 and
+     * 65535
+     */
+    private static @Nullable String validHost(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String[] hosts = value.split(",", -1);
+        boolean dropped = false;
+        for (int i = 0; i < hosts.length; i++) {
+            String host = hosts[i].trim();
+            int portSeparator = portSeparator(host);
+            if (portSeparator >= 0 && !isPort(host.substring(portSeparator + 1))) {
+                host = host.substring(0, portSeparator);
+                dropped = true;
+            }
+            hosts[i] = host;
+        }
+        return dropped ? String.join(", ", hosts) : value;
+    }
+
+    /**
+     * Drop the invalid values of {@code Forwarded} elements: a {@code proto} that is no scheme,
+     * and the port of a {@code host} that is no port.
+     *
+     * @param elements The parsed elements
+     * @return Whether a value was dropped
+     */
+    private static boolean dropInvalidValues(List<Map<String, String>> elements) {
+        boolean dropped = false;
+        for (Map<String, String> element : elements) {
+            String proto = element.get("proto");
+            if (proto != null && validScheme(proto) == null) {
+                element.remove("proto");
+                dropped = true;
+            }
+            String host = element.get("host");
+            if (host != null) {
+                String valid = Objects.requireNonNull(validHost(host));
+                if (!valid.equals(host)) {
+                    element.put("host", valid);
+                    dropped = true;
+                }
+            }
+        }
+        return dropped;
+    }
+
+    /**
+     * Format parsed {@code Forwarded} elements, quoting the values that are no token. An element
+     * left without parameters stays in the chain as an unknown node.
+     */
+    private static String formatForwarded(List<Map<String, String>> elements) {
+        List<String> formatted = new ArrayList<>(elements.size());
+        for (Map<String, String> element : elements) {
+            if (element.isEmpty()) {
+                formatted.add("for=" + UNKNOWN);
+                continue;
+            }
+            List<String> pairs = new ArrayList<>(element.size());
+            element.forEach((name, value) -> pairs.add(name + "=" + quoteIfNeeded(value)));
+            formatted.add(String.join(";", pairs));
+        }
+        return String.join(", ", formatted);
+    }
+
+    /**
+     * @return The first value of a list, trimmed
+     */
+    private static String first(String list) {
+        int comma = list.indexOf(',');
+        return (comma < 0 ? list : list.substring(0, comma)).trim();
     }
 
     /**
@@ -452,7 +534,7 @@ public final class ForwardedHeaders {
         if (proto == null) {
             return null;
         }
-        return switch (proto.trim().toLowerCase(Locale.ROOT)) {
+        return switch (first(proto).toLowerCase(Locale.ROOT)) {
             case "http", "ws" -> HTTP_PORT;
             case "https", "wss" -> HTTPS_PORT;
             default -> null;
