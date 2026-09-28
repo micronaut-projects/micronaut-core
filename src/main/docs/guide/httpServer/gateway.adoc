@@ -78,7 +78,40 @@ micronaut:
 
 Predicates and filters are given in the shortcut syntax, `Name=arg1, arg2`, or by `name` and `args`. They are created by the beans of api:http.gateway.config.GatewayPredicateFactory[] and api:http.gateway.config.GatewayFilterFactory[] named after them, e.g. `@Named("StripPrefix")`: an application adds its own predicate or filter with a bean of its name. The arguments bind by position or by name, through the conversion service or to the constructor of an introspected record, without reflection. An unknown predicate or filter, an invalid argument, or a route without a URI fails the startup with the id of the route; a route with `enabled: false` is not registered. The routes of the configuration are a map keyed by their ids, so the order they are written in is not an order of the routes: the `order` of a route breaks the ties, see above.
 
-The predicates are `Path`, `Method`, `Header` (a regular expression matches the value or one of its comma-separated elements), `Query`, `Cookie`, `Host` (`**.example.org`, `{sub}.example.org`), `RemoteAddr` (the peer of the connection), `XForwardedRemoteAddr` (the client address of `X-Forwarded-For`, see below), `After`, `Before` and `Between`.
+The predicates are `Path`, `Method`, `Header` (a regular expression matches the value or one of its comma-separated elements), `Query`, `Cookie`, `Host` (`**.example.org`, `{sub}.example.org`), `RemoteAddr` (the peer of the connection), `XForwardedRemoteAddr` (the client address of `X-Forwarded-For`, see below), `After`, `Before`, `Between` and `ReadBody`.
+
+=== Routing by the Body
+
+`ReadBody` chooses a route by the body of the request, like the predicate of Spring Cloud Gateway: `ReadBody=type, predicate[, max-size]` decodes the body to the type, `String`, `byte[]` or the fully qualified name of a class, e.g. of a JSON body, and tests it with the `Predicate` bean of the name. In code, `where(...)` of the route takes a body condition, e.g. `RequestCondition.body(type, predicate)`, `bodyText(...)` or `bodyBytes(...)` of api:web.router.builder.RequestCondition[]. It is the body condition of the functional routes, see <<functionalRoutesConditions, Conditions>>: the router reads the body before it chooses the route, and a body that does not match goes to the next route that matches the request, the route of the same path with a greater `order`, or `404` when there is none.
+
+[configuration]
+----
+micronaut:
+  gateway:
+    routes:
+      express-orders:
+        uri: lb://express
+        order: 1
+        predicates:
+          - Path=/orders/**
+          - ReadBody=com.example.Order, isExpress
+      orders:
+        uri: lb://orders
+        order: 2
+        predicates:
+          - Path=/orders/**
+----
+
+[source,java]
+----
+gateway.route("express-orders").path("/orders/**").order(1)
+    .where(RequestCondition.body(Order.class, Order::express))
+    .uri("lb://express");
+gateway.route("orders").path("/orders/**").order(2)
+    .uri("lb://orders");
+----
+
+The route relays the body it read. A route with a body condition does not stream the body of a request, which is buffered up to the limit, `max-size` or `maxBytes(...)` of the condition, by default `micronaut.server.max-request-buffer-size`; a limit above it fails the startup. A body over the limit, or that does not decode, does not match. Two routes of the same path and order whose conditions a body both meets are ambiguous, `400`: give the routes with a body condition a lower order than their fallback. The requests of the routes without a body condition are not read, and stream.
 
 == Dynamic Routes
 
@@ -99,7 +132,7 @@ The api:http.gateway.GatewayFilters[] are the proxy transforms, applied once to 
 * the host: `PreserveHostHeader`, `SetRequestHostHeader`;
 * the route filters `SetStatus`, `RedirectTo` and `SecureHeaders`, which apply to every response of the route, including a fallback or an error of the gateway;
 * the size limits: `RequestSize` (`413` with an `errorMessage` header for a `Content-Length` over the limit, before the upstream is called; a body that streams in fails the relay with `413` once it goes over, while no response was relayed) and `RequestHeaderSize` (`431` when the names and values of the headers, cookies included, are larger than the limit, or when there are more headers than an optional count);
-* the body filters `ModifyRequestBody` and `ModifyResponseBody` (a `BodyRewriter`, in code or as a named bean), `RemoveJsonAttributesResponseBody` (needs a `JsonMapper`), and `ReadBody` (a named `Predicate<byte[]>` bean in the configuration): they read the whole body, up to a limit (256 KiB by default in the configuration), decode `gzip` and `deflate`, and send the result encoded again with its new `Content-Length`. **A route with a body filter no longer streams that body**, its response trailers are dropped, and a body over the limit is `413` for a request and `502` for a response. `ReadBody` runs once the route is chosen: a body that does not match is answered with `404`, no other route is tried;
+* the body filters `ModifyRequestBody` and `ModifyResponseBody` (a `BodyRewriter`, in code or as a named bean) and `RemoveJsonAttributesResponseBody` (needs a `JsonMapper`): they read the whole body, up to a limit (256 KiB by default in the configuration), decode `gzip` and `deflate`, and send the result encoded again with its new `Content-Length`. A route that rewrites response bodies asks the upstream for those codings only, of those the client accepts, and relays an event stream as it is; a request body in another coding is `415`. **A route with a body filter no longer streams that body**, its response trailers are dropped, and a body over the limit is `413` for a request and `502` for a response; an application writes its own body filter with api:http.gateway.GatewayBodyFilter[];
 * `Cors` (`GatewayFilters.cors(...)`), the CORS policy of the route: the CORS filter of the server answers its preflights without calling the upstream, a preflight of a forbidden origin is `403`, and the responses to an allowed origin get `Access-Control-Allow-Origin`; the policy of a dynamic route changes with a refresh;
 * `CacheRequestBody`, which reads a copy of the body, up to a limit, into `GatewayRequestContext.cachedRequestBody()` for the other filters; the body is still relayed;
 * `Retry` and `CircuitBreaker`.
@@ -110,7 +143,7 @@ The path filters work on the raw, percent-encoded path, which they never decode:
 
 Routes with the same paths in a weight group split the traffic by weight, like Spring Cloud Gateway's `Weight` predicate: `.weight("orders", 9)` in code, `Weight=orders, 9` in the configuration. For each request the group chooses one of its routes, at random by weight, and only that route matches. A route of weight `0` only takes requests forced to it. The group can be set up under `micronaut.gateway.weight-groups.<group>`:
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   gateway:
@@ -129,7 +162,7 @@ micronaut:
 
 == Mirroring
 
-`GatewayFilters.mirror(uri, percentage)` (`Mirror=http://shadow:8080, 10` in the configuration) sends a copy of a percentage of the requests of a route to a shadow upstream and discards its responses. The shadow gets the request as the proxy transforms of the route made it, once its whole body arrived, with a copy of the body read at the pace of the upstream of the route, never slower. A body over `max-body-size` (64 KiB by default) is not mirrored. The shadow is never retried and has its own `timeout` (5 seconds by default); `shadow-host: true` adds a `-shadow` suffix to its `Host`. Nothing of the shadow, a failure, a reset or a timeout, affects the request.
+`GatewayFilters.mirror(uri, percentage)` (`Mirror=http://shadow:8080, 10` in the configuration) sends a copy of a percentage of the requests of a route to a shadow upstream and discards its responses. The shadow gets the request as the proxy transforms of the route made it, once its whole body arrived, with a copy of the body read at the pace of the upstream of the route, never slower. A body over `max-body-size` (64 KiB by default) is not mirrored. The shadow is never retried and has its own `timeout` (5 seconds by default); `shadow-host: true` adds a `-shadow` suffix to its `Host`. An upgrade request, e.g. a WebSocket, is never mirrored. Nothing of the shadow, a failure, a reset or a timeout, affects the request.
 
 == Response Cache
 
@@ -137,7 +170,7 @@ micronaut:
 
 * a response is fresh for its `s-maxage`, `max-age` or `Expires`, or for the time to live when it has none; it is served with an `Age`, and a matching `If-None-Match` or `If-Modified-Since` gets a `304`;
 * the key is the route, the path and the query, the `Authorization` and `Cookie` of the request, and the values of the headers of the `Vary` of the response;
-* `no-store`, `private` and `no-cache` responses, responses with `Set-Cookie` or `Vary: *`, and responses to a request with `Authorization` (unless `public` or `s-maxage`) are not stored, and remove what is stored for the URI; a `POST`, `PUT`, `PATCH` or `DELETE` of the URI removes its responses;
+* `no-store`, `private` and `no-cache` responses, responses with `Set-Cookie` or `Vary: *`, and responses to a request with `Authorization` (unless `public` or `s-maxage`) are not stored; a `200` with `no-store` or `private` also removes what is stored for the URI, while a `304`, an error status or a response of one user leaves it; a `POST`, `PUT`, `PATCH` or `DELETE` of the URI removes its responses;
 * a request with `no-cache`, `max-age=0` or `Pragma: no-cache` goes to the upstream, a request with `no-store` is not stored; `Range` requests and protocol switches bypass the cache;
 * the body is copied while it streams to the client, which is never slowed down by the copy; a response that does not complete, or is larger than the size, is not stored.
 
@@ -147,7 +180,7 @@ The responses are kept by a api:http.gateway.ResponseCacheStore[]: api:http.gate
 
 A api:http.gateway.GatewayRateLimit[] (`RequestRateLimiter` in the configuration) is a token bucket per key of a request, like Spring Cloud Gateway's: `replenish-rate` tokens a second, up to `burst-capacity` (at least the rate; `0` denies every request), `requested-tokens` per request. A request over the limit is answered with `429` without calling the upstream, and the responses carry `X-RateLimit-Remaining`, `-Replenish-Rate`, `-Burst-Capacity` and `-Requested-Tokens` (`include-headers: false` turns them off). A request without a key is answered with `403` (`deny-empty-key`, `empty-key-status`). The key comes from a api:http.gateway.KeyResolver[]: `remoteAddress` (the default: the peer, or the client behind the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`; an IPv6 client by its `/64` network), `principal`, `header:<name>`, or the name of a `KeyResolver` bean, which is synchronous: it reads the request and does no IO. The buckets are in the memory of the gateway (api:http.gateway.InMemoryRateLimiter[]), at most 100,000: a new key is denied while they are all taken; a api:http.gateway.GatewayRateLimiter[] bean named in `rate-limiter` keeps them elsewhere, and when it fails the request is let through. Each route has its own buckets, also when the limit is a default filter.
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   gateway:

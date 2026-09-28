@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,7 @@ class BodyFiltersTest extends GatewayTestBase {
         p.put(r + "yaml-json.predicates", List.of("Path=/yaml-json/**"));
         p.put(r + "yaml-json.filters", List.of("StripPrefix=1", "RemoveJsonAttributesResponseBody=a, true"));
         p.put(r + "yaml-upper.uri", "${test.upstream}");
-        p.put(r + "yaml-upper.predicates", List.of("Path=/yaml-upper/**", "ReadBody=hasHello, 1KB"));
+        p.put(r + "yaml-upper.predicates", List.of("Path=/yaml-upper/**", "ReadBody=byte[], hasHello, 1KB"));
         p.put(r + "yaml-upper.filters", List.of("StripPrefix=1", "ModifyRequestBody=upper, 1KB"));
         return p;
     }
@@ -212,7 +213,8 @@ class BodyFiltersTest extends GatewayTestBase {
             gateway.route("yaml-json-raw").path("/yaml-json-raw/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.removeJsonAttributesResponseBody(mapper, 4096, true, "a")).uri(scripted);
             gateway.route("read-body").path("/read-body/**")
-                .filters(GatewayFilters.stripPrefix(1), GatewayFilters.readBody(64, body -> body.length > 3)).uri(upstream);
+                .where(RequestCondition.bodyBytes(body -> body.length > 3).maxBytes(64))
+                .filters(GatewayFilters.stripPrefix(1)).uri(upstream);
             gateway.route("trailers-rewritten").path("/trailers-rewritten/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.modifyResponseBody(4096, upper)).uri(scripted);
         }

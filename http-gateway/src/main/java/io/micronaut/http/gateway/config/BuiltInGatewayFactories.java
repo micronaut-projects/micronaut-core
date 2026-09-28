@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.gateway.ClientAddress;
@@ -76,6 +77,7 @@ final class BuiltInGatewayFactories {
     private static final String STATUS = "status";
     private static final String MAX_SIZE = "max-size";
     private static final String KEY_RESOLVER = "key-resolver";
+    private static final String REWRITER = "rewriter";
     private static final List<String> NAME_VALUE = List.of("name", VALUE);
 
     // ---- predicates
@@ -248,14 +250,50 @@ final class BuiltInGatewayFactories {
 
     @Singleton
     @Named("ReadBody")
-    @SuppressWarnings("unchecked")
     GatewayPredicateFactory readBody(BeanLocator beanLocator) {
-        return GatewayPredicateFactory.of(List.of("predicate", "max-size"), (route, args) -> {
-            String name = args.get("predicate");
-            java.util.function.Predicate<byte[]> predicate = beanLocator.findBean(java.util.function.Predicate.class, Qualifiers.byName(name))
-                .orElseThrow(() -> new ConfigurationException("No Predicate bean named " + name + " for ReadBody"));
-            route.filters(GatewayFilters.readBody(args.bind(BodyFilterArguments.class).maxSize(), predicate));
+        return GatewayPredicateFactory.of(List.of("type", "predicate", MAX_SIZE), (route, args) -> {
+            ReadBodyArguments arguments = args.bind(ReadBodyArguments.class);
+            // the type and the predicate are required
+            RequestCondition.Body<?> condition = bodyCondition(beanLocator, args, args.get("type"), args.get("predicate"));
+            Long maxSize = arguments.maxSize();
+            route.where(maxSize == null ? condition : condition.maxBytes(maxBytes(maxSize)));
         });
+    }
+
+    /**
+     * The condition of {@code ReadBody}: the body decoded to the type tests the named
+     * {@code Predicate} bean.
+     *
+     * @param beanLocator The bean locator
+     * @param args        The arguments, which convert the name of a class
+     * @param type        The name of the type: {@code String}, {@code byte[]} or the fully
+     *                    qualified name of a class, e.g. of a JSON body
+     * @param name        The name of the {@code Predicate} bean
+     * @return The condition
+     */
+    /**
+     * @param maxSize The {@code max-size} of {@code ReadBody}
+     * @return The limit of the body condition
+     */
+    private static int maxBytes(long maxSize) {
+        if (maxSize < 0 || maxSize > Integer.MAX_VALUE) {
+            throw new ConfigurationException("The max-size of ReadBody must be between 0 and " + Integer.MAX_VALUE + ": " + maxSize);
+        }
+        return (int) maxSize;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static RequestCondition.Body<?> bodyCondition(BeanLocator beanLocator, GatewayArguments args, String type, String name) {
+        java.util.function.Predicate predicate = beanLocator.findBean(java.util.function.Predicate.class, Qualifiers.byName(name))
+            .orElseThrow(() -> new ConfigurationException("No Predicate bean named " + name + " for ReadBody"));
+        return switch (type) {
+            case "String", "java.lang.String" -> RequestCondition.bodyText(predicate);
+            case "byte[]" -> RequestCondition.bodyBytes(predicate);
+            default -> {
+                Class<?> bodyType = args.get("type", Class.class, Object.class);
+                yield RequestCondition.body(Argument.of(bodyType), predicate);
+            }
+        };
     }
 
     @Singleton
@@ -507,15 +545,15 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("ModifyRequestBody")
     GatewayFilterFactory modifyRequestBody(BeanLocator beanLocator) {
-        return GatewayFilterFactory.of(List.of("rewriter", "max-size"), args ->
-            GatewayFilters.modifyRequestBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get("rewriter"))));
+        return GatewayFilterFactory.of(List.of(REWRITER, MAX_SIZE), args ->
+            GatewayFilters.modifyRequestBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get(REWRITER))));
     }
 
     @Singleton
     @Named("ModifyResponseBody")
     GatewayFilterFactory modifyResponseBody(BeanLocator beanLocator) {
-        return GatewayFilterFactory.of(List.of("rewriter", "max-size"), args ->
-            GatewayFilters.modifyResponseBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get("rewriter"))));
+        return GatewayFilterFactory.of(List.of(REWRITER, MAX_SIZE), args ->
+            GatewayFilters.modifyResponseBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get(REWRITER))));
     }
 
     @Singleton
@@ -815,14 +853,26 @@ final class BuiltInGatewayFactories {
     }
 
     /**
-     * The limit of the body filters and of {@code ReadBody}.
+     * The arguments of {@code ReadBody}.
      *
-     * @param predicate The name of the predicate bean of {@code ReadBody}
+     * @param type      The type the body is decoded to: {@code String}, {@code byte[]} or the
+     *                  fully qualified name of a class
+     * @param predicate The name of the {@code Predicate} bean that tests the decoded body
+     * @param maxSize   The limit of the body, e.g. {@code 1MB}; by default
+     *                  {@code micronaut.server.max-request-buffer-size}, which it cannot exceed
+     */
+    @Introspected
+    record ReadBodyArguments(String type, String predicate, @ReadableBytes @Nullable Long maxSize) {
+    }
+
+    /**
+     * The limit of the body filters.
+     *
      * @param rewriter  The name of the rewriter bean of a body filter
      * @param maxSize   The limit of the body, e.g. {@code 1MB}; 256 KiB by default
      */
     @Introspected
-    record BodyFilterArguments(@Nullable String predicate, @Nullable String rewriter,
+    record BodyFilterArguments(@Nullable String rewriter,
                                @ReadableBytes @Bindable(defaultValue = "262144") long maxSize) {
         static final long DEFAULT_MAX_SIZE = 262_144;
     }

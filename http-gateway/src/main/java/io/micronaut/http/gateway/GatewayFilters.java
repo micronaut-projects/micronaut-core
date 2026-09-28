@@ -426,7 +426,7 @@ public final class GatewayFilters {
      * @return The filter
      */
     public static GatewayFilter mirror(String uri, double percentage) {
-        return mirror(uri, percentage, 64 * 1024, Duration.ofSeconds(5), false);
+        return mirror(uri, percentage, 64L * 1024, Duration.ofSeconds(5), false);
     }
 
     /**
@@ -624,23 +624,6 @@ public final class GatewayFilters {
         return node;
     }
 
-    /**
-     * Match the requests of the route by their body, like Spring Cloud Gateway's
-     * {@code ReadBody} predicate: a copy of the body, up to the limit, is read and tested, and the
-     * body is still relayed; the bytes are in the attribute
-     * {@link GatewayAttributes#CACHED_REQUEST_BODY}. Unlike a predicate of the route, a request
-     * whose body does not match is answered with {@code 404}: the router chose the route before
-     * the body arrived, so no other route is tried. A body over the limit is answered with
-     * {@code 413}. A route filter.
-     *
-     * @param maxBytes  The limit of the body
-     * @param predicate The test of the body
-     * @return The filter
-     */
-    public static GatewayFilter readBody(long maxBytes, java.util.function.Predicate<byte[]> predicate) {
-        return new ReadBody(checkMax(maxBytes, "ReadBody"), Objects.requireNonNull(predicate, "predicate"));
-    }
-
     private static long checkMax(long maxBytes, String filter) {
         if (maxBytes < 0) {
             throw new IllegalArgumentException(filter + " needs a size of at least 0: " + maxBytes);
@@ -652,10 +635,10 @@ public final class GatewayFilters {
      * @param filters The filters of a route
      * @return The rewrites of the body of the request, in order
      */
-    static List<ModifyRequestBody> requestRewrites(List<GatewayFilter> filters) {
-        List<ModifyRequestBody> rewrites = new ArrayList<>(0);
+    static List<GatewayBodyFilter> requestRewrites(List<GatewayFilter> filters) {
+        List<GatewayBodyFilter> rewrites = new ArrayList<>(0);
         for (GatewayFilter filter : filters) {
-            if (filter instanceof ModifyRequestBody rewrite) {
+            if (filter instanceof GatewayBodyFilter rewrite && rewrite.target() == GatewayBodyFilter.Target.REQUEST) {
                 rewrites.add(rewrite);
             }
         }
@@ -666,10 +649,10 @@ public final class GatewayFilters {
      * @param filters The filters of a route
      * @return The rewrites of the body of the response, in order
      */
-    static List<ModifyResponseBody> responseRewrites(List<GatewayFilter> filters) {
-        List<ModifyResponseBody> rewrites = new ArrayList<>(0);
+    static List<GatewayBodyFilter> responseRewrites(List<GatewayFilter> filters) {
+        List<GatewayBodyFilter> rewrites = new ArrayList<>(0);
         for (GatewayFilter filter : filters) {
-            if (filter instanceof ModifyResponseBody rewrite) {
+            if (filter instanceof GatewayBodyFilter rewrite && rewrite.target() == GatewayBodyFilter.Target.RESPONSE) {
                 rewrites.add(rewrite);
             }
         }
@@ -1355,7 +1338,12 @@ public final class GatewayFilters {
      * @param maxBytes The limit of the body
      * @param rewriter The rewrite
      */
-    record ModifyRequestBody(long maxBytes, BodyRewriter rewriter) implements GatewayFilter {
+    record ModifyRequestBody(long maxBytes, BodyRewriter rewriter) implements GatewayBodyFilter {
+        @Override
+        public Target target() {
+            return Target.REQUEST;
+        }
+
         @Override
         public String toString() {
             return "ModifyRequestBody=" + maxBytes;
@@ -1365,7 +1353,7 @@ public final class GatewayFilters {
     /**
      * The rewrite of the body of the response, see {@link #modifyResponseBody(long, BodyRewriter)}.
      */
-    static class ModifyResponseBody implements GatewayFilter {
+    static class ModifyResponseBody implements GatewayBodyFilter {
         private final long maxBytes;
         private final BodyRewriter rewriter;
 
@@ -1374,49 +1362,24 @@ public final class GatewayFilters {
             this.rewriter = rewriter;
         }
 
-        long maxBytes() {
+        @Override
+        public Target target() {
+            return Target.RESPONSE;
+        }
+
+        @Override
+        public long maxBytes() {
             return maxBytes;
         }
 
-        BodyRewriter rewriter() {
+        @Override
+        public BodyRewriter rewriter() {
             return rewriter;
         }
 
         @Override
         public String toString() {
             return "ModifyResponseBody=" + maxBytes;
-        }
-    }
-
-    private record ReadBody(long maxBytes, java.util.function.Predicate<byte[]> predicate) implements GatewayFilter {
-        @Override
-        public void configure(RouteFilterSpec<?> route) {
-            route.beforeReplacingAsync(request -> {
-                if (!(request instanceof io.micronaut.http.ServerHttpRequest<?> server)) {
-                    return java.util.concurrent.CompletableFuture.completedFuture(null);
-                }
-                if (request.getContentLength() > maxBytes) {
-                    return java.util.concurrent.CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE));
-                }
-                io.micronaut.http.body.CloseableByteBody copy = server.byteBodyFactory().limit(
-                    server.byteBody().split(io.micronaut.http.body.ByteBody.SplitBackpressureMode.FASTEST), maxBytes);
-                return copy.buffer().handle((bytes, failure) -> {
-                    if (failure != null) {
-                        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
-                    }
-                    byte[] array;
-                    try (bytes) {
-                        array = bytes.toByteArray();
-                    }
-                    request.setAttribute(GatewayAttributes.CACHED_REQUEST_BODY, array);
-                    return predicate.test(array) ? null : HttpResponse.status(HttpStatus.NOT_FOUND);
-                });
-            });
-        }
-
-        @Override
-        public String toString() {
-            return "ReadBody=" + maxBytes;
         }
     }
 
