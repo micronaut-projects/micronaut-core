@@ -645,7 +645,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method METHOD_QUALIFIER_BY_TYPE = ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class);
 
-    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory");
+    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "getFactoryBean", BeanDefinition.class, Class.class, Qualifier.class);
 
     private static final Method METHOD_PROXY_TARGET_TYPE = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType");
 
@@ -2303,29 +2303,31 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             }
             case FieldDefinition<?, ?> fd -> {
                 FieldDefinition<ClassElement, FieldElement> fieldDefinition = (FieldDefinition<ClassElement, FieldElement>) fd;
-                yield buildFactoryFieldCall(methodParameters, additionalStatements, fieldDefinition);
+                yield buildFactoryFieldCall(aThis, methodParameters, additionalStatements, fieldDefinition);
             }
             case MethodDefinition<?, ?> md -> {
                 MethodDefinition<ClassElement, MethodElement> methodDefinition = (MethodDefinition<ClassElement, MethodElement>) md;
-                yield buildFactoryMethodCall(methodParameters, methodDefinition, additionalStatements, values);
+                yield buildFactoryMethodCall(aThis, methodParameters, methodDefinition, additionalStatements, values);
             }
         };
     }
 
-    private ExpressionDef buildFactoryMethodCall(List<VariableDef.MethodParameter> methodParameters,
+    private ExpressionDef buildFactoryMethodCall(VariableDef.This aThis,
+                                                 List<VariableDef.MethodParameter> methodParameters,
                                                  MethodDefinition<ClassElement, MethodElement> factorMethodDefinition,
                                                  List<StatementDef> additionalStatements,
                                                  List<? extends ExpressionDef> values) {
         MethodElement methodElement = factorMethodDefinition.methodElement();
-        ExpressionDef factoryBean = getFactoryBean(methodParameters, methodElement.getOwningType(), methodElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, methodElement.getOwningType(), methodElement.isStatic(), additionalStatements);
         return getBeanFromFactoryMethod(factorMethodDefinition, factoryBean, values);
     }
 
-    private ExpressionDef buildFactoryFieldCall(List<VariableDef.MethodParameter> methodParameters,
+    private ExpressionDef buildFactoryFieldCall(VariableDef.This aThis,
+                                                List<VariableDef.MethodParameter> methodParameters,
                                                 List<StatementDef> additionalStatements,
                                                 FieldDefinition<ClassElement, FieldElement> factoryFieldDefinition) {
         FieldElement fieldElement = factoryFieldDefinition.fieldElement();
-        ExpressionDef factoryBean = getFactoryBean(methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), additionalStatements);
         return getBeanFromFactoryField(factoryFieldDefinition, factoryBean);
     }
 
@@ -2430,7 +2432,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return annotationMetadata.stringValue(Property.class, "name");
     }
 
-    private ExpressionDef getFactoryBean(List<VariableDef.MethodParameter> parameters,
+    private ExpressionDef getFactoryBean(VariableDef.This aThis,
+                                         List<VariableDef.MethodParameter> parameters,
                                          ClassElement factoryClass,
                                          boolean isStaticMember,
                                          List<StatementDef> additionalStatements) {
@@ -2450,15 +2453,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         );
 
         ExpressionDef beanResolutionContxt = parameters.getFirst();
+        // the lookup is attributed to the produced definition, and the factory marked as its dependent factory,
+        // so the dependency graph records the factory as a dependency of the bean it produces
         StatementDef.DefineAndAssign defineAndAssign = beanResolutionContxt
-            .invoke(BEAN_LOCATOR_METHOD_GET_BEAN,
-                // first argument is the bean type
+            .invoke(METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN,
+                // the definition of the produced bean
+                aThis,
+                // the factory type
                 ExpressionDef.constant(factoryTypeDef),
-                // second argument is the qualifier for the factory if any
+                // the qualifier for the factory if any
                 getQualifier(factoryClass, argumentExpression)
             ).cast(factoryTypeDef).newLocal("factoryBean");
         additionalStatements.add(defineAndAssign);
-        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY));
         return defineAndAssign.variable();
     }
 

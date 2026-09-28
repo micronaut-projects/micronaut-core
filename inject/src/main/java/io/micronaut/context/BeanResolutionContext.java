@@ -450,6 +450,29 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Resolves the factory bean a produced bean is instantiated from, attributing the lookup to the
+     * produced definition: the factory is a dependency of the bean it produces, not of whatever bean
+     * happened to be resolving the produced one, which is what a lookup with no segment of its own
+     * would record in the {@link BeanDependencyGraph}. The factory is then marked as the dependent
+     * factory, as {@link #markDependentAsFactory()} does.
+     *
+     * @param producedDefinition The definition of the bean the factory produces
+     * @param factoryType The factory type
+     * @param qualifier The factory's qualifier, if any
+     * @param <F> The factory type
+     * @return The factory bean
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        try (Path ignored = getPath().pushConstructorResolve(producedDefinition, Argument.of(factoryType, "factory"))) {
+            F factory = getBean(factoryType, qualifier);
+            markDependentAsFactory();
+            return factory;
+        }
+    }
+
+    /**
      * @return The dependent factory beans that was used to create the bean in context
      * @since 3.5.0
      */

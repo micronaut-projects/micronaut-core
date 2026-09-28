@@ -396,6 +396,19 @@ public interface ApplicationContextBuilder {
     ApplicationContextBuilder eventsEnabled(boolean enabled);
 
     /**
+     * Record which bean received which other bean, as a {@link BeanDependencyGraph} the built context
+     * exposes through {@link BeanContext#findDependencyGraph()}. A development launcher switches this on;
+     * it defaults to on only in {@link io.micronaut.context.env.DevelopmentMode development mode}.
+     *
+     * @param enabled True to record the graph
+     * @return This builder
+     * @since 5.3.0
+     */
+    default ApplicationContextBuilder trackBeanDependencies(boolean enabled) {
+        return this;
+    }
+
+    /**
      * Set a predicate to filter beans considered by the context.
      *
      * <p>The predicate can be read back from the built context with

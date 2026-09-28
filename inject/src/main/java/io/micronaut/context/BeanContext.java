@@ -447,4 +447,15 @@ public interface BeanContext extends
     static BeanContext build(ClassLoader classLoader) {
         return new DefaultBeanContext(classLoader);
     }
+
+    /**
+     * The graph of which bean received which, recorded when the context was configured to
+     * {@link BeanContextConfiguration#isTrackBeanDependencies() track dependencies}.
+     *
+     * @return The graph, or empty when the context does not record it
+     * @since 5.3.0
+     */
+    default Optional<BeanDependencyGraph> findDependencyGraph() {
+        return Optional.empty();
+    }
 }

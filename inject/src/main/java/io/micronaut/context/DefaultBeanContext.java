@@ -259,6 +259,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
+    @Nullable
+    private final DefaultBeanDependencyGraph dependencyGraph;
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -347,6 +349,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         this.tracePatterns = traceConfiguration.classPatterns();
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
+        this.dependencyGraph = contextConfiguration.isTrackBeanDependencies() ? new DefaultBeanDependencyGraph() : null;
         this.conversionService = MutableConversionService.create();
         beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration);
     }
@@ -522,6 +525,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // a restarted context reads its configurations and validator again, as it does its definitions
             beanConfigurationsList = null;
             beanValidator = null;
+            if (dependencyGraph != null) {
+                dependencyGraph.clear();
+            }
         }
         return this;
     }
@@ -556,6 +562,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (bean != null) {
             BeanDefinition<T> definition = beanRegistration.definition();
             if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+                if (dependencyGraph != null) {
+                    // the injections about to run replace the ones recorded, they do not join them
+                    dependencyGraph.removeReinjectable(definition);
+                }
                 injectableBeanDefinition.inject(this, bean);
             }
         }
@@ -1336,6 +1346,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (definition.isSingleton()) {
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
+        }
+        if (dependencyGraph != null) {
+            // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed
+            dependencyGraph.remove(definition);
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -2311,6 +2325,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<BeanDependencyGraph> findDependencyGraph() {
+        return Optional.ofNullable(dependencyGraph);
     }
 
     /**
@@ -3528,10 +3547,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         if (definition.isSingleton() && !isScopedProxyDefinition) {
             BeanRegistration<T> beanRegistration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
-            if (beanRegistration != null) {
-                return beanRegistration;
+            if (beanRegistration == null) {
+                beanRegistration = singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
             }
-            return singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
+            if (dependencyGraph != null) {
+                dependencyGraph.record(resolutionContext, beanRegistration.beanDefinition);
+            }
+            return beanRegistration;
         }
 
         final boolean isProxy = definition.isProxy();
@@ -3549,6 +3571,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     ((Qualified<T>) bean).$withBeanQualifier(q);
                 }
             }
+            if (dependencyGraph != null) {
+                // the receiving bean holds the scoped proxy, which is what a reload must know
+                dependencyGraph.record(resolutionContext, registration.beanDefinition);
+            }
             return registration;
         }
 
@@ -3557,10 +3583,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (isProxy) {
                 definition = getProxyTargetBeanDefinition(beanType, qualifier);
             }
-            return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            if (dependencyGraph != null) {
+                dependencyGraph.record(resolutionContext, scoped.beanDefinition);
+            }
+            return scoped;
         }
         // Unknown scope, prototype scope etc
-        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        if (dependencyGraph != null) {
+            // a prototype belongs to the bean that received it, and what the prototype received is recorded
+            // under the prototype's definition, so a path through it is not lost
+            dependencyGraph.record(resolutionContext, prototype.beanDefinition);
+        }
+        return prototype;
     }
 
     private <T> BeanRegistration<T> intializeEagerBean(@Nullable BeanResolutionContext resolutionContext,
