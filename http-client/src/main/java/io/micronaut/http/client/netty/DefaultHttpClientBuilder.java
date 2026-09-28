@@ -213,6 +213,11 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
+    DefaultHttpClientBuilder lifecycleListener(NettyHttpClient.@Nullable LifecycleListener lifecycleListener) {
+        delegate.lifecycleListener(lifecycleListener);
+        return this;
+    }
+
     /**
      * Build the final HTTP client. This method may only be called once.
      *
