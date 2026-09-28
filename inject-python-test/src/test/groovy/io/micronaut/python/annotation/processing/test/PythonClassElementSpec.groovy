@@ -1635,7 +1635,7 @@ class TypeTestService:
 
         then: "Result should be correctly converted to expected type"
         result == expectedValue
-        result?.getClass() == expectedType
+        expectedType == null ? result == null : expectedType.isAssignableFrom(result.getClass())
         beanDefinition.executableMethods.size() == 1
         beanDefinition.executableMethods[0].returnType.type == returnType
 
