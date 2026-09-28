@@ -87,6 +87,7 @@ class SharedBufferOrderingTest {
 
             @Override
             public void complete() {
+                // the source never completes: the test checks the buffers only
             }
 
             @Override
