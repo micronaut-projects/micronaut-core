@@ -70,6 +70,8 @@ micronaut:
         load-balancer-key-header: X-Session-Id
 ----
 
+With a strategy configured, an instance whose `backup` metadata is `true` is a backup, like the backup servers of nginx: it is selected only when no other instance is available, whatever the strategy. Without the `load-balancer-strategy` setting, the `backup` metadata is ignored and a backup instance is selected in turn like any other.
+
 Every strategy picks among the instances that are up and that the <<serviceDiscoveryManual, outlier detection>> has not ejected: an ejected instance is never selected, whatever the strategy. The instances are those of each selection, so instances added or removed by a refresh of the discovery client are taken into account on the next selection.
 
 To pick the instance in another way, implement api:http.client.loadbalance.LoadBalancerStrategy[] and register it as a bean named after the strategy:

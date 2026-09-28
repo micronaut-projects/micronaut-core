@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.health.HealthStatus;
@@ -79,6 +80,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @return The load balancer
      * @since 5.3.0
      */
+    @Experimental
     public static LoadBalancer withStrategy(LoadBalancer loadBalancer, @Nullable LoadBalancerStrategy strategy) {
         if (strategy != null && loadBalancer instanceof AbstractRoundRobinLoadBalancer roundRobin) {
             roundRobin.setStrategy(strategy);
@@ -92,6 +94,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @param strategy The strategy, or {@code null} for round robin
      * @since 5.3.0
      */
+    @Experimental
     public void setStrategy(@Nullable LoadBalancerStrategy strategy) {
         this.strategy.set(strategy);
     }
@@ -100,6 +103,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @return The strategy that picks among the available instances, {@code null} for round robin
      * @since 5.3.0
      */
+    @Experimental
     public @Nullable LoadBalancerStrategy getStrategy() {
         return strategy.get();
     }
@@ -136,14 +140,15 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * detection, picked by the {@link #getStrategy() strategy}, round robin by default. When
      * every instance that is up is ejected, one of them is selected anyway. An
      * {@link ExcludedInstances} discriminator leaves its instances out, unless no other is
-     * available. An instance whose {@code backup} metadata is {@code true} is selected only when
-     * no other is available, like the backup servers of nginx.
+     * available. With a strategy, an instance whose {@code backup} metadata is {@code true} is
+     * selected only when no other is available, like the backup servers of nginx.
      *
      * @param serviceInstances A list of service instances
      * @param discriminator    The discriminator of the selection, if any
      * @return The next available instance or a {@link NoAvailableServiceException} if none
      * @since 5.3.0
      */
+    @Experimental
     protected ServiceInstance getNextAvailable(List<ServiceInstance> serviceInstances, @Nullable Object discriminator) {
         List<ServiceInstance> availableServices = serviceInstances.stream()
             .filter(si -> si.getHealthStatus().equals(HealthStatus.UP))
@@ -160,15 +165,19 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
                 availableServices = left;
             }
         }
-        List<ServiceInstance> primaries = availableServices.stream().filter(si -> !isBackup(si)).toList();
-        if (!primaries.isEmpty() && primaries.size() < availableServices.size()) {
-            availableServices = primaries;
+        LoadBalancerStrategy strategy = this.strategy.get();
+        if (strategy != null) {
+            // the backup metadata counts once a strategy is configured: discovery metadata may
+            // carry that key already, and the default round robin stays as it was
+            List<ServiceInstance> primaries = availableServices.stream().filter(si -> !isBackup(si)).toList();
+            if (!primaries.isEmpty() && primaries.size() < availableServices.size()) {
+                availableServices = primaries;
+            }
         }
         int len = availableServices.size();
         if (len == 0) {
             throw new NoAvailableServiceException(getServiceID());
         }
-        LoadBalancerStrategy strategy = this.strategy.get();
         if (strategy != null) {
             return strategy.select(availableServices, key);
         }
