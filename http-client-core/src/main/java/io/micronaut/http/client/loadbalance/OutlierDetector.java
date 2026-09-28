@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
@@ -202,10 +203,10 @@ public final class OutlierDetector {
      * instance with a reported outcome. Safe to call concurrently with the selection and the
      * reports; each instance is read consistently, the instances are not read at once.
      *
-     * @return The state of each instance
+     * @return The state of each instance, sorted by URI
      */
     public List<OutlierEjectionState> snapshot() {
-        Set<URI> uris = new HashSet<>(members());
+        Set<URI> uris = new TreeSet<>(members());
         uris.addAll(states.keySet());
         long now = clock.getAsLong();
         Instant wallNow = Instant.now();

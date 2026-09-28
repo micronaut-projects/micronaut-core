@@ -223,6 +223,19 @@ class OutlierDetectorTest {
         Assertions.assertEquals(ALL, detector.available(ALL));
     }
 
+    @Test
+    void snapshotIsSortedByUri() {
+        OutlierDetector detector = detector(2, 100);
+        detector.available(List.of(C, A, B));
+        detector.report(C, Outcome.CONNECT_FAILURE);
+        detector.report(B, Outcome.CONNECT_FAILURE);
+        for (int i = 0; i < 3; i++) {
+            Assertions.assertEquals(
+                List.of(A.getURI(), B.getURI(), C.getURI()),
+                detector.snapshot().stream().map(OutlierEjectionState::uri).toList());
+        }
+    }
+
     private static OutlierEjectionState state(OutlierDetector detector, ServiceInstance instance) {
         List<OutlierEjectionState> snapshot = detector.snapshot();
         Assertions.assertEquals(3, snapshot.size(), snapshot.toString());

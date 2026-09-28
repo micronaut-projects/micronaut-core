@@ -63,7 +63,7 @@ public interface LoadBalancer {
      * ones are ejected, and until when. Read only, and safe to call concurrently; the snapshot is
      * built on each call. Empty for a load balancer without outlier detection.
      *
-     * @return The state of each known instance
+     * @return The state of each known instance, sorted by URI
      * @since 5.3.0
      */
     @Experimental
