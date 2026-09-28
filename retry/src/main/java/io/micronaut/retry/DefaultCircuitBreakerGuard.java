@@ -37,7 +37,7 @@ final class DefaultCircuitBreakerGuard implements CircuitBreakerGuard {
     private final String name;
     private final CircuitBreakerRetry retryState;
 
-    DefaultCircuitBreakerGuard(String name, CircuitBreakerRetry.Circuit circuit, @Nullable ApplicationEventPublisher eventPublisher) {
+    DefaultCircuitBreakerGuard(String name, CircuitBreakerRetry.Circuit circuit, @Nullable ApplicationEventPublisher<Object> eventPublisher) {
         this.name = name;
         this.retryState = new CircuitBreakerRetry(
             circuit,
@@ -86,12 +86,12 @@ final class DefaultCircuitBreakerGuard implements CircuitBreakerGuard {
         return new ReportOnce() {
             @Override
             void success() {
-                circuit.record(generation, null, false, retryState, retryState);
+                circuit.recordOutcome(generation, null, false, retryState, retryState);
             }
 
             @Override
             void failure(Throwable failure) {
-                circuit.record(generation, failure, window.isFailure(failure), retryState, retryState);
+                circuit.recordOutcome(generation, failure, window.isFailure(failure), retryState, retryState);
             }
 
             @Override

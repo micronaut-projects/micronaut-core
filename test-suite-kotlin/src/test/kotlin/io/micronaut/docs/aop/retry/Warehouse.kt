@@ -35,11 +35,13 @@ open class Warehouse {
 
     open fun stock(sku: String): Int {
         call()
+        find(sku)
         return 10
     }
 
     open fun reserve(sku: String) {
         call()
+        find(sku)
     }
 
     open fun ship(order: String): String {

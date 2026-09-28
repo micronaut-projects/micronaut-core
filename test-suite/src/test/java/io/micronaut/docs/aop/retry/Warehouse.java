@@ -40,11 +40,13 @@ public class Warehouse {
 
     public int stock(String sku) {
         call();
+        find(sku);
         return 10;
     }
 
     public void reserve(String sku) {
         call();
+        find(sku);
     }
 
     public String ship(String order) {

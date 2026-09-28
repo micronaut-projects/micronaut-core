@@ -72,6 +72,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
      * @param eventPublisher To publish circuit events
      * @param throwWrappedException If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
      */
+    @SuppressWarnings("unchecked")
     public CircuitBreakerRetry(long openTimeout,
                                RetryStateBuilder childStateBuilder,
                                ExecutableMethod<?, ?> method,
@@ -95,7 +96,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
     public CircuitBreakerRetry(Circuit circuit,
                                RetryStateBuilder childStateBuilder,
                                ExecutableMethod<?, ?> method,
-                               @Nullable ApplicationEventPublisher eventPublisher,
+                               @Nullable ApplicationEventPublisher<Object> eventPublisher,
                                boolean throwWrappedException) {
         this.circuit = circuit;
         this.state = circuit.state;
@@ -420,7 +421,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
 
         private void end(@Nullable Throwable exception, boolean failure) {
             if (ended.compareAndSet(false, true)) {
-                owner.circuit.record(permit, exception, failure, owner, childState);
+                owner.circuit.recordOutcome(permit, exception, failure, owner, childState);
             }
         }
 
@@ -591,11 +592,9 @@ public class CircuitBreakerRetry implements MutableRetryState {
          */
         synchronized CircuitState windowState() {
             CircuitState current = getState();
-            if (current == CircuitState.OPEN && hasOpenTimeoutElapsed()) {
-                halfOpen();
-            } else if (current == CircuitState.HALF_OPEN
-                && trials >= Objects.requireNonNull(window).successThreshold()
-                && hasOpenTimeoutElapsed()) {
+            boolean openOrTrialsTaken = current == CircuitState.OPEN
+                || current == CircuitState.HALF_OPEN && trials >= Objects.requireNonNull(window).successThreshold();
+            if (openOrTrialsTaken && hasOpenTimeoutElapsed()) {
                 halfOpen();
             }
             return getState();
@@ -604,7 +603,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
         /**
          * Take a permit for a call of a circuit with a window: always in a closed circuit, one
          * of the trial permits in a half-open one. The call reports its outcome with
-         * {@link #record}, or returns the permit with {@link #release(long)}.
+         * {@link #recordOutcome}, or returns the permit with {@link #release(long)}.
          *
          * @param throwWrappedException Whether the error of an open circuit is wrapped
          * @return The generation of the permit
@@ -649,7 +648,7 @@ public class CircuitBreakerRetry implements MutableRetryState {
          * @param owner      The user of the circuit, for the events
          * @param retryState The retry state of the call, for the events
          */
-        public void record(long permit, @Nullable Throwable cause, boolean failure, CircuitBreakerRetry owner, RetryState retryState) {
+        public void recordOutcome(long permit, @Nullable Throwable cause, boolean failure, CircuitBreakerRetry owner, RetryState retryState) {
             int change;
             Throwable opened;
             synchronized (this) {

@@ -50,7 +50,7 @@ final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
 
     private final NamedCircuits circuits;
     @Nullable
-    private final ApplicationEventPublisher eventPublisher;
+    private final ApplicationEventPublisher<Object> eventPublisher;
     private final Map<String, CircuitBreakerOperations> configured = new ConcurrentHashMap<>();
     private final Map<String, CircuitBreakerGuard> guards = new ConcurrentHashMap<>();
     private final DefaultRetryRunner retryRunner;
@@ -62,7 +62,7 @@ final class DefaultCircuitBreakerRegistry implements CircuitBreakerRegistry {
      */
     @Inject
     DefaultCircuitBreakerRegistry(NamedCircuits circuits,
-                                  @Nullable ApplicationEventPublisher eventPublisher,
+                                  @Nullable ApplicationEventPublisher<Object> eventPublisher,
                                   @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
         this.circuits = circuits;
         this.eventPublisher = eventPublisher;

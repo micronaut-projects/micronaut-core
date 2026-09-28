@@ -19,10 +19,12 @@ class Warehouse:
 
     def stock(self, sku: str) -> int:
         self._call()
+        self._find(sku)
         return 10
 
     def reserve(self, sku: str) -> None:
         self._call()
+        self._find(sku)
 
     def ship(self, order: str) -> str:
         self._call()

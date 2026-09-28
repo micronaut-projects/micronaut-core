@@ -67,7 +67,7 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
     DefaultCircuitBreakerOperations(CircuitBreakerPolicy circuitBreakerPolicy,
                                     CircuitBreakerRetry.Circuit circuit,
                                     String name,
-                                    @Nullable ApplicationEventPublisher eventPublisher,
+                                    @Nullable ApplicationEventPublisher<Object> eventPublisher,
                                     DefaultRetryRunner retryRunner,
                                     RetryEventEmitter retryEventEmitter) {
         this.retryRunner = retryRunner;

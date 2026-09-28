@@ -30,7 +30,7 @@ import java.util.NoSuchElementException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class NamedCircuitBreakerSpec {
+class NamedCircuitBreakerTest {
 
     // the configuration of the guide
     private static final Map<String, Object> CONFIGURATION = Map.of(
