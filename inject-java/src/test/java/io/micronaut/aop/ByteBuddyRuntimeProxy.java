@@ -23,10 +23,19 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Singleton
 @NullMarked
 public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
+
+    /**
+     * The generated class captures the interceptors and proxy target of one {@link RuntimeProxyDefinition}
+     * in static fields, so it cannot be shared between bean contexts. Each definition therefore gets a
+     * class of its own, and the counter keeps the names unique when several contexts in the same JVM
+     * (and hence the same class loader) proxy the same bean type.
+     */
+    private static final AtomicInteger PROXY_COUNTER = new AtomicInteger();
 
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
@@ -39,7 +48,7 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
         } else {
             builder = byteBuddy.subclass(targetType);
         }
-        builder = builder.name(targetType.getName() + "$ByteBuddyProxy");
+        builder = builder.name(targetType.getName() + "$ByteBuddyProxy$" + PROXY_COUNTER.incrementAndGet());
 
         T proxyTarget = null;
         if (proxyDefinition.proxyTarget()) {
