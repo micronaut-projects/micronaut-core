@@ -149,7 +149,9 @@ snippet::io.micronaut.docs.aop.retry.InventoryClient[tags="registry", indent=0, 
 <2> The guard of the `shipping` circuit, see below
 <3> The operation fails fast while the `inventory` circuit is open, whichever user opened it
 
-A caller that runs each operation itself and only reports its outcome uses the api:retry.CircuitBreakerGuard[] of the name: `acquire()` fails fast with a `CircuitOpenException` while the circuit is open, `onSuccess()` and `onFailure(e)` report the outcome. A guard never retries, so a caller can report an outcome as soon as it knows it, for example once the headers of a response arrive, without waiting for its body.
+The reset timeout and the rolling window of a named circuit are those of its configuration, and a user that declares others fails. A name that is not configured takes them from its users, which must all agree, the defaults included: `registry.circuitBreaker(name)` and `registry.guard(name)` have the defaults, and a user that disagrees with the one that created the circuit fails with an `IllegalStateException` naming both. Configure a name that users share once, rather than repeating its settings.
+
+A caller that runs each operation itself and only reports its outcome uses the api:retry.CircuitBreakerGuard[] of the name: `acquire()` fails fast with a `CircuitOpenException` while the circuit is open, `onSuccess()` and `onFailure(e)` report the outcome, and `release()` returns a permit whose operation ended without one, for example when it was cancelled. A guard never retries, so a caller can report an outcome as soon as it knows it, for example once the headers of a response arrive, without waiting for its body.
 
 snippet::io.micronaut.docs.aop.retry.InventoryClient[tags="guard", indent=0, title="Reporting Outcomes with a CircuitBreakerGuard"]
 
@@ -173,7 +175,7 @@ A circuit breaker may instead decide by a rolling window of outcomes, as in Micr
 |`skipOn` (`skip-on`) |none |the exceptions that count as a success, whatever `failOn` says
 |===
 
-The reset timeout (`reset`) is the time an open circuit waits before it half-opens. The outcome of a call of an annotated method is its outcome after its retries. `CircuitBreakerRegistry.findSnapshot(name)` gives the state and counters of a circuit.
+The reset timeout (`reset`) is the time an open circuit waits before it half-opens; a half-open circuit whose trial calls have not all reported within it, for example because they were abandoned, permits new ones. The outcome of a call of an annotated method is its outcome after its retries, and an exception its `excludes` or `predicate` do not retry counts as a success. A call that started before the circuit last changed state counts for nothing, and a reactive call counts once it is subscribed: cancelled before it produced a value, it counts for nothing. `CircuitBreakerRegistry.findSnapshot(name)` gives the state and counters of a circuit.
 
 For example, the `shipping` circuit of the guard above opens when two of its last four calls failed, and a `NoSuchElementException` counts as a success:
 
