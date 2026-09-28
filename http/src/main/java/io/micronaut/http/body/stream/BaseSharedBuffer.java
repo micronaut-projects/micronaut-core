@@ -62,7 +62,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Any stream error.
      */
     @Nullable
-    private Throwable error;
+    private volatile Throwable error;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -106,6 +106,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * subscribers are, so that a subscriber finds them in its {@link BufferConsumer#complete()}.
      */
     private final CompletableFuture<HttpHeaders> trailers = new CompletableFuture<>();
+    /**
+     * If not negative, each {@link AsFlux} reader is charged for the bytes it has not delivered
+     * yet against its own limit of this size, instead of against the buffered size of this
+     * buffer, see {@link #setReaderBufferLimit(long)}.
+     */
+    private long readerBufferLimit = -1;
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
         this.readBufferFactory = readBufferFactory;
@@ -160,6 +166,29 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     public final boolean isBufferLimitExceeded() {
         return bufferSizeExceeded != null;
+    }
+
+    /**
+     * @return Whether the body failed
+     * @since 5.3.0
+     */
+    public final boolean isFailed() {
+        return error != null;
+    }
+
+    /**
+     * Charge each {@link AsFlux} reader for the bytes it has not delivered yet against a limit
+     * of its own, so that the buffered size of this buffer only counts the bytes it keeps for
+     * the reserved readers. Must be called before the first reader subscribes.
+     *
+     * @param limit The maximum number of bytes a reader holds
+     * @since 5.3.0
+     */
+    public final void setReaderBufferLimit(long limit) {
+        if (limit < 0) {
+            throw new IllegalArgumentException("The reader buffer limit is negative");
+        }
+        this.readerBufferLimit = limit;
     }
 
     public final void setExpectedLengthFrom(@Nullable String contentLength) {
@@ -633,14 +662,35 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     public static final class AsFlux implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
+        /**
+         * The tracker of this reader alone, see {@link #setReaderBufferLimit(long)}, or
+         * {@code null} to charge the buffered size of the shared buffer.
+         */
+        @Nullable
+        private final SizeLimitTracker ownTracker;
         private boolean first = true;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
+            long readerBufferLimit = sharedBuffer.readerBufferLimit;
+            this.ownTracker = readerBufferLimit < 0 ? null : NotThreadSafe.create(readerBufferLimit, true).makeAtomic();
         }
 
         @Override
         public void add(ReadBuffer buf) {
+            SizeLimitTracker ownTracker = this.ownTracker;
+            if (ownTracker != null) {
+                int size = buf.readable();
+                Exception bufferExceededExc = ownTracker.add(size);
+                if (bufferExceededExc != null) {
+                    sink.tryEmitError(bufferExceededExc);
+                    buf.close();
+                } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                    ownTracker.subtract(size);
+                    buf.close();
+                }
+                return;
+            }
             if (first) {
                 // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
                 sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
@@ -668,6 +718,24 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         public Flux<ReadBuffer> asFlux(Upstream upstream) {
+            SizeLimitTracker ownTracker = this.ownTracker;
+            if (ownTracker != null) {
+                return sink.asFlux()
+                    .doOnSubscribe(s -> upstream.start())
+                    .doOnNext(bb -> {
+                        int size = bb.readable();
+                        ownTracker.subtract(size);
+                        upstream.onBytesConsumed(size);
+                    })
+                    .doOnCancel(() -> {
+                        upstream.allowDiscard();
+                        upstream.disregardBackpressure();
+                    })
+                    .doOnDiscard(ReadBuffer.class, rb -> {
+                        ownTracker.subtract(rb.readable());
+                        rb.close();
+                    });
+            }
             return sink.asFlux()
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {

@@ -354,7 +354,8 @@ public class ByteBodyFactory {
      * A body that can be read more than once while its bytes arrive, keeping up to the given
      * number of bytes, e.g. to send a request again after a failed attempt, see
      * {@link ReplayableByteBody}. The given body is claimed. A body whose bytes are all there is
-     * replayable whatever its size.
+     * replayable whatever its size, and a body whose known length is over the limit is read
+     * once.
      *
      * @param body          The body
      * @param maxBufferSize The maximum number of bytes to keep for the next readers
@@ -371,8 +372,14 @@ public class ByteBodyFactory {
             return new ReplayableByteBody(body.move(), null, maxBufferSize);
         }
         long expected = body.expectedLength().orElse(-1);
+        if (expected > maxBufferSize) {
+            // the bytes cannot all be kept: the body is read once, and nothing is kept
+            return new ReplayableByteBody(body.move(), expected, maxBufferSize);
+        }
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, maxBufferSize), adapter);
+        // the buffered size counts what the body keeps, each reader is charged on its own
+        sb.sharedBuffer.setReaderBufferLimit(maxBufferSize);
         adapter.setSharedBuffer(sb.sharedBuffer);
         adapter.setTrailers(body.trailers());
         if (expected >= 0) {

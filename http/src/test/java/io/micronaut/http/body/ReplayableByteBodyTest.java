@@ -110,4 +110,87 @@ class ReplayableByteBodyTest {
         Assertions.assertFalse(replayable.isReplayable());
         Assertions.assertThrows(IllegalStateException.class, replayable::next);
     }
+
+    /**
+     * A reader that consumes the bytes as they arrive is not charged for the bytes the body
+     * keeps for the next readers.
+     */
+    @Test
+    void aReaderThatDrainsAsTheBytesArriveIsNotChargedForTheKeptBytes() throws Exception {
+        Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
+        try (ReplayableByteBody replayable = FACTORY.replayable(FACTORY.adapt(sink.asFlux()), 4)) {
+            CompletableFuture<String> first = new CompletableFuture<>();
+            StringBuilder firstText = new StringBuilder();
+            Flux.from(replayable.next().toReadBufferPublisher())
+                .doOnNext(b -> {
+                    firstText.append(b.toString(StandardCharsets.UTF_8));
+                    b.close();
+                })
+                .doOnError(first::completeExceptionally)
+                .doOnComplete(() -> first.complete(firstText.toString()))
+                .subscribe();
+            sink.tryEmitNext(buf("abc")).orThrow();
+            sink.tryEmitNext(buf("def")).orThrow();
+            sink.tryEmitComplete().orThrow();
+            Assertions.assertEquals("abcdef", first.get(5, TimeUnit.SECONDS));
+            Assertions.assertFalse(replayable.isReplayable());
+        }
+    }
+
+    @Test
+    void aStreamedFirstReadKeepsTheBodyReplayable() {
+        try (ReplayableByteBody replayable = FACTORY.replayable(streamed("abc", "def", "ghi"), 10)) {
+            Assertions.assertEquals("abcdefghi", read(replayable.next()));
+            Assertions.assertTrue(replayable.isReplayable());
+            Assertions.assertEquals("abcdefghi", read(replayable.next()));
+        }
+    }
+
+    /**
+     * A reader that starts after the bytes arrived gets them in one piece: it is charged for them
+     * once, not on top of what the body keeps.
+     */
+    @Test
+    void aStreamedReplayOfABodyOverHalfTheLimit() throws Exception {
+        try (ReplayableByteBody replayable = FACTORY.replayable(streamed("abc", "def", "ghi"), 10)) {
+            try (CloseableAvailableByteBody available = replayable.next().buffer().get(5, TimeUnit.SECONDS)) {
+                Assertions.assertEquals("abcdefghi", available.toString(StandardCharsets.UTF_8));
+            }
+            Assertions.assertTrue(replayable.isReplayable());
+            Assertions.assertEquals("abcdefghi", read(replayable.next()));
+            Assertions.assertEquals("abcdefghi", read(replayable.next()));
+        }
+    }
+
+    @Test
+    void aCancelledReaderDoesNotShrinkTheLimit() {
+        try (ReplayableByteBody replayable = FACTORY.replayable(streamed("abc", "def", "ghi"), 10)) {
+            Assertions.assertEquals("abc", Flux.from(replayable.next().toReadBufferPublisher())
+                .take(1)
+                .map(b -> {
+                    try (b) {
+                        return b.toString(StandardCharsets.UTF_8);
+                    }
+                })
+                .blockFirst(java.time.Duration.ofSeconds(5)));
+            Assertions.assertEquals("abcdefghi", read(replayable.next()));
+            Assertions.assertEquals("abcdefghi", read(replayable.next()));
+        }
+    }
+
+    @Test
+    void aFailedBodyIsNotReplayable() {
+        try (ReplayableByteBody replayable = FACTORY.replayable(FACTORY.adapt(Flux.concat(Flux.just(buf("abc")), Flux.error(new java.io.IOException("reset")))), 100)) {
+            Assertions.assertThrows(Exception.class, () -> read(replayable.next()));
+            Assertions.assertFalse(replayable.isReplayable());
+        }
+    }
+
+    @Test
+    void aBodyWhoseKnownLengthIsOverTheLimitIsReadOnce() {
+        try (ReplayableByteBody replayable = FACTORY.replayable(FACTORY.adapt(Flux.just(buf("abc"), buf("def")), OptionalLong.of(6)), 4)) {
+            Assertions.assertEquals("abcdef", read(replayable.next()));
+            Assertions.assertThrows(BufferLengthExceededException.class, replayable::next);
+        }
+    }
 }

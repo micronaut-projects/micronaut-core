@@ -24,7 +24,9 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.channel.local.LocalChannel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -199,5 +204,81 @@ class ByteBodyLimitReplayOwnershipTest {
     @Test
     void replayableClosedUnread() {
         factory.replayable(streamed("abc", "def"), 100).close();
+    }
+
+    /**
+     * The Netty client reads a request body from another event loop than the one it arrives on:
+     * that reader drains the bytes as they arrive, and is not charged for the bytes the body
+     * keeps.
+     */
+    @Test
+    void replayableReadFromAnotherEventLoopWhileTheBytesArrive() throws Exception {
+        DefaultEventLoopGroup group = new DefaultEventLoopGroup(1);
+        try {
+            LocalChannel other = new LocalChannel();
+            group.register(other).sync();
+            NettyByteBodyFactory otherFactory = new NettyByteBodyFactory(other);
+            Sinks.Many<ByteBuf> sink = Sinks.many().unicast().onBackpressureBuffer();
+            try (ReplayableByteBody replayable = factory.replayable(factory.adaptNetty(sink.asFlux()), 4)) {
+                CompletableFuture<String> first = new CompletableFuture<>();
+                StringBuilder text = new StringBuilder();
+                Flux.from(otherFactory.toStreaming(replayable.next()).toReadBufferPublisher())
+                    .doOnNext(b -> {
+                        text.append(b.toString(StandardCharsets.UTF_8));
+                        b.close();
+                    })
+                    .doOnError(first::completeExceptionally)
+                    .doOnComplete(() -> first.complete(text.toString()))
+                    .subscribe();
+                sink.tryEmitNext(buf("abc")).orThrow();
+                sink.tryEmitNext(buf("def")).orThrow();
+                sink.tryEmitComplete().orThrow();
+                Assertions.assertEquals("abcdef", first.get(5, TimeUnit.SECONDS));
+                Assertions.assertFalse(replayable.isReplayable());
+            }
+            other.close().sync();
+        } finally {
+            group.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+        }
+    }
+
+    @Test
+    void replayableStreamedReplayOverHalfTheLimit() throws Exception {
+        try (ReplayableByteBody replayable = factory.replayable(streamed("abc", "def", "ghi"), 10)) {
+            Assertions.assertEquals("abcdefghi", buffer(replayable.next()));
+            Assertions.assertTrue(replayable.isReplayable());
+            Assertions.assertEquals("abcdefghi", read(replayable.next()));
+        }
+    }
+
+    /**
+     * A replay split off the event loop while the replayable body is closed on it: the close
+     * waits for the reservation of the split, so that the split still reads the body.
+     */
+    @Test
+    void replayableNextOffTheEventLoopRacingClose() throws Exception {
+        DefaultEventLoopGroup group = new DefaultEventLoopGroup(1);
+        try {
+            LocalChannel channel = new LocalChannel();
+            group.register(channel).sync();
+            NettyByteBodyFactory loopFactory = new NettyByteBodyFactory(channel);
+            ReplayableByteBody replayable = loopFactory.replayable(loopFactory.adaptNetty(Flux.just("abc", "def").map(this::buf)), 100);
+            CountDownLatch nextTaken = new CountDownLatch(1);
+            Future<?> closed = group.next().submit(() -> {
+                try {
+                    Assertions.assertTrue(nextTaken.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                replayable.close();
+            });
+            CloseableByteBody next = replayable.next();
+            nextTaken.countDown();
+            closed.get(5, TimeUnit.SECONDS);
+            Assertions.assertEquals("abcdef", read(next));
+            channel.close().sync();
+        } finally {
+            group.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+        }
     }
 }

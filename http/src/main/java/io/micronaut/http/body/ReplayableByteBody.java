@@ -28,9 +28,11 @@ import java.io.Closeable;
  * with all the bytes from the start, while the bytes still arrive: the first reader streams them,
  * and they are kept, up to a limit, for the next readers. Once more bytes than the limit arrived,
  * the kept bytes are dropped: the readers that started still get every byte, and the body cannot
- * be read again, see {@link #isReplayable()}. A reader through
- * {@link ByteBody#toReadBufferPublisher()} counts the bytes it has not consumed yet against the
- * same limit.
+ * be read again, see {@link #isReplayable()}. A body whose known length is over the limit keeps
+ * nothing and is read once. A reader through {@link ByteBody#toReadBufferPublisher()} holds at
+ * most as many bytes it has not consumed yet as the limit, apart from the bytes the body keeps.
+ * The bytes kept for a body from {@link #next()} that is not read yet count against the limit
+ * of the body.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -41,27 +43,39 @@ public final class ReplayableByteBody implements Closeable {
     @Nullable
     private final BaseSharedBuffer sharedBuffer;
     private final long limit;
+    /**
+     * The known length of a body that is read once, as it is over the limit, or {@code -1}.
+     */
+    private final long readOnceLength;
     private boolean closed;
+    private boolean readOnce;
 
     ReplayableByteBody(CloseableByteBody root, @Nullable BaseSharedBuffer sharedBuffer, long limit) {
         this.root = root;
         this.sharedBuffer = sharedBuffer;
         this.limit = limit;
+        this.readOnceLength = -1;
+    }
+
+    ReplayableByteBody(CloseableByteBody root, long readOnceLength, long limit) {
+        this.root = root;
+        this.sharedBuffer = null;
+        this.limit = limit;
+        this.readOnceLength = readOnceLength;
     }
 
     /**
      * @return Whether the body can still be read from the start: no more bytes than the limit
-     * arrived, as far as known
+     * arrived, as far as known, and the body did not fail
      */
     public synchronized boolean isReplayable() {
-        if (closed) {
+        if (closed || readOnceLength >= 0) {
             return false;
         }
         if (sharedBuffer == null) {
             return true;
         }
-        long expected = root.expectedLength().orElse(-1);
-        return (expected < 0 || expected <= limit) && !sharedBuffer.isBufferLimitExceeded();
+        return !sharedBuffer.isBufferLimitExceeded() && !sharedBuffer.isFailed();
     }
 
     /**
@@ -75,6 +89,13 @@ public final class ReplayableByteBody implements Closeable {
     public synchronized CloseableByteBody next() {
         if (closed) {
             throw new IllegalStateException("The replayable body is closed");
+        }
+        if (readOnceLength >= 0) {
+            if (readOnce) {
+                throw new BufferLengthExceededException(limit, readOnceLength);
+            }
+            readOnce = true;
+            return root.move();
         }
         if (sharedBuffer != null && sharedBuffer.isBufferLimitExceeded()) {
             throw new BufferLengthExceededException(limit, limit + 1);
