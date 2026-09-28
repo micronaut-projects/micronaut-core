@@ -89,7 +89,7 @@ Retry settings shared by several methods can be configured once as a named polic
 micronaut:
   retry:
     policies:
-      orders:
+      books:
         attempts: 5
         delay: 200ms
         multiplier: 2
@@ -101,24 +101,15 @@ micronaut:
           - java.io.FileNotFoundException
 ----
 
-[source,java]
-----
-@Singleton
-public class OrderClient {
+snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="named", indent=0, title="Applying a Named Retry Policy"]
 
-    @Retryable(name = "orders") // <1>
-    public Order find(String id) {
-        // ...
-    }
+<1> The method takes the attempts, delay, multiplier, maximum delay, jitter, includes and excludes of the `books` policy
 
-    @Retryable(name = "orders", attempts = "2") // <2>
-    public void cancel(String id) {
-        // ...
-    }
-}
-----
-<1> The method takes the attempts, delay, multiplier, maximum delay, jitter, includes and excludes of the `orders` policy
-<2> A member set explicitly on the annotation overrides the setting of the policy: here two attempts, with the other settings of the policy. Setting `includes` or `excludes` on the annotation replaces both lists of the policy
+A member set explicitly on the annotation overrides the setting of the policy. Setting `includes` or `excludes` on the annotation replaces both lists of the policy:
+
+snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="override", indent=0, title="Overriding a Named Retry Policy"]
+
+<1> One attempt, with the other settings of the `books` policy
 
 A policy member that is not configured takes the default of ann:retry.annotation.Retryable[]. A name that is not configured fails the first call of the method with an `IllegalStateException` naming the missing policy. Without a `name`, the annotation behaves as before.
 
