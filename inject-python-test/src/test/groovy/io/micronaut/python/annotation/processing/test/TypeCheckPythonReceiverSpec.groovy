@@ -361,4 +361,48 @@ class Catalog:
         diagnostics.isEmpty()
     }
 
+    void "an override of a generic Java method is typed with the type arguments the class gives its base"() {
+        when:
+        // findById returns an Optional of Product (E bound to Product), so orElse(None) is a Product,
+        // and save(E) returns a Product: a member it lacks is reported on the Python class
+        def diagnostics = check('''
+import java
+from dataclasses import dataclass
+from typing import Protocol
+from jakarta.inject import Singleton
+from micronaut.core.annotation import Introspected
+
+MinimalCrudRepository = java.type("io.micronaut.python.annotation.processing.test.repository.MinimalCrudRepository")
+
+
+@Introspected
+@dataclass
+class Product:
+    name: str
+
+
+class ProductRepository(MinimalCrudRepository[Product, int], Protocol):
+    def findById(self, id: int) -> Product | None: ...
+
+
+@Singleton
+class Catalog:
+    def __init__(self, products: ProductRepository):
+        self.products = products
+
+    def find(self, id: int) -> str:
+        return self.products.findById(id).orElse(None).nme
+
+    def rename(self, product: Product) -> str:
+        return self.products.save(product).nam
+''')
+
+        then:
+        diagnostics*.rule() == ['unknown-python-member', 'unknown-python-member']
+        diagnostics[0].message() == 'class [Product] has no member [nme]; did you mean [name]?'
+        diagnostics[0].span().line() == 27
+        diagnostics[1].message() == 'class [Product] has no member [nam]; did you mean [name]?'
+        diagnostics[1].span().line() == 30
+    }
+
 }
