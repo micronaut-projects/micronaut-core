@@ -190,17 +190,10 @@ final class LoadBalancerStrategies {
          * {@link Integer#MAX_VALUE}
          */
         static int weight(ServiceInstance instance) {
-            String value = instance.getMetadata().get("weight", String.class).orElse(null);
-            if (value == null) {
-                return 1;
-            }
-            String weight = value.strip();
-            try {
-                return (int) Math.clamp(Long.parseLong(weight), 0, Integer.MAX_VALUE);
-            } catch (NumberFormatException e) {
-                // a number too large even for a long is capped too
-                return weight.matches("\\+?\\d+") ? Integer.MAX_VALUE : 1;
-            }
+            // a long, so that a weight above the int range is capped rather than invalid
+            return instance.getMetadata().get("weight", Long.class)
+                .map(weight -> (int) Math.clamp(weight, 0, Integer.MAX_VALUE))
+                .orElse(1);
         }
     }
 
