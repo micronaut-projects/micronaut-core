@@ -234,6 +234,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         # source text is needed on a runtime whose AST counts UTF-8 bytes rather than characters (see _span).
         self.source_path = source_path or file_name or "Unknown"
         self._source_lines = re.split(r"\r\n|\r|\n", source_text) if source_text is not None else None
+        if type_checker is not None:
+            type_checker.begin_module(self.source_path, self)
         # maintain insertion order
         self.known_decorators = OrderedDict()
         self.known_decorator_functions = OrderedDict()
