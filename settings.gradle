@@ -23,6 +23,7 @@ include "core-bom"
 include "buffer-netty"
 include "core"
 include "core-reactive"
+include "dev"
 include "core-processor"
 include "context"
 include 'context-python'
