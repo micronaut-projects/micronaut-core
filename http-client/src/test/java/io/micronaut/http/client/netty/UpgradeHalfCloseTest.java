@@ -26,11 +26,14 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +42,10 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -105,9 +111,26 @@ class UpgradeHalfCloseTest {
         }
     }
 
+    @Test
+    void overTlsTheEndOfTheSentBodyClosesTheConnection() throws Exception {
+        try (HalfClosingUpstream upstream = HalfClosingUpstream.tls();
+             ApplicationContext ctx = ApplicationContext.run(Map.of("micronaut.http.client.ssl.insecure-trust-all-certificates", true));
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            UpgradedHttpResponse<?> upgraded = upgrade(client, upstream);
+            try (upgraded) {
+                CompletableFuture<?> inbound = upgraded.byteBody().buffer();
+                upgraded.send(body(Flux.just("hi")));
+                Assertions.assertEquals("hi", upstream.received.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                // TLS cannot shut down one direction: the connection is closed, although the
+                // upstream still keeps its side open
+                inbound.handle((ignored, error) -> null).get(TIMEOUT_SECONDS / 2, TimeUnit.SECONDS);
+            }
+        }
+    }
+
     private static UpgradedHttpResponse<?> upgrade(RawHttpClient client, HalfClosingUpstream upstream) {
         HttpResponse<?> response = Mono.from(client.exchange(
-                HttpRequest.GET("http://127.0.0.1:" + upstream.port() + "/half-close")
+                HttpRequest.GET(upstream.scheme() + "://127.0.0.1:" + upstream.port() + "/half-close")
                     .header("Connection", "Upgrade")
                     .header("Upgrade", "echo"),
                 null, null, RawRequestOptions.proxy()))
@@ -124,13 +147,15 @@ class UpgradeHalfCloseTest {
 
     /**
      * Switches to {@code echo}; then either reads to the end and answers, or sends
-     * {@code first}, shuts down its output and reads to the end.
+     * {@code first}, shuts down its output and reads to the end. Over TLS, it reads to the end
+     * and keeps the connection open.
      */
     static final class HalfClosingUpstream implements AutoCloseable {
         final CompletableFuture<String> received = new CompletableFuture<>();
         private final ServerSocket serverSocket;
         private final boolean shutdownFirst;
         private final long shutdownBeforeReadingMillis;
+        private final boolean tls;
 
         HalfClosingUpstream(boolean shutdownFirst) throws IOException {
             this(shutdownFirst, -1);
@@ -142,12 +167,35 @@ class UpgradeHalfCloseTest {
          *                                    to the end
          */
         HalfClosingUpstream(boolean shutdownFirst, long shutdownBeforeReadingMillis) throws IOException {
+            this(shutdownFirst, shutdownBeforeReadingMillis, new ServerSocket(0, 50, InetAddress.getLoopbackAddress()), false);
+        }
+
+        private HalfClosingUpstream(boolean shutdownFirst, long shutdownBeforeReadingMillis, ServerSocket serverSocket, boolean tls) {
             this.shutdownFirst = shutdownFirst;
             this.shutdownBeforeReadingMillis = shutdownBeforeReadingMillis;
-            serverSocket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+            this.tls = tls;
+            this.serverSocket = serverSocket;
             Thread acceptor = new Thread(this::serve, "half-closing-upstream");
             acceptor.setDaemon(true);
             acceptor.start();
+        }
+
+        static HalfClosingUpstream tls() throws Exception {
+            SelfSignedCertificate certificate = new SelfSignedCertificate();
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            keyStore.load(null, null);
+            char[] password = "secret".toCharArray();
+            keyStore.setKeyEntry("upstream", certificate.key(), password, new Certificate[]{certificate.cert()});
+            KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagers.init(keyStore, password);
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(keyManagers.getKeyManagers(), null, null);
+            ServerSocket serverSocket = sslContext.getServerSocketFactory().createServerSocket(0, 50, InetAddress.getLoopbackAddress());
+            return new HalfClosingUpstream(false, -1, serverSocket, true);
+        }
+
+        String scheme() {
+            return tls ? "https" : "http";
         }
 
         int port() {
@@ -162,7 +210,11 @@ class UpgradeHalfCloseTest {
                 readHead(in);
                 out.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                 out.flush();
-                if (shutdownBeforeReadingMillis >= 0) {
+                if (tls) {
+                    received.complete(new String(in.readAllBytes(), StandardCharsets.US_ASCII));
+                    // keep this side open
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS));
+                } else if (shutdownBeforeReadingMillis >= 0) {
                     Thread.sleep(shutdownBeforeReadingMillis);
                     socket.shutdownOutput();
                     received.complete(new String(in.readAllBytes(), StandardCharsets.US_ASCII));
