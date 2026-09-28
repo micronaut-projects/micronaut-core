@@ -2,6 +2,7 @@ import ast
 import inspect
 import keyword
 import os
+import re
 import java
 from collections import OrderedDict
 
@@ -26,6 +27,7 @@ DefaultFactoryDef = java.type("io.micronaut.python.processing.model.DefaultFacto
 ReturnDef = java.type("io.micronaut.python.processing.model.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
+SourceSpan = java.type("io.micronaut.python.processing.model.SourceSpan")
 SuperArgumentDef = java.type("io.micronaut.python.processing.model.SuperArgumentDef")
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
 _JavaTypes = java.type("io.micronaut.python.processing.util.PythonJavaTypes")
@@ -34,6 +36,18 @@ ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 
 _JAVA_INT_MIN = -2 ** 31
 _JAVA_INT_MAX = 2 ** 31 - 1
+
+# CPython reports the columns of AST nodes as UTF-8 byte offsets, GraalPy as character offsets; the
+# probe finds out which, so the spans always count characters. It runs on first use, not at import:
+# a module imported from its bytecode cache must not need the compiler.
+_ast_columns_are_bytes = None
+
+
+def ast_columns_are_bytes():
+    global _ast_columns_are_bytes
+    if _ast_columns_are_bytes is None:
+        _ast_columns_are_bytes = ast.parse('"\u00e9"; x\n').body[1].col_offset == 6
+    return _ast_columns_are_bytes
 
 
 class UnresolvedAnnotationMemberError(ValueError):
@@ -207,11 +221,16 @@ def is_abc_type_name(type_name):
 
 class MicronautAstVisitor(ast.NodeVisitor):
 
-    def __init__(self, callback, package_name="", file_name = "Script.py", visitor_context=None, source_root=""):
+    def __init__(self, callback, package_name="", file_name = "Script.py", visitor_context=None, source_root="",
+                 source_path=None, source_text=None):
         self.callback = callback
         self.package_name = package_name
         self.visitor_context = visitor_context
         self.source_root = source_root or ""
+        # Where the definitions come from: the path of the source when it has one, else its name. The
+        # source text is needed on a runtime whose AST counts UTF-8 bytes rather than characters (see _span).
+        self.source_path = source_path or file_name or "Unknown"
+        self._source_lines = re.split(r"\r\n|\r|\n", source_text) if source_text is not None else None
         # maintain insertion order
         self.known_decorators = OrderedDict()
         self.known_decorator_functions = OrderedDict()
@@ -240,6 +259,37 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.current_script_function_candidates = []
         self.current_script_decorators = []
         self.script_name = file_name
+
+    def _span(self, node):
+        """
+        The location of a node in the original source, or None for a node the transformer generated
+        (marked _mn_generated) or a node without a position. Lines are one-based; columns are one-based
+        character offsets, the end column exclusive.
+        """
+        if node is None or getattr(node, "_mn_generated", False):
+            return None
+        line = getattr(node, "lineno", None)
+        if line is None:
+            return None
+        end_line = getattr(node, "end_lineno", None) or line
+        column = self._char_column(line, getattr(node, "col_offset", 0))
+        end_offset = getattr(node, "end_col_offset", None)
+        end_column = self._char_column(end_line, end_offset) if end_offset is not None else column + 1
+        return SourceSpan(self.source_path, line, column + 1, end_line, end_column + 1)
+
+    def _char_column(self, line, column):
+        """
+        The character offset of an AST column: a byte offset on a runtime whose AST counts UTF-8 bytes,
+        already a character offset otherwise.
+        """
+        if not column or not ast_columns_are_bytes() or self._source_lines is None or line < 1 or line > len(self._source_lines):
+            return column or 0
+        return len(self._source_lines[line - 1].encode("utf-8")[:column].decode("utf-8", "replace"))
+
+    def _module_span(self):
+        last = self._source_lines[-1] if self._source_lines else ""
+        lines = len(self._source_lines) if self._source_lines else 1
+        return SourceSpan(self.source_path, 1, 1, lines, len(last) + 1)
 
     def _resolve_top_level_import(self, module_name, imported_name):
         """
@@ -439,7 +489,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 self.annotation_type_target_decorators.add(annotation_name)
                                 self.annotation_type_target_decorators.add(node.name)
 
-                        decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes, member_decorators, member_types)
+                        decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes, member_decorators, member_types).withSpan(self._span(node))
                         self.known_decorators[node.name] = decorator_def
                         self.callback.apply(decorator_def)
                         return node
@@ -471,7 +521,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                         # only an async generator changes the bridge (a Publisher); a plain generator keeps its declared type
                         is_generator = is_async and has_yield(node)
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node), is_placeholder, is_generator)
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node), is_placeholder, is_generator).withSpan(self._span(node))
                         if self.current_class is not None:
                             if node.name == "__init__":
                                 if is_async:
@@ -638,7 +688,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         self.current_script_attributes,
                         None,
                         self.current_script_decorators
-                    )
+                    ).withSpan(self._module_span())
                     self.callback.apply(script_def)
 
                     # Reset script state
@@ -714,7 +764,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     decorator_name = extract_decorator_name(d)
                     if decorator_name:
                         # Create a DecoratorDef for non-Micronaut decorators
-                        simple_decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
+                        simple_decorator = DecoratorDef(decorator_name, decorator_name, None, {}, []).withSpan(self._span(d))
                         decorators.append(simple_decorator)
 
             # Extract base classes
@@ -733,7 +783,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 self._is_frozen_dataclass_decorator(dec)
                 for dec in node.decorator_list
             )
-            self.current_class = JavaClassDef(class_name, self.package_name, bases, decorators, type_params, [], [], [], None, frozen_dataclass, False, [], class_doc)
+            self.current_class = JavaClassDef(class_name, self.package_name, bases, decorators, type_params, [], [], [], None, frozen_dataclass, False, [], class_doc).withSpan(self._span(node))
             self.current_class_attributes = []
             self.current_class_properties = {}
             self.last_attribute = None
@@ -854,7 +904,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 type_name = self._literal_type(node.value)
 
                 self._track_current_class_constant(attr_name, node.value)
-                attr_def = JavaAttributeDef(attr_name, None, type_name, value, True, [], None, is_static, None)
+                attr_def = JavaAttributeDef(attr_name, None, type_name, value, True, [], None, is_static, None).withSpan(self._span(node))
                 self.current_class_attributes.append(attr_def)
 
     def _handle_ann_assign(self, node):
@@ -904,7 +954,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if node.value:
                     self._track_current_class_constant(attr_name, node.value)
                 default_factory_name = self._dataclass_default_factory_name(node.value)
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None, default_factory_name)
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None, default_factory_name).withSpan(self._span(node))
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
 
@@ -1068,7 +1118,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # source model so generated stubs expose host-readable bean properties.
             # Do not copy injection decorators like @Parameter to the attribute; the
             # constructor parameter remains the injection point.
-            attr_def = JavaAttributeDef(attr_name, parameter.annotation(), parameter.typeAnnotation(), None, False, [], parameter.documentation(), False, None)
+            attr_def = JavaAttributeDef(attr_name, parameter.annotation(), parameter.typeAnnotation(), None, False, [], parameter.documentation(), False, None).withSpan(self._span(stmt))
             self.current_class_attributes.append(attr_def)
             existing_attributes.add(attr_name)
 
@@ -1204,7 +1254,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 is_static = False  # Script attributes should be injectable
                 type_name = None  # No type annotation for simple assignments
 
-                attr_def = JavaAttributeDef(attr_name, None, type_name, value, True, [], None, is_static, None)
+                attr_def = JavaAttributeDef(attr_name, None, type_name, value, True, [], None, is_static, None).withSpan(self._span(node))
                 self.current_script_attributes.append(attr_def)
 
     def _handle_script_ann_assign(self, node):
@@ -1250,7 +1300,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # Script attributes are typically static
                 is_static = False
 
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None)
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None).withSpan(self._span(node))
                 self.current_script_attributes.append(attr_def)
 
     def _is_script_function(self, node):
@@ -1303,7 +1353,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             )
         if decorator is None:
             return
-        self.current_script_decorators.append(decorator)
+        self.current_script_decorators.append(decorator.withSpan(self._span(node)))
 
 
     def _is_enum_class(self, node):
@@ -1710,8 +1760,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         Creates or updates PropertyDef instances in self.current_class_properties.
         """
         if property_name not in self.current_class_properties:
-            # Create new property
-            self.current_class_properties[property_name] = PropertyDef(property_name)
+            # Create new property, located at its first accessor
+            self.current_class_properties[property_name] = PropertyDef(property_name).withSpan(self._span(func_node))
 
         property_def = self.current_class_properties[property_name]
 
@@ -1730,7 +1780,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         is_abstract = is_abstract_method(func_node)
         is_static = is_static_method(func_node)
 
-        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, False, has_return_value(func_node), is_placeholder_method(func_node), None)
+        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, False, has_return_value(func_node), is_placeholder_method(func_node), None).withSpan(self._span(func_node))
 
         # Update the property based on type
         if property_type == "getter":
@@ -2177,7 +2227,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Get parameter documentation
             param_doc = param_docs.get(arg_name, None)
 
-            arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc))
+            arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc).withSpan(self._span(arg)))
 
         vararg = func_node.args.vararg
         if vararg is not None:
@@ -2194,7 +2244,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     type_annotation = self._parse_type(vararg.annotation)
             param_doc = param_docs.get(vararg.arg, None)
             arguments.append(
-                ArgumentDef.of(vararg.arg, annotation, type_annotation, None, False, decorators, param_doc).withVariadic(True)
+                ArgumentDef.of(vararg.arg, annotation, type_annotation, None, False, decorators, param_doc).withVariadic(True).withSpan(self._span(vararg))
             )
 
         return ArgumentsDef.of(arguments)
@@ -2247,6 +2297,18 @@ def is_nested_annotation_member_import(visitor, annotation_name):
         return False
 
 def decorator_to_function(visitor, node):
+    """
+    The DecoratorDef a decorator expression resolves to, located at that expression, or None when the
+    expression is not a decorator the processor knows.
+    """
+    decorator = _resolve_decorator(visitor, node)
+    if decorator is None or visitor is None or not hasattr(visitor, "_span"):
+        return decorator
+    span = visitor._span(node)
+    return decorator.withSpan(span) if span is not None else decorator
+
+
+def _resolve_decorator(visitor, node):
     DecoratorDef = java.type("io.micronaut.python.processing.model.DecoratorDef")
 
     match node:
