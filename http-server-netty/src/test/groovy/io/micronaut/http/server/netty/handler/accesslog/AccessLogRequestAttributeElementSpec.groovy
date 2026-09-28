@@ -5,12 +5,19 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.event.BeanCreatedEvent
+import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.RequestFilter
+import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
+import io.micronaut.http.server.netty.NettyServerCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.websocket.annotation.OnMessage
+import io.micronaut.websocket.annotation.ServerWebSocket
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
 import io.netty.channel.Channel
@@ -106,6 +113,148 @@ class AccessLogRequestAttributeElementSpec extends Specification {
         listAppender.list*.formattedMessage == [
                 '"GET /route-attribute/quoted HTTP/1.1" 200 a\\"b -',
                 '"GET /route-attribute/none HTTP/1.1" 200 - -',
+        ]
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        channel?.close()
+        group.shutdownGracefully()
+        ctx.close()
+    }
+
+    def 'control characters in values are escaped'() {
+        given:
+        def ctx = start('%U %{routeId}r', [:])
+        def listAppender = appender()
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
+        def channel = http1Client(group, ctx.getBean(EmbeddedServer), responses)
+
+        when:
+        channel.writeAndFlush(request('/route-attribute/control'))
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 1
+        }
+        listAppender.list[0].formattedMessage == '/route-attribute/control a\\u001bb\\u000cc\\u0085d\\u2028e\\nf'
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        channel?.close()
+        group.shutdownGracefully()
+        ctx.close()
+    }
+
+    def 'optional values are unwrapped and a failing toString logs a dash'() {
+        given:
+        def ctx = start('%U %s %{routeId}r', [:])
+        def listAppender = appender()
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
+        def channel = http1Client(group, ctx.getBean(EmbeddedServer), responses)
+
+        when:
+        channel.write(request('/route-attribute/optional'))
+        channel.write(request('/route-attribute/empty-optional'))
+        channel.writeAndFlush(request('/route-attribute/throwing'))
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 3
+            listAppender.list.size() == 3
+        }
+        responses*.status()*.code() == [200, 200, 200]
+        listAppender.list*.formattedMessage == [
+                '/route-attribute/optional 200 opt',
+                '/route-attribute/empty-optional 200 -',
+                '/route-attribute/throwing 200 -',
+        ]
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        channel?.close()
+        group.shutdownGracefully()
+        ctx.close()
+    }
+
+    def 'an empty argument still logs the request line'() {
+        given:
+        def ctx = start('%{}r|%{routeId}r', [:])
+        def listAppender = appender()
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
+        def channel = http1Client(group, ctx.getBean(EmbeddedServer), responses)
+
+        when:
+        channel.writeAndFlush(request('/route-attribute/set/one'))
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 1
+        }
+        listAppender.list[0].formattedMessage == 'GET /route-attribute/set/one HTTP/1.1|one'
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        channel?.close()
+        group.shutdownGracefully()
+        ctx.close()
+    }
+
+    def 'the websocket handshake response logs the request attribute'() {
+        given:
+        def ctx = start('%s %U %{routeId}r', [:])
+        def listAppender = appender()
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
+        def channel = http1Client(group, ctx.getBean(EmbeddedServer), responses)
+        def upgrade = request('/route-attribute/ws')
+        upgrade.headers()
+                .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE)
+                .set(HttpHeaderNames.UPGRADE, HttpHeaderValues.WEBSOCKET)
+                .set(HttpHeaderNames.SEC_WEBSOCKET_KEY, 'dGhlIHNhbXBsZSBub25jZQ==')
+                .set(HttpHeaderNames.SEC_WEBSOCKET_VERSION, '13')
+
+        when:
+        channel.writeAndFlush(upgrade)
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 1
+        }
+        listAppender.list[0].formattedMessage == '101 /route-attribute/ws ws'
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        channel?.close()
+        group.shutdownGracefully()
+        ctx.close()
+    }
+
+    def 'an access log handler added by a customizer logs request attributes'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name'                    : 'AccessLogRequestAttributeElementSpec',
+                'route-attribute.custom-logger': true,
+        ])
+        ctx.getBean(EmbeddedServer).start()
+        def listAppender = appender()
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
+        def channel = http1Client(group, ctx.getBean(EmbeddedServer), responses)
+
+        when:
+        channel.write(request('/route-attribute/set/one'))
+        channel.writeAndFlush(request('/route-attribute/none'))
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 2
+        }
+        listAppender.list*.formattedMessage == [
+                '/route-attribute/set/one one',
+                '/route-attribute/none -',
         ]
 
         cleanup:
@@ -276,9 +425,96 @@ class AccessLogRequestAttributeElementSpec extends Specification {
             return HttpResponse.ok('quoted')
         }
 
+        @Get('/control')
+        HttpResponse<?> control(HttpRequest<?> request) {
+            request.setAttribute('routeId', 'a\u001bb\fc\u0085d\u2028e\nf')
+            return HttpResponse.ok('control')
+        }
+
+        @Get('/optional')
+        HttpResponse<?> optional(HttpRequest<?> request) {
+            request.setAttribute('routeId', Optional.of('opt'))
+            return HttpResponse.ok('optional')
+        }
+
+        @Get('/empty-optional')
+        HttpResponse<?> emptyOptional(HttpRequest<?> request) {
+            request.setAttribute('routeId', Optional.empty())
+            return HttpResponse.ok('empty-optional')
+        }
+
+        @Get('/throwing')
+        HttpResponse<?> throwing(HttpRequest<?> request) {
+            request.setAttribute('routeId', new ThrowingToString())
+            return HttpResponse.ok('throwing')
+        }
+
         @Get('/none')
         HttpResponse<?> none() {
             return HttpResponse.ok('none')
+        }
+    }
+
+    static class ThrowingToString {
+        @Override
+        String toString() {
+            throw new IllegalStateException('toString')
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'AccessLogRequestAttributeElementSpec')
+    @ServerWebSocket('/route-attribute/ws')
+    static class RouteAttributeWebSocket {
+        @OnMessage
+        String onMessage(String message) {
+            return message
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'AccessLogRequestAttributeElementSpec')
+    @ServerFilter('/route-attribute/ws')
+    static class RouteAttributeWebSocketFilter {
+        @RequestFilter
+        void filter(HttpRequest<?> request) {
+            request.setAttribute('routeId', 'ws')
+        }
+    }
+
+    /**
+     * Adds an access log handler under a name of its own, with the configured access logger
+     * disabled.
+     */
+    @Singleton
+    @Requires(property = 'route-attribute.custom-logger', value = 'true')
+    static class AccessLogCustomizer implements BeanCreatedEventListener<NettyServerCustomizer.Registry>, NettyServerCustomizer {
+        @Override
+        NettyServerCustomizer.Registry onCreated(BeanCreatedEvent<NettyServerCustomizer.Registry> event) {
+            event.bean.register(this)
+            return event.bean
+        }
+
+        @Override
+        NettyServerCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            return new Adding(channel)
+        }
+
+        static class Adding implements NettyServerCustomizer {
+            final Channel channel
+
+            Adding(Channel channel) {
+                this.channel = channel
+            }
+
+            @Override
+            NettyServerCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+                return new Adding(channel)
+            }
+
+            @Override
+            void onStreamPipelineBuilt() {
+                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, 'custom-access-log',
+                        new HttpAccessLogHandler(LOGGER, '%U %{routeId}r'))
+            }
         }
     }
 }

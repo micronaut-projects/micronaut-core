@@ -76,6 +76,12 @@ class AccessLogFormatParserSpec extends Specification {
 
         then:
         parser.toString() == "%h \"%r\" %s %{routeId}r"
+
+        when: 'an empty argument keeps logging the request line'
+        parser = new AccessLogFormatParser("%{}r")
+
+        then:
+        parser.toString() == "%r"
     }
 
     def "test access log format parser for invalid formats"() {

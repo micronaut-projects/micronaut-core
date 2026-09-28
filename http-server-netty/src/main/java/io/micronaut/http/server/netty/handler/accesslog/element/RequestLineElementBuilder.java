@@ -29,7 +29,7 @@ public final class RequestLineElementBuilder implements LogElementBuilder {
     @Nullable
     public LogElement build(String token, @Nullable String param) {
         if (RequestLineElement.REQUEST_LINE.equals(token)) {
-            return param == null ? RequestLineElement.INSTANCE : new RequestAttributeElement(param);
+            return param == null || param.isEmpty() ? RequestLineElement.INSTANCE : new RequestAttributeElement(param);
         }
         return null;
     }

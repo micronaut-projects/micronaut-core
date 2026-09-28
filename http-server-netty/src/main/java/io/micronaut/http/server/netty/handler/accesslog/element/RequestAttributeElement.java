@@ -19,6 +19,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Optional;
 
 /**
  * RequestAttributeElement LogElement. The value of a Micronaut request attribute, read when the
@@ -43,9 +46,57 @@ final class RequestAttributeElement extends AbstractHttpMessageLogElement {
     @Override
     public String onResponseHeaders(ChannelHandlerContext ctx, HttpHeaders headers, String status) {
         if (ctx.channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST).get() instanceof HttpRequest<?> request) {
-            return wrapValue(request.getAttribute(attribute).map(Object::toString).orElse(null));
+            Object value = request.getAttribute(attribute).orElse(null);
+            if (value instanceof Optional<?> optional) {
+                value = optional.orElse(null);
+            }
+            if (value != null) {
+                try {
+                    return escape(value.toString());
+                } catch (RuntimeException e) {
+                    // a failing toString must not fail the response write
+                    return ConstantElement.UNKNOWN_VALUE;
+                }
+            }
         }
         return ConstantElement.UNKNOWN_VALUE;
+    }
+
+    /**
+     * Escape a value for the log line. Unlike header values, which Netty validates, attribute
+     * values are arbitrary, so control characters and line separators are escaped as well to
+     * prevent log injection.
+     *
+     * @param value The value
+     * @return The escaped value, or {@code -} if it is empty
+     */
+    static String escape(@Nullable String value) {
+        if (value == null || value.isEmpty()) {
+            return ConstantElement.UNKNOWN_VALUE;
+        }
+        StringBuilder buffer = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            String escaped = switch (c) {
+                case '\b' -> "\\b";
+                case '\n' -> "\\n";
+                case '\r' -> "\\r";
+                case '\t' -> "\\t";
+                case '\\' -> "\\\\";
+                case '"' -> "\\\"";
+                default -> c < 0x20 || (c >= 0x7F && c <= 0x9F) || c == '\u2028' || c == '\u2029'
+                    ? String.format("\\u%04x", (int) c) : null;
+            };
+            if (escaped != null) {
+                if (buffer == null) {
+                    buffer = new StringBuilder(value.length() + 8).append(value, 0, i);
+                }
+                buffer.append(escaped);
+            } else if (buffer != null) {
+                buffer.append(c);
+            }
+        }
+        return buffer == null ? value : buffer.toString();
     }
 
     @Override

@@ -43,6 +43,7 @@ import io.micronaut.http.server.netty.RoutingInBoundHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
@@ -70,6 +71,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AsciiString;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -356,15 +358,23 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             }
         }
         Channel channel = ctx.channel();
-        if (handshaker == null) {
-            return WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(channel);
-        } else {
-            return handshaker.handshake(
-                    channel,
-                    req.toFullHttpRequest(),
-                    nettyHeaders,
-                    channel.newPromise()
-            );
+        // the handshake writes the response to the channel directly, bypassing the
+        // PipeliningServerHandler: expose the request to the access log for this write
+        Attribute<Object> responseRequest = channel.attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+        responseRequest.set(req);
+        try {
+            if (handshaker == null) {
+                return WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(channel);
+            } else {
+                return handshaker.handshake(
+                        channel,
+                        req.toFullHttpRequest(),
+                        nettyHeaders,
+                        channel.newPromise()
+                );
+            }
+        } finally {
+            responseRequest.set(null);
         }
     }
 

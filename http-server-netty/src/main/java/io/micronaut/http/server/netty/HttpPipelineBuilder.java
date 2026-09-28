@@ -822,7 +822,6 @@ final class HttpPipelineBuilder {
             pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
             pipeliningServerHandler.setBodySizeLimits(bodySizeLimits());
             pipeliningServerHandler.setRequestDecompressionEnabled(server.getServerConfiguration().isRequestDecompressionEnabled());
-            pipeliningServerHandler.setExposeResponseRequest(accessLogHandler != null);
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, pipeliningServerHandler);
             return pipeliningServerHandler;
         }
