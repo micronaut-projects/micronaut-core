@@ -122,6 +122,7 @@ class LoadBalancerStrategyTest {
                 return instances;
             }
         });
+        balancer.setStrategy(LoadBalancerStrategy.of(LoadBalancerStrategy.ROUND_ROBIN));
         for (int i = 0; i < 6; i++) {
             Assertions.assertNotEquals("backup", Mono.from(balancer.select()).block().getURI().getHost());
         }
