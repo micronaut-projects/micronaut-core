@@ -107,7 +107,7 @@ snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="named", indent=
 
 As with the annotation, `attempts` is the maximum number of retries after the first call: `attempts: 5` calls the method at most six times. The `includes` and `excludes` are fully qualified class names of exception types.
 
-A member set explicitly on the annotation overrides the setting of the policy. Setting `includes` or `excludes` on the annotation replaces both lists of the policy:
+A member set explicitly on the annotation overrides that setting of the policy alone, e.g. `includes` on the annotation replaces the includes of the policy and keeps its excludes:
 
 snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="override", indent=0, title="Overriding a Named Retry Policy"]
 
