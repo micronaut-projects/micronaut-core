@@ -19,6 +19,7 @@ dependencies {
 
     compileOnly(libs.managed.jackson.annotations)
     compileOnly(libs.managed.jspecify)
+    compileOnly(libs.managed.graalvm.nativeimage)
 
     testCompileOnly(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)
@@ -52,6 +53,8 @@ spotless {
 
 noReflection {
     allowIn("io.micronaut.http.DefaultHttpFactories", "SERVICE_LOADING")
+    // whether a request wrapper class overrides getBody(), looked up once per class
+    allowIn("io.micronaut.http.HttpRequestWrapper", "CLASS_MEMBERS")
     allowIn("io.micronaut.http.MediaType", "ANNOTATIONS")
     allowIn("io.micronaut.http.body.stream.UpstreamBalancer", "FIELD_UPDATERS")
     allowIn("io.micronaut.http.cookie.ClientCookieEncoder", "SERVICE_LOADING")
