@@ -35,7 +35,7 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
      * class of its own, and the counter keeps the names unique when several contexts in the same JVM
      * (and hence the same class loader) proxy the same bean type.
      */
-    private static final AtomicInteger PROXY_COUNTER = new AtomicInteger();
+    private static final AtomicInteger PROXY_COUNT = new AtomicInteger();
 
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
@@ -48,7 +48,7 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
         } else {
             builder = byteBuddy.subclass(targetType);
         }
-        builder = builder.name(targetType.getName() + "$ByteBuddyProxy$" + PROXY_COUNTER.incrementAndGet());
+        builder = builder.name(targetType.getName() + "$ByteBuddyProxy" + PROXY_COUNT.incrementAndGet());
 
         T proxyTarget = null;
         if (proxyDefinition.proxyTarget()) {
