@@ -247,6 +247,18 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("ReadBody")
+    @SuppressWarnings("unchecked")
+    GatewayPredicateFactory readBody(BeanLocator beanLocator) {
+        return GatewayPredicateFactory.of(List.of("predicate", "max-size"), (route, args) -> {
+            String name = args.get("predicate");
+            java.util.function.Predicate<byte[]> predicate = beanLocator.findBean(java.util.function.Predicate.class, Qualifiers.byName(name))
+                .orElseThrow(() -> new ConfigurationException("No Predicate bean named " + name + " for ReadBody"));
+            route.filters(GatewayFilters.readBody(args.bind(BodyFilterArguments.class).maxSize(), predicate));
+        });
+    }
+
+    @Singleton
     @Named("After")
     GatewayPredicateFactory after() {
         return GatewayPredicateFactory.of(List.of(DATETIME), (route, args) -> route.where(RequestCondition.after(instant(args.get(DATETIME)))));
@@ -453,6 +465,44 @@ final class BuiltInGatewayFactories {
     @Named("CacheRequestBody")
     GatewayFilterFactory cacheRequestBody() {
         return GatewayFilterFactory.of(List.of(MAX_SIZE), args -> GatewayFilters.cacheRequestBody(args.bind(RequestSizeArguments.class).maxSize()));
+    }
+
+    @Singleton
+    @Named("ModifyRequestBody")
+    GatewayFilterFactory modifyRequestBody(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of("rewriter", "max-size"), args ->
+            GatewayFilters.modifyRequestBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get("rewriter"))));
+    }
+
+    @Singleton
+    @Named("ModifyResponseBody")
+    GatewayFilterFactory modifyResponseBody(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of("rewriter", "max-size"), args ->
+            GatewayFilters.modifyResponseBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get("rewriter"))));
+    }
+
+    @Singleton
+    @Named("RemoveJsonAttributesResponseBody")
+    GatewayFilterFactory removeJsonAttributesResponseBody(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of("*names"), args -> {
+            List<String> names = new ArrayList<>(args.getList("names"));
+            boolean recursive = false;
+            if (!names.isEmpty()) {
+                String last = names.get(names.size() - 1);
+                if (last.equalsIgnoreCase("true") || last.equalsIgnoreCase("false")) {
+                    recursive = Boolean.parseBoolean(last);
+                    names.remove(names.size() - 1);
+                }
+            }
+            io.micronaut.json.JsonMapper mapper = beanLocator.findBean(io.micronaut.json.JsonMapper.class)
+                .orElseThrow(() -> new ConfigurationException("RemoveJsonAttributesResponseBody needs a JsonMapper, e.g. micronaut-jackson-databind or micronaut-serde"));
+            return GatewayFilters.removeJsonAttributesResponseBody(mapper, BodyFilterArguments.DEFAULT_MAX_SIZE, recursive, names.toArray(String[]::new));
+        });
+    }
+
+    private static io.micronaut.http.gateway.BodyRewriter rewriter(BeanLocator beanLocator, String name) {
+        return beanLocator.findBean(io.micronaut.http.gateway.BodyRewriter.class, Qualifiers.byName(name))
+            .orElseThrow(() -> new ConfigurationException("No BodyRewriter bean named " + name));
     }
 
     @Singleton
@@ -676,6 +726,19 @@ final class BuiltInGatewayFactories {
                                 @Bindable(defaultValue = "403") String emptyKeyStatus,
                                 @Bindable(defaultValue = "true") boolean includeHeaders,
                                 @Nullable String rateLimiter) {
+    }
+
+    /**
+     * The limit of the body filters and of {@code ReadBody}.
+     *
+     * @param predicate The name of the predicate bean of {@code ReadBody}
+     * @param rewriter  The name of the rewriter bean of a body filter
+     * @param maxSize   The limit of the body, e.g. {@code 1MB}; 256 KiB by default
+     */
+    @Introspected
+    record BodyFilterArguments(@Nullable String predicate, @Nullable String rewriter,
+                               @ReadableBytes @Bindable(defaultValue = "262144") long maxSize) {
+        static final long DEFAULT_MAX_SIZE = 262_144;
     }
 
     /**

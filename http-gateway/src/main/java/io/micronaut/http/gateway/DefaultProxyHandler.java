@@ -35,6 +35,8 @@ import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReplayableByteBody;
+import io.micronaut.http.MutableByteBodyHttpResponse;
+import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -174,6 +176,12 @@ final class DefaultProxyHandler implements ProxyHandler {
             return CompletableFuture.failedFuture(new UpstreamException(HttpStatus.BAD_GATEWAY, route.getId(),
                 "The filters of the route made an upstream path that is not relayed: " + rejected, null));
         }
+        List<GatewayFilters.ModifyRequestBody> requestRewrites = GatewayFilters.requestRewrites(route.getFilters());
+        if (!requestRewrites.isEmpty()) {
+            // the whole body is read, rewritten and sent again: the request no longer streams
+            return rewriteRequestBody(request, exchange, upstream, requestRewrites)
+                .thenCompose(rewritten -> new Relay(request, pathVariables, exchange, upstream, RequestBody.prepared(request, rewritten)).start());
+        }
         RequestBody body;
         try {
             long sizeLimit = GatewayFilters.maxRequestSize(route.getFilters());
@@ -193,6 +201,32 @@ final class DefaultProxyHandler implements ProxyHandler {
             server.whenAbandoned(() -> result.cancel(false));
         }
         return result;
+    }
+
+    private static ByteBodyFactory bodyFactory(HttpRequest<?> request) {
+        return request instanceof ServerHttpRequest<?> server ? server.byteBodyFactory() : ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+    }
+
+    private CompletionStage<CloseableByteBody> rewriteRequestBody(HttpRequest<?> request, ProxyExchange exchange, MutableHttpRequest<Object> upstream,
+                                                                   List<GatewayFilters.ModifyRequestBody> rewrites) {
+        CloseableByteBody claimed;
+        try {
+            claimed = RawHttpClientSupport.claimServerRequestBody(request);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        ByteBodyFactory factory = bodyFactory(request);
+        if (claimed == null) {
+            claimed = factory.createEmpty();
+        }
+        long max = Long.MAX_VALUE;
+        List<BodyRewriter> rewriters = new ArrayList<>(rewrites.size());
+        for (GatewayFilters.ModifyRequestBody rewrite : rewrites) {
+            max = Math.min(max, rewrite.maxBytes());
+            rewriters.add(rewrite.rewriter());
+        }
+        return BodyCodings.rewrite(factory, claimed, max, upstream.getHeaders(), exchange, rewriters, HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+            .thenApply(body -> body);
     }
 
     /**
@@ -575,6 +609,19 @@ final class DefaultProxyHandler implements ProxyHandler {
          * @param sizeLimit The maximum number of bytes of the body, {@code -1} for no limit
          * @return The body of the request
          */
+        /**
+         * @param request The request
+         * @param body    The body to send instead of the one of the request, all there
+         * @return The body of the request, which can be sent again
+         */
+        static RequestBody prepared(HttpRequest<?> request, CloseableByteBody body) {
+            RequestBody prepared = new RequestBody(request, -1, -1);
+            prepared.claimed = true;
+            prepared.body = body;
+            prepared.replayable = true;
+            return prepared;
+        }
+
         static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry, @Nullable GatewayCircuitBreaker circuitBreaker, long sizeLimit) {
             long replayLimit = retry != null && retry.retriesMethod(request.getMethodName()) ? retry.maxReplayBytes() : -1;
             if (circuitBreaker != null && circuitBreaker.fallback() != null) {
@@ -801,6 +848,10 @@ final class DefaultProxyHandler implements ProxyHandler {
                 if (result.isCancelled()) {
                     relayed.toCompletableFuture().cancel(false);
                 }
+            }
+            List<GatewayFilters.ModifyResponseBody> responseRewrites = GatewayFilters.responseRewrites(route.getFilters());
+            if (!responseRewrites.isEmpty()) {
+                relayed = relayed.thenCompose(response -> rewriteResponseBody(response, responseRewrites));
             }
             relayed.whenComplete((response, failure) -> {
                 context.attempts(attempts.get());
@@ -1102,6 +1153,35 @@ final class DefaultProxyHandler implements ProxyHandler {
                 return false;
             }
             return retry.retriesMethod(request.getMethodName()) && retry.retriesException(failure);
+        }
+
+        /**
+         * Rewrite the body of a relayed response, see {@link GatewayFilters#modifyResponseBody}.
+         */
+        private CompletionStage<HttpResponse<?>> rewriteResponseBody(HttpResponse<?> response, List<GatewayFilters.ModifyResponseBody> rewrites) {
+            int status = response.code();
+            if (!(response instanceof MutableByteBodyHttpResponse<?> mutable) || UpgradedHttpResponse.unwrap(response) != null
+                || request.getMethodName().equals("HEAD") || status < 200 || status == 204 || status == 304) {
+                return CompletableFuture.completedFuture(response);
+            }
+            long max = Long.MAX_VALUE;
+            List<BodyRewriter> rewriters = new ArrayList<>(rewrites.size());
+            for (GatewayFilters.ModifyResponseBody rewrite : rewrites) {
+                max = Math.min(max, rewrite.maxBytes());
+                rewriters.add(rewrite.rewriter());
+            }
+            CloseableByteBody bytes = mutable.byteBody().move();
+            return BodyCodings.rewrite(bodyFactory(request), bytes, max, mutable.getHeaders(), exchange, rewriters, HttpStatus.BAD_GATEWAY)
+                .handle((rewritten, failure) -> {
+                    if (failure != null) {
+                        mutable.close();
+                        Throwable cause = unwrap(failure);
+                        throw cause instanceof RuntimeException re ? re : new CompletionException(cause);
+                    }
+                    MutableByteBodyHttpResponse<?> replaced = MutableByteBodyHttpResponse.of(mutable, rewritten);
+                    replaced.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, true);
+                    return replaced;
+                });
         }
 
         private HttpResponse<?> relay(HttpResponse<?> response) {

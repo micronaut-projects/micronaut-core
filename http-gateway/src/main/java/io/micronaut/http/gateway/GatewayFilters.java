@@ -407,6 +407,159 @@ public final class GatewayFilters {
     }
 
     /**
+     * Rewrite the body of the request before it is relayed, like Spring Cloud Gateway's
+     * {@code ModifyRequestBody}: the whole body, up to the limit, is read and decoded, rewritten,
+     * encoded again and sent with its new {@code Content-Length}. The route no longer streams the
+     * body of the request. A body over the limit is answered with {@code 413}. A proxy transform.
+     *
+     * @param maxBytes The limit of the body, encoded and decoded
+     * @param rewriter The rewrite
+     * @return The filter
+     */
+    public static GatewayFilter modifyRequestBody(long maxBytes, BodyRewriter rewriter) {
+        return new ModifyRequestBody(checkMax(maxBytes, "ModifyRequestBody"), Objects.requireNonNull(rewriter, "rewriter"));
+    }
+
+    /**
+     * Rewrite the body of the response of the upstream, like Spring Cloud Gateway's
+     * {@code ModifyResponseBody}: the whole body, up to the limit, is read and decoded when the
+     * upstream encoded it with {@code gzip} or {@code deflate}, rewritten, encoded again and sent
+     * with its new {@code Content-Length}; its trailers are dropped. The route no longer streams
+     * the body of the response. A body over the limit fails the request with {@code 502}. The
+     * response of a {@code HEAD} request, a {@code 1xx}, {@code 204} or {@code 304}, and a protocol
+     * switch are not rewritten. A proxy transform.
+     *
+     * @param maxBytes The limit of the body, encoded and decoded
+     * @param rewriter The rewrite
+     * @return The filter
+     */
+    public static GatewayFilter modifyResponseBody(long maxBytes, BodyRewriter rewriter) {
+        return new ModifyResponseBody(checkMax(maxBytes, "ModifyResponseBody"), Objects.requireNonNull(rewriter, "rewriter"));
+    }
+
+    /**
+     * Remove attributes from the JSON body of the response, like Spring Cloud Gateway's
+     * {@code RemoveJsonAttributesResponseBody}: from the top-level object, or from every object of
+     * the body when recursive. A body that is not JSON fails the request with {@code 502}. See
+     * {@link #modifyResponseBody(long, BodyRewriter)}.
+     *
+     * @param mapper    The JSON mapper
+     * @param maxBytes  The limit of the body
+     * @param recursive Whether the attributes are removed from the nested objects too
+     * @param names     The names of the attributes
+     * @return The filter
+     */
+    public static GatewayFilter removeJsonAttributesResponseBody(io.micronaut.json.JsonMapper mapper, long maxBytes, boolean recursive, String... names) {
+        Objects.requireNonNull(mapper, "mapper");
+        Set<String> removed = Set.of(names);
+        if (removed.isEmpty()) {
+            throw new IllegalArgumentException("RemoveJsonAttributesResponseBody needs at least one attribute");
+        }
+        BodyRewriter rewriter = (exchange, headers, body) -> {
+            if (body.length == 0) {
+                return java.util.concurrent.CompletableFuture.completedFuture(body);
+            }
+            io.micronaut.json.tree.JsonNode tree;
+            try {
+                tree = mapper.readValue(body, io.micronaut.json.tree.JsonNode.class);
+            } catch (java.io.IOException | RuntimeException e) {
+                throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "The body of the upstream is not JSON: " + e.getMessage());
+            }
+            if (tree == null) {
+                return java.util.concurrent.CompletableFuture.completedFuture(body);
+            }
+            return java.util.concurrent.CompletableFuture.completedFuture(mapper.writeValueAsBytes(removeAttributes(tree, removed, recursive, true)));
+        };
+        return new ModifyResponseBody(checkMax(maxBytes, "RemoveJsonAttributesResponseBody"), rewriter) {
+            @Override
+            public String toString() {
+                return "RemoveJsonAttributesResponseBody=" + String.join(", ", names) + (recursive ? ", true" : "");
+            }
+        };
+    }
+
+    /**
+     * @param node      A node
+     * @param names     The attributes to remove
+     * @param recursive Whether they are removed from the nested objects too
+     * @param here      Whether they are removed from this node, if it is an object, or from the
+     *                  objects of this node, if it is an array
+     * @return The node without the attributes
+     */
+    private static io.micronaut.json.tree.JsonNode removeAttributes(io.micronaut.json.tree.JsonNode node, Set<String> names, boolean recursive, boolean here) {
+        if (node.isObject()) {
+            Map<String, io.micronaut.json.tree.JsonNode> kept = new LinkedHashMap<>();
+            for (Map.Entry<String, io.micronaut.json.tree.JsonNode> entry : node.entries()) {
+                if (here && names.contains(entry.getKey())) {
+                    continue;
+                }
+                kept.put(entry.getKey(), recursive ? removeAttributes(entry.getValue(), names, true, true) : entry.getValue());
+            }
+            return io.micronaut.json.tree.JsonNode.createObjectNode(kept);
+        }
+        if (node.isArray() && (recursive || here)) {
+            List<io.micronaut.json.tree.JsonNode> items = new ArrayList<>(node.size());
+            for (io.micronaut.json.tree.JsonNode item : node.values()) {
+                items.add(removeAttributes(item, names, recursive, here));
+            }
+            return io.micronaut.json.tree.JsonNode.createArrayNode(items);
+        }
+        return node;
+    }
+
+    /**
+     * Match the requests of the route by their body, like Spring Cloud Gateway's
+     * {@code ReadBody} predicate: a copy of the body, up to the limit, is read and tested, and the
+     * body is still relayed; the bytes are in the attribute
+     * {@link GatewayAttributes#CACHED_REQUEST_BODY}. Unlike a predicate of the route, a request
+     * whose body does not match is answered with {@code 404}: the router chose the route before
+     * the body arrived, so no other route is tried. A body over the limit is answered with
+     * {@code 413}. A route filter.
+     *
+     * @param maxBytes  The limit of the body
+     * @param predicate The test of the body
+     * @return The filter
+     */
+    public static GatewayFilter readBody(long maxBytes, java.util.function.Predicate<byte[]> predicate) {
+        return new ReadBody(checkMax(maxBytes, "ReadBody"), Objects.requireNonNull(predicate, "predicate"));
+    }
+
+    private static long checkMax(long maxBytes, String filter) {
+        if (maxBytes < 0) {
+            throw new IllegalArgumentException(filter + " needs a size of at least 0: " + maxBytes);
+        }
+        return maxBytes;
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The rewrites of the body of the request, in order
+     */
+    static List<ModifyRequestBody> requestRewrites(List<GatewayFilter> filters) {
+        List<ModifyRequestBody> rewrites = new ArrayList<>(0);
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof ModifyRequestBody rewrite) {
+                rewrites.add(rewrite);
+            }
+        }
+        return rewrites;
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The rewrites of the body of the response, in order
+     */
+    static List<ModifyResponseBody> responseRewrites(List<GatewayFilter> filters) {
+        List<ModifyResponseBody> rewrites = new ArrayList<>(0);
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof ModifyResponseBody rewrite) {
+                rewrites.add(rewrite);
+            }
+        }
+        return rewrites;
+    }
+
+    /**
      * @param filters The filters of a route
      * @return The smallest {@link #requestSize(long) body limit} among them, or {@code -1} for none
      */
@@ -1028,6 +1181,77 @@ public final class GatewayFilters {
          * @param key     The key
          */
         private record PermitKey(String routeId, String key) {
+        }
+    }
+
+    /**
+     * The rewrite of the body of the request, see {@link #modifyRequestBody(long, BodyRewriter)}.
+     *
+     * @param maxBytes The limit of the body
+     * @param rewriter The rewrite
+     */
+    record ModifyRequestBody(long maxBytes, BodyRewriter rewriter) implements GatewayFilter {
+        @Override
+        public String toString() {
+            return "ModifyRequestBody=" + maxBytes;
+        }
+    }
+
+    /**
+     * The rewrite of the body of the response, see {@link #modifyResponseBody(long, BodyRewriter)}.
+     */
+    static class ModifyResponseBody implements GatewayFilter {
+        private final long maxBytes;
+        private final BodyRewriter rewriter;
+
+        ModifyResponseBody(long maxBytes, BodyRewriter rewriter) {
+            this.maxBytes = maxBytes;
+            this.rewriter = rewriter;
+        }
+
+        long maxBytes() {
+            return maxBytes;
+        }
+
+        BodyRewriter rewriter() {
+            return rewriter;
+        }
+
+        @Override
+        public String toString() {
+            return "ModifyResponseBody=" + maxBytes;
+        }
+    }
+
+    private record ReadBody(long maxBytes, java.util.function.Predicate<byte[]> predicate) implements GatewayFilter {
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacingAsync(request -> {
+                if (!(request instanceof io.micronaut.http.ServerHttpRequest<?> server)) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(null);
+                }
+                if (request.getContentLength() > maxBytes) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE));
+                }
+                io.micronaut.http.body.CloseableByteBody copy = server.byteBodyFactory().limit(
+                    server.byteBody().split(io.micronaut.http.body.ByteBody.SplitBackpressureMode.FASTEST), maxBytes);
+                return copy.buffer().handle((bytes, failure) -> {
+                    if (failure != null) {
+                        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
+                    }
+                    byte[] array;
+                    try (bytes) {
+                        array = bytes.toByteArray();
+                    }
+                    request.setAttribute(GatewayAttributes.CACHED_REQUEST_BODY, array);
+                    return predicate.test(array) ? null : HttpResponse.status(HttpStatus.NOT_FOUND);
+                });
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "ReadBody=" + maxBytes;
         }
     }
 

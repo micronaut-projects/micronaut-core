@@ -126,7 +126,8 @@ record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<Str
                 segmentStart = i;
             }
         }
-        if (p.endsWith("/") && p.length() > 1) {
+        if (p.endsWith("/") && p.length() > 1 && template.charAt(template.length() - 1) != '/') {
+            // once: the loop may have kept the empty last segment
             template.append('/');
         }
         String result = template.isEmpty() ? "/" : template.toString();
