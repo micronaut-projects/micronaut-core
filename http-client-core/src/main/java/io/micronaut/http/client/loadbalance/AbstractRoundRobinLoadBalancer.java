@@ -134,7 +134,10 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     /**
      * The next instance: an instance that is up and that is not ejected by the outlier
      * detection, picked by the {@link #getStrategy() strategy}, round robin by default. When
-     * every instance that is up is ejected, one of them is selected anyway.
+     * every instance that is up is ejected, one of them is selected anyway. An
+     * {@link ExcludedInstances} discriminator leaves its instances out, unless no other is
+     * available. An instance whose {@code backup} metadata is {@code true} is selected only when
+     * no other is available, like the backup servers of nginx.
      *
      * @param serviceInstances A list of service instances
      * @param discriminator    The discriminator of the selection, if any
@@ -149,13 +152,25 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         if (detector != null) {
             availableServices = detector.available(availableServices);
         }
+        Object key = discriminator;
+        if (discriminator instanceof ExcludedInstances excluded) {
+            key = excluded.discriminator();
+            List<ServiceInstance> left = availableServices.stream().filter(si -> !excluded.uris().contains(si.getURI())).toList();
+            if (!left.isEmpty()) {
+                availableServices = left;
+            }
+        }
+        List<ServiceInstance> primaries = availableServices.stream().filter(si -> !isBackup(si)).toList();
+        if (!primaries.isEmpty() && primaries.size() < availableServices.size()) {
+            availableServices = primaries;
+        }
         int len = availableServices.size();
         if (len == 0) {
             throw new NoAvailableServiceException(getServiceID());
         }
         LoadBalancerStrategy strategy = this.strategy.get();
         if (strategy != null) {
-            return strategy.select(availableServices, discriminator);
+            return strategy.select(availableServices, key);
         }
         int i = getServiceIndex(len);
         try {
@@ -165,6 +180,10 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
             i = getServiceIndex(len);
             return availableServices.get(i);
         }
+    }
+
+    private static boolean isBackup(ServiceInstance instance) {
+        return instance.getMetadata().get("backup", String.class).map(value -> value.strip().equalsIgnoreCase("true")).orElse(false);
     }
 
     @Override

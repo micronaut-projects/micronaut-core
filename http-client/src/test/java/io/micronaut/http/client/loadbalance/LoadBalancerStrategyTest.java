@@ -108,6 +108,41 @@ class LoadBalancerStrategyTest {
     }
 
     @Test
+    void aBackupInstanceIsSelectedOnlyWhenNoOtherIsLeft() {
+        List<ServiceInstance> instances = new ArrayList<>(List.of(instance("a"), instance("b"),
+            ServiceInstance.builder("svc", URI.create("http://backup:8080")).metadata(Map.of("backup", "true")).build()));
+        ServiceInstanceListRoundRobinLoadBalancer balancer = new ServiceInstanceListRoundRobinLoadBalancer(new io.micronaut.discovery.ServiceInstanceList() {
+            @Override
+            public String getID() {
+                return "svc";
+            }
+
+            @Override
+            public List<ServiceInstance> getInstances() {
+                return instances;
+            }
+        });
+        for (int i = 0; i < 6; i++) {
+            Assertions.assertNotEquals("backup", Mono.from(balancer.select()).block().getURI().getHost());
+        }
+        // a and b were tried
+        ExcludedInstances tried = new ExcludedInstances(Set.of(URI.create("http://a:8080"), URI.create("http://b:8080")), null);
+        Assertions.assertEquals("backup", Mono.from(balancer.select(tried)).block().getURI().getHost());
+        // only a was tried
+        ExcludedInstances triedA = new ExcludedInstances(Set.of(URI.create("http://a:8080")), null);
+        for (int i = 0; i < 4; i++) {
+            Assertions.assertEquals("b", Mono.from(balancer.select(triedA)).block().getURI().getHost());
+        }
+        // every instance was tried: one of the primaries again
+        ExcludedInstances all = new ExcludedInstances(Set.of(URI.create("http://a:8080"), URI.create("http://b:8080"), URI.create("http://backup:8080")), null);
+        Assertions.assertNotEquals("backup", Mono.from(balancer.select(all)).block().getURI().getHost());
+        // the primaries go down
+        instances.set(0, ServiceInstance.builder("svc", URI.create("http://a:8080")).status(io.micronaut.health.HealthStatus.DOWN).build());
+        instances.set(1, ServiceInstance.builder("svc", URI.create("http://b:8080")).status(io.micronaut.health.HealthStatus.DOWN).build());
+        Assertions.assertEquals("backup", Mono.from(balancer.select()).block().getURI().getHost());
+    }
+
+    @Test
     void stickyKeepsADiscriminatorOnItsInstance() {
         LoadBalancerStrategy strategy = LoadBalancerStrategy.of(LoadBalancerStrategy.STICKY);
         List<ServiceInstance> instances = List.of(instance("a"), instance("b"), instance("c"));
