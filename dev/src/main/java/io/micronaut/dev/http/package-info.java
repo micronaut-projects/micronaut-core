@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 /**
- * The development mode launcher: {@link io.micronaut.dev.MicronautDevMain} starts an application
- * behind a reloadable class loader and the {@link io.micronaut.dev.DevRuntime} recompiles, restarts
- * and reports as sources and resources change.
+ * What development mode adds to an HTTP server: requests wait for a reload in progress, and a
+ * failed compilation is shown instead of the stale application.
  *
  * @author graemerocher
  * @since 5.3.0
  */
 @Experimental
-package io.micronaut.dev;
+package io.micronaut.dev.http;
 
 import io.micronaut.core.annotation.Experimental;

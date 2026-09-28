@@ -1,0 +1,46 @@
+A bean that derives state from other beans, from configuration or from files registers a watch for the specific things it needs, on api:context.WatchableBeanContext[], and receives one batched change whenever they change. The state at startup is the first batch, so a watcher has no separate startup path, and a watch registered while a bean is being created belongs to that bean and closes with it.
+
+[source,java]
+----
+@Singleton
+final class RouteTable implements BeanDefinitionWatcher<RouteBuilder> {
+
+    RouteTable(WatchableBeanContext context) {
+        context.watchDefinitions(RouteBuilder.class, null, this);
+    }
+
+    @Override
+    public void onChange(BeanDefinitionChange<RouteBuilder> change) {
+        rebuild(change.current()); // the set after the batch; change.added() and change.removed() name what moved
+    }
+}
+----
+
+`watchDefinitions` and `watchBeans` watch a type, `watchMethods` the executable methods carrying an annotation, `watchConfiguration` a configuration prefix and `watchResources` the files of a resource kind by glob. A definition or method that comes back in a new generation is paired with the one it replaces, and the pair says whether only bodies changed.
+
+A configuration watcher runs after the configuration beans under its prefix were rebound and says what it did: `APPLIED` when it changed the live bean, `RECREATE` when the bean that registered the watch must be replaced, in which case the context replaces it and the beans that received it, `REQUIRES_RESTART` when nothing short of a restart applies the change.
+
+[source,java]
+----
+@EachBean(DatasourceConfiguration.class)
+HikariDataSource dataSource(DatasourceConfiguration configuration, WatchableBeanContext context) {
+    HikariDataSource dataSource = new HikariDataSource(configuration);
+    String prefix = "datasources." + configuration.getName();
+    context.watchConfiguration(prefix, change -> {
+        if (change.touches(prefix + ".url")) {
+            return ConfigurationWatcher.Outcome.RECREATE;         // this pool only
+        }
+        if (change.touchesAny(prefix + ".username", prefix + ".password")) {
+            dataSource.getHikariConfigMXBean().setPassword(configuration.getPassword());
+            dataSource.getHikariPoolMXBean().softEvictConnections();
+            return ConfigurationWatcher.Outcome.APPLIED;
+        }
+        return ConfigurationWatcher.Outcome.IGNORED;
+    });
+    return dataSource;
+}
+----
+
+Resources are watched the same way: a template engine registers `watchResources(ResourceSelector.of(ResourceKind.VIEWS, "**/*.html"), change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
+
+NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context.processor.BeanDefinitionProcessor[] beans keep working. The context feeds them what is added after startup, through an adapter that sees additions only, which is also how the launcher tells that such a processor cannot follow a reload.
