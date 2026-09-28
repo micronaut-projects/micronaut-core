@@ -91,6 +91,46 @@ class PythonGreeter(GreetingBase):
         ctx?.close()
     }
 
+    void "Python calls the inherited methods of the Java base that declare a type variable of their own"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GreetingBase
+
+
+@Singleton
+class GenericCaller(GreetingBase):
+    def __init__(self):
+        super().__init__("python", 1)
+
+    @Executable
+    def bind_a_type(self) -> str:
+        return self.bindType(GreetingBase.class_)
+
+    @Executable
+    def tag_a_value(self) -> str:
+        return self.tag("v")
+
+    @Executable
+    def pack_is_not_a_member(self) -> bool:
+        return hasattr(self, "packAll")
+''', true)
+
+        when:
+        GreetingBase greeter = ctx.getBean(GreetingBase)
+
+        then: 'a protected method taking a class of its own type variable is callable, as is one taking the variable itself'
+        greeter.bind_a_type() == 'bind:GreetingBase'
+        greeter.tag_a_value() == 'tag:v'
+
+        and: 'a method taking an array of its own type variable stays out: its erasure cannot be named in the dispatcher'
+        !greeter.pack_is_not_a_member()
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "constructor arguments of the Python super call reach the Java base"() {
         given:
         ApplicationContext ctx = buildContext('''

@@ -712,13 +712,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         builder.addSuperinterface(JAVA_BASE_MEMBERS);
         Map<String, List<MethodElement>> baseMethods = new LinkedHashMap<>();
         Set<String> signatures = new HashSet<>();
-        for (MethodElement method : superType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())) {
-            // a generic method (toArray(T[])) has no erasure javac can select an overload for; it is left out,
-            // as is a method throwing a Throwable that is not an Exception, which the dispatcher declares
+        // A method declaring type variables of its own is considered after the ones that do not, so that an
+        // overload of the same erasure without type variables keeps the dispatcher entry it had before.
+        List<MethodElement> candidates = new ArrayList<>(superType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance()));
+        candidates.sort(Comparator.comparingInt((MethodElement method) -> method.getDeclaredTypeVariables().isEmpty() ? 0 : 1));
+        for (MethodElement method : candidates) {
+            // a method throwing a Throwable that is not an Exception is left out, which the dispatcher declares
             if (method.isAbstract() || method.isStatic() || !(method.isPublic() || method.isProtected())
-                || !method.getDeclaredTypeVariables().isEmpty()
                 || Object.class.getName().equals(method.getDeclaringType().getName())
                 || !Arrays.stream(method.getThrownTypes()).allMatch(thrown -> thrown.isAssignable(Exception.class))
+                || !isDispatchableBaseMethod(method)
                 || !signatures.add(bridgeMethodKey(method))) {
                 continue;
             }
@@ -728,6 +731,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         // the dispatcher lets them through, and Python sees them as the host exceptions they are
         builder.addMethod(MethodDef.builder(INVOKE_JAVA_BASE_METHOD)
             .addAnnotation(Override.class)
+            // a base method declaring a type variable is called with its parameters erased, which is an
+            // unchecked call: the dispatcher selects the overload itself and the check is the one the
+            // arguments already passed
+            .addAnnotation(AnnotationDef.builder(ClassTypeDef.of(SuppressWarnings.class))
+                .addMember(AnnotationMetadata.VALUE_MEMBER, "unchecked")
+                .build())
             .addModifiers(Modifier.PUBLIC)
             .addParameter("name", TypeDef.STRING)
             .addParameter("arguments", TypeDef.parameterized(ClassTypeDef.of(List.class), POLYGLOT_VALUE))
@@ -754,9 +763,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 condition = condition.and(VALUE_COERCIBLES.invokeStatic("matchesArgument", TypeDef.Primitive.BOOLEAN, argument, classLiteral(parameters[i].getType())).isTrue());
                             }
                             // a parameterized type is converted to its erasure: the type arguments of an
-                            // inherited signature are not always resolved against the extended type
+                            // inherited signature are not always resolved against the extended type. A type
+                            // variable the method itself declares is erased for the same reason: the
+                            // dispatcher declares none of them, so the variable has no name in its body
                             ClassElement parameterType = parameters[i].getGenericType();
-                            converted.add(isParameterizedReference(parameterType)
+                            converted.add(isParameterizedReference(parameterType) || isDeclaredTypeVariable(method, parameterType)
                                 ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
                                 : convertValueForType(parameterType, argument));
                         }
@@ -773,6 +784,46 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 return StatementDef.multi(statements);
             }));
         addedMethodNames.add(INVOKE_JAVA_BASE_METHOD + "(" + String.class.getName() + ";" + List.class.getName() + ";)");
+    }
+
+    /**
+     * Whether the dispatcher of the Java base can call a method the base declares. It declares none of the
+     * type variables such a method declares of its own, so a parameter naming one is written as the erasure
+     * of its bound. An array of such a type variable ({@code toArray(T[])}) has no erasure the dispatcher
+     * can name (the element model erases the array away together with the variable), so that method is
+     * left out, as it was before any method with type variables was dispatched.
+     *
+     * @param method The method of the Java base
+     * @return Whether the dispatcher can call it
+     */
+    private static boolean isDispatchableBaseMethod(MethodElement method) {
+        if (method.getDeclaredTypeVariables().isEmpty()) {
+            return true;
+        }
+        for (ParameterElement parameter : method.getParameters()) {
+            ClassElement type = parameter.getGenericType();
+            // the element model may carry the array dimensions on the type variable itself or on an
+            // array type over it, so both are asked
+            if (type.getArrayDimensions() > 0
+                && (isDeclaredTypeVariable(method, type) || isDeclaredTypeVariable(method, type.fromArray()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether a type is one of the type variables the given method declares itself, rather than one of the
+     * class or a type of its own.
+     *
+     * @param method The method
+     * @param type The type
+     * @return Whether the type is a type variable of the method
+     */
+    private static boolean isDeclaredTypeVariable(MethodElement method, ClassElement type) {
+        return type instanceof GenericPlaceholderElement placeholder
+            && method.getDeclaredTypeVariables().stream()
+            .anyMatch(variable -> variable.getVariableName().equals(placeholder.getVariableName()));
     }
 
     private static boolean isParameterizedReference(ClassElement type) {

@@ -75,6 +75,15 @@ class NamedGreeter(GreetingBase):
         javaCode.contains('throw PythonJavaBases.noSuchMethod("io.micronaut.python.annotation.processing.test.javabases.GreetingBase", name, arguments);')
         !javaCode.contains('super.staticHelper(')
 
+        and: 'a base method declaring a type variable of its own is dispatched with its parameters erased'
+        javaCode.contains('if ("bindType".equals(name)) {')
+        javaCode.contains('super.bindType(')
+        javaCode.contains('if ("tag".equals(name)) {')
+        javaCode.contains('super.tag(')
+
+        and: 'one taking an array of its own type variable stays out: that erasure cannot be named there'
+        !javaCode.contains('super.packAll(')
+
         cleanup:
         tempDir.deleteDir()
     }

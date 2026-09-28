@@ -16,8 +16,9 @@
 package io.micronaut.python.annotation.processing.test.javabases;
 
 /**
- * A concrete Java class with state, an overridable method, a final method, a protected hook and
- * overloads, extended by Python classes in the tests.
+ * A concrete Java class with state, an overridable method, a final method, a protected hook,
+ * protected methods declaring a type variable of their own and overloads, extended by Python
+ * classes in the tests.
  */
 public class GreetingBase {
 
@@ -43,6 +44,18 @@ public class GreetingBase {
 
     protected String protectedHook() {
         return "hook:" + name;
+    }
+
+    protected <T> String bindType(Class<T> type) {
+        return "bind:" + type.getSimpleName();
+    }
+
+    protected <T> String tag(T value) {
+        return "tag:" + value;
+    }
+
+    public <T> T[] packAll(T[] values) {
+        return values;
     }
 
     public int increment() {
