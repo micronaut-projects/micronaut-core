@@ -32,6 +32,8 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Map;
@@ -56,6 +58,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent>, Ordered {
 
     public static final int POSITION = RefreshEventListener.DEFAULT_POSITION - 100;
+
+    private static final Logger LOG = LoggerFactory.getLogger(RefreshScope.class);
 
     private final Map<BeanIdentifier, CreatedBean<?>> refreshableBeans = new ConcurrentHashMap<>(10);
     private final ConcurrentMap<Object, ReadWriteLock> locks = new ConcurrentHashMap<>();
@@ -200,7 +204,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
                 }
                 String finalConfigPrefix = configPrefix;
                 if (keySet.stream().anyMatch(key -> key.startsWith(finalConfigPrefix))) {
-                    beanContext.refreshBean(registration);
+                    refreshConfigurationBean(registration);
                 }
             }
         }
@@ -210,8 +214,28 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         Collection<BeanRegistration<?>> registrations =
             beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class));
         for (BeanRegistration<?> registration : registrations) {
-            beanContext.refreshBean(registration);
+            refreshConfigurationBean(registration);
         }
+    }
+
+    /**
+     * Re-binds the configuration of the bean. A bean that a {@link io.micronaut.context.event.BeanCreatedEventListener}
+     * replaced with an instance of another type can not be re-bound, it is skipped so the other configuration beans
+     * are still refreshed.
+     *
+     * @param registration The bean registration
+     */
+    private void refreshConfigurationBean(BeanRegistration<?> registration) {
+        Object bean = registration.bean();
+        Class<?> beanType = registration.definition().getBeanType();
+        if (bean != null && !beanType.isInstance(bean)) {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Configuration bean [{}] was replaced by an instance of [{}] and can not be refreshed",
+                    beanType.getName(), bean.getClass().getName());
+            }
+            return;
+        }
+        beanContext.refreshBean(registration);
     }
 
     private void disposeOfBeanSubset(Collection<String> keys) {
