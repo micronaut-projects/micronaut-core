@@ -45,7 +45,8 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      * @return The {@link UriMatchTemplate} used to match URIs
      * @throws UnsupportedOperationException for a route whose template is not in the Micronaut
      * template language, see {@link #getRouteTemplate()}. Such routes can only be declared with
-     * {@code io.micronaut.web.router.builder.RouteDeclaration} since 5.3.0
+     * the {@code route(HttpMethod, RouteTemplate)} and {@code route(String, RouteTemplate)} creators
+     * of {@code io.micronaut.web.router.builder.HttpRouteBuilder} since 5.3.0
      */
     UriMatchTemplate getUriMatchTemplate();
 
