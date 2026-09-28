@@ -18,6 +18,7 @@ package io.micronaut.retry;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.reflect.ClassUtils;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -64,8 +65,8 @@ public class NamedCircuitBreakerConfiguration {
     private Double failureRatio;
     @Nullable
     private Integer successThreshold;
-    private List<Class<? extends Throwable>> failOn = new ArrayList<>();
-    private List<Class<? extends Throwable>> skipOn = new ArrayList<>();
+    private List<String> failOn = new ArrayList<>();
+    private List<String> skipOn = new ArrayList<>();
 
     /**
      * @param name The name of the circuit breaker
@@ -231,41 +232,53 @@ public class NamedCircuitBreakerConfiguration {
     }
 
     /**
-     * @return The exceptions that count as a failure
+     * @return The class names of the exceptions that count as a failure
      * @since 5.3.0
      */
-    public List<Class<? extends Throwable>> getFailOn() {
+    public List<String> getFailOn() {
         return failOn;
     }
 
     /**
-     * @param failOn The exceptions that count as a failure, default every one
+     * @param failOn The class names of the exceptions that count as a failure, default every
+     *               one; resolved when the policy is built, see {@link #toPolicy()}
      * @since 5.3.0
      */
-    public void setFailOn(List<Class<? extends Throwable>> failOn) {
+    public void setFailOn(List<String> failOn) {
         this.failOn = failOn;
     }
 
     /**
-     * @return The exceptions that count as a success
+     * @return The class names of the exceptions that count as a success
      * @since 5.3.0
      */
-    public List<Class<? extends Throwable>> getSkipOn() {
+    public List<String> getSkipOn() {
         return skipOn;
     }
 
     /**
-     * @param skipOn The exceptions that count as a success, whatever failOn says
+     * @param skipOn The class names of the exceptions that count as a success, whatever failOn
+     *               says; resolved when the policy is built, see {@link #toPolicy()}
      * @since 5.3.0
      */
-    public void setSkipOn(List<Class<? extends Throwable>> skipOn) {
+    public void setSkipOn(List<String> skipOn) {
         this.skipOn = skipOn;
     }
 
     /**
      * @return The policy of the configuration
+     * @throws IllegalArgumentException if the configuration is invalid, e.g. a class name of
+     * {@code fail-on} or {@code skip-on} is not found or is not an exception type
      */
     public CircuitBreakerPolicy toPolicy() {
+        try {
+            return buildPolicy();
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid circuit breaker [" + name + "] of " + PREFIX + "." + name + ": " + e.getMessage(), e);
+        }
+    }
+
+    private CircuitBreakerPolicy buildPolicy() {
         CircuitBreakerPolicy.Builder builder = CircuitBreakerPolicy.builder()
             .maxAttempts(attempts)
             .delay(delay)
@@ -287,11 +300,28 @@ public class NamedCircuitBreakerConfiguration {
             builder.successThreshold(successThreshold);
         }
         if (!failOn.isEmpty()) {
-            builder.failOn(failOn.toArray(new Class[0]));
+            builder.failOn(throwables(failOn, "fail-on"));
         }
         if (!skipOn.isEmpty()) {
-            builder.skipOn(skipOn.toArray(new Class[0]));
+            builder.skipOn(throwables(skipOn, "skip-on"));
         }
         return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Class<? extends Throwable>[] throwables(List<String> typeNames, String property) {
+        ClassLoader classLoader = NamedCircuitBreakerConfiguration.class.getClassLoader();
+        Class<? extends Throwable>[] result = new Class[typeNames.size()];
+        for (int i = 0; i < result.length; i++) {
+            String typeName = typeNames.get(i).strip();
+            Class<?> type = ClassUtils.forName(typeName, classLoader).orElseThrow(() ->
+                new IllegalArgumentException(property + " must be exception types, class not found: " + typeName)
+            );
+            if (!Throwable.class.isAssignableFrom(type)) {
+                throw new IllegalArgumentException(property + " must be exception types, got " + type.getName());
+            }
+            result[i] = (Class<? extends Throwable>) type;
+        }
+        return result;
     }
 }
