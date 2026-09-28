@@ -89,7 +89,7 @@ Retry settings shared by several methods can be configured once as a named polic
 micronaut:
   retry:
     policies:
-      orders:
+      books:
         attempts: 5
         delay: 200ms
         multiplier: 2
@@ -101,26 +101,21 @@ micronaut:
           - java.io.FileNotFoundException
 ----
 
-[source,java]
-----
-@Singleton
-public class OrderClient {
+snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="named", indent=0, title="Applying a Named Retry Policy"]
 
-    @Retryable(name = "orders") // <1>
-    public Order find(String id) {
-        // ...
-    }
+<1> The method takes the attempts, delay, multiplier, maximum delay, jitter, includes and excludes of the `books` policy
 
-    @Retryable(name = "orders", attempts = "2") // <2>
-    public void cancel(String id) {
-        // ...
-    }
-}
-----
-<1> The method takes the attempts, delay, multiplier, maximum delay, jitter, includes and excludes of the `orders` policy
-<2> A member set explicitly on the annotation overrides the setting of the policy: here two attempts, with the other settings of the policy. Setting `includes` or `excludes` on the annotation replaces both lists of the policy
+As with the annotation, `attempts` is the maximum number of retries after the first call: `attempts: 5` calls the method at most six times. The `includes` and `excludes` are fully qualified class names of exception types.
 
-A policy member that is not configured takes the default of ann:retry.annotation.Retryable[]. A name that is not configured fails the first call of the method with an `IllegalStateException` naming the missing policy. Without a `name`, the annotation behaves as before.
+A member set explicitly on the annotation overrides the setting of the policy. Setting `includes` or `excludes` on the annotation replaces both lists of the policy:
+
+snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="override", indent=0, title="Overriding a Named Retry Policy"]
+
+<1> One retry, so at most two calls, with the other settings of the `books` policy
+
+A policy member that is not configured takes the default of ann:retry.annotation.Retryable[]. A name that is not configured fails each call of the method with an `IllegalStateException` naming the missing policy; a method returning a `CompletionStage` or a `Publisher` returns it failed. A policy that is invalid, e.g. with an include that is not the name of an exception class, fails the startup of the application. Without a `name`, the annotation behaves as before.
+
+A ann:retry.annotation.CircuitBreaker[] method that has a `name` of ann:retry.annotation.Retryable[], e.g. on its class, retries with the named policy in the same way.
 
 The policies are also available programmatically through the api:retry.RetryRegistry[] bean, whose `retry(name)` returns the `RetryOperations` of a policy.
 

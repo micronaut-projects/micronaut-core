@@ -129,8 +129,8 @@ public @interface Retryable {
      * under {@code micronaut.retry.policies.<name>}, whose settings the method takes: the
      * attempts, delay, maximum delay, multiplier, jitter, includes and excludes. A member set
      * explicitly on this annotation overrides the setting of the policy. A name that is not
-     * configured fails the first call of the method. Empty, the default, for the settings of this
-     * annotation alone.
+     * configured fails each call of the method. A {@link CircuitBreaker} method retries with the
+     * named policy in the same way. Empty, the default, for the settings of this annotation alone.
      *
      * @return The name of the retry policy, or empty
      * @since 5.3.0

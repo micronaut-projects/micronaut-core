@@ -35,13 +35,15 @@ public interface RetryRegistry {
     /**
      * @param name The name
      * @return The policy of the name, if it is configured
+     * @throws IllegalArgumentException if the configuration of the policy is invalid
      */
     Optional<RetryPolicy> findPolicy(String name);
 
     /**
      * @param name The name
      * @return The policy of the name
-     * @throws IllegalArgumentException if no policy of the name is configured
+     * @throws IllegalArgumentException if no policy of the name is configured, or its
+     * configuration is invalid
      */
     default RetryPolicy getPolicy(String name) {
         return findPolicy(name).orElseThrow(() -> new IllegalArgumentException(
@@ -55,7 +57,8 @@ public interface RetryRegistry {
      *
      * @param name The name
      * @return The retry operations
-     * @throws IllegalArgumentException if no policy of the name is configured
+     * @throws IllegalArgumentException if no policy of the name is configured, or its
+     * configuration is invalid
      */
     RetryOperations retry(String name);
 

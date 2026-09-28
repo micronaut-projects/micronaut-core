@@ -59,6 +59,7 @@ import java.util.function.Supplier;
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
+    private static final String NAME = "name";
     private final ConversionService conversionService;
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
@@ -67,7 +68,12 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private final DefaultRetryRunner retryRunner;
     @Nullable
     private final RetryRegistry retryRegistry;
-    private final Map<ExecutableMethod, RetryPolicy> namedPolicies = new ConcurrentHashMap<>();
+    /**
+     * The policies of the methods with a named policy, by their {@code @Retryable} value, from
+     * which alone the policy is built: methods of different beans can share an
+     * {@link ExecutableMethod} that is equal, e.g. one inherited from a common superclass.
+     */
+    private final Map<AnnotationValue<Retryable>, RetryPolicy> namedPolicies = new ConcurrentHashMap<>();
     private final NamedCircuits namedCircuits;
 
     /**
@@ -131,16 +137,30 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         AnnotationRetryStateBuilder annotationRetryStateBuilder = new AnnotationRetryStateBuilder(
             context
         );
-
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
+
+        String name = retry.stringValue(NAME).orElse("");
+        RetryPolicy namedPolicy = null;
+        if (!name.isEmpty()) {
+            try {
+                namedPolicy = namedPolicies.computeIfAbsent(
+                    retry,
+                    value -> annotationRetryStateBuilder.retryPolicy(namedPolicy(name, context))
+                );
+            } catch (RuntimeException e) {
+                return interceptedMethod.handleException(e);
+            }
+        }
+
         // a circuit with a rolling window takes the permit of a publisher when it is subscribed
         CircuitBreakerRetry windowedCircuit = null;
         if (isCircuitBreaker) {
+            RetryPolicy retryPolicy = namedPolicy;
             CircuitBreakerRetry circuitBreakerRetry;
             try {
                 circuitBreakerRetry = circuitContexts.computeIfAbsent(
                     context.getExecutableMethod(),
-                    method -> circuitBreakerRetry(context, annotationRetryStateBuilder)
+                    method -> circuitBreakerRetry(context, annotationRetryStateBuilder, retryPolicy)
                 );
             } catch (RuntimeException e) {
                 return interceptedMethod.handleException(e);
@@ -149,17 +169,10 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             if (circuitBreakerRetry.circuit().getWindow() != null) {
                 windowedCircuit = circuitBreakerRetry;
             }
+        } else if (namedPolicy == null) {
+            retryState = (MutableRetryState) annotationRetryStateBuilder.build();
         } else {
-            String name = retry.stringValue("name").orElse("");
-            if (name.isEmpty()) {
-                retryState = (MutableRetryState) annotationRetryStateBuilder.build();
-            } else {
-                RetryPolicy policy = namedPolicies.computeIfAbsent(
-                    context.getExecutableMethod(),
-                    method -> annotationRetryStateBuilder.retryPolicy(namedPolicy(name, context))
-                );
-                retryState = (MutableRetryState) new PolicyRetryStateBuilder(policy).build();
-            }
+            retryState = (MutableRetryState) new PolicyRetryStateBuilder(namedPolicy).build();
         }
 
         MutableConvertibleValues<Object> attrs = context.getAttributes();
@@ -229,8 +242,11 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * name joins the circuit of the name.
      */
     private CircuitBreakerRetry circuitBreakerRetry(MethodInvocationContext<Object, Object> context,
-                                                    AnnotationRetryStateBuilder annotationRetryStateBuilder) {
-        CircuitBreakerPolicy circuitBreakerPolicy = annotationRetryStateBuilder.circuitBreakerPolicy();
+                                                    AnnotationRetryStateBuilder annotationRetryStateBuilder,
+                                                    @Nullable RetryPolicy namedPolicy) {
+        CircuitBreakerPolicy circuitBreakerPolicy = namedPolicy == null
+            ? annotationRetryStateBuilder.circuitBreakerPolicy()
+            : annotationRetryStateBuilder.circuitBreakerPolicy(namedPolicy);
         AnnotationValue<CircuitBreaker> circuitBreaker = context.findAnnotation(CircuitBreaker.class).orElse(null);
         String name = circuitBreaker == null ? "" : circuitBreaker.stringValue("name").orElse("");
         CircuitBreakerRetry.Circuit circuit;
