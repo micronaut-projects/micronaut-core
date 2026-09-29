@@ -12,8 +12,12 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.http.netty.body.NettyByteBodyFactory
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -139,6 +143,61 @@ class RequestPipelineFailureReleasesConnectionSpec extends Specification {
         "streaming body, expect 100"    | HttpRequest.POST("/pipeline-failure/echo", Flux.just("hel", "lo")).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.EXPECT, "100-continue")
     }
 
+    def "a held back request body is released once when a customizer ends the exchange and then fails (#description)"() {
+        given: "a client whose only customizer ends the exchange of the next request, then fails"
+        def customizer = new FailingCustomizer()
+        DefaultHttpClient customizedClient = DefaultHttpClient.builder()
+                .uri(server.URI)
+                .configuration(server.applicationContext.getBean(HttpClientConfiguration))
+                .clientCustomizer(customizer)
+                .build()
+
+        and: "a warmed up single pooled connection"
+        assert customizedClient.toBlocking().retrieve("/pipeline-failure/ok") == "ok"
+        Channel first = customizedClient.connectionManager().getChannels()[0]
+        customizer.beforeFailure = beforeFailure
+        customizer.failNext = true
+
+        and: "an in-memory body held back for 100 Continue, with an extra reference kept by the test"
+        ByteBuf buf = Unpooled.copiedBuffer("hello", StandardCharsets.UTF_8)
+        buf.retain()
+        def request = HttpRequest.POST("/pipeline-failure/echo", null)
+                .contentType(MediaType.TEXT_PLAIN_TYPE)
+                .header(HttpHeaders.EXPECT, "100-continue")
+
+        when: "the request is sent on that connection"
+        Mono.from(customizedClient.exchange(request, new NettyByteBodyFactory(first).adapt(buf), null)).block()
+
+        then: "the client reports an error"
+        def e = thrown(Exception)
+        causeChain(e).any { it.message == FailingCustomizer.MESSAGE || it.message == FailingCustomizer.EXCHANGE_MESSAGE }
+        !customizer.failNext
+
+        and: "the client released its reference to the body exactly once, and nothing is left running"
+        new PollingConditions(timeout: 5).eventually {
+            assert !first.isActive()
+            assert customizedClient.connectionManager().liveRequestCount() == 0
+            assert buf.refCnt() == 1
+        }
+        buf.release()
+        buf.refCnt() == 0
+
+        when: "a normal request follows on the same client"
+        def response = customizedClient.toBlocking().retrieve(HttpRequest.POST("/pipeline-failure/echo", "again").contentType(MediaType.TEXT_PLAIN_TYPE), String)
+
+        then: "it succeeds on a new connection"
+        response == "again"
+        customizedClient.connectionManager().getChannels()[0] != first
+
+        cleanup:
+        customizedClient.close()
+
+        where:
+        description                        | beforeFailure
+        "exchange failed synchronously"    | { Channel ch -> ch.pipeline().fireExceptionCaught(new IOException(FailingCustomizer.EXCHANGE_MESSAGE)) }
+        "channel closed"                   | { Channel ch -> ch.close() }
+    }
+
     private static List<Throwable> causeChain(Throwable t) {
         List<Throwable> chain = []
         while (t != null && !chain.contains(t)) {
@@ -155,11 +214,17 @@ class RequestPipelineFailureReleasesConnectionSpec extends Specification {
      */
     static class FailingCustomizer implements NettyClientCustomizer {
         static final String MESSAGE = "customizer failure"
+        static final String EXCHANGE_MESSAGE = "exchange failed by the customizer"
 
         volatile boolean failNext
+        /**
+         * Run on the connection before failing, e.g. to end the exchange first.
+         */
+        volatile Closure<?> beforeFailure
 
         @Override
         NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            Channel connection = channel
             return new NettyClientCustomizer() {
                 @Override
                 NettyClientCustomizer specializeForChannel(Channel channel_, ChannelRole role_) {
@@ -170,6 +235,7 @@ class RequestPipelineFailureReleasesConnectionSpec extends Specification {
                 void onRequestPipelineBuilt() {
                     if (failNext) {
                         failNext = false
+                        beforeFailure?.call(connection)
                         throw new IllegalStateException(MESSAGE)
                     }
                 }

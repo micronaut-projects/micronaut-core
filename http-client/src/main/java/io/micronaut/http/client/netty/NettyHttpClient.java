@@ -2083,6 +2083,8 @@ final class NettyHttpClient implements
         // connection turns out to be closed already. An empty body needs no copy, and streamed
         // bodies are never sent again.
         CloseableAvailableByteBody replayBody = null;
+        // set once the response listener took over the exchange
+        AtomicBoolean listenerStarted = new AtomicBoolean();
         try {
             if (byteBody instanceof AvailableByteBody available) {
                 replayBody = retry && available.length() != 0 ? available.split() : null;
@@ -2093,7 +2095,7 @@ final class NettyHttpClient implements
                     completeExceptionallySafe(sink, e);
                 }, onSent);
             }
-            if (!prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, requestedUpgrade, length, streamWriter, byteBuf, retry, replayBody)) {
+            if (!prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, requestedUpgrade, length, streamWriter, byteBuf, retry, replayBody, listenerStarted)) {
                 // the connection could not take the request, prepareRequestPipeline cleaned up
                 return;
             }
@@ -2106,7 +2108,7 @@ final class NettyHttpClient implements
             // handle is released and the caller sees the error
             poolHandle.taint();
             completeExceptionallySafe(sink, t);
-            if (poolHandle.responseHandler.isIdle()) {
+            if (!listenerStarted.get()) {
                 if (streamWriter != null) {
                     streamWriter.cancel();
                 }
@@ -2124,10 +2126,11 @@ final class NettyHttpClient implements
                     selection.release();
                 }
             } else {
-                // the response handler already serves this request: closing the connection ends
-                // it, and the response listener cancels the stream writer, releases the pool
-                // handle and closes the replay body. It only releases the buffer if it was held
-                // back for a CONTINUE.
+                // the response listener owns the exchange, even if it already ended (e.g. a
+                // customizer failed it): it cancels the stream writer, releases the pool handle
+                // and the selection and closes the replay body, once the connection is closed if
+                // it is still running. It only releases the buffer if it was held back for a
+                // CONTINUE.
                 if (byteBuf != null && !expectContinue) {
                     byteBuf.release();
                 }
@@ -2170,6 +2173,9 @@ final class NettyHttpClient implements
      * Start the response listener on the connection and finalize the request headers, without writing
      * anything to the channel yet.
      *
+     * @param listenerStarted Set once the response listener took over the exchange, and with it
+     *                        the stream writer, a body held back for a CONTINUE, the replay body,
+     *                        the pool handle and the selection
      * @return {@code false} if the connection could not take the request. The request is then
      * already cleaned up and failed
      */
@@ -2184,7 +2190,8 @@ final class NettyHttpClient implements
         @Nullable StreamWriter streamWriter,
         @Nullable ByteBuf byteBuf,
         boolean retry,
-        @Nullable CloseableAvailableByteBody replayBody
+        @Nullable CloseableAvailableByteBody replayBody,
+        AtomicBoolean listenerStarted
     ) {
         UploadListener uploadListener = request.getAttribute(UPLOAD_LISTENER, UploadListener.class).orElse(null);
 
@@ -2482,6 +2489,7 @@ final class NettyHttpClient implements
         }
         try {
             poolHandle.responseHandler.startRequest(listener);
+            listenerStarted.set(true);
         } catch (IllegalStateException e) {
             // the handler is gone (e.g. removed by a customizer) or still busy with the previous
             // request: the connection cannot be used
