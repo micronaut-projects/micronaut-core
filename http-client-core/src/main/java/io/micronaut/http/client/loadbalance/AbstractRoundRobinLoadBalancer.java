@@ -207,6 +207,12 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         }
     }
 
+    @Override
+    public List<OutlierEjectionState> getOutlierEjectionStates() {
+        OutlierDetector detector = outlierDetector.get();
+        return detector == null ? List.of() : detector.snapshot();
+    }
+
     private int getServiceIndex(int len) {
         return index.getAndAccumulate(len, (cur, n) -> cur >= n - 1 ? 0 : cur + 1);
     }
