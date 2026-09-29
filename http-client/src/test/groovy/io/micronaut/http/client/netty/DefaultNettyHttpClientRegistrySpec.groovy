@@ -8,11 +8,13 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationMetadataDelegate
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospector
+import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.HttpClientRegistry
 import io.micronaut.http.client.HttpVersionSelection
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
 import io.netty.util.AttributeKey
 import jakarta.inject.Inject
@@ -43,6 +45,77 @@ class DefaultNettyHttpClientRegistrySpec extends Specification {
         ctx.close()
     }
 
+    def 'distinct annotation metadata instances get their own client keys'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def registry = ctx.getBean(DefaultNettyHttpClientRegistry)
+        def first = new CountingMetadata(delegate: AnnotationMetadata.EMPTY_METADATA)
+        def second = new CountingMetadata(delegate: AnnotationMetadata.EMPTY_METADATA)
+
+        when:
+        registry.getClient(first)
+        registry.getClient(second)
+        int firstLookups = first.lookups
+        int secondLookups = second.lookups
+        registry.getClient(first)
+        registry.getClient(second)
+
+        then: 'each instance is resolved once and then served from the cache'
+        firstLookups > 0
+        secondLookups > 0
+        first.lookups == firstLookups
+        second.lookups == secondLookups
+        registry.clientKeyCache.size() == 2
+        registry.clientKeyCache.containsKey(first)
+        registry.clientKeyCache.containsKey(second)
+
+        cleanup:
+        ctx.close()
+    }
+
+    def 'client key of metadata with evaluated expressions is not cached'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def registry = ctx.getBean(DefaultNettyHttpClientRegistry)
+        def metadata = new EvaluatedCountingMetadata(delegate: AnnotationMetadata.EMPTY_METADATA)
+
+        when:
+        def first = registry.getClient(metadata)
+        int lookups = metadata.lookups
+        def second = registry.getClient(metadata)
+
+        then: 'the key is recomputed on every call but still resolves the same client'
+        lookups > 0
+        metadata.lookups > lookups
+        first.is(second)
+        registry.clientKeyCache.isEmpty()
+
+        cleanup:
+        ctx.close()
+    }
+
+    def 'declarative client with an expression in @Client does not grow the key cache'() {
+        given:
+        def server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'DefaultNettyHttpClientRegistrySpec.expression'
+        ])
+        def ctx = ApplicationContext.run([
+                'spec.name': 'DefaultNettyHttpClientRegistrySpec.expression',
+                'micronaut.http.services.expression-client.url': server.URL.toString()
+        ])
+        def registry = ctx.getBean(DefaultNettyHttpClientRegistry)
+        def client = ctx.getBean(ExpressionClient)
+
+        expect:
+        (1..5).collect { client.get() } == ['ok'] * 5
+        registry.clientKeyCache.isEmpty()
+        registry.unbalancedClients.size() == 1
+
+        cleanup:
+        ctx.close()
+        server.close()
+    }
+
     static class CountingMetadata implements AnnotationMetadataDelegate {
         AnnotationMetadata delegate
         int lookups
@@ -51,6 +124,29 @@ class DefaultNettyHttpClientRegistrySpec extends Specification {
         AnnotationMetadata getAnnotationMetadata() {
             lookups++
             return delegate
+        }
+    }
+
+    static class EvaluatedCountingMetadata extends CountingMetadata {
+        @Override
+        boolean hasEvaluatedExpressions() {
+            return true
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'DefaultNettyHttpClientRegistrySpec.expression')
+    @Client("#{ 'expression-' + 'client' }")
+    static interface ExpressionClient {
+        @Get('/registry-expression')
+        String get()
+    }
+
+    @Requires(property = 'spec.name', value = 'DefaultNettyHttpClientRegistrySpec.expression')
+    @Controller
+    static class ExpressionController {
+        @Get('/registry-expression')
+        String get() {
+            return 'ok'
         }
     }
 

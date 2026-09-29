@@ -92,12 +92,12 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -124,13 +124,21 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         NettyClientCustomizer.Registry,
         RefreshEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
+    /**
+     * Upper bound for {@link #clientKeyCache}. Method metadata is bounded by the number of
+     * declarative client methods and injection points; the cap only guards against a caller that
+     * passes a new metadata instance on every call, in which case keys are no longer cached.
+     */
+    private static final int CLIENT_KEY_CACHE_MAX_SIZE = 2048;
     private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
     /**
-     * Cache of the client key computed for an annotation metadata instance. A declarative client
-     * passes the same (generated) metadata instance on every call, so this avoids repeating the
-     * annotation lookups. Weak keys so that transient metadata instances do not accumulate.
+     * Cache of the client key computed for an annotation metadata instance, keyed by identity. A
+     * declarative client passes the same (generated) metadata instance on every call, so this
+     * avoids repeating the annotation lookups. The map is copy-on-write and never mutated once
+     * published: reads are lock-free and misses publish a new copy under {@link #clientKeyCacheLock}.
      */
-    private final Map<AnnotationMetadata, ClientKey> clientKeyCache = Collections.synchronizedMap(new WeakHashMap<>());
+    private volatile IdentityHashMap<AnnotationMetadata, ClientKey> clientKeyCache = new IdentityHashMap<>();
+    private final Object clientKeyCacheLock = new Object();
     /**
      * The running clients created for a {@link LoadBalancer}, e.g. by
      * {@code createBean(HttpClient.class, url)}. The caller owns such a client and is expected to
@@ -587,9 +595,21 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
         ClientKey key = clientKeyCache.get(metadata);
-        if (key == null) {
-            key = computeClientKey(metadata);
-            clientKeyCache.put(metadata, key);
+        if (key != null) {
+            return key;
+        }
+        key = computeClientKey(metadata);
+        // Metadata with evaluated expressions (EvaluatedAnnotationMetadata) is re-created for every
+        // invocation and its values may depend on the call arguments, so its key is never cached.
+        if (!metadata.hasEvaluatedExpressions()) {
+            synchronized (clientKeyCacheLock) {
+                IdentityHashMap<AnnotationMetadata, ClientKey> current = clientKeyCache;
+                if (!current.containsKey(metadata) && current.size() < CLIENT_KEY_CACHE_MAX_SIZE) {
+                    IdentityHashMap<AnnotationMetadata, ClientKey> copy = new IdentityHashMap<>(current);
+                    copy.put(metadata, key);
+                    clientKeyCache = copy;
+                }
+            }
         }
         return key;
     }
