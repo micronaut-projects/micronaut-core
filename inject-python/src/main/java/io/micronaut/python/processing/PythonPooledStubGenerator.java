@@ -166,8 +166,24 @@ final class PythonPooledStubGenerator {
             .toList();
     }
 
+    /**
+     * Whether a type has a Python implementation, and so belongs to a context.
+     *
+     * <p>Being declared in Python is not enough. A {@code Protocol} or an otherwise abstract
+     * Python type -- a Micronaut Data repository, a bean mapper, any introduction interface -- is
+     * implemented by generated Java. It has no Python instance, so no context it lives in and no
+     * interpreter lock to contend for, and warning about one would be noise. It also cannot be
+     * pooled: a pooled type is instantiated once per context, and a {@code Protocol} refuses
+     * instantiation outright.
+     *
+     * @param type The type
+     * @return Whether it is a Python type with a Python implementation
+     */
     private static boolean isPythonType(ClassElement type) {
-        return type instanceof AbstractPythonClassElement || type instanceof PythonScriptElement;
+        if (!(type instanceof AbstractPythonClassElement) && !(type instanceof PythonScriptElement)) {
+            return false;
+        }
+        return !type.isInterface() && !type.isAbstract();
     }
 
     static ClassDef.ClassDefBuilder generatePooledClass(AbstractPythonClassElement element,
