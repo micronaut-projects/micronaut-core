@@ -139,6 +139,10 @@ public final class OutlierDetector {
      * @param outcome  The outcome
      */
     public void report(ServiceInstance instance, LoadBalancer.Outcome outcome) {
+        if (outcome == LoadBalancer.Outcome.CANCELLED) {
+            // says nothing about the instance: neither a failure nor a success
+            return;
+        }
         State state = states.computeIfAbsent(instance.getURI(), uri -> new State());
         long now = clock.getAsLong();
         synchronized (state) {

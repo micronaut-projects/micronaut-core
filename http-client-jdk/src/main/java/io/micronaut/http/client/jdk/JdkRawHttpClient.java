@@ -36,6 +36,7 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
@@ -235,9 +236,16 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
                 java.net.http.HttpClient httpClient = options == null || options.isFollowRedirects() ? rawClient.get() : rawNoRedirectClient.get();
                 // the outcome is reported once the body ends: a response whose body is cut off is a failure
-                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits,
-                        failure -> reportBodyEnd(sent.instance(), responseInfo.statusCode(), failure))))
-                    .onErrorMap(IOException.class, e -> sendError(sent.instance(), httpRequest.uri(), e));
+                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> {
+                        // the end of the body reports or releases the selection
+                        LoadBalancerSelection selection = sent.selection();
+                        if (selection != null) {
+                            selection.claim();
+                        }
+                        return new ByteBodySubscriber(bodySizeLimits, failure -> reportBodyEnd(selection, responseInfo.statusCode(), failure));
+                    }))
+                    .onErrorMap(IOException.class, e -> sendError(sent.selection(), httpRequest.uri(), e))
+                    .doFinally(signal -> releaseUnclaimed(sent.selection()));
             })
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .map(netResponse -> {
