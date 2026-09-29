@@ -73,6 +73,15 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         }
     }
 
+    /**
+     * Marks the registration as destroyed, so that closing it afterwards does not destroy the bean again.
+     *
+     * @return {@code true} if the registration had not been closed or marked before
+     */
+    boolean markDestroyed() {
+        return closed.compareAndSet(false, true);
+    }
+
     @Nullable
     public List<BeanRegistration<?>> getDependents() {
         return dependents;

@@ -1242,18 +1242,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         destroyBean(registration, false);
     }
 
-    /**
-     * Destroys a bean that another bean, or another bean's disposal, owns as a dependent object.
-     *
-     * <p>This is the destruction the dependents of a bean receive when that bean is destroyed, which leaves
-     * {@link LifeCycle#stop()} alone: stopping a bean is for a bean destroyed in its own right, not for one
-     * destroyed because whatever it was resolved for is gone.</p>
-     *
-     * @param registration The registration of the dependent
-     * @param <T>          The bean type
-     * @since 5.2.0
-     */
-    <T> void destroyDependentBean(BeanRegistration<T> registration) {
+    @Override
+    public <T> void destroyDependentBean(BeanRegistration<T> registration) {
+        ArgumentUtils.requireNonNull("registration", registration);
+        if (registration instanceof BeanDisposingRegistration<T> disposingRegistration && !disposingRegistration.markDestroyed()) {
+            // closed, or destroyed as a dependent, already
+            return;
+        }
         destroyBean(registration, true);
     }
 
