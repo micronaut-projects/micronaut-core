@@ -589,6 +589,10 @@ public abstract class ResponseLifecycle {
         private @Nullable Argument<Object> type;
         private @Nullable PieceWriter<Object> pieceWriter;
         private boolean closed;
+        /**
+         * Whether a piece is being written. The piece writer is then only touched by that write.
+         */
+        private boolean writing;
 
         PieceStream(HttpRequest<?> request, HttpResponse<?> response, BooleanSupplier isJson) {
             this.request = request;
@@ -606,46 +610,89 @@ public abstract class ResponseLifecycle {
 
         /**
          * The pieces are written one after the other, but a response can be discarded while a
-         * piece is being written, so this is synchronized with {@link #close()}.
+         * piece is being written, on another thread if the writer is blocking. The state is
+         * guarded by this monitor, but the piece writer is opened, written and closed outside of
+         * it, so that {@link #close()} never waits for a write: a piece writer that is in use when
+         * the stream is closed is closed by the write once it is done.
          */
-        private synchronized CloseableByteBody writeSync(MessageBodyWriter<Object> writer, Argument<Object> type, MediaType mediaType, Object object) {
-            if (closed) {
-                // the response was discarded while this piece was on its way. The piece is
-                // dropped, so there is no point in writing it
+        private CloseableByteBody writeSync(MessageBodyWriter<Object> writer, Argument<Object> type, MediaType mediaType, Object object) {
+            PieceWriter<Object> replaced = null;
+            ReadBuffer separator = null;
+            CloseableByteBody piece;
+            boolean discard;
+            synchronized (this) {
+                if (closed) {
+                    // the response was discarded while this piece was on its way. The piece is
+                    // dropped, so there is no point in writing it
+                    return byteBodyFactory.createEmpty();
+                }
+                writing = true;
+                Argument<Object> currentType = this.type;
+                if (pieceWriter == null || this.writer != writer || currentType == null || !(currentType == type || currentType.equalsType(type))) {
+                    replaced = pieceWriter;
+                    pieceWriter = null;
+                }
+                if (first) {
+                    first = false;
+                    // whether the pieces are framed as a JSON array is settled by the time the first
+                    // piece is written, see mapToHttpContent
+                    separators = isJson.getAsBoolean() ? jsonSeparators() : null;
+                    if (separators != null) {
+                        separator = separators.beforeFirst();
+                    }
+                } else if (separators != null) {
+                    separator = separators.between();
+                }
+            }
+            try {
+                if (replaced != null) {
+                    replaced.close();
+                }
+                // only this write touches the piece writer until writing is reset
+                PieceWriter<Object> current = pieceWriter;
+                if (current == null) {
+                    current = wrap(writer).openPieceWriter(byteBodyFactory, request, response, type, mediaType);
+                    pieceWriter = current;
+                    this.writer = writer;
+                    this.type = type;
+                }
+                piece = current.writePiece(separator, object);
+            } finally {
+                PieceWriter<Object> discarded = null;
+                synchronized (this) {
+                    writing = false;
+                    discard = closed;
+                    if (closed) {
+                        discarded = pieceWriter;
+                        pieceWriter = null;
+                    }
+                }
+                if (discarded != null) {
+                    discarded.close();
+                }
+            }
+            if (discard) {
+                // the response was discarded while this piece was written, nobody reads it
+                piece.close();
                 return byteBodyFactory.createEmpty();
             }
-            Argument<Object> currentType = this.type;
-            if (pieceWriter == null || this.writer != writer || currentType == null || !(currentType == type || currentType.equalsType(type))) {
-                closePieceWriter();
-                pieceWriter = wrap(writer).openPieceWriter(byteBodyFactory, request, response, type, mediaType);
-                this.writer = writer;
-                this.type = type;
-            }
-            ReadBuffer separator = null;
-            if (first) {
-                first = false;
-                // whether the pieces are framed as a JSON array is settled by the time the first
-                // piece is written, see mapToHttpContent
-                separators = isJson.getAsBoolean() ? jsonSeparators() : null;
-                if (separators != null) {
-                    separator = separators.beforeFirst();
+            return piece;
+        }
+
+        void close() {
+            PieceWriter<Object> discarded = null;
+            synchronized (this) {
+                if (closed) {
+                    return;
                 }
-            } else if (separators != null) {
-                separator = separators.between();
+                closed = true;
+                if (!writing) {
+                    discarded = pieceWriter;
+                    pieceWriter = null;
+                }
             }
-            return pieceWriter.writePiece(separator, object);
-        }
-
-        synchronized void close() {
-            closed = true;
-            closePieceWriter();
-        }
-
-        private void closePieceWriter() {
-            PieceWriter<Object> current = this.pieceWriter;
-            if (current != null) {
-                this.pieceWriter = null;
-                current.close();
+            if (discarded != null) {
+                discarded.close();
             }
         }
     }
