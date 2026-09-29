@@ -20,10 +20,12 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Write;
+import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import jakarta.inject.Inject;
 
 import java.util.Map;
-import java.util.Set;
+
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 
@@ -32,21 +34,39 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  *
  * @author Graeme Rocher
  * @see io.micronaut.runtime.context.scope.refresh.RefreshScope
- * @see io.micronaut.runtime.context.scope.refresh.RefreshEvent
+ * @see io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher
  * @see io.micronaut.runtime.context.scope.Refreshable
  * @since 1.0
  */
 @Endpoint("refresh")
 public class RefreshEndpoint {
 
+    @Nullable
+    private final ConfigurationRefresher refresher;
+    @Nullable
     private final Environment environment;
+    @Nullable
     private final ApplicationEventPublisher<RefreshEvent> eventPublisher;
 
     /**
-     * @param environment The Environment
-     * @param eventPublisher The Application event publisher
+     * @param refresher The refresher, which runs the phases of a refresh
+     * @since 5.3.0
      */
+    @Inject
+    public RefreshEndpoint(ConfigurationRefresher refresher) {
+        this.refresher = refresher;
+        this.environment = null;
+        this.eventPublisher = null;
+    }
+
+    /**
+     * @param environment    The Environment
+     * @param eventPublisher The Application event publisher
+     * @deprecated The endpoint runs through the {@link ConfigurationRefresher}; use {@link #RefreshEndpoint(ConfigurationRefresher)}
+     */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     public RefreshEndpoint(Environment environment, ApplicationEventPublisher<RefreshEvent> eventPublisher) {
+        this.refresher = null;
         this.environment = environment;
         this.eventPublisher = eventPublisher;
     }
@@ -60,16 +80,32 @@ public class RefreshEndpoint {
     @Write
     public String[] refresh(@Nullable Boolean force) {
 
+        if (refresher == null) {
+            return refreshByEvent(force);
+        }
+        if (force != null && force) {
+            // the property sources are read again first, so that everything is applied from the new values
+            refresher.refreshAll();
+            return EMPTY_STRING_ARRAY;
+        }
+        return refresher.refresh().change().changed().toArray(EMPTY_STRING_ARRAY);
+    }
+
+    /**
+     * The path of the deprecated constructor: the event, which the refresh scope now hands to the refresher.
+     */
+    private String[] refreshByEvent(@Nullable Boolean force) {
+        if (environment == null || eventPublisher == null) {
+            return EMPTY_STRING_ARRAY;
+        }
         if (force != null && force) {
             eventPublisher.publishEvent(new RefreshEvent());
             return EMPTY_STRING_ARRAY;
-        } else {
-            Map<String, Object> changes = environment.refreshAndDiff();
-            if (!changes.isEmpty()) {
-                eventPublisher.publishEvent(new RefreshEvent(changes));
-            }
-            Set<String> keys = changes.keySet();
-            return keys.toArray(EMPTY_STRING_ARRAY);
         }
+        Map<String, Object> changes = environment.refreshAndDiff();
+        if (!changes.isEmpty()) {
+            eventPublisher.publishEvent(new RefreshEvent(changes));
+        }
+        return changes.keySet().toArray(EMPTY_STRING_ARRAY);
     }
 }
