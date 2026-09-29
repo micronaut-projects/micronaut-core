@@ -102,8 +102,12 @@ explains the one case that behaves differently:
 |The generated proxy
 |construct, methods, post-construct, pre-destroy
 
-|`@Around(proxyTarget = true)`
-|The generated proxy
+|`@Around(proxyTarget = true)`, which includes every scoped proxy
+|The generated proxy, for the methods; the target's own for its lifecycle, see <<proxiedTargets, Proxied Targets>>
+|methods
+
+|`@Around(proxyTarget = true, lazyInterceptorsPerTarget = true)`
+|The target's registration in the context
 |construct, methods, post-construct, pre-destroy
 
 |ann:aop.Introduction[] advice
@@ -127,6 +131,42 @@ NOTE: In the last row the context has no registration for the instance, so nothi
 it was created with, and `PRE_DESTROY` resolves a new interceptor. A proxied bean created and destroyed the same way
 is unaffected: the proxy retained its registrations and `destroyBean(Object)` destroys the non-singleton ones with the
 target. Prototypes injected into other beans, and prototypes destroyed through their `BeanRegistration`, are unaffected.
+
+[[proxiedTargets]]
+=== Proxied Targets
+
+A proxy that fronts a separate target, which is what `@Around(proxyTarget = true)` generates and what every scoped
+proxy (ann:runtime.http.scope.RequestScope[], ann:runtime.context.scope.ThreadLocal[],
+ann:runtime.context.scope.Refreshable[]) and every advised bean a ann:context.annotation.Factory[] method produces use,
+is two beans to the context: the proxy and the target. By default the proxy resolves its interceptors once, as it is
+constructed, and intercepts every target it fronts with them. A non-singleton interceptor is then one instance per
+proxy, shared by every target the proxy resolves, and not the instance that intercepts the construction,
+post-construct and pre-destroy of the target.
+
+Set `lazyInterceptorsPerTarget` to have the interceptors resolved for each target instead:
+
+[source,java]
+----
+@Retention(RUNTIME)
+@Around(proxyTarget = true, lazyInterceptorsPerTarget = true)
+@interface Audited {
+}
+----
+
+A non-singleton interceptor is then the target's own: the instance created with the target, which also intercepts its
+construction, post-construct and pre-destroy, or one created for it on its first call, as a dependent of the target's
+registration. Two targets never share an instance, and each instance is destroyed with its target. A lazy proxy, such
+as a scoped proxy, intercepts each target it resolves with that target's instances. The proxy itself holds only the
+singleton interceptors.
+
+For a scoped bean whose binding annotation carries no ann:aop.Around[] of its own, declare the member together with
+the settings of the scope's proxy, `@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)`: an
+`@Around` declared on the bean replaces the one its scope contributes.
+
+NOTE: A target handed to a hot-swappable proxy through `swap` is intercepted with its own instances when the context
+holds a registration for it, a singleton or a bean of a custom scope. Any other object, such as the target of another
+proxy, is intercepted with instances the context creates once for such targets. A runtime proxy
+(ann:aop.runtime.RuntimeProxy[]) keeps the interceptors it was created with.
 
 == Ordering
 

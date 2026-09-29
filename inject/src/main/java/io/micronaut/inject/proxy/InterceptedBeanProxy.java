@@ -15,8 +15,10 @@
  */
 package io.micronaut.inject.proxy;
 
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.qualifiers.Qualified;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An internal {@link InterceptedBean} that proxies another instance.
@@ -52,6 +54,17 @@ public interface InterceptedBeanProxy<T> extends InterceptedBean, Qualified<T> {
      * @since 5.1.0
      */
     default void clearCachedInterceptedTarget() {
+    }
+
+    /**
+     * The registration of the target this proxy caches, which carries the non-singleton interceptors created for the
+     * target, so that destroying the target through it destroys them too.
+     *
+     * @return The registration, or {@code null} when the proxy caches none
+     * @since 5.3.0
+     */
+    default @Nullable BeanRegistration<T> interceptedTargetRegistration() {
+        return null;
     }
 
 }

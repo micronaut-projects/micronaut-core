@@ -23,6 +23,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
@@ -58,9 +60,18 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
      */
     public static final String META_BINDING_VALUES = "$bindingValues";
     public static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
+    /**
+     * The member of the binding of a proxy that fronts a separate target, which qualifies singleton interceptors
+     * alone: the non-singleton interceptors of a target are the target's own, and the proxy selects them from the
+     * target, so it creates none of its own.
+     *
+     * @since 5.3.0
+     */
+    public static final String META_SINGLETONS_ONLY = "singletonsOnly";
     private static final String META_BIND_MEMBERS = "bindMembers";
     private final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames;
     private final Set<String> supportedInterceptorTypes;
+    private final boolean singletonsOnly;
 
     /**
      * Interceptor binding qualifiers.
@@ -73,8 +84,10 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         AnnotationValue<Annotation> av = annotationMetadata.findAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER).orElse(null);
         if (av == null) {
             annotationValues = Collections.emptyList();
+            singletonsOnly = false;
         } else {
             annotationValues = av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+            singletonsOnly = av.isTrue(META_SINGLETONS_ONLY);
         }
         if (annotationValues.isEmpty()) {
             annotationValues = annotationMetadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
@@ -99,6 +112,63 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             this.supportedAnnotationNames = Collections.emptyMap();
         }
         this.supportedInterceptorTypes = Collections.emptySet();
+        this.singletonsOnly = false;
+    }
+
+    /**
+     * Interceptor binding qualifiers of several interception points, which qualify an interceptor bound to any of them.
+     *
+     * <p>The occurrences of a binding annotation are resolved for each point in its own metadata, so that points
+     * binding different members of the same annotation each keep theirs, and a point binding an annotation by name
+     * qualifies every interceptor of it.</p>
+     *
+     * @param interceptionPoints The metadata of the interception points
+     */
+    private InterceptorBindingQualifier(AnnotationMetadata[] interceptionPoints) {
+        final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames = new LinkedHashMap<>();
+        final Set<String> supportedInterceptorTypes = new LinkedHashSet<>();
+        for (AnnotationMetadata interceptionPoint : interceptionPoints) {
+            final Collection<AnnotationValue<Annotation>> annotationValues = interceptionPoint.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+            findSupportedAnnotations(annotationValues, interceptionPoint).forEach((name, occurrences) -> {
+                if (!supportedAnnotationNames.containsKey(name)) {
+                    supportedAnnotationNames.put(name, occurrences == null ? null : new ArrayList<>(occurrences));
+                    return;
+                }
+                final List<AnnotationValue<?>> merged = supportedAnnotationNames.get(name);
+                if (merged == null) {
+                    return;
+                }
+                if (occurrences == null) {
+                    supportedAnnotationNames.put(name, null);
+                } else {
+                    for (AnnotationValue<?> occurrence : occurrences) {
+                        if (!merged.contains(occurrence)) {
+                            merged.add(occurrence);
+                        }
+                    }
+                }
+            });
+            for (AnnotationValue<?> annotationValue : annotationValues) {
+                annotationValue.annotationClassValue(META_MEMBER_INTERCEPTOR_TYPE).map(AnnotationClassValue::getName).ifPresent(supportedInterceptorTypes::add);
+            }
+        }
+        this.supportedAnnotationNames = supportedAnnotationNames;
+        this.supportedInterceptorTypes = supportedInterceptorTypes;
+        this.singletonsOnly = false;
+    }
+
+    /**
+     * Qualifies the interceptors bound to any of the given interception points, such as the methods of a proxy.
+     * Merging the points into one metadata would keep a single occurrence of an annotation that does not repeat.
+     *
+     * @param interceptionPoints The metadata of the interception points
+     * @param <T>                The bean type
+     * @return The qualifier
+     * @since 5.3.0
+     */
+    @Internal
+    public static <T> InterceptorBindingQualifier<T> ofInterceptionPoints(AnnotationMetadata... interceptionPoints) {
+        return new InterceptorBindingQualifier<>(interceptionPoints);
     }
 
     private static Map<String, List<AnnotationValue<?>>> findSupportedAnnotations(Collection<AnnotationValue<Annotation>> annotationValues,
@@ -123,6 +193,9 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        if (singletonsOnly && !isSingleton(candidate)) {
+            return false;
+        }
         if (supportedInterceptorTypes.contains(candidate.getBeanType().getName())) {
             return true;
         }
@@ -298,12 +371,21 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             return false;
         }
         InterceptorBindingQualifier<?> that = (InterceptorBindingQualifier<?>) o;
-        return supportedAnnotationNames.equals(that.supportedAnnotationNames) && supportedInterceptorTypes.equals(that.supportedInterceptorTypes);
+        return singletonsOnly == that.singletonsOnly
+            && supportedAnnotationNames.equals(that.supportedAnnotationNames)
+            && supportedInterceptorTypes.equals(that.supportedInterceptorTypes);
     }
 
     @Override
     public int hashCode() {
-        return ObjectUtils.hash(supportedAnnotationNames, supportedInterceptorTypes);
+        return 31 * ObjectUtils.hash(supportedAnnotationNames, supportedInterceptorTypes) + Boolean.hashCode(singletonsOnly);
+    }
+
+    private static boolean isSingleton(BeanType<?> candidate) {
+        if (candidate instanceof BeanDefinition<?> definition) {
+            return definition.isSingleton();
+        }
+        return candidate instanceof BeanDefinitionReference<?> reference && reference.isSingleton();
     }
 
     @Override
