@@ -49,7 +49,8 @@ public class UnprocessedRequestException extends HttpClientException {
     private transient ServiceInstance serviceInstance;
     private boolean targetSet;
     @Nullable
-    private transient volatile CloseableByteBody unsentBody;
+    // guarded by this
+    private transient CloseableByteBody unsentBody;
     private volatile boolean bodySent;
 
     /**
