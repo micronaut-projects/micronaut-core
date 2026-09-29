@@ -1,14 +1,18 @@
 package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.async.publisher.Publishers
+import io.micronaut.discovery.ServiceInstance
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.LoadBalancer
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.exceptions.UnprocessedRequestException
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
+import org.reactivestreams.Publisher
 import reactor.core.Disposable
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -259,6 +263,65 @@ class StaleConnectionRetrySpec extends Specification {
         e.reason == UnprocessedRequestException.Reason.CONNECT
         server.requests*.toString() == ['0/0 GET /first', '0/1 GET /second']
         server.connections.get() == 1
+    }
+
+    void "a load balanced exchange whose first attempt hit a stale connection reports only the outcome of the retry"() {
+        given: "a load balancer that records the outcomes, and a server that closes the connection instead of answering its second request"
+        List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>()
+        startLoadBalanced(outcomes) { int connection, int requestOnConnection -> requestOnConnection == 0 }
+
+        expect:
+        exchange(HttpRequest.GET('/first')) == 'ok /first'
+        outcomes == [LoadBalancer.Outcome.SUCCESS]
+
+        when:
+        String response = exchange(HttpRequest.GET('/second'))
+
+        then: "the retry succeeds, and the failed first attempt is not counted against the instance"
+        response == 'ok /second'
+        server.requests*.toString() == ['0/0 GET /first', '0/1 GET /second', '1/0 GET /second']
+        waitFor { outcomes.size() == 2 }
+        outcomes == [LoadBalancer.Outcome.SUCCESS, LoadBalancer.Outcome.SUCCESS]
+    }
+
+    void "a load balanced retry whose new connection cannot be opened reports the connect failure once"() {
+        given:
+        List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>()
+        startLoadBalanced(outcomes) { int connection, int requestOnConnection ->
+            if (requestOnConnection == 0) {
+                return true
+            }
+            server.serverSocket.close()
+            return false
+        }
+
+        expect:
+        exchange(HttpRequest.GET('/first')) == 'ok /first'
+
+        when:
+        exchange(HttpRequest.GET('/second'))
+
+        then:
+        def e = thrown(UnprocessedRequestException)
+        e.reason == UnprocessedRequestException.Reason.CONNECT
+        Thread.sleep(100)
+        outcomes == [LoadBalancer.Outcome.SUCCESS, LoadBalancer.Outcome.CONNECT_FAILURE]
+    }
+
+    private void startLoadBalanced(List<LoadBalancer.Outcome> outcomes, Closure<Boolean> respond) {
+        server = new RawServer(respond)
+        ServiceInstance instance = ServiceInstance.of('stale', new URI("http://127.0.0.1:${server.port}"))
+        client = ctx.createBean(HttpClient, new LoadBalancer() {
+            @Override
+            Publisher<ServiceInstance> select(Object discriminator) {
+                return Publishers.just(instance)
+            }
+
+            @Override
+            void report(ServiceInstance serviceInstance, LoadBalancer.Outcome outcome) {
+                outcomes.add(outcome)
+            }
+        })
     }
 
     void "a retry is sent on another idle pooled connection of the same event loop"() {
