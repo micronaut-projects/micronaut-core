@@ -137,6 +137,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * avoids repeating the annotation lookups. The map is copy-on-write and never mutated once
      * published: reads are lock-free and misses publish a new copy under {@link #clientKeyCacheLock}.
      */
+    @SuppressWarnings("java:S3077") // the published map is never modified, volatile only publishes it
     private volatile IdentityHashMap<AnnotationMetadata, ClientKey> clientKeyCache = new IdentityHashMap<>();
     private final Object clientKeyCacheLock = new Object();
     /**
