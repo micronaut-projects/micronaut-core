@@ -98,6 +98,15 @@ abstract class AbstractJdkHttpClient {
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
     public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
     public static final String WEIRD_ALPN_ERROR_MESSAGE = "The only supported ALPN modes are [" + HttpVersionSelection.ALPN_HTTP_1 + "] or [" + HttpVersionSelection.ALPN_HTTP_1 + "," + HttpVersionSelection.ALPN_HTTP_2 + "]";
+    /**
+     * The headers that are never copied to a redirect to another origin.
+     */
+    private static final List<String> ALWAYS_CROSS_ORIGIN_FILTERED_HEADERS = List.of(
+        io.micronaut.http.HttpHeaders.AUTHORIZATION,
+        io.micronaut.http.HttpHeaders.COOKIE,
+        io.micronaut.http.HttpHeaders.ORIGIN,
+        io.micronaut.http.HttpHeaders.REFERER
+    );
     @Nullable
     protected final LoadBalancer loadBalancer;
     @Nullable
@@ -578,8 +587,12 @@ abstract class AbstractJdkHttpClient {
                     log.debug("Client {} Following redirect {} to: {}", clientId, response.statusCode(), redirectRequest);
                 }
                 sendFollowingRedirects(httpClient, redirectRequest, bodyHandler, nextRedirectCount, result, inFlight);
-            } catch (Throwable t) {
-                result.completeExceptionally(t);
+            } catch (Exception e) {
+                result.completeExceptionally(e instanceof HttpClientException ? e : populateServiceId(
+                    new HttpClientException("Failed to follow the redirect: " + e.getMessage(), e),
+                    clientId,
+                    configuration
+                ));
             }
         });
     }
@@ -603,13 +616,13 @@ abstract class AbstractJdkHttpClient {
         }
         URI redirectUri;
         try {
-            redirectUri = request.uri().resolve(new URI(location.get())).normalize();
+            redirectUri = request.uri().resolve(new URI(location.get()));
         } catch (URISyntaxException | IllegalArgumentException e) {
             return null;
         }
         String scheme = redirectUri.getScheme();
         // like HttpClient.Redirect.NORMAL: no redirects from https to http
-        if (scheme == null || !(scheme.equalsIgnoreCase(request.uri().getScheme()) || scheme.equalsIgnoreCase("https"))) {
+        if (scheme == null || redirectUri.getHost() == null || !(scheme.equalsIgnoreCase(request.uri().getScheme()) || scheme.equalsIgnoreCase("https"))) {
             return null;
         }
         return redirectUri;
@@ -625,19 +638,28 @@ abstract class AbstractJdkHttpClient {
      * @return The request to the redirect URI
      */
     private HttpRequest redirectRequest(HttpRequest request, int statusCode, URI location) {
+        String method = request.method();
+        // like HttpClient.Redirect.NORMAL: a 303 changes the method to GET, a 301 or 302 only
+        // changes a POST to a GET, and any other redirect keeps the method and body
+        boolean changeToGet = (statusCode == 303 && !method.equals(io.micronaut.http.HttpMethod.HEAD.name())) ||
+            ((statusCode == 301 || statusCode == 302) && method.equals(io.micronaut.http.HttpMethod.POST.name()));
+        // the body headers are kept for a 307 or 308 like in the Netty client, and for a
+        // 301 or 302 that sends the body again
         boolean preserveBody = statusCode == 307 || statusCode == 308 ||
-            ((statusCode == 301 || statusCode == 302) && request.method().equals(io.micronaut.http.HttpMethod.QUERY.name()));
+            (!changeToGet && statusCode != 303 && request.bodyPublisher().map(body -> body.contentLength() != 0).orElse(false));
         Set<String> filteredHeaders = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         filteredHeaders.addAll(configuration.getRedirectAlwaysFilteredHeaders());
         if (!isSameOrigin(request.uri(), location)) {
             filteredHeaders.addAll(configuration.getRedirectCrossOriginFilteredHeaders());
+            // HttpClient.Redirect.NORMAL never sends these to another origin, whatever the configuration
+            filteredHeaders.addAll(ALWAYS_CROSS_ORIGIN_FILTERED_HEADERS);
         }
         if (!preserveBody) {
             filteredHeaders.addAll(configuration.getRedirectAdditionalNonPreserveBodyFilteredHeaders());
         }
         HttpRequest.Builder builder = HttpRequest.newBuilder(request, (name, value) -> !filteredHeaders.contains(name))
             .uri(location);
-        if (!preserveBody && !request.method().equals(io.micronaut.http.HttpMethod.HEAD.name())) {
+        if (changeToGet) {
             builder.GET();
         }
         return builder.build();

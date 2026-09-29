@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.ByteBodyHttpResponse
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -12,6 +13,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Put
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RawHttpClient
@@ -28,7 +30,8 @@ class JdkRedirectSpec extends Specification {
     @AutoCleanup
     EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
             'spec.name'                                               : 'JdkRedirectSpec',
-            'micronaut.http.client.redirect-cross-origin-filtered-headers': ['Authorization', 'X-Api-Key'],
+            // replaces the default list, which includes Authorization
+            'micronaut.http.client.redirect-cross-origin-filtered-headers': ['X-Api-Key'],
             'micronaut.http.client.max-redirects'                     : 3,
     ])
 
@@ -45,17 +48,27 @@ class JdkRedirectSpec extends Specification {
                 .header('X-Other', 'other'))
 
         then:
-        response == 'X-Api-Key=none X-Other=other'
+        response == 'X-Api-Key=none X-Other=other Authorization=none'
+    }
+
+    def 'Authorization is not copied to a cross-origin redirect, even if the configured headers do not include it'() {
+        when:
+        def response = client.toBlocking().retrieve(HttpRequest.GET("/jdk-redirect/redirect?port=$otherServer.port")
+                .header(HttpHeaders.AUTHORIZATION, 'Bearer secret'))
+
+        then:
+        response == 'X-Api-Key=none X-Other=none Authorization=none'
     }
 
     def 'configured headers are copied to a same-origin redirect'() {
         when:
         def response = client.toBlocking().retrieve(HttpRequest.GET("/jdk-redirect/redirect?port=$server.port")
                 .header('X-Api-Key', 'secret')
-                .header('X-Other', 'other'))
+                .header('X-Other', 'other')
+                .header(HttpHeaders.AUTHORIZATION, 'Bearer secret'))
 
         then:
-        response == 'X-Api-Key=secret X-Other=other'
+        response == 'X-Api-Key=secret X-Other=other Authorization=Bearer secret'
     }
 
     def 'the raw client does not copy configured headers to a cross-origin redirect'() {
@@ -69,17 +82,26 @@ class JdkRedirectSpec extends Specification {
 
         then:
         response.status == HttpStatus.OK
-        response.byteBody().buffer().get().toString(StandardCharsets.UTF_8) == 'X-Api-Key=none X-Other=other'
+        response.byteBody().buffer().get().toString(StandardCharsets.UTF_8) == 'X-Api-Key=none X-Other=other Authorization=none'
 
         cleanup:
         response?.close()
         rawClient?.close()
     }
 
-    def 'a 307 redirect keeps the method and body, a 303 redirect switches to GET'() {
+    def 'a #status redirect of a #method request is followed with #expected'() {
         expect:
-        client.toBlocking().retrieve(HttpRequest.POST("/jdk-redirect/post-redirect?status=307", 'foo').contentType(MediaType.TEXT_PLAIN)) == 'POST foo'
-        client.toBlocking().retrieve(HttpRequest.POST("/jdk-redirect/post-redirect?status=303", 'foo').contentType(MediaType.TEXT_PLAIN)) == 'GET'
+        client.toBlocking().retrieve(HttpRequest.create(HttpMethod.valueOf(method), "/jdk-redirect/body-redirect?status=$status").body('foo').contentType(MediaType.TEXT_PLAIN)) == expected
+
+        where:
+        status | method | expected
+        307    | 'POST' | 'POST foo'
+        308    | 'PUT'  | 'PUT foo'
+        301    | 'PUT'  | 'PUT foo'
+        302    | 'PUT'  | 'PUT foo'
+        302    | 'POST' | 'GET'
+        303    | 'POST' | 'GET'
+        303    | 'PUT'  | 'GET'
     }
 
     def 'the maximum number of redirects is honoured'() {
@@ -104,17 +126,27 @@ class JdkRedirectSpec extends Specification {
 
         @Get(value = '/echo', produces = MediaType.TEXT_PLAIN)
         String echo(HttpRequest<?> request) {
-            "X-Api-Key=${request.headers.get('X-Api-Key') ?: 'none'} X-Other=${request.headers.get('X-Other') ?: 'none'}"
+            "X-Api-Key=${request.headers.get('X-Api-Key') ?: 'none'} X-Other=${request.headers.get('X-Other') ?: 'none'} Authorization=${request.headers.get(HttpHeaders.AUTHORIZATION) ?: 'none'}"
         }
 
-        @Post(value = '/post-redirect', consumes = MediaType.TEXT_PLAIN)
+        @Post(value = '/body-redirect', consumes = MediaType.TEXT_PLAIN)
         HttpResponse<?> postRedirect(@QueryValue int status, @Body String body) {
             HttpResponse.status(HttpStatus.valueOf(status)).header(HttpHeaders.LOCATION, '/jdk-redirect/method')
+        }
+
+        @Put(value = '/body-redirect', consumes = MediaType.TEXT_PLAIN)
+        HttpResponse<?> putRedirect(@QueryValue int status, @Body String body) {
+            postRedirect(status, body)
         }
 
         @Post(value = '/method', consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
         String methodPost(@Body String body) {
             "POST $body"
+        }
+
+        @Put(value = '/method', consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+        String methodPut(@Body String body) {
+            "PUT $body"
         }
 
         @Get(value = '/method', produces = MediaType.TEXT_PLAIN)
