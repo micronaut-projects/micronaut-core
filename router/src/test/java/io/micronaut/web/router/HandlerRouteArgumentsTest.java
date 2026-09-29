@@ -168,7 +168,7 @@ class HandlerRouteArgumentsTest {
     @Test
     void aRouteByTheNameOfAStandardMethodIsARouteOfThatMethod() {
         Router router = router(routes -> {
-            assertMissing("uri", () -> routes.route("PROPFIND", null));
+            assertMissing("uri", () -> routes.route("PROPFIND", (String) null));
             routes.route("get", "/x").handle(HandlerRouteArgumentsTest::ok);
             routes.route("PROPFIND", "/y").handle(HandlerRouteArgumentsTest::ok);
         });

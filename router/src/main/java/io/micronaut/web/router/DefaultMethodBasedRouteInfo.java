@@ -51,6 +51,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     permits DefaultRequestMatcher {
 
     private static final RequestArgumentBinder[] ZERO_BINDERS = new RequestArgumentBinder[0];
+    private static final List<MediaType> CONSUMES_ALL = List.of(MediaType.ALL_TYPE);
     private final MethodExecutionHandle<T, R> targetMethod;
     private final String[] argumentNames;
     private final boolean isVoid;
@@ -105,6 +106,8 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
             optionalBodyArgument = Optional.empty();
         }
         optionalFullBodyArgument = super.getFullRequestBodyType();
+        // a route that consumes every type (no consumed types) reads its body as one that consumes */*
+        List<MediaType> readableMediaTypes = this.consumesMediaTypes.isEmpty() ? CONSUMES_ALL : this.consumesMediaTypes;
         this.messageBodyReader = optionalBodyArgument.flatMap(b -> {
             if (b.getAnnotationMetadata().stringValue(Body.class).isPresent() || !b.getAnnotationMetadata().hasAnnotation(Body.class)) {
                 // Special case for `@Body("myProperty")`
@@ -112,7 +115,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
             } else if (b.isAsyncOrReactive() || b.isOptional()) {
                 b = b.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return messageBodyHandlerRegistry.findReader(b, consumesMediaTypes);
+            return messageBodyHandlerRegistry.findReader(b, readableMediaTypes);
         }).orElse(null);
         needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
     }

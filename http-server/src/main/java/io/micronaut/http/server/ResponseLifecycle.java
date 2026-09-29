@@ -420,6 +420,10 @@ public abstract class ResponseLifecycle {
 
         httpContentPublisher = httpContentPublisher.doOnDiscard(CloseableByteBody.class, CloseableByteBody::close);
 
+        // The response is committed with its first item. An error before it, including one of the
+        // writer of the first item, gets the limited handling of handleStreamingError; an error
+        // after it, e.g. a writer failing on a later item, aborts the response, as the status
+        // and the headers were already sent.
         return LazySendingSubscriber.create(httpContentPublisher).map(items -> {
             CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
             return ByteBodyHttpResponseWrapper.wrap(response, byteBody);
