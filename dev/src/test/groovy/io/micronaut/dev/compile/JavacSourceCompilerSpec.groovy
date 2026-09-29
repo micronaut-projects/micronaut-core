@@ -195,7 +195,7 @@ class JavacSourceCompilerSpec extends Specification {
         write("example/UsesHelper.java", "package example; public class UsesHelper { public String go() { return new Helper().help(); } }")
         compiler.compile(request().asFull())
         Files.exists(out.resolve("example/Helper.class"))
-        Files.readString(out.resolveSibling("classes" + SourceIndex.MAPPING_SUFFIX)).contains("example.Pair,example.Helper")
+        Files.readString(SourceIndex.mappingFile(out, SourceKind.JAVA)).contains("example.Pair,example.Helper")
 
         when: "the helper changes inside the pair source"
         Path pair = write("example/Pair.java", "package example; public class Pair { } class Helper { public String help() { return \"two\"; } }")
@@ -216,7 +216,7 @@ class JavacSourceCompilerSpec extends Specification {
         result.status == CompilationResult.Status.NOTHING_TO_DO
         !Files.exists(out.resolve("example/Helper.class"))
         !Files.exists(out.resolve("example/Pair.class"))
-        !Files.readString(out.resolveSibling("classes" + SourceIndex.MAPPING_SUFFIX)).contains("Pair.java")
+        !Files.readString(SourceIndex.mappingFile(out, SourceKind.JAVA)).contains("Pair.java")
     }
 
     void "a class a source stops declaring cannot be linked against by a recompiled dependent"() {
@@ -289,7 +289,7 @@ class JavacSourceCompilerSpec extends Specification {
         !Files.exists(out.resolve("example/Base.class"))
         !Files.exists(out.resolve("example/Derived.class"))
         !Files.exists(out.resolve("example/Alone.class"))
-        !Files.exists(out.resolveSibling("classes" + SourceIndex.MAPPING_SUFFIX))
+        !Files.exists(SourceIndex.mappingFile(out, SourceKind.JAVA))
         Files.exists(out.resolve("application.yml"))
         result.removedOutputs.size() == 4
     }
@@ -304,7 +304,7 @@ class JavacSourceCompilerSpec extends Specification {
         Files.exists(generated.resolve("example/AloneGenerated.java"))
         Files.exists(out.resolve("example/AloneGenerated.class"))
         Files.readString(out.resolve("META-INF/marked/Alone")) == "Alone"
-        Files.readString(out.resolveSibling("classes" + SourceIndex.MAPPING_SUFFIX)).contains("AloneGenerated")
+        Files.readString(SourceIndex.mappingFile(out, SourceKind.JAVA)).contains("AloneGenerated")
 
         when: "the mark is removed"
         Path alone = write("example/Alone.java", "package example; public class Alone { public int value() { return 1; } }")

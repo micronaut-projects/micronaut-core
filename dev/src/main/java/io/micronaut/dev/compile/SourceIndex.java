@@ -47,9 +47,12 @@ import java.util.stream.Stream;
 final class SourceIndex {
 
     /**
-     * The suffix of the mapping file, beside the class output.
+     * The suffix of the mapping file, beside the class output; the language's name follows it, so two
+     * languages sharing one output keep their records apart and a full compilation of one leaves the
+     * other's outputs alone.
      */
-    static final String MAPPING_SUFFIX = ".micronaut-dev-sources";
+    static final String MAPPING_SUFFIX = ".micronaut-dev-sources-";
+    private static final String LEGACY_MAPPING_SUFFIX = ".micronaut-dev-sources";
     private static final String GENERATED_KEY_SUFFIX = "#generated";
     private static final String RESOURCES_KEY_SUFFIX = "#resources";
 
@@ -74,13 +77,19 @@ final class SourceIndex {
      *
      * @param roots The source roots
      * @param classOutput The class output the mapping file sits beside
+     * @param kind The language, which names the mapping file
      * @return The index
      */
-    static SourceIndex scan(List<SourceRoot> roots, Path classOutput) {
+    static SourceIndex scan(List<SourceRoot> roots, Path classOutput, SourceKind kind) {
         Map<Path, Set<String>> recorded = new LinkedHashMap<>();
         Map<Path, Set<String>> generated = new LinkedHashMap<>();
         Map<Path, Set<String>> resources = new LinkedHashMap<>();
-        load(mappingFile(classOutput), recorded, generated, resources);
+        Path mapping = mappingFile(classOutput, kind);
+        if (!Files.isRegularFile(mapping) && kind == SourceKind.JAVA) {
+            // the layout before the mapping was kept per language named the Java one without the suffix
+            mapping = classOutput.resolveSibling(classOutput.getFileName() + LEGACY_MAPPING_SUFFIX);
+        }
+        load(mapping, recorded, generated, resources);
         Map<Path, Set<String>> classesBySource = new LinkedHashMap<>();
         Map<String, Path> sourceByClass = new LinkedHashMap<>();
         for (SourceRoot root : roots) {
@@ -105,8 +114,8 @@ final class SourceIndex {
         return new SourceIndex(roots, classesBySource, sourceByClass, recorded, generated, resources);
     }
 
-    static Path mappingFile(Path classOutput) {
-        return classOutput.resolveSibling(classOutput.getFileName() + MAPPING_SUFFIX);
+    static Path mappingFile(Path classOutput, SourceKind kind) {
+        return classOutput.resolveSibling(classOutput.getFileName() + MAPPING_SUFFIX + kind.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     Set<Path> allSources() {

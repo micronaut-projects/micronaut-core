@@ -12,9 +12,12 @@ dependencies {
     compileOnly(projects.micronautHttpServer)
     // the /dev endpoint exists only when the management module is present
     compileOnly(projects.micronautManagement)
+    // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath
+    compileOnly(libs.managed.groovy)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
+    testImplementation(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
@@ -39,4 +42,7 @@ noReflection {
     allowIn("io.micronaut.dev.DevRuntime", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.DevRuntime", "CLASS_LOADING")
     allowIn("io.micronaut.dev.ManifestRetentionPolicy", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.GroovyCompilation", "CLASS_LOADING")
 }
