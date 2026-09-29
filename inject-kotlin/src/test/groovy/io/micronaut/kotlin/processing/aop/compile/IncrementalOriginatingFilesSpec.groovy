@@ -42,6 +42,28 @@ class SupplierFactory {
         outputs.findAll { it.value.aggregating || !it.value.originatingFiles.contains('SupplierFactory.kt') } == [:]
     }
 
+    void "the adapter of an event listener originates from the declaring file"() {
+        given:
+        def outputs = compile('StartupListener.kt', '''
+package test
+
+import io.micronaut.context.event.StartupEvent
+import io.micronaut.runtime.event.annotation.EventListener
+import jakarta.inject.Singleton
+
+@Singleton
+class StartupListener {
+    @EventListener
+    fun onStartup(event: StartupEvent) {
+    }
+}
+''')
+
+        expect:
+        outputs.keySet().count { it.contains('$ApplicationEventListener$onStartup1$Intercepted') } == 4
+        outputs.findAll { it.value.aggregating || !it.value.originatingFiles.contains('StartupListener.kt') } == [:]
+    }
+
     private static Map<String, Output> compile(String fileName, String source) {
         Map<String, Output> outputs = [:]
         def compilation = new KotlinCompilation()

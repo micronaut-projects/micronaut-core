@@ -346,6 +346,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ElementProxyBuilde
     @Override
     public void addOriginatingElement(Element element) {
         originatingElements.addOriginatingElement(element);
+        proxyBeanDefinitionWriter.addOriginatingElement(element);
     }
 
     /**
