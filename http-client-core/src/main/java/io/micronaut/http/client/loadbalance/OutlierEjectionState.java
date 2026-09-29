@@ -22,8 +22,15 @@ import java.net.URI;
 import java.time.Instant;
 
 /**
- * A snapshot of the outlier detection state of one instance of a service, see
- * {@link OutlierDetectionConfiguration} and {@link io.micronaut.http.client.LoadBalancer#getOutlierEjectionStates()}.
+ * A snapshot of the outlier detection state of one instance of a service.
+ *
+ * <p>Outlier detection, when enabled with {@link OutlierDetectionConfiguration}, counts the
+ * consecutive failures of each instance a load balancer selects. An instance whose failures
+ * reach the configured threshold is <em>ejected</em>: the load balancer stops selecting it
+ * for the ejection time, which grows with each ejection, then tries it again. This record tells
+ * whether an instance is ejected now, until when, and how close it is to the next ejection, for
+ * example for a management endpoint. Obtain it from
+ * {@link io.micronaut.http.client.LoadBalancer#getOutlierEjectionStates()}.</p>
  *
  * @param uri                     The URI of the instance
  * @param ejected                 Whether the instance is ejected now
