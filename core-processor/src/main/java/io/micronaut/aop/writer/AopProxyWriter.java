@@ -253,8 +253,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private final boolean hotswap;
     private final boolean lazy;
     private final boolean cacheLazyTarget;
-    // whether a proxy fronting a separate target resolves its interceptors for each target, see Around#lazyInterceptorsPerTarget
-    private final boolean interceptorsPerTarget;
+    // whether a proxy fronting a separate target resolves its interceptors for each target, see Around#lazyInterceptorsPerTarget;
+    // a binding of the proxy can also opt it in, see InterceptorBinding#lazyInterceptorsPerTarget, which build() settles
+    private boolean interceptorsPerTarget;
     private final MethodElement targetConstructor;
 
     private final Map<MethodElement, MethodElement> overriddenMethods = new LinkedHashMap<>();
@@ -602,6 +603,12 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         }
 
         ClassDef.ClassDefBuilder proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
+
+        if (isProxyTarget && !interceptorsPerTarget) {
+            // every binding is known by now: those of the bean, of its constructor and of each intercepted method
+            interceptorsPerTarget = interceptorBinding.stream()
+                .anyMatch(binding -> binding.isTrue(Interceptor.LAZY_INTERCEPTORS_PER_TARGET.toString()));
+        }
 
         // a proxy that selects the interceptors of each call for its target keeps none of its own
         FieldDef interceptorsField = null;

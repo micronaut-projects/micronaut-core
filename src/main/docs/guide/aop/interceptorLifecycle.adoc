@@ -163,6 +163,15 @@ For a scoped bean whose binding annotation carries no ann:aop.Around[] of its ow
 the settings of the scope's proxy, `@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)`: an
 `@Around` declared on the bean replaces the one its scope contributes.
 
+A binding annotation can instead opt in every proxy with a separate target that it binds, with the member of the same
+name on ann:aop.InterceptorBinding[]: `@InterceptorBinding(kind = InterceptorKind.AROUND, lazyInterceptorsPerTarget = true)`
+declared on the binding annotation, in place of or next to its ann:aop.Around[]. The proxy of a bean that declares
+`@Around(proxyTarget = true)`, of a scoped bean and of a bean a ann:context.annotation.Factory[] method produces then
+resolves its interceptors for each target when the annotation is declared on the bean, on one of its intercepted
+methods or on the factory method, whatever `@Around` the bean declares or its scope contributes. The member is read on
+the bindings a proxy is bound by: `AROUND`, and `AROUND_CONSTRUCT` for its constructor. Either the binding or `@Around`
+is enough, and a proxy that neither opts in is generated as before.
+
 NOTE: A target handed to a hot-swappable proxy through `swap` is intercepted with its own instances when the context
 holds a registration for it, a singleton or a bean of a custom scope. Any other object, such as the target of another
 proxy, is intercepted with instances the context creates once for such targets. A runtime proxy

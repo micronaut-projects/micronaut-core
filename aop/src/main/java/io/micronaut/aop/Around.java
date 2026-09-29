@@ -101,7 +101,11 @@ public @interface Around {
      * A lazy proxy, such as a scoped proxy, therefore intercepts each target it resolves with that target's instance.
      * Singleton interceptors are shared as before.</p>
      *
+     * <p>A binding annotation can opt in every proxy it binds instead, with
+     * {@link InterceptorBinding#lazyInterceptorsPerTarget()}.</p>
+     *
      * @return True if the proxy should resolve its interceptors for each target
+     * @see InterceptorBinding#lazyInterceptorsPerTarget()
      * @since 5.3.0
      */
     boolean lazyInterceptorsPerTarget() default false;

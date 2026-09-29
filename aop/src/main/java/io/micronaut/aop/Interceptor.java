@@ -66,7 +66,8 @@ public interface Interceptor<T, R> extends Ordered {
     CharSequence CACHEABLE_LAZY_TARGET = "cacheableLazyTarget";
 
     /**
-     * The {@link Around#lazyInterceptorsPerTarget()} setting.
+     * The {@link Around#lazyInterceptorsPerTarget()} setting, also the {@link InterceptorBinding#lazyInterceptorsPerTarget()}
+     * member of a binding.
      *
      * @since 5.3.0
      */

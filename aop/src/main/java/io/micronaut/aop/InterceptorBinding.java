@@ -71,4 +71,23 @@ public @interface InterceptorBinding {
      * @since 3.3.0
      */
     boolean bindMembers() default false;
+
+    /**
+     * Declared on a binding annotation, the value of {@code lazyInterceptorsPerTarget()} can be set to {@code true} to
+     * have every proxy that fronts a separate target, and that is bound by this binding, resolve its interceptors for
+     * each target, as {@link Around#lazyInterceptorsPerTarget()} does.
+     *
+     * <p>A proxy is bound by the {@link InterceptorKind#AROUND} bindings of the bean and of its intercepted methods,
+     * and by the {@link InterceptorKind#AROUND_CONSTRUCT} bindings of its constructor. Such a binding opts the proxy in
+     * wherever its annotation is declared: on the bean, on one of those members, or on the factory member producing
+     * the bean. It does so whatever {@link Around} the bean declares or its scope contributes, so a bean of a scope such
+     * as {@code RequestScope} needs no {@code Around} of its own. Either this or
+     * {@link Around#lazyInterceptorsPerTarget()} is enough. The value is read at compile time, and it changes nothing
+     * for a proxy without a separate target, or when declared on an interceptor.</p>
+     *
+     * @return Whether the proxies with a separate target bound by this binding resolve their interceptors for each target
+     * @see Around#lazyInterceptorsPerTarget()
+     * @since 5.3.0
+     */
+    boolean lazyInterceptorsPerTarget() default false;
 }
