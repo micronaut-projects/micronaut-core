@@ -31,6 +31,7 @@ import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -71,6 +72,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,6 +160,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private boolean writing = false;
     private boolean quicWritePending = false;
     private boolean shuttingDown = false;
+    /**
+     * Whether the pipeline carries a {@link HttpAccessLogHandler}, see
+     * {@link #exposeResponseRequest()}. {@code null} until the first response is written.
+     */
+    @Nullable
+    private Boolean exposeResponseRequest;
 
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this(requestHandler, false);
@@ -360,6 +368,38 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
         assert ctx != null;
+        OutboundHandler current = outboundHandler;
+        if (current != null && message instanceof HttpResponse && exposeResponseRequest()) {
+            Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+            attribute.set(current.outboundAccess.attachment);
+            try {
+                return write0(message, flush, close, needsPromise);
+            } finally {
+                attribute.set(null);
+            }
+        }
+        return write0(message, flush, close, needsPromise);
+    }
+
+    /**
+     * Whether to expose the attachment of the response being written in the
+     * {@link HttpAccessLogHandler#RESPONSE_REQUEST} channel attribute while its headers are
+     * written, so that the access log can read request attributes. This is the case when the
+     * pipeline carries an access log handler, also one added by a customizer. The pipeline is
+     * inspected once, on the first response, after the customizers have run.
+     *
+     * @return Whether to expose the attachment
+     */
+    private boolean exposeResponseRequest() {
+        Boolean expose = exposeResponseRequest;
+        if (expose == null) {
+            expose = requiredCtx().pipeline().get(HttpAccessLogHandler.class) != null;
+            exposeResponseRequest = expose;
+        }
+        return expose;
+    }
+
+    private ChannelFuture write0(Object message, boolean flush, boolean close, boolean needsPromise) {
         if (close) {
             return requiredCtx().writeAndFlush(message)
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)

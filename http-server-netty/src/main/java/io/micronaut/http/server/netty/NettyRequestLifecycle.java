@@ -161,7 +161,16 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
         return super.fulfillArguments(routeMatch, request);
     }
 
+    @Override
+    protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+        NettyHttpRequest<?> request = nettyRequest;
+        if (request != null) {
+            request.setFilteredRequest(filteredRequest);
+        }
+    }
+
     void handleException(NettyHttpRequest<?> nettyRequest, Throwable cause) {
+        this.nettyRequest = nettyRequest;
         onError(nettyRequest, cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
     }
 

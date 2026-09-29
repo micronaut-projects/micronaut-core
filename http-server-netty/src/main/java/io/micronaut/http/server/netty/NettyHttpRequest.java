@@ -218,6 +218,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Nullable
     private BodyConvertor bodyConvertor;
+    /**
+     * The request that the request filters passed downstream, when they replaced this one. It is
+     * set before the response is produced, and read when the response is written, after the
+     * response has been handed to the event loop.
+     */
+    @Nullable
+    private HttpRequest<?> filteredRequest;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -255,6 +262,31 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     public void setLegacyBody(@Nullable Object legacyBody) {
         this.legacyBody = legacyBody;
+    }
+
+    /**
+     * Record the request that the request filters passed downstream.
+     *
+     * @param filteredRequest The request after the request filters
+     * @since 5.3.0
+     */
+    @Internal
+    public void setFilteredRequest(HttpRequest<?> filteredRequest) {
+        this.filteredRequest = filteredRequest == this ? null : filteredRequest;
+    }
+
+    /**
+     * The request that the route and the response were produced with: the request that the
+     * request filters passed downstream when they replaced this one, otherwise this request.
+     * The access log reads request attributes from it.
+     *
+     * @return The effective request
+     * @since 5.3.0
+     */
+    @Internal
+    public HttpRequest<?> getEffectiveRequest() {
+        HttpRequest<?> filtered = filteredRequest;
+        return filtered == null ? this : filtered;
     }
 
     @Override

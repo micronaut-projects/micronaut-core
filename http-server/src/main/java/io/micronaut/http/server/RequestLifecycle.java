@@ -374,7 +374,10 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         try {
             List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
-            FilterRunner filterRunner = new FilterRunner(httpFilters, responseProvider) {
+            FilterRunner filterRunner = new FilterRunner(httpFilters, (filteredRequest, propagatedContext) -> {
+                onFilteredRequest(filteredRequest);
+                return responseProvider.apply(filteredRequest, propagatedContext);
+            }) {
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
@@ -391,6 +394,18 @@ public class RequestLifecycle {
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    /**
+     * Called with the request that the request filters pass downstream, before the route, the
+     * file or the error handler produces the response. Filters may replace the request, so this
+     * can be a different instance than the request that the lifecycle was started with.
+     *
+     * @param filteredRequest The request after the request filters
+     * @since 5.3.0
+     */
+    protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+        // no-op by default: only lifecycles that need the effective request record it
     }
 
     private ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
@@ -438,6 +453,7 @@ public class RequestLifecycle {
 
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
+                    onFilteredRequest(request);
                     if (this.routeMatch == null) {
                         //Check if there is a file for the route before returning route not found
                         FileCustomizableResponseType fileCustomizableResponseType = findFile(request);

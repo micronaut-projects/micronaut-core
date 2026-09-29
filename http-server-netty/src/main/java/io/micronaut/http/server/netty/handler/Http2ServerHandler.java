@@ -23,6 +23,7 @@ import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -51,6 +52,7 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
@@ -74,6 +76,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private Http2Connection. @Nullable PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
+    /**
+     * Whether to expose the stream attachment in {@link HttpAccessLogHandler#RESPONSE_REQUEST}
+     * while response headers are written. Set when the access log is enabled.
+     */
+    private boolean exposeResponseRequest = false;
     /**
      * Streams whose request headers were read since the last read complete, without the end of
      * the stream. These are the only streams that can still need {@link MultiplexedStream#devolveToStreaming()}
@@ -435,6 +442,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
+                frameListener.exposeResponseRequest = true;
             }
             frameListener(fl);
             return super.build();
@@ -506,7 +514,18 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(headers, true), 0, endStream, promise);
+            Http2Headers http2Headers = HttpConversionUtil.toHttp2Headers(headers, true);
+            if (exposeResponseRequest) {
+                Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+                attribute.set(attachment());
+                try {
+                    requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+                } finally {
+                    attribute.set(null);
+                }
+            } else {
+                requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+            }
         }
 
         @Override
