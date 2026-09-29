@@ -66,6 +66,22 @@ import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 @Internal
 final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
+
+    /**
+     * Processors per pooled context when no size is configured. See {@link #computeDefaultSize()}.
+     */
+    private static final int PROCESSORS_PER_CONTEXT = 4;
+
+    /**
+     * The fewest contexts to default to. One context serialises every Python call and is
+     * markedly slower than a few.
+     */
+    private static final int MIN_DEFAULT_SIZE = 2;
+
+    /**
+     * The most contexts to default to, however many processors there are.
+     */
+    private static final int MAX_DEFAULT_SIZE = 8;
     private final Engine engine;
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
@@ -130,9 +146,50 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : computeDefaultSize()) : 0;
     }
 
+    /**
+     * The pool size to use when none is configured.
+     *
+     * <p>Scaled down from the processor count and capped, rather than multiplied up.
+     * More contexts cost throughput on any route that reaches a Python bean that is not
+     * itself pooled: such a bean is a single instance living in one context, so the more
+     * contexts there are, the smaller the share of requests served on the one that owns
+     * it. The previous default of {@code processors * 2} sat well past the point where
+     * that begins to dominate, and it grew with core count, so a larger machine made it
+     * worse rather than better.
+     *
+     * <p>Measured on a 12-core machine, 32 concurrent clients against a paged read of
+     * 20 rows in a real application (micronaut-core#13553):
+     *
+     * <table>
+     *   <caption>Throughput by pool size</caption>
+     *   <tr><th>size</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>8</td><td>12</td><td>24</td></tr>
+     *   <tr><th>req/s</th><td>586</td><td>930</td><td>1240</td><td>1238</td><td>977</td><td>899</td><td>915</td><td>869</td><td>847</td></tr>
+     * </table>
+     *
+     * <p>The peak is at 3 to 4, which is what {@code processors / 4} yields there, and the
+     * old default of 24 gave 847. One context is much worse than a few, hence the floor;
+     * the cap keeps a many-core machine from returning to the behaviour this replaces.
+     *
+     * <p>Those numbers are one machine and one application, so the shape -- small, capped,
+     * and not linear in core count -- is better supported than any exact constant. A
+     * workload doing more Python work per request may want more; that is what
+     * {@code micronaut.python.pool.size} is for.
+     *
+     * @return The default pool size
+     */
     private static int computeDefaultSize() {
-        int processors = Runtime.getRuntime().availableProcessors();
-        return Math.max(1, processors * 2);
+        return defaultSizeForProcessors(Runtime.getRuntime().availableProcessors());
+    }
+
+    /**
+     * The default pool size for a processor count. Separated from {@link #computeDefaultSize()}
+     * so that the arithmetic can be exercised for machines other than the one running the test.
+     *
+     * @param processors The number of available processors
+     * @return The default pool size
+     */
+    static int defaultSizeForProcessors(int processors) {
+        return Math.min(MAX_DEFAULT_SIZE, Math.max(MIN_DEFAULT_SIZE, processors / PROCESSORS_PER_CONTEXT));
     }
 
     @Override
