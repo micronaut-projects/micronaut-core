@@ -23,12 +23,14 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.BeanType;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * <p>Core bean definition registry interface containing methods to find {@link BeanDefinition} instances.</p>
@@ -393,6 +395,38 @@ public interface BeanDefinitionRegistry {
      * @since 3.5.0
      */
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition);
+
+    /**
+     * Find a bean registration for the given bean definition, resolved as the given bean type.
+     *
+     * <p>The registration is the one {@link #getBeanRegistration(Argument, Qualifier)} returns for the bean type when
+     * its lookup picks this definition, without the lookup: the caller has already chosen the definition, and no
+     * other candidate is considered. The bean is resolved in the scope of the definition, and with the definition's
+     * declared qualifier, as {@link #getBeanRegistration(BeanDefinition)} resolves it. What differs from that method
+     * is the type the bean is resolved as: a definition that builds its bean from the type it was asked for, such as
+     * the one of {@link BeanProvider}, sees the type arguments of the given bean type rather than those of its own
+     * type.</p>
+     *
+     * <p>The default narrows a lookup of the bean type to the definition. {@link DefaultBeanContext} resolves the
+     * definition directly.</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param beanType       The potentially parameterized bean type to resolve the definition as
+     * @param <T>            The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type, or produced no bean
+     * @since 5.3.0
+     */
+    default <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition, Argument<T> beanType) {
+        Objects.requireNonNull(beanDefinition, "Bean definition cannot be null");
+        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        return getBeanRegistration(beanType, new Qualifier<>() {
+            @Override
+            public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> type, Stream<BT> candidates) {
+                return candidates.filter(beanDefinition::equals);
+            }
+        });
+    }
 
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.

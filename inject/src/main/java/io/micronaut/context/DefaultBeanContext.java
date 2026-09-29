@@ -616,6 +616,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition, Argument<T> beanType) {
+        ArgumentUtils.requireNonNull("beanDefinition", beanDefinition);
+        ArgumentUtils.requireNonNull("beanType", beanType);
+        // the definition is already chosen: only whether it is a candidate for the type is checked, as the lookup
+        // would check it, and the candidate lookup and its caches are skipped
+        Argument<T> resolvedBeanType = resolveCandidateBeanType(beanType, beanDefinition);
+        if (!isInjectableCandidate(resolvedBeanType, beanDefinition)) {
+            throw new NoSuchBeanException(beanType, null, "The bean definition [" + beanDefinition + "] is not a candidate for that type.");
+        }
+        Qualifier<T> qualifier = beanDefinition.getDeclaredQualifier();
+        BeanRegistration<T> registration = resolveBeanRegistration(null, beanDefinition, resolvedBeanType, qualifier);
+        if (registration.bean == null) {
+            registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
+            if (registration.bean == null && !isNullableBeanDefinition(registration.beanDefinition)) {
+                throw newNoSuchBeanException(null, beanType, qualifier, null);
+            }
+        }
+        return registration;
+    }
+
+    @Override
     public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
         if (bean == null) {
             return Optional.empty();
