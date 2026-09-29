@@ -59,7 +59,8 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     @Nullable
     private final MessageBodyReader<?> messageBodyReader;
 
-    private RequestArgumentBinder<Object> @Nullable [] argumentBinders;
+    private @Nullable ResolvedBinders argumentBinders;
+    private @Nullable RouteShape shape;
     private final boolean needsBody;
 
     public DefaultMethodBasedRouteInfo(MethodExecutionHandle<T, R> targetMethod,
@@ -135,10 +136,55 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     @Override
     public RequestArgumentBinder<Object>[] resolveArgumentBinders(RequestBinderRegistry requestBinderRegistry) {
         // Allow concurrent access
-        if (argumentBinders == null) {
-            argumentBinders = resolveArgumentBindersInternal(requestBinderRegistry);
+        ResolvedBinders resolved = argumentBinders;
+        if (resolved == null) {
+            resolved = new ResolvedBinders(requestBinderRegistry, resolveArgumentBindersInternal(requestBinderRegistry));
+            argumentBinders = resolved;
         }
-        return argumentBinders;
+        return resolved.binders;
+    }
+
+    /**
+     * Unlike {@link #resolveArgumentBinders(RequestBinderRegistry)}, which keeps the binders of
+     * the first registry it is called with, these are the binders of the given registry.
+     *
+     * @param requestBinderRegistry The registry
+     * @return The binders of the arguments
+     */
+    @SuppressWarnings("ReferenceEquality") // the binders are specific to the registry instance
+    private RequestArgumentBinder<Object>[] argumentBindersOf(RequestBinderRegistry requestBinderRegistry) {
+        RequestArgumentBinder<Object>[] binders = resolveArgumentBinders(requestBinderRegistry);
+        ResolvedBinders resolved = argumentBinders;
+        if (resolved != null && resolved.registry != requestBinderRegistry) {
+            // the binders were resolved with another registry first
+            return resolveArgumentBindersInternal(requestBinderRegistry);
+        }
+        return binders;
+    }
+
+    /**
+     * The shape of this route for the given registry, built on first use. It is rebuilt when the
+     * registry or the kind of match differs from the one it was built for.
+     *
+     * @param requestBinderRegistry The registry the arguments are bound with
+     * @param match                 The match the arguments are bound for
+     * @return The shape
+     */
+    @SuppressWarnings("ReferenceEquality") // the shape is specific to the registry instance
+    final RouteShape shape(RequestBinderRegistry requestBinderRegistry, AbstractRouteMatch<?, ?> match) {
+        RouteShape shape = this.shape;
+        if (shape == null || shape.registry != requestBinderRegistry || shape.matchType != match.getClass()) {
+            // Allow concurrent access, the shape is immutable
+            shape = new RouteShape(
+                requestBinderRegistry,
+                argumentBindersOf(requestBinderRegistry),
+                argumentNames,
+                match.getClass(),
+                match.pathVariableNames()
+            );
+            this.shape = shape;
+        }
+        return shape;
     }
 
     private RequestArgumentBinder<Object>[] resolveArgumentBindersInternal(RequestBinderRegistry requestBinderRegistry) {
@@ -198,5 +244,18 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     @Override
     public boolean needsRequestBody() {
         return needsBody || super.needsRequestBody();
+    }
+
+    /**
+     * The binders of the arguments and the registry they were resolved with.
+     */
+    private static final class ResolvedBinders {
+        private final RequestBinderRegistry registry;
+        private final RequestArgumentBinder<Object>[] binders;
+
+        private ResolvedBinders(RequestBinderRegistry registry, RequestArgumentBinder<Object>[] binders) {
+            this.registry = registry;
+            this.binders = binders;
+        }
     }
 }

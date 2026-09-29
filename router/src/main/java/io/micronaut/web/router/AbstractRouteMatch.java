@@ -29,7 +29,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
-import io.micronaut.http.bind.binders.UnmatchedRequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.UnsafeExecutionHandle;
@@ -37,11 +36,14 @@ import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Abstract implementation of the {@link RouteMatch} interface.
@@ -54,6 +56,9 @@ import java.util.Optional;
  */
 abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
+    private static final Object[] NO_VALUES = new Object[0];
+    private static final boolean[] NO_FLAGS = new boolean[0];
+
     protected final ConversionService conversionService;
     protected final MethodBasedRouteInfo<T, R> routeInfo;
     protected final MethodExecutionHandle<T, R> methodExecutionHandle;
@@ -63,9 +68,15 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     private final Argument<?>[] arguments;
     private final String[] argumentNames;
     private final @Nullable Object[] argumentValues;
-    private final PostponedRequestArgumentBinder<Object>[] postponedArgumentBinders;
-    private final PendingRequestBindingResult<?>[] pendingRequestBindingResults;
+    /**
+     * Allocated when a binder returns a pending result.
+     */
+    private PendingRequestBindingResult<?> @Nullable [] pendingRequestBindingResults;
     private final boolean[] fulfilledArguments;
+    /**
+     * The shape the binders before the filters ran with, which the binders after the filters use.
+     */
+    private @Nullable RouteShape shape;
     private boolean fulfilled;
     private boolean beforeBindersApplied;
     private boolean afterBindersApplied;
@@ -84,10 +95,13 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         this.arguments = executableMethod.getArguments();
         this.argumentNames = routeInfo.getArgumentNames();
         int length = arguments.length;
-        this.argumentValues = new Object[length];
-        this.fulfilledArguments = new boolean[length];
-        this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
-        this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
+        if (length == 0) {
+            this.argumentValues = NO_VALUES;
+            this.fulfilledArguments = NO_FLAGS;
+        } else {
+            this.argumentValues = new Object[length];
+            this.fulfilledArguments = new boolean[length];
+        }
         if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
             unsafeMethodExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
         } else {
@@ -132,16 +146,19 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (fulfilled) {
             return true;
         }
-        for (int i = 0; i < arguments.length; i++) {
-            boolean isFulfilled = fulfilledArguments[i];
-            if (isFulfilled) {
-                continue;
-            }
-            PendingRequestBindingResult<?> pendingRequestBindingResult = pendingRequestBindingResults[i];
-            if (pendingRequestBindingResult != null && !pendingRequestBindingResult.isPending()) {
-                Argument<?> argument = arguments[i];
-                setBindingResult(i, argument, pendingRequestBindingResult);
-                failOnConversionErrors(argument, pendingRequestBindingResult);
+        PendingRequestBindingResult<?>[] pendingResults = pendingRequestBindingResults;
+        if (pendingResults != null) {
+            for (int i = 0; i < arguments.length; i++) {
+                boolean isFulfilled = fulfilledArguments[i];
+                if (isFulfilled) {
+                    continue;
+                }
+                PendingRequestBindingResult<?> pendingRequestBindingResult = pendingResults[i];
+                if (pendingRequestBindingResult != null && !pendingRequestBindingResult.isPending()) {
+                    Argument<?> argument = arguments[i];
+                    setBindingResult(i, argument, pendingRequestBindingResult);
+                    failOnConversionErrors(argument, pendingRequestBindingResult);
+                }
             }
         }
         checkIfFulfilled();
@@ -237,11 +254,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (!afterBindersApplied) {
             throw new IllegalStateException("Argument binders after filters not processed!");
         }
+        PendingRequestBindingResult<?>[] pendingResults = pendingRequestBindingResults;
         for (int i = 0; i < arguments.length; i++) {
             if (fulfilledArguments[i]) {
                 continue;
             }
-            PendingRequestBindingResult<?> pendingRequestBindingResult = pendingRequestBindingResults[i];
+            PendingRequestBindingResult<?> pendingRequestBindingResult = pendingResults == null ? null : pendingResults[i];
             Argument<?> argument = arguments[i];
             if (pendingRequestBindingResult != null) {
                 setBindingResultOfFail(i, argument, pendingRequestBindingResult);
@@ -293,36 +311,63 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (beforeBindersApplied) {
             throw new IllegalStateException("Argument before filters already processed!");
         }
-        RequestArgumentBinder<Object>[] argumentBinders = routeInfo.resolveArgumentBinders(requestBinderRegistry);
+        RouteShape shape = resolveShape(requestBinderRegistry);
+        this.shape = shape;
+        RequestArgumentBinder<Object>[] argumentBinders = shape.binders;
+        RouteShape.Slot[] slots = shape.slots;
+        boolean[] pathVariables = shape.pathVariables;
+        Map<String, Object> variableValues = null;
+        // the locale and the character encoding are the same for each argument, so they are resolved once
+        Locale locale = null;
+        Charset characterEncoding = null;
+        boolean conversionResolved = false;
         for (int i = 0; i < arguments.length; i++) {
             if (fulfilledArguments[i]) {
                 continue;
             }
             Argument<Object> argument = (Argument<Object>) arguments[i];
-            Object value = getVariableValues().get(argumentNames[i]);
-            if (value != null) {
-                setValue(i, argument, value);
-                continue;
-            }
-            RequestArgumentBinder<Object> argumentBinder = argumentBinders[i];
-            if (argumentBinder instanceof PostponedRequestArgumentBinder<Object> postponedRequestArgumentBinder) {
-                postponedArgumentBinders[i] = postponedRequestArgumentBinder;
-                if (!(argumentBinder instanceof UnmatchedRequestArgumentBinder)) {
-                    // Allow for the unmatched request argument binder to run even so it's postponed
+            // a path variable of the same name wins over the binder, the template decides which arguments can be one
+            if (pathVariables == null || pathVariables[i]) {
+                if (variableValues == null) {
+                    variableValues = getVariableValues();
+                }
+                Object value = variableValues.get(argumentNames[i]);
+                if (value != null) {
+                    setValue(i, argument, value);
                     continue;
                 }
             }
-            if (argumentBinder != null) {
-                fulfillValue(
-                    i,
-                    argumentBinder,
-                    argument,
-                    request
-                );
+            RouteShape.Slot slot = slots[i];
+            if (slot == RouteShape.Slot.EARLY || slot == RouteShape.Slot.POSTPONED_AND_EARLY) {
+                if (!conversionResolved) {
+                    locale = request.getLocale().orElse(null);
+                    characterEncoding = request.getCharacterEncoding();
+                    conversionResolved = true;
+                }
+                ArgumentConversionContext<Object> conversionContext = ConversionContext.of(argument, locale, characterEncoding);
+                fulfillValue(i, argument, argumentBinders[i].bind(conversionContext, request));
             }
         }
         checkIfFulfilled();
         beforeBindersApplied = true;
+    }
+
+    private RouteShape resolveShape(RequestBinderRegistry requestBinderRegistry) {
+        if (routeInfo instanceof DefaultMethodBasedRouteInfo<T, R> defaultRouteInfo) {
+            return defaultRouteInfo.shape(requestBinderRegistry, this);
+        }
+        // not cached for a route info of another kind
+        return new RouteShape(requestBinderRegistry, routeInfo.resolveArgumentBinders(requestBinderRegistry), argumentNames, getClass(), null);
+    }
+
+    /**
+     * The names of the variables the values of {@link #getVariableValues()} can have, the same for
+     * each match of the route, or {@code null} when they are not known.
+     *
+     * @return The names of the path variables
+     */
+    @Nullable Set<String> pathVariableNames() {
+        return null;
     }
 
     @Override
@@ -333,54 +378,44 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (afterBindersApplied) {
             throw new IllegalStateException("Argument binders after filters already processed!");
         }
-        for (int i = 0; i < arguments.length; i++) {
-            if (fulfilledArguments[i]) {
-                continue;
-            }
-            Argument<Object> argument = (Argument<Object>) arguments[i];
-            PostponedRequestArgumentBinder<Object> argumentBinder = postponedArgumentBinders[i];
-            if (argumentBinder != null) {
-                fulfillValuePostponed(
-                    i,
-                    argumentBinder,
-                    argument,
-                    request
-                );
+        // the postponed binders run for the arguments the binders before the filters did not fulfill
+        RouteShape shape = this.shape;
+        if (shape != null && shape.hasPostponed) {
+            RequestArgumentBinder<Object>[] argumentBinders = shape.binders;
+            RouteShape.Slot[] slots = shape.slots;
+            Locale locale = null;
+            Charset characterEncoding = null;
+            boolean conversionResolved = false;
+            for (int i = 0; i < arguments.length; i++) {
+                if (fulfilledArguments[i]) {
+                    continue;
+                }
+                RouteShape.Slot slot = slots[i];
+                if (slot == RouteShape.Slot.POSTPONED || slot == RouteShape.Slot.POSTPONED_AND_EARLY) {
+                    Argument<Object> argument = (Argument<Object>) arguments[i];
+                    if (!conversionResolved) {
+                        locale = request.getLocale().orElse(null);
+                        characterEncoding = request.getCharacterEncoding();
+                        conversionResolved = true;
+                    }
+                    ArgumentConversionContext<Object> conversionContext = ConversionContext.of(argument, locale, characterEncoding);
+                    PostponedRequestArgumentBinder<Object> argumentBinder = (PostponedRequestArgumentBinder<Object>) argumentBinders[i];
+                    fulfillValue(i, argument, argumentBinder.bindPostponed(conversionContext, request));
+                }
             }
         }
         checkIfFulfilled();
         afterBindersApplied = true;
     }
 
-    private <E> void fulfillValue(int index,
-                                  RequestArgumentBinder<E> argumentBinder,
-                                  Argument<E> argument,
-                                  HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
-        ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bind(conversionContext, request);
-        fulfillValue(index, argument, bindingResult);
-    }
-
-    private <E> void fulfillValuePostponed(int index,
-                                           PostponedRequestArgumentBinder<E> argumentBinder,
-                                           Argument<E> argument,
-                                           HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
-        ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bindPostponed(conversionContext, request);
-        fulfillValue(index, argument, bindingResult);
-    }
-
-    private <E> ArgumentConversionContext<E> newContext(Argument<E> argument, HttpRequest<?> request) {
-        return ConversionContext.of(
-            argument,
-            request.getLocale().orElse(null),
-            request.getCharacterEncoding()
-        );
-    }
-
     private <E> void fulfillValue(int index, Argument<E> argument, ArgumentBinder.BindingResult<E> bindingResult) {
         if (bindingResult instanceof PendingRequestBindingResult<?> pendingRequestBindingResult) {
-            pendingRequestBindingResults[index] = pendingRequestBindingResult;
+            PendingRequestBindingResult<?>[] pendingResults = pendingRequestBindingResults;
+            if (pendingResults == null) {
+                pendingResults = new PendingRequestBindingResult[arguments.length];
+                pendingRequestBindingResults = pendingResults;
+            }
+            pendingResults[index] = pendingRequestBindingResult;
             return;
         }
         failOnConversionErrors(argument, bindingResult);

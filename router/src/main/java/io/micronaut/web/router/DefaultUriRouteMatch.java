@@ -27,6 +27,7 @@ import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Default implementation of the {@link RouteMatch} interface for matches to URIs.
@@ -88,6 +89,17 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     @Override
     public List<UriMatchVariable> getVariables() {
         return matchInfo.getVariables();
+    }
+
+    @Override
+    Set<String> pathVariableNames() {
+        // the variables of the template of the route, the same for each of its matches
+        List<UriMatchVariable> matchVariables = matchInfo.getVariables();
+        Set<String> names = CollectionUtils.newHashSet(matchVariables.size());
+        for (UriMatchVariable variable : matchVariables) {
+            names.add(variable.getName());
+        }
+        return names;
     }
 
     @Override

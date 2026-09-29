@@ -17,6 +17,7 @@ package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
@@ -33,7 +34,10 @@ import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import org.jspecify.annotations.Nullable;
 
+import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -65,6 +69,27 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
     @Override
     public Class<RequestBean> getAnnotationType() {
         return RequestBean.class;
+    }
+
+    /**
+     * Resolves the introspection of the bean and the binders of its properties once for the
+     * argument, instead of for every request. The binding itself is the same as {@link #bind}.
+     *
+     * @param argument The argument
+     * @return The binder for the argument
+     */
+    @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        if (getClass() != RequestBeanAnnotationBinder.class || !argument.getAnnotationMetadata().hasAnnotation(RequestBean.class)) {
+            // a subclass may bind differently
+            return this;
+        }
+        Optional<BeanIntrospection<T>> introspection = BeanIntrospector.SHARED.findIntrospection(argument.getType());
+        if (introspection.isEmpty()) {
+            // fails for every request, as before
+            return this;
+        }
+        return new SpecificRequestBeanBinder<>(requestBinderRegistry, argument, introspection.get());
     }
 
     @Override
@@ -147,10 +172,17 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
     private Optional<Object> getBindableResult(ArgumentConversionContext<Object> conversionContext, HttpRequest<?> source) {
         Argument<Object> argument = conversionContext.getArgument();
         Optional<ArgumentBinder<Object, HttpRequest<?>>> binder = requestBinderRegistry.findArgumentBinder(argument);
-        if (binder.isEmpty()) {
+        return bindableResult(binder.orElse(null), conversionContext, source);
+    }
+
+    private static Optional<Object> bindableResult(@Nullable ArgumentBinder<Object, HttpRequest<?>> binder,
+                                                   ArgumentConversionContext<Object> conversionContext,
+                                                   HttpRequest<?> source) {
+        Argument<Object> argument = conversionContext.getArgument();
+        if (binder == null) {
             throw new UnsatisfiedArgumentException(argument);
         }
-        BindingResult<Object> result = binder.get().bind(conversionContext, source);
+        BindingResult<Object> result = binder.bind(conversionContext, source);
         if (!result.isSatisfied() || !result.getConversionErrors().isEmpty()) {
             List<ConversionError> errors = result.getConversionErrors();
             if (!errors.isEmpty()) {
@@ -163,7 +195,7 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
         return result.getValue();
     }
 
-    private boolean isContextType(Class<?> type) {
+    private static boolean isContextType(Class<?> type) {
         // Using the classes added in byType map in DefaultRequestBinderRegistry
         return HttpHeaders.class.isAssignableFrom(type) ||
             HttpRequest.class.isAssignableFrom(type)    ||
@@ -173,4 +205,107 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
 
     }
 
+    /**
+     * The binder of one {@link RequestBean} argument, with the introspection of the bean and the
+     * binders of its properties resolved once.
+     *
+     * @param <T> The bean type
+     */
+    private static final class SpecificRequestBeanBinder<T> extends RequestBeanAnnotationBinder<T> {
+
+        private final Argument<T> argument;
+        private final BeanIntrospection<T> introspection;
+        private final boolean constructorBinding;
+        /**
+         * Per constructor argument or bean property, in the order they are bound.
+         */
+        private final Argument<Object>[] bindArguments;
+        private final @Nullable ArgumentBinder<Object, HttpRequest<?>>[] binders;
+        private final boolean[] contextTypes;
+        /**
+         * Per constructor argument: whether it is an {@link Optional}. Unused for properties.
+         */
+        private final boolean[] optionals;
+        /**
+         * The properties to set, in order, for the binding with setters.
+         */
+        private final BeanProperty<T, Object>[] properties;
+
+        @SuppressWarnings("unchecked")
+        SpecificRequestBeanBinder(RequestBinderRegistry requestBinderRegistry, Argument<T> argument, BeanIntrospection<T> introspection) {
+            super(requestBinderRegistry);
+            this.argument = argument;
+            this.introspection = introspection;
+            // the same map as the binding for each request uses, so the properties are bound in the same order
+            Map<String, BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties().stream()
+                .collect(Collectors.toMap(Named::getName, p -> p));
+            Argument<?>[] constructorArguments = introspection.getConstructorArguments();
+            constructorBinding = constructorArguments.length > 0;
+            int count;
+            if (constructorBinding) {
+                count = constructorArguments.length;
+                properties = new BeanProperty[0];
+            } else {
+                Collection<BeanProperty<T, Object>> values = beanProperties.values();
+                properties = values.toArray(new BeanProperty[0]);
+                count = properties.length;
+            }
+            bindArguments = new Argument[count];
+            binders = new ArgumentBinder[count];
+            contextTypes = new boolean[count];
+            optionals = new boolean[count];
+            for (int i = 0; i < count; i++) {
+                Argument<Object> argumentToBind;
+                if (constructorBinding) {
+                    Argument<Object> constructorArgument = (Argument<Object>) constructorArguments[i];
+                    BeanProperty<T, Object> bp = beanProperties.get(constructorArgument.getName());
+                    argumentToBind = bp != null ? bp.asArgument() : constructorArgument;
+                    optionals[i] = constructorArgument.isOptional();
+                } else {
+                    argumentToBind = properties[i].asArgument();
+                    optionals[i] = argumentToBind.isOptional();
+                }
+                bindArguments[i] = argumentToBind;
+                binders[i] = requestBinderRegistry.findArgumentBinder(argumentToBind).orElse(null);
+                contextTypes[i] = isContextType(argumentToBind.getType());
+            }
+        }
+
+        @Override
+        public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
+            Argument<T> contextArgument = context.getArgument();
+            if (contextArgument != argument && !contextArgument.equals(argument)) {
+                return super.bind(context, source);
+            }
+            int count = bindArguments.length;
+            Object[] values = new Object[count];
+            boolean bindingFound = false;
+            // the same for each property, so they are resolved once
+            Locale locale = source.getLocale().orElse(Locale.getDefault());
+            Charset characterEncoding = source.getCharacterEncoding();
+            for (int i = 0; i < count; i++) {
+                Argument<Object> argumentToBind = bindArguments[i];
+                Optional<Object> bindableResult = bindableResult(
+                    binders[i],
+                    ConversionContext.of(argumentToBind, locale, characterEncoding),
+                    source
+                );
+                if (bindableResult.isPresent() && !contextTypes[i]) {
+                    bindingFound = true;
+                }
+                values[i] = optionals[i] ? bindableResult : bindableResult.orElse(null);
+            }
+            if (!bindingFound && argument.isNullable()) {
+                return BindingResult.empty();
+            }
+            if (constructorBinding) {
+                return () -> Optional.of(introspection.instantiate(false, values));
+            }
+            T bean = introspection.instantiate();
+            for (int i = 0; i < count; i++) {
+                properties[i].set(bean, values[i]);
+            }
+            return () -> Optional.of(bean);
+        }
+    }
 }

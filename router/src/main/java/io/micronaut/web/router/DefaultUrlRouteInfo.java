@@ -49,6 +49,12 @@ import java.util.function.Predicate;
 @Internal
 public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R> {
 
+    /**
+     * Which filters of the router apply to this route, built by {@link DefaultRouter} on first use.
+     */
+    @Nullable
+    RouteFilterPlan filterPlan;
+
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     private final UriMatchTemplate uriMatchTemplate;
