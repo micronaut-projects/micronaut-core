@@ -22,12 +22,12 @@ class MaxResponseSizeDiscardSpec extends Specification {
         int bigLength = 5000
         AtomicInteger connections = new AtomicInteger()
         ServerSocket serverSocket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())
-        Thread server = Thread.startVirtualThread {
+        Thread server = Thread.startDaemon {
             try {
                 while (true) {
                     Socket socket = serverSocket.accept()
                     connections.incrementAndGet()
-                    Thread.startVirtualThread {
+                    Thread.startDaemon {
                         try {
                             serve(socket, bigLength)
                         } catch (IOException ignored) {
