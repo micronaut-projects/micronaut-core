@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 /**
- * The LiveReload contract: browsers connected to the server reload the page, or swap a stylesheet,
- * when the application restarted or a static file or template changed. The server itself is the
- * {@code micronaut-dev-livereload} module, present on the development runtime classpath when
- * LiveReload is wanted.
+ * The Java agent that hands development mode the {@code Instrumentation} it redefines classes with.
  *
  * @author graemerocher
  * @since 5.3.0
  */
 @Experimental
 @NullMarked
-package io.micronaut.dev.livereload;
+package io.micronaut.dev.agent;
 
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.NullMarked;

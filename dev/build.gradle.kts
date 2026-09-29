@@ -14,6 +14,8 @@ dependencies {
     compileOnly(projects.micronautManagement)
     // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath
     compileOnly(libs.managed.groovy)
+    // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
+    compileOnly(libs.bytebuddy.agent)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
@@ -22,7 +24,24 @@ dependencies {
     testImplementation(projects.micronautRouter)
     testCompileOnly(projects.micronautManagement)
     testImplementation(projects.micronautInjectGroovy)
+    testImplementation(libs.bytebuddy.agent)
     testAnnotationProcessor(projects.micronautInjectJava)
+}
+
+tasks.named<Jar>("jar") {
+    manifest {
+        attributes(
+            "Premain-Class" to "io.micronaut.dev.agent.DevAgent",
+            "Agent-Class" to "io.micronaut.dev.agent.DevAgent",
+            "Can-Redefine-Classes" to "true",
+            "Can-Retransform-Classes" to "false"
+        )
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    // the fast path test attaches the agent to the test JVM
+    jvmArgs("-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading")
 }
 
 micronautBuild {
@@ -49,4 +68,7 @@ noReflection {
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.GroovyCompilation", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
+    // the fast path redefines method bodies through the agent
+    allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
 }
