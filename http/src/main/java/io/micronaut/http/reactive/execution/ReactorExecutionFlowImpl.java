@@ -348,6 +348,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         final AtomicReference<@Nullable ExecutionFlow<T>> flow = new AtomicReference<>();
         private final PropagatedContext propagatedContext;
         @Nullable
+        @SuppressWarnings("java:S3077") // the subscription is not modified here, volatile only publishes it to cancel()
         private volatile Subscription subscription;
         private volatile boolean cancelled;
         private boolean complete;
