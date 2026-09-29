@@ -41,14 +41,25 @@ public interface GenericPlaceholder<T> extends Argument<T> {
      * {@link #equalsType(Argument)} or {@link #typeHashCode()}.</p>
      *
      * <p>A placeholder that carries no recorded bounds, one built by hand or compiled before the bounds were
-     * recorded, answers the type it erases to.</p>
+     * recorded, answers the type it erases to. A placeholder whose type is an array stands for an array of the
+     * variable, the {@code T[]} of a {@code T} bounded by {@code Payment}: its type is {@code Payment[]} and its
+     * bounds are the variable's, {@code Payment}.</p>
+     *
+     * <p>A bound is written the way a type argument is, so a bound that is itself a type variable, or that names
+     * one among its own type arguments, has a placeholder there: the bound of {@code T extends Comparable<T>} is
+     * {@code Comparable} with a placeholder named {@code T} as its type argument.</p>
      *
      * @return The bounds, never empty
      * @since 5.2.0
      */
     @Experimental
     default List<Argument<?>> getBounds() {
-        return List.of(Argument.of(getType(), (String) null, getTypeParameters()));
+        Class<?> type = getType();
+        while (type.isArray()) {
+            // the placeholder of an array of the variable: the variable erases to the component
+            type = type.getComponentType();
+        }
+        return List.of(Argument.of(type, (String) null, getTypeParameters()));
     }
 
     /**
@@ -56,6 +67,32 @@ public interface GenericPlaceholder<T> extends Argument<T> {
      */
     default String getVariableName() {
         return Objects.requireNonNull(getName(), "Argument name cannot be null");
+    }
+
+    /**
+     * Whether this placeholder stands for a type that was resolved in place of the type variable, rather than
+     * for the variable itself.
+     *
+     * <p>A placeholder is usually a type variable left unresolved where the argument was built: the {@code T} of
+     * {@code class Bean<T extends Payment>}, whose {@link #getType()} is the type the variable erases to. Some
+     * arguments keep the shape of a placeholder for a type that took the variable's place:
+     * {@link Argument#of(Class, io.micronaut.core.annotation.AnnotationMetadata, Class[])} builds one for each
+     * class it is given, and a processor may compile the {@code Integer} that {@code class Sub extends
+     * Base<Integer>} puts in place of {@code T} into a placeholder named {@code T}. Such a placeholder answers
+     * {@code true} here: {@link #getType()} is the type it was resolved to, while {@link #getVariableName()} and
+     * {@link #getBounds()} still describe the variable it was resolved in place of. A consumer that wants the
+     * type reads {@link #getType()}, one that wants the declaration keeps the variable.</p>
+     *
+     * <p>{@link #isTypeVariable()}, {@link #equals(Object)}, {@link #equalsType(Argument)} and
+     * {@link #typeHashCode()} do not consider it. A placeholder compiled before this was recorded, or built by
+     * hand with {@link Argument#ofTypeVariable(Class, String)}, answers {@code false}.</p>
+     *
+     * @return Whether the placeholder stands for a type resolved in place of its variable
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isResolved() {
+        return false;
     }
 
     @Override

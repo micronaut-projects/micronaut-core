@@ -17,6 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -416,6 +417,32 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Creates an argument for a type resolved in place of a type variable, which keeps the shape of a placeholder
+     * named after the variable. See {@link GenericPlaceholder#isResolved()}.
+     *
+     * @param type               The type the variable was resolved to
+     * @param argumentName       The name of the argument
+     * @param variableName       The name of the variable it was resolved in place of, {@code null} when it is
+     *                           the argument name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The type parameters of the type
+     * @param bounds             The bounds declared for the variable, {@code null} when they are not recorded
+     * @param <T>                The generic type
+     * @return The argument instance
+     * @since 5.3.0
+     */
+    @Experimental
+    @UsedByGeneratedCode
+    static <T> Argument<T> ofResolvedTypeVariable(Class<T> type,
+                                                  @Nullable String argumentName,
+                                                  @Nullable String variableName,
+                                                  @Nullable AnnotationMetadata annotationMetadata,
+                                                  Argument<?> @Nullable [] typeParameters,
+                                                  Argument<?> @Nullable [] bounds) {
+        return new DefaultGenericPlaceholder<>(type, argumentName, variableName, annotationMetadata, typeParameters, bounds, true);
+    }
+
+    /**
      * Creates a new argument for a type written without its type arguments, a raw type.
      *
      * <p>The type parameters are the ones the declaring type declares, the same as they are for a usage
@@ -619,6 +646,9 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * Creates a new argument for the given type and name.
      * NOTE: This method should be avoided as it does use the reflection to retrieve the type parameter names.
      *
+     * <p>Each class given is a type resolved in place of the type's own variable, and is a placeholder named after
+     * that variable which says it is {@link GenericPlaceholder#isResolved() resolved}.</p>
+     *
      * @param type               The type
      * @param annotationMetadata The annotation metadata
      * @param typeParameters     The parameters type
@@ -640,7 +670,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         Argument<?>[] typeArguments = new Argument[len];
         for (int i = 0; i < parameters.length; i++) {
             TypeVariable<Class<T>> parameter = parameters[i];
-            typeArguments[i] = Argument.ofTypeVariable(typeParameters[i], parameter.getName());
+            typeArguments[i] = Argument.ofResolvedTypeVariable(typeParameters[i], parameter.getName(), null, null, null, null);
         }
         return new DefaultArgument<>(type, annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
