@@ -106,11 +106,15 @@ public abstract class ProxyingBeanDefinitionWriter implements ElementProxyBuilde
         this.implementInterface = true;
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.visitorContext = visitorContext;
+        // The target type may come from a library, so the proxy definition also originates from the files declaring
+        // the bean. Incremental processors drop outputs that originate from no source file.
+        OriginatingElements proxyOriginatingElements = OriginatingElements.of(parent.getOriginatingElements());
+        proxyOriginatingElements.addOriginatingElement(targetType);
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
             BeanInjectionUtils.createConstructorDefinition(constructor, visitorContext),
             getCustomBeanDefinitionName(),
             null,
-            OriginatingElements.of(targetType),
+            proxyOriginatingElements,
             visitorContext
         );
         proxyBeanDefinitionWriter.setInterceptedType(targetType.getName());
