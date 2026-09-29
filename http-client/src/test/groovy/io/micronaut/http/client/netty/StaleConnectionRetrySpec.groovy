@@ -133,6 +133,30 @@ class StaleConnectionRetrySpec extends Specification {
         !request.headers.contains('Connection')
     }
 
+    void "the retried request sends each header of the first attempt once, the caller's headers included"() {
+        given:
+        start { int connection, int requestOnConnection -> requestOnConnection == 0 }
+
+        expect:
+        exchange(HttpRequest.GET('/first')) == 'ok /first'
+
+        when:
+        String response = exchange(HttpRequest.PUT('/put', 'hello')
+                .contentType(MediaType.TEXT_PLAIN_TYPE)
+                .header('X-Trace', 'abc'))
+
+        then: "the retry has a head of its own with the same headers, not the head the first attempt wrote"
+        response == 'ok /put'
+        def attempts = server.requests.findAll { it.method == 'PUT' }
+        attempts*.connection == [0, 1]
+        attempts.every { it.headerNames.size() == it.headerNames.toSet().size() }
+        attempts[0].headerNames == attempts[1].headerNames
+        attempts[0].headers == attempts[1].headers
+        attempts.every { it.headers['x-trace'] == 'abc' }
+        attempts.every { it.headers['content-length'] == '5' }
+        attempts.every { it.headers['connection'] == 'keep-alive' }
+    }
+
     void "a POST on a reused connection that the server closed is not retried"() {
         given:
         start { int connection, int requestOnConnection -> requestOnConnection == 0 }
@@ -471,6 +495,7 @@ class StaleConnectionRetrySpec extends Specification {
                 int contentLength = 0
                 boolean chunked = false
                 Map<String, String> headers = [:]
+                List<String> headerNames = []
                 String line
                 while ((line = readLine(input)) != null && !line.isEmpty()) {
                     if (requestLine == null) {
@@ -480,6 +505,7 @@ class StaleConnectionRetrySpec extends Specification {
                     int colon = line.indexOf(':')
                     if (colon > 0) {
                         headers.put(line.substring(0, colon).trim().toLowerCase(Locale.ROOT), line.substring(colon + 1).trim())
+                        headerNames.add(line.substring(0, colon).trim().toLowerCase(Locale.ROOT))
                     }
                     if (line.toLowerCase(Locale.ROOT).startsWith('content-length:')) {
                         contentLength = line.substring('content-length:'.length()).trim() as int
@@ -497,7 +523,7 @@ class StaleConnectionRetrySpec extends Specification {
                     body = new String(input.readNBytes(contentLength), StandardCharsets.UTF_8)
                 }
                 String[] parts = requestLine.split(' ')
-                requests.add(new Req(connection, i, parts[0], parts[1], body, headers))
+                requests.add(new Req(connection, i, parts[0], parts[1], body, headers, headerNames))
                 if (!respond.call(connection, i)) {
                     // close without answering, as if the idle connection had already been closed
                     return
@@ -540,14 +566,17 @@ class StaleConnectionRetrySpec extends Specification {
         final String path
         final String body
         final Map<String, String> headers
+        // every header line of the request, in order, to tell a repeated header
+        final List<String> headerNames
 
-        Req(int connection, int index, String method, String path, String body, Map<String, String> headers) {
+        Req(int connection, int index, String method, String path, String body, Map<String, String> headers, List<String> headerNames) {
             this.connection = connection
             this.index = index
             this.method = method
             this.path = path
             this.body = body
             this.headers = headers
+            this.headerNames = headerNames
         }
 
         @Override
