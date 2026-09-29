@@ -37,6 +37,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         new java.util.concurrent.atomic.AtomicBoolean();
     // replaced, never modified, under the lock of this registration: a proxy fronting the bean may add to them after
     // the bean was created, while they are read without the lock
+    @SuppressWarnings("java:S3077") // a published list is never modified, volatile only publishes it
     @Nullable
     private volatile List<BeanRegistration<?>> dependents;
     @Nullable
@@ -44,6 +45,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     // guarded by this: once set, nothing becomes the bean's any more
     private boolean destroyed;
     // the interceptors a proxy fronting the bean selected for it, see RegisteredBeanInterceptors
+    @SuppressWarnings("java:S3077") // a KeptSelection is immutable, set under the lock of this registration
     @Nullable
     private volatile KeptSelection keptSelection;
     // whether this bean was created as an interceptor of the bean it is a dependent of
@@ -149,15 +151,6 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
-     * Returns the selection kept for the given key, or computes it through a resolution context of this bean and
-     * keeps it, see {@link RegisteredBeanInterceptors#select(BeanRegistration, Object, java.util.function.Function)}.
-     *
-     * @param key      The key
-     * @param selector Computes the selection
-     * @param <S>      The selection type
-     * @return The selection, or {@code null} when this bean is destroyed
-     */
-    /**
      * @param key The key
      * @return The selection kept for the key, or {@code null}
      */
@@ -167,6 +160,15 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         return kept != null && kept.key == key ? kept.value : null;
     }
 
+    /**
+     * Returns the selection kept for the given key, or computes it through a resolution context of this bean and
+     * keeps it, see {@link RegisteredBeanInterceptors#select(BeanRegistration, Object, java.util.function.Function)}.
+     *
+     * @param key      The key
+     * @param selector Computes the selection
+     * @param <S>      The selection type
+     * @return The selection, or {@code null} when this bean is destroyed
+     */
     @SuppressWarnings("unchecked")
     @Nullable
     <S> S select(Object key, java.util.function.Function<BeanResolutionContext, S> selector) {
