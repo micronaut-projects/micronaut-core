@@ -90,6 +90,7 @@ abstract class MultiplexedServerHandler {
      * An HTTP/2 or HTTP/3 stream.
      */
     abstract class MultiplexedStream implements OutboundAccess {
+        private boolean skipCompression;
         @Nullable
         private final Http2RequestEvent jfrEvent;
         @Nullable
@@ -585,8 +586,13 @@ abstract class MultiplexedServerHandler {
         public final void closeAfterWrite() {
         }
 
+        @Override
+        public final void skipCompression() {
+            skipCompression = true;
+        }
+
         private void prepareCompression(HttpResponse headers, long contentLength) {
-            if (compressor != null) {
+            if (compressor != null && !skipCompression) {
                 Compressor.Session session = compressor.prepare(requiredCtx(), Objects.requireNonNull(request), headers, contentLength);
                 if (session != null) {
                     headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);

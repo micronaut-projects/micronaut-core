@@ -35,4 +35,13 @@ public interface OutboundAccess extends NettyWriteContext {
      * unrecoverable error that may corrupt future requests. This method has no effect on HTTP/2.
      */
     void closeAfterWrite();
+
+    /**
+     * Write the next response as it is, never compressed, see
+     * {@link io.micronaut.http.server.ServerResponseAttributes#SKIP_COMPRESSION}.
+     *
+     * @since 5.3.0
+     */
+    default void skipCompression() {
+    }
 }
