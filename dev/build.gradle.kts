@@ -14,6 +14,12 @@ dependencies {
     compileOnly(projects.micronautManagement)
     // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath
     compileOnly(libs.managed.groovy)
+    // the embedded Kotlin compiler exists when the Kotlin Build Tools API and its implementation are on the launch
+    // classpath, and runs KSP when the KSP implementation is too; the build plugin puts them there at the project's versions
+    compileOnly(libs.managed.kotlin.build.tools.api)
+    compileOnly(libs.managed.ksp.api)
+    compileOnly(libs.ksp.commonDeps)
+    compileOnly(libs.ksp.aaEmbeddable)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
     compileOnly(libs.bytebuddy.agent)
     // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
@@ -28,6 +34,11 @@ dependencies {
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(projects.micronautRuntimeOsx)
+    testImplementation(libs.managed.kotlin.build.tools.impl)
+    testImplementation(libs.managed.kotlin.stdlib)
+    testImplementation(libs.ksp.aaEmbeddable)
+    testImplementation(libs.managed.ksp.api)
+    testImplementation(projects.micronautInjectKotlin)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
@@ -71,6 +82,13 @@ noReflection {
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.GroovyCompilation", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KotlinSourceCompiler", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.compile.KotlinSourceCompiler", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KotlinCompilation", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KotlinCompilation", "SERVICE_LOADING")
+    allowIn("io.micronaut.dev.compile.KspCompilation", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.compile.KspCompilation", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KspCompilation", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
