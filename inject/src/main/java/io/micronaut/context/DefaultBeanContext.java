@@ -3393,39 +3393,46 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
             try {
                 List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
-                T bean;
-                if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                } else {
-                    throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
-                }
-                List<?> interceptorRegistrations = null;
-                if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                    Object value = registrations.remove(definition);
-                    if (value instanceof List<?> list) {
-                        interceptorRegistrations = list;
+                BeanRegistration<T> beanRegistration;
+                try {
+                    T bean;
+                    if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                        bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
+                    } else {
+                        throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                     }
-                }
-                bean = postBeanCreated(context, definition, beanType, qualifier, bean);
+                    List<?> interceptorRegistrations = null;
+                    if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                        Object value = registrations.remove(definition);
+                        if (value instanceof List<?> list) {
+                            interceptorRegistrations = list;
+                        }
+                    }
+                    bean = postBeanCreated(context, definition, beanType, qualifier, bean);
 
-                BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
-                if (dependentFactoryBean != null) {
-                    destroyBean(dependentFactoryBean);
+                    BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
+                    if (dependentFactoryBean != null) {
+                        destroyBean(dependentFactoryBean);
+                    }
+                    Qualifier<T> registrationQualifier = qualifier;
+                    if (registrationQualifier == null) {
+                        registrationQualifier = definition.getDeclaredQualifier();
+                    }
+                    BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
+                    List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
+                    beanRegistration = BeanRegistration.of(
+                        this,
+                        beanKey,
+                        definition,
+                        bean,
+                        dependentBeans,
+                        interceptorRegistrations
+                    );
+                } catch (Throwable e) {
+                    destroyDependentsOfFailedBean(context, e);
+                    context.pushDependentBeans(parentDependentBeans);
+                    throw e;
                 }
-                Qualifier<T> registrationQualifier = qualifier;
-                if (registrationQualifier == null) {
-                    registrationQualifier = definition.getDeclaredQualifier();
-                }
-                BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
-                List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                BeanRegistration<T> beanRegistration = BeanRegistration.of(
-                    this,
-                    beanKey,
-                    definition,
-                    bean,
-                    dependentBeans,
-                    interceptorRegistrations
-                );
                 context.pushDependentBeans(parentDependentBeans);
                 if (dependent) {
                     context.addDependentBean(beanRegistration);
@@ -3435,6 +3442,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (isNewPath) {
                     path.close();
                 }
+            }
+        }
+    }
+
+    /**
+     * Destroys the objects created for a bean whose creation failed: its dependents, and its factory bean when the
+     * factory is not a singleton.
+     *
+     * <p>Nothing else would destroy them. They are owned by the registration of the bean, which is never created, and
+     * the resolution context that collected them is either discarded or goes on to collect the dependents of the bean
+     * whose creation this one is nested in. The dependents are destroyed as the dependents of a destroyed bean are,
+     * in the reverse of the order they were created in, and the factory bean as it is once a bean has been created.
+     * A failure to destroy one of them is added to the failure of the creation.</p>
+     *
+     * @param context The resolution context of the failed creation
+     * @param failure The failure of the creation
+     */
+    private void destroyDependentsOfFailedBean(BeanResolutionContext context, Throwable failure) {
+        BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
+        List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
+        ListIterator<BeanRegistration<?>> i = dependentBeans.listIterator(dependentBeans.size());
+        while (i.hasPrevious()) {
+            try {
+                destroyBean(i.previous(), true);
+            } catch (Throwable e) {
+                failure.addSuppressed(e);
+            }
+        }
+        if (dependentFactoryBean != null) {
+            try {
+                destroyBean(dependentFactoryBean);
+            } catch (Throwable e) {
+                failure.addSuppressed(e);
             }
         }
     }
