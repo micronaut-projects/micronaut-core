@@ -45,13 +45,13 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.net.URI;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -64,6 +64,10 @@ import java.util.stream.Collectors;
 final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpClient, ProxyHttpClient {
     private static final String OPTIONS_ATTRIBUTE = "micronaut.http.client.raw.options";
     private static final String ALLOW_RESTRICTED_HEADERS_PROPERTY = "jdk.httpclient.allowRestrictedHeaders";
+    /**
+     * Request attribute with the {@link UploadListener} of the request body.
+     */
+    private static final String UPLOAD_LISTENER_ATTRIBUTE = "micronaut.http.client.jdk.raw.upload-listener";
     /**
      * The headers {@link java.net.http.HttpClient} manages itself, and refuses to take from the
      * request unless {@value #ALLOW_RESTRICTED_HEADERS_PROPERTY} allows them.
@@ -169,8 +173,13 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             }
         }
         request.setAttribute(OPTIONS_ATTRIBUTE, options);
-        // the response timeout is the timeout of the JDK request, see mapToHttpRequest
         ExecutionFlow<HttpResponse<?>> flow = ReactiveExecutionFlow.fromPublisher(Mono.from(exchangeImpl(request, null)).map(r -> (HttpResponse<?>) r));
+        if (options.getResponseTimeout() != null) {
+            // the response timeout does not count the upload of the body, see toJdkRequest
+            UploadListener listener = new UploadListener(new CompletableFuture<>(), new CompletableFuture<>());
+            request.setAttribute(UPLOAD_LISTENER_ATTRIBUTE, listener);
+            flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), listener.started(), listener.uploaded());
+        }
         Mono<MutableHttpResponse<?>> response = Mono.from(ReactiveExecutionFlow.toPublisher(
             flow.map(RawHttpClientSupport::toMutableResponse)
         ));
@@ -202,19 +211,18 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         // the request cookies are sent in its Cookie header, and must not reach the cookie store
         // that is shared with the other clients of the same configuration
         java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
-        Duration responseTimeout = responseTimeout(request);
-        if (responseTimeout != null) {
-            // it can only shorten the configured read timeout, like for the Netty client
-            Duration readTimeout = configuration.getReadTimeout().orElse(null);
-            builder.timeout(readTimeout != null && readTimeout.compareTo(responseTimeout) < 0 ? readTimeout : responseTimeout);
+        java.net.http.HttpRequest built = builder.build();
+        UploadListener listener = request.getAttribute(UPLOAD_LISTENER_ATTRIBUTE, UploadListener.class).orElse(null);
+        java.net.http.HttpRequest.BodyPublisher publisher = built.bodyPublisher().orElse(null);
+        if (listener == null || publisher == null || publisher.contentLength() == 0) {
+            // no body, no upload: the whole exchange counts into the response timeout
+            return built;
         }
-        return builder.build();
-    }
-
-    private static @Nullable Duration responseTimeout(HttpRequest<?> request) {
-        return request.getAttribute(OPTIONS_ATTRIBUTE, RawRequestOptions.class)
-            .map(RawRequestOptions::getResponseTimeout)
-            .orElse(null);
+        // the response timeout of the options pauses from the start to the end of the upload of the
+        // body, see exchangeWithOptions: the body publisher tells when the client takes it
+        return java.net.http.HttpRequest.newBuilder(built, (name, value) -> true)
+            .method(built.method(), new UploadListeningBodyPublisher(publisher, listener))
+            .build();
     }
 
     @Override
@@ -262,5 +270,56 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 //noinspection unchecked
                 return (HttpResponse<O>) response;
             });
+    }
+
+    /**
+     * The upload of the body of a request.
+     *
+     * @param started  Completed when the client subscribes to the body
+     * @param uploaded Completed once the client took the whole body
+     */
+    private record UploadListener(CompletableFuture<@Nullable Void> started, CompletableFuture<@Nullable Void> uploaded) {
+    }
+
+    /**
+     * A body publisher that notifies an {@link UploadListener}.
+     *
+     * @param delegate The body publisher
+     * @param listener The listener
+     */
+    private record UploadListeningBodyPublisher(java.net.http.HttpRequest.BodyPublisher delegate, UploadListener listener)
+        implements java.net.http.HttpRequest.BodyPublisher {
+
+        @Override
+        public long contentLength() {
+            return delegate.contentLength();
+        }
+
+        @Override
+        public void subscribe(java.util.concurrent.Flow.Subscriber<? super java.nio.ByteBuffer> subscriber) {
+            listener.started().complete(null);
+            delegate.subscribe(new java.util.concurrent.Flow.Subscriber<java.nio.ByteBuffer>() {
+                @Override
+                public void onSubscribe(java.util.concurrent.Flow.Subscription subscription) {
+                    subscriber.onSubscribe(subscription);
+                }
+
+                @Override
+                public void onNext(java.nio.ByteBuffer item) {
+                    subscriber.onNext(item);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    subscriber.onError(throwable);
+                }
+
+                @Override
+                public void onComplete() {
+                    subscriber.onComplete();
+                    listener.uploaded().complete(null);
+                }
+            });
+        }
     }
 }

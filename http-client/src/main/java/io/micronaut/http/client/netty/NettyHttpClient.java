@@ -200,6 +200,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -259,6 +260,17 @@ final class NettyHttpClient implements
      * of an upgraded connection.
      */
     private static final String ACTIVITY_TIMEOUT = "micronaut.http.client.raw.activity-timeout";
+
+    /**
+     * Request attribute with the {@link UploadListener} of the request body.
+     */
+    private static final String UPLOAD_LISTENER = "micronaut.http.client.raw.upload-listener";
+
+    /**
+     * Request attribute with the {@link RawRequestOptions#getReadIdleTimeout() read idle timeout}
+     * of an exchange.
+     */
+    private static final String READ_IDLE_TIMEOUT = "micronaut.http.client.raw.read-idle-timeout";
 
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1506,19 +1518,22 @@ final class NettyHttpClient implements
         try {
             BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
             if (options == null) {
-                return sendRawExchange(
-                    propagatedContext,
-                    blockHint,
-                    new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody)
-                );
+                RawHttpRequestWrapper<?> rawRequest = new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
+                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockHint, rawRequest));
             }
-            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
+            RawHttpRequestWrapper<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
-            return RawHttpClientSupport.withResponseTimeout(sendRawExchange(
+            // the response timeout does not count the upload of the body: a slow upload does not time out
+            CompletableFuture<@Nullable Void> uploadStarted = new CompletableFuture<>();
+            CompletableFuture<@Nullable Void> uploaded = new CompletableFuture<>();
+            if (options.getResponseTimeout() != null) {
+                rawRequest.setAttribute(UPLOAD_LISTENER, new UploadListener(() -> uploadStarted.complete(null), () -> uploaded.complete(null)));
+            }
+            return RawHttpClientSupport.withResponseTimeout(rawRequest.keepReplacedBody(sendRawExchange(
                 propagatedContext,
                 blockHint,
                 rawRequest
-            ), options.getResponseTimeout()).map(RawHttpClientSupport::toMutableResponse);
+            )), options.getResponseTimeout(), uploadStarted, uploaded, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;
@@ -1559,6 +1574,9 @@ final class NettyHttpClient implements
         }
         if (!options.isDecompress()) {
             request.setAttribute(NO_DECOMPRESSION, Boolean.TRUE);
+        }
+        if (options.getReadIdleTimeout() != null) {
+            request.setAttribute(READ_IDLE_TIMEOUT, options.getReadIdleTimeout());
         }
     }
 
@@ -1735,10 +1753,18 @@ final class NettyHttpClient implements
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                     // the per-exchange options apply to the whole exchange, redirects included
                     request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
+                    request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirectRequest.setAttribute(READ_IDLE_TIMEOUT, timeout));
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(target -> {
                             setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
                             return sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(target.uri()), target.selection(), readResponse);
+                        })
+                        .onErrorResume(e -> {
+                            // the body went to the server that redirected, it is not unsent
+                            if (e instanceof UnprocessedRequestException unprocessed) {
+                                unprocessed.markBodySent();
+                            }
+                            return ExecutionFlow.error(e);
                         });
                 } else {
                     io.micronaut.http.HttpHeaders headers = byteBodyResponse.getHeaders();
@@ -2036,6 +2062,8 @@ final class NettyHttpClient implements
         // is sent on, may have a known length. The trailers need the chunked transfer coding: a
         // Content-Length request would drop them
         OptionalLong length = NettyByteBodyFactory.hasTrailers(byteBody) ? OptionalLong.empty() : byteBody.expectedLength();
+        UploadListener uploadListener = request.getAttribute(UPLOAD_LISTENER, UploadListener.class).orElse(null);
+        Runnable onSent = uploadListener == null ? null : uploadListener.uploaded();
         // a request that expects 100-continue may already have been processed when the connection
         // fails, so it is never sent again
         boolean retry = allowRetry && !expectContinue;
@@ -2055,10 +2083,14 @@ final class NettyHttpClient implements
                 streamWriter = new StreamWriter(new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
                     poolHandle.taint();
                     completeExceptionallySafe(sink, e);
-                });
+                }, onSent);
                 pipeline.addLast(streamWriter);
             }
             prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf, retry, replayBody);
+            Duration readIdleTimeout = request.getAttribute(READ_IDLE_TIMEOUT, Duration.class).orElse(null);
+            if (readIdleTimeout != null) {
+                RequestReadIdleTimeoutHandler.install(poolHandle.http2, pipeline, readIdleTimeout);
+            }
         } catch (Throwable t) {
             // the request was not written, but the pipeline may be half built: don't reuse the
             // connection, and make sure the pool handle is released and the caller sees the error
@@ -2094,6 +2126,7 @@ final class NettyHttpClient implements
         long writeMark = writeTracker == null ? 0 : writeTracker.mark();
         if (streamWriter == null) {
             if (!expectContinue) {
+                uploadStarted(uploadListener);
                 // it's a bit more efficient to use a full request for HTTP/2
                 channel.writeAndFlush(new DefaultFullHttpRequest(
                     nettyRequest.protocolVersion(),
@@ -2102,13 +2135,14 @@ final class NettyHttpClient implements
                     byteBuf,
                     nettyRequest.headers(),
                     EmptyHttpHeaders.INSTANCE
-                ), requestWritePromise(channel, writeTracker, writeMark));
+                ), whenSent(requestWritePromise(channel, writeTracker, writeMark), onSent));
             } else {
                 channel.writeAndFlush(nettyRequest, requestWritePromise(channel, writeTracker, writeMark));
             }
         } else {
             channel.writeAndFlush(nettyRequest, requestWritePromise(channel, writeTracker, writeMark));
             if (!expectContinue) {
+                uploadStarted(uploadListener);
                 streamWriter.startWriting();
             }
         }
@@ -2133,6 +2167,7 @@ final class NettyHttpClient implements
         @Nullable CloseableAvailableByteBody replayBody
     ) {
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
+        UploadListener uploadListener = request.getAttribute(UPLOAD_LISTENER, UploadListener.class).orElse(null);
 
         if (log.isTraceEnabled()) {
             HttpHeadersUtil.trace(log, nettyRequest.headers().names(), nettyRequest.headers()::getAll);
@@ -2157,8 +2192,21 @@ final class NettyHttpClient implements
         Runnable sendHeldBody = () -> {
             if (stillExpectingContinue.compareAndSet(true, false)) {
                 cancelContinueFallback.run();
+                uploadStarted(uploadListener);
                 if (streamWriter == null) {
-                    poolHandle.channel().writeAndFlush(new DefaultLastHttpContent(byteBuf), poolHandle.channel().voidPromise());
+                    if (uploadListener == null) {
+                        poolHandle.channel().writeAndFlush(new DefaultLastHttpContent(byteBuf), poolHandle.channel().voidPromise());
+                    } else {
+                        Channel channel = poolHandle.channel();
+                        channel.writeAndFlush(new DefaultLastHttpContent(byteBuf)).addListener((ChannelFutureListener) future -> {
+                            if (future.isSuccess()) {
+                                uploadListener.uploaded().run();
+                            } else {
+                                // like the void promise of the other case
+                                channel.pipeline().fireExceptionCaught(future.cause());
+                            }
+                        });
+                    }
                 } else {
                     streamWriter.startWriting();
                 }
@@ -2302,7 +2350,7 @@ final class NettyHttpClient implements
                 // in place before the codec goes: the bytes of the new protocol the codec read together with the
                 // 101 are passed on to the next handlers when it is removed, and must reach the duplex handler
                 pipeline.addLast(RawDuplexHandler.NAME, duplex);
-                for (String name : List.of(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC)) {
+                for (String name : List.of(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, RequestReadIdleTimeoutHandler.NAME, ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC)) {
                     if (pipeline.get(name) != null) {
                         pipeline.remove(name);
                     }
@@ -2443,6 +2491,23 @@ final class NettyHttpClient implements
             configuration.getExpectContinueTimeout().ifPresent(timeout ->
                 continueFallback.set(poolHandle.channel().eventLoop().schedule(sendHeldBody, timeout.toNanos(), TimeUnit.NANOSECONDS)));
         }
+    }
+
+    private static void uploadStarted(@Nullable UploadListener uploadListener) {
+        if (uploadListener != null) {
+            uploadListener.started().run();
+        }
+    }
+
+    private static ChannelPromise whenSent(ChannelPromise promise, @Nullable Runnable onSent) {
+        if (onSent != null) {
+            promise.addListener((ChannelFutureListener) future -> {
+                if (future.isSuccess()) {
+                    onSent.run();
+                }
+            });
+        }
+        return promise;
     }
 
     /**
@@ -3123,6 +3188,15 @@ final class NettyHttpClient implements
             }
             return uri;
         }
+    }
+
+    /**
+     * Notified of the upload of the body of a request.
+     *
+     * @param started  Run when the upload of the body starts
+     * @param uploaded Run once the whole request, the body included, is written to the connection
+     */
+    private record UploadListener(Runnable started, Runnable uploaded) {
     }
 
     /**

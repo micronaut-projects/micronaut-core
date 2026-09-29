@@ -48,6 +48,8 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
     private final StreamingNettyByteBody body;
     private final Consumer<Throwable> errorHandler;
     @Nullable
+    private final Runnable onWritten;
+    @Nullable
     private ChannelHandlerContext ctx;
     @Nullable
     private EventLoopFlow flow;
@@ -61,8 +63,18 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
      * @param errorHandler Handler to call when the streaming body emits an error
      */
     StreamWriter(StreamingNettyByteBody body, Consumer<Throwable> errorHandler) {
+        this(body, errorHandler, null);
+    }
+
+    /**
+     * @param body         The body to read from. This {@link StreamWriter} will immediately take ownership of this body.
+     * @param errorHandler Handler to call when the streaming body emits an error
+     * @param onWritten    Run once the end of the body is written, or {@code null}
+     */
+    StreamWriter(StreamingNettyByteBody body, Consumer<Throwable> errorHandler, @Nullable Runnable onWritten) {
         this.body = body;
         this.errorHandler = errorHandler;
+        this.onWritten = onWritten;
     }
 
     /**
@@ -159,7 +171,20 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
             return;
         }
 
-        ctx.writeAndFlush(lastContent(), ctx.voidPromise());
+        Runnable onWritten = this.onWritten;
+        if (onWritten == null) {
+            ctx.writeAndFlush(lastContent(), ctx.voidPromise());
+        } else {
+            ChannelHandlerContext ctx = this.ctx;
+            ctx.writeAndFlush(lastContent()).addListener((ChannelFutureListener) future -> {
+                if (future.isSuccess()) {
+                    onWritten.run();
+                } else {
+                    // like the void promise of the other case
+                    ctx.channel().pipeline().fireExceptionCaught(future.cause());
+                }
+            });
+        }
         completed = true;
     }
 

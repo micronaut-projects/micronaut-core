@@ -16,6 +16,8 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -112,6 +114,24 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
         }
         replacementBody = body;
         return (MutableHttpRequest<T>) this;
+    }
+
+    /**
+     * A failure of the exchange of this request does not hand the raw bytes back once a filter
+     * replaced them: they were released, see
+     * {@link io.micronaut.http.client.RawRequestOptions#isReturnUnsentBody()}.
+     *
+     * @param flow The exchange flow
+     * @param <T>  The response type
+     * @return The flow
+     */
+    <T> ExecutionFlow<T> keepReplacedBody(ExecutionFlow<T> flow) {
+        return flow.onErrorResume(e -> {
+            if (bodyReplaced && e instanceof UnprocessedRequestException unprocessed) {
+                unprocessed.markBodySent();
+            }
+            return ExecutionFlow.error(e);
+        });
     }
 
     @Override

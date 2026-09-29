@@ -99,6 +99,26 @@ class UpgradeRelayTest {
     }
 
     @Test
+    void aHalfCloseOfTheClientIsRelayedToTheUpstream() throws Exception {
+        try (EchoUpstream upstream = new EchoUpstream();
+             EmbeddedServer server = server(upstream);
+             Socket socket = connect(server)) {
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            out.write(("GET /upgrade-relay?mode=bye HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            Assertions.assertTrue(readHead(in).startsWith("HTTP/1.1 101 "));
+
+            out.write("hello".getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            // the client shuts down its output: the upstream sees the end, and still answers
+            socket.shutdownOutput();
+            Assertions.assertEquals("HELLOBYE", new String(in.readAllBytes(), StandardCharsets.ISO_8859_1));
+            Assertions.assertTrue(upstream.closed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The upstream connection was not closed");
+        }
+    }
+
+    @Test
     void upstreamThatDoesNotSwitchIsRelayedNormally() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              EmbeddedServer server = server(upstream);
@@ -319,7 +339,8 @@ class UpgradeRelayTest {
     /**
      * A raw upstream that switches to an "echo" protocol, answering every byte upper-cased, or
      * refuses the switch with a {@code 200} when asked to. With {@code mode=sink} it only counts
-     * the bytes it receives, with {@code mode=flood} it sends a large stream and closes, and with
+     * the bytes it receives, with {@code mode=flood} it sends a large stream and closes, with
+     * {@code mode=bye} it answers {@code BYE} once the bytes of the client ended, and with
      * {@code protocol=} it switches to another protocol than the one offered.
      */
     static final class EchoUpstream implements AutoCloseable {
@@ -370,6 +391,11 @@ class UpgradeRelayTest {
                         out.write(new String(buffer, 0, n, StandardCharsets.ISO_8859_1).toUpperCase(Locale.ROOT).getBytes(StandardCharsets.ISO_8859_1));
                         out.flush();
                     }
+                }
+                if (head.contains("mode=bye")) {
+                    // the client ended its bytes: answer, then close
+                    out.write("BYE".getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
                 }
             } catch (IOException ignored) {
                 // the connection was closed

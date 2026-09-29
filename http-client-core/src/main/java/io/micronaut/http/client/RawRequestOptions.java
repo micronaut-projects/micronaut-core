@@ -52,6 +52,9 @@ public final class RawRequestOptions {
     private final boolean allowUpgrade;
     @Nullable
     private final Duration activityTimeout;
+    private final boolean returnUnsentBody;
+    @Nullable
+    private final Duration readIdleTimeout;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
@@ -60,6 +63,8 @@ public final class RawRequestOptions {
         this.responseTimeout = builder.responseTimeout;
         this.allowUpgrade = builder.allowUpgrade;
         this.activityTimeout = builder.activityTimeout;
+        this.returnUnsentBody = builder.returnUnsentBody;
+        this.readIdleTimeout = builder.readIdleTimeout;
     }
 
     /**
@@ -96,7 +101,9 @@ public final class RawRequestOptions {
             .decompress(decompress)
             .responseTimeout(responseTimeout)
             .allowUpgrade(allowUpgrade)
-            .activityTimeout(activityTimeout);
+            .activityTimeout(activityTimeout)
+            .returnUnsentBody(returnUnsentBody)
+            .readIdleTimeout(readIdleTimeout);
     }
 
     /**
@@ -138,7 +145,9 @@ public final class RawRequestOptions {
      * The maximum time to wait for the response headers, or {@code null} for no limit other than
      * the client's read timeout. It can only shorten the wait: the read timeout of the client
      * still applies, also to the reads of the response body. When it elapses, the exchange fails
-     * with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException}.
+     * with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException}. It runs from the start
+     * of the exchange, the time to acquire a connection included, and pauses while the request
+     * body is uploaded, so the time of a slow upload does not count.
      *
      * @return The response timeout
      */
@@ -175,6 +184,36 @@ public final class RawRequestOptions {
         return activityTimeout;
     }
 
+    /**
+     * Whether a request whose body was never read, because no connection could be opened or
+     * acquired, hands its body back to the caller instead of closing it: the exchange fails with
+     * an {@link io.micronaut.http.client.exceptions.UnprocessedRequestException} whose
+     * {@link io.micronaut.http.client.exceptions.UnprocessedRequestException#takeUnsentBody()} is
+     * the body, e.g. to send it to another server. The caller must take and close it. Only the
+     * asynchronous raw client of the Netty client hands a body back. Defaults to {@code false}.
+     *
+     * @return Whether the unsent body is handed back
+     * @since 5.3.0
+     */
+    public boolean isReturnUnsentBody() {
+        return returnUnsentBody;
+    }
+
+    /**
+     * The read timeout of this exchange instead of the read timeout of the client: the exchange
+     * fails with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException} when nothing
+     * is read from the connection for this long while the exchange runs, until the end of the
+     * response. Unlike {@link #getResponseTimeout()}, it can be longer than the read timeout of
+     * the client, e.g. for a slow upstream that streams, and shorter. Supported by the Netty
+     * client over HTTP/1.1 and HTTP/2. Defaults to {@code null}, the read timeout of the client.
+     *
+     * @return The read idle timeout, or {@code null}
+     * @since 5.3.0
+     */
+    public @Nullable Duration getReadIdleTimeout() {
+        return readIdleTimeout;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof RawRequestOptions that &&
@@ -183,12 +222,14 @@ public final class RawRequestOptions {
             decompress == that.decompress &&
             Objects.equals(responseTimeout, that.responseTimeout) &&
             allowUpgrade == that.allowUpgrade &&
-            Objects.equals(activityTimeout, that.activityTimeout);
+            Objects.equals(activityTimeout, that.activityTimeout) &&
+            returnUnsentBody == that.returnUnsentBody &&
+            Objects.equals(readIdleTimeout, that.readIdleTimeout);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout);
     }
 
     @Override
@@ -200,6 +241,8 @@ public final class RawRequestOptions {
             ", responseTimeout=" + responseTimeout +
             ", allowUpgrade=" + allowUpgrade +
             ", activityTimeout=" + activityTimeout +
+            ", returnUnsentBody=" + returnUnsentBody +
+            ", readIdleTimeout=" + readIdleTimeout +
             '}';
     }
 
@@ -215,8 +258,34 @@ public final class RawRequestOptions {
         private boolean allowUpgrade = false;
         @Nullable
         private Duration activityTimeout;
+        private boolean returnUnsentBody;
+        @Nullable
+        private Duration readIdleTimeout;
 
         private Builder() {
+        }
+
+        /**
+         * @param readIdleTimeout See {@link RawRequestOptions#getReadIdleTimeout()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder readIdleTimeout(@Nullable Duration readIdleTimeout) {
+            if (readIdleTimeout != null && (readIdleTimeout.isNegative() || readIdleTimeout.isZero())) {
+                throw new IllegalArgumentException("The read idle timeout must be positive");
+            }
+            this.readIdleTimeout = readIdleTimeout;
+            return this;
+        }
+
+        /**
+         * @param returnUnsentBody See {@link RawRequestOptions#isReturnUnsentBody()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder returnUnsentBody(boolean returnUnsentBody) {
+            this.returnUnsentBody = returnUnsentBody;
+            return this;
         }
 
         /**

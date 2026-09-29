@@ -30,6 +30,11 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.EventLoop;
+import io.netty.channel.socket.ChannelInputShutdownEvent;
+import io.netty.channel.socket.ChannelInputShutdownReadComplete;
+import io.netty.channel.socket.DuplexChannel;
+import io.netty.channel.socket.DuplexChannelConfig;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
 import org.jspecify.annotations.Nullable;
@@ -39,10 +44,14 @@ import java.util.Objects;
 /**
  * The last handler of a connection that switched protocols ({@code 101 Switching Protocols}):
  * the raw bytes the peer sends are {@link #inbound()}, a streaming body read with backpressure,
- * and {@link #send(CloseableByteBody)} writes a body to the peer. The connection is closed when
- * the sent body ends or fails, when the consumer of the inbound bytes gives up, when the peer
- * closes, or on an {@link IdleStateEvent} of an activity timeout in front of this handler.
- * Once the connection is inactive, {@code onClosed} runs once.
+ * and {@link #send(CloseableByteBody)} writes a body to the peer. On a plain TCP connection, the
+ * end of one direction is relayed as a half-close: when the peer shuts down its output, the
+ * inbound bytes end and the sent body still flows; when the sent body ends, the output of the
+ * connection is shut down and the inbound bytes still flow. The connection is closed once both
+ * directions ended. A connection that cannot be half-closed, e.g. over TLS, is closed when the
+ * sent body ends or the peer closes. It is also closed when the sent body fails, when the
+ * consumer of the inbound bytes gives up, or on an {@link IdleStateEvent} of an activity timeout
+ * in front of this handler. Once the connection is inactive, {@code onClosed} runs once.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -63,6 +72,11 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
     private ChannelHandlerContext ctx;
     private long demand;
     private boolean inboundDone;
+    /**
+     * Whether the output was shut down: the last of the sent body is written.
+     */
+    private boolean outputShutdown;
+    private boolean halfClosure;
     private boolean closed;
     @Nullable
     private RawWriter writer;
@@ -130,6 +144,13 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         this.ctx = ctx;
         // reads are driven by the consumer of the inbound bytes
         ctx.channel().config().setAutoRead(false);
+        // relay the end of one direction as a half-close, where the transport can shut down one
+        // direction: plain TCP. A TLS connection ends with close_notify in both directions
+        if (channel instanceof DuplexChannel && ctx.channel().config() instanceof DuplexChannelConfig config
+            && ctx.pipeline().get(SslHandler.class) == null) {
+            config.setAllowHalfClosure(true);
+            halfClosure = true;
+        }
     }
 
     @Override
@@ -171,6 +192,22 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         if (evt instanceof IdleStateEvent) {
             // the activity timeout of the switched protocol
             ctx.close();
+            return;
+        }
+        if (evt instanceof ChannelInputShutdownEvent) {
+            // the peer shut down its output: the inbound bytes end, the sent body still flows
+            if (!inboundDone) {
+                inboundDone = true;
+                inbound.complete();
+            }
+            // once the sent body ended, its last write may still be queued: the end of the sent
+            // body closes the connection then, since the inbound bytes ended
+            if (outputShutdown) {
+                ctx.close();
+            }
+            return;
+        }
+        if (evt instanceof ChannelInputShutdownReadComplete) {
             return;
         }
         ctx.fireUserEventTriggered(evt);
@@ -350,14 +387,28 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         }
 
         private void complete0() {
-            // the bytes to the peer ended, i.e. the other side of the relay closed: end the connection, but
+            // the bytes to the peer ended, i.e. the other side of the relay ended: end this direction, but
             // only once the last of them is written, a close would drop the writes still queued
             done = true;
+            ChannelFutureListener end = halfClosure && !inboundDone
+                ? future -> {
+                    if (inboundDone || !future.isSuccess()) {
+                        channel.close();
+                    } else {
+                        outputShutdown = true;
+                        ((DuplexChannel) channel).shutdownOutput();
+                    }
+                }
+                : ChannelFutureListener.CLOSE;
             ChannelFuture last = lastWrite;
             if (last == null) {
-                channel.close();
+                try {
+                    end.operationComplete(channel.newSucceededFuture());
+                } catch (Exception e) {
+                    channel.close();
+                }
             } else {
-                last.addListener(ChannelFutureListener.CLOSE);
+                last.addListener(end);
             }
         }
 

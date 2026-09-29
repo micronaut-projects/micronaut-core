@@ -20,6 +20,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -52,13 +53,29 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
      * @return The future
      */
     public static RawResponseFuture of(ExecutionFlow<? extends HttpResponse<?>> flow, CloseableByteBody requestBody) {
+        return of(flow, requestBody, false);
+    }
+
+    /**
+     * @param flow             The response flow
+     * @param requestBody      The request body, closed when the flow completes
+     * @param returnUnsentBody Whether a body that was never read is handed back through the
+     *                         {@link UnprocessedRequestException} instead, see
+     *                         {@link RawRequestOptions#isReturnUnsentBody()}
+     * @return The future
+     * @since 5.3.0
+     */
+    public static RawResponseFuture of(ExecutionFlow<? extends HttpResponse<?>> flow, CloseableByteBody requestBody, boolean returnUnsentBody) {
         RawResponseFuture future = new RawResponseFuture();
         future.onCancel.set(() -> {
             flow.cancel();
             requestBody.close();
         });
         flow.onComplete((response, error) -> {
-            requestBody.close();
+            if (!(returnUnsentBody && error instanceof UnprocessedRequestException unprocessed
+                && unprocessed.isBodyUntouched() && !future.isDone() && unprocessed.returnUnsentBody(requestBody))) {
+                requestBody.close();
+            }
             future.deliver(response, error);
         });
         return future;

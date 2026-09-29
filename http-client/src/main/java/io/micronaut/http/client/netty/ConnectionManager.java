@@ -1481,7 +1481,7 @@ public class ConnectionManager {
                         ReadTimeoutHandler readTimeoutHandler = new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
-                                if (hasLiveRequests()) {
+                                if (hasLiveRequests() && ctx.channel().attr(RequestReadIdleTimeoutHandler.SUSPENDS_CONNECTION_READ_TIMEOUT).get() == null) { // unless an exchange suspends it
                                     windDownConnection = true;
                                     ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
                                     ctx.close();
