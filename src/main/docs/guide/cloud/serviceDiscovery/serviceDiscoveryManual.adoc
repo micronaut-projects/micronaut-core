@@ -39,3 +39,28 @@ micronaut:
 - `health-check-uri` specifies the endpoint URI of the health check request
 
 The Micronaut framework starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.
+
+The clients also report the outcome of every exchange to the load balancer of the service. With *outlier detection*, an instance whose exchanges keep failing is not selected for a while, without waiting for the next health check:
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
+        outlier-detection:
+          enabled: true
+          consecutive-failures: 5
+          base-ejection-time: 30s
+          max-ejection-time: 5m
+          max-ejection-percent: 50
+----
+
+- `consecutive-failures` transport failures in a row (a connection that cannot be opened, a response that does not arrive in time, a connection or stream reset before the response is complete) eject the instance: it is not selected for `base-ejection-time`, multiplied by the number of times it was ejected, up to `max-ejection-time`. A successful exchange resets the count.
+- `consecutive-server-errors`, off by default, also counts responses with a status of 500 or above.
+- No more than `max-ejection-percent` of the instances are ejected at once, and when every instance is ejected the instances are selected as if none were, so a service whose instances all failed is still tried.
+
+See api:http.client.loadbalance.OutlierDetectionConfiguration[] and api:http.client.LoadBalancer#report-io.micronaut.discovery.ServiceInstance-io.micronaut.http.client.LoadBalancer.Outcome-[LoadBalancer.report].

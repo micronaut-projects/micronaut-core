@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -41,9 +42,10 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 @Internal
-final class NettyRequestLifecycle extends RequestLifecycle {
+final class NettyRequestLifecycle extends RequestLifecycle implements Function<Throwable, ExecutionFlow<HttpResponse<?>>> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyRequestLifecycle.class);
 
     private final RoutingInBoundHandler rib;
@@ -55,6 +57,12 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     @Nullable
     private NettyHttpRequest<?> nettyRequest;
+
+    /**
+     * The context that {@link #handleNormal} ran in, for handling write errors.
+     */
+    @Nullable
+    private PropagatedContext writeErrorContext;
 
     NettyRequestLifecycle(RoutingInBoundHandler rib, OutboundAccess outboundAccess) {
         super(rib.routeExecutor);
@@ -95,15 +103,31 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             }
         }
 
+        writeErrorContext = PropagatedContext.getOrEmpty();
+        // this lifecycle is the write error handler (see apply), so nothing is allocated for it
+        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler = this;
         ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
         if (imperativeFlow != null) {
             Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
             // usually this is a MutableHttpResponse, avoid scalability issues here
             HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
-            rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError());
+            rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError(), writeErrorHandler);
         } else {
-            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
+            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler));
         }
+    }
+
+    /**
+     * Gives the error response when writing the body of the response fails, with the context of
+     * {@link #handleNormal} in scope.
+     *
+     * @param throwable The write error
+     * @return The error response
+     */
+    @Override
+    public ExecutionFlow<HttpResponse<?>> apply(Throwable throwable) {
+        NettyHttpRequest<?> request = Objects.requireNonNull(nettyRequest);
+        return Objects.requireNonNull(writeErrorContext).propagate(() -> onWriteError(request, throwable));
     }
 
     @Nullable
@@ -137,7 +161,16 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         return super.fulfillArguments(routeMatch, request);
     }
 
+    @Override
+    protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+        NettyHttpRequest<?> request = nettyRequest;
+        if (request != null) {
+            request.setFilteredRequest(filteredRequest);
+        }
+    }
+
     void handleException(NettyHttpRequest<?> nettyRequest, Throwable cause) {
+        this.nettyRequest = nettyRequest;
         onError(nettyRequest, cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
     }
 

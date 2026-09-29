@@ -54,11 +54,13 @@ public final class HttpTypeConverterRegistrar implements TypeConverterRegistrar 
                 return Optional.empty();
             }
             return conversions.computeIfAbsent(object, charSequence -> {
-                try {
-                    return Optional.of(SameSite.valueOf(StringUtils.capitalize(object.toString().toLowerCase())));
-                } catch (IllegalArgumentException e) {
-                    return Optional.empty();
+                String name = StringUtils.capitalize(object.toString().toLowerCase());
+                for (SameSite sameSite : SameSite.values()) {
+                    if (sameSite.name().equals(name)) {
+                        return Optional.of(sameSite);
+                    }
                 }
+                return Optional.empty();
             });
         });
     }

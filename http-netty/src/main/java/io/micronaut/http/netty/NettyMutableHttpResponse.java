@@ -22,7 +22,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -32,6 +31,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.RouteMetadataAttributes;
+import io.micronaut.http.RouteMetadataHolder;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.CookieUtils;
@@ -44,6 +45,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpHeadersFactory;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
@@ -54,7 +56,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 
-import java.util.HashMap;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -68,7 +69,7 @@ import java.util.Set;
  */
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
-public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder, RouteMetadataHolder {
     private final HttpVersion httpVersion;
     private HttpResponseStatus httpResponseStatus;
     private final NettyHttpHeaders headers;
@@ -80,9 +81,32 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     @Nullable
     private final DecoderResult decoderResult;
     private final ConversionService conversionService;
+    /**
+     * The attribute map. It is created lazily, by {@link #getAttributes()} only, so that a plain
+     * response never allocates it. It does not store the route metadata: the fields below are the
+     * only store for it, read and written by the typed accessors and, through
+     * {@link RouteMetadataAttributes}, by the attribute map and the attribute accessors. So a
+     * reader on another thread sees a metadata write as soon as the setter has returned, whether
+     * or not the map exists, and neither the setters nor the readers take a lock.
+     * <p>
+     * The fields are volatile only to publish the references safely, including the double-checked
+     * creation of the map, they do not make the referenced objects thread-safe. The route info and
+     * the URI template are immutable. The route match and the attribute map are mutable and, as
+     * before, rely on the request pipeline to hand the message over between threads.
+     */
     @Nullable
-    private MutableConvertibleValues<Object> attributes;
-    private final BodyConvertor bodyConvertor = newBodyConvertor();
+    @SuppressWarnings("java:S3077")
+    private volatile MutableConvertibleValues<Object> attributes;
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile Object routeMatch;
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile Object routeInfo;
+    @Nullable
+    private volatile String uriTemplate;
+    @Nullable
+    private BodyConvertor bodyConvertor;
     @Nullable
     private MessageBodyWriter<B> messageBodyWriter;
 
@@ -159,7 +183,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         this.conversionService = conversionService;
 
         if (nettyHeaders == null) {
-            nettyHeaders = new DefaultHttpHeaders(false);
+            nettyHeaders = new ResponseHeaders();
         }
         this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
@@ -263,7 +287,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             synchronized (this) { // double check
                 attributes = this.attributes;
                 if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
+                    attributes = new RouteMetadataAttributes(this, 4);
                     this.attributes = attributes;
                 }
             }
@@ -272,16 +296,54 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     }
 
     @Override
+    public Optional<Object> getAttribute(CharSequence name) {
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        String key = name.toString();
+        return RouteMetadataAttributes.getAttribute(this, attributes, key);
+    }
+
+    @Override
     public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, @Nullable Object value) {
         // This is the copy from the super method to avoid the type pollution
         if (StringUtils.isNotEmpty(name)) {
-            if (value == null) {
-                getAttributes().remove(name.toString());
-            } else {
-                getAttributes().put(name.toString(), value);
+            String key = name.toString();
+            if (!RouteMetadataAttributes.setMetadata(this, key, value)) {
+                getAttributes().put(key, value);
             }
         }
         return this;
+    }
+
+    @Override
+    public @Nullable Object getRouteMatchMetadata() {
+        return routeMatch;
+    }
+
+    @Override
+    public void setRouteMatchMetadata(@Nullable Object routeMatch) {
+        this.routeMatch = routeMatch;
+    }
+
+    @Override
+    public @Nullable Object getRouteInfoMetadata() {
+        return routeInfo;
+    }
+
+    @Override
+    public void setRouteInfoMetadata(@Nullable Object routeInfo) {
+        this.routeInfo = routeInfo;
+    }
+
+    @Override
+    public @Nullable String getUriTemplateMetadata() {
+        return uriTemplate;
+    }
+
+    @Override
+    public void setUriTemplateMetadata(@Nullable String uriTemplate) {
+        this.uriTemplate = uriTemplate;
     }
 
     @Override
@@ -333,6 +395,11 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+        BodyConvertor bodyConvertor = this.bodyConvertor;
+        if (bodyConvertor == null) {
+            bodyConvertor = newBodyConvertor();
+            this.bodyConvertor = bodyConvertor;
+        }
         return bodyConvertor.convert(conversionContext, body);
     }
 
@@ -352,7 +419,10 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
                 buf.release();
             }
             setBody(body);
-            bodyConvertor.cleanup();
+            BodyConvertor bodyConvertor = this.bodyConvertor;
+            if (bodyConvertor != null) {
+                bodyConvertor.cleanup();
+            }
         }
         return (MutableHttpResponse<T>) this;
     }
@@ -395,7 +465,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             throw new IllegalStateException("Body needs to be converted to ByteBuf from " + body.getClass());
         }
         DefaultStreamedHttpResponse streamedHttpResponse = new DefaultStreamedHttpResponse(
-                HttpVersion.HTTP_1_1,
+                httpVersion,
                 httpResponseStatus,
                 true,
                 Publishers.just(new DefaultLastHttpContent(content))
@@ -484,6 +554,21 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             nextConvertor = null;
         }
 
+    }
+
+    /**
+     * The headers of a response created without headers. A response carries a handful of
+     * headers, so the hash table starts with 8 buckets instead of the 16 used by
+     * {@link DefaultHttpHeaders}. The table still grows by chaining, and names and values are
+     * validated exactly as by {@code new DefaultHttpHeaders(false)}.
+     */
+    private static final class ResponseHeaders extends DefaultHttpHeaders {
+        private static final DefaultHttpHeadersFactory NO_VALIDATION = DefaultHttpHeadersFactory.headersFactory().withValidation(false);
+        private static final int SIZE_HINT = 8;
+
+        ResponseHeaders() {
+            super(NO_VALIDATION.getNameValidator(), NO_VALIDATION.getValueValidator(), SIZE_HINT);
+        }
     }
 
 }

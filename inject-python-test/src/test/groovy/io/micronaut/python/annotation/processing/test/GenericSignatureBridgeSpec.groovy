@@ -156,6 +156,42 @@ class NamedBinder(TaggedArgumentBinder[Named]):
         context.close()
     }
 
+    void "a bind override without a return hint converts its result to the inherited BindingResult"() {
+        given: 'the parameters are hinted like the Java @Override, the return type is not'
+        def context = buildContext('''
+import java
+from jakarta.inject import Singleton
+from java.util import Optional
+from micronaut.core.bind.annotation import Bindable
+from micronaut.core.convert import ArgumentConversionContext
+from io.micronaut.python.annotation.processing.test.generics import MessageAnnotatedArgumentBinder
+
+
+@Bindable
+def SID():
+    def decorator(target):
+        return target
+    return decorator
+
+
+@Singleton
+class UnhintedSidBinder(MessageAnnotatedArgumentBinder[SID]):
+    def getAnnotationType(self):
+        return java.type("python.SID")
+
+    def bind(self, context: ArgumentConversionContext[object], source: str):
+        return lambda: Optional.of(source + "?")
+''')
+        def binder = context.getBean(context.classLoader.loadClass('python.UnhintedSidBinder'))
+        ArgumentConversionContext<Object> conversionContext = ConversionContext.of(Argument.OBJECT_ARGUMENT)
+
+        expect: 'the returned Python lambda is converted to the BindingResult of the inherited signature'
+        binder.bind(conversionContext, "value").value.get() == "value?"
+
+        cleanup:
+        context.close()
+    }
+
     void "a Python bean listens for a type with a self-referential type bound"() {
         given:
         def context = buildContext('''

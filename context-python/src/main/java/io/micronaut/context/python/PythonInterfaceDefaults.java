@@ -47,7 +47,8 @@ import java.util.Map;
  * view the generated stub provides and invokes the default method on it, so the Java implementation runs
  * with a Java view of the Python object as {@code this}, its abstract calls reaching the Python methods
  * through the stub, while the Python object keeps its identity ({@code is}, {@code isinstance}, {@code ==}).
- * A class without a generated stub (one defined inside a function) has no such view: the polyglot proxy
+ * A class without a generated stub (one defined inside a function that is not a GraalPy host adapter of the
+ * interface, because it takes constructor parameters or has another base) has no such view: the polyglot proxy
  * GraalPy creates for the interface dispatches every member to the Python object first, which would reach
  * the installed method again, so the default method is run through a proxy of this class that invokes the
  * default implementation of that one method itself and delegates every other call to the polyglot proxy:

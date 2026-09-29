@@ -94,6 +94,130 @@ class CustomErrorResponse {
         errorUri.stringValue(JsonProperty).get() == "error_uri"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(String title, int pages, boolean available) {}
+""")
+
+        when:
+        def book = introspection.instantiate("Groovy in Action", 912, true)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages", "available"]
+        introspection.getRequiredProperty("title", String).get(book) == "Groovy in Action"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.getRequiredProperty("available", boolean).get(book) == true
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source with an annotated component in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(@JsonProperty("book_title") String title, int pages) {}
+""")
+
+        when:
+        def book = introspection.instantiate("Groovy in Action", 912)
+        BeanProperty title = introspection.getRequiredProperty("title", String)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages"]
+        title.get(book) == "Groovy in Action"
+        title.stringValue(JsonProperty).get() == "book_title"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source with a compact constructor in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(String title, int pages) {
+    Book {
+        title = title.trim()
+    }
+}
+""")
+
+        when:
+        def book = introspection.instantiate(" Groovy in Action ", 912)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages"]
+        introspection.getRequiredProperty("title", String).get(book) == "Groovy in Action"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source with an accessor override in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(String title, int pages) {
+    String title() {
+        title.toUpperCase()
+    }
+}
+""")
+
+        when:
+        def book = introspection.instantiate("Groovy in Action", 912)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages"]
+        introspection.getRequiredProperty("title", String).get(book) == "GROOVY IN ACTION"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
+    }
+
     void "test annotations"() {
         when:
             def introspection = buildBeanIntrospection('test.Test', '''

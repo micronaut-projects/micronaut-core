@@ -86,8 +86,9 @@ class PythonSourceRootsTest {
             .build()
             .compile();
 
-        assertTrue(new File(testOutput, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "jakarta/inject/__init__.py").isFile());
-        assertTrue(new File(mainOutput, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "jakarta/inject/__init__.py").isFile());
+        // each root records the Java packages it imports in a manifest of its own; the runtime merges them
+        assertTrue(hasJavaImportsManifest(testOutput));
+        assertTrue(hasJavaImportsManifest(mainOutput));
 
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{mainOutput.toURI().toURL(), testOutput.toURI().toURL()})) {
             Class<?> service = classLoader.loadClass("example.GreetingService");
@@ -254,5 +255,73 @@ class PythonSourceRootsTest {
                 assertEquals("Hello Python", ((ValueCoercible) bean).asPolyglotValue().invokeMember("greet", "Python").asString());
             }
         }
+    }
+
+    /**
+     * A Java package both roots import from: its {@code __all__} lists the members of
+     * both contributions before the subpackages of either, whichever way the members modules sort by name.
+     */
+    @Test
+    void theSharedJavaPackageListsTheMembersOfBothRootsBeforeTheirSubpackages() throws Exception {
+        Path mainSources = Files.createDirectories(temporaryDirectory.resolve("src/main/python/example"));
+        // the main root contributes the subpackage micronaut.core.convert.value
+        Files.writeString(mainSources.resolve("values_service.py"), """
+            from jakarta.inject import Singleton
+            from micronaut.core.convert.value import ConvertibleValues
+
+            @Singleton
+            class ValuesService:
+                def empty(self) -> object:
+                    return ConvertibleValues.empty()
+            """);
+        Path testSources = Files.createDirectories(temporaryDirectory.resolve("src/test/python/example"));
+        // the test root contributes the member micronaut.core.convert.ConversionContext
+        Files.writeString(testSources.resolve("context_consumer.py"), """
+            from jakarta.inject import Singleton
+            from micronaut.core.convert import ConversionContext
+
+            @Singleton
+            class ContextConsumer:
+                def default_context(self) -> object:
+                    return ConversionContext.DEFAULT
+            """);
+        File mainOutput = Files.createDirectories(temporaryDirectory.resolve("classes/main")).toFile();
+        File testOutput = Files.createDirectories(temporaryDirectory.resolve("classes/test")).toFile();
+        PyronautCompiler.builder()
+            .pythonSrc(mainSources.getParent().toString())
+            .targetDir(mainOutput)
+            .build()
+            .compile();
+        PyronautCompiler.builder()
+            .pythonSrc(testSources.getParent().toString())
+            .targetDir(testOutput)
+            .classpath(List.of(mainOutput))
+            .build()
+            .compile();
+
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{testOutput.toURI().toURL(), mainOutput.toURI().toURL()})) {
+            try (ApplicationContext context = ApplicationContext.builder().classLoader(classLoader).build().start()) {
+                org.graalvm.polyglot.Context pythonContext = context.getBean(org.graalvm.polyglot.Context.class);
+                assertEquals("ConversionContext,value", pythonContext.eval("python", """
+                    import micronaut.core.convert
+                    ','.join(micronaut.core.convert.__all__)
+                    """).asString());
+                // the subpackage is there, and importing the package did not import it
+                assertEquals("False", pythonContext.eval("python", """
+                    import sys
+                    str('micronaut.core.convert.value' in sys.modules)
+                    """).asString());
+                assertTrue(pythonContext.eval("python", """
+                    from micronaut.core.convert import value
+                    value.ConvertibleValues.empty().isEmpty()
+                    """).asBoolean());
+            }
+        }
+    }
+
+    private static boolean hasJavaImportsManifest(File output) {
+        File[] files = new File(output, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH).listFiles();
+        return files != null && java.util.Arrays.stream(files)
+            .anyMatch(file -> file.getName().startsWith(PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX));
     }
 }

@@ -18,4 +18,11 @@ dependencies {
 
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautDiscoveryCore)
+    testImplementation(libs.logback.classic)
+}
+
+noReflection {
+    allowIn("io.micronaut.retry.NamedRetryPolicyConfiguration", "CLASS_LOADING")
+    allowIn("io.micronaut.retry.NamedCircuitBreakerConfiguration", "CLASS_LOADING")
+    allowIn("io.micronaut.retry.intercept.AnnotationRetryStateBuilder", "REFLECTIVE_ACCESS")
 }

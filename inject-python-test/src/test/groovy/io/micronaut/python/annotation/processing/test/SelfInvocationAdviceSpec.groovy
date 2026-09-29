@@ -391,4 +391,45 @@ class FormattingService:
         cleanup:
         context?.close()
     }
+
+    void "an instance attribute named like an intercepted method shadows it on self"() {
+        given:
+        @Language("python") def pythonCode = INTERCEPTOR + '''
+@TestAround
+@Singleton
+class BookStore:
+    def __init__(self):
+        self.books = {}
+
+    @Executable
+    def add(self, title: str) -> int:
+        self.books[title] = len(self.books)
+        return len(self.books)
+
+    @Executable
+    def titles(self) -> list[str]:
+        return sorted(self.books)
+
+    @Executable
+    def books(self) -> int:
+        return -1
+'''
+        def context = buildContext(pythonCode)
+        def store = getBean(context, "python.BookStore")
+
+        when: "the bean writes the attribute that carries the name of an intercepted method"
+        def count = store.add("The Stand")
+
+        then: "self.books is the attribute, as it is in plain Python"
+        count == 1
+        store.titles() == ["The Stand"]
+
+        and: "the method of that name is still intercepted when a Java caller calls it"
+        InterceptionLog.reset()
+        store.books() == -1
+        InterceptionLog.methods() == ["books"]
+
+        cleanup:
+        context?.close()
+    }
 }

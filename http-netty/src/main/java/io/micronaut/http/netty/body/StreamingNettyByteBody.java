@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -27,6 +28,7 @@ import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.UpstreamBalancer;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -35,6 +37,8 @@ import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
@@ -162,6 +166,24 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         private final EventLoop eventLoop;
         private final NettyByteBodyFactory byteBodyFactory;
         private boolean adding = false;
+        /**
+         * Number of {@link #reserve()} calls queued on the event loop. While there are any, a
+         * subscribe is queued behind them, even one from another body of this buffer: a body
+         * closed on the event loop must not take the last reservation before a split made off
+         * the event loop has reserved its own.
+         */
+        private final AtomicInteger pendingReservations = new AtomicInteger();
+        /**
+         * Whether a subscriber is being added. The bytes forwarded to a new subscriber can make
+         * it ask for more, and a source that has bytes queued delivers them right away, back into
+         * this buffer: such input is queued on the event loop behind the subscribe.
+         */
+        private boolean subscribing = false;
+        /**
+         * Number of inputs queued on the event loop, see {@link #subscribing}. The inputs that
+         * follow are queued behind them to keep their order.
+         */
+        private int deferredInputs = 0;
 
         public SharedBuffer(EventLoop loop, NettyByteBodyFactory byteBodyFactory, BodySizeLimits limits, Upstream rootUpstream) {
             super(byteBodyFactory.readBufferFactory(), limits, rootUpstream);
@@ -177,12 +199,123 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
             setExpectedLengthFrom(headers.get(HttpHeaderNames.CONTENT_LENGTH));
         }
 
+        /**
+         * Complete this buffer with the trailing headers of a
+         * {@link io.netty.handler.codec.http.LastHttpContent}.
+         *
+         * @param trailingHeaders The trailing headers, possibly empty
+         * @since 5.3.0
+         */
+        public void completeWithTrailers(HttpHeaders trailingHeaders) {
+            if (trailingHeaders.isEmpty()) {
+                complete();
+            } else {
+                complete(new NettyHttpHeaders(trailingHeaders, ConversionService.SHARED));
+            }
+        }
+
+        @Override
+        protected void submitDeferred(Runnable task) {
+            eventLoop.execute(task);
+        }
+
+        /**
+         * Queue an input that arrives while a subscriber is added, or behind the inputs queued
+         * before it. A queued input runs in its turn, so it is given to this buffer directly. It
+         * counts as queued until it has run: an input it triggers is queued behind it.
+         *
+         * @param input The input
+         * @return {@code true} if the input is queued
+         */
+        private boolean deferInput(Runnable input) {
+            if (!subscribing && deferredInputs == 0) {
+                return false;
+            }
+            deferredInputs++;
+            eventLoop.execute(() -> {
+                try {
+                    input.run();
+                } finally {
+                    deferredInputs--;
+                }
+            });
+            return true;
+        }
+
+        /**
+         * Run a subscribe on the event loop once no {@link #reserve()} is queued from off the
+         * event loop. A reservation is counted before it is queued, so it can be queued behind
+         * this task: the task then moves behind it.
+         *
+         * @param task The subscribe
+         */
+        private void executeAfterReservations(Runnable task) {
+            eventLoop.execute(() -> {
+                if (pendingReservations.get() > 0) {
+                    executeAfterReservations(task);
+                } else {
+                    task.run();
+                }
+            });
+        }
+
+        @Override
+        public void add(ReadBuffer rb) {
+            if (!deferInput(() -> super.add(rb))) {
+                super.add(rb);
+            }
+        }
+
+        @Override
+        public void addAndComplete(ReadBuffer rb) {
+            if (!deferInput(() -> super.addAndComplete(rb))) {
+                super.addAndComplete(rb);
+            }
+        }
+
+        @Override
+        public void complete() {
+            if (!deferInput(super::complete)) {
+                super.complete();
+            }
+        }
+
+        @Override
+        public void complete(io.micronaut.http.HttpHeaders trailers) {
+            if (!deferInput(() -> super.complete(trailers))) {
+                super.complete(trailers);
+            }
+        }
+
+        @Override
+        public void error(Throwable e) {
+            if (!deferInput(() -> super.error(e))) {
+                super.error(e);
+            }
+        }
+
+        private void subscribeOnLoop(@Nullable BufferConsumer subscriber, Upstream specificUpstream) {
+            subscribing = true;
+            try {
+                subscribe0(subscriber, specificUpstream);
+            } finally {
+                subscribing = false;
+            }
+        }
+
         boolean reserve() {
             if (eventLoop.inEventLoop() && !adding) {
                 reserve0();
                 return false;
             } else {
-                eventLoop.execute(this::reserve0);
+                pendingReservations.incrementAndGet();
+                eventLoop.execute(() -> {
+                    try {
+                        reserve0();
+                    } finally {
+                        pendingReservations.decrementAndGet();
+                    }
+                });
                 return true;
             }
         }
@@ -203,10 +336,10 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
          * @param forceDelay       Whether to require an {@link EventLoop#execute} call to ensure serialization with previous {@link #reserve()} call
          */
         void subscribe(@Nullable BufferConsumer subscriber, Upstream specificUpstream, boolean forceDelay) {
-            if (!forceDelay && eventLoop.inEventLoop() && !adding) {
-                subscribe0(subscriber, specificUpstream);
+            if (!forceDelay && pendingReservations.get() == 0 && eventLoop.inEventLoop() && !adding) {
+                subscribeOnLoop(subscriber, specificUpstream);
             } else {
-                eventLoop.execute(() -> subscribe0(subscriber, specificUpstream));
+                executeAfterReservations(() -> subscribeOnLoop(subscriber, specificUpstream));
             }
         }
 
@@ -231,10 +364,10 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
          */
         ExecutionFlow<ReadBuffer> subscribeFull(Upstream specificUpstream, boolean forceDelay) {
             DelayedExecutionFlow<ReadBuffer> asyncFlow = DelayedExecutionFlow.create();
-            if (!forceDelay && eventLoop.inEventLoop() && !adding) {
+            if (!forceDelay && pendingReservations.get() == 0 && eventLoop.inEventLoop() && !adding) {
                 return subscribeFull0(asyncFlow, specificUpstream, true);
             } else {
-                eventLoop.execute(() -> {
+                executeAfterReservations(() -> {
                     ExecutionFlow<ReadBuffer> res = subscribeFull0(asyncFlow, specificUpstream, false);
                     assert res == asyncFlow;
                 });
@@ -243,13 +376,13 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         }
 
         @Override
-        public void add(ReadBuffer rb) {
+        protected @Nullable List<ReadBuffer> addGuarded(ReadBuffer rb, boolean completeAfter) {
             if (!eventLoop.inEventLoop()) {
                 throw new IllegalStateException("Must only be called on event loop");
             }
             adding = true;
             try {
-                super.add(rb);
+                return super.addGuarded(rb, completeAfter);
             } finally {
                 adding = false;
             }

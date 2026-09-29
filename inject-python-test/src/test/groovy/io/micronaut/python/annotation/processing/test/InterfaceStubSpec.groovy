@@ -3,7 +3,9 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.RuntimeBeanDefinition
+import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.runtime.server.EmbeddedServer
+import pythontest.introduction.reflective.FakeAiService
 import pythontest.introduction.reflective.Prompt
 import pythontest.introduction.reflective.ReflectiveService
 import pythontest.introduction.reflective.ReflectiveServiceInterceptor
@@ -17,6 +19,19 @@ import java.lang.reflect.Modifier
  * (java.lang.reflect.Proxy, Method.getAnnotation) can consume it.
  */
 class InterfaceStubSpec extends AbstractPythonTypeElementSpec {
+
+    /**
+     * The patterns of the {@code micronaut.introspection.allowReflection} option naming the interfaces that
+     * carry the runtime annotations of their Python class; {@code null} compiles without the option.
+     */
+    String allowReflection = "python.*"
+
+    @Override
+    protected void configureCompiler(PyronautCompiler.Builder compilerBuilder) {
+        if (allowReflection != null) {
+            compilerBuilder.options(["-A" + RuntimeAnnotationStubSpec.ALLOW_REFLECTION_OPTION + "=" + allowReflection])
+        }
+    }
 
     void "test introduction with only abstract methods compiles to an annotated Java interface"() {
         given:
@@ -210,6 +225,93 @@ class UpperTranslator(Translator):
         translatorType.isInterface()
         translatorType.getMethod("translate", String).getAnnotation(Prompt).value() == "Translate."
         translator.translate("hello") == "HELLO"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test the runtime annotations of an interface are copied only when the option names it"() {
+        given:
+        allowReflection = patterns
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+from typing import Annotated
+from jakarta.inject import Singleton
+from pythontest.introduction.reflective import Prompt, ReflectiveService, Var
+
+
+class Translator(ABC):
+    @Prompt("Translate.")
+    @abstractmethod
+    def translate(self, text: Annotated[str, Var("text")]) -> str:
+        ...
+
+
+@Singleton
+class UpperTranslator(Translator):
+    def translate(self, text: str) -> str:
+        return text.upper()
+''')
+
+        when:
+        Class<?> translatorType = context.classLoader.loadClass("python.Translator")
+        def method = translatorType.getMethod("translate", String)
+
+        then: "the interface is generated either way, and the bean implements it"
+        translatorType.isInterface()
+        context.getBean(translatorType).translate("hello") == "HELLO"
+
+        and: "the third-party annotations of its methods and parameters are reflection data of the interface"
+        (method.getAnnotation(Prompt) != null) == copied
+        (method.parameterAnnotations[0].any { it instanceof Var }) == copied
+
+        cleanup:
+        context?.close()
+
+        where:
+        patterns             | copied
+        null                 | false
+        "other.*"            | false
+        "python.Translator"  | true
+        "python.*"           | true
+    }
+
+    void "test an annotation mapped to the AllowsReflection hint copies the interface annotations without the option"() {
+        given: "no option; @FakeAiService is mapped to @AllowsReflection by FakeAiServiceMapper"
+        allowReflection = null
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+from typing import Annotated
+from pythontest.introduction.reflective import FakeAiService, Prompt, Var
+
+
+@FakeAiService("friend")
+class Friend(ABC):
+    @Prompt("You are a good friend of mine.")
+    @abstractmethod
+    def chat(self, message: Annotated[str, Var("message")]) -> str:
+        ...
+
+
+class Stranger(ABC):
+    @Prompt("Who are you?")
+    @abstractmethod
+    def chat(self, message: Annotated[str, Var("message")]) -> str:
+        ...
+''')
+        Class<?> friendType = context.classLoader.loadClass("python.Friend")
+        Class<?> strangerType = context.classLoader.loadClass("python.Stranger")
+
+        expect: "the mapped hint applies to the interface, its methods and their parameters"
+        friendType.isInterface()
+        friendType.getAnnotation(FakeAiService).value() == "friend"
+        friendType.getMethod("chat", String).getAnnotation(Prompt).value() == "You are a good friend of mine."
+        friendType.getMethod("chat", String).parameterAnnotations[0].find { it instanceof Var }.value() == "message"
+
+        and: "an interface without the hint keeps its annotations in the metadata only"
+        strangerType.isInterface()
+        strangerType.getMethod("chat", String).getAnnotation(Prompt) == null
+        strangerType.getMethod("chat", String).parameterAnnotations[0].length == 0
 
         cleanup:
         context?.close()

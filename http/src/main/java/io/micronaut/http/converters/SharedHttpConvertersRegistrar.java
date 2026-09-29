@@ -46,7 +46,12 @@ public class SharedHttpConvertersRegistrar implements TypeConverterRegistrar {
             try {
                 return HttpVersion.valueOf(Double.parseDouble(s));
             } catch (NumberFormatException e) {
-                return HttpVersion.valueOf(s);
+                for (HttpVersion version : HttpVersion.values()) {
+                    if (version.name().equals(s)) {
+                        return version;
+                    }
+                }
+                throw new IllegalArgumentException("No enum constant " + HttpVersion.class.getName() + "." + s);
             }
         });
         conversionService.addConverter(Number.class, HttpVersion.class, s -> HttpVersion.valueOf(s.doubleValue()));

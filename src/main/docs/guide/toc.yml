@@ -193,6 +193,8 @@ httpServer:
     title: Advanced body access
     byteBodyPrimary: Primary operations
     byteBodySplitting: Splitting
+    byteBodyTrailers: Trailers
+    byteBodyLimitReplay: Limiting and replaying
     byteBodyExample: Example
   sessions: HTTP Sessions
   sse: Server Sent Events
@@ -253,6 +255,7 @@ httpClient:
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
   proxyClient: Proxying Requests with ProxyHttpClient
+  rawClient: Raw Exchanges with RawHttpClient
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
@@ -370,6 +373,7 @@ languageSupport:
       title: Async/Await
       asyncioRuntime: Netty-Backed Asyncio Runtime
       asyncioNetworking: Asyncio Networking and TLS
+      asyncioStreaming: Python-Native Streaming
       asyncioUnsupported: Unsupported Asyncio APIs
   kotlin:
     title: Micronaut for Kotlin

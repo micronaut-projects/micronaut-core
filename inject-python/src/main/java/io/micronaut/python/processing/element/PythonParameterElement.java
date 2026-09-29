@@ -22,9 +22,13 @@ import java.util.Objects;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.model.ArgumentDef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A parameter element representing a Python function parameter.
@@ -46,6 +50,12 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     private final ClassElement type;
     private final PythonMethodElement methodElement;
     private final ArgumentDef argumentDef;
+    // The signature inherited from the parameter of the Java method the Python method overrides
+    // (see withInheritedType and withInheritedAnnotationMetadata)
+    private @Nullable ClassElement inheritedType;
+    private @Nullable AnnotationMetadata inheritedAnnotationMetadata;
+    private @Nullable ElementAnnotationMetadata mergedAnnotationMetadata;
+    private boolean validatedElementResolved;
 
     public PythonParameterElement(ArgumentDef argumentDef,
                                   PythonProcessingEnvironment environment,
@@ -62,9 +72,45 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
         // Resolve parameter type
         this.type = resolveType(argumentDef);
         this.argumentDef = argumentDef;
-        if (hasValidationAnnotation(type)) {
-            annotate(ANN_VALIDATED_ELEMENT);
+    }
+
+    /**
+     * The annotation metadata read from this parameter: the annotations declared on the Python parameter,
+     * seen through those inherited from the overridden Java parameter, as for the parameters of an overriding
+     * Java method (the inherited ones are visible to {@code hasAnnotation} but not to {@code hasDeclaredAnnotation}).
+     */
+    @Override
+    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
+        if (inheritedAnnotationMetadata == null) {
+            return getOwnAnnotationMetadata();
         }
+        if (mergedAnnotationMetadata == null) {
+            mergedAnnotationMetadata = elementAnnotationMetadataFactory.buildMutable(
+                new AnnotationMetadataHierarchy(inheritedAnnotationMetadata, getOwnAnnotationMetadata())
+            );
+        }
+        return mergedAnnotationMetadata;
+    }
+
+    /**
+     * Annotations added by a visitor go to the metadata of the Python parameter itself, which is cached for the
+     * parameter: every view of the parameter (each query of the enclosed methods answers a new copy) sees them,
+     * the inherited metadata being a read-only view over it.
+     */
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return getOwnAnnotationMetadata();
+    }
+
+    private ElementAnnotationMetadata getOwnAnnotationMetadata() {
+        ElementAnnotationMetadata annotationMetadata = super.getElementAnnotationMetadata();
+        if (!validatedElementResolved) {
+            validatedElementResolved = true;
+            if (hasValidationAnnotation(type) && !annotationMetadata.hasAnnotation(ANN_VALIDATED_ELEMENT)) {
+                annotationMetadata.annotate(ANN_VALIDATED_ELEMENT);
+            }
+        }
+        return annotationMetadata;
     }
 
     @Override
@@ -74,11 +120,15 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
     @Override
     public boolean hasDefault() {
-        return getNativeType().hasDefaultValue();
+        // The Java signature a Python override adopts has no defaults: its arguments are the Java ones
+        return inheritedType == null && getNativeType().hasDefaultValue();
     }
 
     @Override
     public ClassElement getType() {
+        if (inheritedType != null) {
+            return inheritedType;
+        }
         if (methodElement.requiresResolvedParameterType()) {
             ClassElement classElement = resolveType(argumentDef, methodElement.getBoundGenericTypes());
             if (!classElement.getTypeArguments().isEmpty()) {
@@ -94,6 +144,9 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
     @Override
     public ClassElement getGenericType() {
+        if (inheritedType != null) {
+            return inheritedType;
+        }
         ClassElement classElement = resolveType(argumentDef, methodElement.getBoundGenericTypes());
         if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
             return pythonClassElement.withTypeAnnotationsKey(argumentDef);
@@ -142,14 +195,51 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
         return java.util.Optional.ofNullable(getNativeType().documentation());
     }
 
+    /**
+     * Returns a copy of this parameter that reports the given type, the type of the corresponding parameter
+     * of the Java method the Python method overrides, in place of the one resolved from the Python hint. The
+     * copy remains a parameter of the Python method: it keeps the Python name, the method element and the
+     * annotation metadata.
+     *
+     * @param type The type of the overridden Java parameter
+     * @return The copy
+     */
+    public PythonParameterElement withInheritedType(ClassElement type) {
+        PythonParameterElement copy = (PythonParameterElement) makeCopy();
+        copy.inheritedType = Objects.requireNonNull(type, "Type cannot be null");
+        return copy;
+    }
+
+    /**
+     * Returns a copy of this parameter that inherits the given annotation metadata, the annotations of the
+     * corresponding parameter of a method the Python method overrides (the constraints of a Java interface
+     * method). They are read through this parameter as inherited annotations, in addition to any inherited
+     * earlier, while annotations added to the copy go to the parameter's own metadata, so a visitor that
+     * annotates the parameter while inheriting annotations itself (the validation visitor) works on it.
+     *
+     * @param annotationMetadata The annotation metadata of the overridden parameter
+     * @return The copy
+     */
+    public PythonParameterElement withInheritedAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
+        PythonParameterElement copy = (PythonParameterElement) makeCopy();
+        copy.inheritedAnnotationMetadata = inheritedAnnotationMetadata == null
+            ? annotationMetadata
+            : new AnnotationMetadataHierarchy(inheritedAnnotationMetadata, annotationMetadata);
+        return copy;
+    }
+
     @Override
     protected AbstractPythonElement copyThis() {
-        return new PythonParameterElement(
+        PythonParameterElement copy = new PythonParameterElement(
             getNativeType(),
             environment,
             methodElement,
             getElementAnnotationMetadataFactory()
         );
+        copy.inheritedType = inheritedType;
+        copy.inheritedAnnotationMetadata = inheritedAnnotationMetadata;
+        return copy;
     }
 
     @Override

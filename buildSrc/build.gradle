@@ -15,4 +15,5 @@ dependencies {
     implementation libs.native.gradle.plugin
     implementation libs.sonatype.scan
     implementation libs.gradle.errorprone
+    implementation libs.gradle.errorprone.no.reflection
 }

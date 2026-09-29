@@ -502,6 +502,19 @@ final class PythonContextRegistry {
         return CURRENT_EXECUTION.isBound() && !CURRENT_EXECUTION.get().contexts.isEmpty();
     }
 
+    /**
+     * The number of active executions of one context.
+     *
+     * @param context The context
+     * @return The count, or 0 for an unknown context
+     */
+    static int activeExecutions(Context context) {
+        synchronized (LOCK) {
+            ContextState state = CONTEXT_STATES.get(context);
+            return state == null ? 0 : state.activeExecutions;
+        }
+    }
+
     static int activeExecutions() {
         return ACTIVE_EXECUTIONS.get();
     }
@@ -775,6 +788,10 @@ final class PythonContextRegistry {
         final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
+        /** Class-bound allocators, keyed by the precomputed class reference cache key. */
+        final Map<String, Value> uninitializedInstanceFactories = new ConcurrentHashMap<>();
+        /** Successfully prepared introduction classes, keyed by the precomputed class reference cache key. */
+        final Set<String> preparedIntroductionClasses = ConcurrentHashMap.newKeySet();
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
@@ -783,6 +800,15 @@ final class PythonContextRegistry {
         final Map<String, Value> classes = new ConcurrentHashMap<>();
         /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
         final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
+        /**
+         * The object a wrapper of another context is seen as in this one, by the object the wrapper
+         * holds. Keyed by identity, as {@link Value#equals(Object)} compares the guest objects, so one
+         * Python object of the other context is one object here however often the view asks for it and
+         * whichever wrapper asks: the view hashes, compares and prints the same object every time.
+         * Weakly keyed: the key is the value the wrapper itself holds, so the entry lives exactly as
+         * long as that wrapper and nothing here keeps it alive.
+         */
+        final Map<Value, Value> viewedValues = Collections.synchronizedMap(new WeakHashMap<>());
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
@@ -794,9 +820,12 @@ final class PythonContextRegistry {
             asyncConstructorArguments.clear();
             asyncInstances.clear();
             coroutineClasses.clear();
+            uninitializedInstanceFactories.clear();
+            preparedIntroductionClasses.clear();
             helpers.clear();
             classes.clear();
             scopedProxies.clear();
+            viewedValues.clear();
             runtimeModule.set(null);
             registered = false;
             noActiveExecutionsListeners.clear();

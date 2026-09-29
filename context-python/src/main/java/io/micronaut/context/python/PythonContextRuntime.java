@@ -46,6 +46,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.reactivestreams.Publisher;
 
 /**
  * Runtime coordination point for generated Python bridge classes.
@@ -89,6 +90,14 @@ public final class PythonContextRuntime {
     private static final String RUNTIME_MODULE_NAME = "micronaut_runtime";
     private static final String RUNTIME_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_runtime.py";
     private static final Source IMPORT_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + RUNTIME_MODULE_NAME + "')", "micronaut-import-runtime.py").cached(true).buildLiteral();
+    /**
+     * The module serving the Java packages, types and annotations the compiled Python sources import; see
+     * {@link #installJavaImportFinder(Context)}.
+     */
+    private static final String JAVA_IMPORTS_MODULE_NAME = "micronaut_java_imports";
+    private static final String JAVA_IMPORTS_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_java_imports.py";
+    private static final Source IMPORT_JAVA_IMPORTS_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + JAVA_IMPORTS_MODULE_NAME + "')", "micronaut-import-java-imports.py").cached(true).buildLiteral();
+    private static final AtomicReference<@Nullable String> JAVA_IMPORTS_MODULE_FALLBACK_SOURCE = new AtomicReference<>();
     private static final String INSTALL_RUNTIME_MODULE_FINDER = "__micronaut_install_runtime_module_finder";
     /**
      * Installs a meta path finder that serves runtime modules from their classpath source when the
@@ -337,7 +346,7 @@ public final class PythonContextRuntime {
      */
     static @Nullable Value asyncBeanValue(ValueCoercible bean, Context targetContext) {
         Value source = bean.asPolyglotValue();
-        if (source == null || PythonConversion.isNone(source)) {
+        if (PythonConversion.isNone(source)) {
             return null;
         }
         PythonClassReference classReference = PYTHON_CLASS_REFERENCES.get(bean.getClass()).orElse(null);
@@ -683,11 +692,13 @@ public final class PythonContextRuntime {
     }
 
     private static boolean shouldOffloadPooledExecution() {
+        if (!Thread.currentThread().isVirtual()) {
+            return false;
+        }
         BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider();
         return provider != null
             && provider.isResolvable()
-            && PythonAsyncioRuntime.currentEventLoopForContext() == null
-            && Thread.currentThread().isVirtual();
+            && PythonAsyncioRuntime.currentEventLoopForContext() == null;
     }
 
     private static <T> T offloadPooledExecution(Supplier<T> action) {
@@ -810,6 +821,45 @@ public final class PythonContextRuntime {
         )));
     }
 
+    /**
+     * Invoke an async generator method on a pooled class instance and expose the generator as a
+     * publisher. On a Netty event loop the generator runs in the loop's own context, which needs no
+     * lease; without a loop the call fails, since nothing could drive the generator after the borrowed
+     * context is returned to the pool.
+     *
+     * @param classReference The Python class reference
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The publisher of the generator's elements
+     * @since 5.2.3
+     */
+    @UsedByGeneratedCode
+    public static Publisher<?> invokePooledPublisher(PythonClassReference classReference, String methodName, Object... args) {
+        return withPooled(classReference, v -> PythonAsyncioRuntime.generatorToPublisher(PythonInvocation.invokePythonMethod(
+            v,
+            methodName,
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        )));
+    }
+
+    /**
+     * Invoke an async generator function of a pooled script and expose the generator as a publisher;
+     * see {@link #invokePooledPublisher(PythonClassReference, String, Object...)}.
+     *
+     * @param packageName The package
+     * @param scriptName The script name
+     * @param methodName The function name
+     * @param args Arguments
+     * @return The publisher of the generator's elements
+     * @since 5.2.3
+     */
+    @UsedByGeneratedCode
+    public static Publisher<?> invokePooledScriptPublisher(String packageName, String scriptName, String methodName, Object... args) {
+        return withPooledScript(packageName, scriptName, v -> PythonAsyncioRuntime.generatorToPublisher(v.getMember(methodName).execute(
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        )));
+    }
+
     private static CompletionStage<?> withPooledStage(PythonClassReference classReference, Function<Value, CompletionStage<?>> fn) {
         if (shouldOffloadPooledExecution()) {
             return offloadPooledExecution(() -> withPooledStage(classReference, fn));
@@ -886,10 +936,28 @@ public final class PythonContextRuntime {
         // generated code reaches this outside any bridge call: the work is an execution of the context
         return PythonContextRegistry.withExecutionFrame(context, () -> {
             Value pythonClass = findClass(classReference, context);
-            // stubs the abstract methods once per class and context; the marker it sets makes later calls a no-op
-            helper(context, PREPARE_INTRODUCTION).execute(pythonClass);
+            prepareIntroductionClass(classReference, pythonClass);
             return instantiate(classReference, args, pythonClass);
         });
+    }
+
+    /**
+     * Prepare an introduction class once per context, within its execution frame.
+     *
+     * @param classReference The stable class reference
+     * @param pythonClass The resolved class in the executing context
+     */
+    @Internal
+    public static void prepareIntroductionClass(PythonClassReference classReference, Value pythonClass) {
+        Context context = pythonClass.getContext();
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
+        String key = classReference.cacheKey();
+        if (!state.preparedIntroductionClasses.contains(key)) {
+            // As in helper(), execute Python outside map monitors. The guest helper is idempotent.
+            helper(context, PREPARE_INTRODUCTION).executeVoid(pythonClass);
+            // A failed preparation must remain retryable.
+            state.preparedIntroductionClasses.add(key);
+        }
     }
 
     /**
@@ -953,7 +1021,14 @@ public final class PythonContextRuntime {
     public static Value newInstance(Context context, PythonClassReference classReference, Object... args) {
         return PythonContextRegistry.withExecutionFrame(context, () -> {
             Value pythonClass = findClass(classReference, context);
-            Value instance = instantiate(classReference, args, pythonClass);
+            Object[] constructorArguments = args;
+            if (isReuseContext() && helper(context, HAS_COROUTINE_METHODS).execute(pythonClass).asBoolean()) {
+                constructorArguments = new Object[args.length];
+                for (int i = 0; i < args.length; i++) {
+                    constructorArguments[i] = PythonCoercion.asyncConstructorArgument(context, args[i]);
+                }
+            }
+            Value instance = instantiate(classReference, constructorArguments, pythonClass);
             rememberConstructorArguments(context, classReference, pythonClass, instance, args);
             return instance;
         });
@@ -1062,10 +1137,8 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newUninitializedInstance(Context context, PythonClassReference classReference) {
-        return PythonContextRegistry.withExecutionFrame(context, () -> {
-            Value pythonClass = findClass(classReference, context);
-            return uninitializedInstanceFactory(context).execute(pythonClass);
-        });
+        return PythonContextRegistry.withExecutionFrame(context,
+            () -> uninitializedInstanceFactory(context, classReference).execute());
     }
 
     /**
@@ -1149,14 +1222,11 @@ public final class PythonContextRuntime {
     public static Value newFrozenDataclassInstance(Context context,
                                                    PythonClassReference classReference,
                                                    @Nullable Map<String, Object> props) {
-        return PythonContextRegistry.withExecutionFrame(context, () -> {
-            Value pythonClass = findClass(classReference, context);
-            return withContextClassLoader(() -> {
-                Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
-                populateProperties(instance, props);
-                return instance;
-            });
-        });
+        return PythonContextRegistry.withExecutionFrame(context, () -> withContextClassLoader(() -> {
+            Value instance = uninitializedInstanceFactory(context, classReference).execute();
+            populateProperties(instance, props);
+            return instance;
+        }));
     }
 
     private static void populateProperties(Value instance, @Nullable Map<String, Object> props) {
@@ -1189,8 +1259,23 @@ public final class PythonContextRuntime {
         );
     }
 
-    private static Value uninitializedInstanceFactory(Context context) {
-        return helper(context, NEW_UNINITIALIZED_INSTANCE);
+    private static Value uninitializedInstanceFactory(Context context, PythonClassReference classReference) {
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
+        String key = classReference.cacheKey();
+        Value factory = state.uninitializedInstanceFactories.get(key);
+        if (factory == null) {
+            // Binding the class once lets subsequent allocations execute without arguments.
+            // Passing a Python class to execute on every allocation makes GraalPy probe it for
+            // special positional/keyword argument markers, raising internal AttributeErrors.
+            // As in getOrCreateValue, bind outside map monitors to preserve GIL lock ordering.
+            factory = helper(context, NEW_UNINITIALIZED_INSTANCE)
+                .invokeMember("__get__", findClass(classReference, context));
+            Value existing = state.uninitializedInstanceFactories.putIfAbsent(key, factory);
+            if (existing != null) {
+                factory = existing;
+            }
+        }
+        return factory;
     }
 
     private static Value propertySetter(Context context) {
@@ -1361,32 +1446,52 @@ public final class PythonContextRuntime {
     }
 
     private static Value importPackageMember(Context ctx, String packageName, String importName) {
-        // A package that is imported already serves the class without importing anything, so a
-        // submodule that happens to carry the class name is not executed for a class the package
-        // defines. Otherwise the module named after the class is tried before the package is imported:
-        // importing a module of a package whose __init__ is being executed by another thread does not
-        // wait for that thread, importing the package does, so a class instantiated on another thread
-        // while its package is being imported (a service the parallel service loader creates for a
-        // call made at import time) would otherwise wait for the import lock the importing thread
-        // holds while it waits for the instantiation. Only a missing submodule is tolerated on the way:
-        // an error raised while executing one propagates.
-        Value module = loadedModule(ctx, packageName);
-        Value member = module != null ? module.getMember(importName) : null;
-        if (member != null && isPythonClass(ctx, member)) {
-            return member;
+        // The package is imported first, unless its import is running already: a package that is
+        // imported serves the class without importing anything, so a submodule that happens to carry
+        // the class name is not executed for a class the package defines, and the import holds the
+        // lock of the package alone. Importing the module named after the class first would take the
+        // lock of the module and then wait for the package, which a second thread resolving another
+        // class of the package the same way waits for while holding the lock of its module; the
+        // initialiser of a generated package imports every module of the package, so the threads
+        // would wait for each other (_DeadlockError). While the import of the package runs, on this
+        // thread or on another one, the module named after the class is imported instead, which the
+        // import system executes without the lock of its package: a class instantiated on another
+        // thread while its package is being imported (a service the parallel service loader creates
+        // for a call made at import time) does not wait for the import lock the importing thread holds
+        // while it waits for the instantiation. Only a missing submodule is tolerated on the way: an
+        // error raised while executing one propagates.
+        Value module = importPackageOfMember(ctx, packageName);
+        if (PythonConversion.isNone(module)) {
+            // The import of the package runs on this thread or on another one.
+            return importMemberWhilePackageImports(ctx, packageName, importName);
         }
-        member = importPackageSubmoduleMember(ctx, packageName, importName);
-        if (member != null && isPythonClass(ctx, member)) {
-            return member;
+        Value member = classMember(ctx, module, importName);
+        if (member == null) {
+            member = importPackageSubmoduleMember(ctx, packageName, importName);
         }
-        if (module == null) {
-            module = importModule(ctx, packageName);
-            member = module.getMember(importName);
-            if (member != null && isPythonClass(ctx, member)) {
-                return member;
-            }
+        if (member == null) {
+            member = findClassInPackageModules(ctx, packageName, importName);
         }
-        member = findClassInPackageModules(ctx, packageName, importName);
+        return requireMember(ctx, member, packageName, importName);
+    }
+
+    private static Value importMemberWhilePackageImports(Context ctx, String packageName, String importName) {
+        Value member = importPackageSubmoduleMember(ctx, packageName, importName);
+        if (member == null) {
+            member = classMember(ctx, importModule(ctx, packageName), importName);
+        }
+        if (member == null) {
+            member = findClassInPackageModules(ctx, packageName, importName);
+        }
+        return requireMember(ctx, member, packageName, importName);
+    }
+
+    private static @Nullable Value classMember(Context ctx, Value module, String importName) {
+        Value member = module.getMember(importName);
+        return isPythonClass(ctx, member) ? member : null;
+    }
+
+    private static Value requireMember(Context ctx, @Nullable Value member, String packageName, String importName) {
         if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
@@ -1442,12 +1547,11 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * A module that is imported and initialized: {@code null} when it was never imported, or while
-     * another thread is still executing it.
+     * The package a class is resolved from, imported unless its import is running already:
+     * {@code None} while this or another thread is still executing it.
      */
-    private static @Nullable Value loadedModule(Context ctx, String moduleName) {
-        Value module = helper(ctx, "__micronaut_loaded_module").execute(moduleName);
-        return PythonConversion.isNone(module) ? null : module;
+    private static Value importPackageOfMember(Context ctx, String packageName) {
+        return withContextClassLoader(() -> helper(ctx, "__micronaut_import_package_of_member").execute(packageName));
     }
 
     private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {
@@ -1585,8 +1689,10 @@ public final class PythonContextRuntime {
             }
             // The virtual file system of this context does not carry the module (a bare context created
             // outside the application, or an application whose file system lists another module set):
-            // serve it from the classpath resource and import it again. The import system serialises
-            // the concurrent first imports of a module, so every thread sees it complete.
+            // serve it, and the Java imports module it imports, from the classpath resources and import
+            // it again. The import system serialises the concurrent first imports of a module, so every
+            // thread sees it complete.
+            installJavaImportFinder(context);
             installRuntimeModuleFinder(context, RUNTIME_MODULE_NAME, RUNTIME_MODULE_RESOURCE, RUNTIME_MODULE_FALLBACK_SOURCE);
             module = context.eval(IMPORT_RUNTIME_MODULE_SOURCE);
         }
@@ -1601,6 +1707,28 @@ public final class PythonContextRuntime {
      * @param e The exception of the failed import
      * @return True if the module was not found
      */
+    /**
+     * Installs the meta path finder serving the Java packages, types and annotations the compiled
+     * Python sources import, which the {@code micronaut_java_imports} module installs when it is
+     * imported: importing it here makes sure the finder is in place before the application modules
+     * import. The module is small and does not import the runtime module, whose import stays deferred
+     * to the first bridge call.
+     *
+     * @param context The context
+     */
+    static void installJavaImportFinder(Context context) {
+        try {
+            context.eval(IMPORT_JAVA_IMPORTS_MODULE_SOURCE);
+        } catch (PolyglotException e) {
+            if (!isModuleNotFound(e)) {
+                throw e;
+            }
+            // served from the class path resource like the runtime module (see runtimeModule)
+            installRuntimeModuleFinder(context, JAVA_IMPORTS_MODULE_NAME, JAVA_IMPORTS_MODULE_RESOURCE, JAVA_IMPORTS_MODULE_FALLBACK_SOURCE);
+            context.eval(IMPORT_JAVA_IMPORTS_MODULE_SOURCE);
+        }
+    }
+
     static boolean isModuleNotFound(PolyglotException e) {
         String message = e.getMessage();
         return message != null && message.contains("ModuleNotFoundError");

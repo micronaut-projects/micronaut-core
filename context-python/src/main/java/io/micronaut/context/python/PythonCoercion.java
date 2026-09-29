@@ -224,7 +224,7 @@ public final class PythonCoercion {
             }
             case ValueCoercible valueCoercible -> {
                 Value polyglotValue = valueCoercible.asPolyglotValue();
-                if (polyglotValue == null || isValueInContext(polyglotValue, context)) {
+                if (isValueInContext(polyglotValue, context)) {
                     return polyglotValue;
                 }
                 throw new IllegalArgumentException(
@@ -557,6 +557,65 @@ public final class PythonCoercion {
     @UsedByGeneratedCode
     public static boolean isValueInContext(@Nullable Value value, Context context) {
         return value != null && context.equals(value.getContext());
+    }
+
+    /**
+     * The Python object the Python view of a generated wrapper reads
+     * ({@link ValueCoercible#PYTHON_OBJECT_MEMBER}).
+     * <p>
+     * A wrapper that Java created rather than read from Python ({@code ObjectMapper.readValue(json,
+     * PyDataclass)}, {@code client.retrieve(request, PyDataclass)}, a bean introspection) creates its
+     * Python object in the primary context of the application whose runtime is installed. While a
+     * nested {@code ApplicationContext.run(...)} is the installed one, that is not the context the
+     * calling Python code runs in, and the object reached it as a foreign object: the view reported
+     * the class of, compared and printed that foreign object instead of the Python one, so
+     * {@code isinstance}, {@code ==} and {@code repr} all failed.
+     * <p>
+     * A reconstructible wrapper is therefore reconstructed in the entered context, once: the
+     * reconstruction is kept in the state of that context, keyed by the object the wrapper holds, so
+     * the view answers with the same object every time and a type with identity semantics compares
+     * equal to itself, hashes stably and can be a dictionary key. It is the state of the wrapper at
+     * that moment; the members of the wrapper itself are not affected and still read and write the
+     * wrapper's own object, which is what {@code asPolyglotValue()} keeps handing to Python code that
+     * calls it. A wrapper whose object already belongs to the entered context, which is every wrapper
+     * of an application that runs alone, is returned unchanged.
+     *
+     * @param coercible The generated wrapper
+     * @return The Python object of the entered context, or the wrapper's own when there is no other
+     */
+    static Value pythonObjectInCurrentContext(ValueCoercible coercible) {
+        Value value = coercible.asPolyglotValue();
+        if (!(coercible instanceof PooledValueCoercible pooled)) {
+            return value;
+        }
+        Context current = enteredContext();
+        if (current == null || isValueInContext(value, current)) {
+            return value;
+        }
+        Map<Value, Value> viewedValues = PythonContextRegistry.state(current).viewedValues;
+        Value viewed = viewedValues.get(value);
+        if (viewed == null) {
+            viewed = coercePooledValue(pooled, current);
+            // a concurrent view of the same object wins, so every caller sees one object
+            Value raced = viewedValues.putIfAbsent(value, viewed);
+            if (raced != null) {
+                viewed = raced;
+            }
+        }
+        return viewed;
+    }
+
+    /**
+     * The polyglot context the calling thread is executing in.
+     *
+     * @return The entered context, or {@code null} when the caller is plain Java
+     */
+    private static @Nullable Context enteredContext() {
+        try {
+            return Context.getCurrent();
+        } catch (IllegalStateException e) {
+            return null;
+        }
     }
 
     /**
@@ -1156,9 +1215,10 @@ public final class PythonCoercion {
             if (value instanceof CompletionStage<?> completionStage) {
                 return PythonAsyncioRuntime.toAwaitable(context, completionStage);
             }
-            CompletionStage<?> publisherStage = publisherStage(value, reactiveContext);
-            if (publisherStage != null) {
-                return PythonAsyncioRuntime.toAwaitable(context, publisherStage);
+            if (value != null && Publishers.isConvertibleToPublisher(value)) {
+                // lazily subscribed, within the coroutine's reactive context: awaiting requests one item,
+                // as_async_iterable takes the publisher itself
+                return PythonAsyncioRuntime.publisherAwaitable(context, value, reactiveContext);
             }
             if (value instanceof Value polyglotValue) {
                 if (polyglotValue.isHostObject()) {
@@ -1166,9 +1226,8 @@ public final class PythonCoercion {
                     if (hostObject instanceof CompletionStage<?> completionStage) {
                         return PythonAsyncioRuntime.toAwaitable(context, completionStage);
                     }
-                    CompletionStage<?> hostPublisherStage = publisherStage(hostObject, reactiveContext);
-                    if (hostPublisherStage != null) {
-                        return PythonAsyncioRuntime.toAwaitable(context, hostPublisherStage);
+                    if (Publishers.isConvertibleToPublisher(hostObject)) {
+                        return PythonAsyncioRuntime.publisherAwaitable(context, hostObject, reactiveContext);
                     }
                 }
                 try {
@@ -1180,7 +1239,14 @@ public final class PythonCoercion {
             return null;
         }
 
-        private static @Nullable CompletionStage<?> publisherStage(@Nullable Object value, @Nullable PythonReactiveContext reactiveContext) {
+        /**
+         * Subscribe to a publisher for its first item: the stage of a Python {@code await}.
+         *
+         * @param value The publisher, or a value convertible to one
+         * @param reactiveContext The reactive context of the awaiting coroutine, or {@code null} for none
+         * @return The stage, or {@code null} when the value is not a publisher
+         */
+        static @Nullable CompletionStage<?> publisherStage(@Nullable Object value, @Nullable PythonReactiveContext reactiveContext) {
             if (!Publishers.isConvertibleToPublisher(value)) {
                 return null;
             }

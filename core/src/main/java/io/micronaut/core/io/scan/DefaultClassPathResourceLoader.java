@@ -260,6 +260,19 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         }
     }
 
+    private static boolean isDirectoryEntry(URL url) throws IOException {
+        JarURLConnection connection = (JarURLConnection) url.openConnection();
+        // do not keep the jar open in the cache of the jar protocol handler, closing it closes the jar
+        connection.setUseCaches(false);
+        JarFile jarFile = connection.getJarFile();
+        try {
+            JarEntry entry = connection.getJarEntry();
+            return entry == null || entry.isDirectory();
+        } finally {
+            jarFile.close();
+        }
+    }
+
     private boolean startsWithBase(URL url) {
         if (checkBase) {
             if (baseURL == null) {
@@ -383,7 +396,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                 try {
                     URI uri = url.toURI();
                     Path pathObject;
-                    if (uri.getScheme().equals("jar")) {
+                    if (uri.getScheme().equals("jar") && isEntryOfJarFile(uri)) {
+                        // the entry the class loader resolved, under the base path
+                        return isDirectoryEntry(url);
+                    } else if (uri.getScheme().equals("jar")) {
                         synchronized (DefaultClassPathResourceLoader.class) {
                             FileSystem fileSystem = null;
                             try {

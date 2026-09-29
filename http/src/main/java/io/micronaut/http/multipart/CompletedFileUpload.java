@@ -232,7 +232,10 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
 
         @Override
         public CompletedFileUpload moveResource() {
-            return new File(getMetadata(), path.moveResource(), actualSize);
+            CompletedFileUpload moved = new File(getMetadata(), path.moveResource(), actualSize);
+            // the file belongs to the new upload: closing this one has nothing left to release
+            closeTracker();
+            return moved;
         }
 
         @Override

@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.python.annotation.PythonClass;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.HostAccess;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.Duration;
@@ -40,6 +42,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Factory that creates the HostAccess bean used by the GraalPy Context.
@@ -57,6 +62,14 @@ final class GraalPyHostAccessFactory {
     private static final String DECORATOR_CLASS = "java_class";
     private static final String DECORATOR_CLASS_NAME = "java_class_name";
 
+    /** The attributes a Python object is identified by: the resolution order of a class, and the name of any object. */
+    private static final String PYTHON_CLASS_MRO = "__mro__";
+    private static final String PYTHON_NAME = "__name__";
+    private static final String PYTHON_QUALIFIED_NAME = "__qualname__";
+    private static final String PYTHON_MODULE = "__module__";
+    /** The part a qualified name of a class or function defined inside a function contains. */
+    private static final String PYTHON_LOCALS = "<locals>";
+
     /** The name of the Python datetime module, which its own datetime type shares. */
     private static final String DATETIME = "datetime";
     private static final String BUILTINS = "builtins";
@@ -70,16 +83,40 @@ final class GraalPyHostAccessFactory {
     private static final String MAIN_MODULE = "__main__";
 
     /**
+     * The Python standard library types {@link PythonCoercion} materialises from a Java value, each with
+     * the conversion back. Registered both for their own Java type and for an {@code Object} parameter.
+     */
+    private static final List<StandardLibraryType<?>> STANDARD_LIBRARY_TYPES = List.of(
+        new StandardLibraryType<>(DATETIME, "date", LocalDate.class, PythonConversion::convertLocalDate, value -> true),
+        new StandardLibraryType<>(DATETIME, "time", LocalTime.class, PythonConversion::convertLocalTime, GraalPyHostAccessFactory::isNaive),
+        new StandardLibraryType<>(DATETIME, DATETIME, LocalDateTime.class, PythonConversion::convertLocalDateTime, GraalPyHostAccessFactory::isNaive),
+        new StandardLibraryType<>(DATETIME, "timedelta", Duration.class, PythonConversion::convertDuration, value -> true),
+        new StandardLibraryType<>(DATETIME, "timezone", ZoneOffset.class, PythonConversion::convertZoneOffset, GraalPyHostAccessFactory::isWholeSecondOffset),
+        new StandardLibraryType<>("uuid", "UUID", UUID.class, PythonConversion::convertUuid, value -> true)
+    );
+
+    /**
+     * The same table keyed by {@code (module, name)}, so a value's type is looked up once rather than
+     * compared against every entry in turn.
+     */
+    private static final Map<String, StandardLibraryType<?>> STANDARD_LIBRARY_TYPES_BY_NAME =
+        STANDARD_LIBRARY_TYPES.stream().collect(Collectors.toUnmodifiableMap(
+            type -> type.module() + '.' + type.typeName(), type -> type));
+
+    /**
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
      *
      * @param mappings The discovered TargetTypeMapping beans
+     * @param functionalInterfaceProviders The generated providers of the functional interfaces the Python sources reference
      * @param beanContext The bean context, whose class loader loads the generated classes
      * @return A HostAccess configured with custom target type mappings
      */
     @Singleton
     @Named(PythonContextRuntime.PYTHON)
-    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings, BeanContext beanContext) {
-        return hostAccess(mappings, beanContext.getClassLoader());
+    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings,
+                          Collection<PythonFunctionalInterfaceProvider> functionalInterfaceProviders,
+                          BeanContext beanContext) {
+        return hostAccess(mappings, beanContext.getClassLoader(), entries(functionalInterfaceProviders));
     }
 
     /**
@@ -102,6 +139,22 @@ final class GraalPyHostAccessFactory {
      * @return A HostAccess configured with custom target type mappings
      */
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings, @Nullable ClassLoader classLoader) {
+        return hostAccess(mappings, classLoader, functionalInterfaces(classLoader));
+    }
+
+    /**
+     * Builds a HostAccess instance and registers all TargetTypeMapping instances.
+     *
+     * @param mappings The TargetTypeMapping instances
+     * @param classLoader The class loader of the generated classes, or {@code null} to use the context
+     *                    class loader of the calling thread
+     * @param functionalInterfaces The functional interfaces a callable is converted to by arity,
+     *                             besides the standard ones
+     * @return A HostAccess configured with custom target type mappings
+     */
+    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings,
+                          @Nullable ClassLoader classLoader,
+                          Collection<PythonFunctionalInterfaceProvider.Entry> functionalInterfaces) {
         HostAccess.Builder builder = HostAccess.newBuilder(HostAccess.ALL);
         PythonClassResolver pythonClassResolver = new PythonClassResolver(mappings, classLoader);
         Map<Class<?>, List<TargetTypeMapping<?>>> assignableMappings = new LinkedHashMap<>();
@@ -127,9 +180,26 @@ final class GraalPyHostAccessFactory {
         registerObjectMapping(builder, pythonClassResolver);
         registerStandardLibraryMappings(builder);
         registerSequenceMappings(builder);
-        PythonCallables.registerStandardInterfaces(builder);
+        PythonCallables.registerFunctionalInterfaces(builder, functionalInterfaces, classLoader);
         registerNumericMappings(builder);
         return builder.build();
+    }
+
+    /**
+     * The functional interfaces the Python compiler found in the Java types the Python sources
+     * reference, from the generated {@link PythonFunctionalInterfaceProvider} services of the class loader.
+     */
+    private static List<PythonFunctionalInterfaceProvider.Entry> functionalInterfaces(@Nullable ClassLoader classLoader) {
+        ClassLoader loader = classLoader != null ? classLoader : Thread.currentThread().getContextClassLoader();
+        return entries(SoftServiceLoader.load(PythonFunctionalInterfaceProvider.class, loader).collectAll());
+    }
+
+    private static List<PythonFunctionalInterfaceProvider.Entry> entries(Collection<PythonFunctionalInterfaceProvider> providers) {
+        List<PythonFunctionalInterfaceProvider.Entry> entries = new ArrayList<>();
+        for (PythonFunctionalInterfaceProvider provider : providers) {
+            entries.addAll(provider.entries());
+        }
+        return entries;
     }
 
     /**
@@ -157,8 +227,20 @@ final class GraalPyHostAccessFactory {
             GraalPyHostAccessFactory::isSequenceOrContainer,
             GraalPyHostAccessFactory::asList);
         builder.targetTypeMapping(Value.class, byte[].class,
-            value -> value != null && !value.isNull() && !value.isHostObject() && value.hasBufferElements(),
+            GraalPyHostAccessFactory::isBytesLike,
             GraalPyHostAccessFactory::readBytes);
+    }
+
+    /**
+     * A Python bytes-like value ({@code bytes}, {@code bytearray}, {@code memoryview}, or any object
+     * exposing the buffer protocol). A Java {@code byte[]} that went to Python is a host object and
+     * keeps the default host conversion, so it comes back as the same array.
+     *
+     * @param value The value
+     * @return {@code true} when the value is a Python buffer
+     */
+    private static boolean isBytesLike(@Nullable Value value) {
+        return value != null && !value.isNull() && !value.isHostObject() && value.hasBufferElements();
     }
 
     /**
@@ -272,24 +354,90 @@ final class GraalPyHostAccessFactory {
     }
 
     private static void registerStandardLibraryMappings(HostAccess.Builder builder) {
-        builder.targetTypeMapping(Value.class, LocalDate.class,
-            value -> PythonCoercion.isPythonType(value, DATETIME, "date"),
-            PythonConversion::convertLocalDate);
-        builder.targetTypeMapping(Value.class, LocalTime.class,
-            value -> PythonCoercion.isPythonType(value, DATETIME, "time"),
-            PythonConversion::convertLocalTime);
-        builder.targetTypeMapping(Value.class, LocalDateTime.class,
-            value -> PythonCoercion.isPythonType(value, DATETIME, DATETIME),
-            PythonConversion::convertLocalDateTime);
-        builder.targetTypeMapping(Value.class, Duration.class,
-            value -> PythonCoercion.isPythonType(value, DATETIME, "timedelta"),
-            PythonConversion::convertDuration);
-        builder.targetTypeMapping(Value.class, ZoneOffset.class,
-            value -> PythonCoercion.isPythonType(value, DATETIME, "timezone"),
-            PythonConversion::convertZoneOffset);
-        builder.targetTypeMapping(Value.class, UUID.class,
-            value -> PythonCoercion.isPythonType(value, "uuid", "UUID"),
-            PythonConversion::convertUuid);
+        for (StandardLibraryType<?> standardType : STANDARD_LIBRARY_TYPES) {
+            registerStandardLibraryMapping(builder, standardType);
+        }
+        registerErasedStandardLibraryMapping(builder);
+    }
+
+    private static <T> void registerStandardLibraryMapping(HostAccess.Builder builder, StandardLibraryType<T> standardType) {
+        builder.targetTypeMapping(Value.class, standardType.targetType(), standardType::matches, standardType.converter());
+    }
+
+    /**
+     * The same conversions for a parameter whose type is {@code Object}.
+     * <p>
+     * {@link PythonCoercion} materialises these six Java types as their Python counterparts on the way
+     * out, so a value read back off a Java object is a native Python value: the {@code java.util.UUID}
+     * identifier of a Micronaut Data entity is a {@code uuid.UUID} once Python holds it. Handing it
+     * straight back only worked while the parameter type named the Java type, because a target type
+     * mapping is selected by the declared parameter type. A type variable erases to {@code Object} —
+     * {@code CrudRepository.findById(ID)} and {@code existsById(ID)} are the ones that bite — and the
+     * unconverted Python object then reached Micronaut Data, which matched no row and raised nothing:
+     * {@code findById} answered an empty {@code Optional} and {@code existsById} answered {@code false}
+     * for a row that is there.
+     * <p>
+     * A value the conversion refuses (an aware {@code datetime}, a sub-second {@code timezone} offset)
+     * stays the Python object it was: {@code Object} is the catch-all parameter type, so a value that
+     * has no Java counterpart must still be passable rather than fail the call.
+     */
+    private static void registerErasedStandardLibraryMapping(HostAccess.Builder builder) {
+        builder.targetTypeMapping(
+            Value.class,
+            Object.class,
+            value -> findStandardLibraryType(value) != null,
+            value -> {
+                StandardLibraryType<?> standardType = findStandardLibraryType(value);
+                // The predicate above is the same lookup, so a value only reaches here having matched.
+                return Objects.requireNonNull(standardType).converter().apply(value);
+            }
+        );
+    }
+
+    /**
+     * @param value a Python value bound for an {@code Object} parameter
+     * @return the standard library type to convert it as, or {@code null} to leave it alone
+     */
+    private static @Nullable StandardLibraryType<?> findStandardLibraryType(@Nullable Value value) {
+        if (value == null || value.isNull() || value.isHostObject()
+            || value.isString() || value.isNumber() || value.isBoolean() || !value.hasMembers()) {
+            return null;
+        }
+        Value type = value.getMember(CLASS_META);
+        if (type == null || !type.hasMembers()) {
+            return null;
+        }
+        String module = PythonConversion.stringMember(type, PYTHON_MODULE);
+        String name = PythonConversion.stringMember(type, PYTHON_NAME);
+        if (module == null || name == null) {
+            return null;
+        }
+        StandardLibraryType<?> standardType = STANDARD_LIBRARY_TYPES_BY_NAME.get(module + '.' + name);
+        return standardType != null && standardType.convertible().test(value) ? standardType : null;
+    }
+
+    /**
+     * @param value a Python {@code time} or {@code datetime}
+     * @return whether it carries no time zone, and so has a {@code LocalTime} or {@code LocalDateTime}
+     * counterpart. An aware one does not, and keeps the default mapping rather than failing the call
+     */
+    private static boolean isNaive(Value value) {
+        Value tzinfo = value.getMember("tzinfo");
+        return tzinfo == null || tzinfo.isNull();
+    }
+
+    /**
+     * @param value a Python {@code datetime.timezone}
+     * @return whether its offset is an exact number of seconds, which is all {@link ZoneOffset} can
+     * express
+     */
+    private static boolean isWholeSecondOffset(Value value) {
+        try {
+            PythonConversion.convertZoneOffset(value);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**
@@ -369,8 +517,14 @@ final class GraalPyHostAccessFactory {
         builder.targetTypeMapping(
             Value.class,
             Object.class,
-            v -> ValueCoercibles.hostObject(v) != null || findMapping(v, pythonClassResolver) != null,
+            v -> isBytesLike(v) || ValueCoercibles.hostObject(v) != null || findMapping(v, pythonClassResolver) != null,
             v -> {
+                // a generic API used with its type arguments erased, RedisCommands<byte[], byte[]> on a
+                // raw-typed bean, takes Object parameters here: a Python bytes value is the byte[] the
+                // declared byte[] parameter of the same API would have received
+                if (isBytesLike(v)) {
+                    return readBytes(v);
+                }
                 ValueCoercible host = ValueCoercibles.hostObject(v);
                 if (host != null) {
                     return host;
@@ -448,6 +602,9 @@ final class GraalPyHostAccessFactory {
                 if (javaClass == null) {
                     javaClass = resolveAnnotationDecoratorClass(value);
                 }
+                if (javaClass == null) {
+                    javaClass = resolvePythonAnnotationClass(value, pythonClassResolver);
+                }
                 if (javaClass != null) {
                     return javaClass;
                 }
@@ -509,6 +666,28 @@ final class GraalPyHostAccessFactory {
             return null;
         }
         return loadClass(className.asString());
+    }
+
+    /**
+     * The annotation type a Python-defined annotation stands for. Such an annotation is a Python
+     * function (a decorator factory), and the compiler generates its {@code @interface} in the Java
+     * package of the module that defines it, under the name of the function, where the resolution of
+     * a Python class finds it. Only a generated annotation type is accepted, so an ordinary Python
+     * function passed where a {@code Class} is expected is still rejected.
+     */
+    private static @Nullable Class<?> resolvePythonAnnotationClass(Value value, PythonClassResolver pythonClassResolver) {
+        if (!value.canExecute() || value.hasMember(PYTHON_CLASS_MRO)) {
+            return null;
+        }
+        String simpleName = stringMember(value, PYTHON_QUALIFIED_NAME);
+        if (simpleName == null || simpleName.isBlank()) {
+            simpleName = stringMember(value, PYTHON_NAME);
+        }
+        if (simpleName == null || simpleName.isBlank() || simpleName.contains(PYTHON_LOCALS)) {
+            return null;
+        }
+        Class<?> resolved = pythonClassResolver.findClass(stringMember(value, PYTHON_MODULE), simpleName);
+        return resolved != null && resolved.isAnnotation() ? resolved : null;
     }
 
     private static @Nullable Class<?> loadClass(String className) {
@@ -582,14 +761,14 @@ final class GraalPyHostAccessFactory {
     }
 
     private static @Nullable Class<?> findPythonClass(@Nullable Value value, PythonClassResolver pythonClassResolver) {
-        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember("__mro__")) {
+        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember(PYTHON_CLASS_MRO)) {
             return null;
         }
-        String className = stringMember(value, "__name__");
-        String qualifiedName = stringMember(value, "__qualname__");
-        String moduleName = stringMember(value, "__module__");
+        String className = stringMember(value, PYTHON_NAME);
+        String qualifiedName = stringMember(value, PYTHON_QUALIFIED_NAME);
+        String moduleName = stringMember(value, PYTHON_MODULE);
         String simpleName = qualifiedName == null || qualifiedName.isBlank() ? className : qualifiedName;
-        if (simpleName == null || simpleName.isBlank() || simpleName.contains("<locals>")) {
+        if (simpleName == null || simpleName.isBlank() || simpleName.contains(PYTHON_LOCALS)) {
             return null;
         }
         return pythonClassResolver.findClass(moduleName, simpleName);
@@ -722,6 +901,35 @@ final class GraalPyHostAccessFactory {
     }
 
     private record PythonClassLookupKey(@Nullable String moduleName, String simpleName) {
+    }
+
+    /**
+     * A Python standard library type and the Java type it converts to.
+     *
+     * @param module The Python module declaring the type
+     * @param typeName The Python type name
+     * @param targetType The Java type
+     * @param converter The conversion
+     * @param <T> The Java type
+     */
+    /**
+     * A Python standard library type with a Java counterpart, and what it takes to get there.
+     *
+     * @param module      the Python module the type is defined in
+     * @param typeName    the Python type name
+     * @param targetType  the Java type it converts to
+     * @param converter   the conversion
+     * @param convertible whether a given value is one the converter can take. A value it cannot --
+     *                    an aware {@code datetime}, an offset finer than a second -- must not match,
+     *                    so that it keeps the mapping it would otherwise have had
+     * @param <T>         the Java type
+     */
+    private record StandardLibraryType<T>(String module, String typeName, Class<T> targetType,
+                                         Function<Value, T> converter, Predicate<Value> convertible) {
+
+        boolean matches(Value value) {
+            return PythonCoercion.isPythonType(value, module, typeName);
+        }
     }
 
 }

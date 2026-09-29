@@ -37,6 +37,18 @@ snippet::micronaut.docs.javabases.PythonGreeter[tags="imports,class", indent=0, 
 <3> A method of the base is overridden in Python; `super().greet()` calls the Java implementation
 <4> The Python object calls the inherited Java methods on itself
 
+== Checked exceptions
+
+A method of the Java base that declares checked exceptions is overridden like any other; the generated Java override declares the same exceptions. A Java exception raised by the Python override (a `java.io.IOException` imported from Java, or a Python exception class extending it) reaches the Java caller as that exception, so a `catch` block of the base, or of the framework calling the method, handles it as it handles a Java implementation. An exception the base method itself throws when called through `super()` is caught in Python with `except`:
+
+snippet::micronaut.docs.javabases.QueueInitializer[tags="imports,class", indent=0, title="Overriding a method declaring a checked exception"]
+
+<1> `ChannelInitializer.initialize(String, String)` declares `throws IOException`
+<2> An `IOException` raised in Python is thrown by the generated override
+<3> The Java implementation may throw the `IOException` too; Python code catches it with `except IOException`
+
+A Python exception that is not one of the declared exceptions (a `ValueError`, for instance) propagates to Java as a `PolyglotException`, as from any other bridged method.
+
 == How it works
 
 The generated Java class is the only Java instance of the base class. Its constructors create the Python object first and then call the constructor of the base with the arguments the Python constructor passed to `super().__init__(...)`, so those arguments must be positional and are best constructor parameters or literals: the compiler resolves the Java constructor from their number and static types (a Python `int` matches `long`/`Long` and `double`/`Double` parameters as a Java `int` widens to them) and reports an error when no constructor, or more than one, matches. A constructor that calls `super().__init__(...)` on several branches must pass the same arguments on each. A class without a `super().__init__(...)` call uses the no-argument constructor of the base. A base method cannot be called from `__init__`: the Java instance exists once `__init__` has returned. A Java constructor that calls a method the Python class overrides (a request handler base initialising itself through a hook, for instance) reaches the Python override; the Python object is complete by then.

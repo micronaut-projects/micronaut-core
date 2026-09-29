@@ -713,10 +713,14 @@ class JacksonCoreProcessorSpec extends Specification {
         })
         processor.onSubscribe(new Subscription() {
             @Override
-            void request(long n) {}
+            void request(long n) {
+                // the test pushes the input with onNext
+            }
 
             @Override
-            void cancel() {}
+            void cancel() {
+                // nothing to release
+            }
         })
 
         processor.onNext(bytes)

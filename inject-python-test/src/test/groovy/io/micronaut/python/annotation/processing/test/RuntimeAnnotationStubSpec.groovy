@@ -5,15 +5,55 @@ import example.reflective.ReflectiveAccessor
 import example.reflective.ReflectiveColumn
 import example.reflective.ReflectiveMapping
 import example.reflective.ReflectiveTable
+import io.micronaut.python.compiler.PyronautCompiler
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest
+import org.junit.jupiter.api.Test
 
 import java.lang.reflect.Modifier
 
 /**
  * The generated Java class of a Python class carries the runtime annotations of Java annotation types
  * (JPA, JAXB, Bean Validation, ...) so that frameworks reading them reflectively see them, together with
- * the no-argument constructor such frameworks instantiate the class with.
+ * the no-argument constructor such frameworks instantiate the class with. The copy is made only for the
+ * classes named in the {@code micronaut.introspection.allowReflection} annotation processor option (the
+ * {@code -A} spelling of the {@code micronaut.introspection.allow-reflection} property).
  */
 class RuntimeAnnotationStubSpec extends AbstractPythonTypeElementSpec {
+
+    static final String ALLOW_REFLECTION_OPTION = "micronaut.introspection.allowReflection"
+
+    /**
+     * The patterns passed as the {@code -A} option to the compilations of this spec; {@code null} for none.
+     */
+    String allowReflection = "python.*"
+
+    @Override
+    protected void configureCompiler(PyronautCompiler.Builder compilerBuilder) {
+        if (allowReflection != null) {
+            compilerBuilder.options(["-A" + ALLOW_REFLECTION_OPTION + "=" + allowReflection])
+        }
+    }
+
+    private static final String TEST_CLASS = '''
+from typing import Annotated
+
+from example.reflective import ReflectiveMapping, ReflectiveTable
+from jakarta.inject import Inject
+from micronaut.context import ApplicationContext
+from micronaut.test.extensions.junit5.annotation import MicronautTest
+from org.junit.jupiter.api import Test
+
+
+@MicronautTest
+@ReflectiveTable(name="tests")
+class ContextSpec:
+    context: Annotated[ApplicationContext, Inject]
+
+    @Test
+    @ReflectiveMapping(name="checks")
+    def test_context(self) -> None:
+        assert self.context is not None
+'''
 
     private static final String ENTITY = '''
 from dataclasses import dataclass, field
@@ -195,6 +235,145 @@ class Reader:
         and: "a Python property getter and setter keep theirs (JPA property access)"
         readerClass.getMethod("name").getAnnotation(ReflectiveMapping).name() == "reader_name"
         readerClass.getMethod("name", String).getAnnotation(ReflectiveMapping).name() == "set_reader_name"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "without the option no third-party runtime annotation reaches the generated class"() {
+        given:
+        allowReflection = null
+        def context = buildContext(ENTITY + TEST_CLASS)
+        Class<?> bookClass = context.classLoader.loadClass("python.Book")
+        Class<?> readerClass = context.classLoader.loadClass("python.Reader")
+        Class<?> testClass = context.classLoader.loadClass("python.ContextSpec")
+
+        expect: "the class, field, accessor and method annotations of the entity stay off the generated class"
+        bookClass.getAnnotation(ReflectiveMapping) == null
+        bookClass.getAnnotation(ReflectiveTable) == null
+        bookClass.getDeclaredField("id").getAnnotation(ReflectiveMapping) == null
+        bookClass.getDeclaredField("id").getAnnotation(ReflectiveColumn) == null
+        bookClass.getMethod("summary").getAnnotation(ReflectiveMapping) == null
+        readerClass.getMethod("name").getAnnotation(ReflectiveMapping) == null
+        readerClass.getMethod("name", String).getAnnotation(ReflectiveMapping) == null
+
+        and: "the annotation metadata still serves them to Micronaut"
+        getBeanIntrospection(context, "python.Book").getAnnotation(ReflectiveTable).stringValue("name").get() == "books"
+
+        and: "the test framework still finds the test annotations on the generated test class"
+        testClass.getAnnotation(MicronautTest) != null
+        testClass.getMethod("test_context").getAnnotation(Test) != null
+        testClass.getAnnotation(ReflectiveTable) == null
+        testClass.getMethod("test_context").getAnnotation(ReflectiveMapping) == null
+
+        and: "the generated class still works as before"
+        bookClass.getConstructor().newInstance().title == "untitled"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a pattern naming the generated class copies its runtime annotations"() {
+        given:
+        allowReflection = patterns
+        def context = buildContext(ENTITY + TEST_CLASS)
+        Class<?> bookClass = context.classLoader.loadClass("python.Book")
+        Class<?> readerClass = context.classLoader.loadClass("python.Reader")
+        Class<?> testClass = context.classLoader.loadClass("python.ContextSpec")
+
+        expect:
+        (bookClass.getAnnotation(ReflectiveTable) != null) == book
+        (bookClass.getDeclaredField("id").getAnnotation(ReflectiveColumn) != null) == book
+        (bookClass.getMethod("summary").getAnnotation(ReflectiveMapping) != null) == book
+        (readerClass.getMethod("name").getAnnotation(ReflectiveMapping) != null) == reader
+        (testClass.getAnnotation(ReflectiveTable) != null) == test
+        (testClass.getMethod("test_context").getAnnotation(ReflectiveMapping) != null) == test
+
+        and: "the test annotations are copied regardless"
+        testClass.getAnnotation(MicronautTest) != null
+        testClass.getMethod("test_context").getAnnotation(Test) != null
+
+        cleanup:
+        context?.close()
+
+        where:
+        patterns                        | book  | reader | test
+        "python.Book"                   | true  | false  | false
+        "python.Book, python.Reader"    | true  | true   | false
+        "python.*"                      | true  | true   | true
+        "*.Reader"                      | false | true   | false
+        "*"                             | true  | true   | true
+        "other.*"                       | false | false  | false
+        "python.Boo"                    | false | false  | false
+    }
+
+    void "the AllowsReflection hint copies the runtime annotations of a class without the option"() {
+        given: "no option; the hint is declared, meta-annotates a Python annotation, or marks one method"
+        allowReflection = null
+        def context = buildContext('''
+from dataclasses import dataclass
+from typing import Annotated
+
+from example.reflective import ReflectiveColumn, ReflectiveMapping, ReflectiveTable
+from micronaut.core.annotation import AllowsReflection, Introspected
+
+
+@AllowsReflection
+def Audited(target):
+    return target
+
+
+@AllowsReflection
+@ReflectiveTable(name="declared")
+@Introspected
+@dataclass
+class Declared:
+    id: Annotated[int | None, ReflectiveColumn("id")] = None
+
+    @ReflectiveMapping(name="summary")
+    def summary(self) -> str:
+        return "declared"
+
+
+@Audited
+@ReflectiveTable(name="audited")
+@Introspected
+@dataclass
+class ThroughPythonAnnotation:
+    id: Annotated[int | None, ReflectiveColumn("id")] = None
+
+
+@ReflectiveTable(name="partial")
+class Partial:
+    @AllowsReflection
+    @ReflectiveMapping(name="hinted")
+    def hinted(self) -> str:
+        return "hinted"
+
+    @ReflectiveMapping(name="plain")
+    def plain(self) -> str:
+        return "plain"
+''')
+        Class<?> declared = context.classLoader.loadClass("python.Declared")
+        Class<?> audited = context.classLoader.loadClass("python.ThroughPythonAnnotation")
+        Class<?> partial = context.classLoader.loadClass("python.Partial")
+
+        expect: "the hint on the class covers the class, its fields and its methods"
+        declared.getAnnotation(ReflectiveTable).name() == "declared"
+        declared.getDeclaredField("id").getAnnotation(ReflectiveColumn).value() == "id"
+        declared.getMethod("summary").getAnnotation(ReflectiveMapping).name() == "summary"
+
+        and: "a Python annotation meta-annotated with the hint carries it to the class"
+        audited.getAnnotation(ReflectiveTable).name() == "audited"
+        audited.getDeclaredField("id").getAnnotation(ReflectiveColumn).value() == "id"
+
+        and: "the hint on a method covers that method only"
+        partial.getAnnotation(ReflectiveTable) == null
+        partial.getMethod("hinted").getAnnotation(ReflectiveMapping).name() == "hinted"
+        partial.getMethod("plain").getAnnotation(ReflectiveMapping) == null
+
+        and: "the hint itself is served by the annotation metadata and is not copied"
+        declared.getAnnotation(io.micronaut.core.annotation.AllowsReflection) == null
 
         cleanup:
         context?.close()

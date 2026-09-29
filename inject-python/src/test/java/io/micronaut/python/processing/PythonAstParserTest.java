@@ -63,6 +63,14 @@ import org.graalvm.polyglot.Source;
 public class PythonAstParserTest {
 
     @Test
+    void recognizesWindowsSourceUriWithinWindowsSourceDirectory() {
+        assertTrue(PythonAstParser.isWithinSourceDir(
+            "C:\\builds\\project\\src\\main\\python",
+            "/C:/builds/project/src/main/python/example/micronaut/forecast_controller.py"
+        ));
+    }
+
+    @Test
     void incrementalProcessorTransformsOnlyAffectedSourcesUnlessAggregationIsRequired(
         @TempDir Path directory
     ) throws Exception {
@@ -224,10 +232,11 @@ public class PythonAstParserTest {
         }
     }
 
-    @Test
-    void testRuntimeTransformAddsFutureAnnotationsBeforeGeneratedCode() {
-        PythonAstParser pythonProcessor = new PythonAstParser();
-        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+    /**
+     * A visitor context resolving the given Java class and nothing else.
+     */
+    private static VisitorContext visitorContextResolving(Class<?> resolvable) {
+        return (VisitorContext) Proxy.newProxyInstance(
             VisitorContext.class.getClassLoader(),
             new Class<?>[] { VisitorContext.class },
             (proxy, method, args) -> {
@@ -242,8 +251,8 @@ public class PythonAstParserTest {
                 if ("getClassElement".equals(method.getName())
                     && args != null
                     && args.length == 1
-                    && "java.security.Principal".equals(args[0])) {
-                    return Optional.of(ClassElement.of(java.security.Principal.class));
+                    && resolvable.getName().equals(args[0])) {
+                    return Optional.of(ClassElement.of(resolvable));
                 }
                 if ("getClassElements".equals(method.getName())) {
                     return ClassElement.ZERO_CLASS_ELEMENTS;
@@ -260,6 +269,76 @@ public class PythonAstParserTest {
                 return null;
             }
         );
+    }
+
+    @Test
+    void testRuntimeTransformKeepsJavaInterfaceBaseOfClassesDefinedInsideFunctions() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContextResolving(java.security.Principal.class), """
+            from dataclasses import dataclass
+            from java.security import Principal
+
+            class ModulePrincipal(Principal):
+                def getName(self) -> str:
+                    return "module"
+
+            def adapter():
+                class LocalPrincipal(Principal):
+                    def getName(self) -> str:
+                        return "local"
+                return LocalPrincipal()
+
+            def with_parameters(name):
+                class NamedPrincipal(Principal):
+                    def __init__(self, name):
+                        self.name = name
+
+                    def getName(self) -> str:
+                        return self.name
+                return NamedPrincipal(name)
+
+            class Outer:
+                def method(self):
+                    class MethodPrincipal(Principal):
+                        def getName(self) -> str:
+                            return "method"
+                    return MethodPrincipal()
+
+            def parameterized():
+                class TypedPrincipal(Principal[str]):
+                    def getName(self) -> str:
+                        return "typed"
+                return TypedPrincipal()
+
+            def decorated():
+                @dataclass
+                class DataPrincipal(Principal):
+                    name: str
+
+                    def getName(self) -> str:
+                        return self.name
+                return DataPrincipal("data")
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        // a module-level class is stripped of the interface: its generated Java class implements it
+        assertTrue(runtimeCode.contains("@_micronaut_java_interface_defaults('java.security.Principal')\nclass ModulePrincipal:"));
+        // a class defined inside a function keeps the interface: GraalPy's host adapter implements it
+        assertTrue(runtimeCode.contains("    class LocalPrincipal(Principal):"));
+        assertTrue(runtimeCode.contains("        class MethodPrincipal(Principal):"));
+        assertFalse(runtimeCode.contains("_micronaut_java_interface_defaults('java.security.Principal')\n    class LocalPrincipal"));
+        // a class with constructor parameters cannot be an adapter (the adapter constructor takes none): stripped
+        assertTrue(runtimeCode.contains("    @_micronaut_java_interface_defaults('java.security.Principal')\n    class NamedPrincipal:"));
+        // a type argument has no run time meaning: the raw interface is the base of the adapter
+        assertTrue(runtimeCode.contains("    class TypedPrincipal(Principal):"));
+        // a decorator may generate the constructor (@dataclass): stripped as before
+        assertTrue(runtimeCode.contains("    @_micronaut_java_interface_defaults('java.security.Principal')\n    @dataclass\n    class DataPrincipal:"));
+    }
+
+    @Test
+    void testRuntimeTransformAddsFutureAnnotationsBeforeGeneratedCode() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = visitorContextResolving(java.security.Principal.class);
         PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
             "module docs"
             from java.security import Principal
@@ -2711,5 +2790,97 @@ class ProductMappers:
         List<PropertyElement> noStaticProperties = pythonClass.getBeanProperties(noStaticQuery);
         // All our test properties are non-static, so size should remain the same
         assertEquals(allProperties.size(), noStaticProperties.size(), "Should include all non-static properties");
+    }
+    /**
+     * The run time strips a leading "io." from every Java package
+     * (context-python/.../micronaut_java_imports.py), so io.swagger.v3.oas.annotations is imported from
+     * Python as swagger.v3.oas.annotations. The compiler restored the prefix only for micronaut.*, which
+     * left every other io. library unresolvable -- and unresolvable annotations are dropped silently.
+     *
+     * <p>The stand-in here is io.example.oas.SampleJavaType; the visitor context below deliberately
+     * resolves only the io.-prefixed spelling, which is the situation a real compile classpath presents.
+     */
+    @Test
+    void testImportOfAnIoPackageOtherThanMicronautResolvesToTheIoPrefixedName() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = ioPrefixedVisitorContext();
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example.oas import SampleJavaType
+
+            class Demo:
+                def index(self, sample: SampleJavaType | None = None) -> dict:
+                    return {}
+            """);
+
+        assertTrue(
+            transformResult.runtimeCode().contains("SampleJavaType = java.type('io.example.oas.SampleJavaType')"),
+            transformResult.runtimeCode()
+        );
+    }
+
+    /**
+     * The same asymmetry on the package lookup, which backs a wildcard import.
+     */
+    @Test
+    void testWildcardImportOfAnIoPackageOtherThanMicronautResolves() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = ioPrefixedVisitorContext();
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example.oas import *
+
+            class Demo:
+                def index(self, sample: SampleJavaType | None = None) -> dict:
+                    return {}
+            """);
+
+        assertTrue(
+            transformResult.runtimeCode().contains("java.type('io.example.oas.SampleJavaType')"),
+            transformResult.runtimeCode()
+        );
+    }
+
+    /**
+     * A visitor context that knows io.example.oas.SampleJavaType and nothing else -- in particular it
+     * does not answer to the "example.oas" spelling Python uses.
+     */
+    private static VisitorContext ioPrefixedVisitorContext() {
+        return (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName())
+                    && args != null
+                    && args.length >= 1
+                    && "io.example.oas.SampleJavaType".equals(args[0])) {
+                    return Optional.of(ClassElement.of(io.example.oas.SampleJavaType.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    if (args != null && args.length >= 1 && "io.example.oas".equals(args[0])) {
+                        return new ClassElement[] { ClassElement.of(io.example.oas.SampleJavaType.class) };
+                    }
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
     }
 }

@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.python.annotation.processing.test.nested.OuterHost
 import io.micronaut.python.annotation.processing.test.nested.OuterMarker
 import io.micronaut.python.compiler.PyronautCompiler
+import io.micronaut.python.compiler.JavaImportsManifest
 import io.micronaut.python.processing.PythonAnnotationProcessor
 
 /**
@@ -239,34 +240,25 @@ class Command:
             .targetDir(tempDir)
             .build()
             .compile()
-        // the package initializers merge the members modules written next to them
-        def packageInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested"))
-        def hostInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterHost"))
-        def builderInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterHost/Builder"))
-        def markerInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterMarker"))
-        def taggedModule = new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterMarker/Tagged.py").text
+        // no module is generated for a Java package: the manifest names what the runtime serves
+        def manifest = JavaImportsManifest.read(tempDir)
+        def nested = "micronaut.python.annotation.processing.test.nested"
 
-        then: "the package imports each type from the type's own module"
-        packageInit.contains("from .OuterHost import OuterHost")
-        packageInit.contains("from .OuterMarker import OuterMarker")
-        !packageInit.contains("from . import OuterHost")
-        !new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterMarker.py").exists()
+        then: "the package and every type nested types are imported through are modules"
+        manifest.packages[nested] == "io.${NESTED}"
+        manifest.types["${nested}.OuterHost"] == "io.${NESTED}.OuterHost"
+        manifest.types["${nested}.OuterHost.Builder"] == "io.${NESTED}.OuterHost\$Builder"
+        manifest.types["${nested}.OuterMarker"] == "io.${NESTED}.OuterMarker"
+        !new File(srcPath, "micronaut/python/annotation/processing/test/nested").exists()
 
-        and: "a class module binds the class and the nested types imported from it"
-        hostInit.contains("OuterHost = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost')")
-        hostInit.contains("Inner = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Inner')")
-        hostInit.contains("from .Builder import Builder")
-        builderInit.contains("Builder = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Builder')")
-        builderInit.contains("Stage = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Builder\$Stage')")
+        and: "the package knows its types, a type module the nested types imported from it"
+        manifest.member(nested, "OuterHost") == ["io.${NESTED}.OuterHost", "class"]
+        manifest.member(nested, "OuterMarker") == ["io.${NESTED}.OuterMarker", "annotation"]
+        manifest.member("${nested}.OuterHost", "Inner") == ["io.${NESTED}.OuterHost\$Inner", "class"]
+        manifest.member("${nested}.OuterHost.Builder", "Stage") == ["io.${NESTED}.OuterHost\$Builder\$Stage", "class"]
 
-        and: "an annotation module holds its decorator and exports the nested annotations"
-        markerInit.contains('@micronaut_annotation("io.micronaut.python.annotation.processing.test.nested.OuterMarker"')
-        markerInit.contains("def OuterMarker(")
-        markerInit.contains("Plain = _OuterMarker_Plain")
-        markerInit.contains("OuterMarker.Plain = _OuterMarker_Plain")
-        markerInit.contains("from .Tagged import Tagged")
-        taggedModule.contains('@micronaut_annotation("io.micronaut.python.annotation.processing.test.nested.OuterMarker$Tagged")')
-        taggedModule.contains("def Tagged(")
+        and: "a nested annotation is an annotation member of its outer type"
+        manifest.member("${nested}.OuterMarker", "Tagged") == ["io.${NESTED}.OuterMarker\$Tagged", "annotation"]
 
         cleanup:
         tempDir.deleteDir()
@@ -322,13 +314,5 @@ class Broken:
         def e = thrown(RuntimeException)
         e.message.contains('Missing')
         e.message.contains('io.micronaut.python.annotation.processing.test.nested.OuterHost')
-    }
-
-    private static String packageMembers(File packageDirectory) {
-        packageDirectory.listFiles()
-            .findAll { it.name.startsWith(PythonAnnotationProcessor.PACKAGE_MEMBERS_MODULE_PREFIX) }
-            .sort { it.name }
-            .collect { it.text }
-            .join('\n')
     }
 }

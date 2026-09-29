@@ -10,6 +10,11 @@ micronautBuild {
     }
 }
 
+noReflection {
+    // the module stands in with reflection for the metadata the processors generate
+    allowIn("io.micronaut.reflection.*")
+}
+
 // the Groovy fixtures stand in for the classes an application hands over, which carry their parameter names
 tasks.withType<GroovyCompile>().configureEach {
     groovyOptions.setParameters(true)

@@ -23,8 +23,12 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReactiveByteBufferByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscription;
 
+import java.io.EOFException;
+import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -32,6 +36,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * {@link HttpResponse.BodySubscriber} implementation that pushes data into a
@@ -46,9 +52,28 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     private final DelayedSubscriber<ReadBuffer> defer = new DelayedSubscriber<>();
     private final CloseableByteBody mapped;
+    @Nullable
+    private final Consumer<@Nullable Throwable> onEnd;
+    private final AtomicBoolean ended = new AtomicBoolean();
 
     public ByteBodySubscriber(BodySizeLimits limits) {
+        this(limits, null);
+    }
+
+    /**
+     * @param limits The body size limits
+     * @param onEnd  Called once when the body ends: with {@code null} when it is complete, or
+     *               when its consumer let the rest go, and with the failure when it failed
+     */
+    public ByteBodySubscriber(BodySizeLimits limits, @Nullable Consumer<@Nullable Throwable> onEnd) {
         this.mapped = BODY_FACTORY.adapt(defer, limits, null, null);
+        this.onEnd = onEnd;
+    }
+
+    private void end(@Nullable Throwable failure) {
+        if (onEnd != null && ended.compareAndSet(false, true)) {
+            onEnd.accept(failure);
+        }
     }
 
     @Override
@@ -66,6 +91,8 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
             @Override
             public void cancel() {
+                // the consumer let the rest of the body go
+                end(null);
                 subscription.cancel();
             }
         });
@@ -88,11 +115,31 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     @Override
     public void onError(Throwable throwable) {
+        if (isTruncatedBody(throwable)) {
+            throwable = new ResponseClosedException("Connection closed before the response body was received completely", true);
+        }
+        end(throwable);
         defer.onError(throwable);
+    }
+
+    /**
+     * Whether the JDK client reports a connection closed before the body was complete: an EOF, or
+     * its messages for a fixed-length or a chunked body that ended early.
+     */
+    static boolean isTruncatedBody(Throwable throwable) {
+        if (throwable instanceof EOFException) {
+            return true;
+        }
+        if (throwable instanceof IOException) {
+            String message = throwable.getMessage();
+            return message != null && (message.startsWith("fixed content-length:") || message.startsWith("chunked transfer encoding"));
+        }
+        return false;
     }
 
     @Override
     public void onComplete() {
+        end(null);
         defer.onComplete();
     }
 }

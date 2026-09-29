@@ -37,6 +37,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -68,19 +69,23 @@ public class Publishers {
         Optional<PublishersOptimizations> publishers = StaticOptimizations.get(PublishersOptimizations.class);
         if (publishers.isPresent()) {
             PublishersOptimizations optimizations = publishers.get();
-            reactiveTypes = optimizations.getReactiveTypes();
-            singleTypes = optimizations.getSingleTypes();
-            completableTypes = optimizations.getCompletableTypes();
+            // copies, since Micronaut AOT generates fixed-size lists and the registerReactive* methods add to them
+            reactiveTypes = new ArrayList<>(optimizations.getReactiveTypes());
+            singleTypes = new ArrayList<>(optimizations.getSingleTypes());
+            completableTypes = new ArrayList<>(optimizations.getCompletableTypes());
         } else {
             reactiveTypes = new ArrayList<>(3);
             singleTypes = new ArrayList<>(3);
             completableTypes = new ArrayList<>(3);
+            Set<String> missingTypes = StaticOptimizations.get(ClassUtils.Optimizations.class)
+                .map(ClassUtils.Optimizations::getMissingTypes)
+                .orElse(Set.of());
             for (String name : getNonSpecificReactiveTypeNames()) {
-                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = findType(name, classLoader, missingTypes);
                 aClass.ifPresent(reactiveTypes::add);
             }
             for (String name : getSingleTypeNames()) {
-                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = findType(name, classLoader, missingTypes);
                 aClass.ifPresent(aClass1 -> {
                     singleTypes.add(aClass1);
                     reactiveTypes.add(aClass1);
@@ -88,7 +93,7 @@ public class Publishers {
             }
 
             for (String name : getCompletableTypeNames()) {
-                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = findType(name, classLoader, missingTypes);
                 aClass.ifPresent(aClass1 -> {
                     completableTypes.add(aClass1);
                     reactiveTypes.add(aClass1);
@@ -98,6 +103,27 @@ public class Publishers {
         REACTIVE_TYPES = reactiveTypes;
         SINGLE_TYPES = singleTypes;
         COMPLETABLE_TYPES = completableTypes;
+    }
+
+    /**
+     * Loads a candidate reactive type without linking or initializing it. The candidates are only used for
+     * {@link Class#isAssignableFrom(Class)} checks, which do not need an initialized class, so their static
+     * initializers run when the application first uses them rather than on startup.
+     *
+     * @param name The name of the candidate
+     * @param classLoader The class loader
+     * @param missingTypes The types known to be missing, computed ahead of time by Micronaut AOT
+     * @return The candidate, if it is present
+     */
+    private static Optional<Class<?>> findType(String name, ClassLoader classLoader, Set<String> missingTypes) {
+        if (missingTypes.contains(name)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Class.forName(name, false, classLoader));
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            return Optional.empty();
+        }
     }
 
     private static List<String> getSingleTypeNames() {

@@ -66,6 +66,14 @@ class FunctionShapeTest(unittest.TestCase):
         self.assertFalse(processor.has_return_value(self.func("def f():\n    pass")))
         self.assertFalse(processor.has_return_value(self.func("def f():\n    def g():\n        return 1")))
 
+    def test_yield_detection(self):
+        self.assertTrue(processor.has_yield(self.func("async def f():\n    yield 1")))
+        self.assertTrue(processor.has_yield(self.func("def f():\n    yield from g()")))
+        self.assertTrue(processor.has_yield(self.func("async def f():\n    async with x:\n        for i in y:\n            yield i")))
+        self.assertFalse(processor.has_yield(self.func("async def f():\n    return 1")))
+        self.assertFalse(processor.has_yield(self.func("async def f():\n    def g():\n        yield 1")))
+        self.assertFalse(processor.has_yield(self.func("async def f():\n    async def g():\n        yield 1\n    return g")))
+
     def test_abstract_and_placeholder_methods(self):
         self.assertTrue(processor.is_abstract_method(self.func("@abstractmethod\ndef f(self): pass")))
         self.assertTrue(processor.is_placeholder_method(self.func("def f(self):\n    ...")))

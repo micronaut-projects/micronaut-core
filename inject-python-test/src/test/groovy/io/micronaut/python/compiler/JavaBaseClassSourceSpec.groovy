@@ -65,7 +65,7 @@ class NamedGreeter(GreetingBase):
 
         and: 'the Python override is bridged and the base implementation reachable non-virtually'
         javaCode.contains('public String greet() {')
-        javaCode.contains('public Object micronautInvokeJavaBaseMethod(String name, List<Value> arguments) {')
+        javaCode.contains('public Object micronautInvokeJavaBaseMethod(String name, List<Value> arguments) throws Exception {')
         javaCode.contains('if ("greet".equals(name)) {')
         javaCode.contains('return super.greet();')
         javaCode.contains('if (arguments.size() == 1 && ValueCoercibles.matchesArgument(arguments.get(0), java.lang.String.class)) {\n        return super.join(PythonConversion.isNone(arguments.get(0)) ? null : arguments.get(0).asString());')

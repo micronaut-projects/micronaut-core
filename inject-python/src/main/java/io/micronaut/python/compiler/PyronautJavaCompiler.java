@@ -80,6 +80,13 @@ import java.util.stream.Stream;
 final class PyronautJavaCompiler {
 
     private static final Object COMPILATION_LOCK = new Object();
+    /**
+     * The codes javac gives the diagnostics an annotation processor reports through its {@code Messager}.
+     */
+    private static final Set<String> PROCESSOR_MESSAGE_CODES = Set.of(
+        "compiler.note.proc.messager",
+        "compiler.warn.proc.messager"
+    );
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
     private static final String ISOLATING_PROCESSOR = "org.gradle.annotation.processing.isolating";
     private static final Pattern SOURCE_IN_MESSAGE = Pattern.compile("Python source \\[([^]]+)]");
@@ -101,6 +108,16 @@ final class PyronautJavaCompiler {
     private PythonProcessingSession pythonProcessingSession;
     private Set<String> incrementalPythonSources;
     private boolean processAggregatingPythonVisitors = true;
+    private CompilationProfiler profiler;
+
+    /**
+     * Sets the profiler of the compilation, or null when it is not profiled.
+     *
+     * @param profiler The profiler
+     */
+    void setProfiler(CompilationProfiler profiler) {
+        this.profiler = profiler;
+    }
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -210,12 +227,15 @@ final class PyronautJavaCompiler {
         }
 
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
-        ClassLoader classLoader = pythonProcessingSession == null
-            ? createAnnotationProcessorClassLoader(processorClasspath)
-            : pythonProcessingSession.classLoader(
-                processorClasspath,
-                () -> createAnnotationProcessorClassLoader(processorClasspath)
-            );
+        ClassLoader classLoader;
+        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
+            classLoader = pythonProcessingSession == null
+                ? createAnnotationProcessorClassLoader(processorClasspath)
+                : pythonProcessingSession.classLoader(
+                    processorClasspath,
+                    () -> createAnnotationProcessorClassLoader(processorClasspath)
+                );
+        }
         try {
             @SuppressWarnings({"rawtypes", "unchecked"})
             List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader
@@ -403,12 +423,15 @@ final class PyronautJavaCompiler {
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
         List<File> compileClasspath = effectiveClasspath(classpath);
         List<String> options = buildCompilerOptions(compileClasspath, bootclasspath, annotationProcessorPath, compilerOptions);
-        ClassLoader classLoader = pythonProcessingSession == null
-            ? createAnnotationProcessorClassLoader(processorClasspath)
-            : pythonProcessingSession.classLoader(
-                processorClasspath,
-                () -> createAnnotationProcessorClassLoader(processorClasspath)
-            );
+        ClassLoader classLoader;
+        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
+            classLoader = pythonProcessingSession == null
+                ? createAnnotationProcessorClassLoader(processorClasspath)
+                : pythonProcessingSession.classLoader(
+                    processorClasspath,
+                    () -> createAnnotationProcessorClassLoader(processorClasspath)
+                );
+        }
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         System.setProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
@@ -418,7 +441,7 @@ final class PyronautJavaCompiler {
             ? trackingFileManager.targetDirectory()
             : null;
         List<Processor> processors;
-        try {
+        try (var _ = CompilationProfiler.span(profiler, "javac.processors")) {
             processors = getAnnotationProcessors(classLoader, outputDirectory);
         } catch (RuntimeException | LinkageError e) {
             if (pythonProcessingSession == null) {
@@ -442,6 +465,7 @@ final class PyronautJavaCompiler {
             IncrementalProcessorTracker processorTracker = null;
             if (task instanceof JavacTask javacTask) {
                 compilationTracker = new JavaCompilationTracker(javacTask);
+                compilationTracker.setProfiler(profiler);
                 javacTask.addTaskListener(compilationTracker);
                 if (fileManager instanceof TrackingJavaFileManager trackingFileManager) {
                     trackingFileManager.setSourceResolver(
@@ -462,7 +486,12 @@ final class PyronautJavaCompiler {
             if (!taskProcessors.isEmpty()) {
                 task.setProcessors(taskProcessors);
             }
-            success = task.call();
+            try (var _ = CompilationProfiler.span(profiler, "javac.task")) {
+                success = task.call();
+            }
+            if (success) {
+                reportProcessorMessages(diagnosticCollector);
+            }
             if (success && compilationTracker != null) {
                 Map<String, Set<String>> outputs = new LinkedHashMap<>();
                 if (fileManager instanceof TrackingJavaFileManager trackingFileManager) {
@@ -508,6 +537,25 @@ final class PyronautJavaCompiler {
             throw processingFailure(diagnosticCollector, null, outputDirectory);
         }
         return IncrementalCompilationTrace.empty();
+    }
+
+    /**
+     * Prints the notes and warnings the annotation processors reported through the {@code Messager}
+     * of a successful compilation. The diagnostics of a compilation are collected rather than printed
+     * as javac would, and were only reported when the compilation failed: a note such as the one naming
+     * the option that copies the runtime annotations of a class, or a warning about an annotation that
+     * could not be copied, was never seen. Javac's own notes and warnings (unchecked operations,
+     * deprecation) are still left out.
+     *
+     * @param diagnosticCollector The diagnostics of the compilation
+     */
+    @SuppressWarnings("java:S106") // the compiler reports its diagnostics on the console, as javac does
+    private static void reportProcessorMessages(DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+        for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics(diagnosticCollector)) {
+            if (PROCESSOR_MESSAGE_CODES.contains(diagnostic.getCode())) {
+                System.err.println(formatDiagnostic(diagnostic));
+            }
+        }
     }
 
     private static Map<String, String> snapshotSystemProperties() {
@@ -988,6 +1036,7 @@ final class PyronautJavaCompiler {
         pythonProcessor.setProcessAggregatingVisitors(processAggregatingPythonVisitors);
         pythonProcessor.setOutputDirectory(outputDirectory);
         pythonProcessor.setProcessingSession(pythonProcessingSession);
+        pythonProcessor.setProfiler(profiler);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }

@@ -18,6 +18,7 @@ package io.micronaut.core.convert;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -41,7 +42,8 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     private final Argument<T> argument;
     private final Locale finalLocale;
     private final Charset finalCharset;
-    private final List<ConversionError> conversionErrors = new ArrayList<>(3);
+    @Nullable
+    private List<ConversionError> conversionErrors;
 
     /**
      * @param argument     The argument
@@ -67,14 +69,14 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     @Override
     public void reject(Exception exception) {
         if (exception != null) {
-            conversionErrors.add(() -> exception);
+            addError(() -> exception);
         }
     }
 
     @Override
     public void reject(Object value, Exception exception) {
         if (exception != null) {
-            conversionErrors.add(new ConversionError() {
+            addError(new ConversionError() {
                 @Override
                 public Optional<Object> getOriginalValue() {
                     return value != null ? Optional.of(value) : Optional.empty();
@@ -88,17 +90,31 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
         }
     }
 
+    private void addError(ConversionError error) {
+        List<ConversionError> errors = conversionErrors;
+        if (errors == null) {
+            errors = new ArrayList<>(3);
+            conversionErrors = errors;
+        }
+        errors.add(error);
+    }
+
     @Override
     public Optional<ConversionError> getLastError() {
-        if (!conversionErrors.isEmpty()) {
-            return Optional.of(conversionErrors.get(conversionErrors.size() - 1));
+        List<ConversionError> errors = conversionErrors;
+        if (errors != null && !errors.isEmpty()) {
+            return Optional.of(errors.get(errors.size() - 1));
         }
         return Optional.empty();
     }
 
     @Override
     public Iterator<ConversionError> iterator() {
-        return Collections.unmodifiableCollection(conversionErrors).iterator();
+        List<ConversionError> errors = conversionErrors;
+        if (errors == null) {
+            return Collections.emptyIterator();
+        }
+        return Collections.unmodifiableCollection(errors).iterator();
     }
 
     @Override
