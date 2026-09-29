@@ -56,6 +56,17 @@ public final class CoroutineHelper {
         this.coroutineContextFactories = coroutineContextFactories;
     }
 
+    /**
+     * Whether the Reactor context of the subscriber has to reach the coroutine of a suspended route, which is the
+     * case when {@code kotlinx-coroutines-reactor} is on the classpath.
+     *
+     * @return true if the Reactor context is propagated to coroutines
+     * @since 5.3.0
+     */
+    public boolean isReactorContextPropagated() {
+        return ContinuationArgumentBinder.isReactorContextPropagated();
+    }
+
     public void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView, PropagatedContext propagatedContext) {
         setupCoroutineContext(httpRequest, contextView, propagatedContext, null);
     }

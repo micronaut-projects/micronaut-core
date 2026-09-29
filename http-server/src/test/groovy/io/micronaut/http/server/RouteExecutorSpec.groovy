@@ -33,6 +33,8 @@ class RouteExecutorSpec extends Specification {
     private RouteExecutor routeExecutor() {
         Router router = Mock(Router)
         BeanContext beanContext = Mock(BeanContext)
+        // like a context without Kotlin: an empty result, never null
+        beanContext.findBean(CoroutineHelper) >> Optional.empty()
         RequestArgumentSatisfier requestArgumentSatisfier = Mock(RequestArgumentSatisfier)
         HttpServerConfiguration serverConfiguration = new HttpServerConfiguration()
         ErrorResponseProcessor errorResponseProcessor = Mock(ErrorResponseProcessor)
