@@ -622,8 +622,20 @@ record MethodFilter<T>(FilterOrder order,
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
                     return resultAwareContinuation.processResult(converted);
                 }
+                ExecutionFlow<Object> flow;
+                if (context.reactive()) {
+                    // an upstream filter subscribes to this result in its Reactor chain and may add to the
+                    // Reactor context with contextWrite: only a publisher that already holds its result is
+                    // unwrapped, anything else stays lazy
+                    flow = ReactiveExecutionFlow.fromPublisherImmediate(converted);
+                    if (flow == null) {
+                        flow = ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(context.propagatedContext(), converted));
+                    }
+                } else {
+                    flow = ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext());
+                }
                 // flatMap skips an empty value, an empty publisher proceeds with the current context
-                return ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext())
+                return flow
                     .map(v -> v == null ? EMPTY_RESULT : v)
                     .flatMap(v -> v == EMPTY_RESULT ? ExecutionFlow.just(context) : next.handle(context, v, continuation));
             };
