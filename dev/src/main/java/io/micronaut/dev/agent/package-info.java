@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 /**
- * The LiveReload server on Netty: adding this module to the development runtime classpath turns
- * LiveReload on.
+ * The Java agent that hands development mode the {@code Instrumentation} it redefines classes with.
  *
  * @author graemerocher
  * @since 5.3.0
  */
 @Experimental
 @NullMarked
-package io.micronaut.dev.livereload.netty;
+package io.micronaut.dev.agent;
 
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.NullMarked;

@@ -155,6 +155,42 @@ public final class GenerationClassLoader extends URLClassLoader {
     }
 
     /**
+     * The class of the given name this generation has defined, if it has.
+     *
+     * @param name The binary name
+     * @return The class, or null if the generation has not loaded it
+     */
+    @Nullable
+    public Class<?> loadedClass(String name) {
+        synchronized (getClassLoadingLock(name)) {
+            return findLoadedClass(name);
+        }
+    }
+
+    /**
+     * Replaces a class file in the generation's snapshot, so that a class not loaded yet is loaded in
+     * the version the JVM was told about when the loaded ones were redefined.
+     *
+     * @param name The binary name
+     * @param classFile The new class file
+     * @return Whether a class file of that name was in the snapshot and is replaced
+     * @throws IOException if the file cannot be written
+     */
+    public boolean replaceClassFile(String name, byte[] classFile) throws IOException {
+        String relative = name.replace('.', '/') + ".class";
+        for (Path root : roots) {
+            Path file = root.resolve(relative);
+            if (Files.isRegularFile(file)) {
+                Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
+                Files.write(temporary, classFile);
+                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Finds a class in this generation's directories only, without delegating to the parent.
      *
      * @param name The binary name
