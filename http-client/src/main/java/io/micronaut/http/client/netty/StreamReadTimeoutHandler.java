@@ -84,6 +84,7 @@ final class StreamReadTimeoutHandler extends ReadTimeoutHandler {
 
             @Override
             public void closeAfterReadTimeout() {
+                // no connection to close: only the stream ends
             }
         };
 
