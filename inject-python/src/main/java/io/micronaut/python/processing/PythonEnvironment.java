@@ -22,6 +22,7 @@ import io.micronaut.python.processing.model.ScriptDef;
 import org.graalvm.polyglot.Context;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -32,6 +33,8 @@ import java.util.stream.Collectors;
  * @param classes A map of Python class names to their definitions.
  * @param scripts A map of Python script names to their definitions.
  * @param decorators A map of Python decorator names to their definitions.
+ * @param shadowedTypes The simple names of the top-level classes per source path that another definition of the same
+ *                      generated Java type name replaces, so the package initializers must not import them.
  * @param context The GraalVM Polyglot context used for executing Python code.
  * @since 5.2.0
  * @author Micronaut
@@ -41,8 +44,18 @@ public record PythonEnvironment(
     Map<String, ClassDef> classes,
     Map<String, ScriptDef> scripts,
     Map<String, DecoratorDef> decorators,
+    Map<String, List<String>> shadowedTypes,
     Context context
 ) implements AutoCloseable {
+
+    public PythonEnvironment(
+        Map<String, ClassDef> classes,
+        Map<String, ScriptDef> scripts,
+        Map<String, DecoratorDef> decorators,
+        Context context
+    ) {
+        this(classes, scripts, decorators, Map.of(), context);
+    }
 
     public PythonEnvironment {
         classes = Collections.unmodifiableMap(classes);
@@ -55,6 +68,7 @@ public record PythonEnvironment(
             )
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
         decorators = Collections.unmodifiableMap(decorators);
+        shadowedTypes = Collections.unmodifiableMap(shadowedTypes);
     }
 
     @Override

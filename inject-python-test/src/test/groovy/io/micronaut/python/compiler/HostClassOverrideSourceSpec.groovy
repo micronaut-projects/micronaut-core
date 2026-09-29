@@ -38,10 +38,21 @@ class PythonConstructorBackedHandler(ConstructorBackedHandler):
         return self.dependencyName()
 '''
 
-        expect:
+        expect: 'the constructor creates the Python object; the Java base receives the argument of the Python super().__init__ call'
         assertGeneratedSourceContains(pythonCode, '''
 public PythonConstructorBackedHandler(HandlerDependency dependency, HandlerDependency extra_dependency) {
-    super(dependency);
+    this(PythonContextRuntime.newInstance(PythonConstructorBackedHandler.__PYTHON_CLASS_REFERENCE, (Object) dependency, (Object) extra_dependency));
+''')
+        assertGeneratedSourceContains(pythonCode, '''
+public PythonConstructorBackedHandler(Value value) {
+    this(value, PythonJavaBases.constructing(value, PythonConstructorBackedHandler.class));
+''')
+        assertGeneratedSourceContains(pythonCode, '''
+private PythonConstructorBackedHandler(Value value, PythonJavaBases.Construction construction) {
+    super((HandlerDependency) PythonConversion.convertValue(PythonJavaBases.argument(value, 0, "(io.micronaut.python.annotation.processing.test.HandlerDependency)"), io.micronaut.python.annotation.processing.test.HandlerDependency.class));
+    construction.finished();
+    this.graalpyInternalValue = value;
+    PythonJavaBases.bind(value, this);
 ''')
     }
 }

@@ -20,6 +20,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.ByteBody;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -30,7 +31,11 @@ import reactor.core.publisher.Sinks;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -58,6 +63,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Nullable
     private Throwable error;
+    /**
+     * Whether {@link #error} is set, for {@link #isFailed()} from any thread.
+     */
+    private volatile boolean failed;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -96,6 +105,22 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private List<ReadBuffer> buffer;
     @Nullable
     private Exception bufferSizeExceeded = null;
+    /**
+     * Whether {@link #bufferSizeExceeded} is set, for {@link #isBufferLimitExceeded()} from any
+     * thread.
+     */
+    private volatile boolean bufferLimitExceeded;
+    /**
+     * The trailers of the body, see {@link ByteBody#trailers()}. Completed before the
+     * subscribers are, so that a subscriber finds them in its {@link BufferConsumer#complete()}.
+     */
+    private final CompletableFuture<HttpHeaders> trailers = new CompletableFuture<>();
+    /**
+     * If not negative, each {@link AsFlux} reader is charged for the bytes it has not delivered
+     * yet against its own limit of this size, instead of against the buffered size of this
+     * buffer, see {@link #setReaderBufferLimit(long)}.
+     */
+    private long readerBufferLimit = -1;
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
         this.readBufferFactory = readBufferFactory;
@@ -134,6 +159,47 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         return rootUpstream;
     }
 
+    /**
+     * Get the trailers of the body, see {@link ByteBody#trailers()}.
+     *
+     * @return The trailers
+     */
+    public final CompletionStage<HttpHeaders> getTrailers() {
+        return trailers;
+    }
+
+    /**
+     * @return Whether more bytes than the buffer limit arrived while bytes were kept for a
+     * reserved reader, so that the kept bytes were dropped
+     * @since 5.3.0
+     */
+    public final boolean isBufferLimitExceeded() {
+        return bufferLimitExceeded;
+    }
+
+    /**
+     * @return Whether the body failed
+     * @since 5.3.0
+     */
+    public final boolean isFailed() {
+        return failed;
+    }
+
+    /**
+     * Charge each {@link AsFlux} reader for the bytes it has not delivered yet against a limit
+     * of its own, so that the buffered size of this buffer only counts the bytes it keeps for
+     * the reserved readers. Must be called before the first reader subscribes.
+     *
+     * @param limit The maximum number of bytes a reader holds
+     * @since 5.3.0
+     */
+    public final void setReaderBufferLimit(long limit) {
+        if (limit < 0) {
+            throw new IllegalArgumentException("The reader buffer limit is negative");
+        }
+        this.readerBufferLimit = limit;
+    }
+
     public final void setExpectedLengthFrom(@Nullable String contentLength) {
         if (contentLength == null) {
             return;
@@ -150,6 +216,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         Exception totalSizeException = sizeLimitTrackers.totalSize().add(parsed);
         if (totalSizeException != null) {
             error(totalSizeException);
+            // nobody can use the body anymore, so like the check in add0, let the upstream drop
+            // the rest instead of stalling it on our missing demand
+            rootUpstream.allowDiscard();
         }
         setExpectedLength(parsed);
     }
@@ -183,6 +252,25 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private void forwardInitialBuffer(@Nullable BufferConsumer subscriber, boolean last) {
         if (subscriber != null) {
             if (buffer != null) {
+                if (last) {
+                    // We hand our copy of the data to a streaming subscriber and drop it, so we no
+                    // longer hold these bytes and their charge has to go, the same way
+                    // discardBuffer() releases it. From here on the subscriber is responsible for
+                    // whatever it keeps: AsFlux charges the bytes again until it delivers them,
+                    // and the other streaming consumers are not charged for anything they receive
+                    // after subscribing either. Without this the bytes that arrived before the
+                    // subscriber showed up stayed charged for the lifetime of the body, on top of
+                    // whatever the subscriber charged, and that permanently shrank the remaining
+                    // budget for the rest of the body.
+                    // The pieces are counted before they are composed, like discardBuffer() counts
+                    // them before it closes them: compose() consumes them and closes them all if it
+                    // fails part way, so they can only be counted while this buffer still owns them.
+                    long n = 0;
+                    for (ReadBuffer piece : buffer) {
+                        n += piece.readable();
+                    }
+                    sizeLimitTrackers.bufferedSize().subtract(n);
+                }
                 subscriber.add(getBufferedData(last));
             }
         } else {
@@ -201,7 +289,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     }
 
     /**
-     * Get all data buffered so far.
+     * Get all data buffered so far. This does <i>not</i> release the buffered size charge for the
+     * data: a subscriber that asked for the full body ({@link #subscribeFull0}) keeps the data, so
+     * it is still held, and for a form field that charge is shared with the form-wide limit and
+     * must survive the field's completion. Only the hand-off to a streaming subscriber releases
+     * it, see {@link #forwardInitialBuffer}.
      *
      * @param discardBuffer {@code true} iff the buffer can and should be discarded after this call
      * @return The buffered data
@@ -336,6 +428,68 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Override
     public void add(ReadBuffer rb) {
+        addGuarded(rb, false);
+    }
+
+    /**
+     * Add a given buffer to this {@link BaseSharedBuffer} and complete it, in one operation. This
+     * allows subscribers that implement {@link BufferConsumer#addAndComplete(ReadBuffer)} to
+     * combine the final bytes and the completion signal into a single downstream message.<br>
+     * Not thread safe, caller must handle concurrency.
+     */
+    @Override
+    public void addAndComplete(ReadBuffer rb) {
+        // The final bytes are stored and this buffer is marked complete before any streaming
+        // subscriber learns of the completion. A subscriber may consume a reserved split from
+        // inside its completion callback (the servlet integration does), and that consumer has
+        // to find the final bytes in the buffer and a completed state, or it would miss them and
+        // then wait for a completion that is never delivered.
+        List<ReadBuffer> deferred = addGuarded(rb, true);
+        if (deferred == null) {
+            complete0(true);
+            return;
+        }
+        // the copies not yet delivered are closed if complete0 or a delivery throws, so that a
+        // caller with an expected length, or a subscriber callback that fails, cannot leak them
+        int delivered = 0;
+        try {
+            complete0(false);
+            // only the subscribers deferred was built for: complete0 above may have run a
+            // buffering subscriber's callback which subscribed another split reentrantly. That
+            // subscriber has already received the buffered bytes and its completion from
+            // subscribe0, since the buffer is complete by now.
+            List<BufferConsumer> targets = new ArrayList<>(Objects.requireNonNull(subscribers).subList(0, deferred.size()));
+            for (BufferConsumer target : targets) {
+                // ownership of the copy passes to the consumer with the call, even if it throws
+                ReadBuffer copy = deferred.get(delivered++);
+                target.addAndComplete(copy);
+            }
+        } finally {
+            for (int i = delivered; i < deferred.size(); i++) {
+                deferred.get(i).close();
+            }
+        }
+    }
+
+    /**
+     * Hook for subclasses that need to apply a concurrency guard around the {@link #add} portion
+     * of {@link #add(ReadBuffer)} and {@link #addAndComplete(ReadBuffer)}. Subclasses must call
+     * {@code super.addGuarded(rb, completeAfter)} and return its result.
+     *
+     * @param rb           The buffer to add
+     * @param completeAfter Whether the subscribers should be completed together with this buffer
+     * @return With {@code completeAfter}, the copies of {@code rb} still to be delivered to the
+     * streaming subscribers together with their completion, one per subscriber in order, or
+     * {@code null} if there are none to deliver. Always {@code null} without {@code completeAfter}.
+     */
+    @Nullable
+    protected List<ReadBuffer> addGuarded(ReadBuffer rb, boolean completeAfter) {
+        return add0(rb, completeAfter);
+    }
+
+    @Nullable
+    private List<ReadBuffer> add0(ReadBuffer rb, boolean completeAfter) {
+        List<ReadBuffer> deferred = null;
         try (rb) {
             assert !working;
 
@@ -349,7 +503,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
             // drop messages if we're done with all subscribers
             if (complete || error != null) {
-                return;
+                return null;
             }
             if (expectedLength == -1) {
                 Exception totalSizeException = sizeLimitTrackers.totalSize().add(rb.readable());
@@ -357,20 +511,29 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     // for maxBodySize, all subscribers get the error
                     error(totalSizeException);
                     rootUpstream.allowDiscard();
-                    return;
+                    return null;
                 }
             } // else, already checked the Content-Length
 
             working = true;
             if (subscribers != null) {
-                for (BufferConsumer consumer : subscribers) {
-                    consumer.add(rb.duplicate());
+                if (completeAfter) {
+                    // delivered by addAndComplete once the state below is final
+                    deferred = new ArrayList<>(subscribers.size());
+                    for (int i = 0; i < subscribers.size(); i++) {
+                        deferred.add(rb.duplicate());
+                    }
+                } else {
+                    for (BufferConsumer consumer : subscribers) {
+                        consumer.add(rb.duplicate());
+                    }
                 }
             }
             if (reserved > 0 || fullSubscribers != null) {
                 if (bufferSizeExceeded == null) {
                     bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
                     if (bufferSizeExceeded != null) {
+                        bufferLimitExceeded = true;
                         discardBuffer();
                         // new subscribers will recognize that the limit has been exceeded. Streaming
                         // subscribers can proceed normally. Need to notify buffering subscribers
@@ -391,6 +554,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             }
             working = false;
         }
+        return deferred;
     }
 
     /**
@@ -399,12 +563,62 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Override
     public void complete() {
+        complete0(true);
+    }
+
+    /**
+     * Complete this buffer with the given trailers, see {@link ByteBody#trailers()}.<br>
+     * Not thread safe, caller must handle concurrency.
+     *
+     * @param trailers The trailers
+     */
+    public void complete(HttpHeaders trailers) {
+        this.trailers.complete(trailers);
+        complete0(true);
+    }
+
+    /**
+     * Complete this buffer with the trailers the given stage completes with: immediately if the
+     * stage is already complete, else once it completes. A stage that fails, fails this buffer.
+     * <br>Not thread safe, caller must handle concurrency.
+     *
+     * @param trailers The trailers
+     */
+    public final void complete(CompletionStage<? extends HttpHeaders> trailers) {
+        CompletableFuture<? extends HttpHeaders> future = trailers.toCompletableFuture();
+        if (future.isDone() && !future.isCompletedExceptionally()) {
+            complete(future.join());
+            return;
+        }
+        future.whenComplete((headers, failure) -> submitDeferred(() -> {
+            if (error != null) {
+                return;
+            }
+            if (failure == null) {
+                complete(headers == null ? NoTrailers.HEADERS : headers);
+            } else {
+                error(failure instanceof CompletionException ce && ce.getCause() != null ? ce.getCause() : failure);
+            }
+        }));
+    }
+
+    /**
+     * Run the given task non-concurrently with the other operations on this buffer, like the
+     * subclass runs the {@link BufferConsumer} methods.
+     *
+     * @param task The task
+     */
+    protected abstract void submitDeferred(Runnable task);
+
+    private void complete0(boolean notifySubscribers) {
         if (expectedLength > lengthSoFar) {
             throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
         }
+        // no-op if the trailers are known
+        trailers.complete(NoTrailers.HEADERS);
         complete = true;
         expectedLength = lengthSoFar;
-        if (subscribers != null) {
+        if (notifySubscribers && subscribers != null) {
             for (BufferConsumer subscriber : subscribers) {
                 subscriber.complete();
             }
@@ -435,6 +649,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         error = e;
+        failed = true;
+        trailers.completeExceptionally(e);
         discardBuffer();
         if (subscribers != null) {
             for (BufferConsumer subscriber : subscribers) {
@@ -457,14 +673,35 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     public static final class AsFlux implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
+        /**
+         * The tracker of this reader alone, see {@link #setReaderBufferLimit(long)}, or
+         * {@code null} to charge the buffered size of the shared buffer.
+         */
+        @Nullable
+        private final SizeLimitTracker ownTracker;
         private boolean first = true;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
+            long readerBufferLimit = sharedBuffer.readerBufferLimit;
+            this.ownTracker = readerBufferLimit < 0 ? null : NotThreadSafe.create(readerBufferLimit, true).makeAtomic();
         }
 
         @Override
         public void add(ReadBuffer buf) {
+            SizeLimitTracker readerTracker = ownTracker;
+            if (readerTracker != null) {
+                int size = buf.readable();
+                Exception bufferExceededExc = readerTracker.add(size);
+                if (bufferExceededExc != null) {
+                    sink.tryEmitError(bufferExceededExc);
+                    buf.close();
+                } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                    readerTracker.subtract(size);
+                    buf.close();
+                }
+                return;
+            }
             if (first) {
                 // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
                 sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
@@ -492,6 +729,24 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         public Flux<ReadBuffer> asFlux(Upstream upstream) {
+            SizeLimitTracker readerTracker = ownTracker;
+            if (readerTracker != null) {
+                return sink.asFlux()
+                    .doOnSubscribe(s -> upstream.start())
+                    .doOnNext(bb -> {
+                        int size = bb.readable();
+                        readerTracker.subtract(size);
+                        upstream.onBytesConsumed(size);
+                    })
+                    .doOnCancel(() -> {
+                        upstream.allowDiscard();
+                        upstream.disregardBackpressure();
+                    })
+                    .doOnDiscard(ReadBuffer.class, rb -> {
+                        readerTracker.subtract(rb.readable());
+                        rb.close();
+                    });
+            }
             return sink.asFlux()
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {

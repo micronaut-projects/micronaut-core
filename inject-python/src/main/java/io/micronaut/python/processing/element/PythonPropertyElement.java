@@ -178,6 +178,17 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         return getType();
     }
 
+    /**
+     * The declared attribute backing the property, when the property is declared as a class attribute
+     * ({@code name: Annotated[str, ...] = ...}) rather than through {@code @property} accessors. Its annotation
+     * metadata is the attribute's own, without the accessor metadata that {@link #getAnnotationMetadata()} merges.
+     *
+     * @return The attribute field, if the property is attribute-backed
+     */
+    public Optional<FieldElement> getAttributeField() {
+        return Optional.ofNullable(field);
+    }
+
     @Override
     public Optional<MethodElement> getReadMethod() {
         return Optional.ofNullable(readMethod);

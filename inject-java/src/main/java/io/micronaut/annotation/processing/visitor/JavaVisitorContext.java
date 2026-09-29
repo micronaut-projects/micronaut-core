@@ -23,7 +23,6 @@ import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
 import io.micronaut.annotation.processing.JavaNativeElementsHelper;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ClassUtils;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -87,11 +86,9 @@ import java.util.stream.Stream;
 @Internal
 public final class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
 
-    // A module that wants the generated classes as Java source replaces the sourcegen bytecode writer on its
-    // annotation processor path with a source generator; javac then compiles them in a later round
-    private static final boolean WRITE_JAVA_SOURCE = !ClassUtils.isPresent(
-        "io.micronaut.sourcegen.bytecode.ByteCodeWriter", JavaVisitorContext.class.getClassLoader());
-
+    // A module that wants the generated classes as Java source puts a source generator on its annotation processor
+    // path, in place of the sourcegen bytecode writer, and sets the option; javac compiles them in a later round
+    private final boolean writeJavaSource;
     private final Messager messager;
     private final Elements elements;
     private final Types types;
@@ -209,6 +206,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
         this.filer = filer;
         this.postponedTypes = postponedTypes;
+        this.writeJavaSource = "true".equals(getOptions().get(MICRONAUT_PROCESSING_JAVA_SOURCE));
     }
 
     @Override
@@ -470,7 +468,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     @Override
     public void visitObjectDef(ObjectDef objectDef, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
         checkForPostponedOriginalElements(originatingElements);
-        if (WRITE_JAVA_SOURCE) {
+        if (writeJavaSource) {
             SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA)
                 .orElseThrow(() -> new IllegalStateException("No Java source generator found on the classpath"));
             sourceGenerator.write(objectDef, this, originatingElements);

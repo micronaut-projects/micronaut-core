@@ -49,8 +49,8 @@ return (CompletionStage<String>) PythonAsyncioRuntime.toCompletionStage(pythonCo
 ''')
     }
 
-    void "abstract async client method bridge returns completion stage of awaited result type"() {
-        expect:
+    void "abstract async client method returns completion stage of awaited result type"() {
+        expect: "the client is a Java interface; the introduction proxy implements the method"
         assertGeneratedSourceContains('''
 from abc import ABC, abstractmethod
 from micronaut.http.annotation import Get
@@ -63,7 +63,9 @@ class BackendClient(ABC):
     async def message(self) -> str:
         ...
 ''', '''
-public CompletionStage<String> message() {
+public interface BackendClient {
+  CompletionStage<String> message();
+}
 ''')
     }
 
@@ -77,6 +79,108 @@ async def message() -> str:
     return "ok"
 ''', '''
 return (CompletionStage<String>) PythonContextRuntime.invokePooledScriptAsync(
+''')
+    }
+
+    void "async generator method bridge returns a publisher of the declared element type"() {
+        expect:
+        assertGeneratedSourceContains('''
+from typing import AsyncIterator
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class StreamingService:
+    @Executable
+    async def numbers(self) -> AsyncIterator[str]:
+        yield "one"
+        yield "two"
+''', '''
+public Publisher<String> numbers() {
+''')
+    }
+
+    void "async generator method bridge exposes the generator through the asyncio runtime"() {
+        expect:
+        assertGeneratedSourceContains('''
+from typing import AsyncGenerator
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class StreamingService:
+    @Executable
+    async def numbers(self) -> AsyncGenerator[int, None]:
+        yield 1
+''', '''
+PythonAsyncioRuntime.generatorToPublisher(pythonAsyncGenerator), java.lang.Integer.class)
+''')
+    }
+
+    void "async generator annotated with a Java publisher keeps the publisher type"() {
+        expect:
+        assertGeneratedSourceContains('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+Publisher = java.type("org.reactivestreams.Publisher")
+
+@Singleton
+class StreamingService:
+    @Executable
+    async def numbers(self) -> Publisher[str]:
+        yield "one"
+''', '''
+public Publisher<String> numbers() {
+''')
+    }
+
+    void "unannotated async generator bridges as a publisher of objects"() {
+        expect:
+        assertGeneratedSourceContains('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class StreamingService:
+    @Executable
+    async def numbers(self):
+        yield 1
+''', '''
+public Publisher<Object> numbers() {
+''')
+    }
+
+    void "classless async generator route bridges through the pooled publisher runtime"() {
+        expect:
+        assertGeneratedSourceContains('''
+from typing import AsyncIterator
+from micronaut.http.annotation import Get
+
+@Get("/numbers")
+async def numbers() -> AsyncIterator[str]:
+    yield "one"
+''', '''
+PythonContextRuntime.invokePooledScriptPublisher(
+''')
+    }
+
+    void "a coroutine returning an async iterator is not bridged as a publisher"() {
+        expect:
+        // the AsyncIterator mapping is confined to async generators: nothing converts a returned iterator
+        assertGeneratedSourceContains('''
+from typing import AsyncIterator
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class StreamingService:
+    @Executable
+    async def numbers(self) -> AsyncIterator[str]:
+        return other_source()
+''', '''
+public CompletionStage<Object> numbers() {
 ''')
     }
 

@@ -1,0 +1,54 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.annotation.processing.test.startup;
+
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ExecutableMethod;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Instantiates the bean of every {@link StartupProcessed} method and invokes the method, like the
+ * Kafka consumer processor does. Executable method processors run before the {@code @Context}
+ * beans are initialized, so the Python bean is created before the GraalPy context bean.
+ * <p>
+ * Registered as a runtime bean definition by the spec (the Java test sources are not processed).
+ */
+public final class StartupMethodProcessor implements ExecutableMethodProcessor<StartupProcessed> {
+
+    private final BeanContext beanContext;
+    private final Map<String, Object> results = new LinkedHashMap<>();
+
+    public StartupMethodProcessor(BeanContext beanContext) {
+        this.beanContext = beanContext;
+    }
+
+    @Override
+    public <B> void process(BeanDefinition<B> beanDefinition, ExecutableMethod<B, ?> method) {
+        B bean = beanContext.getBean(beanDefinition);
+        results.put(method.getMethodName(), method.invoke(bean));
+    }
+
+    /**
+     * @return The results of the methods processed at startup, by method name
+     */
+    public Map<String, Object> getResults() {
+        return results;
+    }
+}

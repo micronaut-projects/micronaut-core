@@ -16,6 +16,9 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -181,10 +184,39 @@ public record PythonProcessingEnvironment(
     public Map<String, ClassElement> classes() {
         Map<String, ClassElement> cached = classesCache.get();
         if (cached == null) {
-            cached = toMapOfClassElement(environment.classes(), this);
-            classesCache.set(cached);
+            cached = registerClassElements(environment.classes());
         }
         return cached;
+    }
+
+    /**
+     * Registers the elements of every Python class before their class level metadata is derived. Deriving that
+     * metadata runs the annotation mappers of the class and property annotations, and a mapper may resolve a class
+     * named by an annotation member through the visitor context (a converter, a naming strategy, an entity): that
+     * lookup reads this registry again, which must therefore already hold the elements, the one being initialized
+     * included, instead of being built a second time.
+     *
+     * @param classes The parsed classes by qualified name
+     * @return The registered elements by qualified name
+     */
+    private Map<String, ClassElement> registerClassElements(Map<String, ClassDef> classes) {
+        Map<String, ClassElement> registry = new LinkedHashMap<>(classes.size());
+        List<PythonClassElement> pending = new ArrayList<>(classes.size());
+        for (Map.Entry<String, ClassDef> entry : classes.entrySet()) {
+            ClassDef classDef = entry.getValue();
+            if (classDef.isEnum()) {
+                registry.put(entry.getKey(), new PythonEnumElement(classDef, this));
+            } else {
+                PythonClassElement classElement = PythonClassElement.registered(classDef, this);
+                registry.put(entry.getKey(), classElement);
+                pending.add(classElement);
+            }
+        }
+        classesCache.set(registry);
+        for (PythonClassElement classElement : pending) {
+            classElement.initializeClassMetadata();
+        }
+        return registry;
     }
 
     /**
@@ -219,18 +251,4 @@ public record PythonProcessingEnvironment(
             ));
     }
 
-    private static Map<String, ClassElement> toMapOfClassElement(Map<String, ClassDef> classes, PythonProcessingEnvironment environment) {
-        return classes.entrySet().stream()
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                entry -> {
-                    ClassDef classDef = entry.getValue();
-                    if (classDef.isEnum()) {
-                        return new PythonEnumElement(classDef, environment);
-                    } else {
-                        return new PythonClassElement(classDef, environment);
-                    }
-                }
-            ));
-    }
 }

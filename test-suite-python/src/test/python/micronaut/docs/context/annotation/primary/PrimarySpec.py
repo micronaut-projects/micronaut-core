@@ -3,7 +3,8 @@ from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context import ApplicationContext
 from jakarta.inject import Inject
 from typing import Annotated
-import java
+
+from .ColorPicker import ColorPicker
 
 @MicronautTest
 class PrimarySpec:
@@ -12,8 +13,7 @@ class PrimarySpec:
     @Test
     def test_primary_color_picker_is_injected(self):
         # tag::primary[]
-        ColorPicker = java.type("micronaut.docs.context.annotation.primary.ColorPicker")
-        color_picker = self.context.getBean(ColorPicker).asPolyglotValue()
+        color_picker = self.context.getBean(ColorPicker)
         print(color_picker.color())
         # end::primary[]
 
@@ -21,6 +21,5 @@ class PrimarySpec:
 
     @Test
     def test_both_color_pickers_are_available(self):
-        ColorPicker = java.type("micronaut.docs.context.annotation.primary.ColorPicker")
         beans = self.context.getBeansOfType(ColorPicker)
         assert 2 == len(beans)

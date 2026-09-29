@@ -129,7 +129,7 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
         this.thisType = ClassTypeDef.of(className);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
-        this.methodDispatchWriter = new DispatchWriter(className);
+        this.methodDispatchWriter = new DispatchWriter(className, true);
     }
 
     /**

@@ -217,7 +217,14 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             return newClassElement(declaredElement, getNativeType().annotatedNode(), genericsType, redirectType, parentTypeArguments, visitedTypes, isRawTypeParameter);
         }
         if (ClassHelper.isPrimitiveType(classNode)) {
-            return PrimitiveElement.valueOf(classNode.getName());
+            PrimitiveElement primitiveElement = PrimitiveElement.valueOf(classNode.getName());
+            if (CollectionUtils.isNotEmpty(classNode.getTypeAnnotations())) {
+                // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
+                return primitiveElement.withTypeAnnotationMetadata(
+                    elementAnnotationMetadataFactory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeAnnotations(classNode), classNode)
+                );
+            }
+            return primitiveElement;
         }
         if (classNode.isEnum()) {
             return new GroovyEnumElement(visitorContext, new GroovyNativeElement.Class(classNode), elementAnnotationMetadataFactory);

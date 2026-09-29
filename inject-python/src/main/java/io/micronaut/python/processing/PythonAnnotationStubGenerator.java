@@ -374,7 +374,9 @@ final class PythonAnnotationStubGenerator {
     }
 
     static AnnotationDef buildAnnotationDef(String annotationName, Map<CharSequence, Object> members) {
-        AnnotationDef.AnnotationDefBuilder builder = AnnotationDef.builder(ClassTypeDef.of(annotationName));
+        // a repeatable container such as Size$List is a nested annotation type: it is written with its canonical name
+        boolean inner = annotationName.lastIndexOf('$') > annotationName.lastIndexOf('.');
+        AnnotationDef.AnnotationDefBuilder builder = AnnotationDef.builder(ClassTypeDef.of(annotationName, inner));
         members.forEach((memberName, value) -> addAnnotationDefMember(builder, memberName.toString(), value));
         return builder.build();
     }
@@ -390,6 +392,10 @@ final class PythonAnnotationStubGenerator {
     }
 
     private static Object normalizeAnnotationDefMember(Object value) {
+        if (value instanceof AnnotationValue<?> annotationValue) {
+            // the members of a repeatable container are annotations themselves
+            return buildAnnotationDef(annotationValue.getAnnotationName(), annotationValue.getValues());
+        }
         if (value instanceof Object[] array) {
             if (array.length == 0) {
                 return EmptyAnnotationArray.INSTANCE;

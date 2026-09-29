@@ -1,8 +1,8 @@
-import io.micronaut.build.internal.python.PythonCompile
+import io.micronaut.build.python.PythonCompile
 
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
-    id("io.micronaut.build.internal.python")
+    id("io.micronaut.build.internal.convention-python")
 }
 
 dependencies {
@@ -34,8 +34,6 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
-    testRuntimeOnly(libs.apiguardian)
-
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))
     testImplementation("io.micronaut.data:micronaut-data-processor") {
@@ -48,13 +46,21 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    testImplementation("io.micronaut.sql:micronaut-hibernate-jpa")
+    testImplementation("io.micronaut.data:micronaut-data-hibernate-jpa") {
+        exclude(group = "io.micronaut")
+    }
     testImplementation("com.h2database:h2")
     testImplementation("jakarta.data:jakarta.data-api:1.1.0-M3")
     testImplementation(libs.managed.snakeyaml)
+    testRuntimeOnly(libs.apiguardian)
 }
 
 tasks.withType<Test>().configureEach {
     systemProperty("micronaut.python.pool.enabled", "false")
+    // Hibernate JPA is on the test classpath for the hibernate examples, which enable it with @Property;
+    // the other examples defining a DataSource must not get a SessionFactory.
+    systemProperty("jpa.enabled", "false")
     // Module tests use the default client; JIT warm-up under the parallel full-suite run exceeded the 10s default once.
     systemProperty("micronaut.http.client.read-timeout", "30s")
     // The asyncio context-isolation test compares IDs across pooled contexts.
@@ -64,4 +70,9 @@ tasks.withType<Test>().configureEach {
 tasks.named<PythonCompile>("compileTestPython") {
     dependsOn(tasks.named("classes"))
     classpath.from(sourceSets.main.get().output)
+    // Hibernate reads @Entity, @Id, ... reflectively from the generated Java classes of the JPA examples:
+    // the compiler copies runtime annotations only onto the generated classes this property names
+    // (the compiler reads it from the -A option or, as here, from a system property of its JVM;
+    // micronaut-build 8.1.2 adds compilerArgs for the -A form).
+    systemProperties.put("micronaut.introspection.allow-reflection", "micronaut.docs.hibernate.*")
 }

@@ -1,0 +1,27 @@
+Java types nested in another type, such as `Map.Entry` or picocli's `CommandLine.Command`, are available to Python code in two ways: as attributes of the imported outer type, and as imports from the module named after the outer type.
+
+[source,python]
+----
+from java.util import Map
+from java.util.Map import Entry
+----
+
+Both spellings name the same Java type, so `Map.Entry` and `Entry` are interchangeable. The module of a Java type exports its nested types and the type itself (`from java.util.Map import Map`), and nesting can go deeper (`from a.b.Outer.Middle import Inner`). Importing a name from a Java type module that is not one of its nested types is a compile-time error.
+
+Nested annotation types work like top-level ones once imported, as decorators and as `Annotated[...]` metadata:
+
+[source,python]
+----
+from typing import Annotated
+
+from picocli.CommandLine import Command, Option, Parameters
+
+@Command(name="greet", description="Greets a name")
+class GreetCommand:
+    verbose: Annotated[bool, Option(names=["-v", "--verbose"])] = False
+    name: Annotated[str, Parameters(index="0")] = "World"
+----
+
+An annotation nested in an imported annotation is also an attribute of the outer decorator, so `@ToString.Exclude` and `Annotated[int, EqualsAndHashCode.Exclude]` resolve without a second import.
+
+Nested annotations of a Java class (rather than of an annotation) must be imported from the class module as shown above: `@CommandLine.Command(...)` refers to the Java annotation interface at run time, which is not callable.

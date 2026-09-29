@@ -30,9 +30,16 @@ jobs:
     strategy:
       matrix:
         java: ['25']
+    outputs:
+      # Outcome of the static analysis step: success, failure or skipped (no Sonar token, e.g. fork pull requests)
+      sonar: ${{ steps.sonar.outcome }}
     env:
       TESTCONTAINERS_RYUK_DISABLED: true
       SONAR_TOKEN_AVAILABLE: ${{ secrets.SONAR_TOKEN != '' }}
+      # Branch pushes write to the remote build cache so later jobs and pull requests reuse
+      # their outputs; pull requests only read. Set explicitly: the setup-gradle token makes the
+      # micronaut-build settings plugin detect CI on every build, which would otherwise push.
+      ORG_GRADLE_PROJECT_cachePush: ${{ github.event_name == 'push' }}
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: Remove system JDKs
@@ -65,6 +72,15 @@ jobs:
 
       - name: "🔧 Setup Gradle"
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          # Exchanged for a short-lived token that the following steps receive as DEVELOCITY_ACCESS_KEY and
+          # GRADLE_ENTERPRISE_ACCESS_KEY, so the long-lived key never reaches the build. Pushes use the writer key.
+          # Other events use DEVELOCITY_PULL_REQUEST_ACCESS_KEY, a key whose Develocity user cannot write to the
+          # build cache, and fall back to the writer key until that secret exists.
+          develocity-access-key: >-
+            ${{ (github.event_name == 'push' && secrets.GRADLE_ENTERPRISE_ACCESS_KEY) ||
+                (github.event_name != 'push' && (secrets.DEVELOCITY_PULL_REQUEST_ACCESS_KEY || secrets.GRADLE_ENTERPRISE_ACCESS_KEY)) ||
+                '' }}
 
       - name: "❓ Optional setup step"
         run: |
@@ -73,23 +89,21 @@ jobs:
       - name: "🛠 Build with Gradle"
         id: gradle
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
         run: |
           ./gradlew check jacocoReport --no-daemon --continue
 
       - name: "🔎 Run static analysis"
+        id: sonar
         if: env.SONAR_TOKEN_AVAILABLE == 'true' && matrix.java == '25'
+        # Waits for the quality gate so a failing gate stops the native tests, but does not fail this
+        # job: snapshot and docs publishing below keep running on branch pushes.
+        continue-on-error: true
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./gradlew sonar --no-parallel --continue
+          ./gradlew sonar --no-parallel --continue -Dsonar.qualitygate.wait=true
 
       - name: "📊 Publish Test Report"
         if: always()
@@ -109,9 +123,6 @@ jobs:
       - name: "📦 Publish to Sonatype Snapshots"
         if: success() && github.event_name == 'push' && matrix.java == '25'
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         run: ./gradlew publishToSonatype docs --no-daemon
@@ -136,3 +147,10 @@ jobs:
       - name: "❓ Optional cleanup step"
         run: |
           [ -f ./cleanup.sh ] && ./cleanup.sh || [ ! -f ./cleanup.sh ]
+  # Native tests start only when the build and its tests passed and the Sonar quality gate did not
+  # fail, so a red or cancelled build never takes runners for the native matrix.
+  native:
+    needs: build
+    if: needs.build.outputs.sonar != 'failure'
+    uses: ./.github/workflows/graalvm-latest.yml
+    secrets: inherit

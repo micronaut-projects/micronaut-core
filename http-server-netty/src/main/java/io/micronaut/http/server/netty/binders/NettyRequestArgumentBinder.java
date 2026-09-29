@@ -35,7 +35,9 @@ public sealed interface NettyRequestArgumentBinder<T> extends RequestArgumentBin
 
     @Override
     default BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest<?> nettyHttpRequest) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        NettyHttpRequest<?> nettyHttpRequest = NettyHttpRequest.findBodyRequest(source);
+        if (nettyHttpRequest != null) {
             return bindForNettyRequest(context, nettyHttpRequest);
         }
         return BindingResult.EMPTY;

@@ -23,16 +23,20 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
@@ -71,6 +75,16 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
      * The JSON handler should be preferred if for any type.
      */
     public static final int ORDER = -10;
+
+    /**
+     * Starting capacity of the buffer a whole JSON response is serialised into. Jackson's
+     * generator writes through an 8000 byte encoding buffer, so a response of up to that size
+     * arrives in one write; with the allocator's 256 byte default that first write already forced
+     * the buffer to grow. Only used for a complete body, not for the elements of a streamed
+     * response: those are written to the channel uncopied, and a hint this large would hold 8 KiB
+     * of capacity for every small element the client has not read yet.
+     */
+    private static final int WRITE_BUFFER_SIZE = 8192;
 
     private final JsonMapper jsonMapper;
 
@@ -131,7 +145,11 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
         return mediaType != null && mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON);
     }
 
-    private static CodecException decorateWrite(Object object, IOException e) {
+    /**
+     * A failure of the mapper while writing is an encoding failure, whether it is an
+     * {@link IOException} or unchecked, like the exceptions of Jackson 3.
+     */
+    static CodecException decorateWrite(Object object, Exception e) {
         return new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
     }
 
@@ -139,12 +157,22 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     public void writeTo(Argument<T> type, @Nullable MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
         try {
-            if (type.getType() == Object.class && object instanceof CharSequence charSequence) {
-                outputStream.write(charSequence.toString().getBytes(MessageBodyWriter.findCharset(mediaType, outgoingHeaders).orElse(StandardCharsets.UTF_8)));
-                return;
-            }
-            jsonMapper.writeValue(outputStream, type, object);
-        } catch (IOException e) {
+            writeValue(type, mediaType, outgoingHeaders, object, outputStream);
+        } catch (CodecException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            throw decorateWrite(object, e);
+        }
+    }
+
+    @Override
+    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<T> httpResponse, Argument<T> type, MediaType mediaType, T object) throws CodecException {
+        httpResponse.getHeaders().contentTypeIfMissing(mediaType);
+        try {
+            return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> jsonMapper.writeValue(s, object)));
+        } catch (CodecException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
             throw decorateWrite(object, e);
         }
     }
@@ -152,9 +180,34 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     @Override
     public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType, T object) throws CodecException {
         try {
-            return bodyFactory.buffer(s -> jsonMapper.writeValue(s, object));
-        } catch (IOException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
+            return bodyFactory.buffer(s -> writeValue(type, mediaType, response.getHeaders(), object, s));
+        } catch (CodecException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            throw decorateWrite(object, e);
+        }
+    }
+
+    @Override
+    public PieceWriter<T> openPieceWriter(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType) throws CodecException {
+        if (type.getType() == Object.class) {
+            // a piece of undeclared type may be an already serialized document that writeValue
+            // passes through unchanged, so these pieces are written one at a time
+            return ResponseBodyWriter.super.openPieceWriter(bodyFactory, request, response, type, mediaType);
+        }
+        return new JsonPieceWriter<>(bodyFactory, jsonMapper, type);
+    }
+
+    /**
+     * Write a single value, either through unchanged if it is an already serialized JSON document,
+     * or using the {@link JsonMapper} with the declared type.
+     */
+    private void writeValue(Argument<T> type, @Nullable MediaType mediaType, Headers headers, T object, OutputStream outputStream) throws IOException {
+        if (type.getType() == Object.class && object instanceof CharSequence charSequence) {
+            // the value is already a JSON document, write it through unchanged
+            outputStream.write(charSequence.toString().getBytes(MessageBodyWriter.findCharset(mediaType, headers).orElse(StandardCharsets.UTF_8)));
+        } else {
+            jsonMapper.writeValue(outputStream, type, object);
         }
     }
 

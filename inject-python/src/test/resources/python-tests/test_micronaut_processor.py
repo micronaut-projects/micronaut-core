@@ -66,6 +66,14 @@ class FunctionShapeTest(unittest.TestCase):
         self.assertFalse(processor.has_return_value(self.func("def f():\n    pass")))
         self.assertFalse(processor.has_return_value(self.func("def f():\n    def g():\n        return 1")))
 
+    def test_yield_detection(self):
+        self.assertTrue(processor.has_yield(self.func("async def f():\n    yield 1")))
+        self.assertTrue(processor.has_yield(self.func("def f():\n    yield from g()")))
+        self.assertTrue(processor.has_yield(self.func("async def f():\n    async with x:\n        for i in y:\n            yield i")))
+        self.assertFalse(processor.has_yield(self.func("async def f():\n    return 1")))
+        self.assertFalse(processor.has_yield(self.func("async def f():\n    def g():\n        yield 1")))
+        self.assertFalse(processor.has_yield(self.func("async def f():\n    async def g():\n        yield 1\n    return g")))
+
     def test_abstract_and_placeholder_methods(self):
         self.assertTrue(processor.is_abstract_method(self.func("@abstractmethod\ndef f(self): pass")))
         self.assertTrue(processor.is_placeholder_method(self.func("def f(self):\n    ...")))
@@ -156,6 +164,65 @@ class Library:
         self.assertEqual("bool", functions["add"].returnType().typeAnnotation().name())
         self.assertTrue(functions["fetch"].isAsync())
         self.assertFalse(functions["add"].isAsync())
+
+    def test_placeholder_bodies_are_abstract_in_abstract_base_classes_only(self):
+        visitor, items = visit("""
+from abc import ABC, abstractmethod
+from typing import Protocol
+
+class Listener:
+    def on_message(self, message: str) -> None:
+        ...
+    @abstractmethod
+    def explicit(self) -> None:
+        ...
+
+class Operations(ABC):
+    def run(self) -> None:
+        ...
+    def concrete(self) -> None:
+        pass
+
+class Contract(Protocol):
+    def run(self) -> None:
+        ...
+""")
+        classes = {item.name(): item for item in items if item.getClass().getSimpleName() == "ClassDef"}
+        listener = {function.name(): function for function in classes["Listener"].functions()}
+        self.assertFalse(listener["on_message"].isAbstract())
+        self.assertTrue(listener["on_message"].hasPlaceholderBody())
+        self.assertTrue(listener["explicit"].isAbstract())
+        operations = {function.name(): function for function in classes["Operations"].functions()}
+        self.assertTrue(operations["run"].isAbstract())
+        self.assertFalse(operations["concrete"].isAbstract())
+        self.assertFalse(operations["concrete"].hasPlaceholderBody())
+        self.assertTrue(classes["Contract"].functions()[0].isAbstract())
+
+    def test_docstrings_are_cleaned_like_inspect_getdoc(self):
+        visitor, items = visit("""
+class Llama:
+    \"\"\"
+    A llama.
+
+    Llamas are domesticated.
+        Indented line.
+    \"\"\"
+
+    name: str
+    \"\"\"
+        The name.
+    \"\"\"
+
+    def speak(self) -> str:
+        \"\"\"
+        Says hello.
+        \"\"\"
+        return "hello"
+""")
+        llama = [item for item in items if item.getClass().getSimpleName() == "ClassDef"][0]
+        self.assertEqual("A llama.\n\nLlamas are domesticated.\n    Indented line.", llama.documentation())
+        self.assertEqual("The name.", llama.attributes()[0].documentation())
+        self.assertEqual("Says hello.", llama.functions()[0].documentation())
 
     def test_python_defined_annotation_becomes_decorator_def(self):
         visitor, items = visit("""

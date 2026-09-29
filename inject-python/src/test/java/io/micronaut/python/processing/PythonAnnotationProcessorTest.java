@@ -28,4 +28,15 @@ class PythonAnnotationProcessorTest {
             PythonAnnotationProcessor.normalizeResourcePath("example\\micronaut\\forecast_controller.py")
         );
     }
+
+    @Test
+    void normalizesWindowsBytecodeCachePathSeparators() {
+        assertEquals(
+            "GRAALPY-VFS/micronaut-application/src/example/micronaut/__pycache__/forecast_controller.graalpy253-313.pyc",
+            PythonAnnotationProcessor.cacheFilePath(
+                "GRAALPY-VFS/micronaut-application/src/example/micronaut/forecast_controller.py",
+                "micronaut\\__pycache__\\forecast_controller.graalpy253-313.pyc"
+            )
+        );
+    }
 }

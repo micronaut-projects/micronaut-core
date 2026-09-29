@@ -10,12 +10,16 @@ plugins {
 // the same classes.
 val testSuiteDir = rootProject.layout.projectDirectory.dir("test-suite")
 
-// The processor path carries the Java source generator in place of the sourcegen bytecode writer: without a bytecode
-// writer the processors write what they generate as Java source, which javac compiles in a later round
+// The processor path carries the Java source generator in place of the sourcegen bytecode writer, and the option asks
+// the processors to write what they generate as Java source, which javac compiles in a later round
 listOf(configurations.annotationProcessor, configurations.testAnnotationProcessor).forEach { configuration ->
     configuration {
         exclude(group = "io.micronaut.sourcegen", module = "micronaut-sourcegen-bytecode-writer")
     }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-Amicronaut.processing.java.source=true")
 }
 
 sourceSets {

@@ -43,6 +43,7 @@ import io.micronaut.http.server.netty.RoutingInBoundHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
@@ -55,7 +56,9 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
@@ -65,8 +68,10 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AsciiString;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,8 +126,28 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                               WebSocketSessionRepository webSocketSessionRepository,
                                               ConversionService conversionService,
                                               NettyHttpServerConfiguration serverConfiguration) {
+        this(embeddedServices, webSocketSessionRepository, WebSocketBeanRegistry.forServer(embeddedServices.getApplicationContext()), conversionService, serverConfiguration);
+    }
+
+    /**
+     * Constructor that shares a {@link WebSocketBeanRegistry} between handlers. A handler is
+     * created for every connection, so the registry (and its bean cache) should be created once
+     * per server.
+     *
+     * @param embeddedServices The embedded server services
+     * @param webSocketSessionRepository The websocket session repository
+     * @param webSocketBeanRegistry The server websocket bean registry
+     * @param conversionService The conversion service
+     * @param serverConfiguration The server configuration
+     * @since 5.3.0
+     */
+    public NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
+                                              WebSocketSessionRepository webSocketSessionRepository,
+                                              WebSocketBeanRegistry webSocketBeanRegistry,
+                                              ConversionService conversionService,
+                                              NettyHttpServerConfiguration serverConfiguration) {
         this.router = embeddedServices.getRouter();
-        this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(embeddedServices.getApplicationContext());
+        this.webSocketBeanRegistry = webSocketBeanRegistry;
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.routeExecutor = embeddedServices.getRouteExecutor();
         this.nettyEmbeddedServices = embeddedServices;
@@ -228,9 +253,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             //Adding new handler to the existing pipeline to handle WebSocket Messages
             WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
 
-            handleHandshake(ctx, msg, webSocketBean, actualResponse);
-
             ChannelPipeline pipeline = ctx.pipeline();
+
+            installCompressionHandler(ctx, msg.getNativeRequest());
+            handleHandshake(ctx, msg, webSocketBean, actualResponse);
 
             try {
                 // re-configure the pipeline
@@ -263,6 +289,37 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             }
         } else {
             Objects.requireNonNull(next).writeResponse(outboundAccess, msg, actualResponse, null);
+        }
+    }
+
+    /**
+     * Add the {@link WebSocketServerCompressionHandler} that negotiates the {@code permessage-deflate}
+     * extension. It is only added to the pipeline once a connection is actually upgraded, so that
+     * plain HTTP requests do not pay for it. The netty handler picks the extensions offered by the
+     * client up from the upgrade request as it passes through {@code channelRead}, and then answers
+     * them on the {@code 101} response as it passes through {@code write}. As the request has already
+     * been read at this point, a headers-only copy of it is replayed through the handler, with a sink
+     * behind the handler so that the copy does not reach the HTTP request handler again.
+     *
+     * @param ctx The context of the HTTP request handler
+     * @param request The upgrade request
+     */
+    private void installCompressionHandler(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request) {
+        ChannelPipeline pipeline = ctx.pipeline();
+        WebSocketServerCompressionHandler compressionHandler = new WebSocketServerCompressionHandler();
+        pipeline.addBefore(ctx.name(), COMPRESSION_HANDLER, compressionHandler);
+        pipeline.addBefore(ctx.name(), UpgradeRequestSink.ID, UpgradeRequestSink.INSTANCE);
+        try {
+            compressionHandler.channelRead(pipeline.context(compressionHandler), new DefaultHttpRequest(
+                request.protocolVersion(),
+                request.method(),
+                request.uri(),
+                request.headers()
+            ));
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to negotiate websocket extensions", e);
+        } finally {
+            pipeline.remove(UpgradeRequestSink.ID);
         }
     }
 
@@ -301,15 +358,23 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             }
         }
         Channel channel = ctx.channel();
-        if (handshaker == null) {
-            return WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(channel);
-        } else {
-            return handshaker.handshake(
-                    channel,
-                    req.toFullHttpRequest(),
-                    nettyHeaders,
-                    channel.newPromise()
-            );
+        // the handshake writes the response to the channel directly, bypassing the
+        // PipeliningServerHandler: expose the request to the access log for this write
+        Attribute<Object> responseRequest = channel.attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+        responseRequest.set(req);
+        try {
+            if (handshaker == null) {
+                return WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(channel);
+            } else {
+                return handshaker.handshake(
+                        channel,
+                        req.toFullHttpRequest(),
+                        nettyHeaders,
+                        channel.newPromise()
+                );
+            }
+        } finally {
+            responseRequest.set(null);
         }
     }
 
@@ -334,18 +399,44 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         this.next = next;
     }
 
+    /**
+     * Swallows the copy of the upgrade request that is replayed through the compression handler.
+     * The copy is not reference counted, so there is nothing to release.
+     */
+    @ChannelHandler.Sharable
+    private static final class UpgradeRequestSink extends ChannelInboundHandlerAdapter {
+        static final String ID = "websocket-upgrade-request-sink";
+        static final UpgradeRequestSink INSTANCE = new UpgradeRequestSink();
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // intentionally empty: the replayed copy must not reach the HTTP request handler again
+        }
+    }
+
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {
         @Nullable
         final RouteMatch<?> route;
 
         boolean shouldProceedNormally;
+        @Nullable
+        private NettyHttpRequest<?> nettyRequest;
 
         WebsocketRequestLifecycle(RouteExecutor routeExecutor, @Nullable RouteMatch<?> route) {
             super(routeExecutor);
             this.route = route;
         }
 
-        ExecutionFlow<HttpResponse<?>> handle(HttpRequest<?> request) {
+        @Override
+        protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.setFilteredRequest(filteredRequest);
+            }
+        }
+
+        ExecutionFlow<HttpResponse<?>> handle(NettyHttpRequest<?> request) {
+            this.nettyRequest = request;
             MutableHttpResponse<?> proceed = HttpResponse.ok();
 
             if (route != null) {

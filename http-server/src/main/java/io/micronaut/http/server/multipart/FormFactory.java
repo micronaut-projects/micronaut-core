@@ -92,7 +92,9 @@ public final class FormFactory {
      */
     @Nullable
     public static FormRouteCompleter getCompleterOrNull(HttpRequest<?> request) {
-        return request.getAttribute(COMPLETER, FormRouteCompleter.class).orElse(null);
+        // getAttribute(name) without a type: the typed lookup allocates a conversion context even
+        // when the attribute is absent, which it is for every non-form request
+        return request.getAttribute(COMPLETER).orElse(null) instanceof FormRouteCompleter completer ? completer : null;
     }
 
     /**
@@ -288,6 +290,9 @@ public final class FormFactory {
             // check size
             if (total > mc.getMaxFileSize()) {
                 buffer.close();
+                // cancel before failing: this releases the demand on the part so the server can
+                // keep draining the rest of the body instead of stalling the client's write
+                Objects.requireNonNull(subscription).cancel();
                 onError(new ContentLengthExceededException("The part named [" + metadata.name() + "] exceeds the maximum allowed content length [" + mc.getMaxFileSize() + "]"));
                 return;
             }

@@ -477,6 +477,16 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         return getOrCreateEventLoopContext(eventLoop);
     }
 
+    /**
+     * The context associated with an asyncio event loop, if one was created.
+     *
+     * @param eventLoop The Python event loop
+     * @return The event-loop context, or null
+     */
+    @Nullable Context findEventLoopContext(PythonEventLoop eventLoop) {
+        return eventLoopContexts.get(eventLoop);
+    }
+
     private Context getOrCreateEventLoopContext(PythonEventLoop eventLoop) {
         Context existing = eventLoopContexts.get(eventLoop);
         if (existing != null) {

@@ -43,3 +43,7 @@ dependencies {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
+
+noReflection {
+    allowIn("io.micronaut.context.python.netty.NettyPythonEventLoopSupport", "CLASS_LOADING", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
+}

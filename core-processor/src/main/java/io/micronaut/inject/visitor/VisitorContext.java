@@ -57,6 +57,14 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
     String MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER = "micronaut.processing.use.context.classloader";
+    /**
+     * Writes what the processors generate as Java source, which javac compiles in a later round, instead of as
+     * bytecode. A module sets it where its annotation processor path carries a Java source generator in place of the
+     * sourcegen bytecode writer.
+     *
+     * @since 5.3
+     */
+    String MICRONAUT_PROCESSING_JAVA_SOURCE = "micronaut.processing.java.source";
 
     /**
      * @return The visitor context's language.

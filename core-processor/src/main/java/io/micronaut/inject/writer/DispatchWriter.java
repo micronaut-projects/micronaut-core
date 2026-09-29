@@ -108,6 +108,8 @@ public final class DispatchWriter implements ClassOutputWriter {
 
     private static final Method METHOD_INVOKE_METHOD = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class);
 
+    private static final Method METHOD_INVOKE_METHOD_PROPAGATING = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethodPropagating", Object.class, java.lang.reflect.Method.class, Object[].class);
+
     private static final Method METHOD_GET_FIELD_VALUE =
         ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class);
 
@@ -130,6 +132,8 @@ public final class DispatchWriter implements ClassOutputWriter {
 
     private final String thisType;
 
+    private final boolean propagateReflectiveExceptions;
+
     private final Map<String, Integer> executableMethodIndexes = new LinkedHashMap<>();
     private final Map<Integer, MethodElement> bridgeMethods = new LinkedHashMap<>();
 
@@ -137,7 +141,19 @@ public final class DispatchWriter implements ClassOutputWriter {
         (aThis, methodIndex) -> aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow();
 
     public DispatchWriter(String thisType) {
+        this(thisType, false);
+    }
+
+    /**
+     * @param thisType                      The type of the generated class
+     * @param propagateReflectiveExceptions Whether a method dispatched through reflection throws what the method
+     *                                      threw, as a directly dispatched method does, instead of wrapping it in an
+     *                                      {@link io.micronaut.core.reflect.exception.InvocationException}
+     * @since 5.2.1
+     */
+    public DispatchWriter(String thisType, boolean propagateReflectiveExceptions) {
         this.thisType = thisType;
+        this.propagateReflectiveExceptions = propagateReflectiveExceptions;
     }
 
     /**
@@ -271,7 +287,8 @@ public final class DispatchWriter implements ClassOutputWriter {
             if (isKotlinDefault) {
                 throw new ProcessingException(methodElement, "Kotlin default methods are not supported for reflection invocation");
             }
-            return new MethodReflectionDispatchTarget(declaringType, methodElement, dispatchTargets.size(), useOneDispatch);
+            return new MethodReflectionDispatchTarget(declaringType, methodElement, dispatchTargets.size(), useOneDispatch,
+                propagateReflectiveExceptions ? METHOD_INVOKE_METHOD_PROPAGATING : METHOD_INVOKE_METHOD);
         } else if (isKotlinDefault) {
             return new KotlinMethodWithDefaultsDispatchTarget(declaringClassType, methodElement, kotlinDefaultMethod, useOneDispatch);
         }
@@ -1288,15 +1305,18 @@ public final class DispatchWriter implements ClassOutputWriter {
         private final MethodElement methodElement;
         private final int methodIndex;
         private final boolean useOneDispatch;
+        private final Method invokeMethod;
 
         private MethodReflectionDispatchTarget(TypedElement declaringType,
                                                MethodElement methodElement,
                                                int methodIndex,
-                                               boolean useOneDispatch) {
+                                               boolean useOneDispatch,
+                                               Method invokeMethod) {
             this.declaringType = declaringType;
             this.methodElement = methodElement;
             this.methodIndex = methodIndex;
             this.useOneDispatch = useOneDispatch;
+            this.invokeMethod = invokeMethod;
         }
 
         @Override
@@ -1322,7 +1342,7 @@ public final class DispatchWriter implements ClassOutputWriter {
         @Override
         public ExpressionDef dispatchMultiExpression(ExpressionDef target, ExpressionDef valuesArray) {
             return TYPE_REFLECTION_UTILS.invokeStatic(
-                METHOD_INVOKE_METHOD,
+                invokeMethod,
 
                 methodElement.isStatic() ? ExpressionDef.nullValue() : target,
                 new VariableDef.This().invoke(GET_ACCESSIBLE_TARGET_METHOD, ExpressionDef.constant(methodIndex)),
@@ -1333,7 +1353,7 @@ public final class DispatchWriter implements ClassOutputWriter {
         @Override
         public ExpressionDef dispatchOneExpression(ExpressionDef target, ExpressionDef value) {
             return TYPE_REFLECTION_UTILS.invokeStatic(
-                METHOD_INVOKE_METHOD,
+                invokeMethod,
 
                 methodElement.isStatic() ? ExpressionDef.nullValue() : target,
                 new VariableDef.This().invoke(GET_ACCESSIBLE_TARGET_METHOD, ExpressionDef.constant(methodIndex)),

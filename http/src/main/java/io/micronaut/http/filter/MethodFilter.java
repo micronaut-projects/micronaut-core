@@ -39,6 +39,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.reactive.execution.SubscriberAwareExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -71,6 +72,9 @@ import java.util.function.Predicate;
  * @param returnHandler       The return handler
  * @param isConditional       Is conditional filter
  * @param executor            The executor to run this filter on
+ * @param isReactive          Is the filter method reactive, either by its return type or its continuation
+ * @param mutableRequestIndex The index of the {@link MutableHttpRequest} argument of a request
+ *                            filter without a continuation, or {@code -1}
  * @author Jonas Konrad
  * @author Denis Stepanov
  * @since 4.2.0
@@ -92,9 +96,32 @@ record MethodFilter<T>(FilterOrder order,
                        boolean filtersException,
                        FilterReturnHandler returnHandler,
                        boolean isConditional,
-                       @Nullable Executor executor) implements InternalHttpFilter {
+                       @Nullable Executor executor,
+                       boolean isReactive,
+                       int mutableRequestIndex) implements InternalHttpFilter {
 
     private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
+    private static final String RESPONSE_MISSING_MESSAGE = "Http response is missing";
+    /**
+     * Marks an empty reactive, asynchronous or flow result.
+     */
+    private static final Object EMPTY_RESULT = new Object();
+
+    /**
+     * Map an empty value to {@link #EMPTY_RESULT}, as the flow operators skip an empty value.
+     *
+     * @param flow The flow
+     * @return The flow with the empty value mapped
+     */
+    private static ExecutionFlow<Object> withEmptyResult(ExecutionFlow<?> flow) {
+        if (flow instanceof ReactiveExecutionFlow<?> reactiveFlow) {
+            return ReactiveExecutionFlow.fromPublisher(
+                Mono.<Object>from(reactiveFlow.toPublisher()).defaultIfEmpty(EMPTY_RESULT)
+            );
+        }
+        // the imperative map is applied to an empty value as well
+        return flow.map(v -> v == null ? EMPTY_RESULT : v);
+    }
 
     static <T> MethodFilter<T> prepareFilterMethod(ConversionService conversionService,
                                                    T bean,
@@ -122,6 +149,8 @@ record MethodFilter<T>(FilterOrder order,
         boolean skipOnError = isResponseFilter;
         boolean filtersException = false;
         ContinuationCreator continuationCreator = null;
+        boolean reactiveContinuation = false;
+        int mutableRequestIndex = -1;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             Class<?> argumentType = argument.getType();
@@ -131,10 +160,13 @@ record MethodFilter<T>(FilterOrder order,
                 // todo: only permit for server
                 fulfilled[i] = ctx -> (ServerHttpRequest<?>) ctx.request;
             } else if (argumentType.isAssignableFrom(MutableHttpRequest.class)) {
+                mutableRequestIndex = i;
                 fulfilled[i] = ctx -> {
                     HttpRequest<?> request = ctx.request;
                     if (!(ctx.request instanceof MutableHttpRequest<?>)) {
-                        request = ctx.request.mutate();
+                        // a mutable wrapper of a request that cannot be mutated, e.g. a wrapper
+                        // another filter continued with
+                        request = MutableServerRequest.mutable(ctx.request);
                     }
                     return request;
                 };
@@ -168,12 +200,20 @@ record MethodFilter<T>(FilterOrder order,
                     throw new IllegalArgumentException("Only one continuation per filter is allowed");
                 }
                 Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalArgumentException("Continuations must specify generic type"));
-                if (isReactive(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
+                if (isExecutionFlow(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
+                    if (isExecutionFlow(returnType)) {
+                        continuationCreator = ResultAwareExecutionFlowContinuationImpl::new;
+                    } else {
+                        continuationCreator = ExecutionFlowContinuationImpl::new;
+                    }
+                    fulfilled[i] = ctx -> ctx.continuation;
+                } else if (isReactive(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     if (isReactive(returnType)) {
                         continuationCreator = ResultAwareReactiveContinuationImpl::new;
                     } else {
                         continuationCreator = ReactiveContinuationImpl::new;
                     }
+                    reactiveContinuation = true;
                     fulfilled[i] = ctx -> ctx.continuation;
                 } else if (continuationReturnType.getType().isAssignableFrom(MutableHttpResponse.class)) {
                     continuationCreator = BlockingContinuationImpl::new;
@@ -233,7 +273,9 @@ record MethodFilter<T>(FilterOrder order,
             filtersException,
             returnHandler,
             bean instanceof ConditionalFilter,
-            executor
+            executor,
+            isReactive(returnType) || reactiveContinuation,
+            isResponseFilter || continuationCreator != null ? -1 : mutableRequestIndex
         );
     }
 
@@ -254,6 +296,10 @@ record MethodFilter<T>(FilterOrder order,
     private static boolean isReactive(Argument<?> continuationReturnType) {
         // Argument.isReactive doesn't work in http-validation, this is a workaround
         return continuationReturnType.isReactive() || continuationReturnType.getType() == Publisher.class;
+    }
+
+    private static boolean isExecutionFlow(Argument<?> type) {
+        return ExecutionFlow.class.isAssignableFrom(type.getType());
     }
 
     @Override
@@ -363,7 +409,12 @@ record MethodFilter<T>(FilterOrder order,
                 return ExecutionFlow.just(filterContext);
             }
             if (asyncArgBinders != null) {
-                return bindArgsAsync(methodContext).flatMap(a -> filter(filterContext, methodContext, a, onExecutor));
+                ExecutionFlow<Object[]> argsFlow = bindArgsAsync(methodContext);
+                if (filterContext.reactive()) {
+                    // subscribe the downstream in the reactive chain to keep its Reactor context
+                    argsFlow = ReactiveExecutionFlow.fromFlow(argsFlow);
+                }
+                return argsFlow.flatMap(a -> filter(filterContext, methodContext, a, onExecutor));
             } else {
                 try {
                     args = bindArgsSync(methodContext);
@@ -374,6 +425,10 @@ record MethodFilter<T>(FilterOrder order,
         }
         if (!onExecutor && executor != null) {
             Object[] finalArgs = args;
+            if (isReactive || filterContext.reactive()) {
+                // a reactive flow keeps the Reactor context of the subscriber for the downstream filters and the route
+                return ReactiveExecutionFlow.async(executor, () -> filter(filterContext, methodContext, finalArgs, true));
+            }
             return ExecutionFlow.async(executor, () -> filter(filterContext, methodContext, finalArgs, true));
         }
         try {
@@ -384,7 +439,15 @@ record MethodFilter<T>(FilterOrder order,
                 returnValue = Objects.requireNonNull(method).invoke(bean, args);
             }
             ExecutionFlow<FilterContext> executionFlow = returnHandler.handle(filterContext, returnValue, methodContext.continuation);
-            PropagatedContext mutatedPropagatedContext = methodContext.mutablePropagatedContext.getContext();
+            if (mutableRequestIndex >= 0) {
+                executionFlow = keepChangedUri(filterContext, args[mutableRequestIndex], executionFlow);
+            }
+            MutablePropagatedContext mutablePropagatedContext = methodContext.mutablePropagatedContext;
+            if (!(executionFlow instanceof ImperativeExecutionFlow<FilterContext>)) {
+                // an asynchronous filter can change the context until its result completes
+                return executionFlow.map(fc -> withMutatedContext(fc, filterContext.propagatedContext(), mutablePropagatedContext));
+            }
+            PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
             if (mutatedPropagatedContext != filterContext.propagatedContext() && mutatedPropagatedContext != null) {
                 executionFlow = executionFlow.map(fc -> fc.withPropagatedContext(mutatedPropagatedContext));
             }
@@ -392,6 +455,58 @@ record MethodFilter<T>(FilterOrder order,
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    /**
+     * A request filter that is given a {@link MutableHttpRequest} while the request is not
+     * mutable receives a mutable copy of it, see {@link HttpRequest#mutate()}. The headers of the
+     * copy are those of the request, but a new URI is the copy's own: when the filter changes
+     * the URI in place and does not return a request, the copy replaces the request, so that
+     * the new URI is used, e.g. to match the route after a pre-matching filter. The copy of a
+     * server request replaces it as a server request, see {@link MutableServerRequest}, so that the
+     * route still reads the bytes of the body. The URI of an asynchronous filter is compared when
+     * its result completes. Changes to the parameters or the body of the copy are not kept unless
+     * the filter returns the copy.
+     *
+     * @param filterContext The context the filter ran with
+     * @param argument      The mutable request the filter was given
+     * @param flow          The result of the filter
+     * @return The result, with the changed request if the filter changed the URI in place
+     */
+    private static ExecutionFlow<FilterContext> keepChangedUri(FilterContext filterContext, @Nullable Object argument, ExecutionFlow<FilterContext> flow) {
+        HttpRequest<?> request = filterContext.request();
+        if (!(argument instanceof MutableHttpRequest<?> copy) || argument == request) {
+            return flow;
+        }
+        if (flow.tryCompleteValue() != null && !isUriChanged(request, copy)) {
+            // a synchronous filter that did not change the URI
+            return flow;
+        }
+        // an asynchronous filter changes the URI until its result completes
+        return flow.map(result -> result.request() == request && result.response() == null && isUriChanged(request, copy)
+            ? result.withRequest(MutableServerRequest.of(request, copy))
+            : result);
+    }
+
+    /**
+     * Whether the filter changed the URI of the mutable copy of the request.
+     *
+     * @param request The request
+     * @param copy    Its mutable copy
+     * @return Whether the URI was changed
+     */
+    private static boolean isUriChanged(HttpRequest<?> request, MutableHttpRequest<?> copy) {
+        return !copy.getUri().equals(request.getUri());
+    }
+
+    private static FilterContext withMutatedContext(FilterContext filterContext,
+                                                    PropagatedContext propagatedContext,
+                                                    MutablePropagatedContext mutablePropagatedContext) {
+        PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
+        if (mutatedPropagatedContext != propagatedContext && mutatedPropagatedContext != null) {
+            return filterContext.withPropagatedContext(mutatedPropagatedContext);
+        }
+        return filterContext;
     }
 
     private Object[] bindArgsSync(FilterMethodContext context) {
@@ -474,21 +589,55 @@ record MethodFilter<T>(FilterOrder order,
                 }
             }
         }
-        if (isReactive(type)) {
+        if (isExecutionFlow(type)) {
+            var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            return (context, returnValue, continuation) -> {
+                if (returnValue == null) {
+                    if (!nullable) {
+                        return ExecutionFlow.error(new NullPointerException("Returned flow must not be null, or mark the method as @Nullable"));
+                    }
+                    return ExecutionFlow.just(context);
+                }
+                ExecutionFlow<?> flow = (ExecutionFlow<?>) returnValue;
+                if (flow instanceof ReactiveExecutionFlow<?> reactiveFlow) {
+                    // the same propagation as a returned publisher
+                    flow = ReactiveExecutionFlow.fromPublisher(
+                        ReactivePropagation.propagate(context.propagatedContext(), reactiveFlow.toPublisher())
+                    );
+                }
+                if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
+                    return resultAwareContinuation.processResult(flow);
+                }
+                // flatMap skips an empty value, an empty flow proceeds with the current context
+                return withEmptyResult(flow)
+                    .flatMap(v -> v == EMPTY_RESULT ? ExecutionFlow.just(context) : next.handle(context, v, continuation));
+            };
+        } else if (isReactive(type)) {
             var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
             return (context, returnValue, continuation) -> {
                 if (returnValue == null && !nullable) {
-                    return next.handle(context, null, continuation);
+                    return ExecutionFlow.error(new NullPointerException("Returned publisher must not be null, or mark the method as @Nullable"));
                 }
                 Publisher<Object> converted = Publishers.convertToPublisher(conversionService, returnValue == null ? Mono.empty() : returnValue);
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(ReactivePropagation.propagate(
-                        context.propagatedContext(),
-                        converted
-                    ));
+                    return resultAwareContinuation.processResult(converted);
                 }
-                return ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext())
-                    .flatMap(v -> next.handle(context, v, continuation));
+                ExecutionFlow<Object> flow;
+                if (context.reactive()) {
+                    // an upstream filter subscribes to this result in its Reactor chain and may add to the
+                    // Reactor context with contextWrite: only a publisher that already holds its result is
+                    // unwrapped, anything else stays lazy
+                    flow = ReactiveExecutionFlow.fromPublisherImmediate(converted);
+                    if (flow == null) {
+                        flow = ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(context.propagatedContext(), converted));
+                    }
+                } else {
+                    flow = ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext());
+                }
+                // flatMap skips an empty value, an empty publisher proceeds with the current context
+                return flow
+                    .map(v -> v == null ? EMPTY_RESULT : v)
+                    .flatMap(v -> v == EMPTY_RESULT ? ExecutionFlow.just(context) : next.handle(context, v, continuation));
             };
         } else if (type.isAsync()) {
             var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
@@ -652,9 +801,10 @@ record MethodFilter<T>(FilterOrder order,
                     }
                     return next.handle(context, doneFlow.getValue(), continuation);
                 } else {
-                    return delayedFlow.flatMap(v -> {
+                    // flatMap skips an empty value, a stage completed with null is handled like a returned null
+                    return withEmptyResult(delayedFlow).flatMap(v -> {
                         try {
-                            return next.handle(context, v, continuation);
+                            return next.handle(context, v == EMPTY_RESULT ? null : v, continuation);
                         } catch (Throwable e) {
                             return ExecutionFlow.error(e);
                         }
@@ -690,7 +840,100 @@ record MethodFilter<T>(FilterOrder order,
 
         @Override
         public ExecutionFlow<FilterContext> processResult(Publisher<HttpResponse<?>> publisher) {
-            return ReactiveExecutionFlow.fromPublisher(publisher).map(httpResponse -> filterContext.withResponse(httpResponse));
+            // an empty publisher proceeds with the context after the continuation, the downstream response if it was called
+            ExecutionFlow<HttpResponse<?>> immediate = ReactiveExecutionFlow.fromPublisherImmediate(publisher);
+            if (immediate != null) {
+                // Mono.just, Mono.error or the continuation publisher itself: no Reactor chain is needed
+                return immediate.map(httpResponse -> httpResponse == null ? filterContext : filterContext.withResponse(httpResponse));
+            }
+            // a lazy publisher keeps the chain reactive: the Reactor context of an upstream filter has to reach it
+            Mono<HttpResponse<?>> mono = Mono.from(ReactivePropagation.propagate(filterContext.propagatedContext(), publisher));
+            return ReactiveExecutionFlow.fromPublisher(
+                mono
+                    .map(httpResponse -> filterContext.withResponse(httpResponse))
+                    .switchIfEmpty(Mono.fromSupplier(() -> filterContext))
+            );
+        }
+    }
+
+    /**
+     * The execution flow continuation that processes the method return value.
+     */
+    private static final class ResultAwareExecutionFlowContinuationImpl extends ExecutionFlowContinuationImpl
+        implements ResultAwareContinuation<ExecutionFlow<HttpResponse<?>>> {
+
+        private ResultAwareExecutionFlowContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                                         FilterContext filterContext,
+                                                         MutablePropagatedContext mutablePropagatedContext) {
+            super(downstream, filterContext, mutablePropagatedContext);
+        }
+
+        @Override
+        public ExecutionFlow<FilterContext> processResult(ExecutionFlow<HttpResponse<?>> flow) {
+            // an empty flow proceeds with the context after the continuation, the downstream response if it was called
+            return withEmptyResult(flow)
+                .map(httpResponse -> httpResponse == EMPTY_RESULT ? filterContext : filterContext.withResponse((HttpResponse<?>) httpResponse));
+        }
+    }
+
+    /**
+     * Continuation implementation that yields an {@link ExecutionFlow}. The downstream flow is
+     * returned as is, so a reactive downstream stays reactive and keeps the Reactor context.
+     */
+    private static sealed class ExecutionFlowContinuationImpl implements FilterContinuation<ExecutionFlow<HttpResponse<?>>>,
+        InternalFilterContinuation<ExecutionFlow<HttpResponse<?>>> {
+
+        protected FilterContext filterContext;
+        private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
+        private final MutablePropagatedContext mutablePropagatedContext;
+
+        private ExecutionFlowContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                              FilterContext filterContext,
+                                              MutablePropagatedContext mutablePropagatedContext) {
+            this.downstream = downstream;
+            this.filterContext = filterContext;
+            this.mutablePropagatedContext = mutablePropagatedContext;
+        }
+
+        @Override
+        public FilterContinuation<ExecutionFlow<HttpResponse<?>>> request(HttpRequest<?> request) {
+            filterContext = filterContext.withRequest(request);
+            return this;
+        }
+
+        @Override
+        public ExecutionFlow<HttpResponse<?>> proceed() {
+            PropagatedContext propagatedContext = filterContext.propagatedContext();
+            PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
+            if (propagatedContext != mutatedPropagatedContext && mutatedPropagatedContext != null) {
+                filterContext = filterContext.withPropagatedContext(mutatedPropagatedContext);
+            } else {
+                filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
+            }
+            // the downstream is called on the first use of the flow, reactively if it's converted to a publisher
+            return new SubscriberAwareExecutionFlow<>() {
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> create(boolean reactive) {
+                    if (reactive) {
+                        filterContext = filterContext.asReactive();
+                    }
+                    ExecutionFlow<FilterContext> downstreamFlow;
+                    try {
+                        downstreamFlow = downstream.apply(filterContext);
+                    } catch (Exception e) {
+                        return ExecutionFlow.error(e);
+                    }
+                    return downstreamFlow.map(newFilterContext -> {
+                        filterContext = newFilterContext;
+                        return Objects.requireNonNull(newFilterContext.response(), RESPONSE_MISSING_MESSAGE);
+                    });
+                }
+            };
+        }
+
+        @Override
+        public FilterContext afterMethodContext() {
+            return filterContext;
         }
     }
 
@@ -716,7 +959,9 @@ record MethodFilter<T>(FilterOrder order,
 
         @Override
         public FilterContinuation<Publisher<HttpResponse<?>>> request(HttpRequest<?> request) {
-            return new ReactiveContinuationImpl(downstream, filterContext.withRequest(request), mutablePropagatedContext);
+            // keep this continuation, the method result is processed with its context
+            filterContext = filterContext.withRequest(request);
+            return this;
         }
 
         @Override
@@ -728,12 +973,13 @@ record MethodFilter<T>(FilterOrder order,
             } else {
                 filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
             }
-            return ReactiveExecutionFlow.fromFlow(
+            filterContext = filterContext.asReactive();
+            return ReactiveExecutionFlow.toPublisher(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
-                    return Objects.requireNonNull(newFilterContext.response(), "Http response is missing");
+                    return Objects.requireNonNull(newFilterContext.response(), RESPONSE_MISSING_MESSAGE);
                 })
-            ).toPublisher();
+            );
         }
 
         @Override
@@ -797,7 +1043,7 @@ record MethodFilter<T>(FilterOrder order,
                     if (interrupted) {
                         Thread.currentThread().interrupt();
                     }
-                    return Objects.requireNonNull(filterContext.response(), "Http response is missing");
+                    return Objects.requireNonNull(filterContext.response(), RESPONSE_MISSING_MESSAGE);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     interrupted = true;

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -51,17 +52,40 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
 
     /**
      * Creates a new reactive flow from a publisher. This method eagerly subscribes to the
-     * publisher, and may return an immediate {@link ExecutionFlow} if possible.
+     * publisher, and may return an immediate {@link ExecutionFlow} if possible. The flow has a
+     * single result: the first item of a multi-valued publisher is taken and the rest is cancelled.
+     * <p>The publisher is subscribed to before the returned flow is, so the Reactor context of a
+     * subscriber downstream of the flow does not reach it, only the given propagated context does.
+     * Use {@link #fromPublisherImmediate(Publisher)} where that context has to be preserved.
      *
      * @param publisher         The publisher
      * @param propagatedContext A context to propagate in the reactor context and as a thread-local
-     *                          in the subscribe operation.
+     *                          in the subscribe operation and while the signals are handled, so
+     *                          that the steps of the flow run in it when the publisher completes on
+     *                          another thread.
      * @param <K>       The flow value type
      * @return a new flow
      * @since 4.8.0
      */
     static <K> ExecutionFlow<K> fromPublisherEager(Publisher<K> publisher, PropagatedContext propagatedContext) {
         return ReactorExecutionFlowImpl.defuse(publisher, propagatedContext);
+    }
+
+    /**
+     * Returns the immediate flow of a publisher that already holds its result, like
+     * {@code Mono.just}, {@code Mono.error} or the publisher of a flow. Nothing is subscribed to,
+     * so this is safe where the publisher must still see the Reactor context of a downstream
+     * subscriber: the caller falls back to {@link #fromPublisher(Publisher)} when {@code null} is
+     * returned.
+     *
+     * @param publisher The publisher
+     * @param <K>       The flow value type
+     * @return The immediate flow, or {@code null} if the publisher has to be subscribed to
+     * @since 5.3.0
+     */
+    @Nullable
+    static <K> ExecutionFlow<K> fromPublisherImmediate(Publisher<K> publisher) {
+        return ReactorExecutionFlowImpl.immediate(publisher);
     }
 
     /**

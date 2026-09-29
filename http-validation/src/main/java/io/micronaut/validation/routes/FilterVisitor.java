@@ -17,6 +17,7 @@ package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.http.HttpRequest;
@@ -34,6 +35,7 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.FilterContinuation;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementQuery;
@@ -121,7 +123,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                     } else if (Body.class.getName().equals(annotationName) && isResponseFilter) {
                         context.fail("Cannot bind @Body for response filter method", parameter);
                         return;
-                    } else if (Body.class.getName().equals(annotationName) && !isPermittedRawType(parameterType)) {
+                    } else if (Body.class.getName().equals(annotationName) && !isPermittedRawType(context, parameterType)) {
                         context.fail("The @Body to a filter method can only be a raw type (byte[], String, ByteBuffer etc.)", parameter);
                         return;
                     }
@@ -182,11 +184,28 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private boolean isPermittedRawType(ClassElement parameterType) {
-        if (parameterType.isArray() && parameterType.isPrimitive() && parameterType.getName().equals("byte")) {
-            return true;
+    /**
+     * The filter binder buffers the body into a {@code byte[]}, a {@link ByteBuffer} or a
+     * {@link String}, so the parameter must be one of those or one of their supertypes.
+     *
+     * @param context       The visitor context
+     * @param parameterType The type of the {@code @Body} parameter
+     * @return Whether the filter binder can bind the body to the parameter
+     */
+    private static boolean isPermittedRawType(VisitorContext context, ClassElement parameterType) {
+        if (parameterType instanceof GenericPlaceholderElement placeholder) {
+            // the type argument is only known to the subclass, the binder checks it at runtime
+            parameterType = placeholder.getResolved().orElseGet(() -> placeholder.getBounds().get(0));
         }
-        return parameterType.isAssignable(byte[].class) || parameterType.isAssignable(ByteBuffer.class) || parameterType.isAssignable(String.class);
+        if (parameterType.isArray()) {
+            return parameterType.isPrimitive() && parameterType.getName().equals("byte");
+        }
+        String name = parameterType.getName();
+        return isAssignableTo(context, String.class, name) || isAssignableTo(context, ByteBuffer.class, name);
+    }
+
+    private static boolean isAssignableTo(VisitorContext context, Class<?> bodyType, String parameterTypeName) {
+        return context.getClassElement(bodyType).map(e -> e.isAssignable(parameterTypeName)).orElse(false);
     }
 
    private static ClassElement resolveReturnType(MethodElement element) {
@@ -195,14 +214,18 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
     }
 
    private static ClassElement resolveType(ClassElement returnType) {
-        if (returnType.isAssignable(Publisher.class) || returnType.isAssignable(CompletionStage.class) || returnType.isOptional()) {
+        if (isAsyncWrapper(returnType) || returnType.isOptional()) {
             returnType = returnType.getFirstTypeArgument().orElse(returnType);
         }
         return returnType;
     }
 
+    private static boolean isAsyncWrapper(ClassElement type) {
+        return type.isAssignable(Publisher.class) || type.isAssignable(CompletionStage.class) || type.isAssignable(ExecutionFlow.class);
+    }
+
     private static boolean isInvalidType(VisitorContext context, Element parameter, ClassElement parameterType, String message) {
-        if (parameterType.isAssignable(Publisher.class) || parameterType.isAssignable(CompletionStage.class)) {
+        if (isAsyncWrapper(parameterType)) {
             parameterType = parameterType.getFirstTypeArgument().orElse(parameterType);
         }
         boolean valid = PERMITTED_CLASSES.stream().anyMatch(parameterType::isAssignable);

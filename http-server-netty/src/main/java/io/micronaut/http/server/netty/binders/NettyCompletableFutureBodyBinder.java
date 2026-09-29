@@ -19,10 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.InternalByteBody;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 
 import java.util.Arrays;
 import java.util.List;
@@ -64,8 +64,9 @@ final class NettyCompletableFutureBodyBinder
 
     @Override
     public BindingResult<CompletableFuture<?>> bind(ArgumentConversionContext<CompletableFuture<?>> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest<?> nhr) {
-            ByteBody rootBody = nhr.byteBody();
+        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        if (server != null) {
+            ByteBody rootBody = server.byteBody();
             if (rootBody.expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
@@ -74,15 +75,8 @@ final class NettyCompletableFutureBodyBinder
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
             CompletableFuture<Object> future = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
-                    Optional<Object> value;
-                    try {
-                        //noinspection unchecked
-                        value = nettyBodyAnnotationBinder.transform(nhr, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
-                    } catch (RuntimeException e) {
-                        throw e;
-                    } catch (Throwable e) {
-                        throw new RuntimeException(e);
-                    }
+                    //noinspection unchecked
+                    Optional<Object> value = nettyBodyAnnotationBinder.transform(source, server, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
                     return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
                 }).toCompletableFuture();
             return () -> Optional.of(future);

@@ -9,9 +9,10 @@ from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
+from .Point import Point
+
 HttpHeaders = java.type("io.micronaut.http.HttpHeaders")
 HttpRequest = java.type("io.micronaut.http.HttpRequest")
-Point = java.type("micronaut.docs.server.binding.Point")
 
 
 @Property(name="spec.name", value="PointControllerTest")
