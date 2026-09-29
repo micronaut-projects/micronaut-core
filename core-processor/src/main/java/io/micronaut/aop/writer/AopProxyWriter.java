@@ -241,6 +241,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         Object.class
     );
     private static final String FIELD_TARGET_REGISTRATION = "$targetRegistration";
+    private static final String LOCAL_TARGET = "target";
+    private static final String LOCAL_TARGET_REGISTRATION = "targetRegistration";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
@@ -490,8 +492,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                             aThis.field(Objects.requireNonNull(fields.beanResolutionContext())),
                             aThis.field(fields.proxyBeanDefinition()),
                             aThis.field(fields.beanQualifier())
-                        ).newLocal("targetRegistration", targetRegistration ->
-                            targetRegistration.invoke(METHOD_REGISTRATION_GET_BEAN).newLocal("target", target -> proceed(
+                        ).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration ->
+                            targetRegistration.invoke(METHOD_REGISTRATION_GET_BEAN).newLocal(LOCAL_TARGET, target -> proceed(
                                 methodElement,
                                 methodParameters,
                                 resolveTargetInterceptors(aThis, fields, proxyMethodsField, targetRegistration, target).arrayElement(index),
@@ -500,7 +502,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                             )));
                     }
                     // the registration the proxy holds is the target's unless the target changed between the two reads
-                    return aThis.invoke(METHOD_INTERCEPTED_TARGET).newLocal("target", target -> proceed(
+                    return aThis.invoke(METHOD_INTERCEPTED_TARGET).newLocal(LOCAL_TARGET, target -> proceed(
                         methodElement,
                         methodParameters,
                         resolveTargetInterceptors(aThis, fields, proxyMethodsField, aThis.field(targetRegistrationField), target).arrayElement(index),
@@ -872,7 +874,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         methodParameters.get(beanResolutionContextArgumentIndex),
                         aThis.field(proxyBeanDefinitionField),
                         methodParameters.get(qualifierIndex)
-                    ).newLocal("targetRegistration", targetRegistration -> StatementDef.multi(
+                    ).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration -> StatementDef.multi(
                         aThis.field(targetRegistrationField).assign(targetRegistration),
                         aThis.field(targetField).assign(targetRegistration.invoke(METHOD_REGISTRATION_GET_BEAN).cast(targetType))
                     )));
@@ -1124,7 +1126,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 return StatementDef.multi(
                     lock.invoke(LOCK_METHOD),
                     StatementDef.doTry(
-                        aThis.field(targetField).newLocal("target", targetVar -> StatementDef.multi(
+                        aThis.field(targetField).newLocal(LOCAL_TARGET, targetVar -> StatementDef.multi(
                             StatementDef.multi(swap),
                             targetVar.returning()
                         ))
@@ -1181,7 +1183,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 //                            return this.$target;
                 VariableDef.Field targetFieldAccess = aThis.field(targetField);
                 return StatementDef.multi(
-                    targetFieldAccess.newLocal("target", targetVar ->
+                    targetFieldAccess.newLocal(LOCAL_TARGET, targetVar ->
                         targetVar.ifNull(
                             new StatementDef.Synchronized(
                                 aThis,
@@ -1203,7 +1205,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                                 aThis.field(beanResolutionContextField),
                                                 aThis.field(proxyBeanDefinitionField),
                                                 aThis.field(beanQualifierField)
-                                            ).newLocal("targetRegistration", targetRegistration -> StatementDef.multi(
+                                            ).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration -> StatementDef.multi(
                                                 // the registration first, so that a call which sees the target sees it
                                                 aThis.field(targetRegistrationField).assign(targetRegistration),
                                                 targetFieldAccess.assign(targetRegistration.invoke(METHOD_REGISTRATION_GET_BEAN)),
