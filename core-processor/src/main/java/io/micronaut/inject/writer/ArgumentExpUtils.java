@@ -866,6 +866,8 @@ public final class ArgumentExpUtils {
             }
             ExpressionDef.Constant boundTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(bound)));
             Map<String, ClassElement> boundTypeArguments = bound.getTypeArguments();
+            // A bound written raw - the List of ? extends List - keeps the variables its type declares, and says so
+            boolean rawBound = isRawType(bound);
             // Persist only type annotations added to the bound
             MutableAnnotationMetadata boundAnnotationMetadata = MutableAnnotationMetadata.of(bound.getTypeAnnotationMetadata());
             if (boundTypeArguments.isEmpty() && boundAnnotationMetadata.isEmpty()) {
@@ -879,9 +881,9 @@ public final class ArgumentExpUtils {
                 MutableAnnotationMetadata.contributeDefaults(annotationMetadataWithDefaults, boundAnnotationMetadata);
                 annotationMetadataExp = AnnotationMetadataGenUtils.instantiateNewMetadata(boundAnnotationMetadata, loadClassValueExpressionFn);
             }
-            // Argument.of(Class, null, AnnotationMetadata, Argument[])
+            // Argument.of(Class, null, AnnotationMetadata, Argument[]) / Argument.ofRawType( .. )
             return TYPE_ARGUMENT.invokeStatic(
-                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
+                rawBound ? METHOD_CREATE_RAW_TYPE : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
                 boundTypeConstant,
                 ExpressionDef.nullValue(),
                 annotationMetadataExp,

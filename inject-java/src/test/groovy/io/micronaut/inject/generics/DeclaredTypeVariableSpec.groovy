@@ -49,6 +49,7 @@ class Bean<T extends Comparable<T>, U extends Payment & Refundable, N extends Nu
     Bean(Event<T> recursive,
          Event<? super U> lowerVariable,
          Event<? extends U> upperVariable,
+         Event<? extends List> rawBound,
          Event<List<N>> nested,
          Event<N[]> arrayOfVariable,
          N[] array) {}
@@ -93,6 +94,7 @@ class Sub extends Base<Integer> {}
         'recursive'       | 'Event<T extends Comparable<T extends Comparable>>'
         'lowerVariable'   | 'Event<? super U extends Payment & Refundable>'
         'upperVariable'   | 'Event<? extends U extends Payment & Refundable>'
+        'rawBound'        | 'Event<? extends List!raw<E extends Object>>'
         'nested'          | 'Event<List<N extends Number>>'
         'arrayOfVariable' | 'Event<(N extends Number)[]>'
         'array'           | '(N extends Number)[]'
