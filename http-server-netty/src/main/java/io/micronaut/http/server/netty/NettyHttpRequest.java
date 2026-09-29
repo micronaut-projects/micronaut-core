@@ -217,10 +217,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private BodyConvertor bodyConvertor;
     /**
-     * The request that the request filters passed downstream, when they replaced this one.
+     * The request that the request filters passed downstream, when they replaced this one. It is
+     * set before the response is produced, and read when the response is written, after the
+     * response has been handed to the event loop.
      */
     @Nullable
-    private volatile HttpRequest<?> filteredRequest;
+    private HttpRequest<?> filteredRequest;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}

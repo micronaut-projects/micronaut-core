@@ -405,6 +405,7 @@ public class RequestLifecycle {
      * @since 5.3.0
      */
     protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+        // no-op by default: only lifecycles that need the effective request record it
     }
 
     private ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
