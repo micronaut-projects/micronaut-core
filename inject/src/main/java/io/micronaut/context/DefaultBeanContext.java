@@ -800,6 +800,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     /**
+     * Forgets the candidates computed so far, so that a configuration entry added or removed since,
+     * an {@code @EachProperty} bean that now exists or no longer does, is seen on the next lookup. The
+     * configuration refresh calls this before it rebinds.
+     */
+    @Internal
+    @Experimental
+    public void invalidateConfigurationCandidates() {
+        invalidateCaches();
+    }
+
+    /**
      * Replaces a singleton with a new instance of its definition, destroying first the beans that received
      * it, as the dependency graph records, so that they are created again on top of the new instance.
      *
@@ -809,7 +820,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @param bean The bean to recreate
      * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace
      */
-    boolean recreateBean(Object bean) {
+    @Internal
+    @Experimental
+    public boolean recreateBean(Object bean) {
         BeanRegistration<Object> registration = findBeanRegistration(bean).orElse(null);
         if (registration == null) {
             return false;

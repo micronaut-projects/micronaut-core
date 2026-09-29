@@ -18,8 +18,8 @@ package io.micronaut.runtime.context.scope.refresh;
 import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.LifeCycle;
-import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.BeanCreationContext;
@@ -29,16 +29,11 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
 import jakarta.inject.Singleton;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
@@ -58,8 +53,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent>, Ordered {
 
     public static final int POSITION = RefreshEventListener.DEFAULT_POSITION - 100;
-
-    private static final Logger LOG = LoggerFactory.getLogger(RefreshScope.class);
 
     private final Map<BeanIdentifier, CreatedBean<?>> refreshableBeans = new ConcurrentHashMap<>(10);
     private final ConcurrentMap<Object, ReadWriteLock> locks = new ConcurrentHashMap<>();
@@ -121,11 +114,16 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> remove(BeanIdentifier identifier) {
-        CreatedBean<?> createdBean = refreshableBeans.get(identifier);
+        // a removed bean is gone from the scope, or the next refresh would close it a second time
+        CreatedBean<?> createdBean = refreshableBeans.remove(identifier);
         if (createdBean != null) {
+            Object bean = createdBean.bean();
             createdBean.close();
+            if (bean != null) {
+                locks.remove(bean);
+            }
             //noinspection ConstantConditions
-            return Optional.ofNullable((T) createdBean.bean());
+            return Optional.ofNullable((T) bean);
         }
         return Optional.empty();
     }
@@ -141,14 +139,54 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
      * @param event The event
      */
     public final void onRefreshEvent(RefreshEvent event) {
-        Map<String, Object> changes = event.getSource();
-        if (changes == RefreshEvent.ALL_KEYS) {
-            disposeOfAllBeans();
-            refreshAllConfigurationProperties();
-        } else {
-            disposeOfBeanSubset(changes.keySet());
-            refreshSubsetOfConfigurationProperties(changes.keySet());
+        // the refresher runs the phases, rebinding the configuration beans before disposing of the refreshable
+        // ones and telling the configuration watches; an event the refresher itself published is done with
+        DefaultConfigurationRefresher refresher = beanContext.findBean(DefaultConfigurationRefresher.class).orElse(null);
+        if (refresher == null) {
+            disposeAffected(toChange(event));
+            return;
         }
+        if (!refresher.isApplying()) {
+            refresher.applyEvent(event);
+        }
+    }
+
+    private static ConfigurationChange toChange(RefreshEvent event) {
+        Map<String, Object> source = event.getSource();
+        return source == RefreshEvent.ALL_KEYS ? ConfigurationChange.ofAll() : ConfigurationChange.ofKeys(source.keySet());
+    }
+
+    /**
+     * Disposes of the refreshable beans a change affects: those declaring a prefix the change touches,
+     * and those declaring none. They are created again on their next use.
+     *
+     * @param change The change
+     * @return How many beans were disposed of
+     * @since 5.3.0
+     */
+    public int disposeAffected(ConfigurationChange change) {
+        if (!change.all() && change.changed().isEmpty()) {
+            // nothing changed: nothing is disposed of, whatever a bean declares
+            return 0;
+        }
+        int disposed = 0;
+        for (Map.Entry<BeanIdentifier, CreatedBean<?>> entry : refreshableBeans.entrySet()) {
+            BeanDefinition<?> definition = entry.getValue().definition();
+            String[] prefixes = definition.stringValues(Refreshable.class);
+            boolean affected = change.all() || ArrayUtils.isEmpty(prefixes);
+            if (!affected) {
+                for (String prefix : prefixes) {
+                    if (change.touches(prefix)) {
+                        affected = true;
+                        break;
+                    }
+                }
+            }
+            if (affected && disposeOfBean(entry.getKey())) {
+                disposed++;
+            }
+        }
+        return disposed;
     }
 
     @Override
@@ -194,71 +232,16 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         return readWriteLock;
     }
 
-    private void refreshSubsetOfConfigurationProperties(Set<String> keySet) {
-        Collection<BeanRegistration<?>> registrations =
-            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class));
-        for (BeanRegistration<?> registration : registrations) {
-            BeanDefinition<?> definition = registration.getBeanDefinition();
-            Optional<String> value = definition.stringValue(ConfigurationReader.class, "prefix");
-            if (value.isPresent()) {
-                String configPrefix = value.get();
-                if (configPrefix.endsWith(".*")) {
-                    configPrefix = configPrefix.substring(0, configPrefix.length() - 2);
-                } else if (configPrefix.endsWith("[*]")) {
-                    configPrefix = configPrefix.substring(0, configPrefix.length() - 3);
-                }
-                String finalConfigPrefix = configPrefix;
-                if (keySet.stream().anyMatch(key -> key.startsWith(finalConfigPrefix))) {
-                    refreshConfigurationBean(registration);
-                }
-            }
-        }
-    }
-
-    private void refreshAllConfigurationProperties() {
-        Collection<BeanRegistration<?>> registrations =
-            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class));
-        for (BeanRegistration<?> registration : registrations) {
-            refreshConfigurationBean(registration);
-        }
-    }
-
     /**
-     * Re-binds the configuration of the bean. A bean that a {@link io.micronaut.context.event.BeanCreatedEventListener}
-     * replaced with an instance of another type can not be re-bound, it is skipped so the other configuration beans
-     * are still refreshed.
+     * The lock of a bean, if the scope still holds the bean: a bean disposed of between a lookup and
+     * a call has none, and the call proceeds on the instance the caller holds.
      *
-     * @param registration The bean registration
+     * @param object The bean
+     * @return The lock, or empty
+     * @since 5.3.0
      */
-    private void refreshConfigurationBean(BeanRegistration<?> registration) {
-        Object bean = registration.bean();
-        Class<?> beanType = registration.definition().getBeanType();
-        if (bean != null && !beanType.isInstance(bean)) {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Configuration bean [{}] was replaced by an instance of [{}] and can not be refreshed",
-                    beanType.getName(), bean.getClass().getName());
-            }
-            return;
-        }
-        beanContext.refreshBean(registration);
-    }
-
-    private void disposeOfBeanSubset(Collection<String> keys) {
-        for (Map.Entry<BeanIdentifier, CreatedBean<?>> entry : refreshableBeans.entrySet()) {
-            BeanDefinition<?> definition = entry.getValue().definition();
-            String[] strings = definition.stringValues(Refreshable.class);
-            if (!ArrayUtils.isEmpty(strings)) {
-                for (String prefix : strings) {
-                    for (String k : keys) {
-                        if (k.startsWith(prefix)) {
-                            disposeOfBean(entry.getKey());
-                        }
-                    }
-                }
-            } else {
-                disposeOfBean(entry.getKey());
-            }
-        }
+    public Optional<ReadWriteLock> findLock(Object object) {
+        return Optional.ofNullable(locks.get(object));
     }
 
     private void disposeOfAllBeans() {
@@ -267,18 +250,20 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         }
     }
 
-    private void disposeOfBean(BeanIdentifier key) {
+    private boolean disposeOfBean(BeanIdentifier key) {
         CreatedBean<?> createdBean = refreshableBeans.remove(key);
-        if (createdBean != null) {
-            Object bean = createdBean.bean();
-            Lock lock = getLock(bean).writeLock();
-            try {
-                lock.lock();
-                createdBean.close();
-                locks.remove(bean);
-            } finally {
-                lock.unlock();
-            }
+        if (createdBean == null) {
+            return false;
         }
+        Object bean = createdBean.bean();
+        Lock lock = getLock(bean).writeLock();
+        try {
+            lock.lock();
+            createdBean.close();
+            locks.remove(bean);
+        } finally {
+            lock.unlock();
+        }
+        return true;
     }
 }

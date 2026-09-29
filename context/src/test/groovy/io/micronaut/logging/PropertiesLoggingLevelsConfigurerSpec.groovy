@@ -30,10 +30,10 @@ class PropertiesLoggingLevelsConfigurerSpec extends Specification {
         def env = context.getEnvironment()
         def loggingSystem = new LogbackLoggingSystem(null, null)
         def configuration = context.getBean(PropertiesLoggingLevelsConfigurer.PropertiesLoggingLevelsConfiguration)
-        def configurer = new PropertiesLoggingLevelsConfigurer(env, configuration, List.of(loggingSystem))
+        def configurer = new PropertiesLoggingLevelsConfigurer(env, configuration, List.of(loggingSystem), context as io.micronaut.context.WatchableBeanContext)
 
-        when:
-        configurer.onApplicationEvent(null)
+        when: "a change under the logger prefix is refreshed: the configurer's watch applies the levels"
+        context.getBean(io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher).refresh(io.micronaut.context.watch.ConfigurationChange.ofKeys(["logger.levels.com.foo.bar"] as Set))
 
         then:
         def loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory()
