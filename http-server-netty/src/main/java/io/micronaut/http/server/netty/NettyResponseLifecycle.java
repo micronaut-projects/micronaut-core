@@ -93,12 +93,18 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     }
 
     @Override
+    protected ConcatenatingSubscriber.Separators jsonSeparators() {
+        return NettyConcatenatingSubscriber.JSON_NETTY;
+    }
+
+    @Override
     protected CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
-        return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY, items);
+        return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY_TRAILING, items);
     }
 
     private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
         static final Separators JSON_NETTY = LeakPresenceDetector.staticInitializer(() -> Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT)));
+        static final Separators JSON_NETTY_TRAILING = JSON_NETTY.trailingOnly();
 
         private final EventLoopFlow flow;
 
