@@ -23,7 +23,9 @@ import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -42,7 +44,9 @@ import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.micronaut.python.processing.PythonStubGenerator.AS_POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_CONTEXT_RUNTIME;
@@ -63,6 +67,110 @@ import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 
 final class PythonPooledStubGenerator {
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
+    private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
+    private static final String REPORTED_POOLED_DEPENDENCIES = "micronaut.python.reported-pooled-dependencies";
+
+
+    /**
+     * Warns about a pooled type whose Python dependency is pinned to a single context.
+     *
+     * <p>A pooled type exists once per context, so it gains from holding only references that can
+     * exist in whichever context serves a call. A singleton Python bean cannot: it is one instance
+     * living in one context, and a pooled instance elsewhere reaching it puts that context's work
+     * back through the owning one. That is the cost pooling is there to avoid, and nothing else
+     * reports it -- the application runs, and is only slower under concurrency, by more the more
+     * contexts there are.
+     *
+     * <p>Measured on a real application, making the beans behind one endpoint poolable was worth
+     * about 40% at 32 concurrent clients; see micronaut-core#13553.
+     *
+     * <p>A warning rather than an error, because the shape is common and works: a route module is
+     * pooled and routinely injects singleton services, so rejecting it would break code that
+     * compiles today for the sake of a performance characteristic.
+     *
+     * @param context The visitor context, for reporting
+     * @param element The pooled Python type
+     * @param dependencies Its injected dependencies
+     */
+    private static void warnAboutContextBoundDependencies(VisitorContext context,
+                                                          ClassElement element,
+                                                          List<? extends TypedElement> dependencies) {
+        for (TypedElement dependency : dependencies) {
+            ClassElement dependencyType = dependency.getGenericType();
+            if (!isPythonImplementedType(dependencyType) || dependencyType.hasStereotype(CONTEXT_POOLED)) {
+                continue;
+            }
+            if (dependencyType.hasStereotype(AnnotationUtil.SINGLETON) && !alreadyReported(context, element, dependency)) {
+                context.warn("The pooled type [" + element.getSimpleName() + "] depends on the singleton Python bean ["
+                    + dependencyType.getSimpleName() + "] through [" + dependency.getName() + "]. A pooled type exists "
+                    + "once per context and a singleton Python bean exists once in one context, so calls through this "
+                    + "dependency run in that one context however many the pool has, and the gain from pooling is lost "
+                    + "for them. Make [" + dependencyType.getSimpleName() + "] pooled as well, or give it a scope that "
+                    + "allows an instance per context. A dependency on a Java type has no such cost.", element);
+            }
+        }
+    }
+
+    /**
+     * A module's injected members.
+     *
+     * <p>Queried as members rather than through {@code ALL_FIELDS}, which returns none of them: a
+     * module-level {@code Annotated[T, Inject]} is the shape {@code PythonScriptElement} looks for
+     * when it decides the module is a bean, so this asks the same way.
+     *
+     * @param scriptElement The module
+     * @return Its injected members, those of them that have a type
+     */
+    private static List<TypedElement> injectedMembers(PythonScriptElement scriptElement) {
+        return scriptElement.getEnclosedElements(ElementQuery.of(MemberElement.class))
+            .stream()
+            .filter(member -> member.hasStereotype(AnnotationUtil.INJECT))
+            .filter(TypedElement.class::isInstance)
+            .map(TypedElement.class::cast)
+            .toList();
+    }
+
+    /**
+     * Whether a type has a Python implementation, and so belongs to a context.
+     *
+     * <p>Being declared in Python is not enough. A {@code Protocol} or an otherwise abstract Python
+     * type -- a Micronaut Data repository, a bean mapper, any introduction interface -- is
+     * implemented by generated Java. It has no Python instance, so no context it lives in and no
+     * interpreter lock to contend for, and warning about one would be noise.
+     *
+     * @param type The type
+     * @return Whether it is a Python type with a Python implementation
+     */
+    private static boolean isPythonImplementedType(ClassElement type) {
+        if (!(type instanceof AbstractPythonClassElement) && !(type instanceof PythonScriptElement)) {
+            return false;
+        }
+        return !type.isInterface() && !type.isAbstract();
+    }
+
+    /**
+     * Whether this pairing has already been reported during this compilation.
+     *
+     * <p>Recorded on the visitor context rather than in static state, so the set belongs to the
+     * compilation and cannot outlive it in a processor daemon. Main and test sources are separate
+     * compilations and each reports once, as a Java compilation would.
+     *
+     * @param context The visitor context
+     * @param element The pooled type
+     * @param dependency The dependency warned about
+     * @return Whether the pairing was reported before this call
+     */
+    @SuppressWarnings("unchecked")
+    private static boolean alreadyReported(VisitorContext context, ClassElement element, TypedElement dependency) {
+        Set<String> reported = context.get(REPORTED_POOLED_DEPENDENCIES, Set.class)
+            .map(set -> (Set<String>) set)
+            .orElse(null);
+        if (reported == null) {
+            reported = ConcurrentHashMap.newKeySet();
+            context.put(REPORTED_POOLED_DEPENDENCIES, reported);
+        }
+        return !reported.add(element.getName() + " -> " + dependency.getName());
+    }
 
     static ClassDef.ClassDefBuilder generatePooledClass(AbstractPythonClassElement element,
                                                         VisitorContext context,
@@ -85,6 +193,9 @@ final class PythonPooledStubGenerator {
             throw new ProcessingException(element, "@Pooled does not support introspected bean properties on Python classes.");
         }
         var pythonConstructor = element.getPrimaryConstructor().orElse(null);
+        if (pythonConstructor != null) {
+            warnAboutContextBoundDependencies(context, element, List.of(pythonConstructor.getParameters()));
+        }
         if (pythonConstructor != null && pythonConstructor.getParameters().length > 0) {
             throw new ProcessingException(element, "@Pooled types must be stateless. Constructor with parameters is not supported.");
         }
@@ -142,6 +253,10 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC);
         builder.addAnnotation(Vetoed.class);
         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
+
+        // A route module is the common pooled type with dependencies, and typically injects
+        // services. Those are what the warning is about.
+        warnAboutContextBoundDependencies(context, scriptElement, injectedMembers(scriptElement));
 
         MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
         builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
