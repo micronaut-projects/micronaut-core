@@ -236,6 +236,7 @@ final class PythonPooledStubGenerator {
                 POOLED_INSTANCE.instantiate(
                     List.of(
                         pythonClassReference(element, pythonClassReference),
+                        aThis,
                         TypeDef.OBJECT.array().instantiate(params)
                     )
                 )
@@ -257,28 +258,21 @@ final class PythonPooledStubGenerator {
                         params.getFirst()
                     )).returning())));
 
-            // Reached when a pooled bean is injected into a Python bean: the dependency crosses
-            // into that bean's context as a value and has to be wrapped again coming back. The
-            // value is the instance for its own context, so the wrapper holds exactly that.
-            //
-            // Through a private constructor, so the bean still has one public constructor and
-            // injection cannot pick this one.
-            MethodDef.MethodDefBuilder wrappingCtor = MethodDef.constructor()
-                .addModifiers(Modifier.PRIVATE)
-                .addParameter(ParameterDef.builder("pooledInstance", POOLED_INSTANCE).build());
-            builder.addMethod(wrappingCtor.build(((aThis, params) ->
-                aThis.field(pooledInstance).assign(params.getFirst()))));
-
+            // An instance this bean created carries a back-reference to this wrapper, so the
+            // conversion resolves it directly and never arrives here. This is reached only for a
+            // value of the class that the bean did not create -- one Python built for itself --
+            // which cannot become this wrapper: the value does not carry the dependencies, and
+            // asking injection for the bean is circular when the bean is what is being built.
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(POLYGLOT_VALUE)
                 .returns(thisType)
-                .build(((aThis, methodParameters) -> thisType.instantiate(
-                    POOLED_INSTANCE.invokeStatic("wrapping", POOLED_INSTANCE, List.of(
-                        pythonClassReference(element, pythonClassReference),
-                        methodParameters.getFirst()
-                    ))
-                ).returning())));
+                .build(((aThis, methodParameters) -> ClassTypeDef.of(UnsupportedOperationException.class)
+                    .instantiate(ExpressionDef.constant(
+                        "Cannot build the pooled Python bean [" + element.getName() + "] from this value: it was not "
+                            + "created by the bean, so it carries neither a reference to it nor the dependencies it "
+                            + "is constructed with."
+                    )).doThrow())));
         } else {
             MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
             builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));

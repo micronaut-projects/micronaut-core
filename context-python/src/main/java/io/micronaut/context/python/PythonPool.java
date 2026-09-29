@@ -289,6 +289,13 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     /**
+     * @return The application context the pool was built with
+     */
+    ApplicationContext applicationContext() {
+        return applicationContext;
+    }
+
+    /**
      * Borrow a context, hand it to the callback, and release it after the callback completes.
      *
      * <p>For a caller that resolves its own value in the context rather than a class cached by

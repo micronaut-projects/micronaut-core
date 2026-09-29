@@ -48,7 +48,15 @@ import java.util.WeakHashMap;
 public final class PythonPooledInstance {
 
     private final PythonContextRuntime.PythonClassReference classReference;
-    @io.micronaut.core.annotation.Nullable
+
+    /**
+     * The generated wrapper these instances belong to. Attached to each instance as
+     * {@link ValueCoercible#HOST_OBJECT_MEMBER} so that a value coming back to Java resolves to
+     * this wrapper instead of having to be rebuilt from the value, which is impossible: the value
+     * does not carry the dependencies the instance was constructed with.
+     */
+    private final Object owner;
+
     private final Object[] constructorArguments;
 
     /**
@@ -62,35 +70,39 @@ public final class PythonPooledInstance {
      * @param constructorArguments The arguments to construct it with, already resolved by injection
      */
     @UsedByGeneratedCode
-    public PythonPooledInstance(PythonContextRuntime.PythonClassReference classReference, Object... constructorArguments) {
+    public PythonPooledInstance(PythonContextRuntime.PythonClassReference classReference,
+                                Object owner,
+                                Object[] constructorArguments) {
         this.classReference = classReference;
+        this.owner = owner;
         this.constructorArguments = constructorArguments;
     }
 
-    private PythonPooledInstance(PythonContextRuntime.PythonClassReference classReference, Value existing) {
-        this.classReference = classReference;
-        this.constructorArguments = null;
-        instances.put(existing.getContext(), existing);
-    }
+
 
     /**
-     * Wraps an instance that already exists, for a Java wrapper built from a polyglot value.
+     * Points the instance back at its wrapper.
      *
-     * <p>This happens when a pooled bean is injected into a Python bean: the dependency crosses
-     * into the other bean's context as a value, and coming back to Java it has to be wrapped
-     * again. The value is the instance for its own context, so that is what this holds.
+     * <p>A value of a pooled class returns to Java whenever the bean is handed to Python and read
+     * again -- building the bean's own AOP proxy does it, before a request is ever served. Without
+     * this, the conversion has only the value to work from, and a wrapper cannot be rebuilt from
+     * one: the dependencies the instance was constructed with are not in it. Asking injection for
+     * the bean instead is circular, since the bean is what is being built.
      *
-     * <p>It carries no constructor arguments, because a bare value does not reveal the
-     * dependencies it was built with. Asking for it in a different context therefore fails, and
-     * says why, rather than quietly constructing a second instance with none.
+     * <p>With the back-reference the conversion finds the wrapper directly, through the same
+     * {@link ValueCoercible#HOST_OBJECT_MEMBER} a wrapper handed to Python exposes.
      *
-     * @param classReference The Python class
-     * @param existing The instance, belonging to the context it came from
-     * @return A holder of that instance
+     * <p>Best effort: a Python class that restricts its attributes refuses the member, and such a
+     * class simply keeps the old behaviour of being rebuilt, or failing to be.
+     *
+     * @param instance The instance to mark
      */
-    @UsedByGeneratedCode
-    public static PythonPooledInstance wrapping(PythonContextRuntime.PythonClassReference classReference, Value existing) {
-        return new PythonPooledInstance(classReference, existing);
+    private void attachOwner(Value instance) {
+        try {
+            instance.putMember(ValueCoercible.HOST_OBJECT_MEMBER, new ValueCoercible.HostObjectReference(owner));
+        } catch (RuntimeException ignored) {
+            // the class does not accept the member; nothing else depends on it being there
+        }
     }
 
     /**
@@ -119,15 +131,11 @@ public final class PythonPooledInstance {
         if (existing != null) {
             return existing;
         }
-        if (constructorArguments == null) {
-            throw new UnsupportedOperationException("The pooled Python bean [" + classReference.displayName()
-                + "] was wrapped from a value belonging to another context and cannot be materialised in this one: "
-                + "the value does not carry the dependencies it was constructed with.");
-        }
         Value type = PythonContextRuntime.findClass(classReference, context);
         Value created = type.canInstantiate()
             ? type.newInstance(PythonCoercion.coerceArgumentsToContext(context, constructorArguments))
             : type;
+        attachOwner(created);
         synchronized (instances) {
             Value prior = instances.get(context);
             if (prior != null) {
