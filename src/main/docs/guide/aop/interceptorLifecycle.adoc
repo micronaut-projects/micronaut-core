@@ -143,21 +143,33 @@ constructed, and intercepts every target it fronts with them. A non-singleton in
 proxy, shared by every target the proxy resolves, and not the instance that intercepts the construction,
 post-construct and pre-destroy of the target.
 
+[.lang-java.lang-groovy.lang-kotlin]
+--
 Set `lazyInterceptorsPerTarget` to have the interceptors resolved for each target instead:
 
-[source,java]
-----
-@Retention(RUNTIME)
-@Around(proxyTarget = true, lazyInterceptorsPerTarget = true)
-@interface Audited {
-}
-----
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.Audited[tags="imports,annotation", indent=0, title="Resolving interceptors for each target"]
 
 A non-singleton interceptor is then the target's own: the instance created with the target, which also intercepts its
 construction, post-construct and pre-destroy, or one created for it on its first call, as a dependent of the target's
 registration. Two targets never share an instance, and each instance is destroyed with its target. A lazy proxy, such
 as a scoped proxy, intercepts each target it resolves with that target's instances. The proxy itself holds only the
 singleton interceptors.
+
+For example, this interceptor numbers the calls it intercepts:
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.AuditInterceptor[tags="imports,interceptor", indent=0, title="A per-target interceptor"]
+
+<1> A non-singleton interceptor, so each target gets its own instance
+<2> State that belongs to one target
+
+On a ann:runtime.context.scope.Refreshable[] bean annotated with `@Audited`, each target the refresh creates starts
+counting again:
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.AuditInterceptorSpec[tags="test", indent=0, title="Each target has its own interceptor"]
+
+<1> One instance intercepts every method of the target
+<2> The refresh replaces the target
+<3> The new target is intercepted by an instance of its own
 
 For a scoped bean whose binding annotation carries no ann:aop.Around[] of its own, declare the member together with
 the settings of the scope's proxy, `@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)`: an
@@ -167,6 +179,13 @@ NOTE: A target handed to a hot-swappable proxy through `swap` is intercepted wit
 holds a registration for it, a singleton or a bean of a custom scope. Any other object, such as the target of another
 proxy, is intercepted with instances the context creates once for such targets. A runtime proxy
 (ann:aop.runtime.RuntimeProxy[]) keeps the interceptors it was created with.
+--
+
+[.lang-python]
+--
+NOTE: An advised Python bean is proxied at run time, by a ann:aop.runtime.RuntimeProxy[], which keeps the
+interceptors it was created with, so a non-singleton interceptor is one instance per proxy.
+--
 
 == Ordering
 
