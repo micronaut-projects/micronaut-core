@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
@@ -114,6 +115,25 @@ final class PythonPooledStubGenerator {
      * @param type The type
      * @return Whether it is a Python type
      */
+    /**
+     * A module's injected members.
+     *
+     * <p>Queried as members rather than through {@code ALL_FIELDS}, which returns none of them:
+     * a module-level {@code Annotated[T, Inject]} is the shape {@code PythonScriptElement} looks
+     * for when it decides the module is a bean, so this asks the same way.
+     *
+     * @param scriptElement The module
+     * @return Its injected members, those of them that have a type
+     */
+    private static List<TypedElement> injectedMembers(PythonScriptElement scriptElement) {
+        return scriptElement.getEnclosedElements(ElementQuery.of(MemberElement.class))
+            .stream()
+            .filter(member -> member.hasStereotype(AnnotationUtil.INJECT))
+            .filter(TypedElement.class::isInstance)
+            .map(TypedElement.class::cast)
+            .toList();
+    }
+
     private static boolean isPythonType(ClassElement type) {
         return type instanceof AbstractPythonClassElement || type instanceof PythonScriptElement;
     }
@@ -199,9 +219,7 @@ final class PythonPooledStubGenerator {
 
         // A route module is the common pooled type with dependencies, and typically injects
         // services. Those are what the warning is about.
-        warnAboutContextBoundDependencies(context, scriptElement, scriptElement.getEnclosedElements(
-            ElementQuery.ALL_FIELDS.annotated(ann -> ann.hasStereotype(AnnotationUtil.INJECT))
-        ));
+        warnAboutContextBoundDependencies(context, scriptElement, injectedMembers(scriptElement));
 
         MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
         builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
