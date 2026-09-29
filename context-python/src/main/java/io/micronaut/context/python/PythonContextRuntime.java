@@ -572,6 +572,146 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * The calling context's instance of a pooled bean that has constructor arguments.
+     *
+     * <p>Chooses the context exactly as {@link #findPooledClass(PythonClassReference)} does, then
+     * asks the bean for its instance there. The instance belongs to the bean rather than to the
+     * pool because the pool's cache is keyed by class, and two pooled beans of one class can hold
+     * different dependencies.
+     *
+     * @param instance The pooled bean's per-context instances
+     * @return The instance for the calling context
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value findPooledInstance(PythonPooledInstance instance) {
+        if (usePrimaryContext()) {
+            return withPrimaryContext(instance::in);
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> instance.in(context));
+        }
+        return getPythonPool().withLeasedContext(instance::in);
+    }
+
+    /**
+     * A pooled bean's instance in a context the caller already owns.
+     *
+     * @param instance The pooled bean's per-context instances
+     * @param context The context
+     * @return The instance for that context
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value findPooledInstance(PythonPooledInstance instance, Context context) {
+        return PythonContextRegistry.withExecutionFrame(context, () -> instance.in(context));
+    }
+
+    /**
+     * Invoke a method on a pooled bean that has constructor arguments.
+     *
+     * @param instance The pooled bean's per-context instances
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The polyglot result
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value invokePooledInstance(PythonPooledInstance instance, String methodName, Object... args) {
+        return withPooledInstance(instance, v -> PythonInvocation.invokePythonMethod(
+            v,
+            methodName,
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        ));
+    }
+
+    /**
+     * Invoke an async method on a pooled bean that has constructor arguments, driving the coroutine
+     * while the context is still leased; see {@link #invokePooledAsync}.
+     *
+     * @param instance The pooled bean's per-context instances
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The stage of the coroutine
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static CompletionStage<?> invokePooledInstanceAsync(PythonPooledInstance instance, String methodName, Object... args) {
+        if (usePrimaryContext()) {
+            return withPrimaryContext(context -> PythonAsyncioRuntime.toCompletionStage(
+                PythonInvocation.invokePythonMethod(
+                    instance.in(context),
+                    methodName,
+                    PythonCoercion.coerceArgumentsToContext(context, args)
+                )));
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> PythonAsyncioRuntime.toCompletionStage(
+                PythonInvocation.invokePythonMethod(
+                    instance.in(context),
+                    methodName,
+                    PythonCoercion.coerceArgumentsToContext(context, args)
+                )));
+        }
+        return getPythonPool().withLeasedContextUntilComplete(context -> PythonAsyncioRuntime.toCompletionStage(
+            PythonInvocation.invokePythonMethod(
+                instance.in(context),
+                methodName,
+                PythonCoercion.coerceArgumentsToContext(context, args)
+            )));
+    }
+
+    /**
+     * Invoke an async generator method on a pooled bean that has constructor arguments; see
+     * {@link #invokePooledPublisher}.
+     *
+     * @param instance The pooled bean's per-context instances
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The publisher
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Publisher<?> invokePooledInstancePublisher(PythonPooledInstance instance, String methodName, Object... args) {
+        return withPooledInstance(instance, v -> PythonAsyncioRuntime.generatorToPublisher(PythonInvocation.invokePythonMethod(
+            v,
+            methodName,
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        )));
+    }
+
+    /**
+     * Run a callback against a pooled bean's instance for the calling context, choosing the context
+     * the way {@link #withPooled} does.
+     *
+     * @param instance The pooled bean's per-context instances
+     * @param fn The callback
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    private static <T> T withPooledInstance(PythonPooledInstance instance, java.util.function.Function<Value, T> fn) {
+        if (shouldOffloadPooledExecution()) {
+            return offloadPooledExecution(() -> withPooledInstance(instance, fn));
+        }
+        if (usePrimaryContext()) {
+            return withPrimaryContext(context -> fn.apply(instance.in(context)));
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> fn.apply(instance.in(context)));
+        }
+        return getPythonPool().withLeasedContext(context -> fn.apply(instance.in(context)));
+    }
+
+    /**
      * Obtain a pooled Python script/module object.
      *
      * @param packageName The Python package

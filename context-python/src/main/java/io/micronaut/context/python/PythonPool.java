@@ -289,6 +289,38 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     /**
+     * Borrow a context, hand it to the callback, and release it after the callback completes.
+     *
+     * <p>For a caller that resolves its own value in the context rather than a class cached by
+     * the pool: a pooled bean with constructor arguments owns its per-context instances, because
+     * the pool's cache is keyed by class and two such beans of one class can hold different
+     * dependencies.
+     *
+     * @param fn The callback that receives the borrowed context
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    <T> T withLeasedContext(java.util.function.Function<Context, T> fn) {
+        Context c = borrow();
+        try {
+            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(c));
+        } finally {
+            release(c);
+        }
+    }
+
+    /**
+     * Borrow a context and keep it leased until the stage the callback returns completes; see
+     * {@link #withLeasedContext} and {@link #withClassUntilComplete}.
+     *
+     * @param fn The callback that receives the borrowed context and returns the stage
+     * @return The stage
+     */
+    CompletionStage<?> withLeasedContextUntilComplete(Function<Context, CompletionStage<?>> fn) {
+        return leaseUntilComplete(fn);
+    }
+
+    /**
      * Borrow a context, resolve a cached class value in that context, and release the context after the callback completes.
      *
      * @param classReference The Python class reference
