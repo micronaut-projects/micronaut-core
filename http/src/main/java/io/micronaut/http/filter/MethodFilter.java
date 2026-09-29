@@ -43,7 +43,6 @@ import io.micronaut.http.reactive.execution.SubscriberAwareExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.NonBlocking;
 
@@ -621,13 +620,22 @@ record MethodFilter<T>(FilterOrder order,
                 }
                 Publisher<Object> converted = Publishers.convertToPublisher(conversionService, returnValue == null ? Mono.empty() : returnValue);
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(ReactivePropagation.propagate(
-                        context.propagatedContext(),
-                        converted
-                    ));
+                    return resultAwareContinuation.processResult(converted);
+                }
+                ExecutionFlow<Object> flow;
+                if (context.reactive()) {
+                    // an upstream filter subscribes to this result in its Reactor chain and may add to the
+                    // Reactor context with contextWrite: only a publisher that already holds its result is
+                    // unwrapped, anything else stays lazy
+                    flow = ReactiveExecutionFlow.fromPublisherImmediate(converted);
+                    if (flow == null) {
+                        flow = ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(context.propagatedContext(), converted));
+                    }
+                } else {
+                    flow = ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext());
                 }
                 // flatMap skips an empty value, an empty publisher proceeds with the current context
-                return ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext())
+                return flow
                     .map(v -> v == null ? EMPTY_RESULT : v)
                     .flatMap(v -> v == EMPTY_RESULT ? ExecutionFlow.just(context) : next.handle(context, v, continuation));
             };
@@ -833,7 +841,13 @@ record MethodFilter<T>(FilterOrder order,
         @Override
         public ExecutionFlow<FilterContext> processResult(Publisher<HttpResponse<?>> publisher) {
             // an empty publisher proceeds with the context after the continuation, the downstream response if it was called
-            Mono<HttpResponse<?>> mono = publisher instanceof Flux<HttpResponse<?>> flux ? flux.next() : Mono.from(publisher);
+            ExecutionFlow<HttpResponse<?>> immediate = ReactiveExecutionFlow.fromPublisherImmediate(publisher);
+            if (immediate != null) {
+                // Mono.just, Mono.error or the continuation publisher itself: no Reactor chain is needed
+                return immediate.map(httpResponse -> httpResponse == null ? filterContext : filterContext.withResponse(httpResponse));
+            }
+            // a lazy publisher keeps the chain reactive: the Reactor context of an upstream filter has to reach it
+            Mono<HttpResponse<?>> mono = Mono.from(ReactivePropagation.propagate(filterContext.propagatedContext(), publisher));
             return ReactiveExecutionFlow.fromPublisher(
                 mono
                     .map(httpResponse -> filterContext.withResponse(httpResponse))
@@ -960,12 +974,12 @@ record MethodFilter<T>(FilterOrder order,
                 filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
             }
             filterContext = filterContext.asReactive();
-            return ReactiveExecutionFlow.fromFlow(
+            return ReactiveExecutionFlow.toPublisher(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
                     return Objects.requireNonNull(newFilterContext.response(), RESPONSE_MISSING_MESSAGE);
                 })
-            ).toPublisher();
+            );
         }
 
         @Override

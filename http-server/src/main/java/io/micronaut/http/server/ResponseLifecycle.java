@@ -389,7 +389,7 @@ public abstract class ResponseLifecycle {
                     responseBodyType,
                     finalMediaType,
                     message);
-                return ReactiveExecutionFlow.toPublisher(() -> flow);
+                return ReactiveExecutionFlow.toPublisher(flow);
             });
         } else {
             MediaType finalMediaType = mediaType;
@@ -414,7 +414,7 @@ public abstract class ResponseLifecycle {
                     }
                     MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
                     ExecutionFlow<CloseableByteBody> flow = writePieceAsync(messageBodyWriter, request, response, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
-                    return ReactiveExecutionFlow.toPublisher(() -> flow);
+                    return ReactiveExecutionFlow.toPublisher(flow);
                 });
         }
 
