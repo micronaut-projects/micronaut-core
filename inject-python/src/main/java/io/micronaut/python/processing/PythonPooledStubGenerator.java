@@ -44,7 +44,9 @@ import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.micronaut.python.processing.PythonStubGenerator.AS_POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_CONTEXT_RUNTIME;
@@ -66,6 +68,7 @@ import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 final class PythonPooledStubGenerator {
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
+    private static final String REPORTED_POOLED_DEPENDENCIES = "micronaut.python.reported-pooled-dependencies";
 
     /**
      * Warns about a pooled type whose Python dependency is pinned to a single context.
@@ -99,14 +102,40 @@ final class PythonPooledStubGenerator {
                 continue;
             }
             if (dependencyType.hasStereotype(AnnotationUtil.SINGLETON)) {
-                context.warn("The pooled type [" + element.getSimpleName() + "] depends on the singleton Python bean ["
-                    + dependencyType.getSimpleName() + "] through [" + dependency.getName() + "]. A pooled type exists "
-                    + "once per context and a singleton Python bean exists once in one context, so calls through this "
-                    + "dependency run in that one context however many the pool has, and the gain from pooling is lost "
-                    + "for them. Make [" + dependencyType.getSimpleName() + "] pooled as well, or give it a scope that "
-                    + "allows an instance per context. A dependency on a Java type has no such cost.", element);
+                if (!alreadyReported(context, element, dependency)) {
+                    context.warn("The pooled type [" + element.getSimpleName() + "] depends on the singleton Python bean ["
+                        + dependencyType.getSimpleName() + "] through [" + dependency.getName() + "]. A pooled type exists "
+                        + "once per context and a singleton Python bean exists once in one context, so calls through this "
+                        + "dependency run in that one context however many the pool has, and the gain from pooling is lost "
+                        + "for them. Make [" + dependencyType.getSimpleName() + "] pooled as well, or give it a scope that "
+                        + "allows an instance per context. A dependency on a Java type has no such cost.", element);
+                }
             }
         }
+    }
+
+    /**
+     * Whether this pairing has already been reported during this compilation.
+     *
+     * <p>Main and test sources are processed in separate rounds that visit the same modules, so
+     * without this every warning is emitted twice. Recorded on the visitor context rather than in
+     * static state, so the set belongs to the compilation and cannot outlive it in a daemon.
+     *
+     * @param context The visitor context
+     * @param element The pooled type
+     * @param dependency The dependency warned about
+     * @return Whether the pairing was reported before this call
+     */
+    @SuppressWarnings("unchecked")
+    private static boolean alreadyReported(VisitorContext context, ClassElement element, TypedElement dependency) {
+        Set<String> reported = context.get(REPORTED_POOLED_DEPENDENCIES, Set.class)
+            .map(set -> (Set<String>) set)
+            .orElse(null);
+        if (reported == null) {
+            reported = ConcurrentHashMap.newKeySet();
+            context.put(REPORTED_POOLED_DEPENDENCIES, reported);
+        }
+        return !reported.add(element.getName() + " -> " + dependency.getName());
     }
 
     /**
