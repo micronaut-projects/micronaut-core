@@ -1,0 +1,63 @@
+package io.micronaut.docs.server.functional;
+
+// tag::imports[]
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRoutes;
+import jakarta.inject.Singleton;
+
+import java.nio.file.Path;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+// end::imports[]
+
+@Requires(property = "spec.name", value = "BodyRoutesTest")
+// tag::clazz[]
+@Singleton
+public class BodyRoutes implements HttpRoutes {
+    private final ItemRepository items;
+    private final Path uploads;
+
+    BodyRoutes(ItemRepository items, @Value("${uploads.directory}") Path uploads) {
+        this.items = items;
+        this.uploads = uploads;
+    }
+
+    @Override
+    public void routes(HttpRouteBuilder routes) {
+        routes.POST("/async/items").body().handleAsync((request, pathVariables, body) ->
+            body.body(Item.class) // <1>
+                .thenCompose(items::saveAsync)
+                .thenApply(HttpResponse::created));
+
+        routes.POST("/async/items/import").body().handleAsync((request, pathVariables, body) ->
+            body.elements(Item.class) // <2>
+                .forEach(items::saveAsync)
+                .thenApply(done -> HttpResponse.accepted()));
+
+        routes.POST("/async/notes")
+            .consumes(MediaType.TEXT_PLAIN_TYPE) // <3>
+            .body().handleAsync((request, pathVariables, body) ->
+                body.text(1024)
+                    .thenApply(text -> HttpResponse.ok("received " + text.length() + " characters")));
+
+        routes.PUT("/async/files").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync((request, pathVariables, body) -> {
+            Path destination = uploads.resolve(UUID.randomUUID() + ".bin");
+            return body.transferTo(destination) // <4>
+                .thenApply(done -> HttpResponse.created(destination.getFileName().toString()));
+        });
+
+        routes.POST("/async/guarded").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync((request, pathVariables, body) -> {
+            if (!request.getHeaders().contains("X-Token")) {
+                return CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.UNAUTHORIZED)); // <5>
+            }
+            return body.bytes(64 * 1024)
+                .thenApply(bytes -> HttpResponse.ok("accepted " + bytes.length + " bytes"));
+        });
+    }
+}
+// end::clazz[]

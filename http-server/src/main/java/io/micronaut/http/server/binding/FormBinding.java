@@ -104,6 +104,7 @@ public final class FormBinding {
     private @Nullable String reader;
     private @Nullable String conflict;
     private @Nullable CompletableFuture<FormData> form;
+    private FormDataArgumentBinder.@Nullable Collection collection;
     private @Nullable DefaultFormParts parts;
 
     private FormBinding(FormCapableHttpRequest<?> request) {
@@ -494,11 +495,29 @@ public final class FormBinding {
             if (mode != Mode.COLLECTED) {
                 throw refused("a FormData");
             }
-            collected = FormDataArgumentBinder.collect(factory, conversionService, request);
+            FormDataArgumentBinder.Collection started = FormDataArgumentBinder.start(UploadContext.of(factory, request), factory, conversionService, request);
+            collection = started;
+            collected = started.result();
             form = collected;
         }
         BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(collected));
         return collected;
+    }
+
+    /**
+     * Stop reading the form of the request, if it is being read, e.g. when the asynchronous
+     * handler of a handler route completed without waiting for the form it asked for: the rest of
+     * the body is discarded and the form fails with a {@link java.util.concurrent.CancellationException}.
+     * The files stored so far stay owned by the request.
+     */
+    void cancelForm() {
+        FormDataArgumentBinder.Collection running;
+        synchronized (this) {
+            running = collection;
+        }
+        if (running != null) {
+            running.cancel();
+        }
     }
 
     /**
@@ -533,7 +552,9 @@ public final class FormBinding {
         Flux<FileUpload> stored = Flux.from(factory.getOrCreateCompleter(request)
                 .subscribeField(name, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, argument)))
             // the files of a name arrive one after the other: each one is stored before the next
-            .concatMap(field -> ReactiveExecutionFlow.toPublisher(store(factory, context, field)));
+            .concatMap(field -> ReactiveExecutionFlow.toPublisher(store(factory, context, field)))
+            // the files waiting behind the one being stored when the argument stops reading
+            .doOnDiscard(RawFormField.class, RawFormField::close);
         CompletableFuture<?> value = all
             // no file of the name leaves the argument unsatisfied, like a single file
             ? stored.collectList().filter(files -> !files.isEmpty()).toFuture()

@@ -143,6 +143,9 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         // the parts of a form arrive in order: each one is read or stored before the next
         Disposable subscription = Flux.from(request.getRawFormFields())
             .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, fields, files, owned, textBytes))))
+            // the fields waiting behind the one being read when the reading stops: the request
+            // ended, the handler did not wait for the form, or the body failed
+            .doOnDiscard(RawFormField.class, RawFormField::close)
             .then(Mono.fromSupplier(() -> form(fields, files, conversionService)))
             .subscribe(result::complete, result::completeExceptionally);
         owned.reading(subscription);
