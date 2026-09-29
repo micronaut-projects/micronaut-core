@@ -565,6 +565,8 @@ public abstract class HttpClientConfiguration {
     /**
      * @return Header names that are additionally filtered for cross-origin redirects.
      * By default this includes {@code Authorization}, {@code Proxy-Authorization}, and {@code Cookie}.
+     * The JDK HTTP client additionally always filters {@code Authorization}, {@code Cookie},
+     * {@code Origin} and {@code Referer} for cross-origin redirects.
      */
     public Set<String> getRedirectCrossOriginFilteredHeaders() {
         return Collections.unmodifiableSet(redirectCrossOriginFilteredHeaders);

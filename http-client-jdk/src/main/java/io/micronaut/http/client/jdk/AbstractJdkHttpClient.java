@@ -587,9 +587,10 @@ abstract class AbstractJdkHttpClient {
                     log.debug("Client {} Following redirect {} to: {}", clientId, response.statusCode(), redirectRequest);
                 }
                 sendFollowingRedirects(httpClient, redirectRequest, bodyHandler, nextRedirectCount, result, inFlight);
-            } catch (Exception e) {
-                result.completeExceptionally(e instanceof HttpClientException ? e : populateServiceId(
-                    new HttpClientException("Failed to follow the redirect: " + e.getMessage(), e),
+            } catch (Throwable t) {
+                // result must always complete, or the caller waits forever
+                result.completeExceptionally(t instanceof HttpClientException || !(t instanceof Exception) ? t : populateServiceId(
+                    new HttpClientException("Failed to follow the redirect: " + t.getMessage(), t),
                     clientId,
                     configuration
                 ));
@@ -606,7 +607,7 @@ abstract class AbstractJdkHttpClient {
      * @return The redirect URI, or {@code null} if the response is not a redirect to follow
      */
     @Nullable
-    private static URI redirectUri(HttpRequest request, int statusCode, java.net.http.HttpHeaders headers) {
+    private URI redirectUri(HttpRequest request, int statusCode, java.net.http.HttpHeaders headers) {
         if (statusCode != 301 && statusCode != 302 && statusCode != 303 && statusCode != 307 && statusCode != 308) {
             return null;
         }
@@ -620,9 +621,15 @@ abstract class AbstractJdkHttpClient {
         } catch (URISyntaxException | IllegalArgumentException e) {
             return null;
         }
+        if (redirectUri.getHost() == null) {
+            if (log.isDebugEnabled()) {
+                log.debug("Client {} Not following redirect {} to a location without a host: {}", clientId, statusCode, location.get());
+            }
+            return null;
+        }
         String scheme = redirectUri.getScheme();
         // like HttpClient.Redirect.NORMAL: no redirects from https to http
-        if (scheme == null || redirectUri.getHost() == null || !(scheme.equalsIgnoreCase(request.uri().getScheme()) || scheme.equalsIgnoreCase("https"))) {
+        if (scheme == null || !(scheme.equalsIgnoreCase(request.uri().getScheme()) || scheme.equalsIgnoreCase("https"))) {
             return null;
         }
         return redirectUri;
@@ -639,14 +646,15 @@ abstract class AbstractJdkHttpClient {
      */
     private HttpRequest redirectRequest(HttpRequest request, int statusCode, URI location) {
         String method = request.method();
-        // like HttpClient.Redirect.NORMAL: a 303 changes the method to GET, a 301 or 302 only
-        // changes a POST to a GET, and any other redirect keeps the method and body
+        // a 303 changes the method to GET (but, unlike HttpClient.Redirect.NORMAL, keeps HEAD
+        // as RFC 9110 allows), a 301 or 302 only changes a POST to a GET like
+        // HttpClient.Redirect.NORMAL, and any other redirect keeps the method and body
         boolean changeToGet = (statusCode == 303 && !method.equals(io.micronaut.http.HttpMethod.HEAD.name())) ||
             ((statusCode == 301 || statusCode == 302) && method.equals(io.micronaut.http.HttpMethod.POST.name()));
         // the body headers are kept for a 307 or 308 like in the Netty client, and for a
         // 301 or 302 that sends the body again
         boolean preserveBody = statusCode == 307 || statusCode == 308 ||
-            (!changeToGet && statusCode != 303 && request.bodyPublisher().map(body -> body.contentLength() != 0).orElse(false));
+            (!changeToGet && request.bodyPublisher().map(body -> body.contentLength() != 0).orElse(false));
         Set<String> filteredHeaders = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         filteredHeaders.addAll(configuration.getRedirectAlwaysFilteredHeaders());
         if (!isSameOrigin(request.uri(), location)) {

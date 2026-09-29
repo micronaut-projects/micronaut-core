@@ -12,6 +12,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Head
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.annotation.QueryValue
@@ -58,6 +59,52 @@ class JdkRedirectSpec extends Specification {
 
         then:
         response == 'X-Api-Key=none X-Other=none Authorization=none'
+    }
+
+    def '#header is not copied to a cross-origin redirect, even if the configured headers do not include it'() {
+        when:
+        def response = client.toBlocking().retrieve(HttpRequest.GET("/jdk-redirect/redirect-header?port=$otherServer.port&name=$header")
+                .header(header, value))
+
+        then:
+        response == 'none'
+
+        where:
+        header                | value
+        HttpHeaders.COOKIE    | 'session=secret'
+        // an Origin that is not localhost is rejected by the server
+        HttpHeaders.ORIGIN    | 'http://localhost:1'
+        HttpHeaders.REFERER   | 'http://localhost:1/secret'
+    }
+
+    def '#header is copied to a same-origin redirect'() {
+        when:
+        def response = client.toBlocking().retrieve(HttpRequest.GET("/jdk-redirect/redirect-header?port=$server.port&name=$header")
+                .header(header, value))
+
+        then:
+        response == value
+
+        where:
+        header                | value
+        HttpHeaders.COOKIE    | 'session=secret'
+        // an Origin that is not localhost is rejected by the server
+        HttpHeaders.ORIGIN    | 'http://localhost:1'
+        HttpHeaders.REFERER   | 'http://localhost:1/secret'
+    }
+
+    def 'a 303 redirect of a HEAD request stays HEAD'() {
+        when:
+        def response = client.toBlocking().exchange(HttpRequest.HEAD("/jdk-redirect/head-redirect"))
+
+        then:
+        response.status == HttpStatus.OK
+        response.header('X-Method') == 'HEAD'
+    }
+
+    def 'a 301 redirect of a PUT request without a body keeps the method'() {
+        expect:
+        client.toBlocking().retrieve(HttpRequest.PUT("/jdk-redirect/empty-redirect", '')) == 'PUT'
     }
 
     def 'configured headers are copied to a same-origin redirect'() {
@@ -122,6 +169,41 @@ class JdkRedirectSpec extends Specification {
         @Get('/redirect')
         HttpResponse<?> redirect(@QueryValue int port) {
             HttpResponse.redirect(URI.create("http://localhost:$port/jdk-redirect/echo"))
+        }
+
+        @Put('/empty-redirect')
+        HttpResponse<?> emptyRedirect() {
+            HttpResponse.status(HttpStatus.MOVED_PERMANENTLY).header(HttpHeaders.LOCATION, '/jdk-redirect/empty-target')
+        }
+
+        @Put(value = '/empty-target', produces = MediaType.TEXT_PLAIN)
+        String emptyTarget(HttpRequest<?> request) {
+            request.methodName
+        }
+
+        @Get('/redirect-header')
+        HttpResponse<?> redirectHeader(@QueryValue int port, @QueryValue String name) {
+            HttpResponse.redirect(URI.create("http://localhost:$port/jdk-redirect/echo-header?name=$name"))
+        }
+
+        @Get(value = '/echo-header', produces = MediaType.TEXT_PLAIN)
+        String echoHeader(HttpRequest<?> request, @QueryValue String name) {
+            request.headers.get(name) ?: 'none'
+        }
+
+        @Head('/head-redirect')
+        HttpResponse<?> headRedirect() {
+            HttpResponse.status(HttpStatus.SEE_OTHER).header(HttpHeaders.LOCATION, '/jdk-redirect/head-target')
+        }
+
+        @Head('/head-target')
+        HttpResponse<?> headTarget(HttpRequest<?> request) {
+            HttpResponse.ok().header('X-Method', request.methodName)
+        }
+
+        @Get('/head-target')
+        HttpResponse<?> getTarget(HttpRequest<?> request) {
+            HttpResponse.ok().header('X-Method', request.methodName)
         }
 
         @Get(value = '/echo', produces = MediaType.TEXT_PLAIN)
