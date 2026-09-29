@@ -47,9 +47,9 @@ public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder impl
 
     private final ServerSslConfiguration ssl;
     @Nullable
-    private KeyStore keyStoreCache = null;
+    private volatile CachedStore keyStoreCache = null;
     @Nullable
-    private KeyStore trustStoreCache = null;
+    private volatile CachedStore trustStoreCache = null;
 
     /**
      * @param httpServerConfiguration The HTTP server configuration
@@ -71,18 +71,28 @@ public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder impl
 
     @Override
     protected Optional<KeyStore> getTrustStore(SslConfiguration ssl) throws Exception {
-        if (trustStoreCache == null) {
-            super.getTrustStore(ssl).ifPresent(trustStore -> trustStoreCache = trustStore);
+        SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
+        StoreSettings settings = new StoreSettings(trustStore.getPath().orElse(null), null, null,
+            trustStore.getPassword().orElse(null), trustStore.getType().orElse(null), trustStore.getProvider().orElse(null));
+        CachedStore cached = trustStoreCache;
+        if (cached == null || !cached.settings().equals(settings)) {
+            cached = new CachedStore(settings, super.getTrustStore(ssl).orElse(null));
+            trustStoreCache = cached;
         }
-        return Optional.ofNullable(trustStoreCache);
+        return Optional.ofNullable(cached.store());
     }
 
     @Override
     protected Optional<KeyStore> getKeyStore(SslConfiguration ssl) throws Exception {
-        if (keyStoreCache == null) {
-            super.getKeyStore(ssl).ifPresent(keyStore -> keyStoreCache = keyStore);
+        SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
+        StoreSettings settings = new StoreSettings(keyStore.getPath().orElse(null), keyStore.getKeyPath(), keyStore.getCertificatePath(),
+            keyStore.getPassword().orElse(null), keyStore.getType().orElse(null), keyStore.getProvider().orElse(null));
+        CachedStore cached = keyStoreCache;
+        if (cached == null || !cached.settings().equals(settings)) {
+            cached = new CachedStore(settings, super.getKeyStore(ssl).orElse(null));
+            keyStoreCache = cached;
         }
-        return Optional.ofNullable(keyStoreCache);
+        return Optional.ofNullable(cached.store());
     }
 
     @Override
@@ -94,15 +104,39 @@ public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder impl
     }
 
     @Override
-    public void onApplicationEvent(RefreshEvent event) {
-        // clear caches
+    public void reload() {
+        // a store is cached with the settings it was loaded from, so a changed setting is a miss on its own; clearing
+        // reloads an unchanged path too, for a store file rewritten in place
         keyStoreCache = null;
         trustStoreCache = null;
     }
 
     @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        reload();
+    }
+
+    @Override
     public int getOrder() {
         return RefreshEventListener.DEFAULT_POSITION - 10;
+    }
+
+    /**
+     * The settings a store was loaded from: a store loaded for other settings is stale, whichever
+     * notification of the change arrives first.
+     *
+     * @param path The store path
+     * @param keyPath The PEM key path
+     * @param certificatePath The PEM certificate path
+     * @param password The password
+     * @param type The store type
+     * @param provider The provider
+     */
+    private record StoreSettings(@Nullable String path, @Nullable String keyPath, @Nullable String certificatePath,
+                                 @Nullable String password, @Nullable String type, @Nullable String provider) {
+    }
+
+    private record CachedStore(StoreSettings settings, @Nullable KeyStore store) {
     }
 
     static class SelfSignedNotConfigured extends BuildSelfSignedCondition {
