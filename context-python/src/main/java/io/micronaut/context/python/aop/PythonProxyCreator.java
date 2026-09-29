@@ -495,6 +495,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     if (executableMethod.getReturnType().getType() == void.class) {
                         return null;
                     }
+                    if (coroutineFunction
+                        && Publisher.class.isAssignableFrom(executableMethod.getReturnType().getType())) {
+                        return PythonAsyncioRuntime.toPublisher(result);
+                    }
                     return box(executableMethod.getReturnType().asArgument(), result);
                 };
             }
