@@ -80,6 +80,12 @@ final class RequestReadIdleTimeoutHandler extends ReadTimeoutHandler {
                 pipeline.addFirst(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, handler);
             }
         } else {
+            if (pipeline.get(RequestReadIdleTimeoutHandler.NAME) != null) {
+                // the handler of the previous exchange: the connection can be handed to the next
+                // exchange, e.g. a redirect, while the last content of the previous response is
+                // still passed on, before that handler removes itself
+                pipeline.remove(RequestReadIdleTimeoutHandler.NAME);
+            }
             pipeline.addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, RequestReadIdleTimeoutHandler.NAME,
                 new RequestReadIdleTimeoutHandler(readIdleTimeout));
         }
