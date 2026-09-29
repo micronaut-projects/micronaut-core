@@ -19,7 +19,11 @@ import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.watch.ExecutableMethodChange;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.AnnotationValue;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
@@ -94,7 +98,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                                    @Nullable
                                    ApplicationEventPublisher eventPublisher,
                                    @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
-        this(conversionService, eventPublisher, executorService, null, null);
+        this(conversionService, eventPublisher, executorService, null, null, null);
     }
 
     /**
@@ -110,19 +114,59 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * @param namedCircuits The circuits of the named circuit breakers
      * @since 5.3.0
      */
-    @Inject
     public DefaultRetryInterceptor(ConversionService conversionService,
                                    @Nullable
                                    ApplicationEventPublisher eventPublisher,
                                    @Named(TaskExecutors.SCHEDULED) ExecutorService executorService,
                                    @Nullable RetryRegistry retryRegistry,
                                    @Nullable NamedCircuits namedCircuits) {
+        this(conversionService, eventPublisher, executorService, retryRegistry, namedCircuits, null);
+    }
+
+    /**
+     * Construct a default retry method interceptor with the event publisher, the registry of the
+     * named retry policies and the named circuit breakers, in a context whose circuit breaker methods
+     * are watched: the circuit of a method that went, or came back in a new generation, is dropped.
+     *
+     * @param conversionService The conversion service
+     * @param eventPublisher The event publisher to publish retry events
+     * @param executorService The executor service to use for completable futures
+     * @param retryRegistry The registry of the named retry policies
+     * @param namedCircuits The circuits of the named circuit breakers
+     * @param beanContext The bean context
+     * @since 5.3.0
+     */
+    @Inject
+    public DefaultRetryInterceptor(ConversionService conversionService,
+                                   @Nullable
+                                   ApplicationEventPublisher eventPublisher,
+                                   @Named(TaskExecutors.SCHEDULED) ExecutorService executorService,
+                                   @Nullable RetryRegistry retryRegistry,
+                                   @Nullable NamedCircuits namedCircuits,
+                                   @Nullable BeanContext beanContext) {
         this.retryRegistry = retryRegistry;
         this.conversionService = conversionService;
         this.eventPublisher = eventPublisher;
         this.executorService = (ScheduledExecutorService) executorService;
         this.retryRunner = new DefaultRetryRunner(this.executorService, this::sleep);
         this.namedCircuits = namedCircuits == null ? new NamedCircuits() : namedCircuits;
+        if (beanContext instanceof WatchableBeanContext watchable) {
+            watchable.watchMethods(CircuitBreaker.class, change -> {
+                // a circuit belongs to the method it guards: a method that went, or came back changed, starts closed;
+                // a named circuit is shared by name and outlives any one method
+                for (ExecutableMethodChange.Entry<CircuitBreaker> gone : change.removed()) {
+                    circuitContexts.keySet().removeIf(key -> key.method().equals(gone.method()));
+                }
+            });
+        }
+    }
+
+    /**
+     * @return How many circuit breaker methods hold a circuit
+     */
+    @Internal
+    public int circuitContexts() {
+        return circuitContexts.size();
     }
 
     @Override

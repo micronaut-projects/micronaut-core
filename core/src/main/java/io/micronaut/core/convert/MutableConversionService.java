@@ -61,4 +61,35 @@ public interface MutableConversionService extends ConversionService {
      */
     <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter);
 
+    /**
+     * Removes the converter registered for the given types, and the variations
+     * {@link #addConverter(Class, Class, TypeConverter)} registered with it. Nothing happens when none is registered.
+     *
+     * @param sourceType The source type
+     * @param targetType The target type
+     * @param <S>        The source generic type
+     * @param <T>        The target generic type
+     * @return Whether a converter was removed
+     * @since 5.3.0
+     */
+    default <S, T> boolean removeConverter(Class<S> sourceType, Class<T> targetType) {
+        throw new UnsupportedOperationException("This conversion service cannot remove a converter");
+    }
+
+    /**
+     * Removes the given converter, if it is the one registered for the given types, and the variations
+     * registered with it. Nothing happens when another converter is registered for the types, or none.
+     *
+     * @param sourceType    The source type
+     * @param targetType    The target type
+     * @param typeConverter The converter, as passed to {@link #addConverter(Class, Class, TypeConverter)}
+     * @param <S>           The source generic type
+     * @param <T>           The target generic type
+     * @return Whether the converter was removed
+     * @since 5.3.0
+     */
+    default <S, T> boolean removeConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        throw new UnsupportedOperationException("This conversion service cannot remove a converter");
+    }
+
 }
