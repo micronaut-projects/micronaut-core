@@ -34,6 +34,27 @@ class JsonMapperStreamWriterSpec extends Specification {
         out.closed
     }
 
+    void "the default stream writer keeps the stream open for a mapper that closes it after each value"() {
+        given:
+        def mapper = new WriteValueOnlyMapper(closeAfterWrite: true)
+        def out = new ClosingEnforcedOutputStream()
+
+        when:
+        def writer = mapper.createStreamWriter(out, Argument.STRING)
+        writer.write("a")
+        writer.write("b")
+
+        then:
+        out.toString(StandardCharsets.UTF_8) == '"a""b"'
+        !out.closed
+
+        when:
+        writer.close()
+
+        then:
+        out.closed
+    }
+
     void "the default stream writer rejects null arguments"() {
         when:
         new WriteValueOnlyMapper().createStreamWriter(null, Argument.STRING)
@@ -58,15 +79,50 @@ class JsonMapperStreamWriterSpec extends Specification {
     }
 
     /**
+     * Fails writes once closed, like a socket or file stream.
+     */
+    static class ClosingEnforcedOutputStream extends java.io.ByteArrayOutputStream {
+        boolean closed
+
+        @Override
+        void write(int b) {
+            ensureOpen()
+            super.write(b)
+        }
+
+        @Override
+        void write(byte[] b, int off, int len) {
+            ensureOpen()
+            super.write(b, off, len)
+        }
+
+        @Override
+        void close() {
+            closed = true
+        }
+
+        private void ensureOpen() {
+            if (closed) {
+                throw new IOException("closed")
+            }
+        }
+    }
+
+    /**
      * A mapper that only knows how to write a string or null value.
      */
     static class WriteValueOnlyMapper implements JsonMapper {
         List<Argument<?>> calls = []
+        boolean closeAfterWrite
 
         @Override
         <T> void writeValue(OutputStream outputStream, Argument<T> type, T object) throws IOException {
             calls.add(type)
             outputStream.write((object == null ? 'null' : '"' + object + '"').getBytes(StandardCharsets.UTF_8))
+            if (closeAfterWrite) {
+                // like a mapper whose generator closes its target
+                outputStream.close()
+            }
         }
 
         @Override

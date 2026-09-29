@@ -25,6 +25,7 @@ import io.micronaut.json.tree.JsonNode;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Processor;
 
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -255,7 +256,8 @@ public interface JsonMapper {
      * values, so the caller frames the sequence.
      *
      * <p>The default implementation calls {@link #writeValue(OutputStream, Argument, Object)} for
-     * every value.
+     * every value, with a view of the stream that the mapper cannot close: the stream is closed
+     * when the writer is.
      *
      * @param outputStream The stream to write to
      * @param type         The type of the values
@@ -268,10 +270,22 @@ public interface JsonMapper {
     default <T> JsonStreamWriter<T> createStreamWriter(OutputStream outputStream, Argument<T> type) throws IOException {
         Objects.requireNonNull(outputStream, "Output stream cannot be null");
         Objects.requireNonNull(type, "Type cannot be null");
+        // a mapper may close the stream it wrote a value to: only the writer closes the target
+        OutputStream nonClosing = new FilterOutputStream(outputStream) {
+            @Override
+            public void write(byte[] b, int off, int len) throws IOException {
+                out.write(b, off, len);
+            }
+
+            @Override
+            public void close() throws IOException {
+                out.flush();
+            }
+        };
         return new JsonStreamWriter<>() {
             @Override
             public void write(@Nullable T value) throws IOException {
-                writeValue(outputStream, type, value);
+                writeValue(nonClosing, type, value);
             }
 
             @Override
