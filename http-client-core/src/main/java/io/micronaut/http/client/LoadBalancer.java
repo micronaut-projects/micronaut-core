@@ -45,8 +45,9 @@ public interface LoadBalancer {
      * Report the outcome of an exchange with an instance this load balancer selected, so that
      * it can stop selecting an instance that keeps failing, see
      * {@link io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration}. The clients
-     * report every load balanced exchange, except the ones the caller cancelled. Ignored by
-     * default.
+     * report every selection exactly once, when its exchange ends: an exchange that the caller
+     * cancelled, or that ended without saying anything about the instance, is reported as
+     * {@link Outcome#CANCELLED}. Ignored by default.
      *
      * @param serviceInstance The instance the request was sent to
      * @param outcome         The outcome of the exchange
@@ -81,7 +82,15 @@ public interface LoadBalancer {
         /**
          * A response with a status of 500 or above.
          */
-        SERVER_ERROR
+        SERVER_ERROR,
+        /**
+         * The exchange ended without saying anything about the instance: the caller cancelled
+         * it before its response, or it failed before it reached the instance, e.g. because
+         * the connection pool was full or the client was closed. It only ends the exchange,
+         * e.g. for the count of exchanges in flight of a strategy: it is neither a failure nor
+         * a success for the outlier detection.
+         */
+        CANCELLED
     }
 
     /**

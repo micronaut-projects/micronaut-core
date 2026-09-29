@@ -66,6 +66,6 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Publishers.map(discoveryClient.getInstances(serviceID), this::getNextAvailable);
+        return Publishers.map(discoveryClient.getInstances(serviceID), instances -> getNextAvailable(instances, discriminator));
     }
 }

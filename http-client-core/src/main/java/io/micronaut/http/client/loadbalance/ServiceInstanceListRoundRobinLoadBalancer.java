@@ -48,7 +48,7 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Mono.fromCallable(() -> getNextAvailable(serviceInstanceList.getInstances()));
+        return Mono.fromCallable(() -> getNextAvailable(serviceInstanceList.getInstances(), discriminator));
     }
 
     @Override
