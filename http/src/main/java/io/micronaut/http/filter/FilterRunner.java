@@ -27,6 +27,7 @@ import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -327,6 +328,10 @@ public class FilterRunner {
                     continue;
                 } else {
                     // Reactive/Async request filter
+                    if (context.reactive()) {
+                        // subscribe the downstream in the reactive chain to keep its Reactor context
+                        flow = ReactiveExecutionFlow.fromFlow(flow);
+                    }
                     flow = flow.flatMap(newContext -> {
                         if (newContext.response() != null) {
                             return ExecutionFlow.just(newContext);

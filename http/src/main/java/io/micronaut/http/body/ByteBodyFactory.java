@@ -315,6 +315,80 @@ public class ByteBodyFactory {
     }
 
     /**
+     * A body with the bytes of the given body that fails with a
+     * {@link io.micronaut.http.exceptions.ContentLengthExceededException} once more than the given
+     * number of bytes arrive, e.g. to bound the body of a request a proxy relays. A body whose
+     * known length is over the limit fails right away. The given body is claimed; its trailers
+     * and its known length are kept.
+     *
+     * @param body        The body
+     * @param maxBodySize The maximum number of bytes
+     * @return The limited body
+     * @since 5.3.0
+     */
+    @NonNull
+    public final CloseableByteBody limit(@NonNull CloseableByteBody body, long maxBodySize) {
+        if (maxBodySize < 0) {
+            throw new IllegalArgumentException("The maximum body size is negative");
+        }
+        long expected = body.expectedLength().orElse(-1);
+        if (expected >= 0 && expected <= maxBodySize) {
+            return body.move();
+        }
+        if (expected > maxBodySize) {
+            // over the limit by its known length: the bytes are never read, so they are released now
+            body.close();
+            StreamingBody failed = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), bytesConsumed -> {
+            });
+            failed.sharedBuffer.setExpectedLengthFrom(Long.toString(expected));
+            return failed.rootBody;
+        }
+        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        StreamingBody sb = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        adapter.setTrailers(body.trailers());
+        return sb.rootBody;
+    }
+
+    /**
+     * A body that can be read more than once while its bytes arrive, keeping up to the given
+     * number of bytes, e.g. to send a request again after a failed attempt, see
+     * {@link ReplayableByteBody}. The given body is claimed. A body whose bytes are all there is
+     * replayable whatever its size, and a body whose known length is over the limit is read
+     * once.
+     *
+     * @param body          The body
+     * @param maxBufferSize The maximum number of bytes to keep for the next readers
+     * @return The replayable body
+     * @since 5.3.0
+     */
+    @NonNull
+    public final ReplayableByteBody replayable(@NonNull CloseableByteBody body, long maxBufferSize) {
+        if (maxBufferSize < 0) {
+            throw new IllegalArgumentException("The maximum buffer size is negative");
+        }
+        if (body instanceof AvailableByteBody) {
+            // the bytes are all there: a split is a reference, not a copy
+            return new ReplayableByteBody(body.move(), null, maxBufferSize);
+        }
+        long expected = body.expectedLength().orElse(-1);
+        if (expected > maxBufferSize) {
+            // the bytes cannot all be kept: the body is read once, and nothing is kept
+            return new ReplayableByteBody(body.move(), expected, maxBufferSize);
+        }
+        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        StreamingBody sb = createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, maxBufferSize), adapter);
+        // the buffered size counts what the body keeps, each reader is charged on its own
+        sb.sharedBuffer.setReaderBufferLimit(maxBufferSize);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        adapter.setTrailers(body.trailers());
+        if (expected >= 0) {
+            sb.sharedBuffer.setExpectedLength(expected);
+        }
+        return new ReplayableByteBody(sb.rootBody, sb.sharedBuffer, maxBufferSize);
+    }
+
+    /**
      * Convert a {@link ByteBody} into a {@link BaseStreamingByteBody} with the same content.
      * <b>Internal API.</b>
      *

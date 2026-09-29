@@ -392,7 +392,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             }
             this.demand = newDemand;
             if (oldDemand <= 0 && newDemand > 0) {
-                streamingContext.read();
+                readAndFlush();
             }
         }
 
@@ -426,8 +426,20 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             long oldDemand = demand;
             demand = Long.MAX_VALUE;
             if (oldDemand <= 0 && state == this) {
-                streamingContext.read();
+                readAndFlush();
             }
+        }
+
+        /**
+         * Requests more data outside of a read of the channel. On an HTTP/2 stream channel,
+         * {@code read()} returns the flow control window of the data read so far, but only flushes
+         * that window update when the channel is not still marked as reading, which it is after a
+         * read was requested during the previous read. Without the flush the server never learns
+         * about the window and the stream stalls.
+         */
+        private void readAndFlush() {
+            streamingContext.read();
+            streamingContext.flush();
         }
     }
 

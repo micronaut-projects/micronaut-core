@@ -116,7 +116,7 @@ record AroundLegacyFilter(HttpFilter bean, FilterOrder order) implements Interna
 
         @Override
         public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
-            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
+            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext())).asReactive();
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
@@ -127,7 +127,7 @@ record AroundLegacyFilter(HttpFilter bean, FilterOrder order) implements Interna
 
         @Override
         public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
-            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
+            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext())).asReactive();
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<MutableHttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;

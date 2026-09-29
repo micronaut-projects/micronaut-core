@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.health.HealthStatus;
@@ -34,6 +35,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     protected final AtomicInteger index = new AtomicInteger(0);
     private final AtomicReference<@Nullable OutlierDetector> outlierDetector = new AtomicReference<>();
+    private final AtomicReference<@Nullable LoadBalancerStrategy> strategy = new AtomicReference<>();
 
     /**
      * A load balancer that ignores the reported outcomes.
@@ -70,6 +72,43 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     }
 
     /**
+     * Let a strategy pick among the available instances of a load balancer, if it is one that
+     * can: a round-robin one. Any other load balancer is returned as it is.
+     *
+     * @param loadBalancer The load balancer
+     * @param strategy     The strategy, or {@code null} for round robin
+     * @return The load balancer
+     * @since 5.3.0
+     */
+    @Experimental
+    public static LoadBalancer withStrategy(LoadBalancer loadBalancer, @Nullable LoadBalancerStrategy strategy) {
+        if (strategy != null && loadBalancer instanceof AbstractRoundRobinLoadBalancer roundRobin) {
+            roundRobin.setStrategy(strategy);
+        }
+        return loadBalancer;
+    }
+
+    /**
+     * Pick among the available instances with the given strategy instead of round robin.
+     *
+     * @param strategy The strategy, or {@code null} for round robin
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setStrategy(@Nullable LoadBalancerStrategy strategy) {
+        this.strategy.set(strategy);
+    }
+
+    /**
+     * @return The strategy that picks among the available instances, {@code null} for round robin
+     * @since 5.3.0
+     */
+    @Experimental
+    public @Nullable LoadBalancerStrategy getStrategy() {
+        return strategy.get();
+    }
+
+    /**
      * Stop selecting an instance that keeps failing, as configured, or ignore the reported
      * outcomes with {@code null}. The ejection state starts over.
      *
@@ -93,6 +132,24 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @return The next available instance or a {@link NoAvailableServiceException} if none
      */
     protected ServiceInstance getNextAvailable(List<ServiceInstance> serviceInstances) {
+        return getNextAvailable(serviceInstances, null);
+    }
+
+    /**
+     * The next instance: an instance that is up and that is not ejected by the outlier
+     * detection, picked by the {@link #getStrategy() strategy}, round robin by default. When
+     * every instance that is up is ejected, one of them is selected anyway. An
+     * {@link ExcludedInstances} discriminator leaves its instances out, unless no other is
+     * available. With a strategy, an instance whose {@code backup} metadata is {@code true} is
+     * selected only when no other is available, like the backup servers of nginx.
+     *
+     * @param serviceInstances A list of service instances
+     * @param discriminator    The discriminator of the selection, if any
+     * @return The next available instance or a {@link NoAvailableServiceException} if none
+     * @since 5.3.0
+     */
+    @Experimental
+    protected ServiceInstance getNextAvailable(List<ServiceInstance> serviceInstances, @Nullable Object discriminator) {
         List<ServiceInstance> availableServices = serviceInstances.stream()
             .filter(si -> si.getHealthStatus().equals(HealthStatus.UP))
             .collect(Collectors.toList());
@@ -100,9 +157,29 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         if (detector != null) {
             availableServices = detector.available(availableServices);
         }
+        Object key = LoadBalancerKey.of(discriminator);
+        if (discriminator instanceof ExcludedInstances excluded) {
+            key = LoadBalancerKey.of(excluded.discriminator());
+            List<ServiceInstance> left = availableServices.stream().filter(si -> !excluded.uris().contains(si.getURI())).toList();
+            if (!left.isEmpty()) {
+                availableServices = left;
+            }
+        }
+        LoadBalancerStrategy strategy = this.strategy.get();
+        if (strategy != null) {
+            // the backup metadata counts once a strategy is configured: discovery metadata may
+            // carry that key already, and the default round robin stays as it was
+            List<ServiceInstance> primaries = availableServices.stream().filter(si -> !isBackup(si)).toList();
+            if (!primaries.isEmpty() && primaries.size() < availableServices.size()) {
+                availableServices = primaries;
+            }
+        }
         int len = availableServices.size();
         if (len == 0) {
             throw new NoAvailableServiceException(getServiceID());
+        }
+        if (strategy != null) {
+            return strategy.select(availableServices, key);
         }
         int i = getServiceIndex(len);
         try {
@@ -114,11 +191,19 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         }
     }
 
+    private static boolean isBackup(ServiceInstance instance) {
+        return instance.getMetadata().get("backup", String.class).map(value -> value.strip().equalsIgnoreCase("true")).orElse(false);
+    }
+
     @Override
     public void report(ServiceInstance serviceInstance, Outcome outcome) {
         OutlierDetector detector = outlierDetector.get();
         if (detector != null) {
             detector.report(serviceInstance, outcome);
+        }
+        LoadBalancerStrategy strategy = this.strategy.get();
+        if (strategy != null) {
+            strategy.report(serviceInstance, outcome);
         }
     }
 
