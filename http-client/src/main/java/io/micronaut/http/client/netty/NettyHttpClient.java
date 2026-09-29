@@ -1512,13 +1512,10 @@ final class NettyHttpClient implements
         try {
             BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
             if (options == null) {
-                return sendRawExchange(
-                    propagatedContext,
-                    blockHint,
-                    new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody)
-                );
+                RawHttpRequestWrapper<?> rawRequest = new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
+                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockHint, rawRequest));
             }
-            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
+            RawHttpRequestWrapper<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
             // the response timeout does not count the upload of the body: a slow upload does not time out
             CompletableFuture<@Nullable Void> uploadStarted = new CompletableFuture<>();
@@ -1526,11 +1523,11 @@ final class NettyHttpClient implements
             if (options.getResponseTimeout() != null) {
                 rawRequest.setAttribute(UPLOAD_LISTENER, new UploadListener(() -> uploadStarted.complete(null), () -> uploaded.complete(null)));
             }
-            return RawHttpClientSupport.withResponseTimeout(sendRawExchange(
+            return RawHttpClientSupport.withResponseTimeout(rawRequest.keepReplacedBody(sendRawExchange(
                 propagatedContext,
                 blockHint,
                 rawRequest
-            ), options.getResponseTimeout(), uploadStarted, uploaded, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
+            )), options.getResponseTimeout(), uploadStarted, uploaded, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;

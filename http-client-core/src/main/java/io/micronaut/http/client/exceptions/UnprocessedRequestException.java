@@ -133,8 +133,8 @@ public class UnprocessedRequestException extends HttpClientException {
     }
 
     /**
-     * Mark that the body was sent before this request failed, e.g. to a server that redirected
-     * it. <b>Internal API.</b>
+     * Mark that the body was sent or released before this request failed, e.g. sent to a server
+     * that redirected it, or replaced by a filter. <b>Internal API.</b>
      *
      * @since 5.3.0
      */
@@ -146,7 +146,7 @@ public class UnprocessedRequestException extends HttpClientException {
     /**
      * @return Whether the request was surely not read at all, e.g. the connection could not be
      * opened, so that its body is untouched. A request that was redirected is not: its body went
-     * to the server that redirected it.
+     * to the server that redirected it. Neither is one whose body a filter replaced.
      * @since 5.3.0
      */
     @Experimental

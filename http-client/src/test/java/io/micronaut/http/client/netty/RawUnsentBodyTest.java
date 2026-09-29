@@ -5,7 +5,11 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.socket.SocketUtils;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.annotation.ClientFilter;
+import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
@@ -22,6 +26,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -99,6 +104,26 @@ class RawUnsentBodyTest {
             Assertions.assertFalse(unprocessed.isBodyUntouched());
             Assertions.assertTrue(unprocessed.takeUnsentBody().isEmpty(), "the body went to the first server");
             redirector.join();
+        }
+    }
+
+    @Test
+    void aBodyAClientFilterReplacedIsNotHandedBack() throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "RawUnsentBodyTest"));
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            UnprocessedRequestException e = exchange(client.toAsyncRaw(), streamed(new AtomicBoolean()), RawRequestOptions.proxy().toBuilder().returnUnsentBody(true).build());
+            // the filter released the original bytes: there is nothing to hand back
+            Assertions.assertFalse(e.isBodyUntouched());
+            Assertions.assertTrue(e.takeUnsentBody().isEmpty());
+        }
+    }
+
+    @ClientFilter("/unsent")
+    @Requires(property = "spec.name", value = "RawUnsentBodyTest")
+    static class ReplacingFilter {
+        @RequestFilter
+        void replace(MutableHttpRequest<?> request) {
+            request.body("replacement");
         }
     }
 }
