@@ -656,12 +656,19 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
          * A snapshot of the path, in its own order, for rendering a message.
          *
          * <p>Rendering reads the path several times -- iterating it, and asking for its
-         * size and for the index of an element -- so it must not read the live list. If
-         * the path is modified in between, iteration fails with a
+         * size and for the index of an element -- so it must not read the live list. A
+         * segment's own {@code toString} can resolve something that pushes onto the path
+         * part way through, and iteration then fails with a
          * {@link java.util.ConcurrentModificationException} thrown from inside the
          * constructor of the exception being reported, which replaces a
          * {@code Circular dependency detected} message and its path with an unrelated
          * error naming neither. Reporting a failure must not be able to fail.
+         *
+         * <p>This addresses modification by the rendering thread, which is the case a
+         * resolution context has: the path belongs to one thread's resolution. It is not a
+         * guard against another thread mutating the path concurrently, and cannot be --
+         * {@link java.util.LinkedList#toArray()} walks its nodes without checking
+         * {@code modCount}, so the copy itself would be unsafe.
          *
          * <p>The order is the list's own, not the descending order the renderers walk in,
          * so that an index into it means what it meant before: {@code lastIndexOf} is used
