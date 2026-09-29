@@ -14,6 +14,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
+import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.http.server.netty.NettyServerCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.annotation.OnMessage
@@ -264,6 +265,73 @@ class AccessLogRequestAttributeElementSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1.1 logs the attribute of the request that a filter replaced the original with'() {
+        given:
+        def ctx = start('%U %{routeId}r', [:])
+        def listAppender = appender()
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
+        def channel = http1Client(group, ctx.getBean(EmbeddedServer), responses)
+
+        when:
+        channel.write(request('/route-attribute/replaced/one'))
+        channel.writeAndFlush(request('/route-attribute/replaced-missing'))
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 2
+            listAppender.list.size() == 2
+        }
+        responses*.content()*.toString(StandardCharsets.UTF_8) == ['one', 'replaced-missing']
+        listAppender.list*.formattedMessage == [
+                '/route-attribute/replaced/one one',
+                '/route-attribute/replaced-missing -',
+        ]
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        channel?.close()
+        group.shutdownGracefully()
+        ctx.close()
+    }
+
+    def 'h2c logs the attribute of the request that a filter replaced the original with'() {
+        given:
+        def ctx = start('%U %{routeId}r', [
+                'micronaut.server.http-version': '2.0',
+                'micronaut.ssl.enabled'        : false,
+        ])
+        def listAppender = appender()
+        def upgrade = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/route-attribute/replaced/one')
+        upgrade.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), ':https')
+        def stream = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/route-attribute/replaced/two')
+        stream.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), ':https')
+        stream.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), 3)
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
+
+        when:
+        def channel = h2cClient(group, ctx.getBean(EmbeddedServer), responses, [stream])
+        channel.writeAndFlush(upgrade)
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 2
+            listAppender.list.size() == 2
+        }
+        responses*.content()*.toString(StandardCharsets.UTF_8).toSet() == ['one', 'two'].toSet()
+        listAppender.list*.formattedMessage.toSet() == [
+                '/route-attribute/replaced/one one',
+                '/route-attribute/replaced/two two',
+        ].toSet()
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        channel?.close()
+        group.shutdownGracefully()
+        ctx.close()
+    }
+
     def 'h2c logs the request attribute of each concurrent stream'() {
         given:
         def ctx = start('%U %{routeId}r', [
@@ -387,6 +455,51 @@ class AccessLogRequestAttributeElementSpec extends Specification {
                 .connect().sync().channel()
     }
 
+    /**
+     * An h2c client that upgrades with the first request it writes, and sends the given requests
+     * as new streams once the upgrade response arrives.
+     */
+    private static Channel h2cClient(NioEventLoopGroup group, EmbeddedServer server, List<FullHttpResponse> responses, List<DefaultFullHttpRequest> afterUpgrade) {
+        return new Bootstrap()
+                .group(group)
+                .channel(NioSocketChannel)
+                .option(ChannelOption.AUTO_READ, true)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                        def connection = new DefaultHttp2Connection(false)
+                        def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
+                                .initialSettings(Http2Settings.defaultSettings())
+                                .frameListener(new DelegatingDecompressorFrameListener(
+                                        connection,
+                                        new InboundHttp2ToHttpAdapterBuilder(connection)
+                                                .maxContentLength(Integer.MAX_VALUE)
+                                                .propagateSettings(false)
+                                                .build()
+                                ))
+                                .connection(connection)
+                                .build()
+                        def clientCodec = new HttpClientCodec()
+                        def upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler)
+                        ch.pipeline()
+                                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, clientCodec)
+                                .addLast(new HttpClientUpgradeHandler(clientCodec, upgradeCodec, 1000000))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NonNull ChannelHandlerContext ctx_, @NonNull Object msg) throws Exception {
+                                        if (responses.isEmpty()) {
+                                            afterUpgrade.forEach(r -> ctx_.channel().write(r))
+                                            ctx_.channel().flush()
+                                        }
+                                        responses.add((FullHttpResponse) msg)
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(server.host, server.port)
+                .connect().sync().channel()
+    }
+
     private static DefaultFullHttpRequest request(String uri) {
         def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, uri)
         request.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
@@ -449,6 +562,18 @@ class AccessLogRequestAttributeElementSpec extends Specification {
             return HttpResponse.ok('throwing')
         }
 
+        @Get('/replaced/{id}')
+        HttpResponse<?> replaced(HttpRequest<?> request, String id) {
+            request.setAttribute('routeId', id)
+            // prove that the filter replaced the request
+            return HttpResponse.ok(request instanceof NettyHttpRequest ? 'original' : id)
+        }
+
+        @Get('/replaced-missing')
+        HttpResponse<?> replacedMissing(HttpRequest<?> request) {
+            return HttpResponse.ok(request instanceof NettyHttpRequest ? 'original' : 'replaced-missing')
+        }
+
         @Get('/none')
         HttpResponse<?> none() {
             return HttpResponse.ok('none')
@@ -477,6 +602,18 @@ class AccessLogRequestAttributeElementSpec extends Specification {
         @RequestFilter
         void filter(HttpRequest<?> request) {
             request.setAttribute('routeId', 'ws')
+        }
+    }
+
+    /**
+     * Replaces the request with a new one, so the route sets its attributes on the replacement.
+     */
+    @Requires(property = 'spec.name', value = 'AccessLogRequestAttributeElementSpec')
+    @ServerFilter(['/route-attribute/replaced/**', '/route-attribute/replaced-missing'])
+    static class ReplacingFilter {
+        @RequestFilter
+        HttpRequest<?> replace(HttpRequest<?> request) {
+            return HttpRequest.GET(request.uri.toString())
         }
     }
 

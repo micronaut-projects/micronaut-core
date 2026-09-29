@@ -419,13 +419,24 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         final RouteMatch<?> route;
 
         boolean shouldProceedNormally;
+        @Nullable
+        private NettyHttpRequest<?> nettyRequest;
 
         WebsocketRequestLifecycle(RouteExecutor routeExecutor, @Nullable RouteMatch<?> route) {
             super(routeExecutor);
             this.route = route;
         }
 
-        ExecutionFlow<HttpResponse<?>> handle(HttpRequest<?> request) {
+        @Override
+        protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.setFilteredRequest(filteredRequest);
+            }
+        }
+
+        ExecutionFlow<HttpResponse<?>> handle(NettyHttpRequest<?> request) {
+            this.nettyRequest = request;
             MutableHttpResponse<?> proceed = HttpResponse.ok();
 
             if (route != null) {

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -45,7 +46,12 @@ final class RequestAttributeElement extends AbstractHttpMessageLogElement {
 
     @Override
     public String onResponseHeaders(ChannelHandlerContext ctx, HttpHeaders headers, String status) {
-        if (ctx.channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST).get() instanceof HttpRequest<?> request) {
+        Object responseRequest = ctx.channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST).get();
+        if (responseRequest instanceof NettyHttpRequest<?> nettyRequest) {
+            // filters may have replaced the request that the route set its attributes on
+            responseRequest = nettyRequest.getEffectiveRequest();
+        }
+        if (responseRequest instanceof HttpRequest<?> request) {
             Object value = request.getAttribute(attribute).orElse(null);
             if (value instanceof Optional<?> optional) {
                 value = optional.orElse(null);
