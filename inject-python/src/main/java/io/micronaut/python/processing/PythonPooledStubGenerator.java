@@ -19,6 +19,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -68,6 +69,8 @@ import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 final class PythonPooledStubGenerator {
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
+    private static final ClassTypeDef POOLED_INSTANCE = ClassTypeDef.of("io.micronaut.context.python.PythonPooledInstance");
+    private static final String POOLED_INSTANCE_FIELD = "graalpyPooledInstance";
     private static final String REPORTED_POOLED_DEPENDENCIES = "micronaut.python.reported-pooled-dependencies";
 
     /**
@@ -192,31 +195,90 @@ final class PythonPooledStubGenerator {
             warnAboutContextBoundDependencies(context, element, List.of(pythonConstructor.getParameters()));
         }
 
-        MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
-        builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
-
-        builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
-            .addModifiers(Modifier.PUBLIC)
-            .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
-                .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(pythonClassReference(element, pythonClassReference))).returning())));
-
-        builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
-            .addModifiers(Modifier.PUBLIC)
-            .addParameter(POLYGLOT_CONTEXT)
-            .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
-                .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
-                    pythonClassReference(element, pythonClassReference),
-                    params.getFirst()
-                )).returning())));
-
         ClassTypeDef thisType = ClassTypeDef.of(typeName);
-        builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
-            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-            .addParameter(POLYGLOT_VALUE)
-            .returns(thisType)
-            .build(((aThis, methodParameters) -> thisType.instantiate().returning())));
+        ParameterElement[] constructorParameters = pythonConstructor == null
+            ? new ParameterElement[0]
+            : pythonConstructor.getParameters();
+        boolean hasConstructorArguments = constructorParameters.length > 0;
+
+        FieldDef pooledInstanceField = null;
+        if (hasConstructorArguments) {
+            // The bean owns its per-context instances, because the pool's cache is keyed by class
+            // and two pooled beans of one class can hold different dependencies. The arguments are
+            // captured once, at injection, and used to construct in whichever context serves a call.
+            FieldDef pooledInstance = FieldDef.builder(POOLED_INSTANCE_FIELD, POOLED_INSTANCE)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                .build();
+            builder.addField(pooledInstance);
+            pooledInstanceField = pooledInstance;
+
+            MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
+            for (ParameterElement parameter : constructorParameters) {
+                ctor.addParameter(ParameterDef.builder(parameter.getName(), erasedType(parameter.getGenericType())).build());
+            }
+            builder.addMethod(ctor.build(((aThis, params) -> aThis.field(pooledInstance).assign(
+                POOLED_INSTANCE.instantiate(
+                    List.of(
+                        pythonClassReference(element, pythonClassReference),
+                        TypeDef.OBJECT.array().instantiate(params)
+                    )
+                )
+            ))));
+
+            builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(POLYGLOT_VALUE)
+                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                    .invokeStatic("findPooledInstance", POLYGLOT_VALUE, List.of(aThis.field(pooledInstance))).returning())));
+
+            builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(POLYGLOT_CONTEXT)
+                .returns(POLYGLOT_VALUE)
+                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                    .invokeStatic("findPooledInstance", POLYGLOT_VALUE, List.of(
+                        aThis.field(pooledInstance),
+                        params.getFirst()
+                    )).returning())));
+
+            // A wrapper cannot be rebuilt from a bare value here: the dependencies the instance was
+            // constructed with are not recoverable from it. Previously unreachable, because a pooled
+            // type could not have constructor arguments at all.
+            builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(POLYGLOT_VALUE)
+                .returns(thisType)
+                .build(((aThis, methodParameters) -> ClassTypeDef.of(UnsupportedOperationException.class)
+                    .instantiate(ExpressionDef.constant(
+                        "Cannot rebuild the pooled Python bean [" + element.getName() + "] from a polyglot value: "
+                            + "it is constructed with injected dependencies, which the value does not carry."
+                    )).doThrow())));
+        } else {
+            MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
+            builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
+
+            builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(POLYGLOT_VALUE)
+                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                    .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(pythonClassReference(element, pythonClassReference))).returning())));
+
+            builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(POLYGLOT_CONTEXT)
+                .returns(POLYGLOT_VALUE)
+                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                    .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
+                        pythonClassReference(element, pythonClassReference),
+                        params.getFirst()
+                    )).returning())));
+
+            builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(POLYGLOT_VALUE)
+                .returns(thisType)
+                .build(((aThis, methodParameters) -> thisType.instantiate().returning())));
+        }
 
         List<MethodElement> methodsToBridge = element.getEnclosedElements(
             ElementQuery.ALL_METHODS
@@ -231,7 +293,7 @@ final class PythonPooledStubGenerator {
         addReferencedPythonClassReferenceFields(builder, element, methodsToBridge);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethodPooledClass(methodElement, builder, element, allClasses);
+            addBridgeMethodPooledClass(methodElement, builder, element, allClasses, pooledInstanceField);
         }
 
         return builder;
@@ -317,7 +379,8 @@ final class PythonPooledStubGenerator {
     private static void addBridgeMethodPooledClass(MethodElement methodElement,
                                                    ClassDef.ClassDefBuilder builder,
                                                    AbstractPythonClassElement element,
-                                                   Map<String, ClassElement> allClasses) {
+                                                   Map<String, ClassElement> allClasses,
+                                                   @Nullable FieldDef pooledInstanceField) {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
@@ -333,19 +396,27 @@ final class PythonPooledStubGenerator {
             for (int i = 0; i < methodElement.getParameters().length; i++) {
                 parameterExpressions.add(methodParameters.get(i));
             }
+            // A bean that owns its per-context instances is invoked through the holder; one
+            // without arguments still goes through the pool's class cache.
+            boolean ownsInstances = pooledInstanceField != null;
             List<ExpressionDef> args = new ArrayList<>();
-            args.add(pythonClassReference(element, element));
+            args.add(ownsInstances ? aThis.field(pooledInstanceField) : pythonClassReference(element, element));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
             if (isAsyncGeneratorPythonMethod(methodElement)) {
                 return convertedElementPublisher(allClasses, methodElement.getGenericReturnType(),
-                    PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledPublisher", ClassTypeDef.of(PUBLISHER), args)).returning();
+                    PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                        ownsInstances ? "invokePooledInstancePublisher" : "invokePooledPublisher",
+                        ClassTypeDef.of(PUBLISHER), args)).returning();
             }
             if (isAsyncPythonMethod(methodElement) && !methodElement.getReturnType().isVoid()) {
                 // the coroutine is driven while the pooled context is still leased to this call
-                return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledAsync", TypeDef.of(CompletionStage.class), args));
+                return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                    ownsInstances ? "invokePooledInstanceAsync" : "invokePooledAsync",
+                    TypeDef.of(CompletionStage.class), args));
             }
-            var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooled", POLYGLOT_VALUE, args);
+            var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                ownsInstances ? "invokePooledInstance" : "invokePooled", POLYGLOT_VALUE, args);
             return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
 

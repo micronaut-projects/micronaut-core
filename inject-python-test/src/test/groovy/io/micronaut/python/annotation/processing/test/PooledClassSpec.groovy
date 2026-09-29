@@ -144,4 +144,37 @@ class Holder:
         cleanup:
         context?.close()
     }
+
+    void "pooled class with a pooled dependency works at runtime across contexts"() {
+        given: "both pooled, so each context has its own instance of each"
+        def python = '''
+from micronaut.context.python.scope import ContextPooled
+
+@ContextPooled
+class Greeter:
+    def greeting(self) -> str:
+        return "hello"
+
+@ContextPooled
+class Greeting:
+    def __init__(self, greeter: Greeter):
+        self.greeter = greeter
+
+    def greet(self, name: str) -> str:
+        return self.greeter.greeting() + " " + name
+'''
+        Map<String, Object> props = ["micronaut.python.pool.size": 4]
+        def context = buildContext(python, true, props)
+
+        when: "the bean is used repeatedly, so more than one pooled context serves it"
+        def greetingClass = context.classLoader.loadClass("python.Greeting")
+        def bean = context.getBean(greetingClass)
+        def results = (1..40).collect { bean.greet("world") }
+
+        then: "every call sees a correctly constructed instance, whichever context served it"
+        results.every { it == "hello world" }
+
+        cleanup:
+        context?.close()
+    }
 }
