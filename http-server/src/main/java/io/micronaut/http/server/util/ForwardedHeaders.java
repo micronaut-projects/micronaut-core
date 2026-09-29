@@ -44,7 +44,13 @@ import java.util.function.Predicate;
  *     {@code -Prefix} values the first proxy set are kept. If the trusted chain only comes in
  *     one of the two formats, it is translated to the other one before this hop is appended
  *     (RFC 7239 section 7.4), so that both headers describe the same chain: a downstream server
- *     that prefers {@code Forwarded} must not see this hop as the client.</li>
+ *     that prefers {@code Forwarded} must not see this hop as the client. A trusted proxy is
+ *     trusted with the values, not with their syntax: an {@code X-Forwarded-Proto} with a scheme
+ *     that is not {@code http}, {@code https}, {@code ws} or {@code wss}, or an
+ *     {@code X-Forwarded-Port} with a port that is not a number between 1 and 65535, is dropped,
+ *     also from the translated {@code Forwarded} header, and the value of this hop is sent
+ *     instead. Such a port is dropped from an {@code X-Forwarded-Host}, and such a scheme or port
+ *     from the {@code proto} and {@code host} of a {@code Forwarded} element.</li>
  *     <li>From any other peer, the inbound values could be forged, so they are replaced with the
  *     values of this hop.</li>
  * </ul>
@@ -85,6 +91,10 @@ public final class ForwardedHeaders {
     private static final int HTTP_PORT = 80;
     private static final int HTTPS_PORT = 443;
     private static final String UNKNOWN = "unknown";
+    // the parameters of a Forwarded element (RFC 7239 section 5)
+    private static final String FOR = "for";
+    private static final String PROTO = "proto";
+    private static final String HOST = "host";
 
     private final Predicate<? super InetSocketAddress> trustedProxy;
     private final boolean xForwarded;
@@ -148,11 +158,13 @@ public final class ForwardedHeaders {
         }
 
         // read the inbound values before the outbound headers change: the two requests can share
-        // their headers, e.g. for a request mutated from a Netty server request
+        // their headers, e.g. for a request mutated from a Netty server request. A trusted proxy
+        // is trusted with the values, not with their syntax: a scheme or a port that is not one
+        // is dropped, before it is translated to Forwarded, and this hop's own value is sent
         String inboundFor = trusted ? join(in.getAll(X_FORWARDED_FOR)) : null;
-        String inboundProto = trusted ? in.get(X_FORWARDED_PROTO) : null;
-        String inboundHost = trusted ? in.get(X_FORWARDED_HOST) : null;
-        String inboundPort = trusted ? in.get(X_FORWARDED_PORT) : null;
+        String inboundProto = trusted ? validScheme(in.get(X_FORWARDED_PROTO)) : null;
+        String inboundHost = trusted ? validHost(in.get(X_FORWARDED_HOST)) : null;
+        String inboundPort = trusted ? validPort(in.get(X_FORWARDED_PORT)) : null;
         String inboundPrefix = trusted ? in.get(X_FORWARDED_PREFIX) : null;
         String inboundForwarded = trusted ? join(in.getAll(HttpHeaders.FORWARDED)) : null;
         if (trusted) {
@@ -165,17 +177,21 @@ public final class ForwardedHeaders {
                 // Forwarded header gives each value the X-Forwarded-* headers do not, e.g. the
                 // client when a proxy only added X-Forwarded-Proto
                 List<Map<String, String>> elements = parseForwarded(inboundForwarded);
+                if (dropInvalidValues(elements)) {
+                    // the other values of the chain are sent as they are
+                    inboundForwarded = formatForwarded(elements);
+                }
                 List<String> addresses = new ArrayList<>(elements.size());
                 String forwardedProto = null;
                 String firstHost = null;
                 for (Map<String, String> element : elements) {
-                    String address = element.get("for");
+                    String address = element.get(FOR);
                     addresses.add(address == null ? UNKNOWN : toXForwardedFor(address));
                     if (forwardedProto == null) {
-                        forwardedProto = element.get("proto");
+                        forwardedProto = element.get(PROTO);
                     }
                     if (firstHost == null) {
-                        firstHost = element.get("host");
+                        firstHost = element.get(HOST);
                     }
                 }
                 if (inboundFor == null && !addresses.isEmpty()) {
@@ -189,7 +205,7 @@ public final class ForwardedHeaders {
                     if (portSeparator >= 0) {
                         inboundHost = firstHost.substring(0, portSeparator);
                         if (inboundPort == null) {
-                            inboundPort = firstHost.substring(portSeparator + 1);
+                            inboundPort = validPort(firstHost.substring(portSeparator + 1));
                         }
                     } else {
                         inboundHost = firstHost;
@@ -244,14 +260,15 @@ public final class ForwardedHeaders {
                 elements.add("for=" + forwardedNode(trimmed.isEmpty() ? UNKNOWN : trimmed));
             }
         }
+        // a list of schemes, hosts or ports has one per proxy: the first proxy received the first
         StringBuilder first = new StringBuilder(elements.isEmpty() ? "" : elements.get(0));
         if (proto != null) {
-            first.append(first.isEmpty() ? "" : ";").append("proto=").append(quoteIfNeeded(proto.trim()));
+            first.append(first.isEmpty() ? "" : ";").append("proto=").append(quoteIfNeeded(first(proto)));
         }
         if (host != null) {
-            String hostWithPort = host.trim();
-            if (port != null && portSeparator(hostWithPort) < 0 && !port.trim().equals(String.valueOf(defaultPort(proto)))) {
-                hostWithPort = hostWithPort + ":" + port.trim();
+            String hostWithPort = first(host);
+            if (port != null && portSeparator(hostWithPort) < 0 && !first(port).equals(String.valueOf(defaultPort(proto)))) {
+                hostWithPort = hostWithPort + ":" + first(port);
             }
             first.append(first.isEmpty() ? "" : ";").append("host=").append(quoteIfNeeded(hostWithPort));
         }
@@ -372,7 +389,7 @@ public final class ForwardedHeaders {
      */
     private static int externalPort(@Nullable String forwardedHost, @Nullable String forwardedProto, String proto, int port) {
         if (forwardedHost != null) {
-            String trimmed = forwardedHost.trim();
+            String trimmed = first(forwardedHost);
             int portSeparator = portSeparator(trimmed);
             if (portSeparator >= 0) {
                 try {
@@ -389,11 +406,161 @@ public final class ForwardedHeaders {
         return defaultPort == null ? port : defaultPort;
     }
 
+    /**
+     * @param value A value of {@code X-Forwarded-Proto}, a scheme or a list of them, one per proxy
+     * @return The value if each scheme is {@code http}, {@code https}, {@code ws} or {@code wss},
+     * else {@code null}
+     */
+    private static @Nullable String validScheme(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        for (String scheme : value.split(",", -1)) {
+            if (!isScheme(scheme.trim())) {
+                return null;
+            }
+        }
+        return value;
+    }
+
+    /**
+     * @param value A single scheme, e.g. the {@code proto} of a {@code Forwarded} element
+     * @return Whether it is {@code http}, {@code https}, {@code ws} or {@code wss}
+     */
+    private static boolean isScheme(String value) {
+        return schemePort(value) != null;
+    }
+
+    /**
+     * @param value A value of {@code X-Forwarded-Host}, a host or a list of them, one per proxy
+     * @return The value, without the port of a host whose port is not a number between 1 and
+     * 65535
+     */
+    private static @Nullable String validHost(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String[] hosts = value.split(",", -1);
+        boolean dropped = false;
+        for (int i = 0; i < hosts.length; i++) {
+            String host = hosts[i].trim();
+            int portSeparator = portSeparator(host);
+            if (portSeparator >= 0 && !isPort(host.substring(portSeparator + 1))) {
+                host = host.substring(0, portSeparator);
+                dropped = true;
+            }
+            hosts[i] = host;
+        }
+        return dropped ? String.join(", ", hosts) : value;
+    }
+
+    /**
+     * Drop the invalid values of {@code Forwarded} elements: a {@code proto} that is no scheme,
+     * a {@code host} that is a list, and the port of a {@code host} that is no port. Each
+     * parameter of an element has a single value (RFC 7239 section 5), unlike the
+     * {@code X-Forwarded-*} lists.
+     *
+     * @param elements The parsed elements
+     * @return Whether a value was dropped
+     */
+    private static boolean dropInvalidValues(List<Map<String, String>> elements) {
+        boolean dropped = false;
+        for (Map<String, String> element : elements) {
+            String proto = element.get(PROTO);
+            if (proto != null && !isScheme(proto)) {
+                element.remove(PROTO);
+                dropped = true;
+            }
+            String host = element.get(HOST);
+            if (host != null && host.indexOf(',') >= 0) {
+                element.remove(HOST);
+                dropped = true;
+            } else if (host != null) {
+                String valid = Objects.requireNonNull(validHost(host));
+                if (!valid.equals(host)) {
+                    element.put(HOST, valid);
+                    dropped = true;
+                }
+            }
+        }
+        return dropped;
+    }
+
+    /**
+     * Format parsed {@code Forwarded} elements, quoting the values that are no token. An element
+     * left without parameters stays in the chain as an unknown node.
+     */
+    private static String formatForwarded(List<Map<String, String>> elements) {
+        List<String> formatted = new ArrayList<>(elements.size());
+        for (Map<String, String> element : elements) {
+            if (element.isEmpty()) {
+                formatted.add("for=" + UNKNOWN);
+                continue;
+            }
+            List<String> pairs = new ArrayList<>(element.size());
+            element.forEach((name, value) -> pairs.add(name + "=" + quoteIfNeeded(value)));
+            formatted.add(String.join(";", pairs));
+        }
+        return String.join(", ", formatted);
+    }
+
+    /**
+     * @return The first value of a list, trimmed
+     */
+    private static String first(String list) {
+        int comma = list.indexOf(',');
+        return (comma < 0 ? list : list.substring(0, comma)).trim();
+    }
+
+    /**
+     * @param value A value of {@code X-Forwarded-Port}, a port or a list of them, one per proxy
+     * @return The value if each port is a number between 1 and 65535, else {@code null}
+     */
+    private static @Nullable String validPort(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        for (String port : value.split(",", -1)) {
+            if (!isPort(port)) {
+                return null;
+            }
+        }
+        return value;
+    }
+
+    /**
+     * @param value A port
+     * @return Whether it is a number between 1 and 65535
+     */
+    private static boolean isPort(String value) {
+        String trimmed = value.trim();
+        if (trimmed.isEmpty() || trimmed.length() > 5) {
+            return false;
+        }
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        int port = Integer.parseInt(trimmed);
+        return port >= 1 && port <= 65535;
+    }
+
     private static @Nullable Integer defaultPort(@Nullable String proto) {
         if (proto == null) {
             return null;
         }
-        return switch (proto.trim().toLowerCase(Locale.ROOT)) {
+        return schemePort(first(proto));
+    }
+
+    /**
+     * @param scheme A single scheme
+     * @return The default port of {@code http}, {@code https}, {@code ws} or {@code wss}, else
+     * {@code null}
+     */
+    private static @Nullable Integer schemePort(String scheme) {
+        return switch (scheme.toLowerCase(Locale.ROOT)) {
             case "http", "ws" -> HTTP_PORT;
             case "https", "wss" -> HTTPS_PORT;
             default -> null;
