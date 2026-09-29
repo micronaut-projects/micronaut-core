@@ -147,7 +147,7 @@ public final class RouteExecutor {
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
-        this.suspendedRoutesNeedReactorContext = coroutineHelper != null && coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
+        this.suspendedRoutesNeedReactorContext = coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
     }
 
