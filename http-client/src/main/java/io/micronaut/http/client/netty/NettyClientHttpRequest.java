@@ -317,6 +317,23 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
         );
     }
 
+    /**
+     * Create the netty request that the client sends for this request. Unlike
+     * {@link #toHttpRequestWithoutBody()}, the headers are a copy, so that the client can add
+     * the headers it generates without modifying this request.
+     *
+     * @param uri The request URI to send
+     * @return The netty request, without body
+     */
+    HttpRequest toOutgoingHttpRequest(String uri) {
+        return new DefaultHttpRequest(
+            HttpVersion.HTTP_1_1,
+            getMethod(httpMethodName),
+            uri,
+            headers.getNettyHeaders().copy()
+        );
+    }
+
     @Override
     @Deprecated
     public boolean isStream() {
