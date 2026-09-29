@@ -97,21 +97,51 @@ class PoolController:
         }
     }
 
-    void "pooled class with ctor args fails compilation"() {
+    void "pooled class with constructor arguments compiles"() {
+        given: "the arguments are not Python beans pinned to one context"
+        def python = '''
+from micronaut.context.python.scope import ContextPooled
+
+@ContextPooled
+class WithArgs:
+    def __init__(self, a: int):
+        self.a = a
+
+    def value(self) -> int:
+        return self.a
+'''
+        when:
+        def context = buildContext(python, false)
+
+        then: "no longer rejected -- each context constructs its own instance with these arguments"
+        context != null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "pooled class depending on a pooled Python bean compiles"() {
         given:
         def python = '''
 from micronaut.context.python.scope import ContextPooled
 
 @ContextPooled
-class Bad:
-    def __init__(self, a: int):
-        self.a = a
+class Dependency:
+    def name(self) -> str:
+        return "dependency"
+
+@ContextPooled
+class Holder:
+    def __init__(self, dependency: Dependency):
+        self.dependency = dependency
 '''
         when:
-        buildContext(python, false)
+        def context = buildContext(python, false)
 
-        then:
-        def ex = thrown(Exception)
-        ex.message.contains("must be stateless")
+        then: "a pooled dependency exists in every context, so there is nothing to warn about"
+        context != null
+
+        cleanup:
+        context?.close()
     }
 }

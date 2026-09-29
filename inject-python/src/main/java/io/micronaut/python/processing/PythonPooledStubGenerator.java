@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -66,39 +67,43 @@ final class PythonPooledStubGenerator {
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
 
     /**
-     * Rejects a pooled type whose Python dependency is pinned to a single context.
+     * Warns about a pooled type whose Python dependency is pinned to a single context.
      *
-     * <p>A pooled type exists once per context, so it may only hold references that can exist
-     * in whichever context serves a call. A singleton Python bean cannot: it is one instance
-     * living in one context, and a pooled instance in another context holding a reference to
-     * it puts that context's work back through the owning one. That is the cost pooling is
-     * there to avoid, and it would be invisible -- the application would run, and only be
-     * slower under concurrency.
+     * <p>A pooled type exists once per context, so it gains from holding only references that
+     * can exist in whichever context serves a call. A singleton Python bean cannot: it is one
+     * instance living in one context, and a pooled instance elsewhere holding a reference to it
+     * puts that context's work back through the owning one. That is the cost pooling is there
+     * to avoid, and nothing else reports it -- the application runs, and is only slower under
+     * concurrency, by more the more contexts there are.
      *
-     * <p>So a Python dependency has to be pooled itself, or scoped so that a fresh instance
-     * can be made for the context that needs it. A dependency that is *not* a Python type is
-     * unrestricted: a Java bean has no context affinity and no interpreter lock to contend
-     * for, so a pooled type may hold as many of them as it likes.
+     * <p>A dependency that is not a Python type is unrestricted: a Java bean has no context
+     * affinity and no interpreter lock to contend for, so a pooled type may hold as many as it
+     * likes.
      *
-     * @param element The pooled Python class
-     * @param constructor Its primary constructor, or {@code null} when it has none
+     * <p>This is a warning rather than an error on purpose. The shape already exists and works:
+     * a route module is pooled and commonly injects singleton services, so rejecting it would
+     * break code that compiles today for the sake of a performance characteristic. The warning
+     * names the cost and leaves the choice.
+     *
+     * @param context The visitor context, for reporting
+     * @param element The pooled Python type
+     * @param dependencies Its injected dependencies
      */
-    private static void validatePooledDependencies(AbstractPythonClassElement element, MethodElement constructor) {
-        if (constructor == null) {
-            return;
-        }
-        for (ParameterElement parameter : constructor.getParameters()) {
-            ClassElement parameterType = parameter.getGenericType();
-            if (!isPythonType(parameterType) || parameterType.hasStereotype(CONTEXT_POOLED)) {
+    private static void warnAboutContextBoundDependencies(VisitorContext context,
+                                                          ClassElement element,
+                                                          List<? extends TypedElement> dependencies) {
+        for (TypedElement dependency : dependencies) {
+            ClassElement dependencyType = dependency.getGenericType();
+            if (!isPythonType(dependencyType) || dependencyType.hasStereotype(CONTEXT_POOLED)) {
                 continue;
             }
-            if (parameterType.hasStereotype(AnnotationUtil.SINGLETON)) {
-                throw new ProcessingException(element, "A pooled type cannot depend on the singleton Python bean ["
-                    + parameterType.getName() + "] through parameter [" + parameter.getName() + "]. "
-                    + "A pooled type exists once per context, and a singleton Python bean exists once in one "
-                    + "context, so the reference would send this context's work back through that one. Make ["
-                    + parameterType.getSimpleName() + "] pooled as well, or give it a scope that allows an "
-                    + "instance per context. A dependency on a Java type is unrestricted.");
+            if (dependencyType.hasStereotype(AnnotationUtil.SINGLETON)) {
+                context.warn("The pooled type [" + element.getSimpleName() + "] depends on the singleton Python bean ["
+                    + dependencyType.getSimpleName() + "] through [" + dependency.getName() + "]. A pooled type exists "
+                    + "once per context and a singleton Python bean exists once in one context, so calls through this "
+                    + "dependency run in that one context however many the pool has, and the gain from pooling is lost "
+                    + "for them. Make [" + dependencyType.getSimpleName() + "] pooled as well, or give it a scope that "
+                    + "allows an instance per context. A dependency on a Java type has no such cost.", element);
             }
         }
     }
@@ -134,7 +139,9 @@ final class PythonPooledStubGenerator {
             throw new ProcessingException(element, "@Pooled does not support introspected bean properties on Python classes.");
         }
         var pythonConstructor = element.getPrimaryConstructor().orElse(null);
-        validatePooledDependencies(element, pythonConstructor);
+        if (pythonConstructor != null) {
+            warnAboutContextBoundDependencies(context, element, List.of(pythonConstructor.getParameters()));
+        }
 
         MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
         builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
@@ -189,6 +196,12 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC);
         builder.addAnnotation(Vetoed.class);
         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
+
+        // A route module is the common pooled type with dependencies, and typically injects
+        // services. Those are what the warning is about.
+        warnAboutContextBoundDependencies(context, scriptElement, scriptElement.getEnclosedElements(
+            ElementQuery.ALL_FIELDS.annotated(ann -> ann.hasStereotype(AnnotationUtil.INJECT))
+        ));
 
         MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
         builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
