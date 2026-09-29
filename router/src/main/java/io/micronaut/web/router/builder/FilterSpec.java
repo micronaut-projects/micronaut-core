@@ -40,7 +40,7 @@ import io.micronaut.core.annotation.Experimental;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface FilterSpec<S> extends ExecutionSpec<FilterSpec<S>> permits DefaultFilterSpec {
+public sealed interface FilterSpec<S> extends ExecutionSpec<FilterSpec<S>> permits DefaultFilterSpec, LocatedFilterSpec, LocatedBodyFilterSpec {
 
     /**
      * @return The route, the group or the server filter that declares the filter, to continue its declaration

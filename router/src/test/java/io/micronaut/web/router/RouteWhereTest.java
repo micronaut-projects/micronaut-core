@@ -22,6 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
@@ -98,6 +99,22 @@ class RouteWhereTest {
 
         assertEquals("any", target(router, HttpRequest.GET("/reports/1")));
         assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/reports/1").header("X-Export", "csv")));
+    }
+
+    @Test
+    void aDeclaredRouteAndALocatorRouteHaveTheConditionsOfTheirGroups() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items", handler("items")));
+        Router router = router(routes -> routes.group(group -> {
+            group.where(CSV);
+            group.GET("/declared/{id}").where(request -> request.getHeaders().contains("X-Q")).handle(handler("declared"));
+            group.locate("/orders/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> items);
+        }));
+
+        assertEquals("declared", target(router, HttpRequest.GET("/declared/1").header("X-Q", "1").header("X-Export", "csv")));
+        assertNull(router.findClosest(HttpRequest.GET("/declared/1").header("X-Q", "1")));
+        assertNull(router.findClosest(HttpRequest.GET("/declared/1").header("X-Export", "csv")));
+        assertEquals("items", target(router, HttpRequest.GET("/orders/1/items").header("X-Export", "csv")));
+        assertNull(router.findClosest(HttpRequest.GET("/orders/1/items")));
     }
 
     @Test

@@ -66,7 +66,7 @@ import java.util.function.Supplier;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits DefaultHttpRouteSpec {
+public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits DefaultHttpRouteSpec, LocatedHttpRouteSpec {
 
     /**
      * Declare the type of the body of the responses of the route, like the return type

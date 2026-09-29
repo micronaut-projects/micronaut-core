@@ -38,7 +38,7 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface HttpBodyRouteSpec<B> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec {
+public sealed interface HttpBodyRouteSpec<B> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec, LocatedHttpBodyRouteSpec {
 
     /**
      * Declare the type of the body of the responses of the route, see

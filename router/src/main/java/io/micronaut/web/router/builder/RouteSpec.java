@@ -83,8 +83,8 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *
      * <p>The media types, and the executor, see {@link ExecutionSpec#executeOn(String)}, of a
      * group apply to its routes to handlers, including the implicit {@code HEAD} routes, the
-     * routes declared for several methods and the declared routes, not to its error and status
-     * routes.</p>
+     * routes declared for several methods and the declared routes, not to its locator routes,
+     * whose located routes declare their own, nor to its error and status routes.</p>
      *
      * @param mediaTypes The media types
      * @return The route or the group
@@ -296,9 +296,10 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * cookies, method, host, client address and time of the request, and
      * {@link RequestPredicates} on its media types too.</p>
      *
-     * <p>On a group, the condition applies to the routes of the group, including the routes of
-     * its nested groups: a route matches a request that meets the conditions of its groups and
-     * its own, which must all be met, as one {@link RouteCondition#all all} condition. Several
+     * <p>On a group, the condition applies to the routes of the group, including its locator
+     * routes and the routes of its nested groups: a route matches a request that meets the
+     * conditions of its groups and its own, which must all be met, as one
+     * {@link RouteCondition#all all} condition. Several
      * conditions of a route or a group must all be met too. The router evaluates them cheapest
      * first, the {@link RouteCondition#custom custom} conditions last, in the order they were
      * declared, outer group first.</p>
@@ -528,8 +529,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *     .handle((request, pathVariables) -> HttpResponse.ok(metrics.scrape()));
      * }</pre>
      *
-     * <p>On a group, the routes of the group, including the routes of its nested groups, inherit
-     * the port; a nested group or a route with its own port overrides it.</p>
+     * <p>On a group, the routes of the group, including its locator routes and the routes of its
+     * nested groups, inherit the port; a nested group or a route with its own port overrides it.
+     * Located routes cannot open a port: their routes cannot have one.</p>
      *
      * @param port The port, between {@code 1} and {@code 65535}: unlike
      *             {@code @Controller(port = ...)}, a negative port or {@code 0}, a random port the

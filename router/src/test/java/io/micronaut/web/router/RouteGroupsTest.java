@@ -27,6 +27,7 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteGroup;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -309,6 +310,33 @@ class RouteGroupsTest {
         assertNotNull(error);
         assertTrue(router.findFilters(inside, error).isEmpty(), "the group does not filter its error routes");
         assertNotNull(GroupErrorRoutes.findStatusRoute(inside, insideMatch.getRouteInfo(), HttpStatus.NOT_FOUND.getCode()));
+    }
+
+    @Test
+    void theFiltersOfTheGroupOfALocatorRunBeforeTheFiltersOfTheLocatedRoute() {
+        List<String> trace = new ArrayList<>();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(order -> order.path("/items", itemsGroup -> {
+            itemsGroup.before(request -> record(trace, "table-group"));
+            itemsGroup.GET("/{item}").before(request -> record(trace, "located-route")).and().handle(RouteGroupsTest::ok);
+        }));
+        LocatedRoutes<?> orders = TestLocatedRoutes.of(order -> order.group(inner -> {
+            inner.before(request -> record(trace, "inner-locator-group"));
+            inner.locate("/lines", (request, pathVariables) -> "lines", target -> items);
+        }));
+        Router router = router(routes -> routes.path("/shop", shop -> {
+            shop.before(request -> record(trace, "shop"));
+            shop.locate("/orders/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> orders);
+        }));
+
+        HttpRequest<?> request = HttpRequest.GET("/shop/orders/5/lines/items/3");
+        UriRouteMatch<Object, Object> match = router.findClosest(request);
+        assertNotNull(match);
+        assertEquals("3", match.getVariableValues().get("item"));
+        run(router, request, match, trace);
+        assertEquals(List.of("shop", "inner-locator-group", "table-group", "located-route", "handler"), trace);
+
+        // not located: no route, no filters
+        assertNull(router.findClosest(HttpRequest.GET("/shop/other")));
     }
 
     @Test

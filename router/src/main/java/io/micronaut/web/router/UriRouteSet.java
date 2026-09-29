@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -262,7 +263,25 @@ final class UriRouteSet {
      * @return The closest matches
      */
     <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, @Nullable Set<Integer> ports) {
-        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request, ports);
+        return findAllClosest(request, null, ports);
+    }
+
+    /**
+     * The closest matches of the request among the candidates a filter accepts, see
+     * {@link Router#findAllClosest(HttpRequest, Predicate)}. A route with a dynamic target is no
+     * candidate itself: the filter applies to the matches its target resolves.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidates, applied before the ambiguity is resolved, or {@code null}
+     * @param ports   The default ports, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches
+     */
+    <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request,
+                                                    @Nullable Predicate<UriRouteMatch<T, R>> filter,
+                                                    @Nullable Set<Integer> ports) {
+        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request, filter, ports);
         if (!hasDynamicTargets || matches.isEmpty()) {
             return matches;
         }
@@ -272,7 +291,7 @@ final class UriRouteSet {
             if (target == null) {
                 result.add(match);
             } else {
-                result.addAll(target.findAllClosest(request, match));
+                result.addAll(target.findAllClosest(request, match, filter));
             }
         }
         return result;
@@ -282,21 +301,45 @@ final class UriRouteSet {
      * The closest matches of a request.
      *
      * @param request The request
+     * @param filter  The filter of the candidates, or {@code null}
      * @param ports   The default ports, or {@code null}
      * @param <T>     The target type
      * @param <R>     The result type
      * @return The closest matches
      */
-    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request, @Nullable Set<Integer> ports) {
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request,
+                                                                  @Nullable Predicate<UriRouteMatch<T, R>> filter,
+                                                                  @Nullable Set<Integer> ports) {
         List<UriRouteInfo<Object, Object>> routes = findInternal(request, ports);
         if (routes.isEmpty()) {
             return Collections.emptyList();
         }
-        List<UriRouteMatch<T, R>> uriRoutes = toMatches(request.getPath(), routes);
+        List<UriRouteMatch<T, R>> uriRoutes = filter(toMatches(request.getPath(), routes), filter);
         if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
         return DefaultRouter.resolveAmbiguity(request, uriRoutes);
+    }
+
+    private <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (filter == null || matches.isEmpty()) {
+            return matches;
+        }
+        var filtered = new ArrayList<UriRouteMatch<T, R>>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            if (accepts(filter, match)) {
+                filtered.add(match);
+            }
+        }
+        return filtered;
+    }
+
+    /**
+     * Whether the filter accepts a candidate. A route with a dynamic target is no candidate: the
+     * filter applies to the matches its target resolves.
+     */
+    private <T, R> boolean accepts(Predicate<UriRouteMatch<T, R>> filter, UriRouteMatch<T, R> match) {
+        return hasDynamicTargets && DynamicRouteTarget.of(match.getRouteInfo()) != null || filter.test(match);
     }
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {

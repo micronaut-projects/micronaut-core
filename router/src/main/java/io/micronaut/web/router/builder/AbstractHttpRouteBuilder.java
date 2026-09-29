@@ -24,20 +24,23 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.RouteLocator;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.StringJoiner;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * Adds the routes to handler functions to a {@link RouteAssembly}: the routes of the builder of
- * the {@link HttpRoutes} beans, see {@link DefaultHttpRouteBuilder}, and of a
+ * the {@link HttpRoutes} beans, see {@link DefaultHttpRouteBuilder}, of the {@link LocatedRoutes}
+ * of located targets, see {@link DefaultLocatedHttpRouteBuilder}, and of a
  * group of routes, see {@link DefaultHttpRouteGroup}, which prefixes their URIs and applies its
  * filters to them.
  *
@@ -45,7 +48,7 @@ import java.util.function.Supplier;
  * @since 5.3.0
  */
 @Internal
-abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
+abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup, DefaultLocatedHttpRouteBuilder {
 
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
 
@@ -127,13 +130,13 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final HttpRouteSpec route(HttpMethod method, String uri) {
+    public HttpRouteSpec route(HttpMethod method, String uri) {
         standardMethod(method);
         return pending(method.name(), uri, (template, handler) -> List.of(route(method, template, handler.get())));
     }
 
     @Override
-    public final HttpRouteSpec route(Set<HttpMethod> methods, String uri) {
+    public HttpRouteSpec route(Set<HttpMethod> methods, String uri) {
         Objects.requireNonNull(methods, "methods");
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
@@ -157,7 +160,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final HttpRouteSpec route(String httpMethodName, String uri) {
+    public HttpRouteSpec route(String httpMethodName, String uri) {
         RouteArguments.httpMethodName(httpMethodName);
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
@@ -167,7 +170,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final HttpRouteSpec any(String uri) {
+    public HttpRouteSpec any(String uri) {
         return pending("any", uri, this::anyMethod);
     }
 
@@ -299,6 +302,33 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
+    public final <T> void locate(String prefixUri, LocatorHandler<? extends T> locator,
+                                 Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables()));
+    }
+
+    @Override
+    public final <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator,
+                                      Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables()));
+    }
+
+    private void locate(String prefixUri, RouteLocator locator) {
+        Objects.requireNonNull(prefixUri, "prefixUri");
+        checkOpen();
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
+        for (String template : RouteLocator.templates(uri(prefixUri))) {
+            for (HttpMethod method : HttpMethod.values()) {
+                if (method != HttpMethod.CUSTOM) {
+                    // the routes of the target decide which media types they consume and produce;
+                    // the located route carries the filters of the groups of the locator route
+                    grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+                }
+            }
+        }
+    }
+
+    @Override
     public final ServerFilterSpec filter(String... patterns) {
         checkOpen();
         // global: the prefix and the filters of a group do not apply
@@ -342,7 +372,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     private void checkOpen() {
         if (closed) {
             throw new IllegalStateException("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
-                + "not after it returned");
+                + "or inside LocatedRoutes.routes(...), not after it returned");
         }
         RouteAssembly.RouteFilters filters = groupFilters;
         if (filters != null && filters.isClosed()) {
