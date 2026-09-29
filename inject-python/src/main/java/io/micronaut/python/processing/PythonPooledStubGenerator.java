@@ -241,18 +241,28 @@ final class PythonPooledStubGenerator {
                         params.getFirst()
                     )).returning())));
 
-            // A wrapper cannot be rebuilt from a bare value here: the dependencies the instance was
-            // constructed with are not recoverable from it. Previously unreachable, because a pooled
-            // type could not have constructor arguments at all.
+            // Reached when a pooled bean is injected into a Python bean: the dependency crosses
+            // into that bean's context as a value and has to be wrapped again coming back. The
+            // value is the instance for its own context, so the wrapper holds exactly that.
+            //
+            // Through a private constructor, so the bean still has one public constructor and
+            // injection cannot pick this one.
+            MethodDef.MethodDefBuilder wrappingCtor = MethodDef.constructor()
+                .addModifiers(Modifier.PRIVATE)
+                .addParameter(ParameterDef.builder("pooledInstance", POOLED_INSTANCE).build());
+            builder.addMethod(wrappingCtor.build(((aThis, params) ->
+                aThis.field(pooledInstance).assign(params.getFirst()))));
+
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(POLYGLOT_VALUE)
                 .returns(thisType)
-                .build(((aThis, methodParameters) -> ClassTypeDef.of(UnsupportedOperationException.class)
-                    .instantiate(ExpressionDef.constant(
-                        "Cannot rebuild the pooled Python bean [" + element.getName() + "] from a polyglot value: "
-                            + "it is constructed with injected dependencies, which the value does not carry."
-                    )).doThrow())));
+                .build(((aThis, methodParameters) -> thisType.instantiate(
+                    POOLED_INSTANCE.invokeStatic("wrapping", POOLED_INSTANCE, List.of(
+                        pythonClassReference(element, pythonClassReference),
+                        methodParameters.getFirst()
+                    ))
+                ).returning())));
         } else {
             MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
             builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));

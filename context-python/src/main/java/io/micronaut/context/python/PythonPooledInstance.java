@@ -48,6 +48,7 @@ import java.util.WeakHashMap;
 public final class PythonPooledInstance {
 
     private final PythonContextRuntime.PythonClassReference classReference;
+    @io.micronaut.core.annotation.Nullable
     private final Object[] constructorArguments;
 
     /**
@@ -64,6 +65,32 @@ public final class PythonPooledInstance {
     public PythonPooledInstance(PythonContextRuntime.PythonClassReference classReference, Object... constructorArguments) {
         this.classReference = classReference;
         this.constructorArguments = constructorArguments;
+    }
+
+    private PythonPooledInstance(PythonContextRuntime.PythonClassReference classReference, Value existing) {
+        this.classReference = classReference;
+        this.constructorArguments = null;
+        instances.put(existing.getContext(), existing);
+    }
+
+    /**
+     * Wraps an instance that already exists, for a Java wrapper built from a polyglot value.
+     *
+     * <p>This happens when a pooled bean is injected into a Python bean: the dependency crosses
+     * into the other bean's context as a value, and coming back to Java it has to be wrapped
+     * again. The value is the instance for its own context, so that is what this holds.
+     *
+     * <p>It carries no constructor arguments, because a bare value does not reveal the
+     * dependencies it was built with. Asking for it in a different context therefore fails, and
+     * says why, rather than quietly constructing a second instance with none.
+     *
+     * @param classReference The Python class
+     * @param existing The instance, belonging to the context it came from
+     * @return A holder of that instance
+     */
+    @UsedByGeneratedCode
+    public static PythonPooledInstance wrapping(PythonContextRuntime.PythonClassReference classReference, Value existing) {
+        return new PythonPooledInstance(classReference, existing);
     }
 
     /**
@@ -91,6 +118,11 @@ public final class PythonPooledInstance {
         }
         if (existing != null) {
             return existing;
+        }
+        if (constructorArguments == null) {
+            throw new UnsupportedOperationException("The pooled Python bean [" + classReference.displayName()
+                + "] was wrapped from a value belonging to another context and cannot be materialised in this one: "
+                + "the value does not carry the dependencies it was constructed with.");
         }
         Value type = PythonContextRuntime.findClass(classReference, context);
         Value created = type.canInstantiate()
