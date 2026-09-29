@@ -63,6 +63,55 @@ import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 
 final class PythonPooledStubGenerator {
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
+    private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
+
+    /**
+     * Rejects a pooled type whose Python dependency is pinned to a single context.
+     *
+     * <p>A pooled type exists once per context, so it may only hold references that can exist
+     * in whichever context serves a call. A singleton Python bean cannot: it is one instance
+     * living in one context, and a pooled instance in another context holding a reference to
+     * it puts that context's work back through the owning one. That is the cost pooling is
+     * there to avoid, and it would be invisible -- the application would run, and only be
+     * slower under concurrency.
+     *
+     * <p>So a Python dependency has to be pooled itself, or scoped so that a fresh instance
+     * can be made for the context that needs it. A dependency that is *not* a Python type is
+     * unrestricted: a Java bean has no context affinity and no interpreter lock to contend
+     * for, so a pooled type may hold as many of them as it likes.
+     *
+     * @param element The pooled Python class
+     * @param constructor Its primary constructor, or {@code null} when it has none
+     */
+    private static void validatePooledDependencies(AbstractPythonClassElement element, MethodElement constructor) {
+        if (constructor == null) {
+            return;
+        }
+        for (ParameterElement parameter : constructor.getParameters()) {
+            ClassElement parameterType = parameter.getGenericType();
+            if (!isPythonType(parameterType) || parameterType.hasStereotype(CONTEXT_POOLED)) {
+                continue;
+            }
+            if (parameterType.hasStereotype(AnnotationUtil.SINGLETON)) {
+                throw new ProcessingException(element, "A pooled type cannot depend on the singleton Python bean ["
+                    + parameterType.getName() + "] through parameter [" + parameter.getName() + "]. "
+                    + "A pooled type exists once per context, and a singleton Python bean exists once in one "
+                    + "context, so the reference would send this context's work back through that one. Make ["
+                    + parameterType.getSimpleName() + "] pooled as well, or give it a scope that allows an "
+                    + "instance per context. A dependency on a Java type is unrestricted.");
+            }
+        }
+    }
+
+    /**
+     * Whether a type is implemented in Python, and so belongs to a context.
+     *
+     * @param type The type
+     * @return Whether it is a Python type
+     */
+    private static boolean isPythonType(ClassElement type) {
+        return type instanceof AbstractPythonClassElement || type instanceof PythonScriptElement;
+    }
 
     static ClassDef.ClassDefBuilder generatePooledClass(AbstractPythonClassElement element,
                                                         VisitorContext context,
@@ -85,9 +134,7 @@ final class PythonPooledStubGenerator {
             throw new ProcessingException(element, "@Pooled does not support introspected bean properties on Python classes.");
         }
         var pythonConstructor = element.getPrimaryConstructor().orElse(null);
-        if (pythonConstructor != null && pythonConstructor.getParameters().length > 0) {
-            throw new ProcessingException(element, "@Pooled types must be stateless. Constructor with parameters is not supported.");
-        }
+        validatePooledDependencies(element, pythonConstructor);
 
         MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
         builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
