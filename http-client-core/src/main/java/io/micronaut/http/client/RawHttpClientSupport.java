@@ -37,6 +37,8 @@ import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -124,12 +126,33 @@ public final class RawHttpClientSupport {
                                                                       @Nullable Duration timeout,
                                                                       CompletionStage<?> uploadStarted,
                                                                       CompletionStage<?> uploaded) {
+        return withResponseTimeout(flow, timeout, uploadStarted, uploaded, null);
+    }
+
+    /**
+     * Like {@link #withResponseTimeout(ExecutionFlow, Duration, CompletionStage, CompletionStage)},
+     * with the timer on a scheduler of the client, e.g. its event loop, so that a timeout fails
+     * the flow there rather than on the shared scheduler of {@link CompletableFuture}.
+     *
+     * @param flow          The response flow
+     * @param timeout       The timeout, or {@code null} for none
+     * @param uploadStarted The stage that completes when the upload of the body starts
+     * @param uploaded      The stage that completes when the upload of the body ended
+     * @param scheduler     The scheduler of the timer, or {@code null} for the one of {@link CompletableFuture}
+     * @return The flow with the timeout applied
+     * @since 5.3.0
+     */
+    public static ExecutionFlow<HttpResponse<?>> withResponseTimeout(ExecutionFlow<HttpResponse<?>> flow,
+                                                                      @Nullable Duration timeout,
+                                                                      CompletionStage<?> uploadStarted,
+                                                                      CompletionStage<?> uploaded,
+                                                                      @Nullable ScheduledExecutorService scheduler) {
         if (timeout == null) {
             return flow;
         }
         AtomicBoolean done = new AtomicBoolean();
         DelayedExecutionFlow<HttpResponse<?>> result = DelayedExecutionFlow.create();
-        ResponseTimer timer = new ResponseTimer(timeout.toNanos(), () -> {
+        ResponseTimer timer = new ResponseTimer(timeout.toNanos(), scheduler, () -> {
             if (done.compareAndSet(false, true)) {
                 result.completeExceptionally(ReadTimeoutException.TIMEOUT_EXCEPTION);
                 flow.cancel();
@@ -210,6 +233,8 @@ public final class RawHttpClientSupport {
      */
     private static final class ResponseTimer {
         private final Runnable onTimeout;
+        @Nullable
+        private final ScheduledExecutorService scheduler;
         private long remainingNanos;
         private long startedAt;
         /**
@@ -221,8 +246,9 @@ public final class RawHttpClientSupport {
         private boolean resumed;
         private boolean stopped;
 
-        ResponseTimer(long timeoutNanos, Runnable onTimeout) {
+        ResponseTimer(long timeoutNanos, @Nullable ScheduledExecutorService scheduler, Runnable onTimeout) {
             this.onTimeout = onTimeout;
+            this.scheduler = scheduler;
             this.remainingNanos = timeoutNanos;
             this.phase = start();
         }
@@ -230,7 +256,13 @@ public final class RawHttpClientSupport {
         private CompletableFuture<@Nullable Void> start() {
             startedAt = System.nanoTime();
             CompletableFuture<@Nullable Void> phase = new CompletableFuture<>();
-            phase.orTimeout(remainingNanos, TimeUnit.NANOSECONDS).whenComplete((ignored, error) -> {
+            if (scheduler == null) {
+                phase.orTimeout(remainingNanos, TimeUnit.NANOSECONDS);
+            } else {
+                ScheduledFuture<?> task = scheduler.schedule(() -> phase.completeExceptionally(new TimeoutException()), remainingNanos, TimeUnit.NANOSECONDS);
+                phase.whenComplete((ignored, error) -> task.cancel(false));
+            }
+            phase.whenComplete((ignored, error) -> {
                 if (error instanceof TimeoutException) {
                     onTimeout.run();
                 }
