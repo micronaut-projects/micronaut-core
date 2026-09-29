@@ -2086,7 +2086,7 @@ final class NettyHttpClient implements
                 }, onSent);
                 pipeline.addLast(streamWriter);
             }
-            prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf, retry, replayBody, uploadListener);
+            prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf, retry, replayBody);
             Duration readIdleTimeout = request.getAttribute(READ_IDLE_TIMEOUT, Duration.class).orElse(null);
             if (readIdleTimeout != null) {
                 RequestReadIdleTimeoutHandler.install(poolHandle.http2, pipeline, readIdleTimeout);
@@ -2164,10 +2164,10 @@ final class NettyHttpClient implements
         @Nullable StreamWriter streamWriter,
         @Nullable ByteBuf byteBuf,
         boolean retry,
-        @Nullable CloseableAvailableByteBody replayBody,
-        @Nullable UploadListener uploadListener
+        @Nullable CloseableAvailableByteBody replayBody
     ) {
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
+        UploadListener uploadListener = request.getAttribute(UPLOAD_LISTENER, UploadListener.class).orElse(null);
 
         if (log.isTraceEnabled()) {
             HttpHeadersUtil.trace(log, nettyRequest.headers().names(), nettyRequest.headers()::getAll);
