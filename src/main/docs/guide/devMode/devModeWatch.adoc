@@ -44,3 +44,21 @@ HikariDataSource dataSource(DatasourceConfiguration configuration, WatchableBean
 Resources are watched the same way: a template engine registers `watchResources(ResourceSelector.of(ResourceKind.VIEWS, "**/*.html"), change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
 
 NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context.processor.BeanDefinitionProcessor[] beans keep working. The context feeds them what is added after startup, through an adapter that sees additions only, which is also how the launcher tells that such a processor cannot follow a reload.
+
+=== Testing a module against a reload
+
+`micronaut-dev-tck` is a small TCK a module runs in its own build: a harness writes a project into a directory, compiles it with the annotation processor on the test classpath, starts it through the development runtime in the test's JVM, and reloads it after an edit, so a test sees two real generations. The module under test is on the test classpath, so it is parent-tier, as it is for an application; the sources the test writes are the reloadable tier.
+
+[source,java]
+----
+try (ReloadHarness harness = ReloadHarness.inDirectory(tempDir)) {
+    harness.source("example.Greeter", "package example; @jakarta.inject.Singleton public class Greeter implements Greeting { public String greet() { return \"one\"; } }");
+    harness.start();
+    harness.source("example.Greeter", "package example; @jakarta.inject.Singleton public class Greeter implements Greeting { public String greet() { return \"two\"; } }");
+    harness.reload();
+    ReloadTck.assertFollowsReload(harness, context -> context.getBean(GreetingRegistry.class).current());
+    ReloadTck.assertRetiredGenerationsCollected(harness);
+}
+----
+
+api:dev.tck.ReloadTck[] holds the assertions: `assertFollowsReload` checks that what a registry hands out after the reload is the new generation's, and names the fix when it is not (watch the definitions, or resolve through the context on use); `assertRetained` checks that a bean the module retains is the same instance the new generation serves; and `assertRetiredGenerationsCollected` checks that no retired generation is reachable once the garbage collector ran, which a static cache or an unstopped thread would prevent. Add `micronaut-dev-tck` and `micronaut-inject-java` to the test classpath to use it.
