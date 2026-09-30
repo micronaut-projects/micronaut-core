@@ -70,7 +70,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     /**
      * Processors per pooled context when no size is configured. See {@link #computeDefaultSize()}.
      */
-    private static final int PROCESSORS_PER_CONTEXT = 4;
+    private static final int PROCESSORS_PER_CONTEXT = 2;
 
     /**
      * The fewest contexts to default to. One context serialises every Python call and is
@@ -149,31 +149,57 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     /**
      * The pool size to use when none is configured.
      *
-     * <p>Scaled down from the processor count and capped, rather than multiplied up.
-     * More contexts cost throughput on any route that reaches a Python bean that is not
-     * itself pooled: such a bean is a single instance living in one context, so the more
-     * contexts there are, the smaller the share of requests served on the one that owns
-     * it. The previous default of {@code processors * 2} sat well past the point where
-     * that begins to dominate, and it grew with core count, so a larger machine made it
-     * worse rather than better.
+     * <p>Scaled down from the processor count and capped, rather than multiplied up. The
+     * previous default of {@code processors * 2} grew with core count, so a larger machine
+     * made it worse rather than better, and it sat past the point where more contexts stop
+     * paying for themselves on every workload measured.
      *
-     * <p>Measured on a 12-core machine, 32 concurrent clients against a paged read of
-     * 20 rows in a real application (micronaut-core#13553):
+     * <p>How far down to scale depends on something this release changes. A Python bean
+     * that is not itself pooled is a single instance living in one context, so the more
+     * contexts there are, the smaller the share of requests served on the one that owns it
+     * -- and until a pooled type could take constructor arguments, a service with a
+     * dependency could not be pooled. Measured that way, on a 12-core machine and 32
+     * concurrent clients against a paged read of 20 rows, throughput peaked at 3 and fell
+     * away: 1,240 at 3, 899 at 6, 847 at 24.
+     *
+     * <p>With the services pooled the relationship inverts, because contexts now add
+     * concurrency instead of dividing the traffic reaching one of them. The same
+     * application and load, re-measured:
      *
      * <table>
-     *   <caption>Throughput by pool size</caption>
-     *   <tr><th>size</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>8</td><td>12</td><td>24</td></tr>
-     *   <tr><th>req/s</th><td>586</td><td>930</td><td>1240</td><td>1238</td><td>977</td><td>899</td><td>915</td><td>869</td><td>847</td></tr>
+     *   <caption>Throughput by pool size, services pooled</caption>
+     *   <tr><th>size</th><td>3</td><td>4</td><td>6</td><td>8</td><td>12</td><td>16</td></tr>
+     *   <tr><th>paged read</th><td>1511</td><td>1948</td><td>2205</td><td>1609</td><td>1423</td><td>1407</td></tr>
+     *   <tr><th>keyed read</th><td>9191</td><td>10873</td><td>13336</td><td>15603</td><td>17581</td><td>16510</td></tr>
+     *   <tr><th>write</th><td>2854</td><td>3126</td><td>3668</td><td>3986</td><td>3611</td><td>3467</td></tr>
      * </table>
      *
-     * <p>The peak is at 3 to 4, which is what {@code processors / 4} yields there, and the
-     * old default of 24 gave 847. One context is much worse than a few, hence the floor;
-     * the cap keeps a many-core machine from returning to the behaviour this replaces.
+     * <p>Three peaks in three places -- 6, 12 and 8 -- and they order by how much Python
+     * work a request does: the paged read builds 20 objects per response and turns over
+     * soonest, the keyed read does almost nothing per request and keeps gaining. So there
+     * is no one right answer, and this picks the best compromise rather than any peak. Of
+     * the sizes measured, 6 is the only one within 25% of every scenario's own best, and it
+     * is what {@code processors / 2} yields on that machine.
      *
-     * <p>Those numbers are one machine and one application, so the shape -- small, capped,
-     * and not linear in core count -- is better supported than any exact constant. A
-     * workload doing more Python work per request may want more; that is what
-     * {@code micronaut.python.pool.size} is for.
+     * <p>Choosing 6 over 8 rests on the paged read falling away between them, so that pair was
+     * measured twice: 2,205 and 2,193 at 6 against 1,609 and 1,437 at 8. The fall is real and
+     * steeper than one run suggested.
+     *
+     * <p>Which is also the limit of what the cap can do. From sixteen processors up the default
+     * is 8, and 8 is where the paged read measured 1,609 and 1,437 against about 2,200 at 6 --
+     * so on a larger machine the heavier workload sits 27% to 35% below its own best. That is not
+     * a reason to lower the cap on this evidence: the same table has the keyed read still gaining
+     * at 12, so a lower cap would move the shortfall onto the lighter workload rather than remove
+     * it. Which way it should go depends on whether the peak travels with the core count or stays
+     * near an absolute number, and one machine cannot say. A workload of either shape on a large
+     * machine should set {@code micronaut.python.pool.size} and measure.
+     *
+     * <p>One machine, one application, and one run per point except that pair: the shape --
+     * small, capped, not linear in core count -- is better supported than the constant, and
+     * {@code processors / 2} is a curve fitted to twelve cores rather than a law. A workload
+     * doing more Python work per request wants fewer contexts and one doing less wants more;
+     * that is what {@code micronaut.python.pool.size} is for, and a workload sensitive to it
+     * should measure rather than trust this.
      *
      * @return The default pool size
      */
