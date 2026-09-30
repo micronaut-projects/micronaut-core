@@ -33,12 +33,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * Service loading in a native image built with runtime class loading ({@code -H:+RuntimeClassLoading}, Crema).
  *
- * <p>{@code nativeTest} runs these tests in such an image, where {@link ServiceScanner#findStaticServiceDefinitions()}
- * must still return the table that {@code ServiceLoaderFeature} stored in the image singletons, including for
- * callers that pass a class loader created at run time and for classes that are loaded at run time. The classes of
- * the {@code cremaRuntime} source set are not part of the image: the tests load them from
- * {@code micronaut.test.crema.runtime.path} with a new class loader. {@code test} runs the same tests on the JVM,
- * where there is no table.</p>
+ * <p>{@code nativeTest}, which this module only has with {@code -PcremaTests=true}, runs these tests in such an
+ * image, where {@link ServiceScanner#findStaticServiceDefinitions()} must still return the table that
+ * {@code ServiceLoaderFeature} stored in the image singletons, including for callers that pass a class loader
+ * created at run time and for classes that are loaded at run time. The classes of the {@code cremaRuntime} source
+ * set are not part of the image: the tests load them from {@code micronaut.test.crema.runtime.path} with a new
+ * class loader. {@code test} runs the same tests on the JVM, where there is no table.</p>
  */
 class CremaServiceLoadingTest {
 
