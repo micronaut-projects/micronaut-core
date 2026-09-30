@@ -167,7 +167,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             CircuitBreakerRetry circuitBreakerRetry;
             try {
                 circuitBreakerRetry = circuitContexts.computeIfAbsent(
-                    new CircuitKey(context.getExecutableMethod(), retry, circuitBreaker),
+                    new CircuitKey(context.getTarget().getClass(), context.getExecutableMethod(), retry, circuitBreaker),
                     key -> circuitBreakerRetry(context, annotationRetryStateBuilder, retryPolicy, circuitBreaker)
                 );
             } catch (RuntimeException e) {
@@ -298,13 +298,15 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     }
 
     /**
-     * The key of the circuit breaker state of a method.
+     * The key of the circuit breaker state of a method and bean.
      *
+     * @param targetType The class of the intercepted target
      * @param method The method
      * @param retry The {@code @Retryable} value of the method, from which its policy is resolved
      * @param circuitBreaker The {@code @CircuitBreaker} value of the method, from which its circuit is resolved
      */
-    private record CircuitKey(ExecutableMethod<?, ?> method,
+    private record CircuitKey(Class<?> targetType,
+                              ExecutableMethod<?, ?> method,
                               AnnotationValue<Retryable> retry,
                               @Nullable AnnotationValue<CircuitBreaker> circuitBreaker) {
     }
