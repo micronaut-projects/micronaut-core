@@ -38,7 +38,8 @@ import java.util.Set;
  * of a single JAR is listed together with the entries that the {@code Class-Path} attribute of its manifest names,
  * as that JAR is when it is started with {@code java -jar}, and a class loader of several JARs without what their
  * manifests name. The list made for a class loader of a thin JAR alone, or of that JAR and the libraries its manifest
- * names, therefore matches the class path of {@code java -jar}.</p>
+ * names, therefore matches the class path of {@code java -jar}. The class path of the parents of the class loader
+ * is not listed, although their services are indexed, so a change to it is not detected at run time.</p>
  *
  * <p>The list is only right for the files as they are when the index is built. A producer has to correct it for
  * what it does afterwards: add an entry for a file it adds to the class path, such as the JAR that holds the

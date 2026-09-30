@@ -123,6 +123,12 @@ import java.util.jar.Manifest;
  *     into a container image under another name, no longer matches its entry: the index is then set aside, with the
  *     {@code WARN}, on every start. A producer must list the names the files have when the application runs, and
  *     register the index without a class path when it cannot know them.</li>
+ *     <li>The class path of a parent class loader is not compared. The index lists the services that its class
+ *     loader finds, which include those of its parents, but only the URLs of a {@link URLClassLoader} itself are
+ *     compared. An index that was built for such a class loader is therefore still served after a JAR is added to
+ *     the class path of its parent, and the services of that JAR are missed. The {@code INFO} line says so when
+ *     the class loader has a parent other than the platform class loader. The parent of the system class loader
+ *     is the platform class loader, which has no class path.</li>
  *     <li>The content of a directory is not compared, nor is a file that is replaced by another one of the same name
  *     and size, and a JAR that an agent appends to the class path is not seen.</li>
  * </ul>
@@ -250,8 +256,8 @@ public record ServiceIndex(ClassLoader classLoader,
      * Lists the class path of a class loader, for the class loaders whose class path is known: the system class
      * loader, whose class path is the {@code java.class.path} system property, and a {@link URLClassLoader} whose
      * URLs are all files. An entry that does not exist is left out, as the class loader ignores it. When exactly
-     * one entry is a file, the entries that the {@code Class-Path} attribute of its manifest names are listed too:
-     * see {@link ServiceIndex}.
+     * one entry is a file, the entries that the {@code Class-Path} attribute of its manifest names are listed too.
+     * The class path of the parents of the class loader is not listed: see {@link ServiceIndex}.
      *
      * @param classLoader The class loader
      * @return The entries of the class path, in its order, or null if the class path is not known
@@ -318,6 +324,13 @@ public record ServiceIndex(ClassLoader classLoader,
         } else if (jars > 1) {
             // reading the manifest of every JAR would open every JAR, which costs more than the index saves
             compared.append(", without the Class-Path of the manifests of its JARs");
+        }
+        if (classLoader instanceof URLClassLoader) {
+            ClassLoader parent = classLoader.getParent();
+            if (parent != null && parent != ClassLoader.getPlatformClassLoader()) {
+                // the services of the parents are indexed, and their class path is not listed
+                compared.append("; the class path of its parent class loaders is not compared");
+            }
         }
         return entries;
     }

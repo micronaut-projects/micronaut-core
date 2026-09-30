@@ -378,6 +378,47 @@ public class ServiceIndexTest {
     }
 
     @Test
+    void doesNotCompareTheClassPathOfAParentClassLoaderAndSaysSo() throws IOException {
+        Path first = jar("parent.jar", Map.of("META-INF/services/" + SERVICE, "p.One\n"), List.of());
+        Path added = jar("added.jar", Map.of("META-INF/services/" + SERVICE, "p.Two\n"), List.of());
+        Path child = jar("child.jar", Map.of("META-INF/services/" + SERVICE, "c.C\n"), List.of());
+        String notCompared = "(class path compared: the 1 entry of the URLs of the class loader, to which the manifest of child.jar adds nothing;"
+            + " the class path of its parent class loaders is not compared)";
+        ServiceIndex built;
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{first.toUri().toURL()}, null);
+             URLClassLoader classLoader = new URLClassLoader(new URL[]{child.toUri().toURL()}, parent)) {
+            built = ServiceIndexBuilder.build(classLoader, List.of(SERVICE));
+
+            // the services of the parent are indexed, and its class path is not listed
+            assertEquals(List.of("p.One", "c.C"), built.standardServices().get(SERVICE));
+            assertEquals(List.of(new ClassPathEntry("child.jar", Files.size(child))), built.classPath());
+            assertSame(built, built.forLookup(classLoader));
+            assertTrue(logged.list.get(0).getFormattedMessage().contains(notCompared), logged.list.get(0).getFormattedMessage());
+        }
+
+        // so a JAR that is added to the class path of the parent is not detected: the index is served, and misses p.Two
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{first.toUri().toURL(), added.toUri().toURL()}, null);
+             URLClassLoader classLoader = new URLClassLoader(new URL[]{child.toUri().toURL()}, parent)) {
+            ServiceIndex stale = new ServiceIndex(classLoader, built.micronautServices(), built.standardServices(), built.classPath());
+
+            assertSame(stale, stale.forLookup(classLoader));
+            assertEquals(List.of("p.One", "c.C"), names(classLoader, SERVICE, stale, false));
+            assertEquals(List.of("p.One", "p.Two", "c.C"), names(classLoader, SERVICE, null, false));
+            assertEquals(List.of(Level.INFO, Level.INFO), logged.list.stream().map(ILoggingEvent::getLevel).toList());
+            assertTrue(logged.list.get(1).getFormattedMessage().contains(notCompared), logged.list.get(1).getFormattedMessage());
+        }
+
+        // a class loader whose parent is the platform class loader has no such class path
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{child.toUri().toURL()}, ClassLoader.getPlatformClassLoader())) {
+            ServiceIndex index = ServiceIndexBuilder.build(classLoader, List.of(SERVICE));
+
+            assertSame(index, index.forLookup(classLoader));
+            assertTrue(logged.list.get(2).getFormattedMessage().contains("(class path compared: the 1 entry of the URLs of the class loader, to which the manifest of child.jar adds nothing)"),
+                logged.list.get(2).getFormattedMessage());
+        }
+    }
+
+    @Test
     void knowsTheClassPathOfTheSystemClassLoaderAndOfAUrlClassLoaderOfFiles() throws IOException {
         ClassLoader system = ClassLoader.getSystemClassLoader();
         List<ClassPathEntry> expected = new ArrayList<>();
