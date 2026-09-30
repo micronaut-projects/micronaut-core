@@ -290,10 +290,15 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                                             @Nullable T resolvedTarget) {
         SelfInvocationBinder<T> targetSupplier = new SelfInvocationBinder<>(proxyDefinition, pythonClass, resolvedTarget);
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(targetSupplier.get()));
-        if (hasAroundConstructAdvice(proxyDefinition)) {
+        if (resolvedTarget == null && hasAroundConstructAdvice(proxyDefinition)) {
             // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.
             // Around-construct advice is observable at bean creation time in Micronaut, so force target
             // creation here while leaving method calls to resolve the current scoped target normally.
+            //
+            // Only when the caller has not resolved it already. A pooled bean runs this method once
+            // per context, from a pool thread, and resolving there is what createPooledProxyTargetProxy
+            // resolves up front to avoid: the definition resolves through the resolution context it was
+            // created with, and every call creates another prototype target that is then discarded.
             proxyDefinition.targetBean();
         }
         for (String memberName : proxyMemberNames(proxyDefinition)) {

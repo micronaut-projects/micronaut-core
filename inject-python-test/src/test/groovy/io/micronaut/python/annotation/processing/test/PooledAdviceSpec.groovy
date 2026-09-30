@@ -165,4 +165,105 @@ class CtxReader:
             System.setProperty("micronaut.python.context-id.enabled", previous)
         }
     }
+
+    void "an async advised pooled method resolves in the context that called it"() {
+        given: """an `async def` reaches the runtime through different entry points than a plain
+                  method -- the stage variants, which keep a context leased until the coroutine
+                  completes -- so it needs its own coverage that the context is not chosen twice.
+                  The advice here counts rather than rewrites, because proceed() on an async method
+                  hands back the stage rather than the value."""
+        def python = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from micronaut.context.python.scope import ContextPooled
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Counted(func):
+    return func
+
+@InterceptorBean(Counted)
+@Singleton
+class CountingInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context : MethodInvocationContext):
+        self.count = self.count + 1
+        return context.proceed()
+
+@ContextPooled
+class Slow:
+    @Counted
+    async def value(self) -> str:
+        import asyncio
+        await asyncio.sleep(0.01)
+        return "value"
+'''
+        def context = buildContext(python, true, ["micronaut.python.pool.size": 2])
+        def interceptor = getBean(context, "python.CountingInterceptor")
+        def bean = context.getBean(context.classLoader.loadClass("python.Slow"))
+        def executor = Executors.newFixedThreadPool(4)
+
+        when: """eight at once against a pool of two. Choosing a second context here would wait for
+                 one that every caller is already holding."""
+        def results = (1..8).collect { executor.submit { bean.value() } }
+            .collect { it.get(60, TimeUnit.SECONDS) }
+            .collect { it.toCompletableFuture().get(60, TimeUnit.SECONDS) as String }
+            .toSet()
+
+        then: "every coroutine completed, and the advice ran on each"
+        results == ["value"] as Set
+        interceptor.count == 8
+
+        cleanup:
+        executor?.shutdownNow()
+        context?.close()
+    }
+
+    void "around-construct advice on a pooled bean runs once, not once per context"() {
+        given: """the target is resolved up front for a pooled bean, so the per-context proxy build
+                  must not resolve it again -- each resolution creates another prototype target"""
+        def python = '''
+from micronaut.aop import AroundConstruct, ConstructorInvocationContext, InterceptorBean
+from micronaut.context.python.scope import ContextPooled
+from jakarta.inject import Singleton
+import java
+
+ConstructorInterceptor = java.type("io.micronaut.aop.ConstructorInterceptor")
+
+@AroundConstruct
+def Constructed(target):
+    return target
+
+@InterceptorBean(Constructed)
+@Singleton
+class CountingConstructInterceptor(ConstructorInterceptor):
+    count: int = 0
+
+    def intercept(self, context: ConstructorInvocationContext):
+        self.count = self.count + 1
+        return context.proceed()
+
+@Constructed
+@ContextPooled
+class Constructed_Bean:
+    def value(self) -> str:
+        return "value"
+'''
+        def context = buildContext(python, true, ["micronaut.python.pool.size": 4])
+        def interceptor = getBean(context, "python.CountingConstructInterceptor")
+
+        when: "the bean is taken once and then used often enough to rotate through the pool"
+        def bean = context.getBean(context.classLoader.loadClass("python.Constructed_Bean"))
+        def results = (1..40).collect { bean.value() }.toSet()
+
+        then: "the advice ran, and the per-context proxies did not each construct another target"
+        results == ["value"] as Set
+        interceptor.count == 1
+
+        cleanup:
+        context?.close()
+    }
 }

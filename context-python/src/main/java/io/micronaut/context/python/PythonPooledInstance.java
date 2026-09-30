@@ -21,9 +21,10 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.function.Function;
 
 /**
@@ -36,18 +37,25 @@ import java.util.function.Function;
  * cache keyed by class alone would hand the first bean's instance to the second, with the
  * wrong dependencies and no error.
  *
- * <p>So the instances belong to the bean rather than to the pool. That also settles their
- * lifetime: keyed weakly by context, an entry goes when its context is closed and dropped,
- * and the whole map goes when the bean itself does. Keeping them in the pool instead would
- * accumulate entries for prototype beans long since collected, which on a long-running
+ * <p>So the instances belong to the bean rather than to the pool -- keeping them in the pool
+ * would accumulate entries for prototype beans long since collected, which on a long-running
  * server is an unbounded leak.
  *
- * @since 5.2.0
+ * <p>They are not <em>stored</em> on the bean, though. A {@link Value} holds a reference to its
+ * own {@link Context}, so a map on the bean keyed by context would pin every context the bean
+ * ever ran in, no matter how weak the key: the value in the entry keeps the key reachable. The
+ * instances live in each context's own state instead, weakly keyed by the bean, so closing a
+ * context releases its instances and collecting a prototype bean releases its entry in every
+ * context that served it.
+ *
+ * @since 5.2.3
  */
 @Internal
 @Experimental
 @UsedByGeneratedCode
 public final class PythonPooledInstance {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PythonPooledInstance.class);
 
     /**
      * The class to construct in each context. Null for a holder whose value is built by a factory
@@ -82,11 +90,6 @@ public final class PythonPooledInstance {
     @Nullable
     private final Function<Context, Value> valueFactory;
 
-    /**
-     * Guarded by itself. Weakly keyed so that a closed context does not keep its instance, or
-     * itself, alive through this map.
-     */
-    private final Map<Context, Value> instances = new WeakHashMap<>();
 
     /**
      * @param classReference The Python class
@@ -152,8 +155,17 @@ public final class PythonPooledInstance {
         }
         try {
             instance.putMember(ValueCoercible.HOST_OBJECT_MEMBER, new ValueCoercible.HostObjectReference(owner));
-        } catch (RuntimeException ignored) {
-            // the class does not accept the member; nothing else depends on it being there
+        } catch (RuntimeException e) {
+            // A class that restricts its attributes -- __slots__ -- refuses the member. Nothing fails
+            // here, but a value of this class coming back to Java is then wrapped from the value
+            // alone, and such a wrapper cannot materialise in another context: the first request the
+            // pool serves on a different one fails with UnsupportedOperationException from #in. That
+            // only appears under load, so leave something behind that points at the cause.
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("The pooled Python class [{}] does not accept the {} member, so a value of it "
+                    + "returning to Java cannot be resolved to its bean: {}",
+                    displayName, ValueCoercible.HOST_OBJECT_MEMBER, e.getMessage());
+            }
         }
     }
 
@@ -173,7 +185,7 @@ public final class PythonPooledInstance {
     @UsedByGeneratedCode
     public static PythonPooledInstance seeded(PythonContextRuntime.PythonClassReference classReference, Value existing) {
         PythonPooledInstance holder = new PythonPooledInstance(classReference, null, null);
-        holder.instances.put(existing.getContext(), existing);
+        PythonContextRegistry.state(existing.getContext()).pooledInstances.put(holder, existing);
         return holder;
     }
 
@@ -188,32 +200,24 @@ public final class PythonPooledInstance {
     /**
      * This bean's instance in the given context, constructing it there on first use.
      *
-     * <p>The construction runs outside the lock. Guest code must never run while a lock on the
-     * map is held: Python re-entering the runtime for the same bean would deadlock against the
-     * thread that holds it, and against the interpreter lock behind it. A duplicate construction
-     * is cheaper than that, and the loser is discarded.
+     * <p>Construction runs before the value is published, never while holding the map. Guest code
+     * must not run under a lock the runtime might need: Python re-entering for the same bean would
+     * wait on the thread holding it, which is waiting on the interpreter lock. A duplicate
+     * construction is cheaper than that, and the loser is discarded.
      *
      * @param context The context
      * @return The instance belonging to that context
      */
     public Value in(Context context) {
-        Value existing;
-        synchronized (instances) {
-            existing = instances.get(context);
-        }
+        Map<Object, Value> instances = PythonContextRegistry.state(context).pooledInstances;
+        Value existing = instances.get(this);
         if (existing != null) {
             return existing;
         }
         if (valueFactory != null) {
             Value produced = valueFactory.apply(context);
-            synchronized (instances) {
-                Value prior = instances.get(context);
-                if (prior != null) {
-                    return prior;
-                }
-                instances.put(context, produced);
-                return produced;
-            }
+            Value prior = instances.putIfAbsent(this, produced);
+            return prior != null ? prior : produced;
         }
         PythonContextRuntime.PythonClassReference reference = classReference;
         if (constructorArguments == null || reference == null) {
@@ -226,13 +230,7 @@ public final class PythonPooledInstance {
             ? type.newInstance(PythonCoercion.coerceDependenciesToContext(context, constructorArguments))
             : type;
         attachOwner(created);
-        synchronized (instances) {
-            Value prior = instances.get(context);
-            if (prior != null) {
-                return prior;
-            }
-            instances.put(context, created);
-            return created;
-        }
+        Value prior = instances.putIfAbsent(this, created);
+        return prior != null ? prior : created;
     }
 }

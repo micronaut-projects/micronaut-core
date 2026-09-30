@@ -806,6 +806,14 @@ final class PythonContextRegistry {
         final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
+        /**
+         * This context's instance of each pooled bean that owns its instances rather than sharing the
+         * pool's per-class cache. Held here rather than on the bean so that closing the context
+         * releases them: a {@link Value} references its own context, so a map keyed by context on the
+         * bean would pin every context the bean ever ran in, however weak the key. Weakly keyed by the
+         * bean, so a prototype bean is forgotten while the context lives on.
+         */
+        final Map<Object, Value> pooledInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */

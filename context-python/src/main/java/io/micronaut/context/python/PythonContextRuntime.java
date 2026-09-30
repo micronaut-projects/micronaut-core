@@ -504,6 +504,24 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * The context to answer in when this thread is already executing in one, or {@code null} when
+     * the caller should choose one.
+     *
+     * <p>An entered context beats every other choice, the event loop's included: a loop is found per
+     * thread rather than per context, so on a thread that has entered a pooled context the two can
+     * name different contexts, and a value has to belong to the context that called in.
+     *
+     * <p>Every context-choosing entry point below consults this first. {@link PythonPool} makes the
+     * same check before it borrows, so forgetting it here answers in the wrong context rather than
+     * deadlocking -- both are wrong, and the pool's guard is the one that cannot be missed.
+     *
+     * @return The entered context, or {@code null}
+     */
+    private static @Nullable Context enteredContext() {
+        return PythonContextRegistry.currentContext();
+    }
+
+    /**
      * A pooled class instance, or the per-context value of a holder that stands in for it.
      *
      * <p>A pooled class with no constructor arguments is served from the pool's per-class cache,
@@ -516,7 +534,7 @@ public final class PythonContextRuntime {
      * @param override The holder, or {@code null} to use the pool's per-class cache
      * @param classReference The Python class reference
      * @return The value to call
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value findPooledClass(@Nullable PythonPooledInstance override, PythonClassReference classReference) {
@@ -531,7 +549,7 @@ public final class PythonContextRuntime {
      * @param classReference The Python class reference
      * @param context The context
      * @return The value to call
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value findPooledClass(@Nullable PythonPooledInstance override, PythonClassReference classReference, Context context) {
@@ -546,7 +564,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args Arguments
      * @return The polyglot result
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value invokePooled(@Nullable PythonPooledInstance override, PythonClassReference classReference, String methodName, Object... args) {
@@ -564,7 +582,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args Arguments
      * @return The stage of the coroutine
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static CompletionStage<?> invokePooledAsync(@Nullable PythonPooledInstance override, PythonClassReference classReference, String methodName, Object... args) {
@@ -582,7 +600,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args Arguments
      * @return The publisher
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Publisher<?> invokePooledPublisher(@Nullable PythonPooledInstance override, PythonClassReference classReference, String methodName, Object... args) {
@@ -604,9 +622,9 @@ public final class PythonContextRuntime {
             // the primary context is shared: the load runs inside a frame of it
             return withPrimaryContext(context -> findClass(classReference, context));
         }
-        Context current = PythonContextRegistry.currentContext();
-        if (current != null) {
-            return getPythonPool().getClass(current, classReference);
+        Context entered = enteredContext();
+        if (entered != null) {
+            return getPythonPool().getClass(entered, classReference);
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -652,9 +670,9 @@ public final class PythonContextRuntime {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(findClass(classReference, context)));
         }
-        Context current = PythonContextRegistry.currentContext();
-        if (current != null) {
-            return fn.apply(getPythonPool().getClass(current, classReference));
+        Context entered = enteredContext();
+        if (entered != null) {
+            return fn.apply(getPythonPool().getClass(entered, classReference));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -678,18 +696,16 @@ public final class PythonContextRuntime {
      *
      * @param instance The pooled bean's per-context instances
      * @return The instance for the calling context
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value findPooledInstance(PythonPooledInstance instance) {
         if (usePrimaryContext()) {
             return withPrimaryContext(instance::in);
         }
-        Context current = PythonContextRegistry.currentContext();
-        if (current != null) {
-            // already executing in a context: that is the one the value has to belong to, and taking
-            // a second one from the pool here deadlocks -- see PythonContextRegistry#currentContext
-            return instance.in(current);
+        Context entered = enteredContext();
+        if (entered != null) {
+            return instance.in(entered);
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -706,7 +722,7 @@ public final class PythonContextRuntime {
      * @param instance The pooled bean's per-context instances
      * @param context The context
      * @return The instance for that context
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value findPooledInstance(PythonPooledInstance instance, Context context) {
@@ -720,7 +736,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args Arguments
      * @return The polyglot result
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value invokePooledInstance(PythonPooledInstance instance, String methodName, Object... args) {
@@ -739,7 +755,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args Arguments
      * @return The stage of the coroutine
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static CompletionStage<?> invokePooledInstanceAsync(PythonPooledInstance instance, String methodName, Object... args) {
@@ -750,6 +766,14 @@ public final class PythonContextRuntime {
                     methodName,
                     PythonCoercion.coerceArgumentsToContext(context, args)
                 )));
+        }
+        Context entered = enteredContext();
+        if (entered != null) {
+            return PythonAsyncioRuntime.toCompletionStage(PythonInvocation.invokePythonMethod(
+                instance.in(entered),
+                methodName,
+                PythonCoercion.coerceArgumentsToContext(entered, args)
+            ));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -778,7 +802,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args Arguments
      * @return The publisher
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Publisher<?> invokePooledInstancePublisher(PythonPooledInstance instance, String methodName, Object... args) {
@@ -805,9 +829,9 @@ public final class PythonContextRuntime {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(instance.in(context)));
         }
-        Context current = PythonContextRegistry.currentContext();
-        if (current != null) {
-            return fn.apply(instance.in(current));
+        Context entered = enteredContext();
+        if (entered != null) {
+            return fn.apply(instance.in(entered));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -829,7 +853,7 @@ public final class PythonContextRuntime {
      * @param packageName The Python package
      * @param scriptName The script/module name
      * @return The value to call
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value findPooledScript(@Nullable PythonPooledInstance override, String packageName, String scriptName) {
@@ -845,7 +869,7 @@ public final class PythonContextRuntime {
      * @param scriptName The script/module name
      * @param context The context
      * @return The value to call
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value findPooledScript(@Nullable PythonPooledInstance override, String packageName, String scriptName, Context context) {
@@ -864,9 +888,9 @@ public final class PythonContextRuntime {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> findScript(packageName, scriptName, context));
         }
-        Context current = PythonContextRegistry.currentContext();
-        if (current != null) {
-            return getPythonPool().getScript(current, packageName, scriptName);
+        Context entered = enteredContext();
+        if (entered != null) {
+            return getPythonPool().getScript(entered, packageName, scriptName);
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -909,6 +933,10 @@ public final class PythonContextRuntime {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(findScript(packageName, scriptName, context)));
         }
+        Context entered = enteredContext();
+        if (entered != null) {
+            return fn.apply(getPythonPool().getScript(entered, packageName, scriptName));
+        }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
             PythonPool pool = getPythonPool();
@@ -949,6 +977,10 @@ public final class PythonContextRuntime {
         }
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(getOrCreateValue(context, expression)));
+        }
+        Context entered = enteredContext();
+        if (entered != null) {
+            return fn.apply(getPythonPool().getValue(entered, expression));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -1150,6 +1182,11 @@ public final class PythonContextRuntime {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(findClass(classReference, context)));
         }
+        Context entered = enteredContext();
+        if (entered != null) {
+            // no lease either: the context belongs to the caller's frame, as on the event-loop path
+            return fn.apply(getPythonPool().getClass(entered, classReference));
+        }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
             // the loop's own context: the coroutine continues on the loop, no lease to keep
@@ -1166,6 +1203,10 @@ public final class PythonContextRuntime {
         }
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(findScript(packageName, scriptName, context)));
+        }
+        Context entered = enteredContext();
+        if (entered != null) {
+            return fn.apply(getPythonPool().getScript(entered, packageName, scriptName));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -1185,7 +1226,7 @@ public final class PythonContextRuntime {
      * @param methodName The function name
      * @param args Arguments
      * @return The polyglot result
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Value invokePooledScript(@Nullable PythonPooledInstance override, String packageName, String scriptName, String methodName, Object... args) {
@@ -1204,7 +1245,7 @@ public final class PythonContextRuntime {
      * @param methodName The function name
      * @param args Arguments
      * @return The stage of the coroutine
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static CompletionStage<?> invokePooledScriptAsync(@Nullable PythonPooledInstance override, String packageName, String scriptName, String methodName, Object... args) {
@@ -1223,7 +1264,7 @@ public final class PythonContextRuntime {
      * @param methodName The function name
      * @param args Arguments
      * @return The publisher
-     * @since 5.2.0
+     * @since 5.2.3
      */
     @UsedByGeneratedCode
     public static Publisher<?> invokePooledScriptPublisher(@Nullable PythonPooledInstance override, String packageName, String scriptName, String methodName, Object... args) {
@@ -1640,7 +1681,7 @@ public final class PythonContextRuntime {
      * @param classReference The class
      * @param ctx The context to resolve it in
      * @return The class Value, belonging to that context
-     * @since 5.2.0
+     * @since 5.2.3
      */
     public static Value findClass(PythonClassReference classReference, Context ctx) {
         // Resolving a class means importing its module and asking inspect.isclass, several guest

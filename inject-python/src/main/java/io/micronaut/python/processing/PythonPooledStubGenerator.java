@@ -145,12 +145,6 @@ final class PythonPooledStubGenerator {
     }
 
     /**
-     * Whether a type is implemented in Python, and so belongs to a context.
-     *
-     * @param type The type
-     * @return Whether it is a Python type
-     */
-    /**
      * A module's injected members.
      *
      * <p>Queried as members rather than through {@code ALL_FIELDS}, which returns none of them:
@@ -220,15 +214,17 @@ final class PythonPooledStubGenerator {
             : pythonConstructor.getParameters();
         boolean hasConstructorArguments = constructorParameters.length > 0;
 
-        FieldDef pooledInstanceField;
+        // Both shapes carry the holder and the factory: with constructor arguments it holds the
+        // per-context instances the bean owns, and without them it is null unless the bean is
+        // AOP-proxied, when it holds one Python proxy per context. Only what they do with it differs.
+        FieldDef pooledInstanceField = pooledInstanceField();
+        builder.addField(pooledInstanceField);
+        addPooledValueFactory(builder, thisType, pooledInstanceField, typeName);
+        FieldDef pooledInstance = pooledInstanceField;
         if (hasConstructorArguments) {
             // The bean owns its per-context instances, because the pool's cache is keyed by class
             // and two pooled beans of one class can hold different dependencies. The arguments are
             // captured once, at injection, and used to construct in whichever context serves a call.
-            FieldDef pooledInstance = pooledInstanceField();
-            builder.addField(pooledInstance);
-            pooledInstanceField = pooledInstance;
-
             MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
             for (ParameterElement parameter : constructorParameters) {
                 ctor.addParameter(ParameterDef.builder(parameter.getName(), erasedType(parameter.getGenericType())).build());
@@ -280,14 +276,8 @@ final class PythonPooledStubGenerator {
                 .returns(thisType)
                 .build(((aThis, methodParameters) -> thisType.instantiate(methodParameters.getFirst()).returning())));
 
-            addPooledValueFactory(builder, thisType, pooledInstance, typeName);
         } else {
-            // The pool's per-class cache serves this bean, so the holder stays null -- unless the
-            // bean is AOP-proxied, when it holds one Python proxy per context instead.
-            FieldDef pooledInstance = pooledInstanceField();
-            builder.addField(pooledInstance);
-            pooledInstanceField = pooledInstance;
-
+            // The pool's per-class cache serves this bean, so the holder stays null.
             MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
             builder.addMethod(ctor.build(((aThis, params) ->
                 aThis.field(pooledInstance).assign(ExpressionDef.nullValue()))));
@@ -317,8 +307,6 @@ final class PythonPooledStubGenerator {
                 .addParameter(POLYGLOT_VALUE)
                 .returns(thisType)
                 .build(((aThis, methodParameters) -> thisType.instantiate().returning())));
-
-            addPooledValueFactory(builder, thisType, pooledInstance, typeName);
         }
 
         List<MethodElement> methodsToBridge = element.getEnclosedElements(
@@ -635,6 +623,10 @@ final class PythonPooledStubGenerator {
 
         builder.addMethod(MethodDef.builder(FROM_POOLED_VALUE_FACTORY)
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+            // The proxy creator looks this up reflectively, as `box` does the (Value) constructor.
+            // Annotated so a native image takes the metadata from the annotation processor rather
+            // than from a hand-written reflect-config entry.
+            .addAnnotation(ClassTypeDef.of("io.micronaut.core.annotation.ReflectiveAccess"))
             .addParameter(ParameterDef.builder("valueFactory", VALUE_FACTORY).build())
             .returns(thisType)
             .build(((aThis, methodParameters) -> thisType.instantiate(
