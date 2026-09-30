@@ -30,3 +30,22 @@ assert introspection.getTypeArguments(Comparable.class).isEmpty(); // <2>
 Arguments bound through an intermediate super type are resolved too, and an argument the type leaves open is reported as the type variable rather than as a resolved type.
 
 NOTE: The no-argument `getTypeArguments()` reports the arguments the introspected type itself *declares*, not what it binds in a super type. For `class PhoneValidator implements Validator<Phone>` it is empty; for `class AnyValidator<T> implements Validator<T>` it is `[T]`.
+
+== Reading the shape of an argument
+
+An api:core.type.Argument[] is written as one of three things: a type, a type variable that was left open, or a wildcard. A wildcard and a type resolved in place of a variable are both compiled as a api:core.type.GenericPlaceholder[], so `instanceof GenericPlaceholder` and `isTypeVariable()` do not tell them apart; `isWildcard()` and `isUnresolvedTypeVariable()` do.
+
+Given an introspected type that declares a wildcard, a type variable and an array of one:
+
+snippet::io.micronaut.docs.ioc.beans.Catalog[tags="class"]
+
+the arguments of its properties answer how each was written:
+
+snippet::io.micronaut.docs.ioc.beans.ArgumentStructureSpec[tags="structure", indent=0]
+
+<1> A wildcard is a api:core.type.WildcardArgument[], which carries the upper and the lower bounds
+<2> A type variable is a api:core.type.GenericPlaceholder[], which carries the name and the bounds of the variable
+<3> `componentType()` and `arrayType()` go between an array and its component, keeping type arguments, wildcards and variables
+<4> `equalsType` answers whether two arguments resolve the same bean, and takes a wildcard for the type it is bounded by. `equalsStructure` compares what was written: the raw type, the type arguments by position, the bounds of a wildcard, and the name and bounds of a variable
+
+NOTE: Type arguments are read by position from `getTypeParameters()`. None of the above depends on the type arguments being named after the type parameters they are given for, as `getTypeVariables()` does, so it works for an argument built with `Argument.of(Class, String, Argument...)` from unnamed arguments.

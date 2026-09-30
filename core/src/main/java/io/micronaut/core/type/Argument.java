@@ -174,6 +174,154 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Whether this argument stands for a wildcard: the {@code ?}, {@code ? extends X} or {@code ? super X} written
+     * as a type argument.
+     *
+     * <p>An argument is written as exactly one of three things, and this method and
+     * {@link #isUnresolvedTypeVariable()} tell them apart:</p>
+     * <ul>
+     *     <li>a wildcard, which answers {@code true} here and is a {@link WildcardArgument} that carries the
+     *     bounds;</li>
+     *     <li>a type variable, which answers {@code true} to {@link #isUnresolvedTypeVariable()} and is a
+     *     {@link GenericPlaceholder} that carries the name and the bounds;</li>
+     *     <li>a type, which answers {@code false} to both: a class, a class written with type arguments
+     *     ({@link #hasTypeArguments()}), a raw type ({@link #isRawType()}), or an array of any type, a type
+     *     variable included ({@link #componentType()}).</li>
+     * </ul>
+     *
+     * <p>Neither {@code instanceof GenericPlaceholder} nor {@link #isTypeVariable()} tells them apart: both are
+     * also true of a wildcard, which is compiled as a placeholder of the type parameter it is the argument of,
+     * and of a type that was resolved in place of a variable ({@link GenericPlaceholder#isResolved()}).</p>
+     *
+     * @return Whether this argument is a wildcard
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isWildcard() {
+        return this instanceof WildcardArgument<?>;
+    }
+
+    /**
+     * Whether this argument stands for a type variable that was left unresolved where the argument was written:
+     * the {@code T} of {@code List<T>}.
+     *
+     * <p>It is {@code false} for a wildcard, for a type resolved in place of a variable
+     * ({@link GenericPlaceholder#isResolved()}) and for an array of a variable, {@code T[]}, which is an array
+     * whose {@link #componentType()} is the variable. An argument that answers {@code true} is a
+     * {@link GenericPlaceholder}; its {@link #getType()} is the type the variable erases to. See
+     * {@link #isWildcard()} for how the shapes of an argument are told apart.</p>
+     *
+     * <p>A placeholder built by hand with {@link #ofTypeVariable(Class, String)} for a type resolved in place of a
+     * variable, or compiled before {@link GenericPlaceholder#isResolved()} was recorded, is taken for the variable
+     * here.</p>
+     *
+     * @return Whether this argument is an unresolved type variable
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isUnresolvedTypeVariable() {
+        return this instanceof GenericPlaceholder<?> placeholder
+            && !(this instanceof WildcardArgument<?>)
+            && !placeholder.isResolved()
+            && !getType().isArray();
+    }
+
+    /**
+     * Whether this argument is a type written with type arguments: {@code List<String>}, {@code List<T>} or
+     * {@code List<?>}, and an array of one, but neither {@code List} written raw nor a class that declares no
+     * type parameters.
+     *
+     * <p>The type arguments are {@link #getTypeParameters()}, by position. Unlike {@link #hasTypeVariables()},
+     * which reads the name-keyed {@link #getTypeVariables()}, this does not depend on the type arguments being
+     * named after the type parameters they are given for, which takes reflection to find out for an argument
+     * built by hand.</p>
+     *
+     * @return Whether the type was written with type arguments
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean hasTypeArguments() {
+        return getTypeParameters().length > 0 && !isRawType();
+    }
+
+    /**
+     * Whether this argument and the given one were written as the same type, compared by structure:
+     * <ul>
+     *     <li>two types are the same class with the same type arguments, compared by position. A type written
+     *     raw and a type that has no type arguments are the same; {@code List}, {@code List<?>} and
+     *     {@code List<Object>} are three different types;</li>
+     *     <li>two wildcards have the same upper and the same lower bounds, so {@code ?} and
+     *     {@code ? extends Object} are the same;</li>
+     *     <li>two type variables, or arrays of one, have the same variable name and the same bounds;</li>
+     *     <li>a type resolved in place of a variable ({@link GenericPlaceholder#isResolved()}) is the type it was
+     *     resolved to.</li>
+     * </ul>
+     *
+     * <p>The name of the argument, the names of its type arguments and the annotations are not compared. This is
+     * a stricter comparison than {@link #equalsType(Argument)}, which takes a wildcard for the type it is bounded
+     * by, ignores the bounds of a variable and matches type arguments by their names; that one answers whether two
+     * arguments resolve the same bean, this one whether they say the same thing.</p>
+     *
+     * <p>A type variable has no identity beyond its name and bounds: the {@code T} of one declaration is the same
+     * as an equally bounded {@code T} of another.</p>
+     *
+     * <p>A variable that is named within its own bounds, the {@code T} of {@code T extends Comparable<T>}, is
+     * compared by its name there, so a recursive bound is the same however many times it was written out.</p>
+     *
+     * @param other The other argument
+     * @return Whether the two were written as the same type
+     * @see #structureHashCode()
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean equalsStructure(@Nullable Argument<?> other) {
+        return ArgumentStructure.equals(this, other);
+    }
+
+    /**
+     * The hash code that agrees with {@link #equalsStructure(Argument)}.
+     *
+     * @return The hash code of the type this argument was written as
+     * @since 5.3.0
+     */
+    @Experimental
+    default int structureHashCode() {
+        return ArgumentStructure.hashCode(this);
+    }
+
+    /**
+     * The component of an array: the {@code List<String>} of {@code List<String>[]}, the {@code T} of
+     * {@code T[]}.
+     *
+     * <p>An array argument is the array class carrying the type arguments of its component, or a placeholder
+     * whose type is an array for an array of a type variable. The component keeps the type arguments, wildcards
+     * among them, the rawness, and the variable with its bounds. It does not keep the name or the annotations of
+     * this argument. The component of an array of arrays is an array.</p>
+     *
+     * @return The component, or {@code null} if this argument is not an array. A wildcard is not an array, even
+     * one bounded by an array, for which {@link #isArray()} is true
+     * @see #arrayType()
+     * @since 5.3.0
+     */
+    @Experimental
+    default @Nullable Argument<?> componentType() {
+        return ArgumentStructure.componentType(this);
+    }
+
+    /**
+     * The array whose component is this argument: {@code List<String>[]} for {@code List<String>}, {@code T[]}
+     * for {@code T}. The inverse of {@link #componentType()}, and what it keeps is the same.
+     *
+     * @return The array
+     * @throws IllegalStateException If this argument is a wildcard or {@code void}, which there is no array of
+     * @since 5.3.0
+     */
+    @Experimental
+    default Argument<?> arrayType() {
+        return ArgumentStructure.arrayType(this);
+    }
+
+    /**
      * Whether the given argument is an instance.
      *
      * @param o The object
