@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.core.env
 
+import io.micronaut.json.env.JsonPropertySourceLoader
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
