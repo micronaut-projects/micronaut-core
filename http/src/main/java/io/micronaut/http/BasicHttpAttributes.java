@@ -110,11 +110,18 @@ public final class BasicHttpAttributes {
      * Add a condition that must be awaited before executing controllers for the given request.
      * This is used to delay execution for argument binding.
      *
+     * <p>A request that is a {@link DetachedBinding} keeps the condition itself: it is bound
+     * outside the argument binding of the route, which does not wait for it.</p>
+     *
      * @param request The request
      * @param flowToAdd The condition to wait for
      */
     @Experimental
     public static void addRouteWaitsFor(HttpRequest<?> request, ExecutionFlow<?> flowToAdd) {
+        if (request instanceof DetachedBinding detached) {
+            detached.addWaitsFor(flowToAdd);
+            return;
+        }
         if (request.getAttribute(ROUTE_WAITS_FOR).orElse(null) instanceof ExecutionFlow<?> existing) {
             request.setAttribute(ROUTE_WAITS_FOR, existing.then(() -> flowToAdd));
         } else {
@@ -185,7 +192,9 @@ public final class BasicHttpAttributes {
      * <p>Not thread-safe: the conditions and the bodies of the route are removed from the
      * attributes of the request while the binding runs, and restored afterwards. It is called
      * while the value is bound, on one thread, and never while another binding of the request
-     * runs, e.g. the argument binding of the route or another detached binding.</p>
+     * runs, e.g. the argument binding of the route or another detached binding. A binding that
+     * can run while another one does binds from a request of its own instead, which keeps the
+     * conditions, see {@link DetachedBinding}.</p>
      *
      * @param request The request
      * @param binding The binding
@@ -260,5 +269,26 @@ public final class BasicHttpAttributes {
      */
     @Internal
     public record DetachedRouteState(@Nullable Object waitsFor, @Nullable Object bodies) {
+    }
+
+    /**
+     * A request a value is bound from outside the argument binding of a route, e.g. a wrapper of
+     * the request of the route made for one binding: it keeps the conditions the binding adds
+     * with {@link #addRouteWaitsFor} itself, for the caller of the binding to wait for. No
+     * attribute of the request holds them, so bindings of one request that run at the same time
+     * do not see or replace the conditions of one another, unlike with
+     * {@link #detachRouteWaitsFor}.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public interface DetachedBinding {
+
+        /**
+         * Add a condition the binding waits for.
+         *
+         * @param flow The condition
+         */
+        void addWaitsFor(ExecutionFlow<?> flow);
     }
 }

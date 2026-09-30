@@ -513,7 +513,7 @@ public final class FormBinding {
      * @return Completes with the form
      */
     CompletableFuture<FormData> form(FormFactory factory, ConversionService conversionService, Supplier<Publisher<RawFormField>> fields) {
-        startForm(factory, conversionService, fields);
+        startForm(factory, conversionService, fields, true);
         synchronized (this) {
             return Objects.requireNonNull(form, "form");
         }
@@ -528,10 +528,23 @@ public final class FormBinding {
      * {@code null} if the form was started before: it is shared, see {@link #form}
      */
     FormDataArgumentBinder.@Nullable Collection startForm(FormFactory factory, ConversionService conversionService) {
-        return startForm(factory, conversionService, request::getRawFormFields);
+        return startForm(factory, conversionService, request::getRawFormFields, true);
     }
 
-    private FormDataArgumentBinder.@Nullable Collection startForm(FormFactory factory, ConversionService conversionService, Supplier<Publisher<RawFormField>> fields) {
+    /**
+     * Start the form of the request, like {@link #startForm(FormFactory, ConversionService)},
+     * outside the argument binding of the route: the route does not wait for the form, the caller
+     * does, e.g. a handler that reads the form while it runs.
+     *
+     * @param factory           The form factory
+     * @param conversionService The conversion service
+     * @return The collection this call started, or {@code null} if the form was started before
+     */
+    FormDataArgumentBinder.@Nullable Collection startDetachedForm(FormFactory factory, ConversionService conversionService) {
+        return startForm(factory, conversionService, request::getRawFormFields, false);
+    }
+
+    private FormDataArgumentBinder.@Nullable Collection startForm(FormFactory factory, ConversionService conversionService, Supplier<Publisher<RawFormField>> fields, boolean routeWaits) {
         FormDataArgumentBinder.Collection collection;
         CompletableFuture<FormData> collected;
         synchronized (this) {
@@ -550,7 +563,9 @@ public final class FormBinding {
             collected = collection.result();
             form = collected;
         }
-        BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(collected));
+        if (routeWaits) {
+            BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(collected));
+        }
         return collection;
     }
 

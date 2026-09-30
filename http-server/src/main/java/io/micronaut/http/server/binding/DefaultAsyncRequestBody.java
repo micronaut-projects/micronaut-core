@@ -90,6 +90,10 @@ import java.util.function.Supplier;
  * filter read the body, fails with a message that names that read. A {@link #copy() copy} reads a
  * split of the bytes instead, which leaves them to the other readers.</p>
  *
+ * <p>The body and its copies can be read together, from different threads too: a read keeps what
+ * its binding waits for to itself, see {@link BindingRequest}, and the reads are started one at
+ * a time, since the bytes of the server request they split or move are not thread-safe.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -115,6 +119,11 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
      * Whether this is a copy, which reads a split of the bytes of the server request.
      */
     private final boolean copy;
+    /**
+     * Held while a read of the body or of one of its copies is started, and while it consumes
+     * the bytes of the server request: shared by the body and its copies.
+     */
+    private final Object lock;
 
     // guarded by this
     private @Nullable String reader;
@@ -127,7 +136,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
      * @param binder  The binder
      */
     DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyArgumentBinder binder) {
-        this(request, server, binder, false);
+        this(request, server, binder, false, new Object());
     }
 
     /**
@@ -135,8 +144,10 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
      * @param server  The server request whose bytes are the body of the request, see {@link ServerRequestBody}
      * @param binder  The binder
      * @param copy    Whether this is a copy, which reads a split of the bytes
+     * @param lock    The lock of the body and its copies
      */
-    private DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyArgumentBinder binder, boolean copy) {
+    private DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyArgumentBinder binder, boolean copy, Object lock) {
+        this.lock = lock;
         this.request = request;
         this.server = server;
         this.binder = binder;
@@ -189,45 +200,48 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             throw new IllegalArgumentException("The body cannot be read as an InputStream by an asynchronous handler, as reading it blocks"
                 + ": take it with takeBody(), or write it to a file with transferTo()");
         }
-        claim("body");
-        // bound like the @Body argument of a controller, with the binder of the type
-        Argument<T> argument = BodyArguments.bodyArgument(type);
-        CompletableFuture<@Nullable T> result = new CompletableFuture<>();
-        try {
-            ArgumentBinder<T, HttpRequest<?>> argumentBinder = binder.binderRegistry().findArgumentBinder(argument)
-                .orElseThrow(() -> UnsatisfiedRouteException.create(argument));
-            ArgumentConversionContext<T> context = ConversionContext.of(argument, request.getLocale().orElse(null), request.getCharacterEncoding());
-            HttpRequest<?> source = bindingSource();
-            @SuppressWarnings("unchecked")
-            ArgumentBinder.BindingResult<T>[] bound = new ArgumentBinder.BindingResult[1];
-            // the binder waits for the body: this waits for it here, not the route, which is running
-            ExecutionFlow<?> waitsFor = BasicHttpAttributes.detachRouteWaitsFor(request, () -> bound[0] = argumentBinder.bind(context, source));
-            waitsFor.onComplete((ignored, error) -> {
-                // the body was decoded from a split of the bytes: the read consumes them
-                consumeDecoded();
-                if (error != null) {
-                    result.completeExceptionally(error);
-                    return;
-                }
-                try {
-                    result.complete(value(argument, context, Objects.requireNonNull(bound[0], "binding result")));
-                } catch (Throwable e) {
-                    result.completeExceptionally(e);
-                }
-            });
-            if (!result.isDone()) {
-                // the body is still arriving: a handler that completed without waiting for it
-                // aborts the read, like the other reads
-                owned(() -> {
-                    abortDecode(result, waitsFor);
-                    return CompletableFuture.completedStage(null);
+        synchronized (lock) {
+            claim("body");
+            // bound like the @Body argument of a controller, with the binder of the type
+            Argument<T> argument = BodyArguments.bodyArgument(type);
+            CompletableFuture<@Nullable T> result = new CompletableFuture<>();
+            try {
+                ArgumentBinder<T, HttpRequest<?>> argumentBinder = binder.binderRegistry().findArgumentBinder(argument)
+                    .orElseThrow(() -> UnsatisfiedRouteException.create(argument));
+                ArgumentConversionContext<T> context = ConversionContext.of(argument, request.getLocale().orElse(null), request.getCharacterEncoding());
+                // the binder waits for the body: this read waits for it, not the route, which is
+                // running. What the binder waits for is kept by the request it binds from, which
+                // is this read's own: another binding of the request never finds it, nor drops it
+                BindingRequest<?> source = bindingSource();
+                ArgumentBinder.BindingResult<T> bound = argumentBinder.bind(context, source);
+                ExecutionFlow<?> waitsFor = source.waitsFor();
+                waitsFor.onComplete((ignored, error) -> {
+                    // the body was decoded from a split of the bytes: the read consumes them
+                    consumeDecoded();
+                    if (error != null) {
+                        result.completeExceptionally(error);
+                        return;
+                    }
+                    try {
+                        result.complete(value(argument, context, bound));
+                    } catch (Throwable e) {
+                        result.completeExceptionally(e);
+                    }
                 });
+                if (!result.isDone()) {
+                    // the body is still arriving: a handler that completed without waiting for it
+                    // aborts the read, like the other reads
+                    owned(() -> {
+                        abortDecode(result, waitsFor);
+                        return CompletableFuture.completedStage(null);
+                    });
+                }
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
             }
-        } catch (Throwable e) {
-            result.completeExceptionally(e);
+            // a view: the caller cannot complete or cancel the read
+            return result.minimalCompletionStage();
         }
-        // a view: the caller cannot complete or cancel the read
-        return result.minimalCompletionStage();
     }
 
     /**
@@ -249,38 +263,48 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public CompletionStage<String> text() {
-        claimBytes("text");
-        UploadContext context = uploadContext();
-        return content("text", context).text(context.maxBufferSize());
+        synchronized (lock) {
+            claimBytes("text");
+            UploadContext context = uploadContext();
+            return content("text", context).text(context.maxBufferSize());
+        }
     }
 
     @Override
     public CompletionStage<String> text(int maximumBytes) {
         checkLimit(maximumBytes);
-        claimBytes("text");
-        return content("text", uploadContext()).text(maximumBytes);
+        synchronized (lock) {
+            claimBytes("text");
+            return content("text", uploadContext()).text(maximumBytes);
+        }
     }
 
     @Override
     public CompletionStage<String> text(int maximumBytes, Charset charset) {
         checkLimit(maximumBytes);
         Objects.requireNonNull(charset, "charset");
-        claimBytes("text");
-        return content("text", uploadContext()).text(maximumBytes, charset);
+        synchronized (lock) {
+            claimBytes("text");
+            return content("text", uploadContext()).text(maximumBytes, charset);
+        }
     }
 
     @Override
     public CompletionStage<byte[]> bytes(int maximumBytes) {
         checkLimit(maximumBytes);
-        claimBytes("bytes");
-        return content("bytes", uploadContext()).bytes(maximumBytes);
+        synchronized (lock) {
+            claimBytes("bytes");
+            return content("bytes", uploadContext()).bytes(maximumBytes);
+        }
     }
 
     @Override
     public CompletionStage<Void> transferTo(Path destination) {
         Objects.requireNonNull(destination, "destination");
-        claimBytes("transferTo");
-        return content("transferTo", uploadContext()).transferTo(destination);
+        synchronized (lock) {
+            claimBytes("transferTo");
+            return content("transferTo", uploadContext()).transferTo(destination);
+        }
     }
 
     @Override
@@ -299,15 +323,23 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             throw new IllegalArgumentException("The elements of the body cannot be read as InputStreams by an asynchronous handler, as reading them blocks"
                 + ": take the body with takeBody()");
         }
-        claimBytes("elements");
-        CloseableByteBody body = readBytes("elements");
-        PublisherBodyElements<T> elements = new PublisherBodyElements<>(() -> elementPublisher(type, body), body::close);
-        owned(elements::closeAsync);
-        return elements;
+        synchronized (lock) {
+            claimBytes("elements");
+            CloseableByteBody body = readBytes("elements");
+            PublisherBodyElements<T> elements = new PublisherBodyElements<>(() -> elementPublisher(type, body), body::close);
+            owned(elements::closeAsync);
+            return elements;
+        }
     }
 
     @Override
     public CompletionStage<FormData> form() {
+        synchronized (lock) {
+            return startForm();
+        }
+    }
+
+    private CompletionStage<FormData> startForm() {
         if (decoded) {
             // a filter set the body to an object: the form it set, or one it converts to
             CompletableFuture<@Nullable FormData> replaced = FormBinding.replacedForm(request, binder.conversionService);
@@ -335,11 +367,9 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                 // share. It is not cancelled with the handler, the request releases it
                 return binding.form(binder.formFactory(), binder.conversionService, () -> copiedFields(formRequest)).minimalCompletionStage();
             }
-            FormDataArgumentBinder.Collection[] start = new FormDataArgumentBinder.Collection[1];
             // the form is read by the handler, outside the argument binding of the route, which
             // it does not delay: the route of a filter that read it does not wait for it
-            BasicHttpAttributes.detachRouteWaitsFor(request, () -> start[0] = binding.startForm(binder.formFactory(), binder.conversionService));
-            FormDataArgumentBinder.Collection started = start[0];
+            FormDataArgumentBinder.Collection started = binding.startDetachedForm(binder.formFactory(), binder.conversionService);
             CompletableFuture<FormData> form = binding.form(binder.formFactory(), binder.conversionService);
             // the form stays the one of the request, but this read consumes the body: the
             // form arguments and the readers of the bytes that come later fail
@@ -362,45 +392,56 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public FormParts parts() {
-        claimBytes("parts");
-        if (cleared != null) {
-            checkForm();
-            // no body: a form without parts
-            return NoFormParts.INSTANCE;
+        synchronized (lock) {
+            claimBytes("parts");
+            if (cleared != null) {
+                checkForm();
+                // no body: a form without parts
+                return NoFormParts.INSTANCE;
+            }
+            FormCapableHttpRequest<?> formRequest = formRequest();
+            UploadContext context = UploadContext.of(binder.formFactory(), formRequest, request.getCharacterEncoding());
+            // the fields are decoded when the first part is asked for: a copy decodes a split of the
+            // bytes, which leaves the whole body to the other readers of the request
+            DefaultFormParts parts = new DefaultFormParts(() -> {
+                synchronized (lock) {
+                    if (copy) {
+                        return copiedFields(formRequest);
+                    }
+                    Publisher<RawFormField> fields = formRequest.getRawFormFields();
+                    // the fields claimed the bytes
+                    describeRead(server.byteBody(), "parts");
+                    return fields;
+                }
+            }, context);
+            owned(parts::closeAsync);
+            return parts;
         }
-        FormCapableHttpRequest<?> formRequest = formRequest();
-        UploadContext context = UploadContext.of(binder.formFactory(), formRequest, request.getCharacterEncoding());
-        // the fields are decoded when the first part is asked for: a copy decodes a split of the
-        // bytes, which leaves the whole body to the other readers of the request
-        DefaultFormParts parts = new DefaultFormParts(copy ? () -> copiedFields(formRequest) : () -> {
-            Publisher<RawFormField> fields = formRequest.getRawFormFields();
-            // the fields claimed the bytes
-            describeRead(server.byteBody(), "parts");
-            return fields;
-        }, context);
-        owned(parts::closeAsync);
-        return parts;
     }
 
     @Override
     public CloseableByteBody takeBody() {
-        claimBytes("takeBody");
-        return readBytes("takeBody");
+        synchronized (lock) {
+            claimBytes("takeBody");
+            return readBytes("takeBody");
+        }
     }
 
     @Override
     public CompletionStage<Void> discardBody() {
-        claim("discardBody");
-        if (!decoded && !copy) {
-            // a copy has not split the bytes it did not read: nothing to discard
-            readBytes("discardBody").close();
+        synchronized (lock) {
+            claim("discardBody");
+            if (!decoded && !copy) {
+                // a copy has not split the bytes it did not read: nothing to discard
+                readBytes("discardBody").close();
+            }
         }
         return CompletableFuture.completedStage(null);
     }
 
     @Override
     public AsyncRequestBody copy() {
-        DefaultAsyncRequestBody copy = new DefaultAsyncRequestBody(request, server, binder, true);
+        DefaultAsyncRequestBody copy = new DefaultAsyncRequestBody(request, server, binder, true, lock);
         synchronized (this) {
             if (copies == null) {
                 copies = new ArrayList<>(1);
@@ -439,18 +480,19 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     }
 
     /**
-     * The request the body is decoded from by the {@code @Body} binders: the decoded body is the
+     * The request the body is decoded from by the {@code @Body} binders, one for each read, which
+     * keeps what the binder waits for, see {@link BindingRequest}. The decoded body is the
      * handler's, not a body of the request, so a server request is bound through a view, which the
      * binders do not keep the decoded body in; {@link HttpRequest#getBody()} of the request does
-     * not change. A request whose body a filter set to an object is bound itself, from that object.
+     * not change. A request whose body a filter set to an object is bound from that object.
      *
      * @return The request to bind the body from
      */
-    private HttpRequest<?> bindingSource() {
+    private BindingRequest<?> bindingSource() {
         if (!decoded && request instanceof ServerHttpRequest<?>) {
             return new BindingView<>(request);
         }
-        return request;
+        return new BindingRequest<>(request);
     }
 
     /**
@@ -538,13 +580,15 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         if (decoded || cleared != null || copy) {
             return;
         }
-        ByteBody bytes = server.byteBody();
-        try {
-            bytes.move().close();
-        } catch (IllegalStateException e) {
-            // e.g. a binder that read the bytes of the request itself
+        synchronized (lock) {
+            ByteBody bytes = server.byteBody();
+            try {
+                bytes.move().close();
+            } catch (IllegalStateException e) {
+                // e.g. a binder that read the bytes of the request itself
+            }
+            describeRead(bytes, "body");
         }
-        describeRead(bytes, "body");
     }
 
     /**
@@ -729,16 +773,34 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     }
 
     /**
-     * A view of a server request for the {@code @Body} binders: they read the bytes of the server
-     * request it wraps, see {@link ServerRequestBody}, and keep no decoded body in it. It never
-     * replaces the body, so the bytes are found without decoding the body of the request.
+     * The request one {@link #body(Argument)} is bound from by the {@code @Body} binders: the
+     * request of the route, which also keeps what the binder waits for, see
+     * {@link BasicHttpAttributes#addRouteWaitsFor}. The read waits for it, not the route, and no
+     * attribute of the request holds it: the reads of the body and of its copies that are in
+     * flight together, and the other bindings of the request, do not see or replace the
+     * conditions of one another. It never replaces the body.
      *
      * @param <B> The body type
      */
-    private static final class BindingView<B> extends HttpRequestWrapper<B> implements BodyPreservingRequestWrapper {
+    private static class BindingRequest<B> extends HttpRequestWrapper<B> implements BodyPreservingRequestWrapper, BasicHttpAttributes.DetachedBinding {
+        private @Nullable ExecutionFlow<?> waitsFor;
 
-        BindingView(HttpRequest<B> request) {
+        BindingRequest(HttpRequest<B> request) {
             super(request);
+        }
+
+        @Override
+        public final void addWaitsFor(ExecutionFlow<?> flow) {
+            ExecutionFlow<?> existing = waitsFor;
+            waitsFor = existing == null ? flow : existing.then(() -> flow);
+        }
+
+        /**
+         * @return What the binding waits for
+         */
+        final ExecutionFlow<?> waitsFor() {
+            ExecutionFlow<?> flow = waitsFor;
+            return flow == null ? ExecutionFlow.empty() : flow;
         }
 
         @Override
@@ -759,6 +821,20 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         @Override
         public long getContentLength() {
             return getDelegate().getContentLength();
+        }
+    }
+
+    /**
+     * A view of a server request for the {@code @Body} binders: they read the bytes of the server
+     * request it wraps, see {@link ServerRequestBody}, and keep no decoded body in it. It never
+     * replaces the body, so the bytes are found without decoding the body of the request.
+     *
+     * @param <B> The body type
+     */
+    private static final class BindingView<B> extends BindingRequest<B> {
+
+        BindingView(HttpRequest<B> request) {
+            super(request);
         }
 
         @Override

@@ -29,7 +29,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -374,7 +373,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             failure = error;
         } else {
             dropInitialBytes();
-            initial = takeInitialBuffer(subscriber, last);
+            // the buffered bytes are kept for the subscribers that wait for the full body, which
+            // hold no reservation: they are given them when the body completes
+            initial = takeInitialBuffer(subscriber, last && fullSubscribers == null);
             if (subscriber != null) {
                 if (subscribers == null) {
                     subscribers = new ArrayList<>(1);
@@ -805,13 +806,30 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 current.get(i).complete();
             }
         }
-        if (fullSubscribers != null && bufferSizeExceeded == null) {
-            boolean last = reserved <= 0;
-            for (Iterator<DelayedExecutionFlow<ReadBuffer>> iterator = fullSubscribers.iterator(); iterator.hasNext(); ) {
-                DelayedExecutionFlow<ReadBuffer> fullSubscriber = iterator.next();
-                fullSubscriber.complete(getBufferedData(last && !iterator.hasNext()));
-            }
+        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
+        if (full != null && bufferSizeExceeded == null) {
             fullSubscribers = null;
+            // the body of every subscriber is taken before the first one is completed: its
+            // completion can run another operation on this buffer, e.g. a reader that closes the
+            // last reservation, which discards the buffered bytes the others are still to be given
+            boolean last = reserved <= 0;
+            int n = full.size();
+            List<ReadBuffer> bodies = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                bodies.add(getBufferedData(last && i == n - 1));
+            }
+            int completed = 0;
+            try {
+                while (completed < n) {
+                    // ownership of the body passes to the subscriber with the call
+                    ReadBuffer body = bodies.get(completed);
+                    full.get(completed++).complete(body);
+                }
+            } finally {
+                for (int i = completed; i < n; i++) {
+                    bodies.get(i).close();
+                }
+            }
         }
     }
 
