@@ -450,8 +450,7 @@ public final class ArgumentExpUtils {
             declaringType,
             null,
             types,
-            new HashSet<>(5),
-            false,
+            new Visit(new HashSet<>(5), false),
             loadClassValueExpressionFn);
     }
 
@@ -463,9 +462,10 @@ public final class ArgumentExpUtils {
         @Nullable
         ClassElement element,
         Map<String, ClassElement> types,
-        Set<Object> visitedTypes,
-        boolean inBounds,
+        Visit visit,
         Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        Set<Object> visitedTypes = visit.visitedTypes();
+        boolean inBounds = visit.inBounds();
         if (element == null) {
             if (visitedTypes.contains(declaringType.getName())) {
                 return TYPE_ARGUMENT.getStaticField(ZERO_ARGUMENTS_CONSTANT, TYPE_ARGUMENT_ARRAY);
@@ -489,8 +489,7 @@ public final class ArgumentExpUtils {
                     argumentName,
                     classElement,
                     typeArguments,
-                    visitedTypes,
-                    inBounds,
+                    visit,
                     loadClassValueExpressionFn
                 );
             }
@@ -524,8 +523,7 @@ public final class ArgumentExpUtils {
             argumentName,
             argumentType,
             typeArguments,
-            visitedTypes,
-            false,
+            new Visit(visitedTypes, false),
             loadClassValueExpressionFn
         );
     }
@@ -538,9 +536,7 @@ public final class ArgumentExpUtils {
      * @param argumentName                   The argument name, {@code null} for a bound
      * @param argumentType                   The argument type
      * @param typeArguments                  The nested type arguments
-     * @param visitedTypes                   The visited types
-     * @param inBounds                       Whether the argument is written inside the bounds of a variable or
-     *                                       a wildcard, where a variable met again is written as the variable
+     * @param visit                          The visited types, and whether the argument is inside bounds
      * @param loadClassValueExpressionFn     The load type method fn
      * @return The expression
      */
@@ -550,9 +546,10 @@ public final class ArgumentExpUtils {
         @Nullable String argumentName,
         ClassElement argumentType,
         Map<String, ClassElement> typeArguments,
-        Set<Object> visitedTypes,
-        boolean inBounds,
+        Visit visit,
         Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        Set<Object> visitedTypes = visit.visitedTypes();
+        boolean inBounds = visit.inBounds();
         ExpressionDef.Constant argumentTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(argumentType)));
 
         List<ExpressionDef> values = new ArrayList<>();
@@ -652,8 +649,7 @@ public final class ArgumentExpUtils {
                 argumentType,
                 argumentType,
                 typeArguments,
-                visitedTypes,
-                inBounds,
+                visit,
                 loadClassValueExpressionFn
             )
         );
@@ -872,8 +868,7 @@ public final class ArgumentExpUtils {
                     null,
                     bound,
                     bound.getTypeArguments(),
-                    visitedTypes,
-                    true,
+                    new Visit(visitedTypes, true),
                     loadClassValueExpressionFn
                 );
             }
@@ -906,8 +901,7 @@ public final class ArgumentExpUtils {
                     bound,
                     bound,
                     boundTypeArguments,
-                    visitedTypes,
-                    true,
+                    new Visit(visitedTypes, true),
                     loadClassValueExpressionFn
                 )
             );
@@ -1060,6 +1054,16 @@ public final class ArgumentExpUtils {
             );
         }).toList());
 
+    }
+
+    /**
+     * Where the writing of a type argument stands.
+     *
+     * @param visitedTypes The types visited so far, to stop at a type that names itself
+     * @param inBounds     Whether the argument is written inside the bounds of a variable or a wildcard, where a
+     *                     variable met again is written as the variable
+     */
+    private record Visit(Set<Object> visitedTypes, boolean inBounds) {
     }
 
 }

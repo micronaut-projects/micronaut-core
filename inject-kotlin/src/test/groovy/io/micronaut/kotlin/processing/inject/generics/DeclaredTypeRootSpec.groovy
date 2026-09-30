@@ -19,8 +19,6 @@ import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.DelegatingBeanDefinition
 
 /**
  * What a declaration keeps where the recorded type arguments alone cannot say it: the rawness of a bean type through
