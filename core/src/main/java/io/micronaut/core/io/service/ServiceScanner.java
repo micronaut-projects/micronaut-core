@@ -102,6 +102,7 @@ final class ServiceScanner<S> {
      *
      * @param classLoader The class loader of the lookup
      * @return The index, or null if the class path must be scanned
+     * @throws ServiceConfigurationError If the index was validated and does not match the class path
      */
     static @Nullable ServiceIndex findServiceIndex(ClassLoader classLoader) {
         Object registered = StaticOptimizations.findSetOnce(SERVICE_INDEX);
@@ -112,13 +113,27 @@ final class ServiceScanner<S> {
     }
 
     /**
-     * Reads the service names listed by a {@code META-INF/services} file, the way the scan reads them.
+     * Reads the service names listed by the {@code META-INF/services} files of a type, the way the scan reads them:
+     * file by file in the order of the class path, so a name that two files list is there twice.
      *
-     * @param url The URL of the file
+     * <p>The names of one file come from a {@link HashSet}, as in the scan, so they are in the order that the hash
+     * codes of the names give them, not in the order of the file. An index built from this method has the order of
+     * the scan only because both iterate the same set of the same names. The tests that compare the two rely on
+     * that: they do not show that the order is guaranteed, and this has to be revisited if the scan ever keeps the
+     * order of the file.</p>
+     *
+     * @param classLoader The class loader
+     * @param serviceName The name of the service type
      * @return The names
+     * @throws IOException If the files cannot be found
      */
-    static Set<String> readStandardServiceNames(URL url) {
-        return UrlServicesLoader.computeStandardServiceTypeNames(url, name -> true);
+    static List<String> readStandardServiceNames(ClassLoader classLoader, String serviceName) throws IOException {
+        List<String> names = new ArrayList<>();
+        Enumeration<URL> serviceConfigs = classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
+        while (serviceConfigs.hasMoreElements()) {
+            names.addAll(UrlServicesLoader.computeStandardServiceTypeNames(serviceConfigs.nextElement(), name -> true));
+        }
+        return names;
     }
 
     SoftServiceLoader.ServiceCollector<S> createCollector() {

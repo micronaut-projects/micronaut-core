@@ -18,10 +18,7 @@ package io.micronaut.core.io.service;
 import io.micronaut.core.annotation.Internal;
 
 import java.io.IOException;
-import java.net.URL;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +32,10 @@ import java.util.Set;
  * a directory are listed in the order of their names, so the index does not depend on the file system it is built
  * on. The {@code META-INF/services} names of each requested type are read with the parser of the scan, from each file
  * in the order of the class path. A name listed by two files is kept twice, as the scan loads it twice.</p>
+ *
+ * <p>The index also lists the class path of the class loader, with the size of each file, when that class path is
+ * known: see {@link ServiceIndex}. A producer that adds a file to the class path afterwards, such as the JAR that
+ * holds the generated index, has to add an entry for it, without a size if the file is not written yet.</p>
  *
  * @author Álvaro Sánchez-Mariscal
  * @since 5.3.0
@@ -52,20 +53,15 @@ public final class ServiceIndexBuilder {
      * @param serviceTypes The service types whose {@code META-INF/services} files are indexed. A type without such a
      *                     file is indexed with no names. The {@code META-INF/micronaut} entries of every type are
      *                     always indexed
-     * @return The index
+     * @return The index, which holds its own copies of the names
      * @throws IOException If the class path cannot be read
      */
     public static ServiceIndex build(ClassLoader classLoader, Collection<String> serviceTypes) throws IOException {
         Map<String, Set<String>> micronautServices = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader, true);
         Map<String, List<String>> standardServices = new LinkedHashMap<>();
         for (String serviceType : serviceTypes) {
-            List<String> names = new ArrayList<>();
-            Enumeration<URL> serviceConfigs = classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceType);
-            while (serviceConfigs.hasMoreElements()) {
-                names.addAll(ServiceScanner.readStandardServiceNames(serviceConfigs.nextElement()));
-            }
-            standardServices.put(serviceType, names);
+            standardServices.put(serviceType, ServiceScanner.readStandardServiceNames(classLoader, serviceType));
         }
-        return new ServiceIndex(classLoader, micronautServices, standardServices);
+        return new ServiceIndex(classLoader, micronautServices, standardServices, ServiceIndex.classPathOf(classLoader));
     }
 }

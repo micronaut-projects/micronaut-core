@@ -242,6 +242,10 @@ public final class MicronautMetaServiceLoaderUtils {
      * of the directory does, every directory below it is a service, and every entry of a service that is neither hidden
      * nor named with a leading dot is one of its entries.
      *
+     * <p>A plain file directly in {@code META-INF/micronaut/} is ignored here. That differs from the two-level walk,
+     * which adds the name of such a file to the service whose directory it visited last, or drops it if it has not
+     * visited one yet. A file there belongs to no service, so this method does not reproduce that.</p>
+     *
      * @param root     The {@code META-INF/micronaut/} directory
      * @param services The services to add to
      * @throws IOException If a directory cannot be read
