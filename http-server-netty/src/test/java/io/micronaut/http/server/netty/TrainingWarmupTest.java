@@ -70,6 +70,8 @@ class TrainingWarmupTest {
     private static final String CHILD_JVM = "child-jvm";
     private static final String OK_PATH = "/training-warmup/ok";
     private static final String REJECTED_PATH = "/training-warmup/rejected";
+    private static final String UNAUTHORIZED_PATH = "/training-warmup/unauthorized";
+    private static final String RATE_LIMITED_PATH = "/training-warmup/rate-limited";
     private static final String FAIL_PATH = "/training-warmup/fail";
     private static final String PATHS = TrainingWarmupConfiguration.PREFIX + ".paths";
     private static final String REPEAT = TrainingWarmupConfiguration.PREFIX + ".repeat";
@@ -126,7 +128,7 @@ class TrainingWarmupTest {
     @Test
     @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void trueInAnyCaseCreatesTheWarmup() {
-        // A boolean is what a YAML or TOML file yields for "enabled: true"
+        // A boolean is what a YAML or TOML file yields for "enabled: true", and YAML for an unquoted "yes" or "on" too
         for (Object value : List.<Object>of("TRUE", "True", true)) {
             WarmupController.REQUESTS.clear();
             ApplicationContext context = Micronaut.build(new String[0])
@@ -145,7 +147,7 @@ class TrainingWarmupTest {
 
     @Test
     void otherTruthyValuesDoNotCreateTheWarmup() {
-        // Micronaut.start() does not stop the application for these values either
+        // As strings: Micronaut.start() does not stop the application for these values either
         for (String value : List.of("yes", "on")) {
             try (ApplicationContext context = ApplicationContext.run(Map.of(
                 "spec.name", SPEC_NAME,
@@ -168,15 +170,18 @@ class TrainingWarmupTest {
             .properties(Map.of(
                 "spec.name", SPEC_NAME,
                 ApplicationConfiguration.TRAINING_ENABLED, "true",
-                PATHS, List.of(OK_PATH, REJECTED_PATH, "/training-warmup/missing", OK_PATH)))
+                PATHS, List.of(OK_PATH, UNAUTHORIZED_PATH, REJECTED_PATH, "/training-warmup/missing", RATE_LIMITED_PATH, OK_PATH)))
             .start();
 
         assertFalse(context.isRunning());
-        assertEquals(List.of(OK_PATH, REJECTED_PATH, OK_PATH), WarmupController.REQUESTS);
+        assertEquals(List.of(OK_PATH, UNAUTHORIZED_PATH, REJECTED_PATH, RATE_LIMITED_PATH, OK_PATH), WarmupController.REQUESTS);
         List<String> warnings = logged(Level.WARN);
-        assertEquals(2, warnings.size(), warnings::toString);
-        assertTrue(warnings.get(0).matches("Training warm-up request GET http://\\S+" + REJECTED_PATH + " returned status 403: .*"), warnings::toString);
-        assertTrue(warnings.get(1).matches("Training warm-up request GET http://\\S+/training-warmup/missing returned status 404: .*"), warnings::toString);
+        assertEquals(4, warnings.size(), warnings::toString);
+        // The 401 carries a Basic challenge, which HttpURLConnection could answer if it had credentials
+        assertTrue(warnings.get(0).matches("Training warm-up request GET http://\\S+" + UNAUTHORIZED_PATH + " returned status 401: .*"), warnings::toString);
+        assertTrue(warnings.get(1).matches("Training warm-up request GET http://\\S+" + REJECTED_PATH + " returned status 403: .*"), warnings::toString);
+        assertTrue(warnings.get(2).matches("Training warm-up request GET http://\\S+/training-warmup/missing returned status 404: .*"), warnings::toString);
+        assertTrue(warnings.get(3).matches("Training warm-up request GET http://\\S+" + RATE_LIMITED_PATH + " returned status 429: .*"), warnings::toString);
     }
 
     @Test
@@ -324,6 +329,22 @@ class TrainingWarmupTest {
         HttpResponse<String> rejected(HttpRequest<?> request) {
             record(request);
             return HttpResponse.status(HttpStatus.FORBIDDEN).body("rejected");
+        }
+
+        @Get("/unauthorized")
+        HttpResponse<String> unauthorized(HttpRequest<?> request) {
+            record(request);
+            return HttpResponse.<String>status(HttpStatus.UNAUTHORIZED)
+                .header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"training\"")
+                .body("unauthorized");
+        }
+
+        @Get("/rate-limited")
+        HttpResponse<String> rateLimited(HttpRequest<?> request) {
+            record(request);
+            return HttpResponse.<String>status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, "1")
+                .body("rate limited");
         }
 
         private static void record(HttpRequest<?> request) {

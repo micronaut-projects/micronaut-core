@@ -110,7 +110,7 @@ class TrainingRunTest {
     @Test
     @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void trueInAnyCaseEnablesTheSwitch() {
-        // A boolean is what a YAML or TOML file yields for "enabled: true"
+        // A boolean is what a YAML or TOML file yields for "enabled: true", and YAML for an unquoted "yes" or "on" too
         for (Object value : List.<Object>of("TRUE", "True", true)) {
             ApplicationContext context = Micronaut.build(new String[0])
                 .environments(Environment.TEST)
@@ -123,7 +123,8 @@ class TrainingRunTest {
 
     @Test
     void otherTruthyValuesLeaveTheSwitchOff() {
-        // A Boolean conversion would accept these, but @Requires(pattern = "(?i)true") on the training beans would not
+        // As strings (a system property, an environment variable, a .properties file, a quoted YAML value):
+        // a Boolean conversion would accept the first three, but @Requires(pattern = "(?i)true") on the training beans would not
         for (String value : List.of("yes", "on", "y", "1", "false")) {
             try (ApplicationContext context = Micronaut.build(new String[0])
                 .environments(Environment.TEST)

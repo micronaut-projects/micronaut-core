@@ -210,16 +210,16 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     /**
      * Reads the training run switch the way the beans of a training run do with
      * {@code @Requires(property = TRAINING_ENABLED, pattern = "(?i)true")}: only {@code true}, in
-     * any case, turns it on. A {@code Boolean} conversion would also accept {@code yes} and
-     * {@code on}, which those beans do not match.
+     * any case, turns it on. A {@code Boolean} conversion would also accept the strings
+     * {@code yes} and {@code on}, which those beans do not match.
+     *
+     * <p>Every application runs this on startup, so it is a plain call: no lambda to link.</p>
      *
      * @param environment The environment
      * @return Whether this run is a training run
      */
     private static boolean isTrainingRun(Environment environment) {
-        return environment.getProperty(ApplicationConfiguration.TRAINING_ENABLED, String.class)
-            .map(StringUtils.TRUE::equalsIgnoreCase)
-            .orElse(false);
+        return StringUtils.TRUE.equalsIgnoreCase(environment.getProperty(ApplicationConfiguration.TRAINING_ENABLED, String.class).orElse(null));
     }
 
     /**
