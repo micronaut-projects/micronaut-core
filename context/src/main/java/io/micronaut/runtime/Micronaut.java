@@ -28,6 +28,7 @@ import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -53,6 +54,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
+    private static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
 
@@ -77,6 +79,10 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             applicationContext.start();
 
             EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
+            boolean trainingRun = isTrainingRun(applicationContext.getEnvironment());
+            if (trainingRun) {
+                announceTrainingRun(applicationContext.getEnvironment(), embeddedApplication != null);
+            }
 
             if (embeddedApplication != null) {
                 try {
@@ -112,7 +118,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         }
                     }
 
-                    if (applicationContext.getEnvironment().getProperty(ApplicationConfiguration.TRAINING_ENABLED, Boolean.class, false)) {
+                    if (trainingRun) {
                         finishTrainingRun(applicationContext, embeddedApplication);
                         return applicationContext;
                     }
@@ -202,6 +208,46 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     /**
+     * Reads the training run switch the way the beans of a training run do with
+     * {@code @Requires(property = TRAINING_ENABLED, pattern = "(?i)true")}: only {@code true}, in
+     * any case, turns it on. A {@code Boolean} conversion would also accept {@code yes} and
+     * {@code on}, which those beans do not match.
+     *
+     * @param environment The environment
+     * @return Whether this run is a training run
+     */
+    private static boolean isTrainingRun(Environment environment) {
+        return environment.getProperty(ApplicationConfiguration.TRAINING_ENABLED, String.class)
+            .map(StringUtils.TRUE::equalsIgnoreCase)
+            .orElse(false);
+    }
+
+    /**
+     * Says as soon as the switch is read that this JVM is a training run, so that a switch set by
+     * mistake on a deployment target is visible before the application stops itself.
+     *
+     * @param environment The environment
+     * @param hasEmbeddedApplication Whether the context has an {@link EmbeddedApplication} to stop
+     */
+    private static void announceTrainingRun(Environment environment, boolean hasEmbeddedApplication) {
+        if (!LOG.isWarnEnabled()) {
+            return;
+        }
+        if (hasEmbeddedApplication) {
+            LOG.warn("Training run ({}=true): this JVM is a training run and does not serve traffic. It stops the application as soon as startup has completed{}. "
+                    + "Never set this property or {} on a deployment target",
+                ApplicationConfiguration.TRAINING_ENABLED, exitsAfterTrainingRun(environment) ? " and exits with status 0" : "", TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
+        } else {
+            LOG.warn("Training run ({}=true): the switch has no effect, because there is no EmbeddedApplication to stop. The JVM exits when the application's own threads end",
+                ApplicationConfiguration.TRAINING_ENABLED);
+        }
+    }
+
+    private static boolean exitsAfterTrainingRun(Environment environment) {
+        return !environment.getActiveNames().contains(Environment.TEST);
+    }
+
+    /**
      * Ends a training run ({@link ApplicationConfiguration#TRAINING_ENABLED}): the application has
      * started and every startup listener, warm-up included, has run. Stops the application, closes
      * the context and exits with status 0, except in the {@code test} environment.
@@ -211,9 +257,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     @SuppressWarnings("java:S1147") // Exiting the JVM is the point of a training run
     private static void finishTrainingRun(ApplicationContext applicationContext, EmbeddedApplication<?> embeddedApplication) {
-        boolean exit = !applicationContext.getEnvironment().getActiveNames().contains(Environment.TEST);
+        boolean exit = exitsAfterTrainingRun(applicationContext.getEnvironment());
         if (LOG.isWarnEnabled()) {
-            LOG.warn("Training run ({}=true): startup completed, stopping the application{}",
+            LOG.warn("Training run ({}=true): startup completed, stopping the application{}. This JVM was a training run and served no traffic",
                 ApplicationConfiguration.TRAINING_ENABLED, exit ? " and exiting with status 0" : "");
         }
         try (applicationContext) {

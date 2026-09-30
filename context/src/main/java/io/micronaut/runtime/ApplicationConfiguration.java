@@ -54,9 +54,17 @@ public class ApplicationConfiguration {
     public static final String APPLICATION_NAME = PREFIX + ".name";
 
     /**
-     * Property name for the training run switch. When it is {@code true}, {@link Micronaut#start()}
-     * stops the application once it has started, then exits the JVM with status 0 unless the
-     * {@code test} environment is active. Off by default.
+     * Property name for the training run switch. When it is {@code true}, in any case,
+     * {@link Micronaut#start()} stops the application once it has started, then exits the JVM with
+     * status 0 unless the {@code test} environment is active. Off by default, and any other value
+     * leaves it off.
+     *
+     * <p>A training run does not serve traffic, so this property must never be set on a deployment
+     * target.</p>
+     *
+     * <p>In the {@code test} environment {@link Micronaut#start()} does not exit the JVM: it
+     * returns the {@link io.micronaut.context.ApplicationContext} it has already closed, so the
+     * caller can only check that the run ended and must not look up beans in it.</p>
      *
      * @since 5.3.0
      */
