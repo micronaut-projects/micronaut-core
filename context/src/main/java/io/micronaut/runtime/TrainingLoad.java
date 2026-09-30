@@ -121,8 +121,8 @@ final class TrainingLoad {
             long start = System.nanoTime();
             Result result = load(applicationContext);
             if (LOG.isInfoEnabled()) {
-                LOG.info("Training run ({}=load): loaded {} of {} bean definitions and the {} types they name in {}ms, skipped {} that could not be loaded",
-                    ApplicationConfiguration.TRAINING_MODE, result.loaded(), result.references(), result.types(),
+                LOG.info("Training run ({}=load): loaded {} of {} bean definitions and the {} types they name in {}ms, skipped {} that could not be evaluated or loaded",
+                    ApplicationConfiguration.TRAINING_MODE, result.loaded(), result.references(), result.types().size(),
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start), result.skipped());
             }
             if (LOG.isWarnEnabled()) {
@@ -137,8 +137,10 @@ final class TrainingLoad {
 
     /**
      * Configures the context without starting it, then loads every enabled bean definition and
-     * reads the metadata of it that names classes. A definition that cannot be loaded, for example
-     * because a class it names is absent, is skipped and logged.
+     * reads the metadata of it that names classes. A definition is skipped and logged if it cannot
+     * be loaded, for example because a class it names is absent, or if one of its conditions cannot
+     * be evaluated. That is the case of a condition that looks up a bean: the context is not
+     * running, so the lookup throws and the bean is not created.
      *
      * @param applicationContext The application context, built and not started, with a started environment
      * @return What was loaded
@@ -163,14 +165,15 @@ final class TrainingLoad {
                     loaded++;
                 }
             } catch (RuntimeException | LinkageError e) {
-                // As in a normal start, where such a definition only fails once something asks for the bean
+                // A definition that cannot be loaded only fails a normal start once something asks for the bean.
+                // A condition that needs a bean is evaluated by a normal start and cannot be here, where no bean is created
                 skipped++;
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Training run ({}=load): skipped bean definition {}: {}", ApplicationConfiguration.TRAINING_MODE, reference.getBeanDefinitionName(), e.toString());
                 }
             }
         }
-        return new Result(references.size(), loaded, skipped, types.size());
+        return new Result(references.size(), loaded, skipped, Collections.unmodifiableSet(types));
     }
 
     /**
@@ -271,8 +274,8 @@ final class TrainingLoad {
      * @param references The bean definition references of the context
      * @param loaded The enabled definitions that were loaded
      * @param skipped The references that could not be evaluated or loaded
-     * @param types The distinct types the loaded definitions name
+     * @param types The distinct types the loaded definitions name, compared by identity
      */
-    record Result(int references, int loaded, int skipped, int types) {
+    record Result(int references, int loaded, int skipped, Set<Class<?>> types) {
     }
 }

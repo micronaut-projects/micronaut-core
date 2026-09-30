@@ -82,8 +82,9 @@ public class ApplicationConfiguration {
      *     bean definition is loaded together with the classes it names. No bean is created, no
      *     startup event is published and the {@link EmbeddedApplication} is not started, so the run
      *     needs none of those services. A bean definition that cannot be loaded, for example
-     *     because a class it names is absent, is skipped. This mode also ends an application that
-     *     has no {@link EmbeddedApplication}.</li>
+     *     because a class it names is absent, is skipped, and so is one with a condition that
+     *     looks up a bean, which a context that is not running refuses. This mode also ends an
+     *     application that has no {@link EmbeddedApplication}.</li>
      * </ul>
      *
      * <p>Any other value fails the training run. In the {@code test} environment a {@code load}

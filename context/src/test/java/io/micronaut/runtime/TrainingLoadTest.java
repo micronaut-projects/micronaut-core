@@ -22,17 +22,25 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.RuntimeBeanDefinition;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.condition.Condition;
+import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.StartupEvent;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
+import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.runtime.TrainingRunTest.ChildJvm;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -52,11 +60,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -65,6 +76,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -81,6 +93,9 @@ class TrainingLoadTest {
     private static final String EAGER_CLIENT = "training-load-test.eager-client";
     private static final String POST_CONSTRUCT_CLIENT = "training-load-test.post-construct-client";
     private static final String OPTIONAL = "training-load-test.optional";
+    private static final String LOOKUP = "training-load-test.lookup";
+    private static final String METADATA = "training-load-test.metadata";
+    private static final String NOT_RUNNING = "java.lang.IllegalStateException: Cannot resolve beans until the context is running";
     private static final String LOAD_LOG = "Training run (" + ApplicationConfiguration.TRAINING_ENABLED + "=true, " + ApplicationConfiguration.TRAINING_MODE + "=load)";
     private static final String ANNOUNCEMENT = LOAD_LOG + ": this JVM is a training run and does not serve traffic. "
         + "It loads the enabled bean definitions and the classes they name, creates no bean and does not start the application";
@@ -88,7 +103,7 @@ class TrainingLoadTest {
     private static final String FAREWELL = "This JVM was a training run and served no traffic";
     private static final String WARMUP_IGNORED = "Training run (" + ApplicationConfiguration.TRAINING_MODE + "=load): the micronaut.application.training.warmup settings are ignored, "
         + "because this mode starts no server and sends no warm-up request";
-    private static final Pattern SUMMARY = Pattern.compile("loaded (\\d+) of (\\d+) bean definitions and the (\\d+) types they name in \\d+ms, skipped (\\d+) that could not be loaded");
+    private static final Pattern SUMMARY = Pattern.compile("loaded (\\d+) of (\\d+) bean definitions and the (\\d+) types they name in \\d+ms, skipped (\\d+) that could not be evaluated or loaded");
     private static final String ENABLED = "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true";
     private static final String LOAD = "-D" + ApplicationConfiguration.TRAINING_MODE + "=load";
 
@@ -101,6 +116,7 @@ class TrainingLoadTest {
         TestApplication.STOPPED.set(0);
         EagerClient.CREATED.set(0);
         PostConstructClient.CREATED.set(0);
+        LookedUp.CREATED.set(0);
         StartupListener.STARTUPS.set(0);
         logs.start();
         micronautLogger().addAppender(logs);
@@ -144,6 +160,8 @@ class TrainingLoadTest {
             .start();
 
         assertFalse(context.isRunning());
+        // A context that was never started is not running either: closing it is what stops its environment
+        assertFalse(context.getEnvironment().isRunning());
         assertEquals(0, TestApplication.CREATED.get());
         assertEquals(0, TestApplication.STARTED.get());
         assertEquals(0, TestApplication.STOPPED.get());
@@ -290,6 +308,106 @@ class TrainingLoadTest {
             assertEquals(complete.loaded(), result.loaded());
             assertEquals(complete.skipped() + 1, result.skipped());
         }
+    }
+
+    @Test
+    void skipsADefinitionWhoseConditionLooksUpABean() {
+        Map<String, Object> properties = Map.of("spec.name", SPEC_NAME, SERVER, "false", LOOKUP, "true");
+        List<String> started;
+        try (ApplicationContext context = ApplicationContext.builder().environments(Environment.TEST).properties(properties).start()) {
+            started = names(context.getAllBeanDefinitions());
+        }
+        // A started context evaluates the two conditions, and the lookup creates the bean
+        assertTrue(started.contains(EnabledByALookup.class.getName()), started::toString);
+        assertTrue(started.contains(EnabledByABeanContextLookup.class.getName()), started::toString);
+        assertEquals(1, LookedUp.CREATED.get());
+
+        try (ApplicationContext context = ApplicationContext.builder().environments(Environment.TEST).properties(properties).build()) {
+            context.getEnvironment().start();
+            TrainingLoad.Result result = TrainingLoad.load(context);
+
+            // A context that is not running refuses the lookups: no bean is created and the two definitions are left out
+            assertEquals(2, result.skipped());
+            assertEquals(started.size() - 2, result.loaded());
+            assertFalse(result.types().contains(EnabledByALookup.class));
+            assertFalse(result.types().contains(EnabledByABeanContextLookup.class));
+            assertTrue(result.types().contains(LookedUp.class));
+        }
+        assertEquals(1, LookedUp.CREATED.get(), "only the started context created the bean");
+        List<String> skipped = messages(Level.INFO).stream().filter(message -> message.contains("skipped bean definition")).toList();
+        assertEquals(2, skipped.size(), skipped::toString);
+        for (Class<?> bean : List.of(EnabledByALookup.class, EnabledByABeanContextLookup.class)) {
+            assertTrue(skipped.stream().anyMatch(message -> message.contains("$" + bean.getSimpleName() + "$") && message.endsWith(": " + NOT_RUNNING)), skipped::toString);
+        }
+    }
+
+    @Test
+    void readsTheTypesThatACompiledDefinitionNames() {
+        List<Class<?>> named = List.of(NamesTypes.class, ConstructorType.class, FieldType.class, MethodType.class,
+            ExecutableParent.class, ReturnType.class, ArgumentType.class, TypeParameter.class);
+
+        try (ApplicationContext context = ApplicationContext.builder().environments(Environment.TEST)
+            .properties(Map.<String, Object>of("spec.name", SPEC_NAME)).build()) {
+            context.getEnvironment().start();
+            Set<Class<?>> types = TrainingLoad.load(context).types();
+
+            // Nothing else names these types
+            assertEquals(List.of(), named.stream().filter(types::contains).toList());
+        }
+        try (ApplicationContext context = ApplicationContext.builder().environments(Environment.TEST)
+            .properties(Map.<String, Object>of("spec.name", SPEC_NAME, METADATA, "true")).build()) {
+            context.getEnvironment().start();
+            TrainingLoad.Result result = TrainingLoad.load(context);
+
+            // The constructor, the injected field and method, and the executable method with its declaring type and its type parameter
+            assertEquals(List.of(), named.stream().filter(type -> !result.types().contains(type)).toList());
+            assertEquals(0, result.skipped());
+        }
+    }
+
+    @Test
+    void readsTheTypesThatAHandWrittenDefinitionNames() {
+        List<Class<?>> named = List.of(HandWrittenDefinition.BeanType.class, ExposedType.class, DeclaringType.class,
+            InterceptedType.class, TargetType.class, TargetDefinitionType.class);
+
+        try (ApplicationContext context = ApplicationContext.builder().environments(Environment.TEST)
+            .properties(Map.<String, Object>of("spec.name", SPEC_NAME)).beanDefinitions(new HandWrittenDefinition()).build()) {
+            context.getEnvironment().start();
+            TrainingLoad.Result result = TrainingLoad.load(context);
+
+            // The exposed types, the declaring type, and the types of an AOP proxy and of its target
+            assertEquals(List.of(), named.stream().filter(type -> !result.types().contains(type)).toList());
+            assertEquals(0, result.skipped());
+        }
+    }
+
+    @Test
+    void aFailureInsideTheLoadFailsTheTrainingRunAndClosesTheContext() {
+        StartsTheContextEarly micronaut = new StartsTheContextEarly();
+        micronaut.environments(Environment.TEST).properties(loadMode());
+
+        ApplicationStartupException e = assertThrows(ApplicationStartupException.class, micronaut::start);
+
+        assertInstanceOf(ConfigurationException.class, e.getCause());
+        assertTrue(e.getMessage().contains(StartsTheContextEarly.FAILURE_MESSAGE), e::getMessage);
+        // The context was running when the load failed, so it was closed on the way out
+        assertEquals(1, micronaut.contexts.size());
+        assertFalse(micronaut.contexts.get(0).isRunning());
+        assertFalse(micronaut.contexts.get(0).getEnvironment().isRunning());
+        // The run is announced, and nothing says that it ended well
+        assertEquals(List.of(ANNOUNCEMENT + DEPLOYMENT_WARNING), messages(Level.WARN));
+        assertEquals(List.of(), messages(Level.INFO).stream().filter(message -> message.contains("loaded")).toList());
+    }
+
+    @Test
+    @Tag(CHILD_JVM)
+    void aFailureInsideTheLoadExitsWithNonZero() {
+        ChildJvm child = ChildJvm.run(FailingMain.class, System.getProperty("java.class.path"), Map.of(), ENABLED, LOAD);
+
+        assertEquals(1, child.exitCode(), child::output);
+        assertTrue(child.output().contains(ANNOUNCEMENT + ", then exits with status 0" + DEPLOYMENT_WARNING), child::output);
+        assertTrue(child.output().contains("Error starting Micronaut server: " + StartsTheContextEarly.FAILURE_MESSAGE), child::output);
+        assertFalse(child.output().contains(FAREWELL), child::output);
     }
 
     @Test
@@ -497,6 +615,169 @@ class TrainingLoadTest {
     }
 
     /**
+     * A bean that a condition looks up.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @Requires(property = LOOKUP, value = "true")
+    static final class LookedUp {
+        static final AtomicInteger CREATED = new AtomicInteger();
+
+        LookedUp() {
+            CREATED.incrementAndGet();
+        }
+    }
+
+    /**
+     * A condition that needs a bean, which only a context that is running resolves.
+     */
+    static final class LooksUpABean implements Condition {
+        @Override
+        public boolean matches(ConditionContext context) {
+            return context.getBean(LookedUp.class) != null;
+        }
+    }
+
+    /**
+     * The same lookup through the bean context of the condition.
+     */
+    static final class LooksUpABeanInTheBeanContext implements Condition {
+        @Override
+        public boolean matches(ConditionContext context) {
+            return context.getBeanContext().getBean(LookedUp.class) != null;
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @Requires(property = LOOKUP, value = "true")
+    @Requires(condition = LooksUpABean.class)
+    static final class EnabledByALookup {
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @Requires(property = LOOKUP, value = "true")
+    @Requires(condition = LooksUpABeanInTheBeanContext.class)
+    static final class EnabledByABeanContextLookup {
+    }
+
+    /**
+     * The types that only {@link NamesTypes} names. None is a bean: nothing may create it.
+     */
+    static final class ConstructorType {
+    }
+
+    static final class FieldType {
+    }
+
+    static final class MethodType {
+    }
+
+    static final class ReturnType {
+    }
+
+    static final class ArgumentType<T> {
+    }
+
+    static final class TypeParameter {
+    }
+
+    /**
+     * Declares the executable method of {@link NamesTypes}, which does not expose this type.
+     */
+    abstract static class ExecutableParent {
+        @Executable
+        ReturnType execute(ArgumentType<TypeParameter> argument) {
+            return new ReturnType();
+        }
+    }
+
+    /**
+     * A compiled definition with every kind of injection point and an executable method.
+     */
+    @Singleton
+    @Bean(typed = NamesTypes.class)
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @Requires(property = METADATA, value = "true")
+    static class NamesTypes extends ExecutableParent {
+        @Inject
+        FieldType field;
+
+        NamesTypes(ConstructorType constructor) {
+        }
+
+        @Inject
+        void method(MethodType method) {
+        }
+    }
+
+    /**
+     * The types that only {@link HandWrittenDefinition} names.
+     */
+    static final class ExposedType {
+    }
+
+    static final class DeclaringType {
+    }
+
+    static final class InterceptedType {
+    }
+
+    static final class TargetType {
+    }
+
+    static final class TargetDefinitionType {
+    }
+
+    /**
+     * A definition registered by hand, as a module may do: nothing has loaded the classes it names
+     * by the time it is read. Each accessor names a type that no other does.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static final class HandWrittenDefinition implements RuntimeBeanDefinition<HandWrittenDefinition.BeanType>,
+        ProxyBeanDefinition<HandWrittenDefinition.BeanType>, AdvisedBeanType<HandWrittenDefinition.BeanType> {
+
+        @Override
+        public Class<BeanType> getBeanType() {
+            return BeanType.class;
+        }
+
+        @Override
+        public Set<Class<?>> getExposedTypes() {
+            return Set.of(ExposedType.class);
+        }
+
+        @Override
+        public Optional<Class<?>> getDeclaringType() {
+            return Optional.of(DeclaringType.class);
+        }
+
+        @Override
+        public Class<? super BeanType> getInterceptedType() {
+            return (Class) InterceptedType.class;
+        }
+
+        @Override
+        public Class<BeanType> getTargetType() {
+            return (Class) TargetType.class;
+        }
+
+        @Override
+        public Class<BeanDefinition<BeanType>> getTargetDefinitionType() {
+            return (Class) TargetDefinitionType.class;
+        }
+
+        @Override
+        public BeanType instantiate(BeanResolutionContext resolutionContext, BeanContext context) {
+            throw new IllegalStateException("Nothing may create this bean");
+        }
+
+        static final class BeanType {
+        }
+    }
+
+    /**
      * A definition registered by hand whose metadata fails the way a missing class does.
      */
     static final class UnreadableDefinition implements RuntimeBeanDefinition<Runnable> {
@@ -582,6 +863,31 @@ class TrainingLoadTest {
             running = false;
             STOPPED.incrementAndGet();
             return this;
+        }
+    }
+
+    /**
+     * Hands the training run a context that is already running, which {@code configure()} rejects:
+     * a failure inside the load, after the run was announced.
+     */
+    static final class StartsTheContextEarly extends Micronaut {
+        static final String FAILURE_MESSAGE = "Bean context is already running. The configure() method can only be called prior to startup";
+        final List<ApplicationContext> contexts = new ArrayList<>();
+
+        @Override
+        protected ApplicationContext newApplicationContext() {
+            ApplicationContext context = super.newApplicationContext().start();
+            contexts.add(context);
+            return context;
+        }
+    }
+
+    /**
+     * The application run by the child JVM whose training run fails inside the load.
+     */
+    static final class FailingMain {
+        public static void main(String[] args) {
+            new StartsTheContextEarly().args(args).start();
         }
     }
 
