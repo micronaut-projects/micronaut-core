@@ -29,6 +29,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jdk.jfr.FlightRecorder;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingStream;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -39,6 +40,7 @@ import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -47,33 +49,46 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Checks, each in a fresh JVM, that serving requests neither needs the {@code jdk.jfr} module
  * nor initializes JFR, and that a recording started after the first request still gets the
  * events, with requests still served once it stops.
+ * <p>
+ * Every case starts a child JVM, which takes a few seconds. A child that fails, or that does not
+ * exit within {@link #CHILD_TIMEOUT} and is killed, fails its case with the output of the child.
+ * The JUnit timeout is the backstop behind that.
  */
+@Timeout(value = 2, unit = TimeUnit.MINUTES)
 class JfrEventGatingTest {
     private static final String SPEC_NAME = "JfrEventGatingTest";
     private static final String RESULT = "RESULT ";
     private static final String METADATA_REPOSITORY = "jdk.jfr.internal.MetadataRepository ";
+    private static final Duration CHILD_TIMEOUT = Duration.ofMinutes(1);
 
     @ParameterizedTest
     @EnumSource(Transport.class)
     void firstRequestDoesNotInitializeJfr(Transport transport) {
         // Netty's own JFR events initialize JFR on the first buffer allocation until it gates
-        // them on an initialized Flight Recorder too (netty/netty#17612).
+        // them on an initialized Flight Recorder too (netty/netty#17614).
         ChildJvm child = ChildJvm.run(transport, Scenario.FIRST_REQUEST, "-Xlog:class+load", "-Dio.netty.jfr.enabled=false");
 
         assertEquals("ok", child.result("body"), child::summary);
         assertEquals("false", child.result("recorderInitialized"), child::summary);
         assertEquals("false", child.result("jfrSupport"), child::summary);
         assertFalse(child.output().contains(METADATA_REPOSITORY), () -> METADATA_REPOSITORY + "was loaded\n" + child.summary());
+        // Micronaut's own event classes stay unloaded whatever Netty does
+        for (String eventName : transport.eventNames) {
+            assertFalse(child.output().contains(" " + eventName + " "), () -> eventName + " was loaded\n" + child.summary());
+        }
     }
 
     @ParameterizedTest
@@ -163,21 +178,40 @@ class JfrEventGatingTest {
             command.add(App.class.getName());
             command.add(transport.name());
             command.add(scenario.name());
+            Process process;
             try {
-                Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-                CompletableFuture<String> output = CompletableFuture.supplyAsync(() -> readAll(process.getInputStream()));
-                if (!process.waitFor(1, TimeUnit.MINUTES)) {
-                    process.destroyForcibly();
-                }
-                String text = output.get(30, TimeUnit.SECONDS);
-                Map<String, String> results = text.lines()
-                    .filter(line -> line.startsWith(RESULT))
-                    .map(line -> line.substring(RESULT.length()).split("=", 2))
-                    .collect(Collectors.toMap(kv -> kv[0], kv -> kv[1], (a, b) -> b));
-                return new ChildJvm(text, results);
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to run the child JVM", e);
+                process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to start the child JVM", e);
             }
+            boolean exited;
+            String text;
+            try {
+                CompletableFuture<String> output = CompletableFuture.supplyAsync(() -> readAll(process.getInputStream()));
+                exited = process.waitFor(CHILD_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                if (!exited) {
+                    process.destroyForcibly().waitFor();
+                }
+                text = output.get(30, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while the child JVM was running", e);
+            } catch (ExecutionException | TimeoutException e) {
+                throw new IllegalStateException("Failed to read the output of the child JVM", e);
+            } finally {
+                // does nothing once the child has exited
+                process.destroyForcibly();
+            }
+            Map<String, String> results = text.lines()
+                .filter(line -> line.startsWith(RESULT))
+                .map(line -> line.substring(RESULT.length()).split("=", 2))
+                .collect(Collectors.toMap(kv -> kv[0], kv -> kv[1], (a, b) -> b));
+            ChildJvm child = new ChildJvm(text, results);
+            if (!exited) {
+                fail("The child JVM did not exit within " + CHILD_TIMEOUT.toSeconds() + " s and was killed\n" + child.summary());
+            }
+            assertEquals(0, process.exitValue(), () -> "The child JVM failed\n" + child.summary());
+            return child;
         }
 
         /**
@@ -205,11 +239,13 @@ class JfrEventGatingTest {
         }
 
         /**
-         * @return the output without the unified JVM logging, which can be thousands of lines
+         * @return the output without the unified JVM logging, which can be thousands of lines,
+         *     and without the status messages Logback prints while it configures itself
          */
         String summary() {
             return output.lines()
                 .filter(line -> !line.startsWith("[") || !line.contains("][info]["))
+                .filter(line -> !line.contains(" |-INFO in "))
                 .collect(Collectors.joining("\n"));
         }
     }
