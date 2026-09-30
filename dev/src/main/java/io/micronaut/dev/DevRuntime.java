@@ -374,6 +374,48 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * Applies a change something other than the watcher reports, a test harness or an IDE: the files are
+     * sorted into the source and resource roots they are under, enqueued as the watcher would enqueue
+     * them, behind any batch already pending, and the batch is awaited. A file under no root is ignored.
+     *
+     * @param changed The files written
+     * @param deleted The files deleted
+     * @since 5.3.0
+     */
+    @Internal
+    public void changed(Collection<Path> changed, Collection<Path> deleted) {
+        Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
+        Map<ResourceKind, SourceChanges> resources = new EnumMap<>(ResourceKind.class);
+        sort(changed, false, sources, resources);
+        sort(deleted, true, sources, resources);
+        awaitBatch(enqueue(new Pending(sources, resources, false)));
+    }
+
+    private void sort(Collection<Path> files, boolean deleted, Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources) {
+        for (Path file : files) {
+            Path absolute = file.toAbsolutePath().normalize();
+            SourceRoot sourceRoot = null;
+            for (SourceRoot root : manifest.sourceRoots()) {
+                if (absolute.startsWith(root.path()) && root.kind().matches(absolute)) {
+                    sourceRoot = root;
+                    break;
+                }
+            }
+            SourceChanges change = deleted ? new SourceChanges(Set.of(), Set.of(absolute)) : new SourceChanges(Set.of(absolute), Set.of());
+            if (sourceRoot != null) {
+                sources.merge(sourceRoot.kind(), change, SourceChanges::merge);
+                continue;
+            }
+            Path resourceRoot = mostSpecificRoot(absolute);
+            if (resourceRoot != null) {
+                resources.merge(resourceRootKinds.get(resourceRoot), change, SourceChanges::merge);
+            } else {
+                LOG.debug("{} is under no source or resource root: ignored", absolute);
+            }
+        }
+    }
+
+    /**
      * Handles source changes as the watcher reports them, and waits for the reload.
      *
      * @param kind The language

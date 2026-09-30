@@ -25,6 +25,7 @@ include "core"
 include "core-reactive"
 include "dev"
 include "dev-livereload"
+include "dev-tck"
 include "core-processor"
 include "context"
 include 'context-python'
