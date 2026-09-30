@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -72,6 +73,17 @@ class ServiceNameConditionTest {
     }
 
     @Test
+    void theLineConditionOfACollectorIsTestedOnTheNameOfEveryScannedEntry() throws IOException {
+        String serviceName = NamedService.class.getName();
+        try (URLClassLoader classLoader = servicesClassLoader()) {
+            // the transformer gets the names the condition accepted: without a comment or the whitespace around them
+            assertEquals(List.of(A, C), collectedNames(SoftServiceLoader.newCollector(serviceName, Set.of(A, C)::contains, classLoader, Function.identity())));
+            // a null condition accepts every entry
+            assertEquals(List.of(A, B, C, D), collectedNames(SoftServiceLoader.newCollector(serviceName, null, classLoader, Function.identity())));
+        }
+    }
+
+    @Test
     void theIteratorOnlyReturnsDefinitionsOfTheStrippedNames() throws IOException {
         try (URLClassLoader classLoader = servicesClassLoader()) {
             List<String> definitions = new ArrayList<>();
@@ -119,6 +131,12 @@ class ServiceNameConditionTest {
 
     private static List<String> sortedNames(List<NamedService> services) {
         return services.stream().map(service -> service.getClass().getName()).sorted().toList();
+    }
+
+    private static List<String> collectedNames(SoftServiceLoader.ServiceCollector<String> collector) {
+        List<String> names = new ArrayList<>();
+        collector.collect(names);
+        return names.stream().sorted().toList();
     }
 
     private static List<String> sortedDefinitionNames(SoftServiceLoader<NamedService> loader) {

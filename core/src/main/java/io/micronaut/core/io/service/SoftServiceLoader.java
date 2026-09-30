@@ -275,6 +275,20 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         return new DefaultServiceDefinition<>(name, loadedClass);
     }
 
+    /**
+     * Creates a collector of the entries of a service type: the lines of its {@code META-INF/services} files and its
+     * entries under {@code META-INF/micronaut}, or only its entries in the service table of a native image when that
+     * table has the service type.
+     *
+     * @param serviceName   The name of the service type
+     * @param lineCondition The condition tested on the name of each entry, whichever source the entry comes from, or
+     *                      null to accept every entry
+     * @param classLoader   The class loader
+     * @param transformer   The function that turns the name of an accepted entry into a result. An entry with a null
+     *                      result is left out
+     * @param <S>           The result type
+     * @return The collector
+     */
     public static <S> ServiceCollector<S> newCollector(String serviceName,
                                                        @Nullable Predicate<String> lineCondition,
                                                        ClassLoader classLoader,
