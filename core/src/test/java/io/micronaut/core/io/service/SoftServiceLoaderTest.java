@@ -3,7 +3,6 @@ package io.micronaut.core.io.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assumptions.abort;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -13,13 +12,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 
-import jdk.jfr.FlightRecorder;
-import jdk.jfr.Recording;
-import jdk.jfr.consumer.RecordedEvent;
-import jdk.jfr.consumer.RecordingFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -78,70 +72,24 @@ public class SoftServiceLoaderTest {
     @Test
     void imageSingletonsAreNotLookedUpOutsideImageCode(@TempDir Path tempDir) throws IOException {
         assumeTrue(System.getProperty(NativeImageUtils.PROPERTY_IMAGE_CODE_KEY) == null);
+        // the JFR types are in JfrErrorRecorder only: with one of them in a method signature of this class, JUnit
+        // could not discover the tests on a JVM without the jdk.jfr module
+        assumeTrue(JfrErrorRecorder.isSupported(), "This JVM has no jdk.jfr module");
         ClassLoader classLoader = getClass().getClassLoader();
-        Error probe;
-        List<String> errors;
-        try (Recording recording = startRecordingErrors()) {
+        // The table is looked up in two places: the constructor of the scan's task, and
+        // findMicronautMetaServiceEntries. Only the errors of this thread are looked at.
+        List<String> errors = JfrErrorRecorder.errorsThrownByCurrentThread(tempDir.resolve("errors.jfr"), () -> {
             assertNull(ServiceScanner.findStaticServiceDefinitions());
-            // a forked scan looks the table up on the calling thread before it forks, and an unforked one does
-            // everything on the calling thread
+            // A forked scan creates its task, and so makes the first lookup, on this thread. The second one is made
+            // by whichever thread runs the task: this one, or a worker of the common pool.
             SoftServiceLoader.load(TestService.class, classLoader).collectAll();
+            // an unforked scan and the direct call make both lookups on this thread
             SoftServiceLoader.load(TestService.class, classLoader).disableFork().collectAll();
             MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, TestService.class.getName());
-            // JFR records an error when it is constructed: this one tells whether the errors of this thread
-            // are recorded
-            probe = new Error("probe " + UUID.randomUUID());
-            errors = errorsOfCurrentThread(recording, tempDir.resolve("errors.jfr"));
-        }
+        });
 
-        assumeTrue(errors.contains(probe.toString()), "JFR did not record the errors of this thread");
         // without the GraalVM SDK on the class path, each lookup of the ImageSingletons class throws a NoClassDefFoundError
         assertEquals(List.of(), errors.stream().filter(error -> error.contains("ImageSingletons")).toList());
-    }
-
-    /**
-     * Starts recording the errors thrown in this JVM, or aborts the test when JFR cannot be used in it.
-     */
-    private static Recording startRecordingErrors() {
-        assumeTrue(FlightRecorder.isAvailable(), "JFR is not available in this JVM");
-        Recording recording = null;
-        try {
-            recording = new Recording();
-            recording.enable("jdk.JavaErrorThrow");
-            recording.start();
-            return recording;
-        } catch (RuntimeException e) {
-            // for example when the JFR repository cannot be created
-            if (recording != null) {
-                recording.close();
-            }
-            return abort("JFR cannot record in this JVM: " + e);
-        }
-    }
-
-    /**
-     * Returns the errors that the calling thread threw during the recording. JFR records the errors of every
-     * thread of the JVM, so the ones thrown by code that runs next to the test are left out.
-     */
-    private static List<String> errorsOfCurrentThread(Recording recording, Path file) {
-        long threadId = Thread.currentThread().threadId();
-        List<RecordedEvent> events;
-        try {
-            recording.stop();
-            recording.dump(file);
-            events = RecordingFile.readAllEvents(file);
-        } catch (IOException e) {
-            return abort("JFR cannot write the recording in this JVM: " + e);
-        }
-        return events.stream()
-            .filter(event -> event.getThread() != null && event.getThread().getJavaThreadId() == threadId)
-            .map(SoftServiceLoaderTest::errorMessage)
-            .toList();
-    }
-
-    private static String errorMessage(RecordedEvent event) {
-        String message = event.getString("message");
-        return event.getClass("thrownClass").getName() + ": " + (message == null ? "" : message);
     }
 
     @Test
