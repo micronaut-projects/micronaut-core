@@ -27,6 +27,7 @@ dependencies {
     testImplementation(platform(libs.test.boms.micronaut.sql))
     testImplementation(platform(libs.test.boms.micronaut.serde))
     testImplementation(libs.managed.reactor)
+    testImplementation("io.micronaut.email:micronaut-email:3.2.0")
     testImplementation(projects.micronautInjectJavaHelper)
     testImplementation(projects.micronautRetry)
     testImplementation(projects.micronautMessaging)

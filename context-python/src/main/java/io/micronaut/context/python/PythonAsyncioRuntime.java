@@ -107,7 +107,11 @@ public final class PythonAsyncioRuntime {
      * @return A publisher of the coroutine's result, empty when the coroutine returns {@code None}.
      */
     @UsedByGeneratedCode
+    @SuppressWarnings("unchecked")
     public static Publisher<Object> toPublisher(Value value) {
+        if (value.isHostObject() && value.asHostObject() instanceof Publisher<?> publisher) {
+            return (Publisher<Object>) publisher;
+        }
         return PythonPublishers.deferred(reactiveContext -> {
             return reactiveContext.propagatedContext().propagate(
                 () -> toCompletionStage(value, reactiveContext).toCompletableFuture()
