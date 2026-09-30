@@ -29,6 +29,7 @@ dependencies {
     testImplementation(libs.managed.reactor)
     testImplementation("io.micronaut.email:micronaut-email:3.2.0")
     testImplementation(projects.micronautInjectJavaHelper)
+    testImplementation(projects.micronautInjectTestUtils)
     testImplementation(projects.micronautRetry)
     testImplementation(projects.micronautMessaging)
     testImplementation(libs.micronaut.validation)

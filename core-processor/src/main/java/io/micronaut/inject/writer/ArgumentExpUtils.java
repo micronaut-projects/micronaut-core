@@ -365,6 +365,7 @@ public final class ArgumentExpUtils {
                 if (variable != null) {
                     // A bound naming the variable it bounds names it rather than repeating it
                     visitedTypes.add(variable.getGenericNativeType());
+                    visitedTypes.add(variableKey(variable.getVariableName()));
                 }
                 // Argument.ofTypeVariable( .. ) keeping the bounds declared for the variable, or
                 // Argument.ofResolvedTypeVariable( .. ) for a type resolved in place of it
@@ -548,6 +549,35 @@ public final class ArgumentExpUtils {
         Map<String, ClassElement> typeArguments,
         Visit visit,
         Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        // A variable is visited for as long as its own argument is being written, which is what stops at the T
+        // within the bounds of T extends Comparable<T>. It is not visited for what is written after it, so that a
+        // variable is written the same way wherever it is met: the second T of Map<T, T> is the variable again, and
+        // the U within the bounds of T extends Comparable<U> keeps its own bounds
+        Set<Object> visitedTypes = visit.visitedTypes();
+        Set<Object> visitedBefore = new HashSet<>(visitedTypes);
+        try {
+            return buildVisitedArgumentWithGenerics(
+                annotationMetadataWithDefaults,
+                owningType,
+                argumentName,
+                argumentType,
+                typeArguments,
+                visit,
+                loadClassValueExpressionFn
+            );
+        } finally {
+            visitedTypes.retainAll(visitedBefore);
+        }
+    }
+
+    private static ExpressionDef buildVisitedArgumentWithGenerics(
+        AnnotationMetadata annotationMetadataWithDefaults,
+        ClassTypeDef owningType,
+        @Nullable String argumentName,
+        ClassElement argumentType,
+        Map<String, ClassElement> typeArguments,
+        Visit visit,
+        Function<String, ExpressionDef> loadClassValueExpressionFn) {
         Set<Object> visitedTypes = visit.visitedTypes();
         boolean inBounds = visit.inBounds();
         ExpressionDef.Constant argumentTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(argumentType)));
@@ -584,7 +614,7 @@ public final class ArgumentExpUtils {
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Prevent placeholder recursion
             Object genericNativeType = placeholderElement.getGenericNativeType();
-            if (visitedTypes.contains(genericNativeType)) {
+            if (visitedTypes.contains(genericNativeType) || visitedTypes.contains(variableKey(placeholderElement.getVariableName()))) {
                 isRecursiveType = true;
             } else {
                 visitedTypes.add(genericNativeType);
@@ -593,6 +623,7 @@ public final class ArgumentExpUtils {
         if (variable != null && !isRecursiveType) {
             // The variable the bounds are written for, which a bound naming it names rather than repeats
             visitedTypes.add(variable.getGenericNativeType());
+            visitedTypes.add(variableKey(variable.getVariableName()));
         }
 
         boolean typeVariable = argumentType.isTypeVariable();
@@ -848,6 +879,14 @@ public final class ArgumentExpUtils {
             }
         }
         return false;
+    }
+
+    /**
+     * The key a variable is visited by, besides the native type it was met as: the native type of a variable named
+     * within its own bounds is not always the one the variable itself has.
+     */
+    private static String variableKey(String variableName) {
+        return "<" + variableName + ">";
     }
 
     private static ExpressionDef pushBounds(AnnotationMetadata annotationMetadataWithDefaults,
