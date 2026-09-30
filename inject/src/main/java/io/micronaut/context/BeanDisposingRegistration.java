@@ -37,6 +37,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Nullable
     private final List<BeanRegistration<?>> dependents;
     @Nullable
+    @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
     private volatile AbstractBeanResolutionContext proxyTargetContext;
     @Nullable
     private final List<?> interceptorRegistrations;

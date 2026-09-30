@@ -70,6 +70,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
     @Nullable
+    @SuppressWarnings("java:S3077") // the list is only ever replaced, never mutated after it is published
     private volatile List<BeanRegistration<?>> cachedProxyTargetDependents;
     @Nullable
     private Map<Class<?>, AbstractBeanResolutionContext> lazyProxyTargetCopies;

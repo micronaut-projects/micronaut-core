@@ -14,9 +14,9 @@ public class UncachedLazyBean {
     }
 
     /**
-     * @return The target the call was made on
+     * @return The target the call was made on, which is what its dependent references
      */
     public Object target() {
-        return this;
+        return reference.owner;
     }
 }
