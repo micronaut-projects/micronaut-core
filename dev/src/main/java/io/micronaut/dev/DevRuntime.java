@@ -119,6 +119,7 @@ public final class DevRuntime implements Closeable {
     private final DevClassLoader classLoader;
     private final ApplicationLauncher launcher;
     private final Map<SourceKind, SourceCompiler> compilers;
+    private final Map<SourceKind, SourceKind> jointOwners;
     private final Map<Path, ResourceKind> resourceRootKinds = new LinkedHashMap<>();
     private final LinkedBlockingQueue<Pending> pending = new LinkedBlockingQueue<>();
     private final AtomicLong submitted = new AtomicLong();
@@ -159,6 +160,7 @@ public final class DevRuntime implements Closeable {
         this.launcher = launcher;
         this.compilers = new EnumMap<>(SourceKind.class);
         this.compilers.putAll(compilers);
+        this.jointOwners = jointOwners(manifest, this.compilers);
         for (ResourceRoot root : manifest.resourceRoots()) {
             resourceRootKinds.put(root.path().toAbsolutePath().normalize(), root.kind());
         }
@@ -503,6 +505,68 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * The roots a compilation of a language reads: its own, and for Kotlin the Java roots too, since kotlinc
+     * resolves the Java sources of a mixed module and KSP processes them, and those of the languages it compiles
+     * jointly; the index of a request takes only the roots of its own language as its sources.
+     */
+    private static List<SourceRoot> compilationRoots(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
+        List<SourceRoot> roots = new ArrayList<>(manifest.sourceRoots(kind));
+        if (kind == SourceKind.KOTLIN) {
+            roots.addAll(manifest.sourceRoots(SourceKind.JAVA));
+        }
+        jointOwners.forEach((joint, owner) -> {
+            if (owner == kind) {
+                roots.addAll(manifest.sourceRoots(joint));
+            }
+        });
+        return roots;
+    }
+
+    /**
+     * The options of a compilation of a language: its own, then those of each language it compiles jointly,
+     * since one compiler run compiles them all. A language's options are kept whole, a flag with its value,
+     * and are not repeated when they are the same as the owner's.
+     */
+    private static List<String> compileOptions(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
+        List<String> own = manifest.compileOptions(kind);
+        List<String> options = new ArrayList<>(own);
+        jointOwners.forEach((joint, owner) -> {
+            List<String> jointOptions = manifest.compileOptions(joint);
+            if (owner == kind && !jointOptions.equals(own)) {
+                options.addAll(jointOptions);
+            }
+        });
+        return options;
+    }
+
+    /**
+     * The languages a compiler of another language compiles jointly (see {@link SourceCompiler#jointKinds()}):
+     * those it names that have sources, are compiled in this JVM and share its class output.
+     *
+     * @param manifest The manifest
+     * @param compilers The compilers by language
+     * @return The owning language, by jointly compiled language
+     */
+    static Map<SourceKind, SourceKind> jointOwners(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
+        Map<SourceKind, SourceKind> owners = new EnumMap<>(SourceKind.class);
+        compilers.forEach((kind, compiler) -> {
+            if (!embedded(manifest, kind)) {
+                return;
+            }
+            for (SourceKind joint : compiler.jointKinds()) {
+                if (joint != kind && embedded(manifest, joint) && manifest.classOutput(joint).equals(manifest.classOutput(kind))) {
+                    owners.putIfAbsent(joint, kind);
+                }
+            }
+        });
+        return owners;
+    }
+
+    private static boolean embedded(DevManifest manifest, SourceKind kind) {
+        return !manifest.sourceRoots(kind).isEmpty() && manifest.compileMode(kind) != CompileMode.BUILD_TOOL;
+    }
+
+    /**
      * Compiles in full every language whose class output does not exist yet, so that the launcher
      * works from a clean checkout as well as after a build. Runs before the loader takes its first
      * snapshot.
@@ -511,25 +575,12 @@ public final class DevRuntime implements Closeable {
      * @param compilers The compilers by language
      * @throws IllegalStateException if a compilation fails
      */
-    /**
-     * The roots a compilation of a language reads: its own, and for Kotlin the Java roots too, since kotlinc
-     * resolves the Java sources of a mixed module and KSP processes them; the index of a request takes only
-     * the roots of its own language as its sources.
-     */
-    private static List<SourceRoot> compilationRoots(DevManifest manifest, SourceKind kind) {
-        if (kind != SourceKind.KOTLIN) {
-            return manifest.sourceRoots(kind);
-        }
-        List<SourceRoot> roots = new ArrayList<>(manifest.sourceRoots(SourceKind.KOTLIN));
-        roots.addAll(manifest.sourceRoots(SourceKind.JAVA));
-        return roots;
-    }
-
     public static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
+        Map<SourceKind, SourceKind> jointOwners = jointOwners(manifest, compilers);
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();
         for (SourceKind kind : compilers.keySet()) {
-            if (!manifest.sourceRoots(kind).isEmpty() && manifest.compileMode(kind) != CompileMode.BUILD_TOOL && !Files.isDirectory(manifest.classOutput(kind))) {
+            if (!jointOwners.containsKey(kind) && embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
                 missing.add(kind);
             }
         }
@@ -538,8 +589,8 @@ public final class DevRuntime implements Closeable {
             if (!missing.contains(kind)) {
                 continue;
             }
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind), Set.of(), Set.of(), true, manifest.compileClasspath(),
-                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind)).asFull();
+            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
+                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull();
             CompilationResult result = entry.getValue().compile(request);
             if (!result.isSuccess()) {
                 CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
@@ -748,19 +799,22 @@ public final class DevRuntime implements Closeable {
     private void handle(Pending batch) {
         long start = System.nanoTime();
         // compile what changed, or everything on the manual trigger; a failure leaves the generation as it is
-        Set<SourceKind> kinds = batch.full ? compilers.keySet() : batch.sources.keySet();
+        // the changes of a language compiled jointly come with those of the language compiling it
+        Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
+        batch.sources.forEach((kind, changes) -> sources.merge(jointOwners.getOrDefault(kind, kind), changes, SourceChanges::merge));
+        Set<SourceKind> kinds = batch.full ? compilers.keySet() : sources.keySet();
         boolean compiled = false;
         Set<SourceKind> compiledKinds = new LinkedHashSet<>();
         Set<String> affectedClasses = new LinkedHashSet<>();
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
-            if (compiler == null || manifest.compileMode(kind) == CompileMode.BUILD_TOOL || manifest.sourceRoots(kind).isEmpty()) {
+            if (compiler == null || jointOwners.containsKey(kind) || !embedded(manifest, kind)) {
                 continue;
             }
-            SourceChanges changes = batch.sources.getOrDefault(kind, SourceChanges.NONE);
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind), changes.changed(), changes.deleted(),
+            SourceChanges changes = sources.getOrDefault(kind, SourceChanges.NONE);
+            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), changes.changed(), changes.deleted(),
                 batch.full || !manifest.isIncremental(), manifest.compileClasspath(), manifest.processorPath(),
-                manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind));
+                manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners));
             CompilationResult result = compiler.compile(request);
             if (!result.isSuccess()) {
                 CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
@@ -778,7 +832,7 @@ public final class DevRuntime implements Closeable {
         // until nothing new is produced: a Groovy class recompiled for a Java change may itself be what a
         // Java source depends on, and Java was visited first
         Set<String> propagated = new LinkedHashSet<>();
-        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && compilers.size() > 1 && !affectedClasses.equals(propagated); pass++) {
+        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && compilers.size() - jointOwners.size() > 1 && !affectedClasses.equals(propagated); pass++) {
             Set<String> fresh = new LinkedHashSet<>(affectedClasses);
             fresh.removeAll(propagated);
             propagated.addAll(affectedClasses);
@@ -786,11 +840,11 @@ public final class DevRuntime implements Closeable {
                 SourceKind kind = entry.getKey();
                 // a language compiled in this batch for its own changes is visited again: an unchanged source of
                 // it that references what another language changed was not selected the first time
-                if (manifest.compileMode(kind) == CompileMode.BUILD_TOOL || manifest.sourceRoots(kind).isEmpty()) {
+                if (jointOwners.containsKey(kind) || !embedded(manifest, kind)) {
                     continue;
                 }
-                CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind), Set.of(), Set.of(), false, manifest.compileClasspath(),
-                    manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind)).withAffectedClasses(fresh);
+                CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), false, manifest.compileClasspath(),
+                    manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
                     CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
