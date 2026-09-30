@@ -26,6 +26,8 @@ class ProxyTargetInterceptorCleanupSpec extends AbstractTypeElementSpec {
     private static final String IMPORTS = '''
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.event.BeanPreDestroyEvent;
+import io.micronaut.context.event.BeanPreDestroyEventListener;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
@@ -35,9 +37,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 '''
 
-    void 'test a selection that fails destroys the interceptors it created already'() {
-        given:
-        ApplicationContext context = buildContext('failing.MyBean', '''
+    private static String failing(String around) {
+        '''
 package failing;
 ''' + IMPORTS + BINDING + '''
 class Events {
@@ -45,6 +46,13 @@ class Events {
     static final AtomicInteger CREATED = new AtomicInteger();
     static final AtomicInteger DESTROYED = new AtomicInteger();
     static volatile boolean failSecond = true;
+    static volatile boolean failDestroy;
+
+    static void destroying() {
+        if (failDestroy) {
+            throw new IllegalStateException("cannot destroy the interceptor");
+        }
+    }
 
     // the second interceptor of a selection fails to be created, whichever of the two it is
     static void creating() {
@@ -52,6 +60,25 @@ class Events {
             throw new IllegalStateException("cannot create the second interceptor");
         }
         CREATED.incrementAndGet();
+    }
+}
+
+// a failure of a @PreDestroy method is logged, one of a listener fails the destruction
+@Singleton
+class FirstDestroyed implements BeanPreDestroyEventListener<FirstInterceptor> {
+    @Override
+    public FirstInterceptor onPreDestroy(BeanPreDestroyEvent<FirstInterceptor> event) {
+        Events.destroying();
+        return event.getBean();
+    }
+}
+
+@Singleton
+class SecondDestroyed implements BeanPreDestroyEventListener<SecondInterceptor> {
+    @Override
+    public SecondInterceptor onPreDestroy(BeanPreDestroyEvent<SecondInterceptor> event) {
+        Events.destroying();
+        return event.getBean();
     }
 }
 
@@ -80,12 +107,17 @@ class SecondInterceptor implements MethodInterceptor<Object, Object> {
 }
 
 @Singleton
-@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)
+''' + around + '''
 @Probed
 class MyBean {
     String work() { return "worked"; }
 }
-''', true)
+'''
+    }
+
+    void 'test a selection that fails destroys the interceptors it created already'() {
+        given:
+        ApplicationContext context = buildContext('failing.MyBean', failing('@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)'), true)
         def events = context.classLoader.loadClass('failing.Events')
         def proxy = context.getBean(context.classLoader.loadClass('failing.MyBean'))
 
@@ -147,8 +179,60 @@ class MyBean {
 '''
     }
 
-    private static Object newTarget(ApplicationContext context) {
-        def constructor = context.classLoader.loadClass('unmanaged.MyBean').getDeclaredConstructor()
+    void 'test a failure to destroy the interceptors of a selection that fails is added to its failure'() {
+        given:
+        ApplicationContext context = buildContext('failing.MyBean', failing('@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)'), true)
+        def events = context.classLoader.loadClass('failing.Events')
+        def proxy = context.getBean(context.classLoader.loadClass('failing.MyBean'))
+        events.failDestroy = true
+
+        when: 'the selection fails, and so does the destruction of the interceptor it created'
+        proxy.work()
+
+        then: 'the failure of the selection is thrown, with the other added to it'
+        RuntimeException e = thrown()
+        e.message.contains('cannot create the second interceptor')
+        e.suppressed.length == 1
+        e.suppressed[0].message.contains('cannot destroy the interceptor') || e.suppressed[0].cause?.message?.contains('cannot destroy the interceptor')
+
+        cleanup:
+        events.failDestroy = false
+        context.close()
+    }
+
+    void 'test a selection for an unmanaged target that fails destroys the interceptors it created already'() {
+        given:
+        ApplicationContext context = buildContext('failing.MyBean', failing('@Around(proxyTarget = true, hotswap = true, lazyInterceptorsPerTarget = true)'), true)
+        def events = context.classLoader.loadClass('failing.Events')
+        def proxy = context.getBean(context.classLoader.loadClass('failing.MyBean'))
+
+        when: 'a target the context holds no registration for is called, and its selection fails on its second interceptor'
+        ((HotSwappableInterceptedProxy) proxy).swap(newTarget(context, 'failing.MyBean'))
+        proxy.work()
+
+        then: 'the one created before the failure is destroyed at once'
+        thrown(RuntimeException)
+        events.CREATED.get() == 1
+        events.DESTROYED.get() == 1
+
+        when: 'the selection is made again'
+        events.failSecond = false
+        def result = proxy.work()
+
+        then: 'both interceptors are created'
+        result == 'worked'
+        events.CREATED.get() == 3
+        events.DESTROYED.get() == 1
+
+        when:
+        context.close()
+
+        then: 'and destroyed with the context'
+        events.DESTROYED.get() == 3
+    }
+
+    private static Object newTarget(ApplicationContext context, String type = 'unmanaged.MyBean') {
+        def constructor = context.classLoader.loadClass(type).getDeclaredConstructor()
         constructor.accessible = true
         constructor.newInstance()
     }

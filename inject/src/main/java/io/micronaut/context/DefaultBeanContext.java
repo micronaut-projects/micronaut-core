@@ -3886,15 +3886,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
         if (kept == null) {
             // computed outside the map: it creates beans, which may select for another target
-            Collection<BeanRegistration<I>> registrations = getBeanRegistrations(interceptorType, binding);
-            List<BeanRegistration<?>> created = new ArrayList<>(registrations.size());
-            for (BeanRegistration<I> registration : registrations) {
-                if (isUnscoped(registration.beanDefinition)) {
-                    created.add(registration);
+            assertContextState();
+            Collection<BeanDefinition<I>> candidates = findBeanCandidatesInternal(null, interceptorType);
+            if (!candidates.isEmpty()) {
+                candidates = applyBeanResolutionFilters(null, interceptorType, candidates);
+                if (binding != null) {
+                    candidates = binding.filterQualified(interceptorType.getType(), candidates);
                 }
             }
+            List<BeanRegistration<I>> registrations = new ArrayList<>(candidates.size());
+            List<BeanRegistration<?>> created = new ArrayList<>(candidates.size());
             UnownedInterceptorSelection selection;
             try {
+                // resolved one by one, so that the ones created are known when the creation of a further one fails
+                for (BeanDefinition<I> candidate : candidates) {
+                    int resolved = registrations.size();
+                    addCandidateToList(null, candidate, interceptorType, binding, registrations);
+                    if (isUnscoped(candidate)) {
+                        created.addAll(registrations.subList(resolved, registrations.size()));
+                    }
+                }
+                registrations.sort(OrderUtil.ORDERED_COMPARATOR);
                 selection = new UnownedInterceptorSelection(selector.apply(registrations), created);
             } catch (RuntimeException | Error e) {
                 destroyCreatedBeans(created, e);
