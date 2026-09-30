@@ -152,8 +152,8 @@ snippet::io.micronaut.docs.aop.lifecycle.pertarget.Audited[tags="imports,annotat
 A non-singleton interceptor is then the target's own: the instance created with the target, which also intercepts its
 construction, post-construct and pre-destroy, or one created for it on its first call, as a dependent of the target's
 registration. Two targets never share an instance, and each instance is destroyed with its target. A lazy proxy, such
-as a scoped proxy, intercepts each target it resolves with that target's instances. The proxy itself holds only the
-singleton interceptors.
+as a scoped proxy, intercepts each target it resolves with that target's instances. The proxy itself is injected with no
+interceptors and creates none.
 
 For example, this interceptor numbers the calls it intercepts:
 

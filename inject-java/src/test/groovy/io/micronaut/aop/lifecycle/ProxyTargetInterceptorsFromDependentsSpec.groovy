@@ -13,7 +13,7 @@ import java.util.concurrent.CountDownLatch
 /**
  * A proxy that fronts a separate target takes the non-singleton interceptors of a call from the dependents of the
  * target's registration, which is where the interceptors created with the target live, and creates as a further
- * dependent of the target any bound only for {@code AROUND}. The proxy itself is injected with singletons only. So
+ * dependent of the target any bound only for {@code AROUND}. The proxy itself is injected with no interceptors. So
  * the instance that intercepted a target's {@code POST_CONSTRUCT} intercepts its methods through the proxy and its
  * {@code PRE_DESTROY}, and is destroyed with the target, whether the proxy fronts one target for its life or a
  * different one on each call.

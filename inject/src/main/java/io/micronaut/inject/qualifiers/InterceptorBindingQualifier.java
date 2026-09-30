@@ -23,8 +23,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
@@ -60,18 +58,9 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
      */
     public static final String META_BINDING_VALUES = "$bindingValues";
     public static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
-    /**
-     * The member of the binding of a proxy that fronts a separate target, which qualifies singleton interceptors
-     * alone: the non-singleton interceptors of a target are the target's own, and the proxy selects them from the
-     * target, so it creates none of its own.
-     *
-     * @since 5.3.0
-     */
-    public static final String META_SINGLETONS_ONLY = "singletonsOnly";
     private static final String META_BIND_MEMBERS = "bindMembers";
     private final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames;
     private final Set<String> supportedInterceptorTypes;
-    private final boolean singletonsOnly;
 
     /**
      * Interceptor binding qualifiers.
@@ -84,10 +73,8 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         AnnotationValue<Annotation> av = annotationMetadata.findAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER).orElse(null);
         if (av == null) {
             annotationValues = Collections.emptyList();
-            singletonsOnly = false;
         } else {
             annotationValues = av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-            singletonsOnly = av.isTrue(META_SINGLETONS_ONLY);
         }
         if (annotationValues.isEmpty()) {
             annotationValues = annotationMetadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
@@ -112,7 +99,6 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             this.supportedAnnotationNames = Collections.emptyMap();
         }
         this.supportedInterceptorTypes = Collections.emptySet();
-        this.singletonsOnly = false;
     }
 
     /**
@@ -154,7 +140,6 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         }
         this.supportedAnnotationNames = supportedAnnotationNames;
         this.supportedInterceptorTypes = supportedInterceptorTypes;
-        this.singletonsOnly = false;
     }
 
     /**
@@ -193,9 +178,6 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        if (singletonsOnly && !isSingleton(candidate)) {
-            return false;
-        }
         if (supportedInterceptorTypes.contains(candidate.getBeanType().getName())) {
             return true;
         }
@@ -371,21 +353,12 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             return false;
         }
         InterceptorBindingQualifier<?> that = (InterceptorBindingQualifier<?>) o;
-        return singletonsOnly == that.singletonsOnly
-            && supportedAnnotationNames.equals(that.supportedAnnotationNames)
-            && supportedInterceptorTypes.equals(that.supportedInterceptorTypes);
+        return supportedAnnotationNames.equals(that.supportedAnnotationNames) && supportedInterceptorTypes.equals(that.supportedInterceptorTypes);
     }
 
     @Override
     public int hashCode() {
-        return 31 * ObjectUtils.hash(supportedAnnotationNames, supportedInterceptorTypes) + Boolean.hashCode(singletonsOnly);
-    }
-
-    private static boolean isSingleton(BeanType<?> candidate) {
-        if (candidate instanceof BeanDefinition<?> definition) {
-            return definition.isSingleton();
-        }
-        return candidate instanceof BeanDefinitionReference<?> reference && reference.isSingleton();
+        return ObjectUtils.hash(supportedAnnotationNames, supportedInterceptorTypes);
     }
 
     @Override

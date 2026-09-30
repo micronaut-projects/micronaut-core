@@ -48,7 +48,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
@@ -706,11 +705,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         }
 
         constructor.getParameter(INTERCEPTORS_PARAMETER).annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
-            builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES));
-            if (interceptorsPerTarget) {
-                // a non-singleton interceptor is the target's own, selected from the target: the proxy creates none
-                builder.member(InterceptorBindingQualifier.META_SINGLETONS_ONLY, true);
+            if (!interceptorsPerTarget) {
+                builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES));
             }
+            // otherwise the interceptors are the target's own, selected from the target: a binding of nothing
+            // qualifies no interceptor, so the proxy is injected with none and creates none
         });
 
         if (parentWriter != null) {
