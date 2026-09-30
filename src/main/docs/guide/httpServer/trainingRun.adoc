@@ -101,10 +101,10 @@ $ java -XX:AOTCacheOutput=app.aot \
 . logs how many bean definitions it loaded, logs a second warning and closes the application context,
 . exits the JVM with status 0.
 
-No bean is created and no bean class is initialized. No constructor, `@PostConstruct` method or startup event listener runs, no `@Context` or other eager bean is created, no method is scheduled, the api:runtime.EmbeddedApplication[] is not started and no port is bound. A bean that opens a connection when it is created therefore does not fail the run. A bean definition that cannot be loaded, for example because it names a class of an optional dependency that is absent, is skipped: the run logs it with the cause, and counts it in the line that ends the loading:
+No bean is created and no bean class is initialized. No constructor, `@PostConstruct` method or startup event listener runs, no `@Context` or other eager bean is created, no method is scheduled, the api:runtime.EmbeddedApplication[] is not started and no port is bound. A bean that opens a connection when it is created therefore does not fail the run. A bean definition that cannot be loaded, for example because it names a class of an optional dependency that is absent, is skipped, and so is one with a condition that cannot be evaluated (see below). The run logs each skipped bean definition with the cause, and counts it in the line that ends the loading:
 
 ----
-Training run (micronaut.application.training.mode=load): loaded 359 of 411 bean definitions and the 655 types they name in 43ms, skipped 0 that could not be loaded
+Training run (micronaut.application.training.mode=load): loaded 359 of 411 bean definitions and the 655 types they name in 43ms, skipped 0 that could not be evaluated or loaded
 ----
 
 The mode is read only when `micronaut.application.training.enabled` is `true`. Its values are `start`, the default, and `load`, in any case; any other value fails the training run. The `load` mode works for every application, including one without an `EmbeddedApplication`, which a `start` run cannot stop. In the `test` environment `System.exit` is not called and `Micronaut.run` returns the application context, closed and never started.
@@ -115,7 +115,7 @@ What still runs in `load` mode is the code that runs whenever an application con
 
 * the property source loaders. If the application reads distributed configuration at startup through the bootstrap context, it still does, and the beans of the bootstrap context that read it are created.
 * the api:context.ApplicationContextConfigurer[] classes of the application.
-* the conditions of the bean definitions, custom api:context.condition.Condition[] classes included. A condition that looks up a bean creates that bean.
+* the conditions of the bean definitions, custom api:context.condition.Condition[] classes included. A condition cannot look up a bean: the application context is not running, so the lookup throws an `IllegalStateException` and no bean is created. The bean definition with that condition is skipped and logged with that cause, although a normal start evaluates the condition.
 
 ==== Choosing a mode
 
