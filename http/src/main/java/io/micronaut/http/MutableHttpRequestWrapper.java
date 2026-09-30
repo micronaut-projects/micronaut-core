@@ -80,6 +80,13 @@ public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implemen
         }
     }
 
+    /**
+     * @return Whether a body was set, which replaces the body of the request it wraps
+     */
+    boolean isBodySet() {
+        return body != null;
+    }
+
     @Override
     public MutableHttpRequest<B> cookie(Cookie cookie) {
         throw new UnsupportedOperationException();

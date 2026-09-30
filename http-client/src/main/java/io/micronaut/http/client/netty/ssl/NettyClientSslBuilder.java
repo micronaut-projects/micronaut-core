@@ -34,7 +34,6 @@ import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jakarta.inject.Singleton;
@@ -127,8 +126,6 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
             }
         }
         if (versionSelection.isAlpn()) {
-            SslProvider provider = ssl.isPreferOpenssl() && SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
-            sslBuilder.sslProvider(provider);
             sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
                 ApplicationProtocolConfig.Protocol.ALPN,
                 ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,

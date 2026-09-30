@@ -137,6 +137,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -524,6 +525,19 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         boolean.class, // isContainerType
         boolean.class,  // requiresMethodProcessing,
         boolean.class // hasEvaluatedExpressions
+    );
+
+    private static final Constructor<?> PRECALCULATED_INFO_WITH_DECLARATION_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(AbstractInitializableBeanDefinition.PrecalculatedInfo.class,
+        Optional.class, // scope
+        boolean.class, // isAbstract
+        boolean.class, // isIterable
+        boolean.class, // isSingleton
+        boolean.class, // isPrimary
+        boolean.class, // isConfigurationProperties
+        boolean.class, // isContainerType
+        boolean.class,  // requiresMethodProcessing,
+        boolean.class, // hasEvaluatedExpressions
+        Argument.class // declaredBeanType
     );
 
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
@@ -1596,7 +1610,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
                 } else {
                     interceptedInterface = ClassTypeDef.of(ParameterizedInterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = null;
+                    defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
                 }
             } else {
                 resolveValuesMethod = RESOLVE_INSTANTIATION_VALUES_METHOD;
@@ -1605,17 +1619,37 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
                 } else {
                     interceptedInterface = ClassTypeDef.of(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = null;
+                    defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
                 }
             }
             classDefBuilder.addSuperinterface(interceptedInterface);
 
+            // The interceptor chain runs in the default method of the intercepted interface, which returns as soon
+            // as the chain has: members are injected and post-construct run here, on the instance it returned, so that
+            // neither happens before an outer construction interceptor has completed or at all when one throws
+            boolean injectsMembers = needsInjectMethod() || needsPostConstruct();
+
             // Remove after AbstractInitializableBeanDefinition#doInstantiate is removed
             classDefBuilder.addMethod(MethodDef.override(PARAMETRIZED_DO_INSTANTIATE_METHOD)
-                .build((aThis, methodParameters) ->
-                    aThis.superRef(interceptedInterface).invoke(PARAMETRIZED_DO_INSTANTIATE_METHOD, methodParameters).returning()));
+                .build((aThis, methodParameters) -> {
+                    ExpressionDef constructed = aThis.superRef(interceptedInterface)
+                        .invoke(PARAMETRIZED_DO_INSTANTIATE_METHOD, methodParameters);
+                    if (isParametrized && injectsMembers) {
+                        return injectAndReturn(aThis, methodParameters, constructed, false);
+                    }
+                    return constructed.returning();
+                }));
 
-            if (superBeanDefinition) {
+            if (!isParametrized && injectsMembers) {
+                classDefBuilder.addMethod(MethodDef.override(INSTANTIATE_METHOD)
+                    .build((aThis, methodParameters) ->
+                        injectAndReturn(
+                            aThis,
+                            methodParameters,
+                            aThis.superRef(interceptedInterface).invoke(defaultInstantiateMethod, methodParameters),
+                            false
+                        )));
+            } else if (superBeanDefinition) {
                 classDefBuilder.addMethod(MethodDef.override(INSTANTIATE_METHOD)
                     .build((aThis, methodParameters) ->
                         aThis.superRef(interceptedInterface).invoke(defaultInstantiateMethod, methodParameters).returning()));
@@ -1639,7 +1673,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                         .<ExpressionDef>mapToObj(index -> constructorValuesArray.arrayElement(index).cast(TypeDef.erasure(parameterElements[index].getType())))
                         .toList();
                     ExpressionDef newInstance = buildNewInstance(aThis, methodParameters, statements, extractedValues);
-                    statements.add(injectAndReturn(aThis, methodParameters, newInstance));
+                    if (hasInjectScope()) {
+                        // An @InjectScope constructor argument is released as soon as the constructor has run, which is
+                        // the contract of the annotation and keeps the release on the path where an outer construction
+                        // interceptor throws after proceed() and the instance is never injected
+                        statements.add(newInstance.newLocal("constructed", constructedVar -> StatementDef.multi(
+                            destroyInjectScopeBeansIfNecessary(methodParameters),
+                            constructedVar.returning()
+                        )));
+                    } else {
+                        statements.add(newInstance.returning());
+                    }
                     return StatementDef.multi(statements);
                 }));
         } else {
@@ -1861,11 +1905,35 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             && parameters[1].getType().isAssignable(TimeUnit.class);
     }
 
+    private boolean needsInjectMethod() {
+        return !injectCommands.isEmpty() || superBeanDefinition;
+    }
+
     private StatementDef injectAndReturn(VariableDef.This aThis,
                                          List<VariableDef.MethodParameter> methodParameters,
                                          ExpressionDef beanInstance) {
-        boolean needsInjectMethod = !injectCommands.isEmpty() || superBeanDefinition;
-        boolean needsInjectScope = hasInjectScope();
+        return injectAndReturn(aThis, methodParameters, beanInstance, true);
+    }
+
+    /**
+     * Injects the members of the instance and runs its post-construct callbacks.
+     *
+     * @param aThis                   The definition
+     * @param methodParameters        The parameters of the method being built, the resolution context first and the
+     *                                bean context second
+     * @param beanInstance            The instance
+     * @param destroyInjectScopeBeans Whether to release the {@link io.micronaut.context.annotation.InjectScope}
+     *                                arguments of the constructor here. False for an intercepted construction, where
+     *                                the generated {@code doInstantiate} releases them as soon as the constructor has
+     *                                run, rather than after the interceptor chain has returned
+     * @return The statement
+     */
+    private StatementDef injectAndReturn(VariableDef.This aThis,
+                                         List<VariableDef.MethodParameter> methodParameters,
+                                         ExpressionDef beanInstance,
+                                         boolean destroyInjectScopeBeans) {
+        boolean needsInjectMethod = needsInjectMethod();
+        boolean needsInjectScope = destroyInjectScopeBeans && hasInjectScope();
         boolean needsPostConstruct = needsPostConstruct();
         if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct) {
             return beanInstance.returning();
@@ -2395,11 +2463,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             ))
         );
 
-        statements.add(
-            beanDefinitionTypeDef.getStaticField(precalculatedInfoField)
-                .put(
-                    precalculatedInfoType.instantiate(
-                        PRECALCULATED_INFO_CONSTRUCTOR,
+        // the declaration is written only where the type arguments cannot say it, through the constructor that
+        // takes it, so that a definition that has none to write costs nothing more
+        ExpressionDef declaredBeanType = declaredBeanTypeArgument();
+        List<ExpressionDef> precalculatedInfoValues = new ArrayList<>(List.of(
 
                         // 1: `Optional` scope
                         scope == null ? TYPE_OPTIONAL.invokeStatic(METHOD_OPTIONAL_EMPTY)
@@ -2426,7 +2493,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                             : ExpressionDef.constant(false),
                         // 9: hasEvaluatedExpressions
                         ExpressionDef.constant(evaluatedExpressionProcessor.hasEvaluatedExpressions())
-
+        ));
+        if (declaredBeanType != null) {
+            // 10: declaredBeanType
+            precalculatedInfoValues.add(declaredBeanType);
+        }
+        statements.add(
+            beanDefinitionTypeDef.getStaticField(precalculatedInfoField)
+                .put(
+                    precalculatedInfoType.instantiate(
+                        declaredBeanType == null ? PRECALCULATED_INFO_CONSTRUCTOR : PRECALCULATED_INFO_WITH_DECLARATION_CONSTRUCTOR,
+                        precalculatedInfoValues.toArray(ExpressionDef[]::new)
                     )
                 )
         );
@@ -3157,6 +3234,31 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 ),
                 ExpressionDef.constant(propertyPath)
             );
+    }
+
+    /**
+     * The bean type as declared, written only where the type arguments recorded for it cannot say it: a raw
+     * type, whose arguments are the ones its type declares, and a type variable, which erases to its bound.
+     *
+     * @return The expression, or {@code null} when the declaration is rebuilt from the type arguments
+     */
+    @Nullable
+    private ExpressionDef declaredBeanTypeArgument() {
+        ClassElement declared = beanTypeElement;
+        if (declared.getName().contains(BeanDefinitionVisitor.PROXY_SUFFIX)
+            || !ArgumentExpUtils.isRawType(declared) && !ArgumentExpUtils.isUnresolvedVariable(declared)) {
+            return null;
+        }
+        return ArgumentExpUtils.pushCreateArgument(
+            annotationMetadataDefaults,
+            declared,
+            beanDefinitionTypeDef,
+            ArgumentExpUtils.isUnresolvedVariable(declared) ? ((GenericPlaceholderElement) declared).getVariableName() : declared.getSimpleName(),
+            declared,
+            AnnotationMetadata.EMPTY_METADATA,
+            declared.getTypeArguments(),
+            loadClassValueExpressionFn
+        );
     }
 
     private ExpressionDef getValueBypassingBeanContext(ClassElement type, List<VariableDef.MethodParameter> methodParameters) {

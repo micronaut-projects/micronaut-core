@@ -18,9 +18,11 @@ package io.micronaut.http.netty.cookies;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.CookieComparator;
 import io.micronaut.http.cookie.SameSite;
 import io.netty.handler.codec.http.cookie.DefaultCookie;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -32,6 +34,8 @@ import java.util.Optional;
  */
 @Internal
 public class NettyCookie implements Cookie {
+
+    private static final CookieComparator COMPARATOR = new CookieComparator();
 
     private final io.netty.handler.codec.http.cookie.Cookie nettyCookie;
 
@@ -174,7 +178,23 @@ public class NettyCookie implements Cookie {
 
     @Override
     public int compareTo(Cookie o) {
-        NettyCookie nettyCookie = (NettyCookie) o;
-        return nettyCookie.nettyCookie.compareTo(this.nettyCookie);
+        return COMPARATOR.compare(this, o);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof NettyCookie that)) {
+            return false;
+        }
+        return COMPARATOR.compare(this, that) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        String domain = getDomain();
+        return Objects.hash(getName(), getPath(), domain == null ? null : domain.toLowerCase(Locale.ROOT));
     }
 }

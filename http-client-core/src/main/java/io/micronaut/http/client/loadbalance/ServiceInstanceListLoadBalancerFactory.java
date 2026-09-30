@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.LoadBalancer;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The default {@link LoadBalancer} factory for creating {@link LoadBalancer} instances from
@@ -39,5 +40,19 @@ public class ServiceInstanceListLoadBalancerFactory {
      */
     public LoadBalancer create(ServiceInstanceList serviceInstanceList) {
         return new ServiceInstanceListRoundRobinLoadBalancer(serviceInstanceList);
+    }
+
+    /**
+     * Creates a {@link LoadBalancer} from the given {@link ServiceInstanceList}, with outlier
+     * detection: the load balancer of {@link #create(ServiceInstanceList)}, which detects
+     * outliers when it is a round-robin one and the configuration enables it.
+     *
+     * @param serviceInstanceList The {@link ServiceInstanceList}
+     * @param outlierDetection    The outlier detection configuration, or {@code null} for none
+     * @return The {@link LoadBalancer}
+     * @since 5.3.0
+     */
+    public LoadBalancer create(ServiceInstanceList serviceInstanceList, @Nullable OutlierDetectionConfiguration outlierDetection) {
+        return AbstractRoundRobinLoadBalancer.withOutlierDetection(create(serviceInstanceList), outlierDetection);
     }
 }

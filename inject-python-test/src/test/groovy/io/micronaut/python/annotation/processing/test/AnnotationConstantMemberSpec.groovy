@@ -233,4 +233,48 @@ class PropertiesMapper:
         e.message.contains("value")
         e.message.contains("Named")
     }
+
+    void "test a computed annotation argument is reported rather than silently emitted"() {
+        when: "an argument that has to be evaluated to have a value"
+        buildContext('''
+from jakarta.inject import Named, Singleton
+
+PREFIX = "mapper"
+
+
+@Singleton
+@Named(str(PREFIX))
+class PropertiesMapper:
+    pass
+''')
+
+        then: "the expression, the member and the annotation are all named"
+        def e = thrown(RuntimeException)
+        e.message.contains("str(PREFIX)")
+        e.message.contains("[value]")
+        e.message.contains("Named")
+        e.message.contains("not a compile-time constant")
+    }
+
+    void "test an annotation bound to a name is reported rather than dropped"() {
+        when: "an annotation factored out into a module-level name, which reads like de-duplication"
+        buildContext('''
+from typing import Annotated
+from jakarta.inject import Named, Singleton
+
+ALIAS = Named("mapper")
+
+
+@Singleton
+class PropertiesMapper:
+    def __init__(self, value: Annotated[str, ALIAS]):
+        self.value = value
+''')
+
+        then: "the name, what it is bound to, and the remedy"
+        def e = thrown(RuntimeException)
+        e.message.contains("ALIAS")
+        e.message.contains("Named(\'mapper\')")
+        e.message.contains("Write the annotation inline")
+    }
 }

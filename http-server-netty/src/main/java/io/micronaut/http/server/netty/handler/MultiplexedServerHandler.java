@@ -34,6 +34,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
@@ -89,6 +90,7 @@ abstract class MultiplexedServerHandler {
      * An HTTP/2 or HTTP/3 stream.
      */
     abstract class MultiplexedStream implements OutboundAccess {
+        private boolean skipCompression;
         @Nullable
         private final Http2RequestEvent jfrEvent;
         @Nullable
@@ -206,6 +208,38 @@ abstract class MultiplexedServerHandler {
         }
 
         /**
+         * Called when the trailers of the request are read: the headers frame that ends the
+         * stream after the request headers.
+         *
+         * @param trailers The trailers
+         * @param endOfStream Whether this is the last request packet. Trailers that do not end
+         *                    the stream are a protocol violation and are ignored
+         */
+        final void onTrailersRead(HttpHeaders trailers, boolean endOfStream) {
+            if (!endOfStream || closed) {
+                return;
+            }
+            if (streamer != null) {
+                streamer.completeWithTrailers(trailers);
+            } else if (!requestAccepted) {
+                // the full request arrived before read complete
+                ByteBuf fullBody;
+                if (bufferedContent == null) {
+                    fullBody = Unpooled.EMPTY_BUFFER;
+                } else {
+                    List<ByteBuf> pieces = bufferedContent;
+                    // composeBody takes ownership of the pieces even when it fails
+                    bufferedContent = null;
+                    fullBody = pieces.size() == 1 ? pieces.get(0) : PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
+                }
+                requestAccepted = true;
+                notifyDataConsumed(fullBody.readableBytes());
+                NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
+                requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory.withTrailers(byteBodyFactory.createChecked(bodySizeLimits, fullBody), trailers), this);
+            }
+        }
+
+        /**
          * Called on read complete. This makes the stream devolve into streaming mode, i.e. give up
          * on buffering data in hopes of reading it all in one go.
          */
@@ -304,7 +338,7 @@ abstract class MultiplexedServerHandler {
             if (PipeliningServerHandler.canHaveBody(response.status())) {
                 OptionalLong length = body.expectedLength();
                 if (length.isPresent()) {
-                    response.headers().set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+                    ContentLengthValues.set(response.headers(), length.getAsLong());
                 }
             } else {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
@@ -379,7 +413,7 @@ abstract class MultiplexedServerHandler {
                     private void complete0() {
                         if (!finished) {
                             if (!reset) {
-                                writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
+                                writeEnd(snbb, response);
                             }
                             if (finish()) {
                                 if (!reset) {
@@ -416,6 +450,31 @@ abstract class MultiplexedServerHandler {
                     consumer.attach(upstream);
                 }
             }
+        }
+
+        /**
+         * End the stream of a streamed response: with the trailers of the body when it carries
+         * any, else with an empty data frame. The body completes its trailers before it completes
+         * the consumer, so they are available here.
+         *
+         * @param body     The body
+         * @param response The response
+         */
+        private void writeEnd(StreamingNettyByteBody body, HttpResponse response) {
+            HttpHeaders trailers = NettyByteBodyFactory.trailersToSend(body);
+            if (trailers == null) {
+                writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
+                return;
+            }
+            if (compressionSession != null) {
+                // the trailers are not compressed: flush the compressed data first
+                compressionSession.finish();
+                ByteBuf compressed = compressionSession.poll();
+                if (compressed != null) {
+                    writeData0(compressed, false, requiredCtx().voidPromise());
+                }
+            }
+            writeTrailers(trailers, endPromise(response));
         }
 
         private void writeStreamingHeaders(HttpResponse response, long contentLength) {
@@ -523,12 +582,22 @@ abstract class MultiplexedServerHandler {
             this.attachment = attachment;
         }
 
+        @Nullable
+        final Object attachment() {
+            return attachment;
+        }
+
         @Override
         public final void closeAfterWrite() {
         }
 
+        @Override
+        public final void skipCompression() {
+            skipCompression = true;
+        }
+
         private void prepareCompression(HttpResponse headers, long contentLength) {
-            if (compressor != null) {
+            if (compressor != null && !skipCompression) {
                 Compressor.Session session = compressor.prepare(requiredCtx(), Objects.requireNonNull(request), headers, contentLength);
                 if (session != null) {
                     headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
@@ -579,6 +648,15 @@ abstract class MultiplexedServerHandler {
          * @param promise The promise to complete when the data is written (used for backpressure)
          */
         abstract void writeData0(ByteBuf data, boolean endStream, ChannelPromise promise);
+
+        /**
+         * Write the response trailers, ending the stream.
+         *
+         * @param trailers The trailers
+         * @param promise The promise to complete when the trailers are written
+         * @since 5.3.0
+         */
+        abstract void writeTrailers(HttpHeaders trailers, ChannelPromise promise);
 
         /**
          * This is the {@link HotObservable} that represents the request body in the streaming
@@ -694,6 +772,10 @@ abstract class MultiplexedServerHandler {
             @Override
             public void complete() {
                 dest.complete();
+            }
+
+            void completeWithTrailers(HttpHeaders trailers) {
+                dest.completeWithTrailers(trailers);
             }
 
             @Override

@@ -70,6 +70,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
     @Nullable
+    @SuppressWarnings("java:S3077") // the list is only ever replaced, never mutated after it is published
+    private volatile List<BeanRegistration<?>> cachedProxyTargetDependents;
+    @Nullable
+    private Map<Class<?>, AbstractBeanResolutionContext> lazyProxyTargetCopies;
+    @Nullable
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
     @Nullable
     private Deque<List<BeanRegistration<?>>> dependentBeansToDestroyAfterResolutionStack;
@@ -412,8 +417,45 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         copy.removeAttribute(INTERCEPTOR_REGISTRATIONS);
         if (copy instanceof AbstractBeanResolutionContext abstractCopy) {
             abstractCopy.lazyProxyTarget = true;
+            // taken by the creation of the proxy once the proxy is instantiated, for its registration
+            if (lazyProxyTargetCopies == null) {
+                lazyProxyTargetCopies = new HashMap<>(2);
+            }
+            // keyed by the class of the definition the proxy resolves its target with, which is the target's
+            lazyProxyTargetCopies.put(proxyBeanDefinition.getClass(), abstractCopy);
         }
         return copy;
+    }
+
+    /**
+     * Takes the copy of this context made for the lazy proxy of the given target while the proxy was created.
+     *
+     * @param targetDefinitionType The class of the definition of the proxy's target
+     * @return The context the proxy retains, or {@code null} if the proxy retains none
+     */
+    @Nullable
+    final AbstractBeanResolutionContext takeLazyProxyTargetCopy(Class<?> targetDefinitionType) {
+        return lazyProxyTargetCopies == null ? null : lazyProxyTargetCopies.remove(targetDefinitionType);
+    }
+
+    /**
+     * Keeps the dependents created with the target a lazy proxy caches on the context the proxy retains, so that
+     * they live as long as the proxy and are destroyed with the target.
+     *
+     * @param dependents The dependents of the cached target
+     */
+    final void setCachedProxyTargetDependents(List<BeanRegistration<?>> dependents) {
+        this.cachedProxyTargetDependents = dependents;
+    }
+
+    /**
+     * @return The dependents of the cached target, which are forgotten, or {@code null}
+     */
+    @Nullable
+    final List<BeanRegistration<?>> takeCachedProxyTargetDependents() {
+        List<BeanRegistration<?>> dependents = cachedProxyTargetDependents;
+        cachedProxyTargetDependents = null;
+        return dependents;
     }
 
     /**
@@ -489,10 +531,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public void markDependentAsFactory() {
         if (dependentBeans != null) {
-            if (dependentBeans.isEmpty()) {
-                return;
+            // an interceptor created for the construction of the bean is resolved before its factory, and is not it
+            for (int i = 0; i < dependentBeans.size(); i++) {
+                if (!(dependentBeans.get(i) instanceof BeanDisposingRegistration<?> registration && registration.isCreatedAsInterceptor())) {
+                    dependentFactory = dependentBeans.remove(i);
+                    return;
+                }
             }
-            dependentFactory = dependentBeans.removeFirst();
         }
     }
 
@@ -638,6 +683,53 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public <T> T getProxyTargetBean(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return context.getProxyTargetBean(this, definition, beanType, qualifier);
+    }
+
+    @Override
+    public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return context.getInterceptorRegistrations(this, interceptorType, binding);
+    }
+
+    /**
+     * Finds the interceptor of the given definition created for the bean this context resolves for, among its
+     * dependents.
+     *
+     * @param definition The definition of the interceptor
+     * @param <I>        The interceptor type
+     * @return The registration, or {@code null} when none was created for the bean
+     */
+    @Nullable
+    <I> BeanRegistration<I> findInterceptor(BeanDefinition<I> definition) {
+        return findInterceptor(getDependentBeans(), definition);
+    }
+
+    /**
+     * Finds the interceptor of the given definition among dependents, one created to intercept the bean they depend
+     * on rather than injected into it.
+     *
+     * @param dependents The dependents, or {@code null}
+     * @param definition The definition of the interceptor
+     * @param <I>        The interceptor type
+     * @return The registration, or {@code null}
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    static <I> BeanRegistration<I> findInterceptor(@Nullable List<BeanRegistration<?>> dependents, BeanDefinition<I> definition) {
+        if (dependents != null) {
+            for (BeanRegistration<?> dependent : dependents) {
+                if (dependent instanceof BeanDisposingRegistration<?> registration
+                    && registration.isCreatedAsInterceptor()
+                    && registration.beanDefinition.equals(definition)) {
+                    return (BeanRegistration<I>) registration;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getProxyTargetBeanRegistration(this, definition, beanType, qualifier);
     }
 
     /**

@@ -1,6 +1,34 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Construct advice no longer wraps injection and `@PostConstruct` (5.3)
+
+A api:aop.ConstructorInterceptor[] now wraps only the constructor call. Fields and methods of the bean are injected, and
+its `@PostConstruct` methods run, after every construct interceptor has returned, instead of inside the call to
+`proceed()`. As a result `@PostConstruct` no longer runs before an outer construct interceptor has completed, nor when
+one throws after `proceed()`.
+
+A construct interceptor that used the injected state of the instance returned by `proceed()` should bind to
+`InterceptorKind.POST_CONSTRUCT` instead, where the bean is injected. See <<lifecycleAdvice, Bean Life Cycle Advice>>.
+Beans compiled with an earlier version keep the previous order until they are recompiled.
+
+=== A filter method that changes the URI of its `MutableHttpRequest` parameter changes the request (5.3)
+
+A request filter method without a continuation can declare a api:http.MutableHttpRequest[] parameter. The server request itself cannot be changed, so the method receives a mutable copy of it: headers changed on the copy are applied to the request, but everything else only changes the copy.
+
+Previously, changing the URI of that copy, e.g. `request.uri(URI.create("/v2/items"))` in a `void` filter method, had no effect unless the method returned the copy.
+
+Since Micronaut 5.3, when the method changes the URI of the copy and returns nothing, the rest of the chain continues with the copy:
+
+* the filters after it and the route see the new URI;
+* for a api:http.server.annotation.PreMatching[] filter, the route is matched with the new URI;
+* the body is still read from the original request;
+* for a filter that returns a `Publisher` or `CompletionStage`, the URI is checked when that result completes.
+
+Changes to the query parameters or the body of the copy are still only kept when the method returns the copy.
+
+If an earlier filter continued with a request that cannot be copied this way, for example an `HttpRequestWrapper`, the parameter is now a mutable wrapper of that request. Previously the method failed with an `UnsupportedOperationException`.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.

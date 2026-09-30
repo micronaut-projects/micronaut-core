@@ -85,7 +85,9 @@ public interface ParameterizedInterceptedBeanDefinition<T>
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }
-        return new ArrayList(resolutionContext.getBeanRegistrations(
+        // the bean's own: a non-singleton interceptor is created as a dependent of the bean, which every later
+        // interception point of the bean finds again
+        return new ArrayList(resolutionContext.getInterceptorRegistrations(
             Interceptor.ARGUMENT,
             Qualifiers.byInterceptorBinding(metadata)
         ));

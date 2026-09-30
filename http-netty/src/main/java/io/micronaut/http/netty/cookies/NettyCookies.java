@@ -55,13 +55,15 @@ public class NettyCookies implements Cookies {
      */
     public NettyCookies(String path, HttpHeaders nettyHeaders, ConversionService conversionService) {
         this.conversionService = conversionService;
-        String value = nettyHeaders.get(HttpHeaderNames.COOKIE);
-        if (value != null) {
+        List<String> values = nettyHeaders.getAll(HttpHeaderNames.COOKIE);
+        if (!values.isEmpty()) {
             cookies = new LinkedHashMap<>();
-            ServerCookieDecoder.INSTANCE.decode(value)
-                    .stream()
-                    .filter(cookie -> cookie.getPath() == null || path.startsWith(cookie.getPath()))
-                    .forEach(cookie -> cookies.put(cookie.getName(), cookie));
+            for (String value : values) {
+                ServerCookieDecoder.INSTANCE.decode(value)
+                        .stream()
+                        .filter(cookie -> cookie.getPath() == null || path.startsWith(cookie.getPath()))
+                        .forEach(cookie -> cookies.put(cookie.getName(), cookie));
+            }
         } else {
             cookies = Collections.emptyMap();
         }

@@ -293,6 +293,11 @@ final class PropagatedContextImpl implements PropagatedContext {
     }
 
     @Override
+    public <T extends PropagatedContextElement> @Nullable T findOrNull(Class<T> elementType) {
+        return findElement(elementType);
+    }
+
+    @Override
     public <T extends PropagatedContextElement> Stream<T> findAll(Class<T> elementType) {
         List<PropagatedContextElement> reverseElements = new ArrayList<>(Arrays.asList(elements));
         Collections.reverse(reverseElements);
