@@ -32,6 +32,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 
 import static ch.qos.logback.classic.util.ClassicEnvUtil.loadFromServiceLoader;
 
@@ -70,13 +71,19 @@ public final class LogbackUtils {
      * {@link Configurator} service, the {@code logback.configurationFile} JVM system property is
      * not set, and neither {@code logback-test.xml} nor {@code logback.xml} is on the classpath.
      * </p>
+     * <p>
+     * This method fails when a file that it reads itself cannot be parsed, be it the location set in
+     * Micronaut configuration or the {@code logback.xml} in the working directory. It does not fail
+     * when Logback finds the file: Logback reports the error the way it does at startup.
+     * </p>
      *
      * @param classLoader       The class loader to look up a location set in Micronaut configuration with
      * @param context           The Logger Context
      * @param configurationFile The {@code logback.configurationFile} property of the Micronaut configuration, if any
      * @param loggerConfig      The {@code logger.config} property of the Micronaut configuration, if any
-     * @throws LoggingSystemException if the location set in Micronaut configuration does not exist, or
-     *                                if Logback fails to configure the context
+     * @throws LoggingSystemException if the location set in Micronaut configuration does not exist, if
+     *                                that location or the {@code logback.xml} in the working directory
+     *                                cannot be parsed, or if Logback fails to configure the context
      * @since 5.3.0
      */
     public static void configure(ClassLoader classLoader,
@@ -88,9 +95,12 @@ public final class LogbackUtils {
     }
 
     /**
+     * Visible for testing: production code goes through the public method, which passes the class
+     * loader that loaded Logback. Only tests call this overload directly, to make Logback's lookup
+     * see {@link Configurator} services and default files that are not on their classpath.
+     *
      * @param classLoader        The class loader to look up a location set in Micronaut configuration with
-     * @param logbackClassLoader The class loader that Logback's own lookup uses. Tests pass one that holds
-     *                           {@link Configurator} service entries
+     * @param logbackClassLoader The class loader that Logback's own lookup uses
      * @param context            The Logger Context
      * @param configurationFile  The {@code logback.configurationFile} property of the Micronaut configuration, if any
      * @param loggerConfig       The {@code logger.config} property of the Micronaut configuration, if any
@@ -173,7 +183,10 @@ public final class LogbackUtils {
     /**
      * Logback's own lookup searches only the classpath for the default file names, whereas this class
      * has always fallen back to a {@code logback.xml} file in the working directory. That fallback is
-     * kept for the case it applied to, which is that nothing else selects a configuration.
+     * kept for the case that nothing else selects a configuration. The previous versions of this class
+     * never looked for {@code logback-test.xml}, so they also used the file in the working directory
+     * when only {@code logback-test.xml} was on the classpath. Logback's lookup finds it, so it now
+     * takes precedence.
      *
      * @param logbackClassLoader The class loader that Logback's own lookup uses
      * @return The {@code logback.xml} file in the working directory, if it exists and no
@@ -188,10 +201,23 @@ public final class LogbackUtils {
             || System.getProperty(ClassicConstants.CONFIG_FILE_PROPERTY) != null
             || logbackClassLoader.getResource(ClassicConstants.TEST_AUTOCONFIG_FILE) != null
             || logbackClassLoader.getResource(ClassicConstants.AUTOCONFIG_FILE) != null
-            || !loadFromServiceLoader(Configurator.class, logbackClassLoader).isEmpty()) {
+            || hasConfiguratorService(logbackClassLoader)) {
             return null;
         }
         return file.toURI().toURL();
+    }
+
+    /**
+     * @param logbackClassLoader The class loader that Logback's own lookup uses
+     * @return Whether that lookup finds a {@link Configurator} service
+     */
+    private static boolean hasConfiguratorService(ClassLoader logbackClassLoader) {
+        // The same lookup as Logback's ClassicEnvUtil.loadFromServiceLoader, which runs next when there is a
+        // service, except that the stream does not instantiate the services. With loadFromServiceLoader here
+        // as well, a refresh would instantiate each of them twice.
+        @SuppressWarnings("NoReflection")
+        boolean found = ServiceLoader.load(Configurator.class, logbackClassLoader).stream().findAny().isPresent();
+        return found;
     }
 
     /**

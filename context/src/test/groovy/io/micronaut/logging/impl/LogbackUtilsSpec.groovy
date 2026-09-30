@@ -7,6 +7,7 @@ import ch.qos.logback.classic.spi.Configurator
 import ch.qos.logback.classic.spi.ConfiguratorRank
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.LogbackException
+import ch.qos.logback.core.joran.spi.JoranException
 import ch.qos.logback.core.read.ListAppender
 import ch.qos.logback.core.spi.ContextAwareBase
 import io.micronaut.logging.LoggingSystemException
@@ -25,7 +26,8 @@ import java.nio.file.Path
  * <p>
  * Logback's startup looks the {@link Configurator} services up with the class loader that loaded Logback,
  * and so does the public {@code configure}. These features therefore go through its package-private
- * overload, which takes that class loader.
+ * overload, which takes that class loader. The public method differs from it by that one argument, and
+ * the feature about the class loader that loaded Logback is the one that goes through it.
  */
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
 @RestoreSystemProperties
@@ -33,6 +35,7 @@ class LogbackUtilsSpec extends Specification {
 
     private static final String CUSTOM = 'custom-logback.xml'
     private static final String MISSING = 'missing-logback.xml'
+    private static final String BROKEN = 'broken-logback.xml'
 
     @TempDir
     Path dir
@@ -134,6 +137,24 @@ class LogbackUtilsSpec extends Specification {
         configurationFile | loggerConfig
         MISSING           | null
         null              | MISSING
+    }
+
+    void "a location set only in Micronaut configuration that cannot be parsed fails"() {
+        given:
+        Files.writeString(dir.resolve(BROKEN), '<configuration><appender name="BROKEN"')
+
+        when:
+        configure([], location(configurationFile), location(loggerConfig))
+
+        then:
+        LoggingSystemException e = thrown()
+        e.message == 'Error while refreshing Logback'
+        e.cause instanceof JoranException
+
+        where:
+        configurationFile | loggerConfig
+        BROKEN            | null
+        null              | BROKEN
     }
 
     private String location(String name) {

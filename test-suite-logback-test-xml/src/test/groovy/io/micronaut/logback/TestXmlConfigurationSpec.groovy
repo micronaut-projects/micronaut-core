@@ -14,6 +14,9 @@ import spock.lang.Specification
  * process-global {@link LoggerContext}, which starts as whatever Logback's startup made of this module's
  * classpath, here one with both {@code logback-test.xml} and {@code logback.xml}. A second spec in this
  * module would share that state and make the result depend on the order of the specs.
+ * <p>
+ * The module directory, which is the working directory of the tests, holds a third {@code logback.xml}. The
+ * refresh falls back to a file there only when none is on the classpath, so it must not be used either.
  */
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
 @See("https://logback.qos.ch/manual/configuration.html#auto_configuration")
@@ -34,6 +37,9 @@ class TestXmlConfigurationSpec extends Specification {
         rootAppenders() == ['TEST']
         loggerContext.getLogger("from.test").level == Level.TRACE
         loggerContext.getLogger("from.main").level == null
+
+        and: 'the logback.xml in the working directory is not used'
+        loggerContext.getLogger("from.working.directory").level == null
 
         and: 'custom levels are still respected'
         loggerContext.getLogger("app.customisation").level == Level.DEBUG
