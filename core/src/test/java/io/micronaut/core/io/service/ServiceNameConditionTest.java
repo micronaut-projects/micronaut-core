@@ -53,7 +53,7 @@ class ServiceNameConditionTest {
     }
 
     @Test
-    void theNamesOfMetaInfServicesEntriesAreStrippedAsServiceLoaderDoes() throws IOException {
+    void theConditionIsTestedOnTheStrippedNamesOfMetaInfServicesEntries() throws IOException {
         try (URLClassLoader classLoader = servicesClassLoader()) {
             List<String> testedNames = new CopyOnWriteArrayList<>();
             Predicate<String> condition = name -> {
@@ -64,7 +64,8 @@ class ServiceNameConditionTest {
             assertEquals(List.of(A, B, C, D), sortedNames(SoftServiceLoader.load(NamedService.class, classLoader, condition).collectAll()));
             // neither the comment nor the whitespace around a name is part of what the condition is tested on
             assertEquals(List.of(A, B, C, D), testedNames.stream().sorted().toList());
-            // java.util.ServiceLoader reads the same names from the META-INF/services file
+            // java.util.ServiceLoader reads the same names from this META-INF/services file, where the whitespace
+            // around the names is spaces and tabs
             assertEquals(List.of(A, B), ServiceLoader.load(NamedService.class, classLoader).stream()
                 .map(provider -> provider.type().getName())
                 .sorted()

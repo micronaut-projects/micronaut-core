@@ -261,7 +261,8 @@ final class ServiceScanner<S> {
                         if (line == null) {
                             break;
                         }
-                        // as java.util.ServiceLoader does: drop the comment, then the whitespace around the name
+                        // Like java.util.ServiceLoader: drop the comment, then the whitespace around the name.
+                        // ServiceLoader calls trim() where this calls strip(): the same for spaces and tabs.
                         int i = line.indexOf('#');
                         if (i > -1) {
                             line = line.substring(0, i);
