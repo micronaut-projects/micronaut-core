@@ -414,7 +414,7 @@ public interface BeanDefinitionRegistry {
      * @param beanType       The potentially parameterized bean type to resolve the definition as
      * @param <T>            The concrete type
      * @return The bean registration
-     * @throws NoSuchBeanException if the definition is not a candidate for the bean type, or produced no bean
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type
      * @since 5.3.0
      */
     default <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition, Argument<T> beanType) {

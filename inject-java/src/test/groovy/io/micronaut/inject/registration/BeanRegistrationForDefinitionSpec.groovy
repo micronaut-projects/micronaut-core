@@ -3,9 +3,11 @@ package io.micronaut.inject.registration
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanDefinitionRegistry
 import io.micronaut.context.BeanProvider
+import io.micronaut.context.BeanResolutionCustomizer
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.BeanDefinition
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
@@ -129,6 +131,37 @@ class BeanRegistrationForDefinitionSpec extends Specification {
         then:
         thrown(NoSuchBeanException)
         ScopedService.created == 0
+    }
+
+    void "a nullable definition that produces no bean resolves to a registration without one"() {
+        when:
+        def registration = context.getBeanRegistration(context.getBeanDefinition(NullableBox), Argument.of(NullableBox))
+
+        then:
+        registration.bean == null
+    }
+
+    void "the resolution customizer replaces the bean of a definition that produces none"() {
+        given:
+        NullableBox replacement = new NullableBox()
+        ApplicationContext customized = ApplicationContext.builder()
+                .properties("spec": getClass().getSimpleName())
+                .beanResolutionCustomizer(new BeanResolutionCustomizer() {
+                    @Override
+                    Optional<?> resolveNullBean(Argument<?> requestedBeanType, Argument<?> resolvedBeanType, BeanDefinition<?> beanDefinition) {
+                        return requestedBeanType.type == NullableBox ? Optional.of(replacement) : Optional.empty()
+                    }
+                })
+                .start()
+
+        when:
+        def registration = customized.getBeanRegistration(customized.getBeanDefinition(NullableBox), Argument.of(NullableBox))
+
+        then:
+        registration.bean.is(replacement)
+
+        cleanup:
+        customized.close()
     }
 
     void "a registry that does not implement it narrows a lookup of the type to the definition"() {

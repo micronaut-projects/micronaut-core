@@ -625,13 +625,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!isInjectableCandidate(resolvedBeanType, beanDefinition)) {
             throw new NoSuchBeanException(beanType, null, "The bean definition [" + beanDefinition + "] is not a candidate for that type.");
         }
-        Qualifier<T> qualifier = beanDefinition.getDeclaredQualifier();
-        BeanRegistration<T> registration = resolveBeanRegistration(null, beanDefinition, resolvedBeanType, qualifier);
+        BeanRegistration<T> registration = resolveBeanRegistration(null, beanDefinition, resolvedBeanType, beanDefinition.getDeclaredQualifier());
         if (registration.bean == null) {
+            // only a nullable definition gets here: any other fails to instantiate when it produces no bean
             registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
-            if (registration.bean == null && !isNullableBeanDefinition(registration.beanDefinition)) {
-                throw newNoSuchBeanException(null, beanType, qualifier, null);
-            }
         }
         return registration;
     }
