@@ -167,6 +167,7 @@ class BeanRegistrationForDefinitionSpec extends Specification {
     void "a definition of an implementation is resolved as an interface from Java without a cast"() {
         expect:
         JavaCaller.resolveAsInterface(context) instanceof StringBox
+        JavaCaller.resolveAsSameType(context, context.getBeanDefinition(StringBox), Argument.of(StringBox)) instanceof StringBox
     }
 
     void "a registry that does not implement it resolves a definition of a custom scope to one instance"() {
