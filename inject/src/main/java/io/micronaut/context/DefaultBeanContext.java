@@ -616,9 +616,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition, Argument<T> beanType) {
-        ArgumentUtils.requireNonNull("beanDefinition", beanDefinition);
+    @SuppressWarnings("unchecked")
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
+        ArgumentUtils.requireNonNull("definition", definition);
         ArgumentUtils.requireNonNull("beanType", beanType);
+        // resolved as the requested type, of which the definition's own type is a subtype
+        BeanDefinition<T> beanDefinition = (BeanDefinition<T>) definition;
         // the definition is already chosen: only whether it is a candidate for the type is checked, as the lookup
         // would check it, and the candidate lookup and its caches are skipped
         Argument<T> resolvedBeanType = resolveCandidateBeanType(beanType, beanDefinition);

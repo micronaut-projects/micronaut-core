@@ -23,14 +23,12 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanType;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * <p>Core bean definition registry interface containing methods to find {@link BeanDefinition} instances.</p>
@@ -407,8 +405,12 @@ public interface BeanDefinitionRegistry {
      * the one of {@link BeanProvider}, sees the type arguments of the given bean type rather than those of its own
      * type.</p>
      *
-     * <p>The default narrows a lookup of the bean type to the definition. {@link DefaultBeanContext} resolves the
-     * definition directly.</p>
+     * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
+     * interface it implements.</p>
+     *
+     * <p>The default narrows a lookup of the bean type to the definition, with a qualifier that is equal for equal
+     * definitions, so a scope that keys its beans by qualifier holds one bean however often the definition is
+     * resolved. {@link DefaultBeanContext} resolves the definition directly.</p>
      *
      * @param beanDefinition The bean definition
      * @param beanType       The potentially parameterized bean type to resolve the definition as
@@ -417,15 +419,10 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException if the definition is not a candidate for the bean type
      * @since 5.3.0
      */
-    default <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition, Argument<T> beanType) {
+    default <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType) {
         Objects.requireNonNull(beanDefinition, "Bean definition cannot be null");
         Objects.requireNonNull(beanType, "Bean type cannot be null");
-        return getBeanRegistration(beanType, new Qualifier<>() {
-            @Override
-            public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> type, Stream<BT> candidates) {
-                return candidates.filter(beanDefinition::equals);
-            }
-        });
+        return getBeanRegistration(beanType, new BeanDefinitionQualifier<>(beanDefinition));
     }
 
     /**

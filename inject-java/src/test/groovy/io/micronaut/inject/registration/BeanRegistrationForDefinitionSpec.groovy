@@ -164,6 +164,31 @@ class BeanRegistrationForDefinitionSpec extends Specification {
         customized.close()
     }
 
+    void "a definition of an implementation is resolved as an interface from Java without a cast"() {
+        expect:
+        JavaCaller.resolveAsInterface(context) instanceof StringBox
+    }
+
+    void "a registry that does not implement it resolves a definition of a custom scope to one instance"() {
+        given:
+        BeanDefinitionRegistry registry = (BeanDefinitionRegistry) Proxy.newProxyInstance(
+                getClass().classLoader,
+                [BeanDefinitionRegistry] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    method.isDefault() ? InvocationHandler.invokeDefault(proxy, method, args) : method.invoke(context, args)
+                } as InvocationHandler
+        )
+        def definition = context.getBeanDefinition(ScopedService)
+
+        when:
+        def first = registry.getBeanRegistration(definition, Argument.of(ScopedService))
+        def second = registry.getBeanRegistration(definition, Argument.of(ScopedService))
+
+        then:
+        first.bean.is(second.bean)
+        ScopedService.created == 1
+    }
+
     void "a registry that does not implement it narrows a lookup of the type to the definition"() {
         given:
         BeanDefinitionRegistry registry = (BeanDefinitionRegistry) Proxy.newProxyInstance(
