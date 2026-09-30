@@ -733,6 +733,47 @@ public final class PythonCoercion {
     }
 
     /**
+     * Coerce the dependencies a pooled bean is constructed with into a context.
+     *
+     * <p>As {@link #coerceArgumentsToContext} except for a dependency that is a Python bean of a
+     * single context: a singleton, or anything else that is not pooled. Such a bean cannot be
+     * reconstructed elsewhere -- there is one Python object and it belongs to its own context -- so
+     * the Java wrapper is passed instead, and calls through it return to the context that owns it.
+     * Rebuilding it is not merely unsupported, it is wrong: two contexts would hold two objects
+     * where the application asked for one.
+     *
+     * <p>This is the same choice module injection makes for the same reason, and it is what the
+     * compile-time warning about a pooled type depending on a singleton Python bean is naming: the
+     * dependency works, and the work behind it runs in one context however many the pool has.
+     *
+     * @param context The target context
+     * @param args The dependencies, already resolved by injection
+     * @return The arguments to construct with
+     */
+    public static Object[] coerceDependenciesToContext(Context context, Object[] args) {
+        Object[] pinned = null;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof ValueCoercible && !(args[i] instanceof PooledValueCoercible)) {
+                if (pinned == null) {
+                    pinned = args.clone();
+                }
+                // a placeholder the coercion leaves alone, replaced with the wrapper below
+                pinned[i] = null;
+            }
+        }
+        if (pinned == null) {
+            return coerceArgumentsToContext(context, args);
+        }
+        Object[] coerced = coerceArgumentsToContext(context, pinned);
+        for (int i = 0; i < args.length; i++) {
+            if (pinned[i] == null && args[i] != null) {
+                coerced[i] = args[i];
+            }
+        }
+        return coerced;
+    }
+
+    /**
      * The Python object standing in for an AOP proxy of a Python class.
      * <p>
      * A generated proxy of a Python class (the scoped proxy of a {@code @Refreshable} factory bean, for

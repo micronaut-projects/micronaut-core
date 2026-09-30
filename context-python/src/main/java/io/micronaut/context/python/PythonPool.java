@@ -289,6 +289,85 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     /**
+     * @return The application context the pool was built with
+     */
+    ApplicationContext applicationContext() {
+        return applicationContext;
+    }
+
+    /**
+     * Borrow a context, hand it to the callback, and release it after the callback completes.
+     *
+     * <p>For a caller that resolves its own value in the context rather than a class cached by
+     * the pool: a pooled bean with constructor arguments owns its per-context instances, because
+     * the pool's cache is keyed by class and two such beans of one class can hold different
+     * dependencies.
+     *
+     * @param fn The callback that receives the borrowed context
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    <T> T withLeasedContext(java.util.function.Function<Context, T> fn) {
+        return inContext(fn);
+    }
+
+    /**
+     * Runs a callback against a context, reusing the one this thread is already executing in
+     * rather than borrowing a second.
+     *
+     * <p>Borrowing while holding is a deadlock, not an inefficiency: every caller ends up holding
+     * one context and waiting for another, and the contexts they wait for are the ones they hold.
+     * It is also wrong before it is slow -- a value belongs to the context it was created in, so
+     * host code reached from guest code has to answer in the context that called it.
+     *
+     * <p>Every leasing path goes through here or {@link #inContextUntilComplete}, so a new caller
+     * cannot reintroduce the deadlock by forgetting the check.
+     *
+     * @param fn The callback that receives the context
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    private <T> T inContext(java.util.function.Function<Context, T> fn) {
+        Context entered = PythonContextRegistry.currentContext();
+        if (entered != null) {
+            return fn.apply(entered);
+        }
+        Context c = borrow();
+        try {
+            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(c));
+        } finally {
+            release(c);
+        }
+    }
+
+    /**
+     * {@link #inContext} for a callback returning a stage, which keeps the lease until the stage
+     * completes. A reused context is not leased: it belongs to the caller's frame, as it does on
+     * the event-loop path.
+     *
+     * @param fn The callback that receives the context and returns the stage
+     * @return The stage
+     */
+    private CompletionStage<?> inContextUntilComplete(Function<Context, CompletionStage<?>> fn) {
+        Context entered = PythonContextRegistry.currentContext();
+        if (entered != null) {
+            return fn.apply(entered);
+        }
+        return leaseUntilComplete(fn);
+    }
+
+    /**
+     * Borrow a context and keep it leased until the stage the callback returns completes; see
+     * {@link #withLeasedContext} and {@link #withClassUntilComplete}.
+     *
+     * @param fn The callback that receives the borrowed context and returns the stage
+     * @return The stage
+     */
+    CompletionStage<?> withLeasedContextUntilComplete(Function<Context, CompletionStage<?>> fn) {
+        return inContextUntilComplete(fn);
+    }
+
+    /**
      * Borrow a context, resolve a cached class value in that context, and release the context after the callback completes.
      *
      * @param classReference The Python class reference
@@ -297,12 +376,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The callback result
      */
     <T> T withClass(PythonContextRuntime.PythonClassReference classReference, java.util.function.Function<Value, T> fn) {
-        Context c = borrow();
-        try {
-            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateClass(c, classReference)));
-        } finally {
-            release(c);
-        }
+        return inContext(c -> fn.apply(getOrCreateClass(c, classReference)));
     }
 
     /**
@@ -316,12 +390,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The callback result
      */
     <T> T withScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
-        Context c = borrow();
-        try {
-            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
-        } finally {
-            release(c);
-        }
+        return inContext(c -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
     }
 
     /**
@@ -336,7 +405,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The stage
      */
     CompletionStage<?> withClassUntilComplete(PythonContextRuntime.PythonClassReference classReference, Function<Value, CompletionStage<?>> fn) {
-        return leaseUntilComplete(c -> fn.apply(getOrCreateClass(c, classReference)));
+        return inContextUntilComplete(c -> fn.apply(getOrCreateClass(c, classReference)));
     }
 
     /**
@@ -349,7 +418,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The stage
      */
     CompletionStage<?> withScriptUntilComplete(String packageName, String scriptName, Function<Value, CompletionStage<?>> fn) {
-        return leaseUntilComplete(c -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
+        return inContextUntilComplete(c -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
     }
 
     private CompletionStage<?> leaseUntilComplete(Function<Context, CompletionStage<?>> fn) {
@@ -382,12 +451,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The callback result
      */
     <T> T withValue(String expression, java.util.function.Function<Value, T> fn) {
-        Context c = borrow();
-        try {
-            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateValue(c, expression)));
-        } finally {
-            release(c);
-        }
+        return inContext(c -> fn.apply(getOrCreateValue(c, expression)));
     }
 
     /**

@@ -126,7 +126,7 @@ final class PythonContextRegistry {
                 listeners = List.copyOf(contextState.noContextListeners);
                 // executions still in flight leave the aggregate now; their exit finds no state
                 ACTIVE_EXECUTIONS.addAndGet(-contextState.activeExecutions);
-                contextState.clear();
+                contextState.clear(context);
             } else {
                 listeners = List.of();
             }
@@ -168,7 +168,7 @@ final class PythonContextRegistry {
             ContextState state = CONTEXT_STATES.remove(context);
             if (state != null) {
                 ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
-                state.clear();
+                state.clear(context);
             }
         }
     }
@@ -291,6 +291,24 @@ final class PythonContextRegistry {
             return run.call();
         }
         return ScopedValue.where(CURRENT_EXECUTION, new ExecutionFrame()).call(run);
+    }
+
+    /**
+     * The context this thread is already executing in, innermost first, or {@code null}.
+     *
+     * <p>A value belongs to the context it was created in, so host code reached from guest code has
+     * to resolve a value in the context that called it rather than choose one. Choosing is not merely
+     * wasteful: taking a second context from the pool while holding one deadlocks, because the
+     * borrow waits for a context that the waiting threads are themselves holding.
+     *
+     * @return The innermost entered context, or {@code null} when this thread is not in one
+     */
+    static @Nullable Context currentContext() {
+        if (!CURRENT_EXECUTION.isBound()) {
+            return null;
+        }
+        List<Context> contexts = CURRENT_EXECUTION.get().contexts;
+        return contexts.isEmpty() ? null : contexts.get(contexts.size() - 1);
     }
 
     private static <T, X extends Throwable> T runEnteredExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
@@ -432,7 +450,7 @@ final class PythonContextRegistry {
                 if (state != null && state == snapshot.get(context)) {
                     CONTEXT_STATES.remove(context);
                     ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
-                    state.clear();
+                    state.clear(context);
                     dropped++;
                 }
             }
@@ -788,6 +806,17 @@ final class PythonContextRegistry {
         final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
+        /**
+         * The pooled beans that have an instance in this context, so that closing it can tell them to
+         * drop it. The instances themselves live on the bean, which is what makes a collected bean take
+         * its instances with it; this is the other half, and neither side can be weak on its own,
+         * because a stored instance reaches its bean (through the host-object back-reference) and a
+         * bean reaches the contexts it has served.
+         *
+         * <p>Weakly held, so a prototype bean collected while this context lives on is not kept
+         * reachable by having been served here.
+         */
+        final Set<PythonPooledInstance> pooledHolders = Collections.newSetFromMap(new WeakHashMap<>());
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
@@ -811,7 +840,15 @@ final class PythonContextRegistry {
         /** Set once a close listener is registered: no new outermost execution may start. */
         private boolean closing;
 
-        private void clear() {
+        private void clear(Context owner) {
+            // tell each pooled bean to forget this context before the state goes. A holder's map is a
+            // ConcurrentHashMap, so this takes no monitor: clear() runs under the registry lock, and
+            // taking a bean's lock here while a thread holding that bean's lock waits for the registry
+            // lock is the deadlock this ordering avoids.
+            for (PythonPooledInstance holder : List.copyOf(pooledHolders)) {
+                holder.forget(owner);
+            }
+            pooledHolders.clear();
             asyncMembers.clear();
             asyncConstructorArguments.clear();
             asyncInstances.clear();
