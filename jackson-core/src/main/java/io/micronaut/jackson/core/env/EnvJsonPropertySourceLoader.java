@@ -19,7 +19,6 @@ import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
-import io.micronaut.json.env.JsonPropertySourceLoader;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -35,7 +34,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
+public class EnvJsonPropertySourceLoader extends io.micronaut.json.env.JsonPropertySourceLoader {
 
     /**
      * Position for the system property source loader in the chain.
