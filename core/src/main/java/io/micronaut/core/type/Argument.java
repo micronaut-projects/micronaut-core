@@ -647,7 +647,9 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * NOTE: This method should be avoided as it does use the reflection to retrieve the type parameter names.
      *
      * <p>Each class given is a type resolved in place of the type's own variable, and is a placeholder named after
-     * that variable which says it is {@link GenericPlaceholder#isResolved() resolved}.</p>
+     * that variable which says it is {@link GenericPlaceholder#isResolved() resolved}. It records no bounds of the
+     * variable, so {@link GenericPlaceholder#getBounds()} answers the class given rather than what the variable
+     * declares.</p>
      *
      * @param type               The type
      * @param annotationMetadata The annotation metadata

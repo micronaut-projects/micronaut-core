@@ -79,13 +79,16 @@ public interface GenericPlaceholder<T> extends Argument<T> {
      * {@link Argument#of(Class, io.micronaut.core.annotation.AnnotationMetadata, Class[])} builds one for each
      * class it is given, and a processor may compile the {@code Integer} that {@code class Sub extends
      * Base<Integer>} puts in place of {@code T} into a placeholder named {@code T}. Such a placeholder answers
-     * {@code true} here: {@link #getType()} is the type it was resolved to, while {@link #getVariableName()} and
-     * {@link #getBounds()} still describe the variable it was resolved in place of. A consumer that wants the
-     * type reads {@link #getType()}, one that wants the declaration keeps the variable.</p>
+     * {@code true} here: {@link #getType()} is the type it was resolved to, and {@link #getVariableName()} names
+     * the variable it was resolved in place of. {@link #getBounds()} are that variable's bounds only where they were
+     * recorded, as the processors do; a resolved placeholder built from a class records none, and answers the
+     * resolved type. A consumer that wants the type reads {@link #getType()}, one that wants the declaration keeps
+     * the variable.</p>
      *
      * <p>{@link #isTypeVariable()}, {@link #equals(Object)}, {@link #equalsType(Argument)} and
-     * {@link #typeHashCode()} do not consider it. A placeholder compiled before this was recorded, or built by
-     * hand with {@link Argument#ofTypeVariable(Class, String)}, answers {@code false}.</p>
+     * {@link #typeHashCode()} do not consider it. {@code false} is not proof that the variable is unresolved: a
+     * placeholder compiled before this was recorded answers {@code false} whatever it holds, and so does one built
+     * by hand with {@link Argument#ofTypeVariable(Class, String)}.</p>
      *
      * @return Whether the placeholder stands for a type resolved in place of its variable
      * @since 5.3.0

@@ -85,4 +85,14 @@ class ResolvedTypeVariableSpec extends Specification {
         array.bounds*.type == [Number]
         twoDimensions.bounds*.type == [Number]
     }
+
+    void "a placeholder built from a class records no bounds of the variable, and answers the class"() {
+        given:
+        GenericPlaceholder<?> variable = (GenericPlaceholder<?>) Argument.of(List, AnnotationMetadata.EMPTY_METADATA, [String] as Class[]).typeParameters[0]
+
+        expect:
+        variable.resolved
+        variable.variableName == 'E'
+        variable.bounds*.type == [String]
+    }
 }

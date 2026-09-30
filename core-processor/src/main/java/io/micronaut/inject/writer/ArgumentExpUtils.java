@@ -728,6 +728,16 @@ public final class ArgumentExpUtils {
     }
 
     /**
+     * Whether the element is a type variable left unresolved, the {@code T} of a factory method returning it.
+     *
+     * @param element The element
+     * @return Whether it is an unresolved variable
+     */
+    public static boolean isUnresolvedVariable(TypedElement element) {
+        return element instanceof GenericPlaceholderElement && unresolvedVariable(element) == element;
+    }
+
+    /**
      * The type variable an element stands for when it was left unresolved: the placeholder itself, or, for a
      * placeholder resolved to another placeholder, the one it ends at. A placeholder that ends at a type, and
      * an element that is not a placeholder, stand for no variable.
@@ -800,7 +810,10 @@ public final class ArgumentExpUtils {
             return List.of();
         }
         List<? extends ClassElement> bounds = placeholderElement.getBounds();
-        if (bounds.size() < 2 && placeholderElement.getResolved().isEmpty() && !namesTypeVariable(bounds, 0)) {
+        if (bounds.size() < 2 && placeholderElement.getResolved().isEmpty()
+            // a bound that is itself a variable, the U of T extends U, is not what the erasure says
+            && bounds.stream().noneMatch(GenericPlaceholderElement.class::isInstance)
+            && !namesTypeVariable(bounds, 0)) {
             return List.of();
         }
         return bounds;

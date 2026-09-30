@@ -226,14 +226,15 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Argument<T> getDeclaredBeanType() {
-        Argument<T> declared = InstantiatableBeanDefinition.super.getDeclaredBeanType();
-        if (precalculatedInfo.isRawBeanType && declared.getTypeParameters().length > 0) {
-            // the type arguments of a raw type are the ones its type declares, which only the rawness tells
-            // apart from a usage written with variables of the same names
-            return Argument.ofRawType(declared.getType(), null, declared.getAnnotationMetadata(), declared.getTypeParameters());
+        Argument<?> declared = precalculatedInfo.declaredBeanType;
+        if (declared != null) {
+            // written by the compiler where the type arguments cannot say it: a raw type, whose arguments are the
+            // ones its type declares, or a type variable, which erases to its bound
+            return (Argument<T>) declared.withAnnotationMetadata(getAnnotationMetadata());
         }
-        return declared;
+        return InstantiatableBeanDefinition.super.getDeclaredBeanType();
     }
 
     @Override
@@ -2782,14 +2783,14 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         boolean isContainerType,
         boolean requiresMethodProcessing,
         boolean hasEvaluatedExpressions,
-        boolean isRawBeanType
+        @Nullable Argument<?> declaredBeanType
     ) {
         public PrecalculatedInfo(Optional<String> scope, boolean isAbstract, boolean isIterable, boolean isSingleton, boolean isPrimary, boolean isConfigurationProperties, boolean isContainerType, boolean requiresMethodProcessing) {
             this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, false);
         }
 
         /**
-         * The info of a definition compiled before the rawness of its bean type was recorded.
+         * The info of a definition compiled before the declaration of its bean type was recorded.
          *
          * @param scope                     The scope
          * @param isAbstract                Whether the bean is abstract
@@ -2802,7 +2803,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
          * @param hasEvaluatedExpressions   Whether the bean has evaluated expressions
          */
         public PrecalculatedInfo(Optional<String> scope, boolean isAbstract, boolean isIterable, boolean isSingleton, boolean isPrimary, boolean isConfigurationProperties, boolean isContainerType, boolean requiresMethodProcessing, boolean hasEvaluatedExpressions) {
-            this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, hasEvaluatedExpressions, false);
+            this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, hasEvaluatedExpressions, null);
         }
     }
 

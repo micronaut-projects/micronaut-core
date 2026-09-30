@@ -125,9 +125,9 @@ class Generic<T extends Number> {}
         'test.Generic' | 'Generic<T extends Number>'
     }
 
-    void "a definition compiled before the rawness was recorded does not say its bean type is raw"() {
+    void "a definition compiled before the rawness was recorded records no declaration of its bean type"() {
         expect:
-        !new AbstractInitializableBeanDefinition.PrecalculatedInfo(Optional.empty(), false, false, false, false, false, false, false, false).isRawBeanType()
-        !new AbstractInitializableBeanDefinition.PrecalculatedInfo(Optional.empty(), false, false, false, false, false, false, false).isRawBeanType()
+        new AbstractInitializableBeanDefinition.PrecalculatedInfo(Optional.empty(), false, false, false, false, false, false, false, false).declaredBeanType() == null
+        new AbstractInitializableBeanDefinition.PrecalculatedInfo(Optional.empty(), false, false, false, false, false, false, false).declaredBeanType() == null
     }
 }
