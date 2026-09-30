@@ -22,8 +22,11 @@ import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -271,8 +274,9 @@ public final class PythonJavaBases {
         for (Method method : type.getDeclaredMethods()) {
             int modifiers = method.getModifiers();
             if (Modifier.isStatic(modifiers) || Modifier.isAbstract(modifiers) || method.isSynthetic() || method.isBridge()
-                || method.getTypeParameters().length > 0) {
-                // a generic method (toArray(T[])) is not reachable through the generated dispatcher either
+                || isErasedArrayOfOwnTypeVariable(method)) {
+                // a method taking an array of a type variable it declares (toArray(T[])) is not reachable
+                // through the generated dispatcher either
                 continue;
             }
             if (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)) {
@@ -283,6 +287,30 @@ public final class PythonJavaBases {
         for (Class<?> anInterface : type.getInterfaces()) {
             collectMethodNames(anInterface, names, visited);
         }
+    }
+
+    /**
+     * Whether a method takes an array of a type variable it declares itself, the one shape of a generic
+     * method the generated dispatcher leaves out because the erasure of such a parameter cannot be named.
+     */
+    private static boolean isErasedArrayOfOwnTypeVariable(Method method) {
+        TypeVariable<Method>[] declared = method.getTypeParameters();
+        if (declared.length == 0) {
+            return false;
+        }
+        for (Type parameterType : method.getGenericParameterTypes()) {
+            if (!(parameterType instanceof GenericArrayType arrayType)
+                || !(arrayType.getGenericComponentType() instanceof TypeVariable<?> component)) {
+                continue;
+            }
+            for (TypeVariable<Method> variable : declared) {
+                // by name: the generic declaration of a variable is not the same Method instance
+                if (variable.getName().equals(component.getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
