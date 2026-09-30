@@ -15,7 +15,6 @@
  */
 package io.micronaut.jackson.core.env
 
-import io.micronaut.json.env.JsonPropertySourceLoader
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
@@ -76,7 +75,7 @@ class JsonPropertySourceLoaderSpec extends Specification {
     void "test json property source loader"() {
         given:
         GroovyClassLoader gcl = new GroovyClassLoader()
-        gcl.addURL(JsonPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
+        gcl.addURL(io.micronaut.json.env.JsonPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
         Environment env = Environment.create(new ApplicationContextConfiguration() {
             @Override
             List<String> getEnvironments() {
