@@ -13,7 +13,7 @@ A failure during startup, the warm-up included, still exits with a non-zero stat
 
 WARNING: Never set `micronaut.application.training.enabled` or `MICRONAUT_APPLICATION_TRAINING_ENABLED` on a deployment target, whether in the configuration of the deployed application or in an environment variable shared by a platform or a cluster. The application would start, stop right away and exit with status 0, which most orchestrators read as a clean shutdown: the service restarts in a loop and nothing reports an error. The exit status has to stay 0 for the tools that write their output at exit, so the two warnings in the log are the only signal. Set the switch only in the build step that runs the training.
 
-The switch acts on the api:runtime.EmbeddedApplication[] of the application, such as the HTTP server or a messaging application. An application without one is not stopped: `Micronaut.run` logs a warning that the switch has no effect and returns as usual. If such an application starts non-daemon threads of its own, the training run does not end until they do, so the application has to stop them itself.
+The switch acts on the api:runtime.EmbeddedApplication[] of the application, such as the HTTP server or a messaging application. An application without one is not stopped: `Micronaut.run` logs a warning that says so and returns as usual. The beans that require the switch are still created, so a startup listener written for the training run still runs. If such an application starts non-daemon threads of its own, the training run does not end until they do, so the application has to stop them itself.
 
 To warm up the application before it stops, list the paths the HTTP server should send GET requests to itself:
 
@@ -32,7 +32,7 @@ micronaut:
 
 include::{includedir}configurationProperties/io.micronaut.http.server.TrainingWarmupConfiguration.adoc[]
 
-The warm-up runs after the other api:runtime.server.event.ServerStartupEvent[] listeners, for the server the application runs (not for other servers built with a server factory). It sends each path in order, `repeat` times, with `java.net.HttpURLConnection`, so no HTTP client is needed. `repeat` must be at least 1: a lower value fails the startup. The requests go to the configured `micronaut.server.host`, or to the loopback address when no host or a wildcard address such as `0.0.0.0` is set. The paths are sent as they are, so they include the context path if the server has one.
+The warm-up runs after the other api:runtime.server.event.ServerStartupEvent[] listeners, for the server the application runs (not for other servers built with a server factory). It sends each path in order, `repeat` times, with `java.net.HttpURLConnection`, so no HTTP client is needed. `repeat` must be at least 1: a lower value fails the training run, even when no paths are set. The requests go to the configured `micronaut.server.host`, or to the loopback address when no host or a wildcard address such as `0.0.0.0` is set. The paths are sent as they are, so they include the context path if the server has one.
 
 An I/O error or a response status of 500 or above fails the startup. A status from 400 to 499 does not: the warm-up logs a warning with the URL and the status, and the training run continues.
 

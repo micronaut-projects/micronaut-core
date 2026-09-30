@@ -312,6 +312,19 @@ class TrainingWarmupTest {
         assertFalse(child.output().contains("exiting with status 0"), child::output);
     }
 
+    @Test
+    @Tag(CHILD_JVM)
+    void repeatBelowOneExitsWithNonZeroEvenWithoutPaths() {
+        // No warm-up paths: the server still creates the warm-up and binds its settings, so an invalid one fails the run
+        ChildJvm child = ChildJvm.run(
+            "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true",
+            "-D" + REPEAT + "=0");
+
+        assertEquals(1, child.exitCode(), child::output);
+        assertTrue(child.output().contains(REPEAT + " must be at least 1 but was 0"), child::output);
+        assertFalse(child.output().contains("exiting with status 0"), child::output);
+    }
+
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/training-warmup")
     static class WarmupController {

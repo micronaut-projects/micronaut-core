@@ -224,7 +224,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
     /**
      * Says as soon as the switch is read that this JVM is a training run, so that a switch set by
-     * mistake on a deployment target is visible before the application stops itself.
+     * mistake on a deployment target is visible before the application stops itself. Without an
+     * {@link EmbeddedApplication} it says that nothing stops the application.
      *
      * @param environment The environment
      * @param hasEmbeddedApplication Whether the context has an {@link EmbeddedApplication} to stop
@@ -238,7 +239,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     + "Never set this property or {} on a deployment target",
                 ApplicationConfiguration.TRAINING_ENABLED, exitsAfterTrainingRun(environment) ? " and exits with status 0" : "", TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
         } else {
-            LOG.warn("Training run ({}=true): the switch has no effect, because there is no EmbeddedApplication to stop. The JVM exits when the application's own threads end",
+            // The beans that require the switch are still created: only the stop and the exit are missing
+            LOG.warn("Training run ({}=true): the application is not stopped, because it has no EmbeddedApplication. The JVM exits when the application's own threads end",
                 ApplicationConfiguration.TRAINING_ENABLED);
         }
     }

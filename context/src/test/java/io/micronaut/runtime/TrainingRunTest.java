@@ -22,6 +22,8 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.event.StartupEvent;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +58,7 @@ class TrainingRunTest {
     // Tests that start a child JVM with the test class path: a constrained run can exclude this tag
     private static final String CHILD_JVM = "child-jvm";
     private static final String SERVER = "training-run-test.server";
+    private static final String LISTENER = "training-run-test.listener";
     private static final String TRAINING_LOG = "Training run (" + ApplicationConfiguration.TRAINING_ENABLED + "=true)";
     private static final String ANNOUNCEMENT = TRAINING_LOG + ": this JVM is a training run and does not serve traffic.";
     private static final String DEPLOYMENT_WARNING = "Never set this property or MICRONAUT_APPLICATION_TRAINING_ENABLED on a deployment target";
@@ -67,6 +70,7 @@ class TrainingRunTest {
     void reset() {
         TestApplication.STARTED.set(0);
         TestApplication.STOPPED.set(0);
+        TrainingOnlyListener.STARTUPS.set(0);
         logs.start();
         micronautLogger().addAppender(logs);
     }
@@ -138,16 +142,18 @@ class TrainingRunTest {
     }
 
     @Test
-    void warnsThatTheSwitchHasNoEffectWithoutAnEmbeddedApplication() {
+    void warnsThatTheApplicationIsNotStoppedWithoutAnEmbeddedApplication() {
         try (ApplicationContext context = Micronaut.build(new String[0])
             .environments(Environment.TEST)
-            .properties(Map.<String, Object>of(ApplicationConfiguration.TRAINING_ENABLED, "true"))
+            .properties(Map.<String, Object>of(LISTENER, "true", ApplicationConfiguration.TRAINING_ENABLED, "true"))
             .start()) {
 
             assertTrue(context.isRunning());
             assertFalse(context.containsBean(EmbeddedApplication.class));
-            assertEquals(List.of(TRAINING_LOG + ": the switch has no effect, because there is no EmbeddedApplication to stop. "
+            assertEquals(List.of(TRAINING_LOG + ": the application is not stopped, because it has no EmbeddedApplication. "
                 + "The JVM exits when the application's own threads end"), warnings());
+            // Only the stop and the exit are missing: a bean that requires the switch still exists and has run
+            assertEquals(1, TrainingOnlyListener.STARTUPS.get());
         }
     }
 
@@ -156,13 +162,15 @@ class TrainingRunTest {
         // Not a server application, so start() returns without the switch
         try (ApplicationContext context = Micronaut.build(new String[0])
             .environments(Environment.TEST)
-            .properties(Map.<String, Object>of("spec.name", SPEC_NAME, SERVER, "false"))
+            .properties(Map.<String, Object>of("spec.name", SPEC_NAME, SERVER, "false", LISTENER, "true"))
             .start()) {
 
             assertTrue(context.isRunning());
             assertEquals(1, TestApplication.STARTED.get());
             assertEquals(0, TestApplication.STOPPED.get());
             assertEquals(List.of(), warnings());
+            assertFalse(context.containsBean(TrainingOnlyListener.class));
+            assertEquals(0, TrainingOnlyListener.STARTUPS.get());
         }
     }
 
@@ -251,6 +259,22 @@ class TrainingRunTest {
             STOPPED.incrementAndGet();
             System.out.println(STOPPED_MESSAGE);
             return this;
+        }
+    }
+
+    /**
+     * A bean that only exists during a training run, declared as the guide shows for a custom
+     * warm-up.
+     */
+    @Singleton
+    @Requires(property = LISTENER, value = "true")
+    @Requires(property = ApplicationConfiguration.TRAINING_ENABLED, pattern = "(?i)true")
+    static final class TrainingOnlyListener implements ApplicationEventListener<StartupEvent> {
+        static final AtomicInteger STARTUPS = new AtomicInteger();
+
+        @Override
+        public void onApplicationEvent(StartupEvent event) {
+            STARTUPS.incrementAndGet();
         }
     }
 
