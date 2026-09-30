@@ -103,8 +103,8 @@ final class DefaultFormData implements FormData {
             return Optional.empty();
         }
         Class<T> rawType = type.getType();
-        // a collection or an array gets every value of the field
-        boolean all = Iterable.class.isAssignableFrom(rawType) || rawType.isArray();
+        // a collection or an array gets every value of the field, and an Optional of one
+        boolean all = FormBinding.isMany(type);
         Argument<T> named = name.equals(type.getName()) ? type : Argument.of(rawType, name, type.getAnnotationMetadata(), type.getTypeParameters());
         return Optional.of(convert(named, all ? List.copyOf(values) : values.get(0)));
     }

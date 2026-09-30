@@ -278,6 +278,34 @@ public class FormArgumentsTest {
     }
 
     @Test
+    void anOptionalCollectionOfATextFieldGetsEveryValue() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Response response = call(server, HttpRequest.POST(CTL + "/tags", "tags=one&name=Fred&tags=two")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+            assertEquals(HttpStatus.OK, response.status(), response.body());
+            assertEquals("[one, two] [one, two] [one, two] [one, two]", response.body());
+            Response missing = call(server, HttpRequest.POST(CTL + "/tags", "name=Fred")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+            assertEquals(HttpStatus.OK, missing.status(), missing.body());
+            assertEquals("null empty null empty", missing.body());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void anOptionalCollectionOfATextFieldOfAMultipartFormGetsEveryValue() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody tags = MultipartBody.builder().addPart("tags", "one").addPart("name", "Fred").addPart("tags", "two").build();
+            Response response = call(server, multipart(CTL + "/tags", tags));
+            assertEquals(HttpStatus.OK, response.status(), response.body());
+            assertEquals("[one, two] [one, two] [one, two] [one, two]", response.body());
+            Response missing = call(server, multipart(CTL + "/tags", MultipartBody.builder().addPart("name", "Fred").build()));
+            assertEquals(HttpStatus.OK, missing.status(), missing.body());
+            assertEquals("null empty null empty", missing.body());
+        }
+    }
+
+    @Test
     @Tag("multipart")
     void fileIsReadAsText() throws IOException {
         try (ServerUnderTest server = server()) {
@@ -629,6 +657,20 @@ public class FormArgumentsTest {
         @Post(uri = "/text-reversed", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
         String textFieldsReversed(@Part("name") String name, String city, int age, FormData form) {
             return name + " " + city + " " + (age + 1) + " " + form.getString("name");
+        }
+
+        @Post(uri = "/tags", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String tags(FormData form,
+                    @Nullable @Part("tags") List<String> list,
+                    @Part("tags") Optional<List<String>> optionalList,
+                    @Part("tags") String @Nullable [] array,
+                    @Part("tags") Optional<String[]> optionalArray) {
+            return tagsResult(list, optionalList, array, optionalArray);
+        }
+
+        private static String tagsResult(@Nullable List<String> list, Optional<List<String>> optionalList, String @Nullable [] array, Optional<String[]> optionalArray) {
+            return list + " " + optionalList.map(List::toString).orElse("empty")
+                + " " + (array == null ? "null" : Arrays.toString(array)) + " " + optionalArray.map(Arrays::toString).orElse("empty");
         }
 
         @Post(uri = "/part", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)

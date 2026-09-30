@@ -121,6 +121,14 @@ class DefaultFormDataTest {
     }
 
     @Test
+    void anOptionalOfACollectionGetsEveryValue() {
+        DefaultFormData form = form(Map.of());
+        assertEquals(Optional.of(List.of(42, 43)), form.get("age", Argument.of(Optional.class, Argument.listOf(Integer.class))));
+        assertArrayEquals(new Integer[] {42, 43}, (Integer[]) form.get("age", Argument.of(Optional.class, Argument.of(Integer[].class))).orElseThrow());
+        assertEquals(Optional.of(42), form.get("age", Argument.of(Optional.class, Argument.of(Integer.class))));
+    }
+
+    @Test
     void missingAndUnconvertibleFields() {
         DefaultFormData form = form(Map.of());
         FormFieldException missing = assertThrows(FormFieldException.class, () -> form.getInt("city"));

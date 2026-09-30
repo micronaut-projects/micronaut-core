@@ -117,8 +117,9 @@ public interface FormData extends NamedValues, AutoCloseable {
 
     /**
      * A required text field converted to a type, with its type arguments: a collection or an
-     * array type, e.g. {@code Argument.listOf(Integer.class)}, gets every value of the field, in
-     * the submitted order; any other type gets the first value, like {@link #get(String, Class)}.
+     * array type, e.g. {@code Argument.listOf(Integer.class)}, or an {@code Optional} of one, gets
+     * every value of the field, in the submitted order; any other type gets the first value, like
+     * {@link #get(String, Class)}.
      *
      * @param name The name of the field
      * @param type The type
@@ -149,7 +150,9 @@ public interface FormData extends NamedValues, AutoCloseable {
             return Optional.empty();
         }
         Class<T> rawType = type.getType();
-        boolean all = Iterable.class.isAssignableFrom(rawType) || rawType.isArray();
+        // the type of the value of an Optional decides
+        Class<?> valueType = rawType == Optional.class ? type.getFirstTypeVariable().<Class<?>>map(Argument::getType).orElse(rawType) : rawType;
+        boolean all = Iterable.class.isAssignableFrom(valueType) || valueType.isArray();
         if (!all && type.getTypeParameters().length == 0) {
             return find(name, rawType);
         }

@@ -762,10 +762,25 @@ public final class FormBinding {
         if (values.isEmpty()) {
             return Optional.empty();
         }
-        Class<T> type = context.getArgument().getType();
-        boolean many = Iterable.class.isAssignableFrom(type) || type.isArray();
         // a single value is the first field of the name, like a field read by name
-        return conversionService.convert(many ? values : values.get(0), context);
+        return conversionService.convert(isMany(context.getArgument()) ? values : values.get(0), context);
+    }
+
+    /**
+     * @param argument The type a text field is converted to
+     * @return Whether the type gets every value of the field: a collection or an array, or an
+     * {@code Optional} of one
+     */
+    static boolean isMany(Argument<?> argument) {
+        Class<?> type = argument.getType();
+        if (type == Optional.class) {
+            Argument<?> value = argument.getFirstTypeVariable().orElse(null);
+            if (value == null) {
+                return false;
+            }
+            type = value.getType();
+        }
+        return Iterable.class.isAssignableFrom(type) || type.isArray();
     }
 
     static String name(Argument<?> argument) {

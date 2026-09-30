@@ -46,6 +46,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -372,6 +373,14 @@ public class FormFilterTest {
     }
 
     @Test
+    void aFilterReadsAnOptionalCollectionOfATextField() throws IOException {
+        try (ServerUnderTest server = server()) {
+            assertEquals("filter:[one, two] [one, two] [one, two]", call(server, urlEncoded("/optional-list", "tags=one&name=Fred&tags=two")).body());
+            assertEquals("filter:null empty empty", call(server, urlEncoded("/optional-list", "name=Fred")).body());
+        }
+    }
+
+    @Test
     @Tag("multipart")
     void aFilterArgumentCannotReadAFormThatIsStreamed() throws IOException {
         try (ServerUnderTest server = server()) {
@@ -549,6 +558,15 @@ public class FormFilterTest {
             request.setAttribute(SEEN, "filter:" + city.orElse("empty"));
         }
 
+        @RequestFilter("/optional-list")
+        void optionalList(HttpRequest<?> request,
+                          @Nullable @Part("tags") List<String> list,
+                          @Part("tags") Optional<List<String>> optionalList,
+                          @Part("tags") Optional<String[]> optionalArray) {
+            request.setAttribute(SEEN, "filter:" + list + " " + optionalList.map(List::toString).orElse("empty")
+                + " " + optionalArray.map(Arrays::toString).orElse("empty"));
+        }
+
         @RequestFilter("/nullable-text")
         void nullableText(HttpRequest<?> request, @Nullable @Part("city") String city) {
             request.setAttribute(SEEN, "filter:" + city);
@@ -593,6 +611,11 @@ public class FormFilterTest {
         @Post(uri = "/async-form-argument", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
         String asyncFormArgument(HttpRequest<?> request, FormData form) {
             return seen(request) + "|" + form.getString("name");
+        }
+
+        @Post(uri = "/optional-list", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        String optionalList(HttpRequest<?> request) {
+            return seen(request);
         }
 
         @Post(uri = "/cleared", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)

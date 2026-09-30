@@ -54,6 +54,13 @@ class FormDataDefaultsTest {
     }
 
     @Test
+    void anOptionalOfACollectionGetsEveryValue() {
+        assertEquals(Optional.of(List.of(42, 43)), FORM.get("age", Argument.of(Optional.class, Argument.listOf(Integer.class))));
+        assertArrayEquals(new Integer[] {42, 43}, (Integer[]) FORM.get("age", Argument.of(Optional.class, Argument.of(Integer[].class))).orElseThrow());
+        assertEquals(Optional.of(42), FORM.get("age", Argument.of(Optional.class, Argument.of(Integer.class))));
+    }
+
+    @Test
     void failures() {
         FormFieldException missing = assertThrows(FormFieldException.class, () -> FORM.get("city", Argument.listOf(Integer.class)));
         assertEquals("city", missing.getFieldName());
