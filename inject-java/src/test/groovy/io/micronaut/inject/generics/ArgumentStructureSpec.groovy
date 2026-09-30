@@ -87,12 +87,44 @@ class Other<T extends Payment, S extends Refundable & Payment, U extends Compara
     @Executable
     void other(List<T> recursive, List<S> several, List<U> none) {}
 }
+
+@Singleton
+class Linked<T extends U, U extends Comparable<U>> {
+
+    @Executable
+    void linked(T variable, List<T> list, U bound, Map<T, U> map, Map<U, T> reversed) {}
+}
+
+@Singleton
+class Mutual<X extends Comparable<Y>, Y extends Comparable<X>> {
+
+    @Executable
+    void mutual(X variable, List<X> list, Y other, Map<Y, X> map) {}
+}
+
+@Singleton
+class OneBound<T extends Comparable<U>, U extends Number> {
+
+    @Executable
+    void bounded(T variable, List<T> list, U bound) {}
+}
+
+@Singleton
+class TwoBounds<T extends Comparable<U>, U extends Number & Runnable> {
+
+    @Executable
+    void bounded(T variable, List<T> list, U bound) {}
+}
 """
 
     @Shared ClassLoader classLoader
     @Shared Map<String, Argument<?>> first
     @Shared Map<String, Argument<?>> second
     @Shared Map<String, Argument<?>> other
+    @Shared Map<String, Argument<?>> linked
+    @Shared Map<String, Argument<?>> oneBound
+    @Shared Map<String, Argument<?>> mutual
+    @Shared Map<String, Argument<?>> twoBounds
 
     def setupSpec() {
         classLoader = buildClassLoader('test.Bean', SOURCE)
@@ -100,6 +132,10 @@ class Other<T extends Payment, S extends Refundable & Payment, U extends Compara
         first = arguments(definition, 'first')
         second = arguments(definition, 'second')
         other = arguments(definitionOf('Other'), 'other')
+        linked = arguments(definitionOf('Linked'), 'linked')
+        oneBound = arguments(definitionOf('OneBound'), 'bounded')
+        mutual = arguments(definitionOf('Mutual'), 'mutual')
+        twoBounds = arguments(definitionOf('TwoBounds'), 'bounded')
     }
 
     private BeanDefinition<?> definitionOf(String simpleName) {
@@ -143,11 +179,11 @@ class Other<T extends Payment, S extends Refundable & Payment, U extends Compara
         'array'                        | 'String[]'                                      | false    | false    | false
         'arrayOfParameterized'         | 'List[]<String>'                                | false    | false    | true
         'arrayOfWildcards'             | 'List[]<? extends Number>'                      | false    | false    | true
-        'arrayOfRecursive'             | '(T extends Comparable<T extends Comparable<Object>>)[]'    | false    | false    | true
+        'arrayOfRecursive'             | '(T extends Comparable<T extends Comparable>)[]'    | false    | false    | true
         'arrayOfSeveral'               | '(S extends Payment & Refundable)[]'            | false    | false    | false
         'arrayOfNone'                  | '(U extends Object)[]'                          | false    | false    | false
         'arrayOfArrays'                | '(U extends Object)[][]'                        | false    | false    | false
-        'recursiveVariable'            | 'T extends Comparable<T extends Comparable<Object>>'        | false    | true     | true
+        'recursiveVariable'            | 'T extends Comparable<T extends Comparable>'        | false    | true     | true
         'severalVariable'              | 'S extends Payment & Refundable'                | false    | true     | false
         'noneVariable'                 | 'U extends Object'                              | false    | true     | false
         'type'                         | 'String'                                        | false    | false    | false
@@ -210,12 +246,11 @@ class Other<T extends Payment, S extends Refundable & Payment, U extends Compara
     }
 
     void "a variable with a recursive bound is the same type wherever it is written"() {
-        given: 'the bound of a variable is written out deeper where the variable is the parameter itself'
+        given:
         Argument<?> typeArgument = first.recursive.typeParameters[0]
         Argument<?> parameter = first.recursiveVariable
 
         expect:
-        render(typeArgument) != render(parameter)
         typeArgument.equalsStructure(parameter)
         parameter.equalsStructure(typeArgument)
         typeArgument.structureHashCode() == parameter.structureHashCode()
@@ -243,6 +278,61 @@ class Other<T extends Payment, S extends Refundable & Payment, U extends Compara
         first.recursiveNestedAndArray.typeParameters[1].componentType().equalsStructure(variable)
         first.recursiveThenNested.typeParameters[0].equalsStructure(variable)
         first.recursiveThenNested.typeParameters[1].equalsStructure(first.recursive)
+    }
+
+    void "a variable bounded by another variable is the same type wherever it is written"() {
+        given: 'T extends U, U extends Comparable<U>'
+        Argument<?> variable = linked.variable
+        Argument<?> bound = linked.bound
+
+        expect:
+        linked.list.typeParameters[0].equalsStructure(variable)
+        variable.equalsStructure(linked.list.typeParameters[0])
+        linked.list.typeParameters[0].structureHashCode() == variable.structureHashCode()
+
+        and: 'whichever of the two variables is written first'
+        linked.map.typeParameters[0].equalsStructure(variable)
+        linked.map.typeParameters[1].equalsStructure(bound)
+        linked.reversed.typeParameters[0].equalsStructure(bound)
+        linked.reversed.typeParameters[1].equalsStructure(variable)
+        linked.reversed.typeParameters[1].structureHashCode() == variable.structureHashCode()
+
+        and: 'the bound of T is the variable U'
+        ((GenericPlaceholder<?>) linked.list.typeParameters[0]).bounds[0].isUnresolvedTypeVariable()
+        ((GenericPlaceholder<?>) ((GenericPlaceholder<?>) variable).bounds[0]).variableName == 'U'
+    }
+
+    void "variables that bound each other are the same type wherever they are written"() {
+        expect: 'X extends Comparable<Y>, Y extends Comparable<X>'
+        mutual.list.typeParameters[0].equalsStructure(mutual.variable)
+        mutual.variable.equalsStructure(mutual.list.typeParameters[0])
+        mutual.list.typeParameters[0].structureHashCode() == mutual.variable.structureHashCode()
+        mutual.map.typeParameters[0].equalsStructure(mutual.other)
+        mutual.map.typeParameters[1].equalsStructure(mutual.variable)
+        mutual.map.typeParameters[1].structureHashCode() == mutual.variable.structureHashCode()
+        !mutual.variable.equalsStructure(mutual.other)
+    }
+
+    void "a variable named within the bounds of another keeps its own bounds"() {
+        given: 'T extends Comparable<U>, where U extends Number, and where U extends Number & Runnable'
+        Argument<?> one = oneBound.list.typeParameters[0]
+        Argument<?> two = twoBounds.list.typeParameters[0]
+
+        expect: 'the U within the bound of T is the U the class declares'
+        ((GenericPlaceholder<?>) two).bounds[0].typeParameters[0].equalsStructure(twoBounds.bound)
+        ((GenericPlaceholder<?>) ((GenericPlaceholder<?>) two).bounds[0].typeParameters[0]).bounds*.type == [Number, Runnable]
+        ((GenericPlaceholder<?>) one).bounds[0].typeParameters[0].equalsStructure(oneBound.bound)
+
+        and: 'so the two are different types, as a type argument and as the parameter itself'
+        !oneBound.list.equalsStructure(twoBounds.list)
+        !twoBounds.list.equalsStructure(oneBound.list)
+        !oneBound.variable.equalsStructure(twoBounds.variable)
+        !oneBound.bound.equalsStructure(twoBounds.bound)
+
+        and: 'and each is the same type wherever it is written'
+        one.equalsStructure(oneBound.variable)
+        two.equalsStructure(twoBounds.variable)
+        two.structureHashCode() == twoBounds.variable.structureHashCode()
     }
 
     void "a compiled argument is the same type as one built by hand without naming the type arguments"() {
@@ -296,7 +386,7 @@ class Other<T extends Payment, S extends Refundable & Payment, U extends Compara
         expect:
         component instanceof GenericPlaceholder
         render(component) == 'S extends Payment & Refundable'
-        render(first.arrayOfRecursive.componentType()) == 'T extends Comparable<T extends Comparable<Object>>'
+        render(first.arrayOfRecursive.componentType()) == 'T extends Comparable<T extends Comparable>'
         render(first.arrayOfArrays.componentType().componentType()) == 'U extends Object'
         first.arrayOfArrays.componentType().componentType().componentType() == null
     }
