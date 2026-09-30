@@ -33,7 +33,8 @@ import java.util.Optional;
  * threads or reactive continuations included.</p>
  *
  * @param method   The scheduled method
- * @param schedule The {@link Scheduled} annotation that triggered the invocation
+ * @param schedule The {@link Scheduled} annotation that triggered the invocation, with its expressions bound to
+ *                 the bean and the arguments of the call
  * @author Denis Stepanov
  * @since 5.3.0
  */

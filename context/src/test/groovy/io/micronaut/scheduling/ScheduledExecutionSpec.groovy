@@ -66,6 +66,21 @@ class ScheduledExecutionSpec extends Specification {
         context.close()
     }
 
+    void 'an expression of the schedule that reads the bean can be evaluated during the call'() {
+        given:
+        ApplicationContext context = ApplicationContext.run('spec.name': 'ScheduledExecutionSpec.condition')
+        Conditional task = context.getBean(Conditional)
+
+        expect:
+        new PollingConditions(timeout: 10).eventually {
+            task.seen == [true]
+        }
+        task.failure == null
+
+        cleanup:
+        context.close()
+    }
+
     void 'a call the application makes has no current execution'() {
         given:
         ApplicationContext context = ApplicationContext.run('spec.name': 'ScheduledExecutionSpec')
@@ -125,6 +140,28 @@ class ScheduledExecutionSpec extends Specification {
                 seen.afterOnTheSameThread = ScheduledExecution.current().isPresent()
                 executor.shutdown()
             } as Runnable, 1, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledExecutionSpec.condition')
+    static class Conditional {
+
+        final List<Boolean> seen = new CopyOnWriteArrayList<>()
+        volatile Throwable failure
+
+        boolean isEnabled() {
+            true
+        }
+
+        @Scheduled(initialDelay = '10ms', condition = '#{this.enabled}')
+        void run() {
+            try {
+                seen.add(ScheduledExecution.current().orElseThrow().schedule().booleanValue('condition').orElse(false))
+            } catch (Throwable e) {
+                failure = e
+                seen.add(false)
+            }
         }
     }
 }

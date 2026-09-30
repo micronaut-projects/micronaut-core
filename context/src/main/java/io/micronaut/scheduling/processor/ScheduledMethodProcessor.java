@@ -146,7 +146,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     if (shouldRun) {
                         // tells an interceptor of the method that the scheduler invoked it, and by which schedule
                         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty()
-                            .plus(new ScheduledExecution(method, scheduledAnnotation))
+                            .plus(new ScheduledExecution(method, finalAnnotationValue))
                             .propagate()) {
                             boundExecutable.invoke(bean);
                         } catch (Throwable e) {
