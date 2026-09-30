@@ -1973,7 +1973,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct) {
             return beanInstance.returning();
         }
-        return beanInstance.newLocal("instance", instanceVar -> {
+        // The instance is held as the bean type: an intercepted construction returns what the erased interface method
+        // declares, and `initialize` takes the bean type its definition is parameterized with
+        ExpressionDef typedInstance = beanTypeDef.equals(beanInstance.type()) ? beanInstance : beanInstance.cast(beanTypeDef);
+        return typedInstance.newLocal("instance", instanceVar -> {
             List<StatementDef> statements = new ArrayList<>();
             if (needsInjectMethod) {
                 statements.add(

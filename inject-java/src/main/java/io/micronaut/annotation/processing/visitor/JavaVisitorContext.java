@@ -206,7 +206,9 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
         this.filer = filer;
         this.postponedTypes = postponedTypes;
-        this.writeJavaSource = "true".equals(getOptions().get(MICRONAUT_PROCESSING_JAVA_SOURCE));
+        // Only this compilation's own options: TypeElementVisitorProcessor copies them into the system properties of
+        // a compiler daemon Gradle reuses, where the option of one module would otherwise be read by the next
+        this.writeJavaSource = "true".equals(VisitorContextUtils.getProcessorOptions(processingEnv).get(MICRONAUT_PROCESSING_JAVA_SOURCE));
     }
 
     @Override

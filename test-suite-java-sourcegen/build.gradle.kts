@@ -18,7 +18,12 @@ listOf(configurations.annotationProcessor, configurations.testAnnotationProcesso
     }
 }
 
+// Both compilers: a Java source of this suite is compiled by javac, and one under src/test/groovy by the Groovy
+// joint compilation, whose annotation processors run with their own options
 tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-Amicronaut.processing.java.source=true")
+}
+tasks.withType<GroovyCompile>().configureEach {
     options.compilerArgs.add("-Amicronaut.processing.java.source=true")
 }
 
