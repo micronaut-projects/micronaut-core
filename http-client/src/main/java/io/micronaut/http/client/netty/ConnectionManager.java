@@ -139,11 +139,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -1260,14 +1262,21 @@ public class ConnectionManager {
 
         final boolean http2;
         final Channel channel;
+        /**
+         * The response handler installed once in the pipeline of {@link #channel} as
+         * {@link ChannelPipelineCustomizer#HANDLER_MICRONAUT_HTTP_RESPONSE}, shared by all
+         * requests on it.
+         */
+        final Http1ResponseHandler responseHandler;
 
         boolean released = false;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
-        private PoolHandle(boolean http2, Channel channel) {
+        private PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler) {
             this.http2 = http2;
             this.channel = channel;
+            this.responseHandler = responseHandler;
         }
 
         public final Channel channel() {
@@ -1590,6 +1599,7 @@ public class ConnectionManager {
 
         final class Http1ConnectionHolder extends ConnectionHolder {
             private final Pool.Http1PoolEntry poolEntry;
+            private final Http1ResponseHandler responseHandler = new Http1ResponseHandler();
             private volatile boolean hasLiveRequest = false;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
@@ -1609,6 +1619,9 @@ public class ConnectionManager {
                 }
                 connectionCustomizer.onStreamPipelineBuilt();
 
+                // stays for the lifetime of the connection, after any handlers the customizers added
+                channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
+
                 poolEntry.onConnectionEstablished();
             }
 
@@ -1626,8 +1639,16 @@ public class ConnectionManager {
                     return;
                 }
                 hasLiveRequest = true;
-                PoolHandle ph = new PoolHandle(false, channel) {
+                PoolHandle ph = new PoolHandle(false, channel, responseHandler) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
+                    /**
+                     * Handlers that customizers added in {@link NettyClientCustomizer#onRequestPipelineBuilt()}.
+                     * They belong to this request only, and are removed when it completes, so that
+                     * they don't collide with the handlers added for the next request on this
+                     * connection.
+                     */
+                    @Nullable
+                    List<ChannelHandlerContext> requestHandlers;
 
                     @Override
                     public void taint() {
@@ -1638,6 +1659,7 @@ public class ConnectionManager {
                     public void release() {
                         super.release();
                         if (!windDownConnection) {
+                            removeRequestHandlers();
                             ChannelHandlerContext newLast = channel.pipeline().lastContext();
                             if (lastContext != newLast) {
                                 log.warn("BUG - Handler not removed: {}", newLast);
@@ -1659,7 +1681,33 @@ public class ConnectionManager {
 
                     @Override
                     public void notifyRequestPipelineBuilt() {
+                        ChannelPipeline pipeline = channel.pipeline();
+                        Set<String> before = new HashSet<>(pipeline.names());
                         connectionCustomizer.onRequestPipelineBuilt();
+                        for (String name : pipeline.names()) {
+                            if (!before.contains(name)) {
+                                ChannelHandlerContext added = pipeline.context(name);
+                                if (added != null) {
+                                    if (requestHandlers == null) {
+                                        requestHandlers = new ArrayList<>(1);
+                                    }
+                                    requestHandlers.add(added);
+                                }
+                            }
+                        }
+                    }
+
+                    private void removeRequestHandlers() {
+                        if (requestHandlers == null) {
+                            return;
+                        }
+                        ChannelPipeline pipeline = channel.pipeline();
+                        for (ChannelHandlerContext added : requestHandlers) {
+                            if (!added.isRemoved()) {
+                                pipeline.remove(added.handler());
+                            }
+                        }
+                        requestHandlers = null;
                     }
                 };
                 emitPoolHandle(sink, ph);
@@ -1791,7 +1839,10 @@ public class ConnectionManager {
                             streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new ResponseContentDecompressor());
                         }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
-                        PoolHandle ph = new PoolHandle(true, streamChannel) {
+                        // after the customizer, so that handlers it appended see the response first
+                        Http1ResponseHandler responseHandler = new Http1ResponseHandler();
+                        streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
+                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler) {
                             @Override
                             public void taint() {
                                 // do nothing, we don't reuse stream channels

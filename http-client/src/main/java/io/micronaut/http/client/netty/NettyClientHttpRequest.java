@@ -309,10 +309,15 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
 
     @Override
     public HttpRequest toHttpRequestWithoutBody() {
+        return toHttpRequestWithoutBody(resolveUriPath());
+    }
+
+    @Override
+    public HttpRequest toHttpRequestWithoutBody(String requestTarget) {
         return new DefaultHttpRequest(
             HttpVersion.HTTP_1_1,
             getMethod(httpMethodName),
-            resolveUriPath(),
+            requestTarget,
             headers.getNettyHeaders()
         );
     }

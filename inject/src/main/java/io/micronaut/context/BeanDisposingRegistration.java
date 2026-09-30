@@ -41,9 +41,10 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Nullable
     private volatile List<BeanRegistration<?>> dependents;
     @Nullable
+    @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
+    private volatile AbstractBeanResolutionContext proxyTargetContext;
+    @Nullable
     private final List<?> interceptorRegistrations;
-    // guarded by this: once set, nothing becomes the bean's any more
-    private boolean destroyed;
     // the interceptors a proxy fronting the bean selected for it, see RegisteredBeanInterceptors
     @SuppressWarnings("java:S3077") // a KeptSelection is immutable, set under the lock of this registration
     @Nullable
@@ -85,6 +86,28 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         }
     }
 
+    /**
+     * @return The resolution context a lazy proxy retains to resolve its target, or {@code null} if the bean is
+     * not such a proxy
+     */
+    @Nullable
+    AbstractBeanResolutionContext getProxyTargetContext() {
+        return proxyTargetContext;
+    }
+
+    void setProxyTargetContext(@Nullable AbstractBeanResolutionContext proxyTargetContext) {
+        this.proxyTargetContext = proxyTargetContext;
+    }
+
+    /**
+     * Marks the registration as destroyed, so that closing it afterwards does not destroy the bean again.
+     *
+     * @return {@code true} if the registration had not been closed or marked before
+     */
+    boolean markDestroyed() {
+        return closed.compareAndSet(false, true);
+    }
+
     @Nullable
     public List<BeanRegistration<?>> getDependents() {
         return dependents;
@@ -122,20 +145,17 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     /**
      * Adds beans created for this bean after it was created, so that they are destroyed with it.
      *
+     * Called under the lock of this registration, before its dependents are taken for destruction.
+     *
      * @param created The registrations of the beans
-     * @return {@code false} when this bean is destroyed already, and nothing was added
      */
-    synchronized boolean addDependents(List<BeanRegistration<?>> created) {
-        if (destroyed) {
-            return false;
-        }
+    private void addDependents(List<BeanRegistration<?>> created) {
         if (!created.isEmpty()) {
             List<BeanRegistration<?>> current = dependents;
             List<BeanRegistration<?>> added = current == null ? new ArrayList<>(created.size()) : new ArrayList<>(current);
             added.addAll(created);
             dependents = added;
         }
-        return true;
     }
 
     /**
@@ -145,7 +165,8 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
      */
     @Nullable
     synchronized List<BeanRegistration<?>> takeDependents() {
-        destroyed = true;
+        // destroyed, however the destruction was reached: closing the registration afterwards destroys nothing
+        closed.set(true);
         keptSelection = null;
         return dependents;
     }
@@ -181,7 +202,8 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
             if (kept != null && kept.key == key) {
                 return (S) kept.value;
             }
-            if (destroyed) {
+            if (closed.get()) {
+                // closed, or being destroyed: nothing becomes the bean's any more
                 return null;
             }
             S selection;

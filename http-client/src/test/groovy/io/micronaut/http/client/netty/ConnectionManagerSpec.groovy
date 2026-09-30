@@ -732,6 +732,45 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'customizer handlers see the response on #protocol'(String protocol) {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+                'spec.recorder': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+        def recorder = ctx.getBean(ResponseRecorder)
+
+        when:
+        if (protocol == 'http2') {
+            def conn = new EmbeddedTestConnectionHttp2()
+            conn.setupHttp2Tls()
+            patch(client, conn)
+            def future = conn.testExchangeRequest(client)
+            conn.exchangeSettings()
+            conn.testExchangeResponse(future)
+        } else {
+            def conn = new EmbeddedTestConnectionHttp1()
+            conn.setupHttp1()
+            patch(client, conn)
+            conn.testExchangeResponse(conn.testExchangeRequest(client))
+        }
+
+        then:
+        // a handler appended by the customizer comes before the response handler, so it observes
+        // the response head and the last content
+        recorder.messages.any { it instanceof io.netty.handler.codec.http.HttpResponse }
+        recorder.messages.any { it instanceof LastHttpContent }
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        protocol << ['http1', 'http2']
+    }
+
     def 'http1 plain text customization'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
@@ -777,6 +816,43 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+
+    def 'http1 request handlers added by a customizer do not collide on a reused connection'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': ConnectionManagerSpec.simpleName,
+                'spec.request-handler': true,
+                'micronaut.http.client.pool.max-concurrent-http1-connections': 1,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+        def customizer = ctx.getBean(RequestHandlerCustomizer)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        when:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        def namesBetweenRequests = conn.clientChannel.pipeline().names()
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        then:
+        // no duplicate name error when adding the handler for the second request
+        customizer.errors.isEmpty()
+        // the handler was added exactly once for each request, and saw that request's response
+        customizer.handlerCounts == [1, 1]
+        customizer.handlers.size() == 2
+        customizer.handlers.every { it.responses == 1 }
+        // it is removed when the request completes, and the connection is kept
+        !namesBetweenRequests.contains(RequestHandlerCustomizer.NAME)
+        !conn.clientChannel.pipeline().names().contains(RequestHandlerCustomizer.NAME)
+        conn.clientChannel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE) != null
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
 
     def 'http2 customization'(boolean secure) {
         given:
@@ -1612,6 +1688,108 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 response handler is installed once per connection'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
+
+        when:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        def pipeline = conn.clientChannel.pipeline()
+        def handlerNames = pipeline.names()
+        def handler = pipeline.get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
+
+        then:
+        handler instanceof Http1ResponseHandler
+        handler.idle
+        pipeline.toMap().values().count { it instanceof Http1ResponseHandler } == 1
+
+        when:
+        for (int i = 0; i < 5; i++) {
+            conn.testExchangeResponse(conn.testExchangeRequest(client))
+            conn.testStreamingResponse(conn.testStreamingRequest(client))
+            conn.testPublisherRequest(client)
+        }
+
+        then:
+        // the same handler served every request, and no request left anything behind
+        pipeline.names() == handlerNames
+        pipeline.get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE).is(handler)
+        pipeline.toMap().values().count { it instanceof Http1ResponseHandler } == 1
+        handler.idle
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http1 connection serves the next request after a cancelled streaming response'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        when:
+        def received = new ArrayDeque<String>()
+        Disposable subscription = Flux.from(client.dataStream(HttpRequest.GET(conn.scheme + '://example.com/foo')))
+                .subscribe(b -> received.add(b.toString(StandardCharsets.UTF_8)))
+        conn.advance()
+        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
+        def tail = conn.serverChannel.readInbound()
+        def handler = conn.clientChannel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
+
+        then:
+        request.uri() == '/foo'
+        tail == null || tail instanceof LastHttpContent
+        handler instanceof Http1ResponseHandler
+        !handler.idle
+
+        when:
+        def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        response.headers().add('content-length', 6)
+        conn.serverChannel.writeOutbound(response)
+        conn.serverChannel.writeOutbound(new DefaultHttpContent(Unpooled.wrappedBuffer('foo'.bytes)))
+        conn.advance()
+
+        then:
+        received.poll() == 'foo'
+
+        when:
+        // the consumer goes away while the body is still on the wire
+        subscription.dispose()
+        conn.advance()
+        conn.serverChannel.writeOutbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer('bar'.bytes)))
+        conn.advance()
+
+        then:
+        // the rest of the body is drained, nothing is delivered, and the connection is kept
+        received.isEmpty()
+        handler.idle
+        conn.clientChannel.isOpen()
+        assertPoolConnections(client, 1)
+
+        when:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        then:
+        conn.clientChannel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE).is(handler)
+        handler.idle
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'raw exchange cancelled before the response closes the http1 connection'() {
         def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
         def client = ctx.getBean(DefaultHttpClient)
@@ -1907,6 +2085,31 @@ class ConnectionManagerSpec extends Specification {
             assert future.get().status() == HttpStatus.OK
         }
 
+        /**
+         * A request with a streaming (publisher) body, which is written by a StreamWriter. The
+         * server needs a HttpObjectAggregator.
+         */
+        void testPublisherRequest(HttpClient client) {
+            def future = Mono.from(client.exchange(HttpRequest.POST(scheme + '://example.com/foo', Flux.fromIterable([1, 2, 3]))
+                    .contentType(MediaType.APPLICATION_JSON_TYPE), String)).toFuture()
+            future.exceptionally(t -> t.printStackTrace())
+            advance()
+
+            FullHttpRequest request = serverChannel.readInbound()
+            assert request.uri() == '/foo'
+            assert request.method() == HttpMethod.POST
+            assert request.headers().get('host') == 'example.com'
+            assert request.headers().get("connection") == "keep-alive"
+            assert request.content().toString(StandardCharsets.UTF_8) == '[1,2,3]'
+            request.release()
+
+            def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer('foo'.bytes))
+            response.headers().add("Content-Length", 3)
+            serverChannel.writeOutbound(response)
+            advance()
+            assert future.get().body() == 'foo'
+        }
+
         private Queue<String> testStreamingRequest(StreamingHttpClient client) {
             def responseData = new ArrayDeque<String>()
             Flux.from(client.dataStream(HttpRequest.GET(scheme + '://example.com/foo')))
@@ -2085,6 +2288,89 @@ class ConnectionManagerSpec extends Specification {
 
             assert responseData.poll() == 'bar'
             assert responseData.poll() == 'END'
+        }
+    }
+
+    /**
+     * Customizer that appends a recording inbound handler to every channel it specializes for,
+     * like a logging customizer would.
+     */
+    @Requires(property = "spec.recorder", value = "true")
+    @Singleton
+    static class ResponseRecorder implements NettyClientCustomizer, BeanCreatedEventListener<Registry> {
+        final List<Object> messages = new ArrayList<>()
+
+        @Override
+        NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                @Override
+                void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    messages.add(msg)
+                    super.channelRead(ctx, msg)
+                }
+            })
+            return this
+        }
+
+        @Override
+        Registry onCreated(BeanCreatedEvent<Registry> event) {
+            event.getBean().register(this)
+            return event.getBean()
+        }
+    }
+
+    /**
+     * Customizer that adds a named handler for each request, like the documented logbook
+     * customizer.
+     */
+    @Requires(property = "spec.request-handler", value = "true")
+    @Singleton
+    static class RequestHandlerCustomizer implements NettyClientCustomizer, BeanCreatedEventListener<Registry> {
+        static final String NAME = "request-handler"
+
+        final List<Throwable> errors = new ArrayList<>()
+        final List<Integer> handlerCounts = new ArrayList<>()
+        final List<CountingHandler> handlers = new ArrayList<>()
+
+        @Override
+        NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            return new NettyClientCustomizer() {
+                @Override
+                NettyClientCustomizer specializeForChannel(Channel channel_, ChannelRole role_) {
+                    return RequestHandlerCustomizer.this.specializeForChannel(channel_, role_)
+                }
+
+                @Override
+                void onRequestPipelineBuilt() {
+                    def handler = new CountingHandler()
+                    try {
+                        channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, NAME, handler)
+                    } catch (Throwable t) {
+                        errors.add(t)
+                        throw t
+                    }
+                    handlers.add(handler)
+                    handlerCounts.add(channel.pipeline().names().count { it == NAME } as Integer)
+                }
+            }
+        }
+
+        @Override
+        Registry onCreated(BeanCreatedEvent<Registry> event) {
+            event.getBean().register(this)
+            return event.getBean()
+        }
+
+        static class CountingHandler extends ChannelInboundHandlerAdapter {
+            int responses
+
+            @Override
+            void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                if (msg instanceof io.netty.handler.codec.http.HttpResponse) {
+                    responses++
+                }
+                super.channelRead(ctx, msg)
+            }
         }
     }
 

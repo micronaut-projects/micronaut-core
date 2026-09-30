@@ -21,11 +21,20 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
+import io.micronaut.http.body.PieceWriter;
+import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
@@ -53,7 +62,7 @@ import java.util.Objects;
 @Singleton
 @Produces(MediaType.APPLICATION_JSON_STREAM)
 @Consumes(MediaType.APPLICATION_JSON_STREAM)
-public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableJsonHandler {
+public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableJsonHandler, ResponseBodyWriter<T> {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
     public NettyJsonStreamHandler(JsonMapper jsonMapper) {
@@ -110,5 +119,20 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     @Override
     public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
         return jsonMessageHandler.writeTo(type, mediaType, object, outgoingHeaders, bufferFactory);
+    }
+
+    @Override
+    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<T> httpResponse, Argument<T> type, MediaType mediaType, T object) throws CodecException {
+        return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(s -> writeTo(type, mediaType, object, httpResponse.getHeaders(), s)));
+    }
+
+    @Override
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType, T object) throws CodecException {
+        return bodyFactory.buffer(s -> writeTo(type, mediaType, object, response.toMutableResponse().getHeaders(), s));
+    }
+
+    @Override
+    public PieceWriter<T> openPieceWriter(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType) throws CodecException {
+        return jsonMessageHandler.openPieceWriter(bodyFactory, request, response, type, mediaType);
     }
 }

@@ -36,6 +36,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
@@ -148,7 +149,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
      * A failure of the mapper while writing is an encoding failure, whether it is an
      * {@link IOException} or unchecked, like the exceptions of Jackson 3.
      */
-    private static CodecException decorateWrite(Object object, Exception e) {
+    static CodecException decorateWrite(Object object, Exception e) {
         return new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
     }
 
@@ -185,6 +186,16 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
         } catch (IOException | RuntimeException e) {
             throw decorateWrite(object, e);
         }
+    }
+
+    @Override
+    public PieceWriter<T> openPieceWriter(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType) throws CodecException {
+        if (type.getType() == Object.class) {
+            // a piece of undeclared type may be an already serialized document that writeValue
+            // passes through unchanged, so these pieces are written one at a time
+            return ResponseBodyWriter.super.openPieceWriter(bodyFactory, request, response, type, mediaType);
+        }
+        return new JsonPieceWriter<>(bodyFactory, jsonMapper, type);
     }
 
     /**
