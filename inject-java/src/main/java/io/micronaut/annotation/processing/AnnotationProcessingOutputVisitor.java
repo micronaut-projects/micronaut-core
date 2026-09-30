@@ -114,8 +114,13 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    @SuppressWarnings("java:S1075")
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        visitServiceDescriptor(type, classname, originatingElement, null);
+    }
+
+    @Override
+    @SuppressWarnings("java:S1075")
+    public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement, byte @Nullable [] content) {
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
             Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
@@ -125,8 +130,10 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
                 path,
                 element
             );
-            try (Writer w = fileObject.openWriter()) {
-                w.write("");
+            try (OutputStream out = fileObject.openOutputStream()) {
+                if (content != null) {
+                    out.write(content);
+                }
             }
         } catch (IOException e) {
             throw new ClassGenerationException("Unable to generate Bean entry at path: " + path, e);

@@ -25,8 +25,24 @@ import org.jspecify.annotations.Nullable;
  * @param objectDef           The generated object definition
  * @param serviceClass        The service to be registered
  * @param originatingElements The originating elements
+ * @param serviceContent      The content of the {@code META-INF/micronaut} entry of the service, or {@code null}
+ *                            to leave the entry empty
  * @author Denis Stepanov
  * @since 5.1.0
  */
-public record OutputObjectDef(ObjectDef objectDef, @Nullable Class<?> serviceClass, OriginatingElements originatingElements) {
+public record OutputObjectDef(ObjectDef objectDef,
+                              @Nullable Class<?> serviceClass,
+                              OriginatingElements originatingElements,
+                              byte @Nullable [] serviceContent) {
+
+    /**
+     * An object definition whose service entry is empty.
+     *
+     * @param objectDef           The generated object definition
+     * @param serviceClass        The service to be registered
+     * @param originatingElements The originating elements
+     */
+    public OutputObjectDef(ObjectDef objectDef, @Nullable Class<?> serviceClass, OriginatingElements originatingElements) {
+        this(objectDef, serviceClass, originatingElements, null);
+    }
 }

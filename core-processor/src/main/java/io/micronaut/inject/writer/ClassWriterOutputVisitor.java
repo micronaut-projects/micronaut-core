@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.Element;
 
@@ -91,6 +92,22 @@ public interface ClassWriterOutputVisitor {
      * @since 3.5.0
      */
     void visitServiceDescriptor(String type, String classname, Element originatingElement);
+
+    /**
+     * Adds the {@code META-INF/micronaut/<type>/<classname>} entry of a service, with content. The entry names the
+     * class; the content is what the service keeps about it, and an empty entry is always valid. A visitor that does
+     * not write content leaves the entry empty.
+     *
+     * @param type               the fully qualified service name
+     * @param classname          the fully qualified classname
+     * @param originatingElement The originating element
+     * @param content            The content of the entry, or {@code null} to leave it empty
+     * @since 5.3.0
+     */
+    @Experimental
+    default void visitServiceDescriptor(String type, String classname, Element originatingElement, byte @Nullable [] content) {
+        visitServiceDescriptor(type, classname, originatingElement);
+    }
 
     /**
      * Visit a file within the META-INF directory of the 'classes' directory.

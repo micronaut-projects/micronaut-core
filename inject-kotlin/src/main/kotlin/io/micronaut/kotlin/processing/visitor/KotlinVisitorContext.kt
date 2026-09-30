@@ -451,6 +451,15 @@ internal class KotlinVisitorContext(
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
     }
 
+    override fun visitServiceDescriptor(
+        type: String,
+        classname: String,
+        originatingElement: Element,
+        content: ByteArray?
+    ) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement, content)
+    }
+
     override fun visitMetaInfFile(
         path: String,
         vararg originatingElements: Element

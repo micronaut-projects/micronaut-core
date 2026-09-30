@@ -39,6 +39,10 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
     }
 
     override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
+        visitServiceDescriptor(type, classname, originatingElement, null)
+    }
+
+    override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element, content: ByteArray?) {
         val fileName = "${type}${File.separator}${classname}"
         val packageName = "META-INF.micronaut"
         environment.codeGenerator.createNewFile(
@@ -46,7 +50,9 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
             packageName,
             fileName,
             "").use {
-            it.bufferedWriter().write("")
+            if (content != null) {
+                it.write(content)
+            }
         }
     }
 
