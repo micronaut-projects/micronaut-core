@@ -32,12 +32,18 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.UnsafeExecutable;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.binders.PendingRequestBindingResult;
+import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.ReleasableRequestBody;
+import io.micronaut.http.form.FormPart;
+import io.micronaut.http.form.FormParts;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.reactive.execution.SubscriberAwareExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
@@ -46,6 +52,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.NonBlocking;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,6 +61,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Internal implementation of {@link io.micronaut.http.annotation.ServerFilter}.
@@ -75,6 +83,9 @@ import java.util.function.Predicate;
  * @param isReactive          Is the filter method reactive, either by its return type or its continuation
  * @param mutableRequestIndex The index of the {@link MutableHttpRequest} argument of a request
  *                            filter without a continuation, or {@code -1}
+ * @param bodyIndexes         The indexes of the {@link AsyncRequestBody}, {@link FormParts},
+ *                            {@link FormPart} and {@code Optional<FormPart>} arguments, released
+ *                            when the filter method completed, or {@code null}
  * @author Jonas Konrad
  * @author Denis Stepanov
  * @since 4.2.0
@@ -98,7 +109,8 @@ record MethodFilter<T>(FilterOrder order,
                        boolean isConditional,
                        @Nullable Executor executor,
                        boolean isReactive,
-                       int mutableRequestIndex) implements InternalHttpFilter {
+                       int mutableRequestIndex,
+                       int @Nullable [] bodyIndexes) implements InternalHttpFilter {
 
     private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
     private static final String RESPONSE_MISSING_MESSAGE = "Http response is missing";
@@ -151,6 +163,7 @@ record MethodFilter<T>(FilterOrder order,
         ContinuationCreator continuationCreator = null;
         boolean reactiveContinuation = false;
         int mutableRequestIndex = -1;
+        int[] bodyIndexes = null;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             Class<?> argumentType = argument.getType();
@@ -239,10 +252,32 @@ record MethodFilter<T>(FilterOrder order,
                             return async.bindAsync(conversionContext, request).map(result -> convertResult(method, argument, result));
                         };
                     } else {
+                        if (isReleasedBody(argument)) {
+                            // what the reads of the body left open is released when the filter completed
+                            bodyIndexes = bodyIndexes == null ? new int[] {i} : append(bodyIndexes, i);
+                        }
                         fulfilled[i] = ctx -> {
                             HttpRequest<?> request = ctx.request;
                             ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
-                            ArgumentBinder.BindingResult<Object> result = argumentBinder.bind(conversionContext, request);
+                            // what the binding waits for is the filter's, not the route's; nothing
+                            // is allocated for a request without such conditions
+                            BasicHttpAttributes.DetachedRouteState detached = BasicHttpAttributes.detachRouteState(request);
+                            ArgumentBinder.BindingResult<Object> result;
+                            ExecutionFlow<?> waitsFor = null;
+                            try {
+                                result = argumentBinder.bind(conversionContext, request);
+                                if (result instanceof PendingRequestBindingResult<Object> pending && pending.isPending()) {
+                                    waitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
+                                }
+                            } finally {
+                                BasicHttpAttributes.restoreRouteState(request, detached);
+                            }
+                            if (waitsFor != null) {
+                                // e.g. a form that is still read: the filter waits for it, like a
+                                // controller method does
+                                ArgumentBinder.BindingResult<Object> pendingResult = result;
+                                return new PendingArgument(waitsFor, () -> convertResult(method, argument, pendingResult));
+                            }
                             return convertResult(method, argument, result);
                         };
                         if (argumentBinder instanceof FilterArgumentBinderPredicate pred) {
@@ -275,12 +310,25 @@ record MethodFilter<T>(FilterOrder order,
             bean instanceof ConditionalFilter,
             executor,
             isReactive(returnType) || reactiveContinuation,
-            isResponseFilter || continuationCreator != null ? -1 : mutableRequestIndex
+            isResponseFilter || continuationCreator != null ? -1 : mutableRequestIndex,
+            bodyIndexes
         );
+    }
+
+    private static int[] append(int[] indexes, int index) {
+        int[] result = Arrays.copyOf(indexes, indexes.length + 1);
+        result[indexes.length] = index;
+        return result;
     }
 
     @Nullable
     private static <T> Object convertResult(ExecutableMethod<T, ?> method, Argument<?> argument, ArgumentBinder.BindingResult<Object> result) {
+        if (argument.getType() == Optional.class && result.getConversionErrors().isEmpty()) {
+            // like the argument of a route: a binder may produce the Optional or its value, and
+            // a missing or unsatisfied value is an empty Optional
+            Object value = result.isSatisfied() ? result.getValue().orElse(null) : null;
+            return value instanceof Optional<?> optional ? optional : Optional.ofNullable(value);
+        }
         if (result.isPresentAndSatisfied() || (argument.isNullable() && result.isSatisfied())) {
             return result.getValue().orElse(null);
         } else {
@@ -421,6 +469,10 @@ record MethodFilter<T>(FilterOrder order,
                 } catch (Throwable e) {
                     return ExecutionFlow.error(e);
                 }
+                ExecutionFlow<Object[]> pending = PendingArgument.await(args);
+                if (pending != null) {
+                    return pending.flatMap(a -> filter(filterContext, methodContext, a, onExecutor));
+                }
             }
         }
         if (!onExecutor && executor != null) {
@@ -439,6 +491,9 @@ record MethodFilter<T>(FilterOrder order,
                 returnValue = Objects.requireNonNull(method).invoke(bean, args);
             }
             ExecutionFlow<FilterContext> executionFlow = returnHandler.handle(filterContext, returnValue, methodContext.continuation);
+            if (bodyIndexes != null) {
+                executionFlow = releaseBodies(args, executionFlow);
+            }
             if (mutableRequestIndex >= 0) {
                 executionFlow = keepChangedUri(filterContext, args[mutableRequestIndex], executionFlow);
             }
@@ -453,8 +508,48 @@ record MethodFilter<T>(FilterOrder order,
             }
             return executionFlow;
         } catch (Throwable e) {
+            if (bodyIndexes != null) {
+                return releaseBodies(args, ExecutionFlow.error(e));
+            }
             return ExecutionFlow.error(e);
         }
+    }
+
+    /**
+     * @param argument An argument of a filter method
+     * @return Whether it is released when the filter method completed, like the argument of a
+     * controller method: an {@link AsyncRequestBody}, {@link FormParts}, a {@link FormPart} or an
+     * {@code Optional<FormPart>}
+     */
+    private static boolean isReleasedBody(Argument<?> argument) {
+        Class<?> type = argument.getType();
+        if (type == Optional.class) {
+            type = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
+            return type == FormPart.class;
+        }
+        return type == AsyncRequestBody.class || type == FormParts.class || type == FormPart.class;
+    }
+
+    /**
+     * Release what the reads of the {@link AsyncRequestBody}, {@link FormParts} and
+     * {@link FormPart} arguments of the filter method left open, e.g. a read the filter started
+     * and did not wait for, when the filter completed: before the filter chain continues, or the
+     * response of the filter is written. The reads of a copy of the body are released too. A
+     * failure to release fails the filter, see {@link ReleasableRequestBody#releaseAfter}.
+     *
+     * @param args The arguments of the filter method
+     * @param flow The result of the filter
+     * @return The result, once the bodies were released
+     */
+    private ExecutionFlow<FilterContext> releaseBodies(Object[] args, ExecutionFlow<FilterContext> flow) {
+        ReleasableRequestBody bodies = null;
+        for (int index : Objects.requireNonNull(bodyIndexes)) {
+            Object arg = args[index] instanceof Optional<?> optional ? optional.orElse(null) : args[index];
+            if (arg instanceof ReleasableRequestBody body) {
+                bodies = bodies == null ? body : ReleasableRequestBody.both(bodies, body);
+            }
+        }
+        return bodies == null ? flow : ReleasableRequestBody.releaseAfter(flow, bodies);
     }
 
     /**
@@ -528,7 +623,8 @@ record MethodFilter<T>(FilterOrder order,
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
-        ExecutionFlow<Object[]> result = ExecutionFlow.just(args);
+        ExecutionFlow<Object[]> pending = PendingArgument.await(args);
+        ExecutionFlow<Object[]> result = pending == null ? ExecutionFlow.just(args) : pending;
         for (int i = 0; i < asyncArgBinders.length; i++) {
             AsyncFilterArgBinder binder = asyncArgBinders[i];
             if (binder != null) {
@@ -668,6 +764,37 @@ record MethodFilter<T>(FilterOrder order,
 
     private interface AsyncFilterArgBinder {
         ExecutionFlow<Object> bind(FilterMethodContext context);
+    }
+
+    /**
+     * An argument whose binding is pending, e.g. a form that is still read: bound once what the
+     * binding waits for completed.
+     *
+     * @param waitsFor What the binding waits for
+     * @param value    The value of the argument, once the binding completed
+     */
+    private record PendingArgument(ExecutionFlow<?> waitsFor, Supplier<@Nullable Object> value) {
+
+        /**
+         * Wait for the pending arguments.
+         *
+         * @param args The bound arguments
+         * @return Completes with the arguments once none is pending, or {@code null} if none is
+         */
+        static @Nullable ExecutionFlow<Object[]> await(Object[] args) {
+            ExecutionFlow<Object[]> result = null;
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] instanceof PendingArgument pending) {
+                    int position = i;
+                    ExecutionFlow<Object[]> previous = result == null ? ExecutionFlow.just(args) : result;
+                    result = previous.flatMap(a -> pending.waitsFor.then(() -> {
+                        a[position] = pending.value.get();
+                        return ExecutionFlow.just(a);
+                    }));
+                }
+            }
+            return result;
+        }
     }
 
     /**

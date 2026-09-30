@@ -295,11 +295,14 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         }
 
         private void subscribeOnLoop(@Nullable BufferConsumer subscriber, Upstream specificUpstream) {
+            // a subscriber can subscribe another split reentrantly: the inputs stay deferred
+            // until the outer subscribe is done
+            boolean outer = subscribing;
             subscribing = true;
             try {
                 subscribe0(subscriber, specificUpstream);
             } finally {
-                subscribing = false;
+                subscribing = outer;
             }
         }
 

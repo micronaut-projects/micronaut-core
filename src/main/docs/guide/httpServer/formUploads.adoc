@@ -1,0 +1,124 @@
+The api:http.form.FormData[], api:http.form.FileUpload[], api:http.form.FormPart[] and api:http.form.FormParts[] types read a submitted form, `application/x-www-form-urlencoded` or `multipart/form-data`, without a `Publisher`. Every operation that reads content returns a `CompletionStage`, so a method can return a stage and never block.
+
+NOTE: These types are experimental. Their API may change in a future release.
+
+== The Whole Form
+
+A method argument of type api:http.form.FormData[] receives the whole form, read before the method runs:
+
+snippet::io.micronaut.docs.server.formdata.ProfileController[tags="imports,class,formData,endclass", title="Reading the Whole Form"]
+
+<1> The method declares a api:http.form.FormData[] argument
+<2> `getString` reads a required text field
+<3> `getInt` with a default value reads an optional text field
+<4> `getFile` returns the uploaded file of a field as a api:http.form.FileUpload[]
+<5> `bytes` reads the content of the file, and the method returns the stage
+
+Text fields convert with accessors like the ones of <<pathVariables, path variables>>: `getString`, `getInt` and the other types for a required field, the same with a default value for an optional one, `findString`, `findInt` and the other `find` methods, and `get(name, type)` for any other type. `getValues` returns every value of a field, e.g. of checkboxes, and `get` with an api:core.type.Argument[] of a collection, e.g. `Argument.listOf(Integer.class)`, converts every value. `getFile`, `findFile` and `getFiles` return the uploaded files of a field.
+
+A required field that is missing, or a value that does not convert, is answered with `400 Bad Request`.
+
+The uploaded files are stored in memory or on disk, depending on the `micronaut.server.multipart` configuration, see <<uploads, File Uploads>>. A file larger than `micronaut.server.multipart.max-file-size` is answered with `413 Request Entity Too Large`.
+
+== Binding Files and Fields
+
+A method can also declare the files and text fields it needs as arguments, bound by name or with the api:http.annotation.Part[] annotation:
+
+snippet::io.micronaut.docs.server.formdata.ProfileController[tags="arguments", indent=0, title="Binding Files and Fields"]
+
+<1> A text field, bound by name
+<2> A api:http.form.FileUpload[] bound to the `avatar` field with api:http.annotation.Part[]
+<3> An optional file: `null` when the field was not sent. An `Optional<FileUpload>` works too
+<4> Every file sent in the `documents` field
+<5> `transferTo` writes the file to a new file, and the method returns the stage
+
+The arguments share one form: a api:http.form.FormData[] argument, the api:http.form.FileUpload[] arguments and the text field arguments of a method are all read from the same form, and `form.getFile("avatar")` returns the same api:http.form.FileUpload[] as an `avatar` argument. A required file or field that is missing is answered with `400 Bad Request`.
+
+== Consuming an Upload
+
+The content of a api:http.form.FileUpload[] can be consumed once, with one of:
+
+* `bytes(maximumBytes)`, which reads the content into memory
+* `text(maximumBytes)`, which reads the content into memory as text, in the charset of the part's `Content-Type`, else the charset of the request, else the default charset of the server. `text(maximumBytes, charset)` reads it in the given charset instead.
+* `transferTo(path)`, which writes the content to a new file. The file must not exist, and its directory must exist. Once written, the file belongs to the application.
+* `transferTo(outputStream)`, which writes the content to a stream
+* `takeBody()`, which hands the content over as a api:http.body.CloseableByteBody[], which the caller must then consume or close
+
+None of them blocks: the reads return a `CompletionStage`, whether the content is in memory, on disk or still arriving, and content stored on disk is read on the I/O executor. A second consumption throws an `IllegalStateException`. The name, file name, content type and size stay readable after the content was consumed.
+
+WARNING: `fileName()` is the name the client sent. Do not use it as a path without sanitizing it.
+
+An upload belongs to the request. When the request ends, what the application did not consume is released, including the fields that were still waiting to be read when the reading stopped, and an operation that is still running is aborted. The work on an upload must therefore be part of the stage the method returns, as in the examples above.
+
+WARNING: Do not close an upload in a try-with-resources block around an asynchronous operation: the block closes it as soon as the operation starts, which aborts the operation.
+
+`close()` releases an upload early, and `FormData.close()` releases all the files of a form. The text fields stay readable.
+
+== Streaming a Part
+
+A api:http.form.FormPart[] argument receives a part of the form as it arrives, without storing it first:
+
+snippet::io.micronaut.docs.server.formdata.ProfileController[tags="formPart", indent=0, title="Streaming a Part"]
+
+<1> A text field sent before the part
+<2> The `video` part, read as it arrives
+<3> `transferTo` writes the content to a new file while it is received
+
+The method runs once the part starts arriving, so the text fields it needs must be sent before the part. A field sent after the part cannot be bound, and the request is answered with `400 Bad Request`. A api:http.form.FormPart[] is a text field or a file: `isFile()` tells which, `text()` reads a text field, in the charset of the part like a file's `text`, and `file()` gives the part as a api:http.form.FileUpload[]. An `Optional<FormPart>` argument is empty when the form has no such part.
+
+Like the reads of an api:http.body.AsyncRequestBody[], an operation on the part that is still running when the method completes, e.g. a `transferTo` whose stage the method did not return, is aborted and its buffers and files are released before the response is written, or, for a streamed response, when its stream ends. The work on the part must therefore be part of the stage the method returns. Content the method did not read is discarded when the request ends.
+
+== Reading the Parts One by One
+
+A api:http.form.FormParts[] argument reads the whole form part by part, in the order the client sent them:
+
+snippet::io.micronaut.docs.server.formdata.ProfileController[tags="formParts", indent=0, title="Reading the Parts"]
+
+<1> The method declares a api:http.form.FormParts[] argument
+<2> `forEach` hands every part to the consumer, one at a time
+<3> A file is written to a new file
+<4> A text field is read, here with a limit of 1024 bytes
+<5> The stage of `forEach` completes once every part was consumed
+
+The consumer owns its part until the stage it returned completes. Then what it did not read is discarded, and the next part is read. `part(name, consumer)` reads forward to the part of a name, discarding the parts before it, and completes with `false` when the form has no such part. `closeAsync()` discards the rest of the form.
+
+The parts are closed like the reads of an api:http.body.AsyncRequestBody[]: when the method completes, normally or exceptionally, before the response is written, or, for a method that answers with a streamed response, when its stream ends: completes, fails or is cancelled, e.g. because the client disconnected. An operation the method did not wait for is aborted then, the part it was consuming is released, and the rest of the form is discarded, so the work on the parts must be part of the stage the method returns, or of its stream.
+
+An api:http.body.AsyncRequestBody[] argument reads a form too, with `form()` for a api:http.form.FormData[] and `parts()` for api:http.form.FormParts[], see <<asyncRequestBody, Reading the Body Asynchronously>>.
+
+== Limits
+
+A form is decoded as it arrives, so `micronaut.server.max-request-buffer-size` does not limit the form as a whole: it limits what is read into memory. This holds even for a limit smaller than what the server receives before the form is read, e.g. with the request headers. Only the form read from a copy of the body, `copy().form()` or `copy().parts()` of an api:http.body.AsyncRequestBody[], is held to the limit as a whole, see <<asyncRequestBody, Reading the Body Asynchronously>>.
+
+* The text fields of a api:http.form.FormData[] are held in memory, and are limited together: a form whose text fields are larger than `micronaut.server.max-request-buffer-size` is answered with `413 Request Entity Too Large`. The text field and api:http.form.FileUpload[] arguments share that form, and its limit.
+* The files of a api:http.form.FormData[] are stored as the `micronaut.server.multipart` configuration says, and each is limited by `micronaut.server.multipart.max-file-size`.
+* The parts of api:http.form.FormParts[] and a api:http.form.FormPart[] are limited one by one, by the operation that reads them: `text()` reads up to `micronaut.server.max-request-buffer-size` bytes, `text(maximumBytes)` and `bytes(maximumBytes)` up to the given limit, and `transferTo` is not limited by the buffer size. A part larger than the limit of its read fails with `413 Request Entity Too Large`.
+
+The request as a whole is limited by `micronaut.server.max-request-size`, and the Netty server limits the number of fields and the bytes the decoder buffers with its `micronaut.server.netty.form-max-fields` and `micronaut.server.netty.form-max-buffered-bytes` settings.
+
+== Combining Arguments
+
+A method can combine a api:http.form.FormData[] argument, api:http.form.FileUpload[] arguments and text field arguments, as they share one form. The other combinations read the form in ways that exclude each other, and the request is answered with `500 Internal Server Error` with a message that says the arguments "cannot be combined":
+
+* a api:http.form.FormParts[] argument with any other form argument
+* a api:http.form.FormData[] argument with a api:http.multipart.CompletedFileUpload[], a api:http.form.FormPart[] or a api:http.form.FormParts[] argument
+
+== In Filters
+
+The request filter methods of a api:http.annotation.ServerFilter[] can declare the same arguments as a controller method: api:http.body.AsyncRequestBody[], api:http.form.FormData[], api:http.form.FormParts[], api:http.form.FormPart[], api:http.form.FileUpload[], a `List` or an `Optional` of those, and text fields with api:http.annotation.Part[]. A filter that reads the form with api:http.form.FormData[], api:http.form.FileUpload[] or api:http.annotation.Part[] arguments leaves the same form for the route:
+
+snippet::io.micronaut.docs.server.formdata.TermsFilter[tags="imports,class", title="Reading the Form in a Filter"]
+
+<1> The request filter method declares a api:http.form.FormData[] argument
+<2> The filter reads a text field, and answers the request itself when the terms were not accepted
+<3> Otherwise the request continues
+
+snippet::io.micronaut.docs.server.formdata.SignupController[tags="imports,class", title="The Route Reads the Same Form"]
+
+<1> The route binds the fields and files of the form the filter read, and can still consume the files
+
+An api:http.body.AsyncRequestBody[] argument is different: its `form()` and `parts()` consume the body, like its other reads. So does a api:http.form.FormParts[] argument, once the filter reads a part, and its parts are closed when the filter method completes, like the reads of an api:http.body.AsyncRequestBody[]. A api:http.form.FormPart[] argument of a filter streams its part the same way: the fields before it are discarded, the filter runs once the part starts, and the rest of the form is discarded when the filter method completes. The route can then no longer read the form, and fails with `500 Internal Server Error` when it does, while the files the filter did not read are released when the request ends. A filter that reads the form of an api:http.body.AsyncRequestBody[] and leaves it for the route reads it from a copy: `copy().form()` is the same shared form as a api:http.form.FormData[] argument, read from a split of the body, and `copy().parts()` streams through the parts of a split of the body. The body keeps the bytes for the route, which can read them in any way, so the form is then held to `micronaut.server.max-request-buffer-size` as a whole. See <<asyncRequestBody, Reading the Body Asynchronously>>.
+
+A filter that continues with a mutable request whose body it cleared, with `request.body(null)`, leaves an empty form for the route. A filter that sets a api:http.form.FormData[] as the body replaces the form.
+
+NOTE: With `micronaut-http-validation` on the annotation processor path, these parameters and api:http.annotation.Part[] are compilation errors on a response filter method and on the methods of a api:http.annotation.ClientFilter[]. So is a api:http.annotation.Part[] parameter of a request filter method whose type is read with the arguments of the route, after the filters: api:http.multipart.CompletedFileUpload[], api:http.multipart.StreamingFileUpload[], api:http.multipart.CompletedPart[], api:http.multipart.PartData[] or a `Publisher`. A filter reads a file with a api:http.form.FileUpload[], a api:http.form.FormPart[] or a api:http.form.FormData[] argument instead.

@@ -1,0 +1,48 @@
+Instead of one method argument per URI variable, a method can declare an argument of type api:http.PathVariables[]. It gives every variable of the route that matched the request, and converts a value when it is read.
+
+NOTE: api:http.PathVariables[] is experimental. Its API may change in a future release.
+
+snippet::io.micronaut.docs.server.pathvariables.ItemController[tags="imports,class,item,endclass", title="Reading the Path Variables"]
+
+<1> The route has a required variable `id` and an optional variable `page`
+<2> The method declares a api:http.PathVariables[] argument instead of one argument per variable
+<3> `getLong` converts the value of a required variable
+<4> `getInt` with a default value is used for an optional variable
+
+A request to `/items/5` answers `Item 5, page 1`, and one to `/items/5/3` answers `Item 5, page 3`.
+
+== Accessors
+
+Values convert with the conversion service of the route, the same way as the api:http.annotation.PathVariable[] arguments of a method:
+
+* `getString`, `getInt`, `getLong`, `getBoolean` and the accessors of the other primitive types read a required variable.
+* The same accessors with a second argument, e.g. `getInt("page", 1)`, return the default value when the variable has no value.
+* `findString`, `findInt`, `findLong`, `findDouble` and `findBoolean` return an empty optional when the variable has no value.
+* `get(name, type)` and `find(name, type)` convert to any other type, e.g. `UUID`, and accept an api:core.type.Argument[] for a generic type.
+* `names()` and `contains(name)` tell which variables have a value.
+
+The values of an exploded variable, e.g. `/files{/path*}`, or of a comma separated value are read as a list:
+
+snippet::io.micronaut.docs.server.pathvariables.ItemController[tags="lists", indent=0, title="Reading a List"]
+
+<1> `getStrings` splits the value, so `/tags/red,green` gives `[red, green]`
+<2> `getList` converts each value, so `/sum/1,2,3` gives `[1, 2, 3]`
+
+== Errors
+
+A required variable that has no value, or a value that does not convert, is answered with `400 Bad Request`, the same as for a api:http.annotation.PathVariable[] argument. With the example above, `/items/abc` is answered with `400`.
+
+A method that declares api:http.PathVariables[] reads the variables itself, so the compile-time route validation does not report the variables of the URI template that have no argument of their own.
+
+== In Filters
+
+The request filter methods of a api:http.annotation.ServerFilter[] run after the request is routed, so they can declare api:http.PathVariables[] too:
+
+snippet::io.micronaut.docs.server.pathvariables.ArchivedItemFilter[tags="imports,class", title="Reading the Path Variables in a Filter"]
+
+<1> The filter applies to the `/items/**` routes
+<2> The request filter method declares a api:http.PathVariables[] argument
+<3> `findLong` reads the `id` variable of the route that matched the request, if it has one
+<4> The filter answers the request itself, here with `410 Gone`
+
+WARNING: A api:http.server.annotation.PreMatching[] filter method runs before the request is routed, so there are no path variables yet. With `micronaut-http-validation` on the annotation processor path, a api:http.PathVariables[] parameter of a `@PreMatching` filter method or of a api:http.annotation.ClientFilter[] method is a compilation error.

@@ -120,6 +120,7 @@ httpServer:
   runningServer: Running the Embedded Server
   runningSpecificPort: Running Server on a Specific Port
   routing: HTTP Routing
+  pathVariables: Path Variables
   binding: Simple Request Binding
   customArgumentBinding: Custom Argument Binding
   hostResolution: Host Resolution
@@ -134,6 +135,7 @@ httpServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
+  asyncRequestBody: Reading the Body Asynchronously
   jsonBinding:
     title: JSON Binding
     serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
@@ -173,6 +175,7 @@ httpServer:
     formCapable: Detailed Form API
   serverIO: Writing Response Data
   uploads: File Uploads
+  formUploads: Form Data and File Uploads
   transfers: File Transfers
   filters:
     title: HTTP Filters

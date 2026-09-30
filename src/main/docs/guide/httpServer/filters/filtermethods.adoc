@@ -13,6 +13,8 @@ controller supports streaming (e.g. `@Body InputStream` parameter), leading to p
 IMPORTANT: Body binding is supported by the netty-based HTTP server, but may not be supported by all other HTTP server
 backends.
 
+The request filter methods of a api:http.annotation.ServerFilter[] can also declare the parameters that read the body of the request in a controller method: an api:http.body.AsyncRequestBody[], a api:http.form.FormData[], api:http.form.FormParts[], a api:http.form.FormPart[] or a api:http.form.FileUpload[], a `List` or an `Optional` of those, and text fields annotated with api:http.annotation.Part[]. A filter that reads the form with a api:http.form.FormData[], api:http.form.FileUpload[] or api:http.annotation.Part[] parameter leaves the same form for the route, and a api:http.annotation.Body[] parameter reads a copy of the body, while the reads of an api:http.body.AsyncRequestBody[] consume the body, unless the filter reads its `copy()`, and so do api:http.form.FormParts[] and api:http.form.FormPart[] parameters. The request filter methods that run after routing can also declare api:http.PathVariables[]. See <<asyncRequestBody, Reading the Body Asynchronously>>, <<formUploads, Form Data and File Uploads>> and <<pathVariables, Path Variables>>. With `micronaut-http-validation` on the annotation processor path, the body parameters are compilation errors on response filter methods and on the methods of a api:http.annotation.ClientFilter[], and api:http.PathVariables[] is a compilation error on api:http.server.annotation.PreMatching[] and client filter methods.
+
 To write asynchronous filters, you can return a reactive publisher.
 
 To put these concepts into practice lets look at an example.

@@ -39,6 +39,7 @@ public abstract non-sealed class InternalByteBody implements ByteBody {
 
     private @Nullable Throwable primaryOpTrace;
     private @Nullable Throwable closeTrace;
+    private volatile @Nullable String claimedBy;
 
     /**
      * Record the first primary operation location, if tracking is enabled.
@@ -81,11 +82,25 @@ public abstract non-sealed class InternalByteBody implements ByteBody {
     public abstract Publisher<ReadBuffer> toReadBufferPublisher();
 
     /**
+     * Like {@link #toReadBufferPublisher()}, for a reader that streams the bytes without holding
+     * them, e.g. to decode them piece by piece with a limit of its own: a streaming body does not
+     * hold such a reader to its buffer limit, only the backpressure of its upstream bounds the
+     * bytes the reader has not received yet.
+     *
+     * @return The publisher
+     * @since 5.3.0
+     */
+    public Publisher<ReadBuffer> toUnbufferedReadBufferPublisher() {
+        return toReadBufferPublisher();
+    }
+
+    /**
      * Throw the standard "already claimed" error and attach stored traces when tracking is enabled.
      */
     @Contract("-> fail")
     protected final void failClaim() {
-        IllegalStateException e = new IllegalStateException(
+        String reader = claimedBy;
+        IllegalStateException e = new IllegalStateException(reader != null ? reader :
             "Request body has already been claimed: Two conflicting sites are trying to access the request body. " +
                 "If this is intentional, the first user must ByteBody#split the body. " +
                 "To find out where the body was claimed, enable the -D" + TRACK_OPERATIONS_PROPERTY + "=true system property."
@@ -99,6 +114,49 @@ public abstract non-sealed class InternalByteBody implements ByteBody {
             }
         }
         throw e;
+    }
+
+    /**
+     * Describe the read that claimed the given body: a later access to the body fails with this
+     * message instead of the generic one, e.g. for a route that reads a body a filter consumed.
+     * The first description is kept.
+     *
+     * @param body    The body
+     * @param message The message of the failure of a later access, which names the read
+     * @since 5.3.0
+     */
+    public static void describeClaim(ByteBody body, String message) {
+        if (body instanceof InternalByteBody internal && internal.claimedBy == null) {
+            internal.claimedBy = message;
+        }
+    }
+
+    /**
+     * The description of the read that claimed the given body, see {@link #describeClaim}.
+     *
+     * @param body The body
+     * @return The message of the failure of a later access, or {@code null} if no read described
+     * itself
+     * @since 5.3.0
+     */
+    public static @Nullable String claimDescription(ByteBody body) {
+        return body instanceof InternalByteBody internal ? internal.claimedBy : null;
+    }
+
+    /**
+     * Read the bytes of the body without holding them, see
+     * {@link #toUnbufferedReadBufferPublisher()}.
+     *
+     * @param body The body
+     * @return The publisher
+     * @since 5.3.0
+     */
+    public static Publisher<ReadBuffer> toUnbufferedReadBufferPublisher(ByteBody body) {
+        if (body instanceof InternalByteBody internal) {
+            return internal.toUnbufferedReadBufferPublisher();
+        } else {
+            return body.toReadBufferPublisher();
+        }
     }
 
     public static ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow(ByteBody body) {
