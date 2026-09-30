@@ -404,6 +404,14 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
      * @param <T> The wrapper type
      * @return The wrapper
      */
+    /**
+     * Note for a native image: this is a reflective lookup, as {@code box}'s lookup of the
+     * {@code (Value)} constructor already is, and neither is covered by generated metadata. A
+     * {@code @ReflectiveAccess} on the generated method was tried and removed: the stub is written as
+     * source and the annotation was not shown to reach any consumer, and claiming coverage that has
+     * not been demonstrated is worse than naming the gap. Removing the reflection altogether would
+     * mean the generated class registering its factory at class-initialisation time instead.
+     */
     private static <T> T newPooledWrapper(Class<T> type, Function<Context, Value> perContext) {
         try {
             return type.cast(type.getDeclaredMethod("fromPooledValueFactory", Function.class).invoke(null, perContext));

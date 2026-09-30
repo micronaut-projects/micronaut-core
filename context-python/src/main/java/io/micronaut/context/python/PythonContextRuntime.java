@@ -263,7 +263,7 @@ public final class PythonContextRuntime {
      * The runtime is installed on demand first, so a pooled entry point reached before the runtime exists
      * routes to the pool once the application has configured one.
      */
-    private static boolean usePrimaryContext() {
+    static boolean usePrimaryContext() {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.require();
         return runtime.pool() == null || PythonApplicationRuntime.isReuseContext();
     }
@@ -517,97 +517,14 @@ public final class PythonContextRuntime {
      *
      * @return The entered context, or {@code null}
      */
-    private static @Nullable Context enteredContext() {
+    static @Nullable Context enteredContext() {
         return PythonContextRegistry.currentContext();
     }
 
-    /**
-     * A pooled class instance, or the per-context value of a holder that stands in for it.
-     *
-     * <p>A pooled class with no constructor arguments is served from the pool's per-class cache,
-     * which is what the holder is null for. A holder appears when the bean is AOP-proxied: the
-     * proxy is one Python object per context, created around the class rather than being an
-     * instance of it, so it cannot live in that cache and the wrapper carries it instead. Without
-     * this the generated bridge would reach the unproxied instance and the advice -- a
-     * {@code @Transactional} boundary, for one -- would be skipped with nothing said.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-class cache
-     * @param classReference The Python class reference
-     * @return The value to call
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value findPooledClass(@Nullable PythonPooledInstance override, PythonClassReference classReference) {
-        return override == null ? findPooledClass(classReference) : findPooledInstance(override);
-    }
 
-    /**
-     * As {@link #findPooledClass(PythonPooledInstance, PythonClassReference)}, in a context the
-     * caller already owns.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-class cache
-     * @param classReference The Python class reference
-     * @param context The context
-     * @return The value to call
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value findPooledClass(@Nullable PythonPooledInstance override, PythonClassReference classReference, Context context) {
-        return override == null ? findPooledClass(classReference, context) : findPooledInstance(override, context);
-    }
 
-    /**
-     * Invoke a method on a pooled class, or on the holder standing in for it.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-class cache
-     * @param classReference The Python class reference
-     * @param methodName The method name
-     * @param args Arguments
-     * @return The polyglot result
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value invokePooled(@Nullable PythonPooledInstance override, PythonClassReference classReference, String methodName, Object... args) {
-        return override == null
-            ? invokePooled(classReference, methodName, args)
-            : invokePooledInstance(override, methodName, args);
-    }
 
-    /**
-     * As {@link #invokePooled(PythonPooledInstance, PythonClassReference, String, Object...)}, for
-     * an async method.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-class cache
-     * @param classReference The Python class reference
-     * @param methodName The method name
-     * @param args Arguments
-     * @return The stage of the coroutine
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static CompletionStage<?> invokePooledAsync(@Nullable PythonPooledInstance override, PythonClassReference classReference, String methodName, Object... args) {
-        return override == null
-            ? invokePooledAsync(classReference, methodName, args)
-            : invokePooledInstanceAsync(override, methodName, args);
-    }
 
-    /**
-     * As {@link #invokePooled(PythonPooledInstance, PythonClassReference, String, Object...)}, for
-     * an async generator method.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-class cache
-     * @param classReference The Python class reference
-     * @param methodName The method name
-     * @param args Arguments
-     * @return The publisher
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Publisher<?> invokePooledPublisher(@Nullable PythonPooledInstance override, PythonClassReference classReference, String methodName, Object... args) {
-        return override == null
-            ? invokePooledPublisher(classReference, methodName, args)
-            : invokePooledInstancePublisher(override, methodName, args);
-    }
 
     /**
      * Obtain a pooled Python class instance (per-context cached).
@@ -686,195 +603,13 @@ public final class PythonContextRuntime {
     }
 
 
-    /**
-     * The calling context's instance of a pooled bean that has constructor arguments.
-     *
-     * <p>Chooses the context exactly as {@link #findPooledClass(PythonClassReference)} does, then
-     * asks the bean for its instance there. The instance belongs to the bean rather than to the
-     * pool because the pool's cache is keyed by class, and two pooled beans of one class can hold
-     * different dependencies.
-     *
-     * @param instance The pooled bean's per-context instances
-     * @return The instance for the calling context
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value findPooledInstance(PythonPooledInstance instance) {
-        if (usePrimaryContext()) {
-            return withPrimaryContext(instance::in);
-        }
-        Context entered = enteredContext();
-        if (entered != null) {
-            return instance.in(entered);
-        }
-        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
-        if (eventLoop != null) {
-            PythonPool pool = getPythonPool();
-            Context context = pool.getEventLoopContext(eventLoop);
-            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> instance.in(context));
-        }
-        return getPythonPool().withLeasedContext(instance::in);
-    }
 
-    /**
-     * A pooled bean's instance in a context the caller already owns.
-     *
-     * @param instance The pooled bean's per-context instances
-     * @param context The context
-     * @return The instance for that context
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value findPooledInstance(PythonPooledInstance instance, Context context) {
-        return PythonContextRegistry.withExecutionFrame(context, () -> instance.in(context));
-    }
 
-    /**
-     * Invoke a method on a pooled bean that has constructor arguments.
-     *
-     * @param instance The pooled bean's per-context instances
-     * @param methodName The method name
-     * @param args Arguments
-     * @return The polyglot result
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value invokePooledInstance(PythonPooledInstance instance, String methodName, Object... args) {
-        return withPooledInstance(instance, v -> PythonInvocation.invokePythonMethod(
-            v,
-            methodName,
-            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
-        ));
-    }
 
-    /**
-     * Invoke an async method on a pooled bean that has constructor arguments, driving the coroutine
-     * while the context is still leased; see {@link #invokePooledAsync}.
-     *
-     * @param instance The pooled bean's per-context instances
-     * @param methodName The method name
-     * @param args Arguments
-     * @return The stage of the coroutine
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static CompletionStage<?> invokePooledInstanceAsync(PythonPooledInstance instance, String methodName, Object... args) {
-        if (usePrimaryContext()) {
-            return withPrimaryContext(context -> PythonAsyncioRuntime.toCompletionStage(
-                PythonInvocation.invokePythonMethod(
-                    instance.in(context),
-                    methodName,
-                    PythonCoercion.coerceArgumentsToContext(context, args)
-                )));
-        }
-        Context entered = enteredContext();
-        if (entered != null) {
-            return PythonAsyncioRuntime.toCompletionStage(PythonInvocation.invokePythonMethod(
-                instance.in(entered),
-                methodName,
-                PythonCoercion.coerceArgumentsToContext(entered, args)
-            ));
-        }
-        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
-        if (eventLoop != null) {
-            PythonPool pool = getPythonPool();
-            Context context = pool.getEventLoopContext(eventLoop);
-            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> PythonAsyncioRuntime.toCompletionStage(
-                PythonInvocation.invokePythonMethod(
-                    instance.in(context),
-                    methodName,
-                    PythonCoercion.coerceArgumentsToContext(context, args)
-                )));
-        }
-        return getPythonPool().withLeasedContextUntilComplete(context -> PythonAsyncioRuntime.toCompletionStage(
-            PythonInvocation.invokePythonMethod(
-                instance.in(context),
-                methodName,
-                PythonCoercion.coerceArgumentsToContext(context, args)
-            )));
-    }
 
-    /**
-     * Invoke an async generator method on a pooled bean that has constructor arguments; see
-     * {@link #invokePooledPublisher}.
-     *
-     * @param instance The pooled bean's per-context instances
-     * @param methodName The method name
-     * @param args Arguments
-     * @return The publisher
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Publisher<?> invokePooledInstancePublisher(PythonPooledInstance instance, String methodName, Object... args) {
-        return withPooledInstance(instance, v -> PythonAsyncioRuntime.generatorToPublisher(PythonInvocation.invokePythonMethod(
-            v,
-            methodName,
-            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
-        )));
-    }
 
-    /**
-     * Run a callback against a pooled bean's instance for the calling context, choosing the context
-     * the way {@link #withPooled} does.
-     *
-     * @param instance The pooled bean's per-context instances
-     * @param fn The callback
-     * @param <T> The callback result type
-     * @return The callback result
-     */
-    private static <T> T withPooledInstance(PythonPooledInstance instance, java.util.function.Function<Value, T> fn) {
-        if (shouldOffloadPooledExecution()) {
-            return offloadPooledExecution(() -> withPooledInstance(instance, fn));
-        }
-        if (usePrimaryContext()) {
-            return withPrimaryContext(context -> fn.apply(instance.in(context)));
-        }
-        Context entered = enteredContext();
-        if (entered != null) {
-            return fn.apply(instance.in(entered));
-        }
-        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
-        if (eventLoop != null) {
-            PythonPool pool = getPythonPool();
-            Context context = pool.getEventLoopContext(eventLoop);
-            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> fn.apply(instance.in(context)));
-        }
-        return getPythonPool().withLeasedContext(context -> fn.apply(instance.in(context)));
-    }
 
-    /**
-     * A pooled module, or the per-context value of a holder that stands in for it.
-     *
-     * <p>A route module is a pooled type like any other, and an AOP-proxied one carries a holder of
-     * one Python proxy per context for the same reason a class does; see
-     * {@link #findPooledClass(PythonPooledInstance, PythonClassReference)}.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-module cache
-     * @param packageName The Python package
-     * @param scriptName The script/module name
-     * @return The value to call
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value findPooledScript(@Nullable PythonPooledInstance override, String packageName, String scriptName) {
-        return override == null ? findPooledScript(packageName, scriptName) : findPooledInstance(override);
-    }
 
-    /**
-     * As {@link #findPooledScript(PythonPooledInstance, String, String)}, in a context the caller
-     * already owns.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-module cache
-     * @param packageName The Python package
-     * @param scriptName The script/module name
-     * @param context The context
-     * @return The value to call
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value findPooledScript(@Nullable PythonPooledInstance override, String packageName, String scriptName, Context context) {
-        return override == null ? findPooledScript(packageName, scriptName, context) : findPooledInstance(override, context);
-    }
 
     /**
      * Obtain a pooled Python script/module object.
@@ -1008,7 +743,7 @@ public final class PythonContextRuntime {
         return value;
     }
 
-    private static boolean shouldOffloadPooledExecution() {
+    static boolean shouldOffloadPooledExecution() {
         BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider();
         return provider != null
             && provider.isResolvable()
@@ -1016,7 +751,7 @@ public final class PythonContextRuntime {
             && Thread.currentThread().isVirtual();
     }
 
-    private static <T> T offloadPooledExecution(Supplier<T> action) {
+    static <T> T offloadPooledExecution(Supplier<T> action) {
         BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider();
         if (provider == null || !provider.isResolvable()) {
             return action.get();
@@ -1217,61 +952,8 @@ public final class PythonContextRuntime {
         return getPythonPool().withScriptUntilComplete(packageName, scriptName, fn);
     }
 
-    /**
-     * Invoke a module function, or the same function on the holder standing in for the module.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-module cache
-     * @param packageName The Python package
-     * @param scriptName The script/module name
-     * @param methodName The function name
-     * @param args Arguments
-     * @return The polyglot result
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Value invokePooledScript(@Nullable PythonPooledInstance override, String packageName, String scriptName, String methodName, Object... args) {
-        return override == null
-            ? invokePooledScript(packageName, scriptName, methodName, args)
-            : invokePooledInstance(override, methodName, args);
-    }
 
-    /**
-     * As {@link #invokePooledScript(PythonPooledInstance, String, String, String, Object...)}, for an
-     * async function.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-module cache
-     * @param packageName The Python package
-     * @param scriptName The script/module name
-     * @param methodName The function name
-     * @param args Arguments
-     * @return The stage of the coroutine
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static CompletionStage<?> invokePooledScriptAsync(@Nullable PythonPooledInstance override, String packageName, String scriptName, String methodName, Object... args) {
-        return override == null
-            ? invokePooledScriptAsync(packageName, scriptName, methodName, args)
-            : invokePooledInstanceAsync(override, methodName, args);
-    }
 
-    /**
-     * As {@link #invokePooledScript(PythonPooledInstance, String, String, String, Object...)}, for an
-     * async generator function.
-     *
-     * @param override The holder, or {@code null} to use the pool's per-module cache
-     * @param packageName The Python package
-     * @param scriptName The script/module name
-     * @param methodName The function name
-     * @param args Arguments
-     * @return The publisher
-     * @since 5.2.3
-     */
-    @UsedByGeneratedCode
-    public static Publisher<?> invokePooledScriptPublisher(@Nullable PythonPooledInstance override, String packageName, String scriptName, String methodName, Object... args) {
-        return override == null
-            ? invokePooledScriptPublisher(packageName, scriptName, methodName, args)
-            : invokePooledInstancePublisher(override, methodName, args);
-    }
 
     /**
      * Invoke a method on a pooled script instance.
@@ -1681,7 +1363,7 @@ public final class PythonContextRuntime {
      * @param classReference The class
      * @param ctx The context to resolve it in
      * @return The class Value, belonging to that context
-     * @since 5.2.3
+     * @since 5.2.10
      */
     public static Value findClass(PythonClassReference classReference, Context ctx) {
         // Resolving a class means importing its module and asking inspect.isclass, several guest

@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
@@ -41,14 +42,18 @@ import java.util.function.Function;
  * would accumulate entries for prototype beans long since collected, which on a long-running
  * server is an unbounded leak.
  *
- * <p>They are not <em>stored</em> on the bean, though. A {@link Value} holds a reference to its
- * own {@link Context}, so a map on the bean keyed by context would pin every context the bean
- * ever ran in, no matter how weak the key: the value in the entry keeps the key reachable. The
- * instances live in each context's own state instead, weakly keyed by the bean, so closing a
- * context releases its instances and collecting a prototype bean releases its entry in every
- * context that served it.
+ * <p>Their lifetime needs both halves, and neither works alone, because the references run in
+ * both directions. A stored instance reaches this holder: the host-object back-reference points
+ * at the wrapper, and the wrapper holds the holder. This holder reaches every context it has
+ * served, because a {@link Value} holds its own {@link Context}. So a weak key never fires,
+ * whichever way round the map is: the value in the entry keeps the key reachable.
  *
- * @since 5.2.3
+ * <p>The map therefore lives here, which is what makes a collected bean take its instances with
+ * it, and each context keeps a weak set of the holders it has served so that closing it can call
+ * {@link #forget}. A closed context is removed from every holder that served it; a collected
+ * holder takes its whole map at once.
+ *
+ * @since 5.2.10
  */
 @Internal
 @Experimental
@@ -83,6 +88,17 @@ public final class PythonPooledInstance {
     private final Object[] constructorArguments;
 
     /**
+     * This bean's instance per context. Strong keys: the entries are removed when a context closes,
+     * through {@link #forget}, so a weak key would only be a backstop -- and could not work anyway,
+     * since the instance in the entry reaches this holder and so keeps its own key reachable.
+     *
+     * <p>A {@link ConcurrentHashMap} rather than a synchronized map: this is the
+     * read path of every call on a pooled bean that owns its instances, and it should not queue behind
+     * a lock, least of all one shared with every other context.
+     */
+    private final Map<Context, Value> instances = new ConcurrentHashMap<>();
+
+    /**
      * Builds this bean's value for a context, when the value is not a plain instance of the class.
      * An AOP-proxied pooled bean needs one proxy per context, because a Python proxy belongs to the
      * context it was created in, and the wrapper Micronaut hands out has to work in all of them.
@@ -93,6 +109,7 @@ public final class PythonPooledInstance {
 
     /**
      * @param classReference The Python class
+     * @param owner The generated wrapper these instances belong to, for the back-reference
      * @param constructorArguments The arguments to construct it with, already resolved by injection
      */
     @UsedByGeneratedCode
@@ -185,7 +202,7 @@ public final class PythonPooledInstance {
     @UsedByGeneratedCode
     public static PythonPooledInstance seeded(PythonContextRuntime.PythonClassReference classReference, Value existing) {
         PythonPooledInstance holder = new PythonPooledInstance(classReference, null, null);
-        PythonContextRegistry.state(existing.getContext()).pooledInstances.put(holder, existing);
+        holder.publish(existing.getContext(), existing);
         return holder;
     }
 
@@ -200,24 +217,22 @@ public final class PythonPooledInstance {
     /**
      * This bean's instance in the given context, constructing it there on first use.
      *
-     * <p>Construction runs before the value is published, never while holding the map. Guest code
-     * must not run under a lock the runtime might need: Python re-entering for the same bean would
-     * wait on the thread holding it, which is waiting on the interpreter lock. A duplicate
+     * <p>Construction runs before the value is published, and holds nothing while it runs. Guest code
+     * must not run under a lock the runtime might need: Python re-entering for the same bean would wait
+     * on the thread holding it, which is itself waiting on the interpreter lock. A duplicate
      * construction is cheaper than that, and the loser is discarded.
      *
      * @param context The context
      * @return The instance belonging to that context
      */
     public Value in(Context context) {
-        Map<Object, Value> instances = PythonContextRegistry.state(context).pooledInstances;
-        Value existing = instances.get(this);
+        Value existing = instances.get(context);
         if (existing != null) {
             return existing;
         }
         if (valueFactory != null) {
             Value produced = valueFactory.apply(context);
-            Value prior = instances.putIfAbsent(this, produced);
-            return prior != null ? prior : produced;
+            return publish(context, produced);
         }
         PythonContextRuntime.PythonClassReference reference = classReference;
         if (constructorArguments == null || reference == null) {
@@ -230,7 +245,47 @@ public final class PythonPooledInstance {
             ? type.newInstance(PythonCoercion.coerceDependenciesToContext(context, constructorArguments))
             : type;
         attachOwner(created);
-        Value prior = instances.putIfAbsent(this, created);
-        return prior != null ? prior : created;
+        return publish(context, created);
+    }
+
+    /**
+     * Stores this context's instance and tells the context to call {@link #forget} when it closes.
+     *
+     * <p>Registering with the context takes the registry's lock, which is safe only because this class
+     * holds no lock of its own: {@code ContextState.clear} calls {@link #forget} while holding that
+     * lock, so a bean-level monitor here would be the other half of a deadlock.
+     *
+     * @param context The context
+     * @param instance The instance created for it
+     * @return The stored instance, which is an earlier one when two threads raced
+     */
+    private Value publish(Context context, Value instance) {
+        Value prior = instances.putIfAbsent(context, instance);
+        if (prior != null) {
+            return prior;
+        }
+        PythonContextRegistry.state(context).pooledHolders.add(this);
+        return instance;
+    }
+
+    /**
+     * How many contexts hold an instance of this bean. For tests of the lifetime: the map is not
+     * observable otherwise, and both of its leaks were invisible rather than wrong.
+     *
+     * @return The number of contexts with an instance
+     */
+    int contextCount() {
+        return instances.size();
+    }
+
+    /**
+     * Drops this context's instance, because the context is closing.
+     *
+     * <p>Takes no monitor: {@code ContextState.clear} calls this under the registry lock.
+     *
+     * @param context The context being closed
+     */
+    void forget(Context context) {
+        instances.remove(context);
     }
 }

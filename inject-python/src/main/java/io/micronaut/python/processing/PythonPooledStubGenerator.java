@@ -19,7 +19,6 @@ import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -70,6 +69,8 @@ final class PythonPooledStubGenerator {
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
     private static final ClassTypeDef POOLED_INSTANCE = ClassTypeDef.of("io.micronaut.context.python.PythonPooledInstance");
+    /** The entry points a pooled bean that owns its per-context values is generated against. */
+    private static final ClassTypeDef PYTHON_POOLED_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonPooledRuntime");
     private static final String POOLED_INSTANCE_FIELD = "graalpyPooledInstance";
     private static final String FROM_POOLED_VALUE_FACTORY = "fromPooledValueFactory";
     private static final TypeDef VALUE_FACTORY = TypeDef.parameterized(
@@ -242,14 +243,14 @@ final class PythonPooledStubGenerator {
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(POLYGLOT_VALUE)
-                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                .build(((aThis, params) -> PYTHON_POOLED_RUNTIME
                     .invokeStatic("findPooledInstance", POLYGLOT_VALUE, List.of(aThis.field(pooledInstance))).returning())));
 
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(POLYGLOT_CONTEXT)
                 .returns(POLYGLOT_VALUE)
-                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                .build(((aThis, params) -> PYTHON_POOLED_RUNTIME
                     .invokeStatic("findPooledInstance", POLYGLOT_VALUE, List.of(
                         aThis.field(pooledInstance),
                         params.getFirst()
@@ -285,7 +286,7 @@ final class PythonPooledStubGenerator {
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(POLYGLOT_VALUE)
-                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                .build(((aThis, params) -> PYTHON_POOLED_RUNTIME
                     .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
                         aThis.field(pooledInstance),
                         pythonClassReference(element, pythonClassReference)
@@ -295,7 +296,7 @@ final class PythonPooledStubGenerator {
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(POLYGLOT_CONTEXT)
                 .returns(POLYGLOT_VALUE)
-                .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+                .build(((aThis, params) -> PYTHON_POOLED_RUNTIME
                     .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
                         aThis.field(pooledInstance),
                         pythonClassReference(element, pythonClassReference),
@@ -362,7 +363,7 @@ final class PythonPooledStubGenerator {
         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+            .build(((aThis, params) -> PYTHON_POOLED_RUNTIME
                 .invokeStatic("findPooledScript", POLYGLOT_VALUE,
                     List.of(aThis.field(pooledInstanceField), ExpressionDef.constant(pkg), ExpressionDef.constant(script)))
                 .returning())));
@@ -371,7 +372,7 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC)
             .addParameter(POLYGLOT_CONTEXT)
             .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
+            .build(((aThis, params) -> PYTHON_POOLED_RUNTIME
                 .invokeStatic("findPooledScript", POLYGLOT_VALUE,
                     List.of(aThis.field(pooledInstanceField), ExpressionDef.constant(pkg), ExpressionDef.constant(script), params.getFirst()))
                 .returning())));
@@ -446,17 +447,17 @@ final class PythonPooledStubGenerator {
             args.addAll(parameterExpressions);
             if (isAsyncGeneratorPythonMethod(methodElement)) {
                 return convertedElementPublisher(allClasses, methodElement.getGenericReturnType(),
-                    PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                    PYTHON_POOLED_RUNTIME.invokeStatic(
                         ownsInstances ? "invokePooledInstancePublisher" : "invokePooledPublisher",
                         ClassTypeDef.of(PUBLISHER), args)).returning();
             }
             if (isAsyncPythonMethod(methodElement) && !methodElement.getReturnType().isVoid()) {
                 // the coroutine is driven while the pooled context is still leased to this call
-                return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                return completionStage(methodElement, PYTHON_POOLED_RUNTIME.invokeStatic(
                     ownsInstances ? "invokePooledInstanceAsync" : "invokePooledAsync",
                     TypeDef.of(CompletionStage.class), args));
             }
-            var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+            var invoked = PYTHON_POOLED_RUNTIME.invokeStatic(
                 ownsInstances ? "invokePooledInstance" : "invokePooled", POLYGLOT_VALUE, args);
             return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
@@ -493,12 +494,12 @@ final class PythonPooledStubGenerator {
             args.addAll(parameterExpressions);
             if (isAsyncGeneratorPythonMethod(methodElement)) {
                 return convertedElementPublisher(allClasses, methodElement.getGenericReturnType(),
-                    PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScriptPublisher", ClassTypeDef.of(PUBLISHER), args)).returning();
+                    PYTHON_POOLED_RUNTIME.invokeStatic("invokePooledScriptPublisher", ClassTypeDef.of(PUBLISHER), args)).returning();
             }
             if (isAsyncPythonMethod(methodElement) && !methodElement.getReturnType().isVoid()) {
-                return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScriptAsync", TypeDef.of(CompletionStage.class), args));
+                return completionStage(methodElement, PYTHON_POOLED_RUNTIME.invokeStatic("invokePooledScriptAsync", TypeDef.of(CompletionStage.class), args));
             }
-            var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE, args);
+            var invoked = PYTHON_POOLED_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE, args);
             return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
 
@@ -548,6 +549,8 @@ final class PythonPooledStubGenerator {
             .returns(propertyType);
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
+            // a property read takes no holder, so it stays on the entry point without one: reading a
+            // module attribute goes through the pool's module cache, as it did before holders existed
             var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
                 List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(beanProperty.getName())));
             return handleReturnType(allClasses, beanProperty.getGenericType(), invoked).returning();
@@ -623,10 +626,8 @@ final class PythonPooledStubGenerator {
 
         builder.addMethod(MethodDef.builder(FROM_POOLED_VALUE_FACTORY)
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-            // The proxy creator looks this up reflectively, as `box` does the (Value) constructor.
-            // Annotated so a native image takes the metadata from the annotation processor rather
-            // than from a hand-written reflect-config entry.
-            .addAnnotation(ClassTypeDef.of("io.micronaut.core.annotation.ReflectiveAccess"))
+            // The proxy creator looks this up reflectively, as `box` does the (Value) constructor;
+            // see the note there about what a native image would need.
             .addParameter(ParameterDef.builder("valueFactory", VALUE_FACTORY).build())
             .returns(thisType)
             .build(((aThis, methodParameters) -> thisType.instantiate(
