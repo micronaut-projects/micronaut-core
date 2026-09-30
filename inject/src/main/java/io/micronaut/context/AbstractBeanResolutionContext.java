@@ -70,6 +70,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
     @Nullable
+    @SuppressWarnings("java:S3077") // the list is only ever replaced, never mutated after it is published
+    private volatile List<BeanRegistration<?>> cachedProxyTargetDependents;
+    @Nullable
+    private Map<Class<?>, AbstractBeanResolutionContext> lazyProxyTargetCopies;
+    @Nullable
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
     @Nullable
     private Deque<List<BeanRegistration<?>>> dependentBeansToDestroyAfterResolutionStack;
@@ -412,8 +417,45 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         copy.removeAttribute(INTERCEPTOR_REGISTRATIONS);
         if (copy instanceof AbstractBeanResolutionContext abstractCopy) {
             abstractCopy.lazyProxyTarget = true;
+            // taken by the creation of the proxy once the proxy is instantiated, for its registration
+            if (lazyProxyTargetCopies == null) {
+                lazyProxyTargetCopies = new HashMap<>(2);
+            }
+            // keyed by the class of the definition the proxy resolves its target with, which is the target's
+            lazyProxyTargetCopies.put(proxyBeanDefinition.getClass(), abstractCopy);
         }
         return copy;
+    }
+
+    /**
+     * Takes the copy of this context made for the lazy proxy of the given target while the proxy was created.
+     *
+     * @param targetDefinitionType The class of the definition of the proxy's target
+     * @return The context the proxy retains, or {@code null} if the proxy retains none
+     */
+    @Nullable
+    final AbstractBeanResolutionContext takeLazyProxyTargetCopy(Class<?> targetDefinitionType) {
+        return lazyProxyTargetCopies == null ? null : lazyProxyTargetCopies.remove(targetDefinitionType);
+    }
+
+    /**
+     * Keeps the dependents created with the target a lazy proxy caches on the context the proxy retains, so that
+     * they live as long as the proxy and are destroyed with the target.
+     *
+     * @param dependents The dependents of the cached target
+     */
+    final void setCachedProxyTargetDependents(List<BeanRegistration<?>> dependents) {
+        this.cachedProxyTargetDependents = dependents;
+    }
+
+    /**
+     * @return The dependents of the cached target, which are forgotten, or {@code null}
+     */
+    @Nullable
+    final List<BeanRegistration<?>> takeCachedProxyTargetDependents() {
+        List<BeanRegistration<?>> dependents = cachedProxyTargetDependents;
+        cachedProxyTargetDependents = null;
+        return dependents;
     }
 
     /**

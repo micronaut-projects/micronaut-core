@@ -37,6 +37,9 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Nullable
     private final List<BeanRegistration<?>> dependents;
     @Nullable
+    @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
+    private volatile AbstractBeanResolutionContext proxyTargetContext;
+    @Nullable
     private final List<?> interceptorRegistrations;
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -71,6 +74,28 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         if (closed.compareAndSet(false, true)) {
             beanContext.destroyBean(this);
         }
+    }
+
+    /**
+     * @return The resolution context a lazy proxy retains to resolve its target, or {@code null} if the bean is
+     * not such a proxy
+     */
+    @Nullable
+    AbstractBeanResolutionContext getProxyTargetContext() {
+        return proxyTargetContext;
+    }
+
+    void setProxyTargetContext(@Nullable AbstractBeanResolutionContext proxyTargetContext) {
+        this.proxyTargetContext = proxyTargetContext;
+    }
+
+    /**
+     * Marks the registration as destroyed, so that closing it afterwards does not destroy the bean again.
+     *
+     * @return {@code true} if the registration had not been closed or marked before
+     */
+    boolean markDestroyed() {
+        return closed.compareAndSet(false, true);
     }
 
     @Nullable

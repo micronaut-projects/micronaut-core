@@ -165,6 +165,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
+    private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     /**
      * The maximum number of additional destruction passes performed during {@link #stop()} to destroy
@@ -1263,18 +1264,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         destroyBean(registration, false);
     }
 
-    /**
-     * Destroys a bean that another bean, or another bean's disposal, owns as a dependent object.
-     *
-     * <p>This is the destruction the dependents of a bean receive when that bean is destroyed, which leaves
-     * {@link LifeCycle#stop()} alone: stopping a bean is for a bean destroyed in its own right, not for one
-     * destroyed because whatever it was resolved for is gone.</p>
-     *
-     * @param registration The registration of the dependent
-     * @param <T>          The bean type
-     * @since 5.2.0
-     */
-    <T> void destroyDependentBean(BeanRegistration<T> registration) {
+    @Override
+    public <T> void destroyDependentBean(BeanRegistration<T> registration) {
+        ArgumentUtils.requireNonNull("registration", registration);
+        if (registration instanceof BeanDisposingRegistration<T> disposingRegistration && !disposingRegistration.markDestroyed()) {
+            // closed, or destroyed as a dependent, already
+            return;
+        }
         destroyBean(registration, true);
     }
 
@@ -1319,7 +1315,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (CollectionUtils.isNotEmpty(dependents)) {
                 final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
                 while (i.hasPrevious()) {
-                    destroyBean(i.previous(), true);
+                    // through the guarded path, so that a dependent is destroyed once however it is reached
+                    destroyDependentBean(i.previous());
                 }
             }
         } else {
@@ -1435,7 +1432,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (disposingRegistration.getDependents() != null) {
                 destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
                 for (BeanRegistration<?> beanRegistration : disposingRegistration.getDependents()) {
-                    destroyBean(beanRegistration, true);
+                    destroyDependentBean(beanRegistration);
                     destroyed.add(beanRegistration.bean);
                 }
             }
@@ -1455,11 +1452,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     if (destroyed.contains(interceptedTarget)) {
                         return;
                     }
+                    // the target is destroyed with the dependents created with it; those of the proxy went above
                     destroyBean(BeanRegistration.of(this,
                         new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
                         proxyTargetBeanDefinition,
                         interceptedTarget,
-                        registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
+                        takeCachedProxyTargetDependents(registration)
                     ));
                     interceptedProxy.clearCachedInterceptedTarget();
                 }
@@ -1676,7 +1674,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // let the customizer decide what a null target becomes, as bean lookup does
             registration = resolveNullBeanRegistration(beanType, beanType, registration);
         }
+        if (registration.bean != null
+            && registration instanceof BeanDisposingRegistration<T> disposingRegistration
+            && !registration.beanDefinition.isSingleton()) {
+            // the proxy keeps the target and not its registration: remember what was created with the target,
+            // so that it is destroyed with the target when the proxy is
+            // they are kept on the context the proxy retains, and only for a proxy that caches its target: a proxy
+            // that resolves a new target on every call must leave nothing behind
+            List<BeanRegistration<?>> dependents = disposingRegistration.getDependents();
+            if (dependents != null && !dependents.isEmpty()
+                && resolutionContext instanceof AbstractBeanResolutionContext retained && retained.isLazyProxyTarget()
+                && definition.booleanValue(AROUND_TYPE, "cacheableLazyTarget").orElse(false)) {
+                retained.setCachedProxyTargetDependents(dependents);
+            }
+        }
         return registration.bean;
+    }
+
+    /**
+     * Takes the dependents created with the target a lazy proxy caches, which are kept on the resolution context
+     * the proxy retains.
+     *
+     * @param proxyRegistration The registration of the proxy
+     * @return The dependents of the cached target, or {@code null} if there are none
+     */
+    @Nullable
+    private static List<BeanRegistration<?>> takeCachedProxyTargetDependents(BeanRegistration<?> proxyRegistration) {
+        if (proxyRegistration instanceof BeanDisposingRegistration<?> disposingRegistration) {
+            AbstractBeanResolutionContext retained = disposingRegistration.getProxyTargetContext();
+            if (retained != null) {
+                return retained.takeCachedProxyTargetDependents();
+            }
+        }
+        return null;
     }
 
     @Override
@@ -3453,6 +3483,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     destroyDependentsOfFailedBean(context, e);
                     context.pushDependentBeans(parentDependentBeans);
                     throw e;
+                }
+                if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
+                    && context instanceof AbstractBeanResolutionContext creating
+                    && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
+                    // the context a lazy proxy retains holds what is created with the target it caches
+                    disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
                 }
                 context.pushDependentBeans(parentDependentBeans);
                 if (dependent) {
