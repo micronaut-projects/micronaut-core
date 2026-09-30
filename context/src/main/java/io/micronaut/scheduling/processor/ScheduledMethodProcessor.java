@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
@@ -144,13 +145,12 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
                         // tells an interceptor of the method that the scheduler invoked it, and by which schedule
-                        ScheduledExecution previous = ScheduledExecution.enter(new ScheduledExecution(method, scheduledAnnotation));
-                        try {
+                        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty()
+                            .plus(new ScheduledExecution(method, scheduledAnnotation))
+                            .propagate()) {
                             boundExecutable.invoke(bean);
                         } catch (Throwable e) {
                             handleException(beanDefinition.getBeanType(), bean, e);
-                        } finally {
-                            ScheduledExecution.exit(previous);
                         }
                     }
                 } catch (NoSuchBeanException noSuchBeanException) {

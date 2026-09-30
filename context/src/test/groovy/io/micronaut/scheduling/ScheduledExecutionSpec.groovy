@@ -22,7 +22,15 @@ import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import io.micronaut.core.propagation.PropagatedContext
+import jakarta.inject.Named
+
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 class ScheduledExecutionSpec extends Specification {
 
@@ -36,6 +44,23 @@ class ScheduledExecutionSpec extends Specification {
             task.initialDelays.toSet() == ['10ms', '50ms'] as Set
         }
         task.methods.toSet() == ['run'] as Set
+
+        cleanup:
+        context.close()
+    }
+
+    void 'the execution is present during the call, reaches propagated work and is gone after the call'() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+            'spec.name': 'ScheduledExecutionSpec.single',
+            'micronaut.executors.single.type': 'scheduled',
+            'micronaut.executors.single.core-pool-size': 1)
+        OnSingleThread task = context.getBean(OnSingleThread)
+
+        expect:
+        new PollingConditions(timeout: 10).eventually {
+            task.seen == [during: true, propagated: true, notPropagated: false, afterOnTheSameThread: false]
+        }
 
         cleanup:
         context.close()
@@ -71,6 +96,35 @@ class ScheduledExecutionSpec extends Specification {
 
         String direct() {
             ScheduledExecution.current().map { it.method().methodName }.orElse('none')
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledExecutionSpec.single')
+    static class OnSingleThread {
+
+        final Map<String, Boolean> seen = new ConcurrentHashMap<>()
+        private final ScheduledExecutorService scheduler
+        private final ExecutorService executor = Executors.newSingleThreadExecutor()
+
+        OnSingleThread(@Named('single') ExecutorService scheduler) {
+            this.scheduler = (ScheduledExecutorService) scheduler
+        }
+
+        @Scheduled(initialDelay = '10ms', scheduler = 'single')
+        void run() {
+            seen.during = ScheduledExecution.current().isPresent()
+            executor.submit(PropagatedContext.wrapCurrent({
+                seen.propagated = ScheduledExecution.current().isPresent()
+            } as Runnable)).get()
+            executor.submit({
+                seen.notPropagated = ScheduledExecution.current().isPresent()
+            } as Runnable).get()
+            // the scheduler has a single thread, so this runs on it once this call has returned
+            scheduler.schedule({
+                seen.afterOnTheSameThread = ScheduledExecution.current().isPresent()
+                executor.shutdown()
+            } as Runnable, 1, TimeUnit.MILLISECONDS)
         }
     }
 }
