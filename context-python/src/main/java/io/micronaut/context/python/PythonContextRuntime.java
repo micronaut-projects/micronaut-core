@@ -604,6 +604,10 @@ public final class PythonContextRuntime {
             // the primary context is shared: the load runs inside a frame of it
             return withPrimaryContext(context -> findClass(classReference, context));
         }
+        Context current = PythonContextRegistry.currentContext();
+        if (current != null) {
+            return getPythonPool().getClass(current, classReference);
+        }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
             // the load, and any injection the context is behind on, are guest work of the loop's context
@@ -648,6 +652,10 @@ public final class PythonContextRuntime {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(findClass(classReference, context)));
         }
+        Context current = PythonContextRegistry.currentContext();
+        if (current != null) {
+            return fn.apply(getPythonPool().getClass(current, classReference));
+        }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
             // the load and the callback run in a tracked frame of the event-loop context: a close
@@ -676,6 +684,12 @@ public final class PythonContextRuntime {
     public static Value findPooledInstance(PythonPooledInstance instance) {
         if (usePrimaryContext()) {
             return withPrimaryContext(instance::in);
+        }
+        Context current = PythonContextRegistry.currentContext();
+        if (current != null) {
+            // already executing in a context: that is the one the value has to belong to, and taking
+            // a second one from the pool here deadlocks -- see PythonContextRegistry#currentContext
+            return instance.in(current);
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -791,6 +805,10 @@ public final class PythonContextRuntime {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(instance.in(context)));
         }
+        Context current = PythonContextRegistry.currentContext();
+        if (current != null) {
+            return fn.apply(instance.in(current));
+        }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
             PythonPool pool = getPythonPool();
@@ -845,6 +863,10 @@ public final class PythonContextRuntime {
     public static Value findPooledScript(String packageName, String scriptName) {
         if (usePrimaryContext()) {
             return withPrimaryContext(context -> findScript(packageName, scriptName, context));
+        }
+        Context current = PythonContextRegistry.currentContext();
+        if (current != null) {
+            return getPythonPool().getScript(current, packageName, scriptName);
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {

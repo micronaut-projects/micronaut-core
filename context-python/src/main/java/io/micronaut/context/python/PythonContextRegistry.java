@@ -293,6 +293,24 @@ final class PythonContextRegistry {
         return ScopedValue.where(CURRENT_EXECUTION, new ExecutionFrame()).call(run);
     }
 
+    /**
+     * The context this thread is already executing in, innermost first, or {@code null}.
+     *
+     * <p>A value belongs to the context it was created in, so host code reached from guest code has
+     * to resolve a value in the context that called it rather than choose one. Choosing is not merely
+     * wasteful: taking a second context from the pool while holding one deadlocks, because the
+     * borrow waits for a context that the waiting threads are themselves holding.
+     *
+     * @return The innermost entered context, or {@code null} when this thread is not in one
+     */
+    static @Nullable Context currentContext() {
+        if (!CURRENT_EXECUTION.isBound()) {
+            return null;
+        }
+        List<Context> contexts = CURRENT_EXECUTION.get().contexts;
+        return contexts.isEmpty() ? null : contexts.get(contexts.size() - 1);
+    }
+
     private static <T, X extends Throwable> T runEnteredExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
         frame.contexts.add(ctx);
         Context entered = null;
