@@ -266,8 +266,9 @@ class JfrEventGatingTest {
                     BlockingHttpClient client = httpClient.toBlocking();
                     if (scenario == Scenario.NO_JFR_MODULE) {
                         result("jfrAvailable", NativeImageUtils.JFR_AVAILABLE);
-                        result("jfrSupport", JfrSupport.isRecorderInitialized());
+                        // The request goes first: it is what fails when an event class is loaded
                         result("body", client.retrieve(transport.path));
+                        result("jfrSupport", JfrSupport.isRecorderInitialized());
                     } else {
                         result("body", client.retrieve(transport.path));
                         result("recorderInitialized", Jfr.recorderInitialized());
