@@ -51,6 +51,9 @@ class ArgumentStructureSpec extends AbstractTypeElementSpec {
         S[] arrayOfSeveral,
         U[] arrayOfNone,
         U[][] arrayOfArrays,
+        Map<T, T> recursiveTwice,
+        Map<List<T>, T[]> recursiveNestedAndArray,
+        Map<T, List<T>> recursiveThenNested,
         T recursiveVariable,
         S severalVariable,
         U noneVariable,
@@ -223,6 +226,23 @@ class Other<T extends Payment, S extends Refundable & Payment, U extends Compara
         typeArgument.equalsStructure(handBuilt)
         parameter.equalsStructure(handBuilt)
         parameter.structureHashCode() == handBuilt.structureHashCode()
+    }
+
+    void "a variable with a recursive bound is the variable each time it is written among the type arguments"() {
+        given:
+        Argument<?> variable = first.recursiveVariable
+
+        expect: 'the second T of Map<T, T> is written the way the first is'
+        render(first.recursiveTwice) == 'Map<T extends Comparable<T extends Comparable>, T extends Comparable<T extends Comparable>>'
+        first.recursiveTwice.typeParameters.every { it.isUnresolvedTypeVariable() && it.equalsStructure(variable) && variable.equalsStructure(it) }
+        first.recursiveTwice.typeParameters.every { it.structureHashCode() == variable.structureHashCode() }
+
+        and: 'as is one written after a type that names the variable, or as an array'
+        first.recursiveNestedAndArray.typeParameters[0].equalsStructure(first.recursive)
+        first.recursiveNestedAndArray.typeParameters[1].equalsStructure(first.arrayOfRecursive)
+        first.recursiveNestedAndArray.typeParameters[1].componentType().equalsStructure(variable)
+        first.recursiveThenNested.typeParameters[0].equalsStructure(variable)
+        first.recursiveThenNested.typeParameters[1].equalsStructure(first.recursive)
     }
 
     void "a compiled argument is the same type as one built by hand without naming the type arguments"() {

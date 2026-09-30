@@ -173,11 +173,11 @@ final class ArgumentStructure {
             return Argument.ofTypeVariable(type, null, placeholder.getVariableName(), null,
                 typeParameters, placeholder.getBounds().toArray(Argument.ZERO_ARGUMENTS));
         }
-        if (typeParameters.length == 0) {
-            return Argument.of(type);
-        }
         if (argument.isRawType()) {
             return Argument.ofRawType(type, null, null, typeParameters);
+        }
+        if (typeParameters.length == 0) {
+            return Argument.of(type);
         }
         return Argument.of(type, (String) null, typeParameters);
     }

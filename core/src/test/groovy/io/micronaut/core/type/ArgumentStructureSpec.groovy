@@ -310,6 +310,18 @@ class ArgumentStructureSpec extends Specification {
         ((GenericPlaceholder<?>) again).bounds*.type == [Number, Comparable]
     }
 
+    void "a raw type that was given no type parameters stays raw as an array and as a component"() {
+        given:
+        Argument<?> raw = Argument.ofRawType(List, null, null, null)
+
+        expect:
+        raw.arrayType().isRawType()
+        raw.arrayType().type == List[]
+        raw.arrayType().componentType().isRawType()
+        Argument.ofRawType(List[], null, null, null).componentType().isRawType()
+        raw.arrayType().equalsStructure(Argument.of(List[]))
+    }
+
     void "an argument that is not an array has no component"() {
         expect:
         type(String).componentType() == null

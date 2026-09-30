@@ -474,6 +474,9 @@ public final class ArgumentExpUtils {
             }
         }
 
+        // A type argument is not visited for the ones written beside it: the second T of Map<T, T> is the variable
+        // again, written the way the first is, rather than the type a variable met within itself ends at
+        Set<Object> visitedBefore = types.size() > 1 ? new HashSet<>(visitedTypes) : null;
         return TYPE_ARGUMENT_ARRAY.instantiate(types.entrySet().stream().map(entry -> {
             String argumentName = entry.getKey();
             ClassElement classElement = entry.getValue();
@@ -483,7 +486,7 @@ public final class ArgumentExpUtils {
                 || classElement instanceof WildcardElement
                 || isRawType(classElement)
                 || !boundsToRecord(classElement).isEmpty()) {
-                return buildArgumentWithGenerics(
+                ExpressionDef argument = buildArgumentWithGenerics(
                     annotationMetadataWithDefaults,
                     owningType,
                     argumentName,
@@ -492,6 +495,10 @@ public final class ArgumentExpUtils {
                     visit,
                     loadClassValueExpressionFn
                 );
+                if (visitedBefore != null) {
+                    visitedTypes.retainAll(visitedBefore);
+                }
+                return argument;
             }
             return buildArgument(argumentName, classElement);
         }).toList());
