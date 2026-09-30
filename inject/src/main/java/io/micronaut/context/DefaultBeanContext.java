@@ -3428,7 +3428,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         dependentBeans,
                         interceptorRegistrations
                     );
-                } catch (Throwable e) {
+                } catch (RuntimeException e) {
                     destroyDependentsOfFailedBean(context, e);
                     context.pushDependentBeans(parentDependentBeans);
                     throw e;
@@ -3466,14 +3466,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         while (i.hasPrevious()) {
             try {
                 destroyBean(i.previous(), true);
-            } catch (Throwable e) {
+            } catch (RuntimeException e) {
                 failure.addSuppressed(e);
             }
         }
         if (dependentFactoryBean != null) {
             try {
                 destroyBean(dependentFactoryBean);
-            } catch (Throwable e) {
+            } catch (RuntimeException e) {
                 failure.addSuppressed(e);
             }
         }
