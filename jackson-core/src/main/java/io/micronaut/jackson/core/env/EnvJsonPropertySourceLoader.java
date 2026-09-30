@@ -19,6 +19,7 @@ import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.json.env.JsonPropertySourceLoader;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
