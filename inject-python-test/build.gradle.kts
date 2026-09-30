@@ -28,6 +28,7 @@ dependencies {
     testImplementation(platform(libs.test.boms.micronaut.serde))
     testImplementation(libs.managed.reactor)
     testImplementation(projects.micronautInjectJavaHelper)
+    testImplementation(projects.micronautInjectTestUtils)
     testImplementation(projects.micronautRetry)
     testImplementation(projects.micronautMessaging)
     testImplementation(libs.micronaut.validation)
