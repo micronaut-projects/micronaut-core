@@ -143,6 +143,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
         if (parsed > limits.maxBodySize()) {
             error(new ContentLengthExceededException(limits.maxBodySize(), parsed));
+            // nobody can use the body anymore, so like the check in add0, let the upstream drop
+            // the rest instead of stalling it on our missing demand
+            rootUpstream.allowDiscard();
         }
         setExpectedLength(parsed);
     }

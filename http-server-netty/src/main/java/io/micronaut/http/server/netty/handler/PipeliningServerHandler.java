@@ -640,6 +640,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.outboundAccess = null;
 
             StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler(outboundAccess, HttpUtil.is100ContinueExpected(request));
+            if (inboundHandler == this) {
+                inboundHandler = streamingInboundHandler;
+            } else {
+                ((DecompressingInboundHandler) inboundHandler).delegate = streamingInboundHandler;
+            }
+            // install the handler first: if the Content-Length already exceeds the limit, this
+            // rejects the body and switches to the dropping handler so the rest is drained
+            streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             for (HttpContent content : buffer) {
                 streamingInboundHandler.read(content);
             }
@@ -647,12 +655,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             receivedLength = 0;
             failed = false;
 
-            if (inboundHandler == this) {
-                inboundHandler = streamingInboundHandler;
-            } else {
-                ((DecompressingInboundHandler) inboundHandler).delegate = streamingInboundHandler;
-            }
-            streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
 
