@@ -66,8 +66,10 @@ import static io.micronaut.inject.writer.BeanDefinitionDescriptor.MEMBERSHIP_STE
  * What a processor writes into the {@code META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference} entries
  * of the definitions it generates.
  *
- * <p>The spec of every processor compiles the same beans, written in its language, to a directory as a build does,
- * and has to write the same descriptors for them.</p>
+ * <p>The spec of every processor compiles the same beans, written in its language, to a directory as a build does.
+ * Each descriptor has to agree with the class it describes. What the processors hold in the same way is expected
+ * here for all of them. What they hold differently, in the class and so in the descriptor, is what the specs
+ * override.</p>
  */
 abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
 
@@ -91,6 +93,36 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
      * cannot pass by finding nothing of what this processor compiled
      */
     protected abstract List<String> getModuleDefinitions()
+
+    /**
+     * @return The definitions of the compiled beans that the format cannot describe, whose entries are empty
+     */
+    protected List<String> getUndescribed() {
+        // a member of its qualifier is an expression, which is only known once it is evaluated
+        return ['test.$Dynamic$Definition']
+    }
+
+    /**
+     * @return The type of the value of a member that is an array of {@code int}
+     */
+    protected Class<?> getIntArrayType() {
+        return int[]
+    }
+
+    /**
+     * @return The names the classes {@code int[]} and {@code Object[]} have as values of a member
+     */
+    protected List<String> getArrayClassNames() {
+        return ['[I', '[Ljava.lang.Object;']
+    }
+
+    /**
+     * @return The types of the values of the members that are given no element: an array of strings, of
+     * {@code int} and of annotations
+     */
+    protected List<Class<?>> getEmptyArrayTypes() {
+        return [String[], int[], AnnotationValue[]]
+    }
 
     void setupSpec() {
         output = compile()
@@ -119,8 +151,8 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         then:
         comparison.differences.isEmpty()
         comparison.notLoaded.isEmpty()
-        comparison.withoutDescriptor == ['test.$Dynamic$Definition']
-        comparison.compared.size() == definitions().size() - 1
+        comparison.withoutDescriptor as Set == undescribed as Set
+        comparison.compared.size() == definitions().size() - undescribed.size()
     }
 
     void "the flags are the answers of the reference"() {
@@ -202,13 +234,14 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
 
         and:
         painted.qualifiers()*.annotationName == ['test.Colored']
-        values.keySet() == ['name', 'shade', 'dark', 'mode', 'type', 'tags', 'levels', 'detail', 'comment', AnnotationUtil.NON_BINDING_ATTRIBUTE] as Set
+        values.keySet() == ['name', 'shade', 'dark', 'mode', 'type', 'tags', 'levels', 'types', 'detail', 'comment', AnnotationUtil.NON_BINDING_ATTRIBUTE] as Set
         values.name == 'red'
         values.shade == 3
         values.dark == true
         values.mode == 'STRIPED'
         values.type == new AnnotationClassValue<>('java.lang.String')
         values.tags == ['a', 'b'] as String[]
+        values.levels.getClass() == intArrayType
         values.levels as List == [1, 2]
         values.detail == new AnnotationValue<>('test.Detail', [value: 'fine'] as Map<CharSequence, Object>)
         values.comment == 'ignored'
@@ -216,6 +249,26 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         and: "the members that are not compared, which the metadata names in a member of its own"
         painted.nonBindingMembers() == ['comment', AnnotationUtil.NON_BINDING_ATTRIBUTE]
         values[AnnotationUtil.NON_BINDING_ATTRIBUTE] == ['comment', AnnotationUtil.NON_BINDING_ATTRIBUTE] as String[]
+
+        and: "a class that is an array has the name of the class the definition loads, not the one of the source"
+        values.types.getClass() == AnnotationClassValue[]
+        values.types*.name == arrayClassNames
+    }
+
+    void "a member that is given no element is described as the array the definition holds"() {
+        given:
+        Map<CharSequence, Object> values = descriptor('Blank').qualifiers()[0].values
+
+        expect:
+        values.keySet() == ['name', 'tags', 'levels', 'details'] as Set
+        [values.tags, values.levels, values.details]*.getClass() == emptyArrayTypes
+        [values.tags, values.levels, values.details].every { java.lang.reflect.Array.getLength(it) == 0 }
+    }
+
+    void "an array of classes that is given no element is described where the definition holds one of class values"() {
+        expect:
+        undescribed.contains('test.$Untyped$Definition') ||
+            descriptor('Untyped').qualifiers()[0].values.types == [] as AnnotationClassValue[]
     }
 
     void "the conditions that are checked before the definition is loaded are described in their order"() {
@@ -225,7 +278,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
             new MatchesMissingPropertyCondition('descriptor.disabled'),
             new MatchesEnvironmentCondition(['test'] as String[]),
             new MatchesNotEnvironmentCondition(['cloud'] as String[]),
-            new MatchesPresenceOfClassesCondition([new AnnotationClassValue<>('java.lang.String')] as AnnotationClassValue[]),
+            new MatchesPresenceOfClassesCondition([new AnnotationClassValue<>('java.lang.String'), new AnnotationClassValue<>(arrayClassNames[0])] as AnnotationClassValue[]),
             new MatchesAbsenceOfClassesCondition([new AnnotationClassValue<>('test.Missing')] as AnnotationClassValue[]),
             new MatchesPresenceOfEntitiesCondition([new AnnotationClassValue<>('test.Marker')] as AnnotationClassValue[]),
             new MatchesConfigurationCondition('test', null),
@@ -254,9 +307,10 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
     }
 
     void "a definition the format cannot describe keeps an empty entry"() {
-        expect: "a member of a qualifier that is an expression is only known once it is evaluated"
-        content('test.$Dynamic$Definition').length == 0
-        BeanDefinitionDescriptors.load(classLoader, 'test.$Dynamic$Definition') != null
+        expect:
+        undescribed.contains('test.$Dynamic$Definition')
+        undescribed.every { content(it).length == 0 }
+        undescribed.every { BeanDefinitionDescriptors.load(classLoader, it) != null }
     }
 
     void "the entries of the other services are empty"() {
@@ -288,7 +342,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         sorted(found) == sorted(foundInJar)
 
         and: "the entries of the copy are empty, and the ones of the jar are the ones that were compiled"
-        found[SERVICE].count { content(it).length > 0 } == found[SERVICE].size() - 1
+        found[SERVICE].count { content(it).length > 0 } == found[SERVICE].size() - undescribed.size()
         found[SERVICE].every { BeanDefinitionDescriptors.read(emptied, it).length == 0 }
         found[SERVICE].every { BeanDefinitionDescriptors.read(jar, it) == content(it) }
 
@@ -297,7 +351,9 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         copies?.toFile()?.deleteDir()
     }
 
-    void "a context loads the definitions from entries that carry content"() {
+    // A smoke test of the beans the other features describe. Nothing in the context reads the content of an entry,
+    // so this cannot fail because of what a descriptor says.
+    void "a context starts from the definitions that were compiled"() {
         given: "the definitions the loader of the services finds in what was compiled"
         Set<String> names = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(new URLClassLoader(output, null))[SERVICE]
         ApplicationContext context = ApplicationContext.builder()

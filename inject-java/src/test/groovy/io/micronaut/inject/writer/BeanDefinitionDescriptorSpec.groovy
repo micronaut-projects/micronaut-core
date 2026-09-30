@@ -1,6 +1,10 @@
 package io.micronaut.inject.writer
 
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.JavaParser
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.VisitorContext
 import spock.lang.Shared
 import spock.lang.TempDir
 
@@ -40,6 +44,60 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
         ]
     }
 
+    void "a definition built by a type element visitor has a descriptor"() {
+        given: "the definition of the class that @Import makes a bean, which the processor of the visitors writes"
+        def descriptor = descriptor('Imports$Library0')
+
+        expect:
+        descriptor.beanType() == 'test.Library'
+        descriptor.exposedTypes() == ['test.Library']
+    }
+
+    void "the content a type element visitor gives the entry of a service is written"() {
+        given: "a visitor that adds a service of its own with content"
+        byte[] content = [1, 2, 3]
+        TypeElementVisitor visitor = new TypeElementVisitor<Object, Object>() {
+            @Override
+            TypeElementVisitor.VisitorKind getVisitorKind() {
+                return TypeElementVisitor.VisitorKind.ISOLATING
+            }
+
+            @Override
+            void visitClass(ClassElement element, VisitorContext context) {
+                if (element.simpleName == 'Visited') {
+                    context.visitServiceDescriptor('test.Service', element.name, element, content)
+                }
+            }
+        }
+        JavaParser parser = new JavaParser() {
+            @Override
+            protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
+                return new TypeElementVisitorProcessor() {
+                    @Override
+                    protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                        return [visitor]
+                    }
+                }
+            }
+        }
+
+        when:
+        JavaFileObject entry = parser.generate('test.Visited', '''
+package test;
+
+@jakarta.inject.Singleton
+class Visited {
+}
+''').find { it.name == CLASS_OUTPUT + 'META-INF/micronaut/test.Service/test.Visited' }
+
+        then:
+        entry != null
+        entry.openInputStream().withCloseable { it.bytes } == content
+
+        cleanup:
+        parser.close()
+    }
+
     private static final String BEANS = '''
 package test;
 
@@ -52,6 +110,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Import;
 import io.micronaut.context.annotation.NonBinding;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Primary;
@@ -183,15 +242,29 @@ enum Mode {
 
     int[] levels() default {};
 
+    Class<?>[] types() default {};
+
     Detail detail() default @Detail("none");
+
+    Detail[] details() default {};
 
     @NonBinding
     String comment() default "";
 }
 
 @Singleton
-@Colored(name = "red", shade = 3, dark = true, mode = Mode.STRIPED, type = String.class, tags = {"a", "b"}, levels = {1, 2}, detail = @Detail("fine"), comment = "ignored")
+@Colored(name = "red", shade = 3, dark = true, mode = Mode.STRIPED, type = String.class, tags = {"a", "b"}, levels = {1, 2}, types = {int[].class, Object[].class}, detail = @Detail("fine"), comment = "ignored")
 class Painted {
+}
+
+@Singleton
+@Colored(name = "blank", tags = {}, levels = {}, details = {})
+class Blank {
+}
+
+@Singleton
+@Colored(name = "untyped", types = {})
+class Untyped {
 }
 
 @Singleton
@@ -209,7 +282,7 @@ class NamedOne implements Api {
 @Requires(missingProperty = "descriptor.disabled")
 @Requires(env = "test")
 @Requires(notEnv = "cloud")
-@Requires(classes = String.class)
+@Requires(classes = {String.class, int[].class})
 @Requires(missingClasses = "test.Missing")
 @Requires(entities = Marker.class)
 @Requires(configuration = "test")
@@ -238,6 +311,13 @@ class Products {
     Product[] all() {
         return new Product[0];
     }
+}
+
+class Library {
+}
+
+@Import(classes = Library.class)
+class Imports {
 }
 
 @Around

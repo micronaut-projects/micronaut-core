@@ -21,6 +21,25 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
         ]
     }
 
+    @Override
+    protected List<String> getUndescribed() {
+        // KSP holds an empty array of classes as one of KClass, which the definition holds too
+        return super.getUndescribed() + ['test.$Untyped$Definition']
+    }
+
+    @Override
+    protected Class<?> getIntArrayType() {
+        // KSP holds the elements of an array of a primitive type as their wrappers
+        return Integer[]
+    }
+
+    @Override
+    protected List<Class<?>> getEmptyArrayTypes() {
+        // and an empty array of anything but strings as one of objects
+        return [String[], Object[], Object[]]
+    }
+
+    // the beans of the specs of the other processors, but the one @Import adds: KSP has no beans added by visitors
     private static final String BEANS = '''
 package test
 
@@ -127,13 +146,23 @@ annotation class Colored(
     val type: KClass<*> = Any::class,
     val tags: Array<String> = [],
     val levels: IntArray = [],
+    val types: Array<KClass<*>> = [],
     val detail: Detail = Detail("none"),
+    val details: Array<Detail> = [],
     @get:NonBinding val comment: String = ""
 )
 
 @Singleton
-@Colored(name = "red", shade = 3, dark = true, mode = Mode.STRIPED, type = String::class, tags = ["a", "b"], levels = [1, 2], detail = Detail("fine"), comment = "ignored")
+@Colored(name = "red", shade = 3, dark = true, mode = Mode.STRIPED, type = String::class, tags = ["a", "b"], levels = [1, 2], types = [IntArray::class, Array<Any>::class], detail = Detail("fine"), comment = "ignored")
 class Painted
+
+@Singleton
+@Colored(name = "blank", tags = [], levels = [], details = [])
+class Blank
+
+@Singleton
+@Colored(name = "untyped", types = [])
+class Untyped
 
 @Singleton
 @Colored(name = "#{ 'dyn' + 'amic' }")
@@ -148,7 +177,7 @@ class NamedOne : Api
 @Requires(missingProperty = "descriptor.disabled")
 @Requires(env = ["test"])
 @Requires(notEnv = ["cloud"])
-@Requires(classes = [String::class])
+@Requires(classes = [String::class, IntArray::class])
 @Requires(missingClasses = ["test.Missing"])
 @Requires(entities = [Marker::class])
 @Requires(configuration = "test")

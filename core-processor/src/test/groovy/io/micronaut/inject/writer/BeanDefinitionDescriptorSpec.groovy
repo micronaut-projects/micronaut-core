@@ -156,6 +156,7 @@ class BeanDefinitionDescriptorSpec extends Specification {
             annotation : new AnnotationValue<>("a.Nested", [value: 1] as Map<CharSequence, Object>),
             strings    : ["a", "b"] as String[],
             noStrings  : [] as String[],
+            noObjects  : [] as Object[],
             booleans   : [true, false] as boolean[],
             bytes      : [1, 2] as byte[],
             chars      : ['a', 'b'] as char[],
@@ -186,6 +187,44 @@ class BeanDefinitionDescriptorSpec extends Specification {
             assert readValues[member].getClass() == value.getClass()
             assert readValues[member] == value
         }
+    }
+
+    void "a class is described by the name the class literal of the definition has: #name"() {
+        given:
+        def classValue = new AnnotationClassValue<>(name)
+
+        when:
+        def read = BeanDefinitionDescriptor.read(describe(
+            [qualifier(classValue), qualifier([classValue] as AnnotationClassValue[])],
+            [new MatchesPresenceOfClassesCondition([classValue] as AnnotationClassValue[])]
+        ).toByteArray())
+
+        then:
+        read.qualifiers()[0].values.value == new AnnotationClassValue<>(described)
+        read.qualifiers()[1].values.value == [new AnnotationClassValue<>(described)] as AnnotationClassValue[]
+        read.preLoadConditions() == [new MatchesPresenceOfClassesCondition([new AnnotationClassValue<>(described)] as AnnotationClassValue[])]
+
+        and: "which is the name the class has once it is loaded"
+        loaded == null || loaded.name == described
+
+        where:
+        name                   | described              | loaded
+        "a.Type"               | "a.Type"               | null
+        "java.lang.String"     | "java.lang.String"     | String
+        "[I"                   | "[I"                   | int[]
+        "[[Ljava.lang.String;" | "[[Ljava.lang.String;" | String[][]
+        "boolean[]"            | "[Z"                   | boolean[]
+        "byte[]"               | "[B"                   | byte[]
+        "char[]"               | "[C"                   | char[]
+        "short[]"              | "[S"                   | short[]
+        "int[]"                | "[I"                   | int[]
+        "long[]"               | "[J"                   | long[]
+        "float[]"              | "[F"                   | float[]
+        "double[]"             | "[D"                   | double[]
+        "int[][]"              | "[[I"                  | int[][]
+        "java.lang.Object[]"   | "[Ljava.lang.Object;"  | Object[]
+        "java.lang.String[][]" | "[[Ljava.lang.String;" | String[][]
+        "a.Type\$Inner[]"      | "[La.Type\$Inner;"     | null
     }
 
     void "an enum constant is described by its name, as the generated metadata holds it"() {
@@ -220,6 +259,8 @@ class BeanDefinitionDescriptorSpec extends Specification {
         "an expression"                        | describe([qualifier(new EvaluatedExpressionReference("#{1}", "a.Qualifier", "value", "a.\$Expr"))], [])
         "a collection"                         | describe([qualifier(["a", "b"])], [])
         "an array of objects"                  | describe([qualifier(["a", 1] as Object[])], [])
+        "an empty array of another type"       | describe([qualifier([] as BigInteger[])], [])
+        "an array of an array by its name"     | describe([qualifier(new AnnotationClassValue<>("[I[]"))], [])
         "an array of numbers"                  | describe([qualifier([1G, 2G] as BigInteger[])], [])
         "an array of wrappers with no element" | describe([qualifier([1, null] as Integer[])], [])
         "a number that is not of a primitive"  | describe([qualifier(1G)], [])
@@ -253,6 +294,7 @@ class BeanDefinitionDescriptorSpec extends Specification {
         "an unknown value"             | withPayload(payloadEndingWithQualifierValue(99))
         "an unknown array"             | withPayload(payloadEndingWithQualifierValue(12, 99, 0, 0))
         "an unknown array of wrappers" | withPayload(payloadEndingWithQualifierValue(13, 1, 0, 0))
+        "a kind after the last one"    | withPayload(payloadEndingWithQualifierValue(15))
         "an array of arrays"           | withPayload(payloadEndingWithQualifierValue(12, 12, 0, 1, 1, 0, 0))
         "an unknown constant"          | withPayload(payloadEnding(1, 11, 0, 1, 0, 3, (int) 'Z', (int) 'O', (int) 'S'))
         "text"                         | "a.b.\$C\$Definition".bytes

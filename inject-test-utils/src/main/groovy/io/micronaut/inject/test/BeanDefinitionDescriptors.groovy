@@ -199,6 +199,17 @@ class BeanDefinitionDescriptors {
         for (Map.Entry<String, String> repeatable : descriptor.repeatableContainers().entrySet()) {
             check("container of ${repeatable.key}", repeatable.value, AnnotationMetadataSupport.getRepeatableAnnotation(repeatable.key))
         }
+        // and the other way. The registry is shared by every class, so it does not tell what this one registered:
+        // what it has to have registered is the container of each annotation its metadata holds repeated
+        for (String name : names) {
+            AnnotationValue<?> container = metadata.getAnnotation(name)
+            List<AnnotationValue<?>> repeated = container == null ? [] : (List<AnnotationValue<?>>) container.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
+            for (String repeatable : repeated*.annotationName.toSet()) {
+                if (AnnotationMetadataSupport.getRepeatableAnnotation(repeatable) == name && !AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().containsKey(repeatable)) {
+                    check("container of $repeatable", descriptor.repeatableContainers().get(repeatable), name)
+                }
+            }
+        }
 
         // as QualifiedBeanType#getDeclaredQualifier reads them
         AnnotationMetadata declared = (AnnotationMetadata) reference.getTargetAnnotationMetadata()

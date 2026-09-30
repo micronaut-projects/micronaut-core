@@ -82,8 +82,17 @@ import java.util.TreeSet;
  * value      = ubyte kind, then: 1 utf | 2 boolean | 3 byte | 4 char | 5 short | 6 int | 7 long | 8 float | 9 double
  *              | 10 utf (class name) | 11 annotation | 12 ubyte kind of the elements (1 to 11), ushort n, element[n]
  *              | 13 the same for the kinds 2 to 9, for an array of the wrappers of a primitive type
+ *              | 14 nothing, for an array of objects that has no element
  * condition  = ubyte kind, then the components of the condition record
  * </pre>
+ *
+ * <p>Types are named in two ways, and a reader needs both. The bean type and the exposed types are named by the
+ * name of the class, with {@code []} appended for each dimension of an array. A class that is the value of an
+ * annotation member or of a condition is named as {@link Class#getName()} names it, {@code [I} or
+ * {@code [Ljava.lang.String;} for an array, because the definition holds that value by a class literal.</p>
+ *
+ * <p>The qualifiers carry the members that are declared. The default values of their other members are not part
+ * of the descriptor: a definition registers them when it is loaded.</p>
  *
  * <p>A reader uses a descriptor only when the magic and the version are the ones it knows and the entry is as long
  * as the header says. A later addition appends to the payload and keeps the version: the fields are read in order
@@ -211,6 +220,7 @@ public record BeanDefinitionDescriptor(int flags,
     private static final int VALUE_ANNOTATION = 11;
     private static final int VALUE_ARRAY = 12;
     private static final int VALUE_WRAPPER_ARRAY = 13;
+    private static final int VALUE_EMPTY_ARRAY = 14;
 
     private static final int CONDITION_CLASSES = 1;
     private static final int CONDITION_MISSING_CLASSES = 2;
@@ -416,7 +426,43 @@ public record BeanDefinitionDescriptor(int flags,
             // an instance is a value of its own, which a name does not give back
             throw new UndescribableException();
         }
-        out.writeUTF(classValue.getName());
+        out.writeUTF(classLiteralName(classValue.getName()));
+    }
+
+    /**
+     * The name of the class of a class value as the definition holds it. The definition takes the value from a
+     * class literal, so that the name is the one {@link Class#getName()} gives. A processor that names an array as
+     * the source does, {@code int[]}, names it differently from the class it generates, which holds {@code [I}.
+     *
+     * @param name The name a processor gives the class
+     * @return The name of the class
+     */
+    private static String classLiteralName(String name) {
+        if (!name.endsWith("[]")) {
+            return name;
+        }
+        int dimensions = 0;
+        String component = name;
+        while (component.endsWith("[]")) {
+            dimensions++;
+            component = component.substring(0, component.length() - 2);
+        }
+        if (component.isEmpty() || component.charAt(0) == '[') {
+            // not a name a class literal is written from
+            throw new UndescribableException();
+        }
+        String descriptor = switch (component) {
+            case "boolean" -> "Z";
+            case "byte" -> "B";
+            case "char" -> "C";
+            case "short" -> "S";
+            case "int" -> "I";
+            case "long" -> "J";
+            case "float" -> "F";
+            case "double" -> "D";
+            default -> "L" + component + ";";
+        };
+        return "[".repeat(dimensions) + descriptor;
     }
 
     private static AnnotationClassValue<?>[] readClasses(DataInputStream in, int length) throws IOException {
@@ -553,6 +599,8 @@ public record BeanDefinitionDescriptor(int flags,
                     writePrimitive(out, kind, element(wrapper));
                 }
             }
+            // an empty array of a type the processor does not know is one of objects, in the generated metadata too
+            case Object[] objects when objects.length == 0 && objects.getClass() == Object[].class -> out.writeByte(VALUE_EMPTY_ARRAY);
             // an expression, a collection, an array of another type: the generated metadata holds a value that a
             // reader of these bytes could not give back
             default -> throw new UndescribableException();
@@ -632,6 +680,7 @@ public record BeanDefinitionDescriptor(int flags,
             case VALUE_ANNOTATION -> readAnnotation(in);
             case VALUE_ARRAY -> readArray(in);
             case VALUE_WRAPPER_ARRAY -> readWrapperArray(in);
+            case VALUE_EMPTY_ARRAY -> new Object[0];
             default -> readPrimitive(in, kind);
         };
     }

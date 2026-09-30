@@ -31,6 +31,28 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
         ]
     }
 
+    @Override
+    protected List<String> getArrayClassNames() {
+        // the class of an array of a primitive type is given a name that no class has, and the definition holds the
+        // value by that name
+        return ['[Lint;', '[Ljava.lang.Object;']
+    }
+
+    @Override
+    protected List<Class<?>> getEmptyArrayTypes() {
+        // an empty array of an annotation of the same compilation is one of objects
+        return [String[], int[], Object[]]
+    }
+
+    void "a definition built by a type element visitor has a descriptor"() {
+        given: "the definition of the class that @Import makes a bean, which the transform of the visitors writes"
+        def descriptor = descriptor('Imports$Library0')
+
+        expect:
+        descriptor.beanType() == 'test.Library'
+        descriptor.exposedTypes() == ['test.Library']
+    }
+
     void "an entry that is compiled again is written anew"() {
         given:
         Path targetDir = Files.createDirectories(tempDir.resolve('again'))
@@ -89,6 +111,7 @@ import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Import
 import io.micronaut.context.annotation.NonBinding
 import io.micronaut.context.annotation.Parallel
 import io.micronaut.context.annotation.Primary
@@ -212,15 +235,29 @@ enum Mode {
 
     int[] levels() default []
 
+    Class<?>[] types() default []
+
     Detail detail() default @Detail("none")
+
+    Detail[] details() default []
 
     @NonBinding
     String comment() default ""
 }
 
 @Singleton
-@Colored(name = "red", shade = 3, dark = true, mode = Mode.STRIPED, type = String, tags = ["a", "b"], levels = [1, 2], detail = @Detail("fine"), comment = "ignored")
+@Colored(name = "red", shade = 3, dark = true, mode = Mode.STRIPED, type = String, tags = ["a", "b"], levels = [1, 2], types = [int[].class, Object[].class], detail = @Detail("fine"), comment = "ignored")
 class Painted {
+}
+
+@Singleton
+@Colored(name = "blank", tags = [], levels = [], details = [])
+class Blank {
+}
+
+@Singleton
+@Colored(name = "untyped", types = [])
+class Untyped {
 }
 
 @Singleton
@@ -238,7 +275,7 @@ class NamedOne implements Api {
 @Requires(missingProperty = "descriptor.disabled")
 @Requires(env = "test")
 @Requires(notEnv = "cloud")
-@Requires(classes = String)
+@Requires(classes = [String, int[].class])
 @Requires(missingClasses = "test.Missing")
 @Requires(entities = Marker)
 @Requires(configuration = "test")
@@ -267,6 +304,13 @@ class Products {
     Product[] all() {
         return new Product[0]
     }
+}
+
+class Library {
+}
+
+@Import(classes = Library)
+class Imports {
 }
 
 @Around
