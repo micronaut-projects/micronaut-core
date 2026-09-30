@@ -20,9 +20,9 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.Configurator;
 import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.classic.util.DefaultJoranConfigurator;
-import ch.qos.logback.core.LogbackException;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
+import ch.qos.logback.core.util.Loader;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.logging.LoggingSystemException;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +31,7 @@ import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.ServiceConfigurationError;
 
 import static ch.qos.logback.classic.util.ClassicEnvUtil.loadFromServiceLoader;
 
@@ -48,39 +49,74 @@ public final class LogbackUtils {
     /**
      * Configures a Logger Context, typically after a {@link LoggerContext#reset()}.
      * <p>
-     * A location that only Micronaut can see wins: {@code logback.configurationFile} set in
-     * Micronaut configuration but not as a JVM system property, otherwise {@code logger.config}.
+     * A location that only Micronaut can see wins: {@code logback.configurationFile} of the
+     * Micronaut configuration, unless its value is exactly that of the JVM system property of the
+     * same name, or {@code logger.config} when {@code logback.configurationFile} is not set.
      * The context is configured from that location with {@link DefaultJoranConfigurator}, whatever
      * {@link Configurator} services exist. The location is looked up on the classpath first and
      * then on the file system, and a missing location fails.
      * </p>
      * <p>
      * Otherwise the context is configured the way Logback's own startup configures it, with
-     * {@link ContextInitializer#autoConfig(ClassLoader)}: the {@link Configurator} services by rank,
-     * until one returns {@link Configurator.ExecutionStatus#DO_NOT_INVOKE_NEXT_IF_ANY}, then the
+     * {@link ContextInitializer#autoConfig(ClassLoader)} and the class loader that Logback's startup
+     * uses, which is the one that loaded Logback: the {@link Configurator} services by rank, until
+     * one returns {@link Configurator.ExecutionStatus#DO_NOT_INVOKE_NEXT_IF_ANY}, then the
      * {@code logback.configurationFile} JVM system property, {@code logback-test.xml} or
-     * {@code logback.xml}, then the basic console configuration.
+     * {@code logback.xml} on the classpath, then the basic console configuration.
+     * </p>
+     * <p>
+     * There is one addition to Logback's own lookup, kept from the previous versions of this
+     * class: a {@code logback.xml} file in the working directory is used when there is no
+     * {@link Configurator} service, the {@code logback.configurationFile} JVM system property is
+     * not set, and neither {@code logback-test.xml} nor {@code logback.xml} is on the classpath.
      * </p>
      *
-     * @param classLoader       The class loader to look up the configuration and the {@link Configurator} services with
+     * @param classLoader       The class loader to look up a location set in Micronaut configuration with
      * @param context           The Logger Context
      * @param configurationFile The {@code logback.configurationFile} property of the Micronaut configuration, if any
      * @param loggerConfig      The {@code logger.config} property of the Micronaut configuration, if any
+     * @throws LoggingSystemException if the location set in Micronaut configuration does not exist, or
+     *                                if Logback fails to configure the context
      * @since 5.3.0
      */
     public static void configure(ClassLoader classLoader,
                                  LoggerContext context,
                                  @Nullable String configurationFile,
                                  @Nullable String loggerConfig) {
+        // ContextInitializer.autoConfig(), which Logback's startup calls, uses this class loader
+        configure(classLoader, Loader.getClassLoaderOfClass(Configurator.class), context, configurationFile, loggerConfig);
+    }
+
+    /**
+     * @param classLoader        The class loader to look up a location set in Micronaut configuration with
+     * @param logbackClassLoader The class loader that Logback's own lookup uses. Tests pass one that holds
+     *                           {@link Configurator} service entries
+     * @param context            The Logger Context
+     * @param configurationFile  The {@code logback.configurationFile} property of the Micronaut configuration, if any
+     * @param loggerConfig       The {@code logger.config} property of the Micronaut configuration, if any
+     */
+    static void configure(ClassLoader classLoader,
+                          ClassLoader logbackClassLoader,
+                          LoggerContext context,
+                          @Nullable String configurationFile,
+                          @Nullable String loggerConfig) {
         String location = micronautOnlyLocation(configurationFile, loggerConfig);
         if (location != null) {
             configureByResource(context, location, findResource(classLoader, location));
-        } else {
-            try {
-                new ContextInitializer(context).autoConfig(classLoader);
-            } catch (JoranException | LogbackException e) {
-                throw new LoggingSystemException("Error while refreshing Logback", e);
+            return;
+        }
+        try {
+            URL workingDirectoryFile = findWorkingDirectoryFile(logbackClassLoader);
+            if (workingDirectoryFile != null) {
+                context.getStatusManager().add(new InfoStatus("Found resource [" + ClassicConstants.AUTOCONFIG_FILE + "] in the working directory at [" + workingDirectoryFile + "]", context));
+                configureByUrl(context, workingDirectoryFile);
+            } else {
+                new ContextInitializer(context).autoConfig(logbackClassLoader);
             }
+        } catch (Exception | ServiceConfigurationError e) {
+            // Logback wraps what a Configurator throws in a LogbackException, and a Configurator service
+            // that cannot be loaded is a ServiceConfigurationError. Nothing else is expected.
+            throw new LoggingSystemException("Error while refreshing Logback", e);
         }
     }
 
@@ -123,6 +159,30 @@ public final class LogbackUtils {
     }
 
     /**
+     * Logback's own lookup searches only the classpath for the default file names, whereas this class
+     * has always fallen back to a {@code logback.xml} file in the working directory. That fallback is
+     * kept for the case it applied to, which is that nothing else selects a configuration.
+     *
+     * @param logbackClassLoader The class loader that Logback's own lookup uses
+     * @return The {@code logback.xml} file in the working directory, if it exists and no
+     * {@link Configurator} service, {@code logback.configurationFile} JVM system property or default
+     * file on the classpath takes precedence over it
+     * @throws MalformedURLException if the file cannot be converted to a URL
+     */
+    private static @Nullable URL findWorkingDirectoryFile(ClassLoader logbackClassLoader) throws MalformedURLException {
+        File file = new File(ClassicConstants.AUTOCONFIG_FILE);
+        // The file is checked first because it rarely exists, and then nothing else is looked up
+        if (!file.exists()
+            || System.getProperty(ClassicConstants.CONFIG_FILE_PROPERTY) != null
+            || logbackClassLoader.getResource(ClassicConstants.TEST_AUTOCONFIG_FILE) != null
+            || logbackClassLoader.getResource(ClassicConstants.AUTOCONFIG_FILE) != null
+            || !loadFromServiceLoader(Configurator.class, logbackClassLoader).isEmpty()) {
+            return null;
+        }
+        return file.toURI().toURL();
+    }
+
+    /**
      * @param classLoader The class loader
      * @param location    The location on the classpath or on the file system
      * @return The resource, if it exists
@@ -158,12 +218,21 @@ public final class LogbackUtils {
             throw new LoggingSystemException("Resource " + location + " not found");
         }
         try {
-            DefaultJoranConfigurator defaultConfigurator = new DefaultJoranConfigurator();
-            defaultConfigurator.setContext(context);
-            defaultConfigurator.configureByResource(resource);
+            configureByUrl(context, resource);
         } catch (JoranException e) {
             throw new LoggingSystemException("Error while refreshing Logback", e);
         }
+    }
+
+    /**
+     * @param context Logger Context
+     * @param url     The URL of the xml logback config file
+     * @throws JoranException if the file cannot be read or parsed
+     */
+    private static void configureByUrl(LoggerContext context, URL url) throws JoranException {
+        DefaultJoranConfigurator defaultConfigurator = new DefaultJoranConfigurator();
+        defaultConfigurator.setContext(context);
+        defaultConfigurator.configureByResource(url);
     }
 
     /**

@@ -6,6 +6,7 @@ import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.Configurator
 import ch.qos.logback.classic.spi.ConfiguratorRank
 import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.LogbackException
 import ch.qos.logback.core.read.ListAppender
 import ch.qos.logback.core.spi.ContextAwareBase
 import io.micronaut.logging.LoggingSystemException
@@ -21,6 +22,10 @@ import java.nio.file.Path
  * The configurator cases of the issue: a fresh {@link LoggerContext} and a class loader that holds the
  * {@link Configurator} service entry. Logback's own lookup finds this module's {@code logback.xml}, whose
  * root appender is {@code STDOUT}.
+ * <p>
+ * Logback's startup looks the {@link Configurator} services up with the class loader that loaded Logback,
+ * and so does the public {@code configure}. These features therefore go through its package-private
+ * overload, which takes that class loader.
  */
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
 @RestoreSystemProperties
@@ -59,7 +64,7 @@ class LogbackUtilsSpec extends Specification {
         }
 
         when:
-        LogbackUtils.configure(classLoader(configurators), context, location(configurationFile), location(loggerConfig))
+        configure(configurators, location(configurationFile), location(loggerConfig))
 
         then:
         rootAppenders() == expected
@@ -79,9 +84,44 @@ class LogbackUtilsSpec extends Specification {
         'logback.configurationFile that overrides the JVM system property'    | [StubConfigurator]             | CUSTOM            | null         | MISSING        | ['CUSTOM']
     }
 
+    void "Logback resolves a -Dlogback.configurationFile that is a URL"() {
+        given:
+        String url = dir.resolve(CUSTOM).toUri().toString()
+        System.setProperty(ClassicConstants.CONFIG_FILE_PROPERTY, url)
+
+        when:
+        configure([], url, null)
+
+        then:
+        rootAppenders() == ['CUSTOM']
+    }
+
+    void "the public method looks the Configurator services up with the class loader that loaded Logback"() {
+        when: 'the class loader for the locations of the Micronaut configuration holds a Configurator service'
+        LogbackUtils.configure(classLoader([StubConfigurator]), context, null, null)
+
+        then: 'Logback never sees it, as its startup did not'
+        rootAppenders() == ['STDOUT']
+    }
+
+    void "a Configurator service that #description fails with a LoggingSystemException"() {
+        when:
+        LogbackUtils.configure(getClass().classLoader, classLoader(services), context, null, null)
+
+        then:
+        LoggingSystemException e = thrown()
+        e.message == 'Error while refreshing Logback'
+        cause.isInstance(e.cause)
+
+        where:
+        description        | services                                         | cause
+        'throws'           | [ThrowingConfigurator]                           | LogbackException
+        'cannot be loaded' | ['io.micronaut.logging.impl.NoSuchConfigurator'] | ServiceConfigurationError
+    }
+
     void "a missing location set only in Micronaut configuration fails, whatever configurators exist"() {
         when:
-        LogbackUtils.configure(classLoader([StubConfigurator]), context, configurationFile, loggerConfig)
+        configure([StubConfigurator], configurationFile, loggerConfig)
 
         then:
         LoggingSystemException e = thrown()
@@ -97,10 +137,17 @@ class LogbackUtilsSpec extends Specification {
         name == null ? null : dir.resolve(name).toString()
     }
 
-    private ClassLoader classLoader(List<Class<? extends Configurator>> configurators) {
+    private void configure(List<Class<? extends Configurator>> configurators, String configurationFile, String loggerConfig) {
+        LogbackUtils.configure(getClass().classLoader, classLoader(configurators), context, configurationFile, loggerConfig)
+    }
+
+    /**
+     * @param configurators The {@link Configurator} classes, or their names, to register as services
+     */
+    private ClassLoader classLoader(List<?> configurators) {
         Path services = dir.resolve('META-INF/services')
         Files.createDirectories(services)
-        Files.write(services.resolve(Configurator.name), configurators*.name)
+        Files.write(services.resolve(Configurator.name), configurators.collect { it instanceof Class ? it.name : it as String })
         URLClassLoader classLoader = new URLClassLoader([dir.toUri().toURL()] as URL[], getClass().classLoader)
         classLoaders << classLoader
         return classLoader
@@ -148,6 +195,17 @@ class LogbackUtilsSpec extends Specification {
     static class DecliningConfigurator extends AbstractStubConfigurator {
         DecliningConfigurator() {
             super(null, ExecutionStatus.INVOKE_NEXT_IF_ANY)
+        }
+    }
+
+    static class ThrowingConfigurator extends AbstractStubConfigurator {
+        ThrowingConfigurator() {
+            super(null, ExecutionStatus.NEUTRAL)
+        }
+
+        @Override
+        ExecutionStatus configure(LoggerContext loggerContext) {
+            throw new IllegalStateException('broken')
         }
     }
 
