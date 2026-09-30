@@ -130,6 +130,26 @@ public final class BasicHttpAttributes {
     }
 
     /**
+     * Take the conditions that were added with {@link #addRouteWaitsFor} off the request: the
+     * caller waits for them, and the conditions that are added afterwards are told apart from
+     * them, e.g. those of the arguments of a route that are bound once the route waited for the
+     * others.
+     *
+     * @param request The request
+     * @return The conditions to wait for, or {@code null} if there are none
+     * @since 5.3.0
+     */
+    @Internal
+    public static @Nullable ExecutionFlow<?> takeRouteWaitsFor(HttpRequest<?> request) {
+        // getAttribute(name) without a type, see getRouteWaitsFor
+        if (request.getAttribute(ROUTE_WAITS_FOR).orElse(null) instanceof ExecutionFlow<?> flow) {
+            request.getAttributes().remove(ROUTE_WAITS_FOR);
+            return flow;
+        }
+        return null;
+    }
+
+    /**
      * Add a body the route of the request is invoked with, which is released when the route
      * completed, before its response is written, or, for a streamed response, when its stream
      * ended, see {@link #takeRouteBodies}.

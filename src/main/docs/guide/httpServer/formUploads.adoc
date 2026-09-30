@@ -103,6 +103,10 @@ A method can combine a api:http.form.FormData[] argument, api:http.form.FileUplo
 * a api:http.form.FormParts[] argument with any other form argument
 * a api:http.form.FormData[] argument with a api:http.multipart.CompletedFileUpload[], a api:http.form.FormPart[] or a api:http.form.FormParts[] argument
 
+== In a Request Bean
+
+The members of a api:http.annotation.RequestBean[] are bound like the arguments of the method: a api:http.form.FormData[], a api:http.form.FileUpload[], a text field with api:http.annotation.Part[], a api:http.form.FormPart[], api:http.form.FormParts[], an api:http.body.AsyncRequestBody[] and api:http.PathVariables[] can be members of the bean. The method waits for a form that is still arriving before it is invoked with the bean, as it does for its arguments.
+
 == In Filters
 
 The request filter methods of a api:http.annotation.ServerFilter[] can declare the same arguments as a controller method: api:http.body.AsyncRequestBody[], api:http.form.FormData[], api:http.form.FormParts[], api:http.form.FormPart[], api:http.form.FileUpload[], a `List` or an `Optional` of those, and text fields with api:http.annotation.Part[]. A filter that reads the form with api:http.form.FormData[], api:http.form.FileUpload[] or api:http.annotation.Part[] arguments leaves the same form for the route:

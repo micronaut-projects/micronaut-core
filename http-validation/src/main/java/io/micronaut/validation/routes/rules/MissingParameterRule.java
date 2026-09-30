@@ -22,6 +22,7 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 import java.util.ArrayList;
@@ -62,7 +63,11 @@ public class MissingParameterRule implements RouteValidationRule {
                 }
             }
             if (parameter.hasAnnotation("io.micronaut.http.annotation.RequestBean")) {
-                for (AnnotatedElement element : findProperties(parameter.getType())) {
+                for (TypedElement element : findProperties(parameter.getType())) {
+                    if (element.getType().getName().equals(PathVariables.class.getName())) {
+                        // reads every variable of the route, like a parameter
+                        return new RouteValidationResult(EMPTY_STRING_ARRAY);
+                    }
                     if (element.getAnnotationMetadata().hasStereotype(Bindable.class)) {
                         routeVariables.add(element.getAnnotationMetadata().stringValue(Bindable.class).orElse(element.getName()));
                     }
@@ -81,7 +86,7 @@ public class MissingParameterRule implements RouteValidationRule {
         return new RouteValidationResult(errorMessages.toArray(EMPTY_STRING_ARRAY));
     }
 
-    private static Collection<? extends AnnotatedElement> findProperties(ClassElement t) {
+    private static Collection<? extends TypedElement> findProperties(ClassElement t) {
         if (t.isRecord()) {
             Optional<MethodElement> primaryConstructor = t.getPrimaryConstructor();
             if (primaryConstructor.isPresent()) {

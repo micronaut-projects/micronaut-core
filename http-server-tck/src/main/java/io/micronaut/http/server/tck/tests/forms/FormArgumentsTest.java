@@ -16,16 +16,19 @@
 package io.micronaut.http.server.tck.tests.forms;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.CloseableByteBody;
@@ -337,6 +340,48 @@ public class FormArgumentsTest {
     }
 
     @Test
+    void theMembersOfARequestBeanAreTakenFromTheForm() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Function<String, HttpRequest<?>> form = path -> HttpRequest.POST(CTL + path, "name=Fred&city=Prague&age=41")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE).header("X-Id", "7");
+            // like the parameters of a route
+            assertEquals("Fred Prague 7", call(server, form.apply("/bean/data-parameters")).body());
+            assertEquals("Fred Prague 7", call(server, form.apply("/bean/data")).body());
+            assertEquals("Fred Prague 42", call(server, form.apply("/bean/text")).body());
+            assertEquals("Fred Prague 42 Fred", call(server, form.apply("/bean/data-and-text")).body());
+            assertEquals("5 Fred Prague", call(server, form.apply("/bean/async/5")).body());
+            // a required member that is missing
+            Response missing = call(server, HttpRequest.POST(CTL + "/bean/text", "name=Fred&age=41")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+            assertEquals(HttpStatus.BAD_REQUEST, missing.status(), missing.body());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void theMembersOfARequestBeanAreTakenFromAMultipartForm() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Function<String, HttpRequest<?>> form = path -> HttpRequest.POST(CTL + path, MultipartBody.builder()
+                    .addPart("name", "Fred")
+                    .addPart("city", "Prague")
+                    .addPart("age", "41")
+                    .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, bytes("picture"))
+                    .build())
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE).header("X-Id", "7");
+            assertEquals("Fred Prague 7", call(server, form.apply("/bean/data-parameters")).body());
+            assertEquals("Fred Prague 7", call(server, form.apply("/bean/data")).body());
+            assertEquals("Fred Prague 42", call(server, form.apply("/bean/text")).body());
+            assertEquals("Fred Prague 42 Fred", call(server, form.apply("/bean/data-and-text")).body());
+            assertEquals("5 Fred Prague", call(server, form.apply("/bean/async/5")).body());
+            assertEquals("Fred avatar.txt 7 picture", call(server, form.apply("/bean/file")).body());
+            assertEquals("same Fred Fred picture", call(server, form.apply("/bean/shared")).body());
+            // a required file that is missing
+            Response missing = call(server, multipart(CTL + "/bean/file", MultipartBody.builder().addPart("name", "Fred").build()));
+            assertEquals(HttpStatus.BAD_REQUEST, missing.status(), missing.body());
+        }
+    }
+
+    @Test
     @Tag("multipart")
     void fileIsReadAsText() throws IOException {
         try (ServerUnderTest server = server()) {
@@ -607,6 +652,30 @@ public class FormArgumentsTest {
     record Response(HttpStatus status, String body) {
     }
 
+    @Introspected
+    record FormDataBean(FormData form, @Header("X-Id") String id) {
+    }
+
+    @Introspected
+    record TextFieldsBean(@Part("name") String name, @Part("city") String city, @Part("age") int age) {
+    }
+
+    @Introspected
+    record FormDataAndTextBean(FormData form, @Part("name") String name, @Part("city") String city, @Part("age") int age) {
+    }
+
+    @Introspected
+    record AsyncBodyBean(AsyncRequestBody body, PathVariables path) {
+    }
+
+    @Introspected
+    record FileBean(@Part("avatar") FileUpload avatar, @Part("name") String name) {
+    }
+
+    @Introspected
+    record SharedBean(FormData form, @Part("avatar") FileUpload avatar, @Part("name") String name) {
+    }
+
     @Controller(CTL)
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class FormArgumentsController {
@@ -717,6 +786,41 @@ public class FormArgumentsTest {
         @Post(uri = "/integers-optional", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
         String integersOptional(FormData form, @Part("tags") Optional<List<Integer>> tags) {
             return tags.orElseThrow().toString();
+        }
+
+        @Post(uri = "/bean/data-parameters", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String beanDataParameters(FormData form, @Header("X-Id") String id) {
+            return form.getString("name") + " " + form.getString("city") + " " + id;
+        }
+
+        @Post(uri = "/bean/data", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String beanData(@RequestBean FormDataBean bean) {
+            return bean.form().getString("name") + " " + bean.form().getString("city") + " " + bean.id();
+        }
+
+        @Post(uri = "/bean/text", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String beanText(@RequestBean TextFieldsBean bean) {
+            return bean.name() + " " + bean.city() + " " + (bean.age() + 1);
+        }
+
+        @Post(uri = "/bean/data-and-text", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String beanDataAndText(@RequestBean FormDataAndTextBean bean) {
+            return bean.name() + " " + bean.city() + " " + (bean.age() + 1) + " " + bean.form().getString("name");
+        }
+
+        @Post(uri = "/bean/async/{id}", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> beanAsync(@RequestBean AsyncBodyBean bean) {
+            return bean.body().form().thenApply(form -> bean.path().getString("id") + " " + form.getString("name") + " " + form.getString("city"));
+        }
+
+        @Post(uri = "/bean/file", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> beanFile(@RequestBean FileBean bean) {
+            return describe(bean.name(), bean.avatar());
+        }
+
+        @Post(uri = "/bean/shared", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> beanShared(@RequestBean SharedBean bean) {
+            return sharedResult(bean.form(), bean.avatar(), bean.name());
         }
 
         @Post(uri = "/part", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
