@@ -25,6 +25,7 @@ import io.micronaut.runtime.event.ApplicationStartupEvent
 import io.micronaut.runtime.event.annotation.EventListener
 import jakarta.inject.Singleton
 import spock.lang.Specification
+import spock.lang.Tag
 import spock.lang.Timeout
 
 import java.nio.file.Path
@@ -56,10 +57,13 @@ class TrainingRunSpec extends Specification {
         LifecycleRecorder.EVENTS.contains('stopped: ' + MessagingApplication.name)
     }
 
+    @Tag('child-jvm') // starts a child JVM with the test class path: a constrained run can exclude this tag
     void "a training run of a messaging application exits with status 0"() {
         given:
         List<String> command = [
                 Path.of(System.getProperty('java.home'), 'bin', 'java').toString(),
+                // The child runs next to the forked test JVMs: bound its heap and its GC threads
+                '-Xmx128m', '-XX:+UseSerialGC',
                 '-D' + ApplicationConfiguration.TRAINING_ENABLED + '=true',
                 '-cp', System.getProperty('java.class.path'),
                 Main.name

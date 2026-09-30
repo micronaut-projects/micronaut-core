@@ -17,7 +17,6 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.ApplicationConfiguration;
 import org.jspecify.annotations.Nullable;
 
@@ -31,7 +30,7 @@ import java.util.List;
  * @since 5.3.0
  */
 @ConfigurationProperties(TrainingWarmupConfiguration.PREFIX)
-@Requires(property = ApplicationConfiguration.TRAINING_ENABLED, value = StringUtils.TRUE)
+@Requires(property = ApplicationConfiguration.TRAINING_ENABLED, pattern = TrainingWarmupConfiguration.ENABLED_PATTERN)
 public class TrainingWarmupConfiguration {
 
     /**
@@ -44,6 +43,12 @@ public class TrainingWarmupConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_REPEAT = 1;
+
+    /**
+     * The values of {@link ApplicationConfiguration#TRAINING_ENABLED} that turn a training run on:
+     * {@code true} in any case, as {@link io.micronaut.runtime.Micronaut#start()} reads it.
+     */
+    static final String ENABLED_PATTERN = "(?i)true";
 
     private List<String> paths = Collections.emptyList();
     private int repeat = DEFAULT_REPEAT;
@@ -74,11 +79,15 @@ public class TrainingWarmupConfiguration {
     }
 
     /**
-     * How many times the warm-up requests the paths. Default value ({@value #DEFAULT_REPEAT}).
+     * How many times the warm-up requests the paths. It must be at least 1. Default value ({@value #DEFAULT_REPEAT}).
      *
      * @param repeat The number of rounds
+     * @throws IllegalArgumentException if the value is less than 1.
      */
     public void setRepeat(int repeat) {
+        if (repeat < 1) {
+            throw new IllegalArgumentException(PREFIX + ".repeat must be at least 1 but was " + repeat);
+        }
         this.repeat = repeat;
     }
 }

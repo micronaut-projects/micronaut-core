@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.EmbeddedApplication;
@@ -39,13 +38,17 @@ import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Sends the GET requests of {@link TrainingWarmupConfiguration} to the server once it has started,
  * so that a training run exercises the request path before {@link io.micronaut.runtime.Micronaut}
  * stops the application. It runs after the other {@link ServerStartupEvent} listeners, only for the
- * server that is the {@link EmbeddedApplication} of the context, and a status of 400 or more, or an
- * I/O error, fails the startup.
+ * server that is the {@link EmbeddedApplication} of the context.
+ *
+ * <p>An I/O error or a status of 500 or more fails the startup. A status from 400 to 499 is logged
+ * at WARN and the warm-up continues: a request the application rejects, for example with 401 or
+ * 403 behind security, has still exercised the server.</p>
  *
  * <p>The requests use {@link HttpURLConnection}, so no HTTP client module is needed. They go to
  * the configured {@code micronaut.server.host}, or to the loopback address when no host or a
@@ -56,7 +59,7 @@ import java.util.List;
  */
 @Internal
 @Singleton
-@Requires(property = ApplicationConfiguration.TRAINING_ENABLED, value = StringUtils.TRUE)
+@Requires(property = ApplicationConfiguration.TRAINING_ENABLED, pattern = TrainingWarmupConfiguration.ENABLED_PATTERN)
 final class TrainingWarmup implements ApplicationEventListener<ServerStartupEvent>, Ordered {
 
     private static final Logger LOG = LoggerFactory.getLogger(TrainingWarmup.class);
@@ -83,8 +86,7 @@ final class TrainingWarmup implements ApplicationEventListener<ServerStartupEven
     @Override
     public void onApplicationEvent(ServerStartupEvent event) {
         List<String> paths = warmupConfiguration.getPaths();
-        int repeat = warmupConfiguration.getRepeat();
-        if (paths.isEmpty() || repeat < 1) {
+        if (paths.isEmpty()) {
             return;
         }
         EmbeddedServer server = event.getSource();
@@ -99,17 +101,25 @@ final class TrainingWarmup implements ApplicationEventListener<ServerStartupEven
                 + TrainingWarmupConfiguration.PREFIX + ".paths");
         }
         String origin = scheme + "://" + requestHost(serverConfiguration.getHost().orElse(null)) + ':' + server.getPort();
+        int repeat = warmupConfiguration.getRepeat();
+        long start = System.nanoTime();
         for (int i = 0; i < repeat; i++) {
             for (String path : paths) {
                 get(origin + (path.startsWith("/") ? path : "/" + path));
             }
         }
         if (LOG.isInfoEnabled()) {
-            LOG.info("Training warm-up sent {} GET requests to {}", paths.size() * repeat, origin);
+            // Micronaut logs "Startup completed in ..." after this listener, so that time includes the warm-up
+            LOG.info("Training warm-up sent {} GET requests to {} in {}ms",
+                paths.size() * repeat, origin, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
         }
     }
 
-    private static String requestHost(@Nullable String configuredHost) {
+    /**
+     * @param configuredHost The value of {@code micronaut.server.host}, if any
+     * @return The host to send the warm-up requests to, in the form a URL takes
+     */
+    static String requestHost(@Nullable String configuredHost) {
         String host = configuredHost;
         if (host == null || host.isBlank() || host.equals("0.0.0.0") || host.equals("::") || host.equals("[::]")) {
             host = InetAddress.getLoopbackAddress().getHostAddress();
@@ -140,8 +150,11 @@ final class TrainingWarmup implements ApplicationEventListener<ServerStartupEven
         if (LOG.isDebugEnabled()) {
             LOG.debug("Training warm-up request GET {} returned {}", url, status);
         }
-        if (status >= 400) {
+        if (status >= 500) {
             throw new ApplicationStartupException("Training warm-up request GET " + url + " returned status " + status);
+        }
+        if (status >= 400 && LOG.isWarnEnabled()) {
+            LOG.warn("Training warm-up request GET {} returned status {}: the application rejected the request, the training run continues", url, status);
         }
     }
 }
