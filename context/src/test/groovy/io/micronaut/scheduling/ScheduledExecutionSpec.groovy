@@ -81,6 +81,22 @@ class ScheduledExecutionSpec extends Specification {
         context.close()
     }
 
+    void 'a scheduled method receives the execution of each call as an argument, beside an injected bean'() {
+        given:
+        ApplicationContext context = ApplicationContext.run('spec.name': 'ScheduledExecutionSpec.argument')
+        TakesExecution task = context.getBean(TakesExecution)
+
+        expect:
+        new PollingConditions(timeout: 10).eventually {
+            task.alone == [true]
+            task.withBean == [true]
+            task.initialDelays.toSet() == ['10ms', '50ms'] as Set
+        }
+
+        cleanup:
+        context.close()
+    }
+
     void 'a call the application makes has no current execution'() {
         given:
         ApplicationContext context = ApplicationContext.run('spec.name': 'ScheduledExecutionSpec')
@@ -161,6 +177,38 @@ class ScheduledExecutionSpec extends Specification {
             } catch (Throwable e) {
                 failure = e
                 seen.add(false)
+            }
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledExecutionSpec.argument')
+    static class Collaborator {
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledExecutionSpec.argument')
+    static class TakesExecution {
+
+        final List<Boolean> alone = new CopyOnWriteArrayList<>()
+        final List<Boolean> withBean = new CopyOnWriteArrayList<>()
+        final List<String> initialDelays = new CopyOnWriteArrayList<>()
+
+        @Scheduled(initialDelay = '10ms')
+        void alone(ScheduledExecution execution) {
+            alone.add(execution.is(ScheduledExecution.current().orElse(null)) && execution.method().methodName == 'alone')
+        }
+
+        @Scheduled(initialDelay = '10ms')
+        void withBean(Collaborator collaborator, ScheduledExecution execution) {
+            withBean.add(collaborator != null && execution.is(ScheduledExecution.current().orElse(null)))
+        }
+
+        @Scheduled(fixedDelay = '1h', initialDelay = '10ms')
+        @Scheduled(fixedDelay = '2h', initialDelay = '50ms')
+        void twice(ScheduledExecution execution) {
+            if (execution.is(ScheduledExecution.current().orElse(null))) {
+                initialDelays.add(execution.schedule().stringValue('initialDelay').orElse(''))
             }
         }
     }

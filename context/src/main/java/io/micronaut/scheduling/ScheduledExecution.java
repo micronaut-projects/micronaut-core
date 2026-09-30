@@ -32,6 +32,9 @@ import java.util.Optional;
  * the method and the schedule that triggered it for the whole of the call, work the call propagates to other
  * threads or reactive continuations included.</p>
  *
+ * <p>A scheduled method may also declare a parameter of this type, beside the beans it has injected, and receives
+ * the same instance.</p>
+ *
  * @param method   The scheduled method
  * @param schedule The {@link Scheduled} annotation that triggered the invocation, with its expressions bound to
  *                 the bean and the arguments of the call
