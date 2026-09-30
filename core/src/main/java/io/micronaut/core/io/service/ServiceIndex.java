@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,8 +42,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 /**
  * A precomputed index of the services of a closed class path, which lets service loading on the JVM skip the scan of
@@ -90,17 +96,35 @@ import java.util.TreeSet;
  *     <li>If the index lists the {@link #classPath() class path} it was built for, the first lookup compares it with
  *     the class path of the class loader: the entries must have the same file names and, where the index gives a
  *     size, the same sizes, in any order. If they differ, a {@code WARN} names the entries that differ and the class
- *     path is scanned, as without an index. The class path of the class loader is known for a
- *     {@link URLClassLoader} whose URLs are all files, from those URLs, and for the system class loader, from the
- *     {@code java.class.path} system property. Entries that reach the class loader another way, for example through
- *     the {@code Class-Path} attribute of a manifest, are not seen by the check, and the content of a directory is
- *     not compared. For any other class loader nothing is compared, and the producer is responsible for only
- *     registering an index that matches. An index without a class path is not checked and costs no I/O.</li>
+ *     path is scanned, as without an index. The class path of the class loader is known for the system class loader,
+ *     from the {@code java.class.path} system property, and for a {@link URLClassLoader} whose URLs are all files,
+ *     from those URLs. When exactly one of those entries is a file, as for an application started with
+ *     {@code java -jar}, the entries that the {@code Class-Path} attribute of the manifest of that JAR names are part
+ *     of the class path that is compared, so a thin JAR is compared together with the libraries its manifest lists.
+ *     For any other class loader nothing is compared, and the producer is responsible for only registering an index
+ *     that matches. An index without a class path is not checked and costs no I/O.</li>
  *     <li>If the system property {@value #VALIDATE_PROPERTY} is {@code true} when the index is first used, that
  *     lookup also scans the class path and compares the result with the index, without regard to the order. If the
  *     names differ, or the class path check above fails, that lookup and every later one fail with a
  *     {@link ServiceConfigurationError} that lists the differences. This costs more than not having an index, so it
  *     is meant for the tests of a producer and for diagnosing an application, not for production.</li>
+ * </ul>
+ *
+ * <p>The comparison of the class path is cheap, and it does not see everything. The {@code INFO} line says what was
+ * compared.</p>
+ * <ul>
+ *     <li>A {@code Class-Path} attribute is only followed for a class path that has a single JAR, and only for that
+ *     JAR. A class path of several JARs is compared without the entries that the manifests of those JARs name,
+ *     because reading them would open every JAR when the application starts, which costs more than the index saves.
+ *     The JARs that a {@code Class-Path} names are not asked for a {@code Class-Path} of their own. An index served
+ *     for such a class path can therefore miss the services of a JAR that only a manifest leads to.</li>
+ *     <li>Entries are compared by their file names, not by their paths, which differ between the machine that builds
+ *     and the one that runs. A JAR that is renamed between packaging and deployment, for example when it is copied
+ *     into a container image under another name, no longer matches its entry: the index is then set aside, with the
+ *     {@code WARN}, on every start. A producer must list the names the files have when the application runs, and
+ *     register the index without a class path when it cannot know them.</li>
+ *     <li>The content of a directory is not compared, nor is a file that is replaced by another one of the same name
+ *     and size, and a JAR that an agent appends to the class path is not seen.</li>
  * </ul>
  *
  * <p>The registered index is held for the life of the JVM, and so is its class loader, which is therefore never
@@ -223,46 +247,187 @@ public record ServiceIndex(ClassLoader classLoader,
     }
 
     /**
-     * Lists the class path of a class loader, for the class loaders whose class path is known: a
-     * {@link URLClassLoader} whose URLs are all files, and the system class loader, whose class path is the
-     * {@code java.class.path} system property. An entry that does not exist is left out, as the class loader
-     * ignores it.
+     * Lists the class path of a class loader, for the class loaders whose class path is known: the system class
+     * loader, whose class path is the {@code java.class.path} system property, and a {@link URLClassLoader} whose
+     * URLs are all files. An entry that does not exist is left out, as the class loader ignores it. When exactly
+     * one entry is a file, the entries that the {@code Class-Path} attribute of its manifest names are listed too:
+     * see {@link ServiceIndex}.
      *
      * @param classLoader The class loader
      * @return The entries of the class path, in its order, or null if the class path is not known
      */
     static @Nullable List<ClassPathEntry> classPathOf(ClassLoader classLoader) {
-        List<ClassPathEntry> entries = new ArrayList<>();
+        return classPathOf(classLoader, new StringBuilder());
+    }
+
+    /**
+     * Lists the class path of a class loader, and says where its entries come from.
+     *
+     * @param classLoader The class loader
+     * @param compared    Where to say, for the log, where the entries come from
+     * @return The entries of the class path, in its order, or null if the class path is not known
+     */
+    private static @Nullable List<ClassPathEntry> classPathOf(ClassLoader classLoader, StringBuilder compared) {
+        List<File> files = new ArrayList<>();
+        String source;
         if (classLoader instanceof URLClassLoader urlClassLoader) {
             try {
                 for (URL url : urlClassLoader.getURLs()) {
                     if (!"file".equals(url.getProtocol())) {
                         return null;
                     }
-                    addClassPathEntry(entries, new File(url.toURI()));
+                    files.add(new File(url.toURI()));
                 }
             } catch (URISyntaxException | IllegalArgumentException e) {
                 return null;
             }
+            source = "the URLs of the class loader";
         } else if (classLoader == ClassLoader.getSystemClassLoader()) {
             for (String element : System.getProperty("java.class.path", "").split(File.pathSeparator)) {
                 // an empty element is the working directory
-                addClassPathEntry(entries, new File(element.isEmpty() ? "." : element));
+                files.add(new File(element.isEmpty() ? "." : element));
             }
+            source = "java.class.path";
         } else {
             return null;
+        }
+        List<ClassPathEntry> entries = new ArrayList<>(files.size());
+        File jar = null;
+        int jars = 0;
+        for (File file : files) {
+            // java.io.File and not java.nio.file.Files: in a JVM that has just started, File reads a class path of
+            // 55 entries in 0.2 ms, where Files takes 0.6 ms
+            if (file.isFile()) {
+                entries.add(new ClassPathEntry(file.getName(), file.length()));
+                jar = file;
+                jars++;
+            } else if (file.isDirectory()) {
+                entries.add(new ClassPathEntry(file.getName(), -1));
+            }
+        }
+        // a StringBuilder and not a concatenation, which would link a call site on the startup path
+        appendCount(compared, entries.size()).append(source);
+        if (jar != null && jars == 1) {
+            // the class path of an application started with java -jar: the JAR, and what its manifest names
+            int named = addManifestClassPath(jar, files, entries, !(classLoader instanceof URLClassLoader));
+            if (named == 0) {
+                compared.append(", to which the manifest of ").append(jar.getName()).append(" adds nothing");
+            } else {
+                appendCount(compared.append(" and "), named).append("the Class-Path of the manifest of ").append(jar.getName());
+            }
+        } else if (jars > 1) {
+            // reading the manifest of every JAR would open every JAR, which costs more than the index saves
+            compared.append(", without the Class-Path of the manifests of its JARs");
         }
         return entries;
     }
 
-    // java.io.File and not java.nio.file.Files: in a JVM that has just started, File reads a class path of 55 entries
-    // in 0.2 ms, where Files takes 0.6 ms
-    private static void addClassPathEntry(List<ClassPathEntry> entries, File file) {
-        if (file.isFile()) {
-            entries.add(new ClassPathEntry(file.getName(), file.length()));
-        } else if (file.isDirectory()) {
-            entries.add(new ClassPathEntry(file.getName(), -1));
+    private static StringBuilder appendCount(StringBuilder builder, int entries) {
+        return builder.append("the ").append(entries).append(entries == 1 ? " entry of " : " entries of ");
+    }
+
+    /**
+     * Adds the entries that the {@code Class-Path} attribute of the manifest of a JAR names, the way the class loader
+     * finds them: each name is a URL relative to the JAR, a URL that ends with a slash is a directory, and any other
+     * one is a JAR. A name that is not the URL of a file, that does not exist, or that is already on the class path
+     * is left out. The manifests of the JARs that are added are not read.
+     *
+     * @param jar       The JAR
+     * @param classPath The files of the class path the JAR is on
+     * @param entries   The entries of that class path, to add to
+     * @param canonical Whether the names are relative to the canonical path of the JAR, as they are for the system
+     *                  class loader, which follows a link to the JAR, or to its path as it is given
+     * @return The number of entries that were added
+     */
+    private static int addManifestClassPath(File jar, List<File> classPath, List<ClassPathEntry> entries, boolean canonical) {
+        String names = null;
+        // without the verification of a signed JAR: only the names are read
+        try (JarFile jarFile = new JarFile(jar, false)) {
+            Manifest manifest = jarFile.getManifest();
+            if (manifest != null) {
+                names = manifest.getMainAttributes().getValue(Attributes.Name.CLASS_PATH);
+            }
+        } catch (IOException e) {
+            // not a JAR that can be read: the class loader finds nothing in it either
         }
+        if (names == null) {
+            return 0;
+        }
+        File base = jar.getAbsoluteFile();
+        if (canonical) {
+            try {
+                base = jar.getCanonicalFile();
+            } catch (IOException e) {
+                // the absolute path is the closest there is
+            }
+        }
+        Set<String> seen = new HashSet<>();
+        for (File file : classPath) {
+            seen.add(file == jar ? base.getPath() : file.getAbsolutePath());
+        }
+        int added = 0;
+        StringTokenizer tokenizer = new StringTokenizer(names);
+        while (tokenizer.hasMoreTokens()) {
+            ClassPathEntry entry = manifestClassPathEntry(base, tokenizer.nextToken(), seen);
+            if (entry != null) {
+                entries.add(entry);
+                added++;
+            }
+        }
+        return added;
+    }
+
+    /**
+     * Finds the entry that a name of a {@code Class-Path} adds to the class path.
+     *
+     * @param jar  The JAR whose manifest has the name, which the name is relative to
+     * @param name The name
+     * @param seen The paths of the entries that are on the class path already, to add to
+     * @return The entry, or null if the name adds none
+     */
+    private static @Nullable ClassPathEntry manifestClassPathEntry(File jar, String name, Set<String> seen) {
+        File file;
+        boolean directory;
+        String entryName;
+        if (isPlainPath(name)) {
+            // the usual name, such as lib/some.jar: it is resolved as a path, because parsing 55 names as URLs takes
+            // 1.2 ms in a JVM that has just started
+            file = name.charAt(0) == '/' ? new File(name) : new File(jar.getParentFile(), name);
+            directory = name.endsWith("/");
+            entryName = file.getName();
+        } else {
+            try {
+                URI uri = jar.toURI().resolve(name);
+                file = new File(uri);
+                directory = uri.getPath().endsWith("/");
+            } catch (IllegalArgumentException e) {
+                // not the URL of a file
+                return null;
+            }
+            // "." is listed under that name, as it is when java.class.path names it, and not under the name of the
+            // directory of the JAR, which depends on where the application is deployed
+            String written = new File(name).getName();
+            entryName = ".".equals(written) || "..".equals(written) ? written : file.getName();
+        }
+        if (!seen.add(file.getPath())) {
+            return null;
+        }
+        if (directory) {
+            return file.isDirectory() ? new ClassPathEntry(entryName, -1) : null;
+        }
+        return file.isFile() ? new ClassPathEntry(entryName, file.length()) : null;
+    }
+
+    /**
+     * Whether a name of a {@code Class-Path} is a path that is the same once it is resolved as a URL: it has no
+     * scheme, no host, no escaped character, no query, no fragment, and no {@code .} or {@code ..} segment.
+     *
+     * @param name The name
+     * @return True if the name can be resolved as a path
+     */
+    private static boolean isPlainPath(String name) {
+        return name.indexOf(':') < 0 && name.indexOf('%') < 0 && name.indexOf('?') < 0 && name.indexOf('#') < 0
+            && !name.startsWith("//") && !name.contains("./") && !name.endsWith(".");
     }
 
     private Check check() {
@@ -297,16 +462,17 @@ public record ServiceIndex(ClassLoader classLoader,
         boolean validate = Boolean.getBoolean(VALIDATE_PROPERTY);
         String checked = "class path not compared: the index does not list one";
         if (classPath != null) {
-            List<ClassPathEntry> actual = classPathOf(classLoader);
+            StringBuilder compared = new StringBuilder();
+            List<ClassPathEntry> actual = classPathOf(classLoader, compared);
             if (actual == null) {
                 checked = "class path not compared: the class loader is neither the system class loader nor a URLClassLoader of files";
             } else {
                 String difference = classPathDifference(classPath, actual);
                 if (difference != null) {
-                    String reason = "the index was built for a different class path: " + difference;
+                    String reason = "the index was built for a different class path: " + difference + " (compared with " + compared + ")";
                     return new Check(this, false, reason, validate ? failure(reason) : null);
                 }
-                checked = "class path compared";
+                checked = compared.insert(0, "class path compared: ").toString();
             }
         }
         if (validate) {
@@ -492,7 +658,10 @@ public record ServiceIndex(ClassLoader classLoader,
      * An entry of the class path an index was built for.
      *
      * @param name The file name of the entry, without the directories that lead to it, which differ between the
-     *             machine that builds the index and the one that runs the application
+     *             machine that builds the index and the one that runs the application. It must be the name the entry
+     *             has when the application runs: an index that lists a JAR under the name it had when it was
+     *             packaged is set aside when that JAR is deployed under another name. A producer that cannot know
+     *             the names registers the index without a class path
      * @param size The size of the entry in bytes if it is a file, or a negative number to not compare the size:
      *             for a directory, and for a file whose size the producer cannot know, such as the JAR that holds
      *             the index itself

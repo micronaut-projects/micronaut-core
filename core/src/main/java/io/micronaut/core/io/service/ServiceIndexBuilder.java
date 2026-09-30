@@ -34,8 +34,17 @@ import java.util.Set;
  * in the order of the class path. A name listed by two files is kept twice, as the scan loads it twice.</p>
  *
  * <p>The index also lists the class path of the class loader, with the size of each file, when that class path is
- * known: see {@link ServiceIndex}. A producer that adds a file to the class path afterwards, such as the JAR that
- * holds the generated index, has to add an entry for it, without a size if the file is not written yet.</p>
+ * known: see {@link ServiceIndex}. It is listed by the rule the first lookup applies at run time, so a class loader
+ * of a single JAR is listed together with the entries that the {@code Class-Path} attribute of its manifest names,
+ * as that JAR is when it is started with {@code java -jar}, and a class loader of several JARs without what their
+ * manifests name. The list made for a class loader of a thin JAR alone, or of that JAR and the libraries its manifest
+ * names, therefore matches the class path of {@code java -jar}.</p>
+ *
+ * <p>The list is only right for the files as they are when the index is built. A producer has to correct it for
+ * what it does afterwards: add an entry for a file it adds to the class path, such as the JAR that holds the
+ * generated index, give no size for a file it has yet to write or that it changes, and give every file the name it
+ * has when the application runs, which a JAR that is renamed when it is deployed does not keep. When it cannot know
+ * those names, it has to register the index without a class path.</p>
  *
  * @author Álvaro Sánchez-Mariscal
  * @since 5.3.0
