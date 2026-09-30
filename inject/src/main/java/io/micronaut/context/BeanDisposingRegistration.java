@@ -186,7 +186,13 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
             }
             S selection;
             try (ExistingBeanResolutionContext resolutionContext = new ExistingBeanResolutionContext(beanContext, this)) {
-                selection = selector.apply(resolutionContext);
+                try {
+                    selection = selector.apply(resolutionContext);
+                } catch (RuntimeException | Error e) {
+                    // what the selection created before it failed is not the bean's, and nothing else holds it
+                    resolutionContext.context.destroyCreatedBeans(resolutionContext.getAndResetDependentBeans(), e);
+                    throw e;
+                }
                 addDependents(resolutionContext.getAndResetDependentBeans());
             }
             keptSelection = new KeptSelection(key, selection);

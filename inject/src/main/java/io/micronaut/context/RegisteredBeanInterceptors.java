@@ -16,8 +16,11 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -58,19 +61,6 @@ public final class RegisteredBeanInterceptors {
     }
 
     /**
-     * Returns the selection the context keeps for a target it holds no registration for, computing it once.
-     *
-     * <p>Such a target owns nothing, so the interceptors of every such target of a definition are the same instances,
-     * which live as long as the context. Two threads asking at once may each compute one; the first kept is the one
-     * handed out from then on.</p>
-     *
-     * @param beanLocator The bean locator
-     * @param key         The key, the definition of the target
-     * @param selector    Computes the selection
-     * @param <S>         The selection type
-     * @return The selection
-     */
-    /**
      * Returns the selection kept on the bean for the given key, without computing it: how a proxy reads the
      * selection of a target on every call without creating the selector.
      *
@@ -97,10 +87,33 @@ public final class RegisteredBeanInterceptors {
         return beanLocator instanceof DefaultBeanContext beanContext ? (S) beanContext.keptUnownedInterceptors(key) : null;
     }
 
-    public static <S> S selectUnowned(BeanLocator beanLocator, Object key, java.util.function.Supplier<S> selector) {
+    /**
+     * Returns the selection the context keeps for a target it holds no registration for, computing it once.
+     *
+     * <p>Such a target owns nothing, so the interceptors of every such target of a definition are the same instances,
+     * which live as long as the context and are destroyed when it stops. Two threads asking at once may each compute
+     * one; the first kept is the one handed out from then on, and the interceptors created for the other are
+     * destroyed.</p>
+     *
+     * @param beanLocator     The bean locator
+     * @param key             The key, the definition of the target
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param selector        Computes the selection from the registrations of the interceptors
+     * @param <I>             The interceptor type
+     * @param <S>             The selection type
+     * @return The selection
+     */
+    public static <I, S> S selectUnowned(BeanLocator beanLocator,
+                                         Object key,
+                                         Argument<I> interceptorType,
+                                         @Nullable Qualifier<I> binding,
+                                         Function<Collection<BeanRegistration<I>>, S> selector) {
         if (beanLocator instanceof DefaultBeanContext beanContext) {
-            return beanContext.selectUnownedInterceptors(key, selector);
+            return beanContext.selectUnownedInterceptors(key, interceptorType, binding, selector);
         }
-        return selector.get();
+        return selector.apply(beanLocator instanceof BeanDefinitionRegistry registry
+            ? registry.getBeanRegistrations(interceptorType, binding)
+            : List.of());
     }
 }

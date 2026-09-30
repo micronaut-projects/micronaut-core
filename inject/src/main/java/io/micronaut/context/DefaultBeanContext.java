@@ -146,6 +146,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -245,7 +246,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final CustomScopeRegistry customScopeRegistry;
     // the interceptors of targets this context holds no registration for, by the definition of the target
-    private final Map<Object, Object> unownedInterceptorSelections = new ConcurrentHashMap<>();
+    private final Map<Object, UnownedInterceptorSelection> unownedInterceptorSelections = new ConcurrentHashMap<>();
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
     private @Nullable BeanDefinitionValidator beanValidator;
@@ -489,6 +490,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 destroySingletons(stragglers, processed);
             }
+
+            // the interceptors of targets this context holds no registration for have no other owner. They go last,
+            // so that a singleton calling such a target as it is destroyed is still intercepted by them
+            destroyUnownedInterceptorSelections();
 
             if (checkEnabledBeans != null) {
                 checkEnabledBeans.cancel(true);
@@ -3797,26 +3802,54 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             return getBeanRegistrations(resolutionContext, interceptorType, binding);
         }
         List<BeanRegistration<I>> registrations = new ArrayList<>(candidates.size());
-        for (BeanDefinition<I> candidate : candidates) {
-            if (!isUnscoped(candidate)) {
+        List<BeanRegistration<?>> createdRegistrations = new ArrayList<>(candidates.size());
+        try {
+            for (BeanDefinition<I> candidate : candidates) {
+                if (!isUnscoped(candidate)) {
+                    addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
+                    continue;
+                }
+                BeanRegistration<I> existing = resolutionContext.findInterceptor(candidate);
+                if (existing != null) {
+                    registrations.add(existing);
+                    continue;
+                }
+                int created = registrations.size();
                 addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
-                continue;
-            }
-            BeanRegistration<I> existing = resolutionContext.findInterceptor(candidate);
-            if (existing != null) {
-                registrations.add(existing);
-                continue;
-            }
-            int created = registrations.size();
-            addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
-            for (int i = created; i < registrations.size(); i++) {
-                if (registrations.get(i) instanceof BeanDisposingRegistration<?> registration) {
-                    registration.markCreatedAsInterceptor();
+                for (int i = created; i < registrations.size(); i++) {
+                    if (registrations.get(i) instanceof BeanDisposingRegistration<?> registration) {
+                        registration.markCreatedAsInterceptor();
+                        createdRegistrations.add(registration);
+                    }
                 }
             }
+        } catch (RuntimeException | Error e) {
+            restoreDependentBeans(resolutionContext, createdRegistrations);
+            throw e;
         }
         registrations.sort(OrderUtil.ORDERED_COMPARATOR);
         return registrations;
+    }
+
+    /**
+     * Gives back to a resolution context the dependents it recorded before the creation of a further bean failed:
+     * a bean is created with the dependents of its own, and when it fails the ones recorded before it are not put
+     * back, so that nothing would destroy them.
+     */
+    private static void restoreDependentBeans(BeanResolutionContext resolutionContext, List<BeanRegistration<?>> created) {
+        List<BeanRegistration<?>> dependents = resolutionContext.getDependentBeans();
+        for (BeanRegistration<?> registration : created) {
+            boolean recorded = false;
+            for (BeanRegistration<?> dependent : dependents) {
+                if (dependent == registration) {
+                    recorded = true;
+                    break;
+                }
+            }
+            if (!recorded) {
+                resolutionContext.addDependentBean(registration);
+            }
+        }
     }
 
     /**
@@ -3825,30 +3858,91 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @Nullable
     Object keptUnownedInterceptors(Object key) {
-        return unownedInterceptorSelections.get(key);
+        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
+        return kept == null ? null : kept.selection;
     }
 
     /**
      * Returns the interceptors this context keeps for targets it holds no registration for, see
      * {@link RegisteredBeanInterceptors#selectUnowned(BeanLocator, Object, java.util.function.Supplier)}.
      *
-     * @param key      The key
-     * @param selector Computes the selection
-     * @param <S>      The selection type
+     * <p>The interceptors no scope holds that a selection is computed from are created for it, and this context is
+     * their only owner: they are destroyed when it stops, or at once when the selection fails or another thread kept
+     * its own first.</p>
+     *
+     * @param key             The key
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param selector        Computes the selection from the registrations of the interceptors
+     * @param <I>             The interceptor type
+     * @param <S>             The selection type
      * @return The selection
      */
     @SuppressWarnings("unchecked")
-    <S> S selectUnownedInterceptors(Object key, java.util.function.Supplier<S> selector) {
-        Object selection = unownedInterceptorSelections.get(key);
-        if (selection == null) {
+    <I, S> S selectUnownedInterceptors(Object key,
+                                       Argument<I> interceptorType,
+                                       @Nullable Qualifier<I> binding,
+                                       Function<Collection<BeanRegistration<I>>, S> selector) {
+        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
+        if (kept == null) {
             // computed outside the map: it creates beans, which may select for another target
-            selection = selector.get();
-            Object kept = unownedInterceptorSelections.putIfAbsent(key, selection);
-            if (kept != null) {
-                selection = kept;
+            Collection<BeanRegistration<I>> registrations = getBeanRegistrations(interceptorType, binding);
+            List<BeanRegistration<?>> created = new ArrayList<>(registrations.size());
+            for (BeanRegistration<I> registration : registrations) {
+                if (isUnscoped(registration.beanDefinition)) {
+                    created.add(registration);
+                }
+            }
+            UnownedInterceptorSelection selection;
+            try {
+                selection = new UnownedInterceptorSelection(selector.apply(registrations), created);
+            } catch (RuntimeException | Error e) {
+                destroyCreatedBeans(created, e);
+                throw e;
+            }
+            kept = unownedInterceptorSelections.putIfAbsent(key, selection);
+            if (kept == null) {
+                return (S) selection.selection;
+            }
+            // another thread kept its selection first: the interceptors created for this one intercept nothing
+            destroyCreatedBeans(created, null);
+        }
+        return (S) kept.selection;
+    }
+
+    private void destroyUnownedInterceptorSelections() {
+        for (Iterator<UnownedInterceptorSelection> i = unownedInterceptorSelections.values().iterator(); i.hasNext();) {
+            UnownedInterceptorSelection selection = i.next();
+            i.remove();
+            destroyCreatedBeans(selection.created, null);
+        }
+    }
+
+    /**
+     * Destroys beans created for something that does not, or no longer, own them, the last created first.
+     *
+     * @param created The registrations of the beans
+     * @param failure The failure they are destroyed for, which a failure to destroy one is added to as suppressed,
+     *                or {@code null} to log it
+     */
+    void destroyCreatedBeans(@Nullable List<BeanRegistration<?>> created, @Nullable Throwable failure) {
+        if (created == null) {
+            return;
+        }
+        for (int i = created.size() - 1; i >= 0; i--) {
+            try {
+                destroyDependentBean(created.get(i));
+            } catch (RuntimeException e) {
+                if (failure != null) {
+                    failure.addSuppressed(e);
+                } else if (LOG.isErrorEnabled()) {
+                    LOG.error(e.getMessage(), e);
+                }
             }
         }
-        return (S) selection;
+    }
+
+    private record UnownedInterceptorSelection(Object selection, List<BeanRegistration<?>> created) {
     }
 
     /**

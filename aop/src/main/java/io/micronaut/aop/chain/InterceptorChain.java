@@ -261,13 +261,11 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         if (unowned != null) {
             return unowned;
         }
-        return RegisteredBeanInterceptors.selectUnowned(beanLocator, targetDefinition, () -> selectForMethods(
+        return RegisteredBeanInterceptors.selectUnowned(beanLocator, targetDefinition, Interceptor.ARGUMENT, bindingOf(methods), registrations -> selectForMethods(
             beanLocator.getBean(InterceptorRegistry.ARGUMENT),
             methods,
             introduction,
-            beanLocator instanceof BeanDefinitionRegistry registry
-                ? registry.getBeanRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
-                : List.of()
+            registrations
         ));
     }
 
