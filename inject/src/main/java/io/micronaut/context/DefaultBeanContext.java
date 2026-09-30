@@ -1410,9 +1410,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (disposingRegistration.getDependents() != null) {
                 destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
                 for (BeanRegistration<?> beanRegistration : disposingRegistration.getDependents()) {
-                    // unguarded: the cached target below is destroyed with these same registrations, and
-                    // ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec pins the pre-destroy count that gives
-                    destroyBean(beanRegistration, true);
+                    destroyDependentBean(beanRegistration);
                     destroyed.add(beanRegistration.bean);
                 }
             }

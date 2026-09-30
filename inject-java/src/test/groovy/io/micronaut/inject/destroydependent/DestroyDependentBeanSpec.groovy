@@ -154,7 +154,23 @@ class DestroyDependentBeanSpec extends Specification {
         NestedDependency.destroyed == 1
     }
 
-    void "a context that does not implement it destroys the registration in its own right"() {
+    void "a dependent of a lazy proxy destroyed before the uninitialized proxy is destroyed once"() {
+        given:
+        def proxy = resolveAsDependent(SharedWithDependency)
+        BeanRegistration<?> child = ((DependentBeanProvider) proxy.registration).dependentBeans()[0]
+
+        expect:
+        child.bean instanceof NestedDependency
+
+        when:
+        context.destroyDependentBean(child)
+        context.destroyDependentBean(proxy.registration)
+
+        then:
+        NestedDependency.destroyed == 1
+    }
+
+    void "a context that does not implement it refuses rather than destroy the registration in its own right"() {
         given:
         BeanContext beanContext = (BeanContext) Proxy.newProxyInstance(
                 getClass().classLoader,
@@ -169,8 +185,9 @@ class DestroyDependentBeanSpec extends Specification {
         beanContext.destroyDependentBean(resolved.registration)
 
         then:
-        NestedDependency.destroyed == 1
-        LifeCycleBean.stopped == 1
+        thrown(UnsupportedOperationException)
+        NestedDependency.destroyed == 0
+        LifeCycleBean.stopped == 0
     }
 
     private <T> Resolved<T> resolveAsDependent(Class<T> type) {

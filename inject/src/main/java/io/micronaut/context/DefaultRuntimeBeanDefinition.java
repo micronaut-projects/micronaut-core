@@ -525,7 +525,13 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         private static void destroyDependents(BeanContext context, List<BeanRegistration<?>> dependents) {
             ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
             while (i.hasPrevious()) {
-                context.destroyDependentBean(i.previous());
+                BeanRegistration<?> dependent = i.previous();
+                if (context instanceof DefaultBeanContext defaultBeanContext) {
+                    defaultBeanContext.destroyDependentBean(dependent);
+                } else {
+                    // a context that cannot destroy a bean as a dependent destroys it in its own right
+                    context.destroyBean(dependent);
+                }
             }
         }
     }
