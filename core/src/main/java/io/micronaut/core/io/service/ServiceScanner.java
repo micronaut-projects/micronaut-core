@@ -97,15 +97,21 @@ final class ServiceScanner<S> {
      * application without an index does not load {@link ServiceIndex}, and the read does not make the registration
      * that follows fail.</p>
      *
-     * <p>A lookup calls this method once, on the thread that starts it, and never from one of its fork-join tasks:
-     * see {@link MicronautMetaServiceLoaderUtils#findMicronautMetaServiceEntries(ClassLoader, String, ServiceIndex)}.</p>
+     * <p>The read does not wait for the loaders once a thread has started to run them: see
+     * {@link StaticOptimizations.SetOnce#find(String)}. A lookup can therefore start on a thread of the fork-join
+     * pool while a loader waits for that thread, as it does when a loader looks up a service whose constructor looks
+     * a service up.</p>
+     *
+     * <p>A lookup calls this method once, on the thread that starts it, and hands the answer to its fork-join tasks,
+     * so that the whole lookup uses one answer: see
+     * {@link MicronautMetaServiceLoaderUtils#findMicronautMetaServiceEntries(ClassLoader, String, ServiceIndex)}.</p>
      *
      * @param classLoader The class loader of the lookup
      * @return The index, or null if the class path must be scanned
      * @throws ServiceConfigurationError If the index was validated and does not match the class path
      */
     static @Nullable ServiceIndex findServiceIndex(ClassLoader classLoader) {
-        Object registered = StaticOptimizations.findSetOnce(SERVICE_INDEX);
+        Object registered = StaticOptimizations.SetOnce.find(SERVICE_INDEX);
         if (registered == null) {
             return null;
         }

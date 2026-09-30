@@ -91,14 +91,14 @@ class StaticOptimizationsTest extends Specification {
         def optimization = new TestSetOnce()
 
         expect: "a read that comes before the value is set finds nothing"
-        StaticOptimizations.findSetOnce(TestSetOnce.name) == null
+        StaticOptimizations.SetOnce.find(TestSetOnce.name) == null
 
         when:
         StaticOptimizations.set(optimization)
 
         then:
         noExceptionThrown()
-        StaticOptimizations.findSetOnce(TestSetOnce.name).is(optimization)
+        StaticOptimizations.SetOnce.find(TestSetOnce.name).is(optimization)
         StaticOptimizations.get(TestSetOnce).get().is(optimization)
 
         when:
@@ -107,7 +107,7 @@ class StaticOptimizationsTest extends Specification {
         then:
         IllegalStateException ex = thrown()
         ex.message == "An optimization of class io.micronaut.core.optim.StaticOptimizationsTest\$TestSetOnce was already set: it can only be set once"
-        StaticOptimizations.findSetOnce(TestSetOnce.name).is(optimization)
+        StaticOptimizations.SetOnce.find(TestSetOnce.name).is(optimization)
     }
 
     def "only a set-once optimization is found by name"() {
@@ -115,7 +115,7 @@ class StaticOptimizationsTest extends Specification {
         StaticOptimizations.set(new TestOptimizations())
 
         then:
-        StaticOptimizations.findSetOnce(TestOptimizations.name) == null
+        StaticOptimizations.SetOnce.find(TestOptimizations.name) == null
     }
 
     def "a JVM-only optimization is not stored in #imageCode native image code"() {
@@ -154,7 +154,7 @@ class StaticOptimizationsTest extends Specification {
         StaticOptimizations.reset()
 
         then: "the index that the core tests register through a loader is dropped, and the other optimizations are not"
-        StaticOptimizations.findSetOnce(ServiceIndex.name) == null
+        StaticOptimizations.SetOnce.find(ServiceIndex.name) == null
         !StaticOptimizations.@OPTIMIZATIONS.containsKey(ServiceIndex)
         StaticOptimizations.@OPTIMIZATIONS.containsKey(TestOptimizations3)
 
@@ -165,7 +165,7 @@ class StaticOptimizationsTest extends Specification {
 
     def "a second service index is rejected"() {
         given: "the index that the core tests register through a loader"
-        def registered = StaticOptimizations.findSetOnce(ServiceIndex.name)
+        def registered = StaticOptimizations.SetOnce.find(ServiceIndex.name)
 
         when:
         StaticOptimizations.set(new ServiceIndex(getClass().classLoader, [:], [:]))
@@ -174,7 +174,7 @@ class StaticOptimizationsTest extends Specification {
         IllegalStateException ex = thrown()
         ex.message == "An optimization of class io.micronaut.core.io.service.ServiceIndex was already set: it can only be set once"
         registered.is(ServiceIndexTest.TestServiceIndexLoader.INDEX)
-        StaticOptimizations.findSetOnce(ServiceIndex.name).is(registered)
+        StaticOptimizations.SetOnce.find(ServiceIndex.name).is(registered)
         StaticOptimizations.get(ServiceIndex).get().is(registered)
     }
 
@@ -191,7 +191,7 @@ class StaticOptimizationsTest extends Specification {
         ServiceIndexTest.LookingUpLoader.found == []
 
         and: "the index is registered, and the lookups that follow are served from it"
-        StaticOptimizations.findSetOnce(ServiceIndex.name).is(ServiceIndexTest.TestServiceIndexLoader.INDEX)
+        StaticOptimizations.SetOnce.find(ServiceIndex.name).is(ServiceIndexTest.TestServiceIndexLoader.INDEX)
         SoftServiceLoader.load(ServiceIndexTest.Greeter, classLoader).collectAll()*.getClass() == [ServiceIndexTest.Hello, ServiceIndexTest.Hi, ServiceIndexTest.Hey]
 
         cleanup:
@@ -208,7 +208,7 @@ class StaticOptimizationsTest extends Specification {
         when: "in each round, several indexes are set at the same time while no index is set"
         def rounds = (1..1000).collect {
             StaticOptimizations.@OPTIMIZATIONS.remove(ServiceIndex)
-            StaticOptimizations.@SET_ONCE.remove(ServiceIndex.name)
+            StaticOptimizations.SetOnceValues.BY_CLASS_NAME.remove(ServiceIndex.name)
             def indexes = (1..threads).collect { new ServiceIndex(classLoader, [:], [:]) }
             def barrier = new CyclicBarrier(threads)
             def winners = indexes.collect { index ->
@@ -222,7 +222,7 @@ class StaticOptimizationsTest extends Specification {
                     }
                 } as Callable<ServiceIndex>)
             }*.get(60, TimeUnit.SECONDS).findAll()
-            [winners: winners, registered: StaticOptimizations.findSetOnce(ServiceIndex.name), stored: StaticOptimizations.@OPTIMIZATIONS.get(ServiceIndex)]
+            [winners: winners, registered: StaticOptimizations.SetOnce.find(ServiceIndex.name), stored: StaticOptimizations.@OPTIMIZATIONS.get(ServiceIndex)]
         }
 
         then: "one set succeeds and the others fail, every time"

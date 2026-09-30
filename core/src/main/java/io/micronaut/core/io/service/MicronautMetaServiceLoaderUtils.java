@@ -103,9 +103,8 @@ public final class MicronautMetaServiceLoaderUtils {
      * Find Micronaut service entries for a lookup that has already asked for the service index.
      *
      * <p>A lookup asks for the index once, on the thread that starts it, and hands the answer to its fork-join tasks.
-     * A task must not ask again: reading the registered index can wait for the initialization of
-     * {@link io.micronaut.core.optim.StaticOptimizations}, and if the thread that runs that initialization is the one
-     * that waits for the task, because one of its loaders looks a service up, neither would ever finish.</p>
+     * A task does not ask again, so the whole lookup uses one answer: an index can be registered, or switched off,
+     * while the lookup runs.</p>
      *
      * @param classLoader The classloader
      * @param serviceName The service name

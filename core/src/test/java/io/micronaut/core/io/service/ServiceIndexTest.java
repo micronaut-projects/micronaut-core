@@ -43,8 +43,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -664,16 +667,7 @@ public class ServiceIndexTest {
     void isRegisteredAfterALoaderThatLooksAServiceUpWhileTheOptimizationsAreInitialized() throws Exception {
         // an application of its own, whose optimizations are yet to be initialized, with two loaders: the first one
         // looks a service up, which forks, and the second one registers the index
-        Path loaders = Files.createDirectories(tempDir.resolve("loaders"));
-        Files.writeString(Files.createDirectories(loaders.resolve("META-INF/services")).resolve(StaticOptimizations.Loader.class.getName()),
-            LookingUpLoader.class.getName() + "\n" + TestServiceIndexLoader.class.getName() + "\n");
-        URL[] classPath = {
-            SoftServiceLoader.class.getProtectionDomain().getCodeSource().getLocation(),
-            org.slf4j.Logger.class.getProtectionDomain().getCodeSource().getLocation(),
-            ServiceIndexTest.class.getProtectionDomain().getCodeSource().getLocation(),
-            loaders.toUri().toURL()
-        };
-        try (RecordingClassLoader application = new RecordingClassLoader(classPath)) {
+        try (RecordingClassLoader application = new RecordingClassLoader(applicationWithLoaders(LookingUpLoader.class, TestServiceIndexLoader.class))) {
             // on a thread of its own, which is given up if the initialization never ends
             List<String> served = assertTimeoutPreemptively(Duration.ofSeconds(60), () -> {
                 Thread.currentThread().setContextClassLoader(application);
@@ -681,11 +675,11 @@ public class ServiceIndexTest {
                 lookingUp.getField("lookUp").set(null, true);
 
                 // the initialization runs the loaders
-                Class<?> optimizations = Class.forName(StaticOptimizations.class.getName(), true, application);
+                Class.forName(StaticOptimizations.class.getName(), true, application);
 
                 // the lookup of the first loader scanned the class path, which has no such service
                 assertEquals(List.of(), lookingUp.getField("found").get(null));
-                Object registered = optimizations.getMethod("findSetOnce", String.class).invoke(null, ServiceIndex.class.getName());
+                Object registered = application.loadClass(StaticOptimizations.SetOnce.class.getName()).getMethod("find", String.class).invoke(null, ServiceIndex.class.getName());
                 assertNotNull(registered);
                 // and the lookups that follow are served from the index
                 Object classLoader = registered.getClass().getMethod("classLoader").invoke(registered);
@@ -698,6 +692,56 @@ public class ServiceIndexTest {
                 return types;
             });
             assertEquals(List.of(Hello.class.getName(), Hi.class.getName(), Hey.class.getName()), served);
+        }
+    }
+
+    @Test
+    void doesNotMakeALookupOnAPoolThreadWaitForTheLoaders() throws Exception {
+        assumeTrue(ForkJoinPool.getCommonPoolParallelism() > 1, "the common pool does not run tasks in parallel");
+        // an application of its own, without an index, whose optimizations are yet to be initialized. Its loader looks
+        // services up, which forks, and the constructor of those services looks services up in turn. The thread that
+        // runs the loader waits for the threads of the pool, so their lookups must not wait for the loaders to end
+        int services = 8;
+        List<URL> classPath = new ArrayList<>(List.of(applicationWithLoaders(NestedLookupLoader.class)));
+        for (int i = 0; i < services; i++) {
+            // a file of its own for each service, so that each one is a task of its own
+            Path directory = Files.createDirectories(tempDir.resolve("services" + i).resolve("META-INF/services"));
+            Files.writeString(directory.resolve(NestedLookup.class.getName()), NestedLookupService.class.getName() + "\n");
+            classPath.add(tempDir.resolve("services" + i).toUri().toURL());
+        }
+        try (RecordingClassLoader application = new RecordingClassLoader(classPath.toArray(URL[]::new))) {
+            // on a thread of its own, which is given up if the initialization never ends
+            List<?> lookedUp = assertTimeoutPreemptively(Duration.ofSeconds(60), () -> {
+                Thread.currentThread().setContextClassLoader(application);
+                // the initialization runs the loader
+                Class.forName(StaticOptimizations.class.getName(), true, application);
+                return List.of(
+                    application.loadClass(NestedLookupLoader.class.getName()).getField("found").get(null),
+                    application.loadClass(NestedLookupService.class.getName()).getField("POOL_THREADS").get(null)
+                );
+            }, "a lookup that a service makes on a thread of the pool waits for the loaders, which wait for that thread");
+            assertEquals(services, lookedUp.get(0));
+            // the lookups of the services did run on threads of the pool
+            assertFalse(((Set<?>) lookedUp.get(1)).isEmpty());
+        }
+    }
+
+    @Test
+    void isReadByAnotherThreadWhileTheLoadersRun() throws Exception {
+        // an application of its own, whose optimizations are yet to be initialized, with two loaders: the first one
+        // registers the index, and the second one has another thread read it and waits for that thread
+        try (RecordingClassLoader application = new RecordingClassLoader(applicationWithLoaders(TestServiceIndexLoader.class, ReadingLoader.class))) {
+            List<?> read = assertTimeoutPreemptively(Duration.ofSeconds(60), () -> {
+                Thread.currentThread().setContextClassLoader(application);
+                // the initialization runs the loaders
+                Class.forName(StaticOptimizations.class.getName(), true, application);
+                Class<?> reading = application.loadClass(ReadingLoader.class.getName());
+                Object registered = application.loadClass(StaticOptimizations.SetOnce.class.getName()).getMethod("find", String.class).invoke(null, ServiceIndex.class.getName());
+                assertNotNull(registered);
+                return List.of(reading.getField("returned").get(null), reading.getField("read").get(null) == registered);
+            });
+            // the read did not wait for the loaders to end, and it found the index that was registered before it
+            assertEquals(List.of(true, true), read);
         }
     }
 
@@ -920,6 +964,28 @@ public class ServiceIndexTest {
     }
 
     /**
+     * Makes the class path of an application of its own: the classes of core and of the tests, which a class loader
+     * loads again, and a directory that registers the given loaders and no other one, in that order.
+     *
+     * @param loaders The loaders of the optimizations
+     * @return The class path
+     */
+    private URL[] applicationWithLoaders(Class<?>... loaders) throws IOException {
+        Path registered = Files.createDirectories(tempDir.resolve("loaders"));
+        StringBuilder names = new StringBuilder();
+        for (Class<?> loader : loaders) {
+            names.append(loader.getName()).append('\n');
+        }
+        Files.writeString(Files.createDirectories(registered.resolve("META-INF/services")).resolve(StaticOptimizations.Loader.class.getName()), names);
+        return new URL[]{
+            SoftServiceLoader.class.getProtectionDomain().getCodeSource().getLocation(),
+            org.slf4j.Logger.class.getProtectionDomain().getCodeSource().getLocation(),
+            ServiceIndexTest.class.getProtectionDomain().getCodeSource().getLocation(),
+            registered.toUri().toURL()
+        };
+    }
+
+    /**
      * Makes the next lookup check its index again, by checking another index: only the last check is kept.
      */
     private static void forgetTheLastCheck() throws IOException {
@@ -1092,6 +1158,82 @@ public class ServiceIndexTest {
                 throw new UncheckedIOException(e);
             }
             return new ServiceIndex(classLoader, micronautServices, standardServices, classPath);
+        }
+    }
+
+    /**
+     * A loader that looks up services whose constructor looks a service up.
+     */
+    public static final class NestedLookupLoader implements StaticOptimizations.Loader<NestedLookupLoader.Loaded> {
+
+        public static volatile int found = -1;
+
+        @Override
+        public Loaded load() {
+            found = SoftServiceLoader.load(NestedLookup.class, NestedLookupLoader.class.getClassLoader()).collectAll().size();
+            return new Loaded();
+        }
+
+        public static final class Loaded {
+        }
+    }
+
+    public interface NestedLookup {
+    }
+
+    /**
+     * A service whose constructor looks services up, as a service that is itself made of services does.
+     */
+    public static final class NestedLookupService implements NestedLookup {
+
+        public static final Set<String> POOL_THREADS = ConcurrentHashMap.newKeySet();
+        private static final CountDownLatch LOOKED_UP_ON_A_POOL_THREAD = new CountDownLatch(1);
+
+        public NestedLookupService() {
+            Thread thread = Thread.currentThread();
+            if (thread instanceof ForkJoinWorkerThread) {
+                ClassLoader classLoader = NestedLookupService.class.getClassLoader();
+                // the two kinds of lookup: each one asks for the index when it starts
+                SoftServiceLoader.load(Runnable.class, classLoader).collectAll();
+                MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(classLoader, Runnable.class, null);
+                POOL_THREADS.add(thread.getName());
+                LOOKED_UP_ON_A_POOL_THREAD.countDown();
+            } else {
+                // The thread that started the lookup, which loads a service itself when no thread of the pool has
+                // taken it yet. It leaves the other services to the pool, by waiting until one of them was loaded
+                // there, so that the test always has a lookup that starts on a thread of the pool
+                try {
+                    LOOKED_UP_ON_A_POOL_THREAD.await(20, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    }
+
+    /**
+     * A loader that has another thread read the registered index, and waits for that thread.
+     */
+    public static final class ReadingLoader implements StaticOptimizations.Loader<ReadingLoader.Loaded> {
+
+        public static volatile boolean returned;
+        public static volatile Object read;
+
+        @Override
+        public Loaded load() {
+            Thread reader = new Thread(() -> read = StaticOptimizations.SetOnce.find(ServiceIndex.class.getName()), "reader of the service index");
+            reader.setDaemon(true);
+            reader.start();
+            try {
+                reader.join(TimeUnit.SECONDS.toMillis(10));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            returned = !reader.isAlive();
+            return new Loaded();
+        }
+
+        public static final class Loaded {
         }
     }
 

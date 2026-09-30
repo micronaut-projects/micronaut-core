@@ -43,13 +43,14 @@ public abstract class StaticOptimizations {
     private static final String IMAGE_CODE_PROPERTY = "org.graalvm.nativeimage.imagecode";
 
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
-    private static final Map<String, SetOnce> SET_ONCE = new ConcurrentHashMap<>();
     private static final Map<Class<?>, StackTraceElement[]> CHECKED = new ConcurrentHashMap<>();
     private static final StackTraceElement[] EMPTY_STACK_TRACE_ELEMENT_ARRAY = new StackTraceElement[0];
 
     private static boolean cacheEnvironment = false;
 
     static {
+        // from here on SetOnce.find reads what the loaders have set so far, and does not wait for them
+        SetOnceValues.loadersStarted = true;
         reset();
     }
 
@@ -59,7 +60,7 @@ public abstract class StaticOptimizations {
      */
     static void reset() {
         OPTIMIZATIONS.clear();
-        SET_ONCE.clear();
+        SetOnceValues.BY_CLASS_NAME.clear();
         CHECKED.clear();
         ServiceLoader.load(Loader.class).forEach(loader -> set(loader.load()));
     }
@@ -95,20 +96,11 @@ public abstract class StaticOptimizations {
     }
 
     /**
-     * Returns, if it was set, the {@link SetOnce} optimization of the named class.
-     *
-     * <p>Unlike {@link #get(Class)}, the lookup is by class name, so a caller does not have to load the class of an
-     * optimization that was never set, and the read is not recorded, so it does not make a later
-     * {@link #set(Object)} fail. That is safe for a value that is never replaced, as long as the caller calls this
-     * method on each use instead of keeping the result: a read that comes before the value is set, for example from
-     * a {@link Loader} that runs before the loader of the value, finds nothing, and a later read finds the value.</p>
-     *
-     * @param optimizationClassName the name of the optimization class
-     * @return the optimization, or null if it is not set
-     * @since 5.3.0
+     * Does nothing. Calling it initializes this class, which runs the loaders, as calling any of its static methods
+     * does.
      */
-    public static @Nullable SetOnce findSetOnce(String optimizationClassName) {
-        return SET_ONCE.get(optimizationClassName);
+    private static void runLoaders() {
+        // the loaders run in the static initializer
     }
 
     /**
@@ -129,7 +121,7 @@ public abstract class StaticOptimizations {
             return;
         }
         SetOnce setOnce = value instanceof SetOnce s ? s : null;
-        if (setOnce != null && SET_ONCE.containsKey(optimizationClass.getName())) {
+        if (setOnce != null && SetOnceValues.BY_CLASS_NAME.containsKey(optimizationClass.getName())) {
             throw alreadySet(optimizationClass);
         }
         if (CHECKED.containsKey(optimizationClass)) {
@@ -143,7 +135,7 @@ public abstract class StaticOptimizations {
             }
             throw new IllegalStateException(sb.toString());
         }
-        if (setOnce != null && SET_ONCE.putIfAbsent(optimizationClass.getName(), setOnce) != null) {
+        if (setOnce != null && SetOnceValues.BY_CLASS_NAME.putIfAbsent(optimizationClass.getName(), setOnce) != null) {
             // a concurrent call set a value after the check above, so exactly one of the calls succeeds
             throw alreadySet(optimizationClass);
         }
@@ -167,12 +159,40 @@ public abstract class StaticOptimizations {
     /**
      * Marks an optimization that can be set at most once: setting a second value of its class fails, instead of
      * replacing the first one. It is for an optimization that describes the whole application, of which two values
-     * cannot both be right. Such an optimization can be read with {@link StaticOptimizations#findSetOnce(String)}.
+     * cannot both be right. Such an optimization can be read with {@link #find(String)}.
      *
      * @since 5.3.0
      */
     @Internal
     public interface SetOnce {
+
+        /**
+         * Returns, if it was set, the set-once optimization of the named class.
+         *
+         * <p>Unlike {@link StaticOptimizations#get(Class)}, the lookup is by class name, so a caller does not have
+         * to load the class of an optimization that was never set, and the read is not recorded, so it does not make
+         * a later {@link StaticOptimizations#set(Object)} fail. That is safe for a value that is never replaced, as
+         * long as the caller calls this method on each use instead of keeping the result: a read that comes before
+         * the value is set, for example from a {@link Loader} that runs before the loader of the value, finds
+         * nothing, and a later read finds the value.</p>
+         *
+         * <p>The first call runs the loaders, if nothing has run them yet. A call that is made once a thread has
+         * started to run them does not wait for that thread: it returns what is set so far. Any static method of
+         * {@link StaticOptimizations} would wait, and a caller that the thread of the loaders waits for in turn
+         * would then never return. That is the case of a loader that looks services up with fork-join tasks, when
+         * one of those services looks a service up from the thread of the pool that instantiates it. It is why
+         * this method is not a static method of {@link StaticOptimizations}.</p>
+         *
+         * @param optimizationClassName the name of the optimization class
+         * @return the optimization, or null if it is not set
+         */
+        static @Nullable SetOnce find(String optimizationClassName) {
+            if (!SetOnceValues.loadersStarted) {
+                // no thread has started to run the loaders: this one runs them, or waits for the one that does
+                runLoaders();
+            }
+            return SetOnceValues.BY_CLASS_NAME.get(optimizationClassName);
+        }
     }
 
     /**
@@ -183,6 +203,20 @@ public abstract class StaticOptimizations {
      */
     @Internal
     public interface JvmOnly {
+    }
+
+    /**
+     * The {@link SetOnce} optimizations, and whether the loaders have started to run. They are in a class of their
+     * own so that {@link SetOnce#find(String)} can read them without initializing {@link StaticOptimizations}, which
+     * would wait for the thread that runs the loaders.
+     */
+    private static final class SetOnceValues {
+        static final Map<String, SetOnce> BY_CLASS_NAME = new ConcurrentHashMap<>();
+        // set when the initialization of StaticOptimizations starts, and never reset
+        static volatile boolean loadersStarted;
+
+        private SetOnceValues() {
+        }
     }
 
     /**
