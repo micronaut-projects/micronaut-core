@@ -1249,6 +1249,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private HttpResponse initialMessage;
         private BufferConsumer.Upstream upstream;
         private boolean earlyComplete = false;
+        /**
+         * Data that arrived before this handler became the current outbound handler. A body that
+         * already buffered some bytes (e.g. the response body of an HTTP client relayed by a
+         * route) hands them over as soon as it is subscribed to. They are written after the
+         * initial message.
+         */
+        @Nullable
+        private List<ReadBuffer> earlyData = null;
         private boolean writtenLast = false;
         private long incompleteWrittenBytes = 0;
 
@@ -1267,6 +1275,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (initialMessage != null) {
                 write(initialMessage, false, false, false);
                 initialMessage = null;
+                writeEarlyData();
                 upstream.start();
             }
             if (earlyComplete) {
@@ -1291,7 +1300,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void add0(ReadBuffer buf) {
             if (outboundHandler != this) {
-                throw new IllegalStateException("onNext before request?");
+                if (removed || initialMessage == null) {
+                    buf.close();
+                    return;
+                }
+                // data the body had buffered before this response is up for writing
+                if (earlyData == null) {
+                    earlyData = new ArrayList<>(1);
+                }
+                earlyData.add(buf);
+                return;
             }
 
             if (writtenLast) {
@@ -1299,14 +1317,38 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (!removed) {
-                int n = buf.readable();
-                writeCompressing(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, false);
-                incompleteWrittenBytes += n;
+                writeContent(buf);
                 if (ctx.channel().isWritable()) {
                     writeSome();
                 }
             } else {
                 buf.close();
+            }
+        }
+
+        private void writeContent(ReadBuffer buf) {
+            int n = buf.readable();
+            writeCompressing(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, false);
+            incompleteWrittenBytes += n;
+        }
+
+        private void writeEarlyData() {
+            List<ReadBuffer> data = earlyData;
+            if (data != null) {
+                earlyData = null;
+                for (ReadBuffer buf : data) {
+                    writeContent(buf);
+                }
+            }
+        }
+
+        private void releaseEarlyData() {
+            List<ReadBuffer> data = earlyData;
+            if (data != null) {
+                earlyData = null;
+                for (ReadBuffer buf : data) {
+                    buf.close();
+                }
             }
         }
 
@@ -1347,6 +1389,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (initialMessage != null) {
                     writePotentialEnd(initialMessage, false, false);
                     initialMessage = null;
+                    writeEarlyData();
                 }
 
                 if (!writtenLast) {
@@ -1367,6 +1410,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // - while cancel() may trigger onComplete/onError, `removed` is true at this point, so
             //   they won't call responseWritten in turn
             requestHandler.responseWritten(outboundAccess.attachment);
+            releaseEarlyData();
             upstream.allowDiscard();
             outboundHandler = null;
         }
