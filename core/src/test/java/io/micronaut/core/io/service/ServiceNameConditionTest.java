@@ -10,7 +10,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -50,6 +52,26 @@ class ServiceNameConditionTest {
     }
 
     @Test
+    void theNamesOfMetaInfServicesEntriesAreStrippedAsServiceLoaderDoes() throws IOException {
+        try (URLClassLoader classLoader = servicesClassLoader()) {
+            List<String> testedNames = new CopyOnWriteArrayList<>();
+            Predicate<String> condition = name -> {
+                testedNames.add(name);
+                return true;
+            };
+
+            assertEquals(List.of(A, B, C, D), sortedNames(SoftServiceLoader.load(NamedService.class, classLoader, condition).collectAll()));
+            // neither the comment nor the whitespace around a name is part of what the condition is tested on
+            assertEquals(List.of(A, B, C, D), testedNames.stream().sorted().toList());
+            // java.util.ServiceLoader reads the same names from the META-INF/services file
+            assertEquals(List.of(A, B), ServiceLoader.load(NamedService.class, classLoader).stream()
+                .map(provider -> provider.type().getName())
+                .sorted()
+                .toList());
+        }
+    }
+
+    @Test
     void theConditionIsTestedOnTheNameOfEveryEntryOfAStaticServiceLoader() throws Exception {
         Map<String, List<String>> results = runInIsolatedClassLoader(StaticServiceLoaderScenario.class);
 
@@ -60,16 +82,19 @@ class ServiceNameConditionTest {
     }
 
     /**
-     * Lists {@code A} (with a trailing comment) and {@code B} under {@code META-INF/services}, and {@code C} and
-     * {@code D} under {@code META-INF/micronaut}.
+     * Lists {@code A} and {@code B} under {@code META-INF/services}, and {@code C} and {@code D} under
+     * {@code META-INF/micronaut}. In the {@code META-INF/services} file, {@code A} is followed by blanks and a
+     * comment, {@code B} is indented and directly followed by a comment, and there are comment and blank lines.
      */
     private URLClassLoader servicesClassLoader() throws IOException {
         Path services = Files.createDirectories(tempDir.resolve("META-INF/services"));
-        Files.writeString(services.resolve(NamedService.class.getName()), """
-            # a comment
-            %s#a trailing comment
-            %s
-            """.formatted(A, B));
+        Files.write(services.resolve(NamedService.class.getName()), List.of(
+            "# a comment",
+            "  # an indented comment",
+            A + "   # a trailing comment",
+            "\t  " + B + "#a trailing comment",
+            "  "
+        ));
         Path micronaut = Files.createDirectories(tempDir.resolve("META-INF/micronaut/" + NamedService.class.getName()));
         Files.createFile(micronaut.resolve(C));
         Files.createFile(micronaut.resolve(D));

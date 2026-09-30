@@ -261,14 +261,13 @@ final class ServiceScanner<S> {
                         if (line == null) {
                             break;
                         }
-                        if (line.isEmpty() || line.charAt(0) == '#') {
-                            continue;
-                        }
+                        // as java.util.ServiceLoader does: drop the comment, then the whitespace around the name
                         int i = line.indexOf('#');
                         if (i > -1) {
                             line = line.substring(0, i);
                         }
-                        if (!lineCondition.test(line)) {
+                        line = line.strip();
+                        if (line.isEmpty() || !lineCondition.test(line)) {
                             continue;
                         }
                         typeNames.add(line);
