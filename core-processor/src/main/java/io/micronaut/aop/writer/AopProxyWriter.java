@@ -241,6 +241,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     );
     private static final String FIELD_TARGET_REGISTRATION = "$targetRegistration";
     private static final String LOCAL_TARGET = "target";
+    private static final String METHOD_RESOLVE_TARGET_REGISTRATION = "$resolveTargetRegistration";
+    private static final ClassTypeDef TYPE_BEAN_REGISTRATION = ClassTypeDef.of(BeanRegistration.class);
     private static final String LOCAL_TARGET_REGISTRATION = "targetRegistration";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
@@ -500,14 +502,35 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 method
                             )));
                     }
-                    // the registration the proxy holds is the target's unless the target changed between the two reads
-                    return aThis.invoke(METHOD_INTERCEPTED_TARGET).newLocal(LOCAL_TARGET, target -> proceed(
-                        methodElement,
-                        methodParameters,
-                        resolveTargetInterceptors(aThis, fields, proxyMethodsField, aThis.field(targetRegistrationField), target).arrayElement(index),
-                        target,
-                        method
-                    ));
+                    if (!hotswap) {
+                        // a lazy proxy that caches its target takes the target of a call from the registration it caches
+                        return aThis.invoke(METHOD_RESOLVE_TARGET_REGISTRATION, TYPE_BEAN_REGISTRATION).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration ->
+                            targetRegistration.invoke(METHOD_REGISTRATION_GET_BEAN).newLocal(LOCAL_TARGET, target -> proceed(
+                                methodElement,
+                                methodParameters,
+                                resolveTargetInterceptors(aThis, fields, proxyMethodsField, targetRegistration, target).arrayElement(index),
+                                target,
+                                method
+                            )));
+                    }
+                    // the target and its registration are read under the one lock they are swapped under, so that a
+                    // call never has the target of before a swap with the registration of after it
+                    VariableDef.Field readLock = aThis.field(FIELD_READ_LOCK, ClassTypeDef.of(Lock.class));
+                    return ExpressionDef.nullValue().cast(TypeDef.OBJECT).newLocal(LOCAL_TARGET, target ->
+                        ExpressionDef.nullValue().cast(TYPE_BEAN_REGISTRATION).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration -> StatementDef.multi(
+                            // two field reads, which cannot fail: the lock is released without a finally
+                            readLock.invoke(LOCK_METHOD),
+                            target.assign(aThis.field(Objects.requireNonNull(targetField))),
+                            targetRegistration.assign(aThis.field(targetRegistrationField)),
+                            readLock.invoke(UNLOCK_METHOD),
+                            proceed(
+                                methodElement,
+                                methodParameters,
+                                resolveTargetInterceptors(aThis, fields, proxyMethodsField, targetRegistration, target).arrayElement(index),
+                                target,
+                                method
+                            )
+                        )));
                 }
 
                 ExpressionDef targetArgument;
@@ -804,6 +827,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     proxyBuilder.addMethod(getClearCachedInterceptedTargetMethod(targetField, targetRegistrationField));
                     if (targetRegistrationField != null) {
                         proxyBuilder.addMethod(getInterceptedTargetRegistrationMethod(targetRegistrationField));
+                        proxyBuilder.addMethod(getResolveTargetRegistrationMethod(
+                            targetField,
+                            targetRegistrationField,
+                            beanResolutionContextField,
+                            proxyBeanDefinitionField,
+                            beanQualifierField
+                        ));
                     }
                 } else {
                     interceptedTargetMethod = getLazyInterceptedTargetMethod(
@@ -1181,6 +1211,12 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 //                                }
 //                            }
 //                            return this.$target;
+                if (targetRegistrationField != null) {
+                    // the target of the registration, which is cached with it
+                    return aThis.invoke(METHOD_RESOLVE_TARGET_REGISTRATION, TYPE_BEAN_REGISTRATION)
+                        .invoke(METHOD_REGISTRATION_GET_BEAN)
+                        .returning();
+                }
                 VariableDef.Field targetFieldAccess = aThis.field(targetField);
                 return StatementDef.multi(
                     targetFieldAccess.newLocal(LOCAL_TARGET, targetVar ->
@@ -1190,27 +1226,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 StatementDef.multi(
                                     targetVar.assign(targetFieldAccess),
                                     targetVar.ifNull(
-                                        targetRegistrationField == null
-                                            ? StatementDef.multi(
-                                                targetFieldAccess.assign(
-                                                    pushResolveLazyProxyTargetBean(
-                                                        aThis,
-                                                        beanResolutionContextField,
-                                                        proxyBeanDefinitionField,
-                                                        beanQualifierField)
-                                                ),
-                                                aThis.field(beanResolutionContextField).assign(ExpressionDef.nullValue())
-                                            )
-                                            : resolveProxyTargetRegistration(
-                                                aThis.field(beanResolutionContextField),
-                                                aThis.field(proxyBeanDefinitionField),
-                                                aThis.field(beanQualifierField)
-                                            ).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration -> StatementDef.multi(
-                                                // the registration first, so that a call which sees the target sees it
-                                                aThis.field(targetRegistrationField).assign(targetRegistration),
-                                                targetFieldAccess.assign(targetRegistration.invoke(METHOD_REGISTRATION_GET_BEAN)),
-                                                aThis.field(beanResolutionContextField).assign(ExpressionDef.nullValue())
-                                            ))
+                                        StatementDef.multi(
+                                            targetFieldAccess.assign(
+                                                pushResolveLazyProxyTargetBean(
+                                                    aThis,
+                                                    beanResolutionContextField,
+                                                    proxyBeanDefinitionField,
+                                                    beanQualifierField)
+                                            ),
+                                            aThis.field(beanResolutionContextField).assign(ExpressionDef.nullValue())
+                                        )
                                     )
                                 )
                             )
@@ -1218,6 +1243,46 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     ),
                     targetFieldAccess.returning()
                 );
+            });
+    }
+
+    /**
+     * The registration of the target a lazy proxy caches, resolved on the first call. A call takes its target from
+     * the registration it gets here, so that it never has a target with the registration of another.
+     */
+    private MethodDef getResolveTargetRegistrationMethod(FieldDef targetField,
+                                                         FieldDef targetRegistrationField,
+                                                         FieldDef beanResolutionContextField,
+                                                         FieldDef proxyBeanDefinitionField,
+                                                         FieldDef beanQualifierField) {
+        return MethodDef.builder(METHOD_RESOLVE_TARGET_REGISTRATION)
+            .addModifiers(Modifier.PRIVATE)
+            .returns(TYPE_BEAN_REGISTRATION)
+            .build((aThis, methodParameters) -> {
+                VariableDef.Field registrationFieldAccess = aThis.field(targetRegistrationField);
+                return registrationFieldAccess.newLocal(LOCAL_TARGET_REGISTRATION, registrationVar -> StatementDef.multi(
+                    registrationVar.ifNull(
+                        new StatementDef.Synchronized(
+                            aThis,
+                            StatementDef.multi(
+                                registrationVar.assign(registrationFieldAccess),
+                                registrationVar.ifNull(
+                                    StatementDef.multi(
+                                        registrationVar.assign(resolveProxyTargetRegistration(
+                                            aThis.field(beanResolutionContextField),
+                                            aThis.field(proxyBeanDefinitionField),
+                                            aThis.field(beanQualifierField)
+                                        )),
+                                        registrationFieldAccess.assign(registrationVar),
+                                        aThis.field(targetField).assign(registrationVar.invoke(METHOD_REGISTRATION_GET_BEAN)),
+                                        aThis.field(beanResolutionContextField).assign(ExpressionDef.nullValue())
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    registrationVar.returning()
+                ));
             });
     }
 
