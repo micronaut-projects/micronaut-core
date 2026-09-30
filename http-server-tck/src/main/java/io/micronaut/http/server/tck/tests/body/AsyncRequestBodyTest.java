@@ -175,7 +175,11 @@ public class AsyncRequestBodyTest {
             assertEquals(HttpStatus.REQUEST_ENTITY_TOO_LARGE, call(server, text("/text", large)).status());
             assertEquals("small", call(server, text("/text", "small")).body());
             assertEquals(String.valueOf(large.length()), call(server, text("/file", large)).body());
-            assertEquals(String.valueOf(large.length()), call(server, text("/bytes/" + (32 * BUFFER_LIMIT), large)).body());
+            // bytes(n) holds the body in memory: a limit above the one of the server does not raise it
+            assertEquals(HttpStatus.REQUEST_ENTITY_TOO_LARGE, rejected(BUFFER_LIMIT, text("/bytes/" + (32 * BUFFER_LIMIT), large)).status());
+            String fits = "x".repeat(BUFFER_LIMIT);
+            assertEquals(String.valueOf(fits.length()), call(server, text("/bytes/" + (32 * BUFFER_LIMIT), fits)).body());
+            assertEquals(HttpStatus.REQUEST_ENTITY_TOO_LARGE, rejected(BUFFER_LIMIT, text("/bytes/" + (32 * BUFFER_LIMIT), fits + "x")).status());
             assertEquals(HttpStatus.REQUEST_ENTITY_TOO_LARGE, call(server, text("/bytes/100", large)).status());
             StringJoiner items = new StringJoiner(",", "[", "]");
             for (int i = 0; i < 2048; i++) {

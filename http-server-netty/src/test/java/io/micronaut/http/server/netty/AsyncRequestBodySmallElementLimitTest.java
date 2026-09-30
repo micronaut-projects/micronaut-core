@@ -30,8 +30,13 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -43,10 +48,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The elements of a body read with {@link AsyncRequestBody#elements} are limited one at a time by
@@ -189,6 +196,87 @@ class AsyncRequestBodySmallElementLimitTest {
         }
     }
 
+    @ParameterizedTest(name = "{0}, chunked={1}")
+    @MethodSource("explicitLimits")
+    void anExplicitLimitDoesNotRaiseTheBufferLimitOfABodyThatArrivesInPieces(String path, boolean chunked) throws Exception {
+        int limit = 64;
+        // four times the limit, below the limit the handler asks for, in pieces below the limit
+        String body = "x".repeat(4 * limit);
+        try (ApplicationContext ctx = run(limit)) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            String response = postInPieces(server, path, body, limit / 2, chunked);
+            assertTrue(response.startsWith("HTTP/1.1 413"), path + ": " + response);
+        }
+    }
+
+    @ParameterizedTest(name = "{0}, chunked={1}")
+    @MethodSource("explicitLimits")
+    void anExplicitLimitAboveTheBufferLimitReadsABodyWithinTheBufferLimit(String path, boolean chunked) throws Exception {
+        int limit = 64;
+        String body = "x".repeat(limit);
+        try (ApplicationContext ctx = run(limit)) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            String response = postInPieces(server, path, body, limit / 2, chunked);
+            assertTrue(response.startsWith("HTTP/1.1 200"), path + ": " + response);
+            assertTrue(response.endsWith("length=" + limit), path + ": " + response);
+        }
+    }
+
+    static Stream<Arguments> explicitLimits() {
+        List<Arguments> cases = new ArrayList<>();
+        for (String path : new String[]{"/small-elements/bytes-limit", "/small-elements/text-limit", "/small-elements/text-charset-limit"}) {
+            for (boolean chunked : new boolean[]{false, true}) {
+                cases.add(Arguments.of(path, chunked));
+            }
+        }
+        return cases.stream();
+    }
+
+    /**
+     * Post a body in pieces that are flushed one at a time, so that the server reads them one at
+     * a time, and read the whole response. The response is read while the body is sent: a server
+     * that answers before the whole body arrived closes the connection, and what is sent after
+     * that resets it.
+     */
+    private static String postInPieces(EmbeddedServer server, String path, String body, int piece, boolean chunked) throws Exception {
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.getPort())) {
+            socket.setSoTimeout(10_000);
+            socket.setTcpNoDelay(true);
+            InputStream in = socket.getInputStream();
+            CompletableFuture<String> response = CompletableFuture.supplyAsync(() -> {
+                ByteArrayOutputStream received = new ByteArrayOutputStream();
+                byte[] buffer = new byte[1024];
+                try {
+                    for (int read = in.read(buffer); read >= 0; read = in.read(buffer)) {
+                        received.write(buffer, 0, read);
+                    }
+                } catch (IOException e) {
+                    // reset after the response: what was received is the response
+                }
+                return received.toString(StandardCharsets.UTF_8);
+            });
+            OutputStream out = socket.getOutputStream();
+            try {
+                out.write(("POST " + path + " HTTP/1.1\r\nHost: localhost\r\nContent-Type: text/plain\r\nConnection: close\r\n"
+                    + (chunked ? "Transfer-Encoding: chunked" : "Content-Length: " + body.length()) + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                out.flush();
+                for (int i = 0; i < body.length() && !response.isDone(); i += piece) {
+                    Thread.sleep(50);
+                    String part = body.substring(i, Math.min(body.length(), i + piece));
+                    out.write((chunked ? Integer.toHexString(part.length()) + "\r\n" + part + "\r\n" : part).getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                }
+                if (chunked && !response.isDone()) {
+                    out.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                }
+            } catch (IOException e) {
+                // the server answered and closed the connection before the whole body was sent
+            }
+            return response.get(20, TimeUnit.SECONDS);
+        }
+    }
+
     /**
      * @return A JSON array of small numbers, of at least the length
      */
@@ -262,6 +350,21 @@ class AsyncRequestBodySmallElementLimitTest {
         @Post(uri = "/bytes", consumes = MediaType.APPLICATION_JSON)
         CompletionStage<HttpResponse<String>> bytes(AsyncRequestBody body) {
             return body.bytes(2048).thenApply(bytes -> HttpResponse.ok("length=" + bytes.length).contentType(MediaType.TEXT_PLAIN_TYPE));
+        }
+
+        @Post(uri = "/bytes-limit", consumes = MediaType.TEXT_PLAIN)
+        CompletionStage<HttpResponse<String>> bytesLimit(AsyncRequestBody body) {
+            return body.bytes(2048).thenApply(bytes -> HttpResponse.ok("length=" + bytes.length).contentType(MediaType.TEXT_PLAIN_TYPE));
+        }
+
+        @Post(uri = "/text-limit", consumes = MediaType.TEXT_PLAIN)
+        CompletionStage<HttpResponse<String>> textLimit(AsyncRequestBody body) {
+            return body.text(2048).thenApply(text -> HttpResponse.ok("length=" + text.length()).contentType(MediaType.TEXT_PLAIN_TYPE));
+        }
+
+        @Post(uri = "/text-charset-limit", consumes = MediaType.TEXT_PLAIN)
+        CompletionStage<HttpResponse<String>> textCharsetLimit(AsyncRequestBody body) {
+            return body.text(2048, StandardCharsets.US_ASCII).thenApply(text -> HttpResponse.ok("length=" + text.length()).contentType(MediaType.TEXT_PLAIN_TYPE));
         }
 
         @Post(uri = "/file", consumes = MediaType.TEXT_PLAIN)

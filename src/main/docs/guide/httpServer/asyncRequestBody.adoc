@@ -14,12 +14,14 @@ snippet::io.micronaut.docs.server.asyncbody.PeopleController[tags="imports,class
 
 The other ways to read the body are:
 
-* `text()` reads the body as a string, in the charset of the request, up to `micronaut.server.max-request-buffer-size` bytes. `text(maximumBytes)` sets another limit, and `text(maximumBytes, charset)` reads the body in the given charset instead.
-* `bytes(maximumBytes)` reads the body into a `byte[]`.
+* `text()` reads the body as a string, in the charset of the request, up to `micronaut.server.max-request-buffer-size` bytes. `text(maximumBytes)` sets a lower limit, and `text(maximumBytes, charset)` reads the body in the given charset instead.
+* `bytes(maximumBytes)` reads the body into a `byte[]`, up to `maximumBytes` and never more than `micronaut.server.max-request-buffer-size` bytes.
 * `transferTo(path)` writes the body to a new file, without holding it in memory, so `micronaut.server.max-request-buffer-size` does not limit it.
 * `takeBody()` hands the body over as a api:http.body.CloseableByteBody[], unread. The method must then consume or close it, e.g. by sending it on with an HTTP client.
 * `discardBody()` discards the body without reading it.
 * `form()` and `parts()` read a form, see <<formUploads, Form Data and File Uploads>>.
+
+`body`, `text` and `bytes` hold the whole body in memory, so `micronaut.server.max-request-buffer-size` always limits them, however the body is chunked and whenever it arrives. The `maximumBytes` of `text` and `bytes` lowers that limit and never raises it: the body is read up to the smaller of the two, and a larger body is answered with `413 Request Entity Too Large`. To read a body larger than the buffer limit, read it with `elements`, which limits each element, write it to a file with `transferTo`, or take it with `takeBody()`.
 
 snippet::io.micronaut.docs.server.asyncbody.PeopleController[tags="text", indent=0, title="Reading the Body as Text"]
 

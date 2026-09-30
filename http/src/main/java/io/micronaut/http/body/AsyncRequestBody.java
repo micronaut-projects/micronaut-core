@@ -67,6 +67,17 @@ import java.util.concurrent.CompletionStage;
  * malformed JSON and {@code 413} for a body that is too large. The returned stages fail with
  * those exceptions; a stage that is returned by the handler reaches the error routes.</p>
  *
+ * <h2>Reads that hold the body in memory</h2>
+ * <p>{@link #body(Argument)}, {@link #text()}, {@link #text(int)}, {@link #text(int, Charset)} and
+ * {@link #bytes(int)} hold the whole body in memory, so they are limited by
+ * {@code micronaut.server.max-request-buffer-size}, however the body arrives. The limit given to
+ * {@link #text(int)}, {@link #text(int, Charset)} and {@link #bytes(int)} lowers that limit, and
+ * never raises it: the body is read up to the smaller of the two, and a larger body fails with a
+ * {@link io.micronaut.http.exceptions.ContentLengthExceededException}, answered with {@code 413}.
+ * A body larger than the buffer limit of the server is read with {@link #elements(Argument)},
+ * which limits each element, written to a file with {@link #transferTo(Path)}, or taken with
+ * {@link #takeBody()}.</p>
+ *
  * <h2>Streaming</h2>
  * <p>{@link #elements(Argument)} decodes a JSON array or a JSON stream one element at a time,
  * {@link #parts()} reads a form part by part, and {@link #transferTo(Path)} writes the body to a
@@ -213,12 +224,16 @@ public interface AsyncRequestBody {
     CompletionStage<String> text();
 
     /**
-     * Read the whole body as text, in the charset of the request.
+     * Read the whole body as text, in the charset of the request. The body is held in memory: it
+     * is read up to the given limit, and never more than the limit of the server for buffered
+     * request content ({@code micronaut.server.max-request-buffer-size}): a larger body is read
+     * with {@link #elements(Argument)}, {@link #transferTo(Path)} or {@link #takeBody()}.
      *
-     * @param maximumBytes The maximum number of bytes to read, not characters, zero or more
+     * @param maximumBytes The maximum number of bytes to read, not characters, zero or more: it
+     *                     lowers the limit of the server, and does not raise it
      * @return Completes with the body, or exceptionally with a
      * {@link io.micronaut.http.exceptions.ContentLengthExceededException} when it is larger
-     * than the limit
+     * than the smaller of the two limits
      * @throws IllegalArgumentException if the limit is negative
      * @throws IllegalStateException    if the body was already read
      */
@@ -226,13 +241,17 @@ public interface AsyncRequestBody {
 
     /**
      * Read the whole body as text, in the given charset, whatever the content type of the
-     * request says.
+     * request says. The body is held in memory: it is read up to the given limit, and never more
+     * than the limit of the server for buffered request content
+     * ({@code micronaut.server.max-request-buffer-size}): a larger body is read with
+     * {@link #elements(Argument)}, {@link #transferTo(Path)} or {@link #takeBody()}.
      *
-     * @param maximumBytes The maximum number of bytes to read, not characters, zero or more
+     * @param maximumBytes The maximum number of bytes to read, not characters, zero or more: it
+     *                     lowers the limit of the server, and does not raise it
      * @param charset      The charset of the body
      * @return Completes with the body, or exceptionally with a
      * {@link io.micronaut.http.exceptions.ContentLengthExceededException} when it is larger
-     * than the limit
+     * than the smaller of the two limits
      * @throws IllegalArgumentException if the limit is negative
      * @throws IllegalStateException    if the body was already read
      * @throws NullPointerException     if the charset is {@code null}
@@ -240,12 +259,16 @@ public interface AsyncRequestBody {
     CompletionStage<String> text(int maximumBytes, Charset charset);
 
     /**
-     * Read the whole body into memory.
+     * Read the whole body into memory. It is read up to the given limit, and never more than the
+     * limit of the server for buffered request content
+     * ({@code micronaut.server.max-request-buffer-size}): a larger body is read with
+     * {@link #elements(Argument)}, {@link #transferTo(Path)} or {@link #takeBody()}.
      *
-     * @param maximumBytes The maximum number of bytes to read, zero or more
+     * @param maximumBytes The maximum number of bytes to read, zero or more: it lowers the limit
+     *                     of the server, and does not raise it
      * @return Completes with the body, or exceptionally with a
      * {@link io.micronaut.http.exceptions.ContentLengthExceededException} when it is larger
-     * than the limit
+     * than the smaller of the two limits
      * @throws IllegalArgumentException if the limit is negative
      * @throws IllegalStateException    if the body was already read
      */

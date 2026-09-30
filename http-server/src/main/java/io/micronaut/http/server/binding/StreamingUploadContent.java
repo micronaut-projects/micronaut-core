@@ -70,7 +70,8 @@ final class StreamingUploadContent extends UploadContent {
 
     /**
      * The whole body of a request, read like the content of a form field: into memory with a
-     * limit, or to a file. It has no limit of its own.
+     * limit, or to a file. In memory it is held to the buffer limit of the server, whatever the
+     * limit the caller asks for; written to a file it has no limit of its own.
      *
      * @param body        The body, owned by the content
      * @param contentType The content type of the request
@@ -115,7 +116,10 @@ final class StreamingUploadContent extends UploadContent {
 
     @Override
     UploadContent.Operation<byte[]> newBytes(long limit) {
-        return new Collect(limit);
+        // the whole body is held in memory: the limit of the caller does not raise the buffer
+        // limit of the server. The body releases each piece to the collector as it arrives, so
+        // its own accounting only limits a body that arrived before it is read
+        return new Collect(requestBody ? Math.min(limit, context.maxBufferSize()) : limit);
     }
 
     @Override
