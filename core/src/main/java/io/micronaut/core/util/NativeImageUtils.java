@@ -54,6 +54,11 @@ public final class NativeImageUtils {
      * event is not enabled. On the JVM, the {@code jdk.jfr} module can be left out of the runtime
      * (a jlink image, {@code --limit-modules}), and loading a JFR event class then fails with a
      * {@link NoClassDefFoundError}. This flag guards class initialization of any JFR events.
+     * <p>
+     * The check is on the boot layer, so it also applies to an application launched on the module
+     * path ({@code java -m}): if its resolved module graph does not contain {@code jdk.jfr}, the
+     * flag is {@code false} and no JFR event is emitted. Adding {@code jdk.jfr} to the runtime
+     * (for a jlink image, {@code jlink --add-modules jdk.jfr}) turns the events back on.
      */
     public static final boolean JFR_AVAILABLE = !inImageCode()
         && ModuleLayer.boot().findModule("jdk.jfr").isPresent();

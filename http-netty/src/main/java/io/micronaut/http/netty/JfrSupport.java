@@ -30,13 +30,15 @@ import jdk.jfr.FlightRecorder;
  * first.
  *
  * @author Álvaro Sánchez-Mariscal
- * @since 5.2.6
+ * @since 5.3.0
  */
 @Internal
 public final class JfrSupport {
     /**
-     * Whether a Flight Recorder was seen. Not volatile: {@link FlightRecorder#isInitialized()}
-     * never reverts, and a stale read only costs one more call to it.
+     * Whether a Flight Recorder was seen. Deliberately a plain field, not {@code volatile} or an
+     * {@code AtomicBoolean}: it is read on every request, {@link FlightRecorder#isInitialized()}
+     * never reverts, and a thread that reads a stale {@code false} only makes one more call to
+     * that method, which is itself a volatile read.
      */
     private static boolean recorderSeen;
 
@@ -47,6 +49,10 @@ public final class JfrSupport {
      * Whether JFR events may be recorded now. This is {@code false} in a native image, when the
      * {@code jdk.jfr} module is not in the runtime, and while no Flight Recorder exists. It never
      * initializes an event class.
+     * <p>
+     * Callers check this, and then whether their event is enabled, once when a request or a
+     * carrier task starts. A request that is already in flight when a recording enables the
+     * event therefore produces no event; the requests that start after it do.
      *
      * @return {@code true} if a Flight Recorder exists, so that JFR event classes may be used
      */
