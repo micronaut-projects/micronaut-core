@@ -3,6 +3,7 @@ package io.micronaut.core.io.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assumptions.abort;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -12,8 +13,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 
+import jdk.jfr.FlightRecorder;
 import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
@@ -76,24 +79,64 @@ public class SoftServiceLoaderTest {
     void imageSingletonsAreNotLookedUpOutsideImageCode(@TempDir Path tempDir) throws IOException {
         assumeTrue(System.getProperty(NativeImageUtils.PROPERTY_IMAGE_CODE_KEY) == null);
         ClassLoader classLoader = getClass().getClassLoader();
-        Path file = tempDir.resolve("errors.jfr");
-        try (Recording recording = new Recording()) {
-            recording.enable("jdk.JavaErrorThrow");
-            recording.start();
+        Error probe;
+        List<String> errors;
+        try (Recording recording = startRecordingErrors()) {
             assertNull(ServiceScanner.findStaticServiceDefinitions());
+            // a forked scan looks the table up on the calling thread before it forks, and an unforked one does
+            // everything on the calling thread
             SoftServiceLoader.load(TestService.class, classLoader).collectAll();
             SoftServiceLoader.load(TestService.class, classLoader).disableFork().collectAll();
             MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, TestService.class.getName());
-            recording.stop();
-            recording.dump(file);
+            // JFR records an error when it is constructed: this one tells whether the errors of this thread
+            // are recorded
+            probe = new Error("probe " + UUID.randomUUID());
+            errors = errorsOfCurrentThread(recording, tempDir.resolve("errors.jfr"));
         }
 
+        assumeTrue(errors.contains(probe.toString()), "JFR did not record the errors of this thread");
         // without the GraalVM SDK on the class path, each lookup of the ImageSingletons class throws a NoClassDefFoundError
-        List<String> imageSingletonsErrors = RecordingFile.readAllEvents(file).stream()
+        assertEquals(List.of(), errors.stream().filter(error -> error.contains("ImageSingletons")).toList());
+    }
+
+    /**
+     * Starts recording the errors thrown in this JVM, or aborts the test when JFR cannot be used in it.
+     */
+    private static Recording startRecordingErrors() {
+        assumeTrue(FlightRecorder.isAvailable(), "JFR is not available in this JVM");
+        Recording recording = null;
+        try {
+            recording = new Recording();
+            recording.enable("jdk.JavaErrorThrow");
+            recording.start();
+            return recording;
+        } catch (RuntimeException e) {
+            // for example when the JFR repository cannot be created
+            if (recording != null) {
+                recording.close();
+            }
+            return abort("JFR cannot record in this JVM: " + e);
+        }
+    }
+
+    /**
+     * Returns the errors that the calling thread threw during the recording. JFR records the errors of every
+     * thread of the JVM, so the ones thrown by code that runs next to the test are left out.
+     */
+    private static List<String> errorsOfCurrentThread(Recording recording, Path file) {
+        long threadId = Thread.currentThread().threadId();
+        List<RecordedEvent> events;
+        try {
+            recording.stop();
+            recording.dump(file);
+            events = RecordingFile.readAllEvents(file);
+        } catch (IOException e) {
+            return abort("JFR cannot write the recording in this JVM: " + e);
+        }
+        return events.stream()
+            .filter(event -> event.getThread() != null && event.getThread().getJavaThreadId() == threadId)
             .map(SoftServiceLoaderTest::errorMessage)
-            .filter(message -> message.contains("ImageSingletons"))
             .toList();
-        assertEquals(List.of(), imageSingletonsErrors);
     }
 
     private static String errorMessage(RecordedEvent event) {
