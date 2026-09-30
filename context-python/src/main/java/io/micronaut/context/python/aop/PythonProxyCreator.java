@@ -27,6 +27,7 @@ import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.python.PythonContextRuntime;
 import io.micronaut.context.python.PythonCoercion;
 import io.micronaut.context.python.PythonConversion;
+import io.micronaut.context.python.PooledValueCoercible;
 import io.micronaut.context.python.PythonInvocation;
 import io.micronaut.context.python.PythonPublishers;
 import io.micronaut.context.python.PythonAsyncioRuntime;
@@ -66,6 +67,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -255,8 +257,38 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> T createProxyTargetProxyInFrame(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
+        if (PooledValueCoercible.class.isAssignableFrom(type)) {
+            return createPooledProxyTargetProxy(proxyDefinition, type);
+        }
         Value pythonClass = PythonContextRuntime.findClass(resolvePythonClassReference(proxyDefinition));
-        SelfInvocationBinder<T> targetSupplier = new SelfInvocationBinder<>(proxyDefinition, pythonClass);
+        Value proxyValue = buildProxyTargetValue(proxyDefinition, pythonClass, null);
+        T proxy = box(type, proxyValue);
+        if (proxy == null) {
+            throw new IllegalStateException("Python proxy target cannot be null");
+        }
+        // the Python proxy returned to Java resolves to this proxy again, not to a new wrapper of it
+        proxyValue.getMember(SCOPED_PROXY_BIND_JAVA_PROXY_METHOD).execute(new ValueCoercible.HostObjectReference(proxy));
+        return proxy;
+    }
+
+    /**
+     * Builds the Python scoped proxy for one context, from that context's copy of the class.
+     *
+     * <p>Everything here belongs to a single context: the scoped proxy value, the overrides written
+     * into it, and the {@link SelfInvocationBinder} that binds the target's own methods. A pooled
+     * bean therefore calls this once per context, while a bean of any other scope calls it once.
+     *
+     * @param proxyDefinition The proxy definition
+     * @param pythonClass The class, resolved in the context the proxy is being built for
+     * @param resolvedTarget The target bean, when it has already been resolved, or {@code null} to
+     *                       resolve it through the proxy definition as a call needs it
+     * @param <T> The bean type
+     * @return The proxy value, belonging to that context
+     */
+    private <T> Value buildProxyTargetValue(RuntimeProxyDefinition<T> proxyDefinition,
+                                            Value pythonClass,
+                                            @Nullable T resolvedTarget) {
+        SelfInvocationBinder<T> targetSupplier = new SelfInvocationBinder<>(proxyDefinition, pythonClass, resolvedTarget);
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(targetSupplier.get()));
         if (hasAroundConstructAdvice(proxyDefinition)) {
             // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.
@@ -311,13 +343,74 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             }
             proxyValue.getMember(SCOPED_PROXY_OVERRIDE_METHOD).execute(methodName, proxiedFunction);
         }
-        T proxy = box(type, proxyValue);
-        if (proxy == null) {
-            throw new IllegalStateException("Python proxy target cannot be null");
-        }
-        // the Python proxy returned to Java resolves to this proxy again, not to a new wrapper of it
-        proxyValue.getMember(SCOPED_PROXY_BIND_JAVA_PROXY_METHOD).execute(new ValueCoercible.HostObjectReference(proxy));
+        return proxyValue;
+    }
+
+    /**
+     * A proxy-target proxy for a pooled bean, which needs one Python proxy per context.
+     *
+     * <p>A Python proxy belongs to the context it was created in, and a pooled bean exists in every
+     * context, so a single proxy cannot stand for one: a call arriving on another context would be
+     * using a value of a foreign context. Creating one proxy per context on demand is what lets a
+     * pooled bean carry advice at all -- without it the advice has to be dropped, which for
+     * {@code @Transactional} means running with no transaction and saying nothing.
+     *
+     * <p>There is still exactly one Java wrapper, the one Micronaut injects. It holds the function
+     * below, and each proxy it builds is bound back to that same wrapper so a proxy returning to
+     * Java resolves to it rather than to a new wrapper.
+     *
+     * @param proxyDefinition The proxy definition
+     * @param type The generated wrapper type
+     * @param <T> The wrapper type
+     * @return The wrapper
+     */
+    private <T> T createPooledProxyTargetProxy(RuntimeProxyDefinition<T> proxyDefinition, Class<T> type) {
+        // The target is resolved once, here, rather than per call through the scoped proxy. A pooled
+        // bean is prototype scoped, so every resolution creates a bean, and the proxy definition
+        // resolves through the resolution context it was created with -- reusing that later, from a
+        // pool thread, corrupts its dependent-bean stack. Once is also all that is needed: the target
+        // wrapper is itself pooled, so the one wrapper stands for an instance in every context.
+        T target = proxyDefinition.targetBean();
+        AtomicReference<T> wrapper = new AtomicReference<>();
+        PythonContextRuntime.PythonClassReference classReference = resolvePythonClassReference(proxyDefinition);
+        Function<Context, Value> perContext = context -> PythonContextRuntime.withExecutionFrame(context, () -> {
+            Value proxyValue = buildProxyTargetValue(
+                proxyDefinition,
+                PythonContextRuntime.findClass(classReference, context),
+                target
+            );
+            T created = wrapper.get();
+            if (created != null) {
+                proxyValue.getMember(SCOPED_PROXY_BIND_JAVA_PROXY_METHOD)
+                    .execute(new ValueCoercible.HostObjectReference(created));
+            }
+            return proxyValue;
+        });
+        T proxy = newPooledWrapper(type, perContext);
+        wrapper.set(proxy);
         return proxy;
+    }
+
+    /**
+     * Builds the wrapper of a pooled type from its generated factory.
+     *
+     * @param type The generated wrapper type
+     * @param perContext Builds the proxy for a context
+     * @param <T> The wrapper type
+     * @return The wrapper
+     */
+    private static <T> T newPooledWrapper(Class<T> type, Function<Context, Value> perContext) {
+        try {
+            return type.cast(type.getDeclaredMethod("fromPooledValueFactory", Function.class).invoke(null, perContext));
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException("The pooled Python type [" + type.getName() + "] has no "
+                + "fromPooledValueFactory(Function) factory, so an advised pooled bean cannot be proxied per context.", e);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            Throwable cause = e instanceof InvocationTargetException invocation && invocation.getCause() != null
+                ? invocation.getCause() : e;
+            throw new IllegalStateException("Cannot build the pooled Python wrapper [" + type.getName() + "]: "
+                + cause.getMessage(), cause);
+        }
     }
 
     private static <T> boolean isSyntheticPropertySetter(
@@ -856,12 +949,20 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     private final class SelfInvocationBinder<T> implements Supplier<T> {
         private final RuntimeProxyDefinition<T> proxyDefinition;
         private final Value pythonClass;
+        /**
+         * The target, when the caller resolved it up front. A pooled bean does, because it is
+         * prototype scoped and its definition can only resolve on the thread and resolution
+         * context it was created with.
+         */
+        @Nullable
+        private final T resolvedTarget;
         private final List<InterceptedFunction<T>> interceptedFunctions = new ArrayList<>();
         private final AtomicReference<WeakReference<Object>> boundTarget = new AtomicReference<>(new WeakReference<>(null));
 
-        SelfInvocationBinder(RuntimeProxyDefinition<T> proxyDefinition, Value pythonClass) {
+        SelfInvocationBinder(RuntimeProxyDefinition<T> proxyDefinition, Value pythonClass, @Nullable T resolvedTarget) {
             this.proxyDefinition = proxyDefinition;
             this.pythonClass = pythonClass;
+            this.resolvedTarget = resolvedTarget;
         }
 
         void interceptedMethodAdded(String methodName, MethodSelector<T> methodSelector, Value originalFunction, boolean coroutineFunction) {
@@ -870,7 +971,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
         @Override
         public T get() {
-            T target = proxyDefinition.targetBean();
+            T target = resolvedTarget != null ? resolvedTarget : proxyDefinition.targetBean();
             if (!interceptedFunctions.isEmpty() && !isBound(target)) {
                 synchronized (boundTarget) {
                     if (!isBound(target)) {

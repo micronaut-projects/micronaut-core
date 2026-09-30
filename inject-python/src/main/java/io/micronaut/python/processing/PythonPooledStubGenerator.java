@@ -71,6 +71,9 @@ final class PythonPooledStubGenerator {
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
     private static final ClassTypeDef POOLED_INSTANCE = ClassTypeDef.of("io.micronaut.context.python.PythonPooledInstance");
     private static final String POOLED_INSTANCE_FIELD = "graalpyPooledInstance";
+    private static final String FROM_POOLED_VALUE_FACTORY = "fromPooledValueFactory";
+    private static final TypeDef VALUE_FACTORY = TypeDef.parameterized(
+        ClassTypeDef.of("java.util.function.Function"), POLYGLOT_CONTEXT, POLYGLOT_VALUE);
     private static final String REPORTED_POOLED_DEPENDENCIES = "micronaut.python.reported-pooled-dependencies";
 
     /**
@@ -217,14 +220,12 @@ final class PythonPooledStubGenerator {
             : pythonConstructor.getParameters();
         boolean hasConstructorArguments = constructorParameters.length > 0;
 
-        FieldDef pooledInstanceField = null;
+        FieldDef pooledInstanceField;
         if (hasConstructorArguments) {
             // The bean owns its per-context instances, because the pool's cache is keyed by class
             // and two pooled beans of one class can hold different dependencies. The arguments are
             // captured once, at injection, and used to construct in whichever context serves a call.
-            FieldDef pooledInstance = FieldDef.builder(POOLED_INSTANCE_FIELD, POOLED_INSTANCE)
-                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-                .build();
+            FieldDef pooledInstance = pooledInstanceField();
             builder.addField(pooledInstance);
             pooledInstanceField = pooledInstance;
 
@@ -258,30 +259,47 @@ final class PythonPooledStubGenerator {
                         params.getFirst()
                     )).returning())));
 
-            // An instance this bean created carries a back-reference to this wrapper, so the
-            // conversion resolves it directly and never arrives here. This is reached only for a
-            // value of the class that the bean did not create -- one Python built for itself --
-            // which cannot become this wrapper: the value does not carry the dependencies, and
-            // asking injection for the bean is circular when the bean is what is being built.
+            // A wrapper for a value rather than for injected dependencies. The AOP machinery needs
+            // this: a proxy target is a Python object created for one context and handed to Java to
+            // be wrapped, and `box` looks for exactly this constructor. The wrapper stands for that
+            // object in that context and is not asked for another, which is why the holder may
+            // carry no arguments.
+            MethodDef.MethodDefBuilder valueCtor = MethodDef.constructor()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(ParameterDef.builder("value", POLYGLOT_VALUE).build());
+            builder.addMethod(valueCtor.build(((aThis, params) -> aThis.field(pooledInstance).assign(
+                POOLED_INSTANCE.invokeStatic("seeded", POOLED_INSTANCE, List.of(
+                    pythonClassReference(element, pythonClassReference),
+                    params.getFirst()
+                ))
+            ))));
+
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(POLYGLOT_VALUE)
                 .returns(thisType)
-                .build(((aThis, methodParameters) -> ClassTypeDef.of(UnsupportedOperationException.class)
-                    .instantiate(ExpressionDef.constant(
-                        "Cannot build the pooled Python bean [" + element.getName() + "] from this value: it was not "
-                            + "created by the bean, so it carries neither a reference to it nor the dependencies it "
-                            + "is constructed with."
-                    )).doThrow())));
+                .build(((aThis, methodParameters) -> thisType.instantiate(methodParameters.getFirst()).returning())));
+
+            addPooledValueFactory(builder, thisType, pooledInstance, typeName);
         } else {
+            // The pool's per-class cache serves this bean, so the holder stays null -- unless the
+            // bean is AOP-proxied, when it holds one Python proxy per context instead.
+            FieldDef pooledInstance = pooledInstanceField();
+            builder.addField(pooledInstance);
+            pooledInstanceField = pooledInstance;
+
             MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
-            builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
+            builder.addMethod(ctor.build(((aThis, params) ->
+                aThis.field(pooledInstance).assign(ExpressionDef.nullValue()))));
 
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(POLYGLOT_VALUE)
                 .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
-                    .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(pythonClassReference(element, pythonClassReference))).returning())));
+                    .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
+                        aThis.field(pooledInstance),
+                        pythonClassReference(element, pythonClassReference)
+                    )).returning())));
 
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC)
@@ -289,6 +307,7 @@ final class PythonPooledStubGenerator {
                 .returns(POLYGLOT_VALUE)
                 .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                     .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
+                        aThis.field(pooledInstance),
                         pythonClassReference(element, pythonClassReference),
                         params.getFirst()
                     )).returning())));
@@ -298,6 +317,8 @@ final class PythonPooledStubGenerator {
                 .addParameter(POLYGLOT_VALUE)
                 .returns(thisType)
                 .build(((aThis, methodParameters) -> thisType.instantiate().returning())));
+
+            addPooledValueFactory(builder, thisType, pooledInstance, typeName);
         }
 
         List<MethodElement> methodsToBridge = element.getEnclosedElements(
@@ -313,7 +334,7 @@ final class PythonPooledStubGenerator {
         addReferencedPythonClassReferenceFields(builder, element, methodsToBridge);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethodPooledClass(methodElement, builder, element, allClasses, pooledInstanceField);
+            addBridgeMethodPooledClass(methodElement, builder, element, allClasses, pooledInstanceField, hasConstructorArguments);
         }
 
         return builder;
@@ -332,8 +353,14 @@ final class PythonPooledStubGenerator {
         // services. Those are what the warning is about.
         warnAboutContextBoundDependencies(context, scriptElement, injectedMembers(scriptElement));
 
+        // Null unless the module is AOP-proxied, in which case it holds one Python proxy per
+        // context and every bridged call goes through that rather than the pool's module cache.
+        FieldDef pooledInstanceField = pooledInstanceField();
+        builder.addField(pooledInstanceField);
+
         MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
-        builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
+        builder.addMethod(ctor.build(((aThis, params) ->
+            aThis.field(pooledInstanceField).assign(ExpressionDef.nullValue()))));
 
         ClassTypeDef thisType = ClassTypeDef.of(typeName);
         String name = scriptElement.getNativeType().name();
@@ -349,7 +376,7 @@ final class PythonPooledStubGenerator {
             .returns(POLYGLOT_VALUE)
             .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                 .invokeStatic("findPooledScript", POLYGLOT_VALUE,
-                    List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script)))
+                    List.of(aThis.field(pooledInstanceField), ExpressionDef.constant(pkg), ExpressionDef.constant(script)))
                 .returning())));
 
         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
@@ -358,7 +385,7 @@ final class PythonPooledStubGenerator {
             .returns(POLYGLOT_VALUE)
             .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                 .invokeStatic("findPooledScript", POLYGLOT_VALUE,
-                    List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), params.getFirst()))
+                    List.of(aThis.field(pooledInstanceField), ExpressionDef.constant(pkg), ExpressionDef.constant(script), params.getFirst()))
                 .returning())));
 
         builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
@@ -366,6 +393,8 @@ final class PythonPooledStubGenerator {
             .addParameter(POLYGLOT_VALUE)
             .returns(thisType)
             .build(((aThis, methodParameters) -> thisType.instantiate().returning())));
+
+        addPooledValueFactory(builder, thisType, pooledInstanceField, typeName);
 
         List<MethodElement> methodsToBridge = scriptElement.getEnclosedElements(
             ElementQuery.ALL_METHODS
@@ -380,7 +409,7 @@ final class PythonPooledStubGenerator {
         boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethodPooledScript(methodElement, builder, pkg, script, allClasses);
+            addBridgeMethodPooledScript(methodElement, builder, pkg, script, allClasses, pooledInstanceField);
         }
 
         List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
@@ -400,7 +429,8 @@ final class PythonPooledStubGenerator {
                                                    ClassDef.ClassDefBuilder builder,
                                                    AbstractPythonClassElement element,
                                                    Map<String, ClassElement> allClasses,
-                                                   @Nullable FieldDef pooledInstanceField) {
+                                                   FieldDef pooledInstanceField,
+                                                   boolean ownsInstances) {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
@@ -416,11 +446,14 @@ final class PythonPooledStubGenerator {
             for (int i = 0; i < methodElement.getParameters().length; i++) {
                 parameterExpressions.add(methodParameters.get(i));
             }
-            // A bean that owns its per-context instances is invoked through the holder; one
-            // without arguments still goes through the pool's class cache.
-            boolean ownsInstances = pooledInstanceField != null;
+            // A bean that owns its per-context instances is invoked through the holder. One without
+            // arguments passes the holder too, so that a proxy takes over when there is one, and
+            // otherwise goes through the pool's class cache.
             List<ExpressionDef> args = new ArrayList<>();
-            args.add(ownsInstances ? aThis.field(pooledInstanceField) : pythonClassReference(element, element));
+            args.add(aThis.field(pooledInstanceField));
+            if (!ownsInstances) {
+                args.add(pythonClassReference(element, element));
+            }
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
             if (isAsyncGeneratorPythonMethod(methodElement)) {
@@ -446,7 +479,8 @@ final class PythonPooledStubGenerator {
                                                     ClassDef.ClassDefBuilder builder,
                                                     String pkg,
                                                     String script,
-                                                    Map<String, ClassElement> allClasses) {
+                                                    Map<String, ClassElement> allClasses,
+                                                    FieldDef pooledInstanceField) {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
@@ -463,6 +497,8 @@ final class PythonPooledStubGenerator {
                 parameterExpressions.add(methodParameters.get(i));
             }
             List<ExpressionDef> args = new ArrayList<>();
+            // the holder first, so a proxy takes over when the module is advised
+            args.add(aThis.field(pooledInstanceField));
             args.add(ExpressionDef.constant(pkg));
             args.add(ExpressionDef.constant(script));
             args.add(ExpressionDef.constant(pythonFunctionName));
@@ -557,6 +593,56 @@ final class PythonPooledStubGenerator {
                 return StatementDef.multi(result, ExpressionDef.nullValue().returning());
             }
         })));
+    }
+
+    /**
+     * The field holding this bean's per-context Python values.
+     *
+     * <p>Null unless the bean needs values of its own rather than the pool's per-class or
+     * per-module cache: it has constructor arguments, so two beans of the class are not
+     * interchangeable, or it is AOP-proxied, so its value is one Python proxy per context.
+     *
+     * @return The field
+     */
+    private static FieldDef pooledInstanceField() {
+        return FieldDef.builder(POOLED_INSTANCE_FIELD, POOLED_INSTANCE)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+            .build();
+    }
+
+    /**
+     * Adds the constructor and factory an AOP-proxied pooled bean is built through.
+     *
+     * <p>A Python proxy belongs to the context it was created in, so one proxy cannot serve a bean
+     * that exists in every context. The proxy creator hands over a function that builds a proxy in
+     * whichever context asks; this is the one wrapper Micronaut injects, and every call it bridges
+     * goes through that function's value rather than through the pool's shared instance -- which is
+     * what makes the advice run at all.
+     *
+     * @param builder The class being generated
+     * @param thisType Its type
+     * @param holder The per-context value field
+     * @param displayName What to call the bean in a diagnostic
+     */
+    private static void addPooledValueFactory(ClassDef.ClassDefBuilder builder,
+                                              ClassTypeDef thisType,
+                                              FieldDef holder,
+                                              String displayName) {
+        builder.addMethod(MethodDef.constructor()
+            .addModifiers(Modifier.PRIVATE)
+            .addParameter(ParameterDef.builder("pooledInstance", POOLED_INSTANCE).build())
+            .build(((aThis, params) -> aThis.field(holder).assign(params.getFirst()))));
+
+        builder.addMethod(MethodDef.builder(FROM_POOLED_VALUE_FACTORY)
+            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+            .addParameter(ParameterDef.builder("valueFactory", VALUE_FACTORY).build())
+            .returns(thisType)
+            .build(((aThis, methodParameters) -> thisType.instantiate(
+                POOLED_INSTANCE.invokeStatic("producedBy", POOLED_INSTANCE, List.of(
+                    ExpressionDef.constant(displayName),
+                    methodParameters.getFirst()
+                ))
+            ).returning())));
     }
 
     private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {
