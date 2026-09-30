@@ -56,12 +56,17 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Checks, each in a fresh JVM, that serving requests neither needs the {@code jdk.jfr} module
  * nor initializes JFR, and that a recording started after the first request still gets the
  * events, with requests still served once it stops.
+ * <p>
+ * Netty's own JFR events set up JFR's metadata on the first buffer allocation, so the
+ * first-request cases turn them off. The late-recording cases run with Netty's default settings,
+ * and check there that the first request loads none of Micronaut's event classes.
  * <p>
  * Every case starts a child JVM, which takes a few seconds. A child that fails, or that does not
  * exit within {@link #CHILD_TIMEOUT} and is killed, fails its case with the output of the child.
@@ -72,6 +77,10 @@ class JfrEventGatingTest {
     private static final String SPEC_NAME = "JfrEventGatingTest";
     private static final String RESULT = "RESULT ";
     private static final String METADATA_REPOSITORY = "jdk.jfr.internal.MetadataRepository ";
+    /**
+     * The first line the child application prints once the first request is served.
+     */
+    private static final String FIRST_REQUEST_SERVED = RESULT + "recorderInitialized=";
     private static final Duration CHILD_TIMEOUT = Duration.ofMinutes(1);
 
     @ParameterizedTest
@@ -85,9 +94,8 @@ class JfrEventGatingTest {
         assertEquals("false", child.result("recorderInitialized"), child::summary);
         assertEquals("false", child.result("jfrSupport"), child::summary);
         assertFalse(child.output().contains(METADATA_REPOSITORY), () -> METADATA_REPOSITORY + "was loaded\n" + child.summary());
-        // Micronaut's own event classes stay unloaded whatever Netty does
         for (String eventName : transport.eventNames) {
-            assertFalse(child.output().contains(" " + eventName + " "), () -> eventName + " was loaded\n" + child.summary());
+            assertFalse(child.classLoadedAt(eventName) >= 0, () -> eventName + " was loaded\n" + child.summary());
         }
     }
 
@@ -104,11 +112,18 @@ class JfrEventGatingTest {
     @ParameterizedTest
     @EnumSource(Transport.class)
     void recordingStartedAfterFirstRequestReceivesEvents(Transport transport) {
-        ChildJvm child = ChildJvm.run(transport, Scenario.LATE_RECORDING);
+        // Netty's default settings: its own events set up JFR's metadata on the first request
+        ChildJvm child = ChildJvm.run(transport, Scenario.LATE_RECORDING, "-Xlog:class+load");
 
         assertEquals("false", child.result("recorderInitialized"), child::summary);
+        int firstRequestServed = child.output().indexOf(FIRST_REQUEST_SERVED);
         for (String eventName : transport.eventNames) {
             assertEquals(transport.expectedEvent, child.result("event:" + eventName), child::summary);
+            // Micronaut's event classes are loaded for the request under the recording, and not
+            // for the first request, whatever Netty does
+            int loaded = child.classLoadedAt(eventName);
+            assertTrue(loaded >= 0, () -> "No class+load line for " + eventName + "\n" + child.summary());
+            assertTrue(loaded > firstRequestServed, () -> eventName + " was loaded by the first request\n" + child.summary());
         }
         assertEquals("true", child.result("jfrSupportAfterRecording"), child::summary);
         assertEquals("ok", child.result("bodyAfterRecording"), child::summary);
@@ -236,6 +251,15 @@ class JfrEventGatingTest {
 
         String result(String key) {
             return results.get(key);
+        }
+
+        /**
+         * @param className a class name
+         * @return where the {@code -Xlog:class+load} line of the class is in the output, or -1 if
+         *     the class was not loaded
+         */
+        int classLoadedAt(String className) {
+            return output.indexOf(" " + className + " ");
         }
 
         /**
