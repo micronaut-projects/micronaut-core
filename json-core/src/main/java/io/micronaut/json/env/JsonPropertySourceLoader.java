@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -81,6 +82,6 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
      * @throws IOException If the input stream cannot be read
      */
     protected Map<String, Object> readJsonAsMap(InputStream input) throws IOException {
-        return jsonMapper.readValue(input, MAP_ARGUMENT);
+        return Objects.requireNonNull(jsonMapper.readValue(input, MAP_ARGUMENT));
     }
 }
