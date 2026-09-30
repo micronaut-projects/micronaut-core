@@ -72,6 +72,22 @@ class ServiceNameConditionTest {
     }
 
     @Test
+    void theIteratorOnlyReturnsDefinitionsOfTheStrippedNames() throws IOException {
+        try (URLClassLoader classLoader = servicesClassLoader()) {
+            List<String> definitions = new ArrayList<>();
+            for (ServiceDefinition<NamedService> definition : SoftServiceLoader.load(NamedService.class, classLoader)) {
+                definitions.add("'" + definition.getName() + "' " + (definition.isPresent() ? "present" : "not present"));
+            }
+
+            // no definition under a name with the whitespace around it, and none for a line without a name
+            assertEquals(
+                List.of("'" + A + "' present", "'" + B + "' present", "'" + C + "' present", "'" + D + "' present"),
+                definitions.stream().sorted().toList()
+            );
+        }
+    }
+
+    @Test
     void theConditionIsTestedOnTheNameOfEveryEntryOfAStaticServiceLoader() throws Exception {
         Map<String, List<String>> results = runInIsolatedClassLoader(StaticServiceLoaderScenario.class);
 
