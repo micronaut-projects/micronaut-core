@@ -9,6 +9,12 @@ import spock.lang.Issue
 import spock.lang.See
 import spock.lang.Specification
 
+/**
+ * One spec per module on purpose: the Logback state of the whole JVM is under test. It asserts on the
+ * process-global {@link LoggerContext}, which starts as whatever Logback's startup made of this module's
+ * classpath, here one with both {@code logback-test.xml} and {@code logback.xml}. A second spec in this
+ * module would share that state and make the result depend on the order of the specs.
+ */
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
 @See("https://logback.qos.ch/manual/configuration.html#auto_configuration")
 class TestXmlConfigurationSpec extends Specification {

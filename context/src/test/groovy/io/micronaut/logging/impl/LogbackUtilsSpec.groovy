@@ -70,6 +70,9 @@ class LogbackUtilsSpec extends Specification {
         rootAppenders() == expected
 
         where:
+        // STDOUT is not Logback's doing: it is the root appender that src/test/resources/logback.xml of this
+        // module declares, which Logback's own lookup finds on the classpath. A row that expects it breaks
+        // if that file renames the appender.
         description                                                           | configurators                  | configurationFile | loggerConfig | systemProperty | expected
         'logger.config wins over a configurator'                              | [StubConfigurator]             | null              | CUSTOM       | null           | ['CUSTOM']
         'Joran runs after a configurator that declines'                       | [DecliningConfigurator]        | null              | null         | null           | ['STDOUT']

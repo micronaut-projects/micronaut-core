@@ -152,7 +152,19 @@ public final class LogbackUtils {
     private static @Nullable String micronautOnlyLocation(@Nullable String configurationFile,
                                                           @Nullable String loggerConfig) {
         if (configurationFile != null) {
-            // A JVM system property is Logback's own, and it still takes precedence over logger.config
+            // The location is Logback's own when it is the -Dlogback.configurationFile JVM system property.
+            // System properties are a property source of the Micronaut environment, so a value that is
+            // only set there arrives here as the very same string, and exact equality tells the cases apart:
+            // - Equal: Logback's startup read the same string, so its own lookup is used. A value repeated
+            //   verbatim in another property source cannot be told apart from the system property, and
+            //   does not need to be.
+            // - Not equal, be it only by a trailing slash or by a relative instead of an absolute path:
+            //   Micronaut configuration holds a value that Logback's startup did not read, because there
+            //   is no system property or because a property source that takes precedence over the system
+            //   properties overrides it. That value is used here, and it fails when it does not exist.
+            //   Normalizing both values before comparing them would be guessing that two different
+            //   settings mean the same.
+            // Either way logback.configurationFile keeps its precedence over logger.config.
             return configurationFile.equals(System.getProperty(ClassicConstants.CONFIG_FILE_PROPERTY)) ? null : configurationFile;
         }
         return loggerConfig;
