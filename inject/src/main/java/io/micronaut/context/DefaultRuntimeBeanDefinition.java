@@ -529,7 +529,6 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
                 if (context instanceof DefaultBeanContext defaultBeanContext) {
                     defaultBeanContext.destroyDependentBean(dependent);
                 } else {
-                    // a context that cannot destroy a bean as a dependent destroys it in its own right
                     context.destroyBean(dependent);
                 }
             }
