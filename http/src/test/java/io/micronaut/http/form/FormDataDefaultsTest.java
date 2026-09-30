@@ -61,6 +61,19 @@ class FormDataDefaultsTest {
     }
 
     @Test
+    void aCollectionWithAValueThatDoesNotConvertIsAConversionError() {
+        FormData form = new TextForm(Map.of("mixed", List.of("1", "bad")));
+        // not the values that convert, without the others
+        ConversionErrorException e = assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.listOf(Integer.class)));
+        assertEquals("mixed", e.getArgument().getName());
+        assertThrows(ConversionErrorException.class, () -> form.find("mixed", Argument.listOf(Integer.class)));
+        assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.setOf(Integer.class)));
+        assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.of(Integer[].class)));
+        assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.of(Optional.class, Argument.listOf(Integer.class))));
+        assertEquals(List.of("1", "bad"), form.get("mixed", Argument.listOf(String.class)));
+    }
+
+    @Test
     void failures() {
         FormFieldException missing = assertThrows(FormFieldException.class, () -> FORM.get("city", Argument.listOf(Integer.class)));
         assertEquals("city", missing.getFieldName());

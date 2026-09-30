@@ -105,6 +105,13 @@ final class DefaultFormData implements FormData {
         Class<T> rawType = type.getType();
         // a collection or an array gets every value of the field, and an Optional of one
         boolean all = FormBinding.isMany(type);
+        if (all && rawType == Optional.class) {
+            // converted to the collection: the conversion to an Optional does not report the
+            // values of the collection that were rejected
+            Argument<?> valueType = type.getFirstTypeVariable().orElseThrow();
+            Object value = convert(Argument.of(valueType.getType(), name, valueType.getAnnotationMetadata(), valueType.getTypeParameters()), List.copyOf(values));
+            return Optional.of(rawType.cast(Optional.of(value)));
+        }
         Argument<T> named = name.equals(type.getName()) ? type : Argument.of(rawType, name, type.getAnnotationMetadata(), type.getTypeParameters());
         return Optional.of(convert(named, all ? List.copyOf(values) : values.get(0)));
     }
@@ -182,12 +189,14 @@ final class DefaultFormData implements FormData {
         }
         ConversionContext context = ConversionContext.of(argument);
         Optional<T> result = conversionService.convert(value, argument.getType(), context);
-        if (result.isPresent()) {
-            return result.get();
-        }
+        // checked first: a collection is converted from the values that convert, and the
+        // others are rejected, which is not the value that was asked for
         Optional<ConversionError> error = context.getLastError();
         if (error.isPresent()) {
             throw new ConversionErrorException(argument, error.get());
+        }
+        if (result.isPresent()) {
+            return result.get();
         }
         throw new FormFieldException(argument.getName(), "Form field [" + argument.getName() + "] cannot be converted to " + argument.getTypeName());
     }

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests.binding;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -71,6 +72,14 @@ public class PathVariablesTest {
     }
 
     @Test
+    void aListVariableWithAnElementThatDoesNotConvertIsBadRequest() throws IOException {
+        // not the elements that convert, without the others
+        badRequest("/path-variables/numbers/1,bad");
+        badRequest("/path-variables/numbers-typed/1,bad");
+        ok("/path-variables/numbers-typed/1,2", "[1, 2]");
+    }
+
+    @Test
     void aServerFilterReadsThePathVariablesAfterRouting() throws IOException {
         ok("/path-variables/filtered/7", "filter:7 controller:7");
     }
@@ -119,6 +128,11 @@ public class PathVariablesTest {
         String numbers(PathVariables pathVariables) {
             List<Integer> numbers = pathVariables.getList("numbers", Integer.class);
             return String.valueOf(numbers.stream().mapToInt(Integer::intValue).sum());
+        }
+
+        @Get("/numbers-typed/{numbers}")
+        String numbersTyped(PathVariables pathVariables) {
+            return pathVariables.get("numbers", Argument.listOf(Integer.class)).toString();
         }
 
         @Get("/missing/{id}")

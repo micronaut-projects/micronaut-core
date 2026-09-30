@@ -30,6 +30,13 @@ class RoutePathVariablesTest {
     }
 
     @Test
+    void aListWithAnElementThatDoesNotConvertIsAConversionError() {
+        PathVariables mixed = new RoutePathVariables(Map.of("ids", "1,bad"), ConversionService.SHARED);
+        assertThrows(ConversionErrorException.class, () -> mixed.getList("ids", Integer.class));
+        assertThrows(ConversionErrorException.class, () -> mixed.findList("ids", Integer.class));
+    }
+
+    @Test
     void aValueThatDoesNotConvertIsAConversionError() {
         assertThrows(ConversionErrorException.class, () -> pathVariables.getInt("ids"));
     }

@@ -381,6 +381,17 @@ public class FormFilterTest {
     }
 
     @Test
+    void aCollectionOfAFilterWithAValueThatDoesNotConvertIsABadRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            assertEquals("filter:[1, 2] [1, 2]", call(server, urlEncoded("/integers", "tags=1&name=Fred&tags=2")).body());
+            Response rejected = call(server, urlEncoded("/integers", "tags=1&name=Fred&tags=bad"));
+            assertEquals(HttpStatus.BAD_REQUEST, rejected.status(), rejected.body());
+            Response rejectedAccessor = call(server, urlEncoded("/integers-accessor", "tags=1&name=Fred&tags=bad"));
+            assertEquals(HttpStatus.BAD_REQUEST, rejectedAccessor.status(), rejectedAccessor.body());
+        }
+    }
+
+    @Test
     @Tag("multipart")
     void aFilterArgumentCannotReadAFormThatIsStreamed() throws IOException {
         try (ServerUnderTest server = server()) {
@@ -567,6 +578,16 @@ public class FormFilterTest {
                 + " " + optionalArray.map(Arrays::toString).orElse("empty"));
         }
 
+        @RequestFilter("/integers")
+        void integers(HttpRequest<?> request, @Part("tags") List<Integer> list, @Part("tags") Optional<List<Integer>> optionalList) {
+            request.setAttribute(SEEN, "filter:" + list + " " + optionalList.orElseThrow());
+        }
+
+        @RequestFilter("/integers-accessor")
+        void integersAccessor(HttpRequest<?> request, FormData form) {
+            request.setAttribute(SEEN, "filter:" + form.get("tags", Argument.listOf(Integer.class)));
+        }
+
         @RequestFilter("/nullable-text")
         void nullableText(HttpRequest<?> request, @Nullable @Part("city") String city) {
             request.setAttribute(SEEN, "filter:" + city);
@@ -611,6 +632,11 @@ public class FormFilterTest {
         @Post(uri = "/async-form-argument", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
         String asyncFormArgument(HttpRequest<?> request, FormData form) {
             return seen(request) + "|" + form.getString("name");
+        }
+
+        @Post(uris = {"/integers", "/integers-accessor"}, consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        String integers(HttpRequest<?> request) {
+            return seen(request);
         }
 
         @Post(uri = "/optional-list", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)

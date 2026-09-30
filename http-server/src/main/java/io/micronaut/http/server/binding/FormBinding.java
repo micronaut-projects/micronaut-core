@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
@@ -758,12 +759,33 @@ public final class FormBinding {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private static <T> Optional<T> convert(ConversionService conversionService, ArgumentConversionContext<T> context, List<String> values) {
         if (values.isEmpty()) {
             return Optional.empty();
         }
+        Argument<T> argument = context.getArgument();
+        boolean many = isMany(argument);
+        if (many && argument.getType() == Optional.class) {
+            // converted to the collection, with its own context: the conversion to an Optional
+            // does not report the values of the collection that were rejected
+            Argument<?> valueType = argument.getFirstTypeVariable().orElseThrow();
+            ArgumentConversionContext<?> valueContext = ConversionContext.of(
+                Argument.of(valueType.getType(), argument.getName(), valueType.getAnnotationMetadata(), valueType.getTypeParameters()),
+                context.getLocale(), context.getCharset());
+            Optional<?> value = conversionService.convert(values, valueContext);
+            ConversionError error = valueContext.getLastError().orElse(null);
+            if (error != null) {
+                context.reject(error.getOriginalValue().orElse(values), error.getCause());
+                return Optional.empty();
+            }
+            return value.map(v -> (T) Optional.of(v));
+        }
         // a single value is the first field of the name, like a field read by name
-        return conversionService.convert(isMany(context.getArgument()) ? values : values.get(0), context);
+        Optional<T> converted = conversionService.convert(many ? values : values.get(0), context);
+        // a collection is converted from the values that convert, and the others are rejected:
+        // that is not the value of the argument, which fails with the error of the conversion
+        return context.getLastError().isPresent() ? Optional.empty() : converted;
     }
 
     /**

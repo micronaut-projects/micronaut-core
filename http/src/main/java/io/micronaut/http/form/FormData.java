@@ -156,15 +156,28 @@ public interface FormData extends NamedValues, AutoCloseable {
         if (!all && type.getTypeParameters().length == 0) {
             return find(name, rawType);
         }
-        Argument<T> named = name.equals(type.getName()) ? type : Argument.of(rawType, name, type.getAnnotationMetadata(), type.getTypeParameters());
-        ArgumentConversionContext<T> context = ConversionContext.of(named);
-        Optional<T> result = ConversionService.SHARED.convert(all ? values : values.get(0), context);
-        if (result.isPresent()) {
-            return result;
+        if (all && rawType == Optional.class) {
+            // converted to the collection: the conversion to an Optional does not report the
+            // values of the collection that were rejected
+            Argument<?> value = type.getFirstTypeVariable().orElseThrow();
+            return Optional.of(rawType.cast(Optional.of(
+                convertField(name, Argument.of(value.getType(), name, value.getAnnotationMetadata(), value.getTypeParameters()), values))));
         }
+        Argument<T> named = name.equals(type.getName()) ? type : Argument.of(rawType, name, type.getAnnotationMetadata(), type.getTypeParameters());
+        return Optional.of(convertField(name, named, all ? values : values.get(0)));
+    }
+
+    private static <T> T convertField(String name, Argument<T> named, Object value) {
+        ArgumentConversionContext<T> context = ConversionContext.of(named);
+        Optional<T> result = ConversionService.SHARED.convert(value, context);
+        // checked first: a collection is converted from the values that convert, and the
+        // others are rejected, which is not the value that was asked for
         Optional<ConversionError> error = context.getLastError();
         if (error.isPresent()) {
             throw new ConversionErrorException(named, error.get());
+        }
+        if (result.isPresent()) {
+            return result.get();
         }
         throw new FormFieldException(name, "Form field [" + name + "] cannot be converted to " + named.getTypeName());
     }

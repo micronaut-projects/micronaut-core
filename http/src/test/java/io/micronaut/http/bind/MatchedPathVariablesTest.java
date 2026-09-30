@@ -93,6 +93,18 @@ class MatchedPathVariablesTest {
     }
 
     @Test
+    void aListWithAnElementThatDoesNotConvertIsAConversionError() {
+        PathVariables mixed = new MatchedPathVariables(Map.of("ids", "1,bad"), ConversionService.SHARED);
+        // not the elements that convert, without the others
+        ConversionErrorException e = assertThrows(ConversionErrorException.class, () -> mixed.getList("ids", Integer.class));
+        assertEquals("ids", e.getArgument().getName());
+        assertThrows(ConversionErrorException.class, () -> mixed.get("ids", Argument.listOf(Integer.class)));
+        assertThrows(ConversionErrorException.class, () -> mixed.findList("ids", Integer.class));
+        assertThrows(ConversionErrorException.class, () -> mixed.find("ids", Argument.setOf(Integer.class)));
+        assertEquals(List.of("1", "bad"), mixed.getStrings("ids"));
+    }
+
+    @Test
     void theValuesAreReadOnly() {
         MatchedPathVariables matched = (MatchedPathVariables) pathVariables;
         assertThrows(UnsupportedOperationException.class, () -> matched.values().put("id", "6"));

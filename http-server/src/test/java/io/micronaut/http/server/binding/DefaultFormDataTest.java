@@ -129,6 +129,22 @@ class DefaultFormDataTest {
     }
 
     @Test
+    void aCollectionWithAValueThatDoesNotConvertIsAConversionError() {
+        Map<String, List<String>> fields = new LinkedHashMap<>();
+        fields.put("mixed", List.of("1", "bad"));
+        DefaultFormData form = new DefaultFormData(fields, Map.of(), ConversionService.SHARED);
+        // not the values that convert, without the others
+        ConversionErrorException e = assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.listOf(Integer.class)));
+        assertEquals("mixed", e.getArgument().getName());
+        assertThrows(ConversionErrorException.class, () -> form.find("mixed", Argument.listOf(Integer.class)));
+        assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.setOf(Integer.class)));
+        assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.of(Integer[].class)));
+        assertThrows(ConversionErrorException.class, () -> form.get("mixed", Argument.of(Optional.class, Argument.listOf(Integer.class))));
+        assertEquals(1, form.getInt("mixed"));
+        assertEquals(List.of("1", "bad"), form.get("mixed", Argument.listOf(String.class)));
+    }
+
+    @Test
     void missingAndUnconvertibleFields() {
         DefaultFormData form = form(Map.of());
         FormFieldException missing = assertThrows(FormFieldException.class, () -> form.getInt("city"));

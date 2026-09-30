@@ -135,12 +135,14 @@ public class MatchedPathVariables implements PathVariables {
         }
         ConversionContext context = ConversionContext.of(argument);
         Optional<T> result = conversionService.convert(value, argument.getType(), context);
-        if (result.isPresent()) {
-            return result.get();
-        }
+        // checked first: a collection is converted from the elements that convert, and the
+        // others are rejected, which is not the value that was asked for
         Optional<ConversionError> error = context.getLastError();
         if (error.isPresent()) {
             throw new ConversionErrorException(argument, error.get());
+        }
+        if (result.isPresent()) {
+            return result.get();
         }
         throw unconvertible(argument);
     }

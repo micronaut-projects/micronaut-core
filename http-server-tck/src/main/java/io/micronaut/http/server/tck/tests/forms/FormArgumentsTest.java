@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests.forms;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -302,6 +303,36 @@ public class FormArgumentsTest {
             Response missing = call(server, multipart(CTL + "/tags", MultipartBody.builder().addPart("name", "Fred").build()));
             assertEquals(HttpStatus.OK, missing.status(), missing.body());
             assertEquals("null empty null empty", missing.body());
+        }
+    }
+
+    @Test
+    void aCollectionOfATextFieldWithAValueThatDoesNotConvertIsABadRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String path : List.of("/integers", "/integers-argument", "/integers-optional")) {
+                Response converted = call(server, HttpRequest.POST(CTL + path, "tags=1&name=Fred&tags=2")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+                assertEquals(HttpStatus.OK, converted.status(), converted.body());
+                assertEquals("[1, 2]", converted.body(), path);
+                // not the values that convert, without the others
+                Response rejected = call(server, HttpRequest.POST(CTL + path, "tags=1&name=Fred&tags=bad")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+                assertEquals(HttpStatus.BAD_REQUEST, rejected.status(), path + ": " + rejected.body());
+            }
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void aCollectionOfATextFieldOfAMultipartFormWithAValueThatDoesNotConvertIsABadRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String path : List.of("/integers", "/integers-argument", "/integers-optional")) {
+                Response converted = call(server, multipart(CTL + path, MultipartBody.builder().addPart("tags", "1").addPart("tags", "2").build()));
+                assertEquals(HttpStatus.OK, converted.status(), converted.body());
+                assertEquals("[1, 2]", converted.body(), path);
+                Response rejected = call(server, multipart(CTL + path, MultipartBody.builder().addPart("tags", "1").addPart("tags", "bad").build()));
+                assertEquals(HttpStatus.BAD_REQUEST, rejected.status(), path + ": " + rejected.body());
+            }
         }
     }
 
@@ -671,6 +702,21 @@ public class FormArgumentsTest {
         private static String tagsResult(@Nullable List<String> list, Optional<List<String>> optionalList, String @Nullable [] array, Optional<String[]> optionalArray) {
             return list + " " + optionalList.map(List::toString).orElse("empty")
                 + " " + (array == null ? "null" : Arrays.toString(array)) + " " + optionalArray.map(Arrays::toString).orElse("empty");
+        }
+
+        @Post(uri = "/integers", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String integers(FormData form) {
+            return form.get("tags", Argument.listOf(Integer.class)).toString();
+        }
+
+        @Post(uri = "/integers-argument", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String integersArgument(FormData form, @Part("tags") List<Integer> tags) {
+            return tags.toString();
+        }
+
+        @Post(uri = "/integers-optional", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String integersOptional(FormData form, @Part("tags") Optional<List<Integer>> tags) {
+            return tags.orElseThrow().toString();
         }
 
         @Post(uri = "/part", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
