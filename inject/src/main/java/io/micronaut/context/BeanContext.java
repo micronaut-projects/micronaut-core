@@ -245,6 +245,42 @@ public interface BeanContext extends
     <T> void destroyBean(BeanRegistration<T> beanRegistration);
 
     /**
+     * Destroys the given bean as a dependent, the way the context destroys the dependents of a bean when it destroys
+     * that bean.
+     *
+     * <p>This is for a bean that was resolved on behalf of something else, whose dependent it is, such as one of the
+     * registrations {@link BeanResolutionContext#getAndResetDependentBeans()} reports. It differs from
+     * {@link #destroyBean(BeanRegistration)} in what it leaves alone:</p>
+     *
+     * <ul>
+     *     <li>A proxy whose target lives in a custom scope, such as a {@code @ScopedProxy}, is destroyed together
+     *     with its own dependents, and its target stays in the scope: the target belongs to the scope, which may
+     *     have handed it to other beans as well. {@link #destroyBean(BeanRegistration)} removes the target from
+     *     the scope.</li>
+     *     <li>A proxy that is a singleton is not destroyed: a singleton is not the dependent of one bean.</li>
+     *     <li>The context does not call {@link LifeCycle#stop()} on a bean that implements {@link LifeCycle},
+     *     which {@link #destroyBean(BeanRegistration)} does once the bean's pre-destroy has run: stopping is for a
+     *     bean destroyed in its own right, not for one destroyed because whatever it was resolved for is gone. The
+     *     pre-destroy of the bean's definition runs either way, and stops the bean if the definition does.</li>
+     * </ul>
+     *
+     * <p>The bean's own dependents are destroyed as dependents in either case. A registration that was already
+     * closed, or destroyed through this method, is not destroyed again.</p>
+     *
+     * <p>Destroying a bean as a dependent needs a context that tracks what a bean owns. The default throws an
+     * {@link UnsupportedOperationException} rather than destroy the bean in its own right, which would take a scoped
+     * target out of its scope. {@link DefaultBeanContext} implements it.</p>
+     *
+     * @param registration The registration of the dependent bean
+     * @param <T>          The bean type
+     * @throws UnsupportedOperationException if the context cannot destroy a bean as a dependent
+     * @since 5.3.0
+     */
+    default <T> void destroyDependentBean(BeanRegistration<T> registration) {
+        throw new UnsupportedOperationException("This implementation of BeanContext doesn't support destroying a bean as a dependent");
+    }
+
+    /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
      *
      * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will

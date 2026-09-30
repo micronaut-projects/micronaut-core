@@ -113,6 +113,25 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
+     * Obtains the registrations of the interceptors bound to the bean this context resolves for, as the bean's own.
+     *
+     * <p>A singleton, or an interceptor of a custom scope, comes from its scope. An interceptor no scope holds, a
+     * prototype or one with no scope, is the instance created for the bean earlier, for another of its interception
+     * points or for a proxy that fronts it, and is otherwise created now as a dependent of the bean, so that it is
+     * destroyed with the bean. That is what gives every interception point of a bean the same instance. A context the
+     * container did not create resolves as {@link #getBeanRegistrations(Argument, Qualifier)} does.</p>
+     *
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param <I>             The interceptor type
+     * @return The registrations
+     * @since 5.3.0
+     */
+    default <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return getBeanRegistrations(interceptorType, binding);
+    }
+
+    /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
      *
      * @see io.micronaut.context.annotation.InjectScope
@@ -363,6 +382,31 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> T getProxyTargetBean(BeanDefinition<T> definition,
                              Argument<T> beanType,
                              @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the proxy target for a given proxy bean definition together with its registration.
+     *
+     * <p>Where {@link #getProxyTargetBean(BeanDefinition, Argument, Qualifier)} returns the target alone, this returns
+     * the registration the context holds for it, which carries the non-singleton interceptors created for the target.
+     * A proxy that fronts the target selects the interceptors of the target from it.</p>
+     *
+     * @param definition The proxy target bean definition
+     * @param beanType   The bean type
+     * @param qualifier  The bean qualifier
+     * @param <T>        The generic type
+     * @return The registration of the proxy target
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition,
+                                                                  Argument<T> beanType,
+                                                                  @Nullable Qualifier<T> qualifier) {
+        return new BeanRegistration<>(
+            new DefaultBeanContext.BeanKey<>(beanType, qualifier),
+            definition,
+            getProxyTargetBean(definition, beanType, qualifier)
+        );
+    }
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.

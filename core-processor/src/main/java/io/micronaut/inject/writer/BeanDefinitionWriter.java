@@ -138,6 +138,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -526,6 +527,19 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         boolean.class, // isContainerType
         boolean.class,  // requiresMethodProcessing,
         boolean.class // hasEvaluatedExpressions
+    );
+
+    private static final Constructor<?> PRECALCULATED_INFO_WITH_DECLARATION_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(AbstractInitializableBeanDefinition.PrecalculatedInfo.class,
+        Optional.class, // scope
+        boolean.class, // isAbstract
+        boolean.class, // isIterable
+        boolean.class, // isSingleton
+        boolean.class, // isPrimary
+        boolean.class, // isConfigurationProperties
+        boolean.class, // isContainerType
+        boolean.class,  // requiresMethodProcessing,
+        boolean.class, // hasEvaluatedExpressions
+        Argument.class // declaredBeanType
     );
 
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
@@ -2527,11 +2541,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             ))
         );
 
-        statements.add(
-            beanDefinitionTypeDef.getStaticField(precalculatedInfoField)
-                .put(
-                    precalculatedInfoType.instantiate(
-                        PRECALCULATED_INFO_CONSTRUCTOR,
+        // the declaration is written only where the type arguments cannot say it, through the constructor that
+        // takes it, so that a definition that has none to write costs nothing more
+        ExpressionDef declaredBeanType = declaredBeanTypeArgument();
+        List<ExpressionDef> precalculatedInfoValues = new ArrayList<>(List.of(
 
                         // 1: `Optional` scope
                         scope == null ? TYPE_OPTIONAL.invokeStatic(METHOD_OPTIONAL_EMPTY)
@@ -2558,7 +2571,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                             : ExpressionDef.constant(false),
                         // 9: hasEvaluatedExpressions
                         ExpressionDef.constant(evaluatedExpressionProcessor.hasEvaluatedExpressions())
-
+        ));
+        if (declaredBeanType != null) {
+            // 10: declaredBeanType
+            precalculatedInfoValues.add(declaredBeanType);
+        }
+        statements.add(
+            beanDefinitionTypeDef.getStaticField(precalculatedInfoField)
+                .put(
+                    precalculatedInfoType.instantiate(
+                        declaredBeanType == null ? PRECALCULATED_INFO_CONSTRUCTOR : PRECALCULATED_INFO_WITH_DECLARATION_CONSTRUCTOR,
+                        precalculatedInfoValues.toArray(ExpressionDef[]::new)
                     )
                 )
         );
@@ -3289,6 +3312,31 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 ),
                 ExpressionDef.constant(propertyPath)
             );
+    }
+
+    /**
+     * The bean type as declared, written only where the type arguments recorded for it cannot say it: a raw
+     * type, whose arguments are the ones its type declares, and a type variable, which erases to its bound.
+     *
+     * @return The expression, or {@code null} when the declaration is rebuilt from the type arguments
+     */
+    @Nullable
+    private ExpressionDef declaredBeanTypeArgument() {
+        ClassElement declared = beanTypeElement;
+        if (declared.getName().contains(BeanDefinitionVisitor.PROXY_SUFFIX)
+            || !ArgumentExpUtils.isRawType(declared) && !ArgumentExpUtils.isUnresolvedVariable(declared)) {
+            return null;
+        }
+        return ArgumentExpUtils.pushCreateArgument(
+            annotationMetadataDefaults,
+            declared,
+            beanDefinitionTypeDef,
+            ArgumentExpUtils.isUnresolvedVariable(declared) ? ((GenericPlaceholderElement) declared).getVariableName() : declared.getSimpleName(),
+            declared,
+            AnnotationMetadata.EMPTY_METADATA,
+            declared.getTypeArguments(),
+            loadClassValueExpressionFn
+        );
     }
 
     private ExpressionDef getValueBypassingBeanContext(ClassElement type, List<VariableDef.MethodParameter> methodParameters) {
