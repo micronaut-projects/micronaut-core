@@ -3,6 +3,7 @@ package io.micronaut.core.io.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -199,6 +200,39 @@ public class ServiceIndexTest {
         assertThrows(UnsupportedOperationException.class, () -> index.standardServices().put(OTHER_SERVICE, List.of()));
         assertThrows(UnsupportedOperationException.class, () -> index.classPath().add(new ClassPathEntry("other.jar", 1)));
         assertNull(new ServiceIndex(ServiceIndexTest.class.getClassLoader(), micronautServices, standardServices).classPath());
+    }
+
+    @Test
+    void usesTheCollectionsOfATrustedProducerAsTheyAre() {
+        Set<String> entries = new LinkedHashSet<>(List.of("c", "a", "b"));
+        List<String> names = new ArrayList<>(List.of("z", "x", "z"));
+        Map<String, Set<String>> micronautServices = new LinkedHashMap<>(Map.of(SERVICE, entries));
+        Map<String, List<String>> standardServices = new LinkedHashMap<>(Map.of(SERVICE, names));
+        ClassLoader classLoader = ServiceIndexTest.class.getClassLoader();
+
+        ServiceIndex trusted = ServiceIndex.ofTrusted(classLoader, micronautServices, standardServices, null);
+
+        // nothing is copied, where the constructor copies every set and list
+        assertSame(entries, trusted.micronautServices().get(SERVICE));
+        assertSame(names, trusted.standardServices().get(SERVICE));
+        ServiceIndex copied = new ServiceIndex(classLoader, micronautServices, standardServices);
+        assertNotSame(entries, copied.micronautServices().get(SERVICE));
+        assertNotSame(names, copied.standardServices().get(SERVICE));
+        // the two are the same index, and the maps of both refuse changes
+        assertEquals(copied, trusted);
+        assertEquals(List.of(SERVICE), List.copyOf(trusted.micronautServices().keySet()));
+        assertEquals(Set.of(), trusted.micronautServices().getOrDefault(MISSING_SERVICE, Set.of()));
+        assertThrows(UnsupportedOperationException.class, () -> trusted.micronautServices().put(OTHER_SERVICE, Set.of()));
+        assertThrows(UnsupportedOperationException.class, () -> trusted.micronautServices().remove(SERVICE));
+        assertThrows(UnsupportedOperationException.class, () -> trusted.standardServices().put(OTHER_SERVICE, List.of()));
+        // the index serves the names as the scan would
+        assertEquals(List.of("z", "x", "z", "c", "a", "b"), names(classLoader, SERVICE, trusted, false));
+
+        // an index made from the maps of a trusted index shares them, and the constructor still copies any other map
+        ServiceIndex shared = new ServiceIndex(classLoader, trusted.micronautServices(), trusted.standardServices());
+        assertSame(entries, shared.micronautServices().get(SERVICE));
+        ServiceIndex mixed = new ServiceIndex(classLoader, trusted.micronautServices(), standardServices);
+        assertNotSame(names, mixed.standardServices().get(SERVICE));
     }
 
     @Test

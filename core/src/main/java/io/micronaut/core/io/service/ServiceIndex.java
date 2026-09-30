@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,7 +55,7 @@ import java.util.TreeSet;
  * <pre>{@code
  * public final class GeneratedServiceIndexLoader implements StaticOptimizations.Loader<ServiceIndex> {
  *     public ServiceIndex load() {
- *         return new ServiceIndex(GeneratedServiceIndexLoader.class.getClassLoader(), micronautServices, standardServices, classPath);
+ *         return ServiceIndex.ofTrusted(GeneratedServiceIndexLoader.class.getClassLoader(), micronautServices, standardServices, classPath);
  *     }
  * }
  * }</pre>
@@ -154,8 +155,12 @@ public record ServiceIndex(ClassLoader classLoader,
      */
     public ServiceIndex {
         Objects.requireNonNull(classLoader, "classLoader");
-        micronautServices = copyOfSets(micronautServices);
-        standardServices = copyOfLists(standardServices);
+        if (!(micronautServices instanceof TrustedMap<?>)) {
+            micronautServices = copyOfSets(micronautServices);
+        }
+        if (!(standardServices instanceof TrustedMap<?>)) {
+            standardServices = copyOfLists(standardServices);
+        }
         classPath = classPath == null ? null : List.copyOf(classPath);
     }
 
@@ -168,6 +173,29 @@ public record ServiceIndex(ClassLoader classLoader,
      */
     public ServiceIndex(ClassLoader classLoader, Map<String, Set<String>> micronautServices, Map<String, List<String>> standardServices) {
         this(classLoader, micronautServices, standardServices, null);
+    }
+
+    /**
+     * Creates an index that uses the given maps, with their sets and lists, as they are, where the constructors copy
+     * every one of them. It is meant for generated code, which builds the collections for the index alone and runs
+     * at the start of the application, where the copies would be made for nothing.
+     *
+     * <p>The caller must not modify the maps, the sets or the lists afterwards, and the order in which they iterate
+     * is the order the services are loaded in. Service loading only iterates the sets and asks for their size, so a
+     * set does not have to be hashed: an unmodifiable {@link Set} view of an array of names is enough.</p>
+     *
+     * @param classLoader       The class loader the index was built for, and the only one it is served for
+     * @param micronautServices The entries under {@code META-INF/micronaut/<type>/} for every type
+     * @param standardServices  The names listed by the {@code META-INF/services/<type>} files of each indexed type
+     * @param classPath         The entries of the class path the index was built for, or null to not compare the
+     *                          class path
+     * @return The index
+     */
+    public static ServiceIndex ofTrusted(ClassLoader classLoader,
+                                         Map<String, Set<String>> micronautServices,
+                                         Map<String, List<String>> standardServices,
+                                         @Nullable List<ClassPathEntry> classPath) {
+        return new ServiceIndex(classLoader, new TrustedMap<>(micronautServices), new TrustedMap<>(standardServices), classPath);
     }
 
     /**
@@ -496,5 +524,35 @@ public record ServiceIndex(ClassLoader classLoader,
      * @param failure The message of the error that every lookup fails with, or null if the lookups do not fail
      */
     private record Check(ServiceIndex index, boolean usable, String detail, @Nullable String failure) {
+    }
+
+    /**
+     * An unmodifiable view of a map that {@link #ofTrusted} was given, which the constructor recognizes and does not
+     * copy. Only that method creates one.
+     *
+     * @param <V> The type of the values
+     */
+    private static final class TrustedMap<V> extends AbstractMap<String, V> {
+
+        private final Map<String, V> map;
+
+        TrustedMap(Map<String, V> map) {
+            this.map = Collections.unmodifiableMap(map);
+        }
+
+        @Override
+        public Set<Entry<String, V>> entrySet() {
+            return map.entrySet();
+        }
+
+        @Override
+        public @Nullable V get(Object key) {
+            return map.get(key);
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return map.containsKey(key);
+        }
     }
 }
