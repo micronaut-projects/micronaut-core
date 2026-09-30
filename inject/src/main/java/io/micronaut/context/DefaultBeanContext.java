@@ -1293,7 +1293,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (CollectionUtils.isNotEmpty(dependents)) {
                 final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
                 while (i.hasPrevious()) {
-                    destroyBean(i.previous(), true);
+                    // through the guarded path, so that a dependent is destroyed once however it is reached
+                    destroyDependentBean(i.previous());
                 }
             }
         } else {
@@ -1409,7 +1410,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (disposingRegistration.getDependents() != null) {
                 destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
                 for (BeanRegistration<?> beanRegistration : disposingRegistration.getDependents()) {
-                    destroyBean(beanRegistration, true);
+                    destroyDependentBean(beanRegistration);
                     destroyed.add(beanRegistration.bean);
                 }
             }

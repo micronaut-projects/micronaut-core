@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.DefaultBeanResolutionContext
+import io.micronaut.context.DependentBeanProvider
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
@@ -123,6 +124,34 @@ class DestroyDependentBeanSpec extends Specification {
         then:
         SharedBean.destroyed == 0
         context.getBean(SharedBean).id() == id
+    }
+
+    void "a nested dependent destroyed after its parent is destroyed once"() {
+        given:
+        def parent = resolveAsDependent(PrototypeBean)
+        BeanRegistration<?> child = ((DependentBeanProvider) parent.registration).dependentBeans()[0]
+
+        when:
+        context.destroyDependentBean(parent.registration)
+        context.destroyDependentBean(child)
+
+        then:
+        PrototypeBean.destroyed == 1
+        NestedDependency.destroyed == 1
+    }
+
+    void "a nested dependent destroyed before its parent is destroyed once"() {
+        given:
+        def parent = resolveAsDependent(PrototypeBean)
+        BeanRegistration<?> child = ((DependentBeanProvider) parent.registration).dependentBeans()[0]
+
+        when:
+        context.destroyDependentBean(child)
+        context.destroyDependentBean(parent.registration)
+
+        then:
+        PrototypeBean.destroyed == 1
+        NestedDependency.destroyed == 1
     }
 
     void "a context that does not implement it destroys the registration in its own right"() {

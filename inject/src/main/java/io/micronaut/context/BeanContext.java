@@ -267,8 +267,10 @@ public interface BeanContext extends
      * <p>The bean's own dependents are destroyed as dependents in either case. A registration that was already
      * closed, or destroyed through this method, is not destroyed again.</p>
      *
-     * <p>The default destroys the registration with {@link #destroyBean(BeanRegistration)}. {@link DefaultBeanContext}
-     * destroys it as a dependent.</p>
+     * <p><strong>The default implementation does not destroy the bean as a dependent:</strong> it destroys the
+     * registration in its own right with {@link #destroyBean(BeanRegistration)}, which takes a scoped proxy's target
+     * out of its scope and stops a {@link LifeCycle} bean. The guarantees above hold only for an implementation that
+     * overrides this method, as {@link DefaultBeanContext} does.</p>
      *
      * @param registration The registration of the dependent bean
      * @param <T>          The bean type
