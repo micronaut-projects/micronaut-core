@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.binding;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -27,13 +28,17 @@ import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.filter.FilterContinuation;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
+import io.netty.channel.EventLoop;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayOutputStream;
@@ -54,6 +59,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -202,6 +208,78 @@ class AsyncRequestBodyReleaseTest {
         assertTrue(response.head().endsWith(CancellationException.class.getSimpleName()), response.head());
     }
 
+    @Test
+    void theElementsOfARouteAFilterStoppedWaitingForAreReleasedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/elements", MediaType.APPLICATION_JSON, "[{\"name\":\"Fred\"},{\"name\":\"Bar");
+        assertFallback(response);
+    }
+
+    @Test
+    void theElementsOfAReactiveRouteAFilterStoppedWaitingForAreReleasedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/elements-mono", MediaType.APPLICATION_JSON, "[{\"name\":\"Fred\"},{\"name\":\"Bar");
+        assertFallback(response);
+    }
+
+    @Test
+    void thePartsOfARouteAFilterStoppedWaitingForAreReleasedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/parts", MediaType.MULTIPART_FORM_DATA + "; boundary=" + BOUNDARY, partialForm());
+        assertFallback(response);
+    }
+
+    @Test
+    void thePartsOfAReactiveRouteAFilterStoppedWaitingForAreReleasedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/parts-mono", MediaType.MULTIPART_FORM_DATA + "; boundary=" + BOUNDARY, partialForm());
+        assertFallback(response);
+    }
+
+    @Test
+    void theFileOfARouteAFilterStoppedWaitingForIsDeletedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/transfer", MediaType.TEXT_PLAIN, "x".repeat(16 * 1024));
+        assertFallback(response);
+    }
+
+    @Test
+    void theFileOfAReactiveRouteAFilterStoppedWaitingForIsDeletedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/transfer-mono", MediaType.TEXT_PLAIN, "x".repeat(16 * 1024));
+        assertFallback(response);
+    }
+
+    @Test
+    void theElementsOfAFilterAnotherFilterStoppedWaitingForAreReleasedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/filter/elements", MediaType.APPLICATION_JSON, "[{\"name\":\"Fred\"},{\"name\":\"Bar");
+        assertFallback(response);
+    }
+
+    @Test
+    void theElementsOfAReactiveFilterAnotherFilterStoppedWaitingForAreReleasedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/filter/elements-mono", MediaType.APPLICATION_JSON, "[{\"name\":\"Fred\"},{\"name\":\"Bar");
+        assertFallback(response);
+    }
+
+    @Test
+    void theFileOfAFilterAnotherFilterStoppedWaitingForIsDeletedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/filter/transfer", MediaType.TEXT_PLAIN, "x".repeat(16 * 1024));
+        assertFallback(response);
+    }
+
+    @Test
+    void theFileOfAReactiveFilterAnotherFilterStoppedWaitingForIsDeletedBeforeTheFallbackResponse() throws Exception {
+        Response response = send("/release/cancel/filter/transfer-mono", MediaType.TEXT_PLAIN, "x".repeat(16 * 1024));
+        assertFallback(response);
+    }
+
+    /**
+     * The filter that stopped waiting for the rest of the chain answered: the read the cancelled
+     * method started was aborted, and the file it staged is gone, when its response is written,
+     * while the request is open.
+     */
+    private static void assertFallback(Response response) {
+        assertEquals(200, response.status(), response.head());
+        assertTrue(response.head().endsWith("fallback"), response.head());
+        assertEquals(CancellationException.class.getSimpleName(), response.header("X-Outcome"), response.head());
+        assertEquals("0", response.header("X-Files"), response.head());
+    }
+
     /**
      * Send the head of a request and a part of its body, which is never completed, and read the
      * response.
@@ -285,6 +363,7 @@ class AsyncRequestBodyReleaseTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Probe {
         private final AtomicReference<String> outcome = new AtomicReference<>("none");
+        private final CompletableFuture<Boolean> waiting = new CompletableFuture<>();
         private final ExecutorService executor;
         volatile @Nullable Path directory;
 
@@ -311,6 +390,58 @@ class AsyncRequestBodyReleaseTest {
 
         String outcome() {
             return outcome.get();
+        }
+
+        /**
+         * A method that never completes started its read: the filter that waits for it stops
+         * waiting, once the method returned and the filter subscribed to its result, which is
+         * when the event loop the method runs on is free to run a task.
+         */
+        void waiting(HttpRequest<?> request) {
+            eventLoop(request).execute(() -> waiting.complete(true));
+        }
+
+        /**
+         * Tell the filter that waits once the method returned, and the file of the transfer is
+         * being written.
+         */
+        void waitingForFile(HttpRequest<?> request) {
+            eventLoop(request).execute(() -> async(() -> {
+                awaitFile();
+                return waiting.complete(true);
+            }));
+        }
+
+        /**
+         * Nobody waits for the release of a cancelled method, and it may continue on another
+         * thread, e.g. to delete a file: the filter that stopped waiting answers once the read
+         * ended and its file is gone, or, when the body is not released, after a while, while
+         * the request is still open.
+         */
+        CompletionStage<Boolean> whenReleased() {
+            return async(() -> {
+                for (int i = 0; i < 200 && (PENDING.equals(outcome()) || !"0".equals(files())); i++) {
+                    try {
+                        Thread.sleep(25);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(e);
+                    }
+                }
+                return true;
+            });
+        }
+
+        private static EventLoop eventLoop(HttpRequest<?> request) {
+            EventLoop eventLoop = ((NettyHttpRequest<?>) request).getChannelHandlerContext().channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                throw new IllegalStateException("The method does not run on the event loop");
+            }
+            return eventLoop;
+        }
+
+        CompletionStage<Boolean> whenWaiting() {
+            return waiting;
         }
 
         Path destination() {
@@ -486,6 +617,136 @@ class AsyncRequestBodyReleaseTest {
                 probe.awaitFile();
                 return HttpResponse.ok("answered");
             });
+        }
+    }
+
+    /**
+     * Routes that start a read and never complete: the filter around them stops waiting.
+     */
+    @Controller("/release/cancel")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class CancelledController {
+        private final Probe probe;
+
+        CancelledController(Probe probe) {
+            this.probe = probe;
+        }
+
+        @Post(uri = "/elements", consumes = MediaType.APPLICATION_JSON)
+        CompletionStage<HttpResponse<String>> elements(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.elements(Person.class).forEach(person -> never()));
+            probe.waiting(request);
+            return never();
+        }
+
+        @Post(uri = "/elements-mono", consumes = MediaType.APPLICATION_JSON)
+        Mono<HttpResponse<String>> elementsMono(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.elements(Person.class).forEach(person -> never()));
+            probe.waiting(request);
+            return Mono.never();
+        }
+
+        @Post(uri = "/parts", consumes = MediaType.MULTIPART_FORM_DATA)
+        CompletionStage<HttpResponse<String>> parts(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.parts().forEach(part -> never()));
+            probe.waiting(request);
+            return never();
+        }
+
+        @Post(uri = "/parts-mono", consumes = MediaType.MULTIPART_FORM_DATA)
+        Mono<HttpResponse<String>> partsMono(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.parts().forEach(part -> never()));
+            probe.waiting(request);
+            return Mono.never();
+        }
+
+        @Post(uri = "/transfer", consumes = MediaType.TEXT_PLAIN)
+        CompletionStage<HttpResponse<String>> transfer(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.transferTo(probe.destination()));
+            probe.waitingForFile(request);
+            return never();
+        }
+
+        @Post(uri = "/transfer-mono", consumes = MediaType.TEXT_PLAIN)
+        Mono<HttpResponse<String>> transferMono(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.transferTo(probe.destination()));
+            probe.waitingForFile(request);
+            return Mono.never();
+        }
+
+        @Post(uri = "/filter/{read}", consumes = MediaType.ALL, produces = MediaType.TEXT_PLAIN)
+        String filtered(String read) {
+            return "not reached";
+        }
+    }
+
+    /**
+     * Stops waiting for the rest of the chain once the method in it started its read, as a
+     * timeout would, and answers instead: the rest of the chain is cancelled. Its answer takes
+     * as long as the release of the body the cancelled method read.
+     */
+    @ServerFilter("/release/cancel/**")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class TimeoutFilter implements Ordered {
+        private final Probe probe;
+
+        TimeoutFilter(Probe probe) {
+            this.probe = probe;
+        }
+
+        @Override
+        public int getOrder() {
+            // inside the filter of the outcome, around the filters that read
+            return -100;
+        }
+
+        @RequestFilter
+        Publisher<HttpResponse<?>> timeout(FilterContinuation<Publisher<HttpResponse<?>>> continuation) {
+            return Mono.from(continuation.proceed())
+                .timeout(Mono.fromCompletionStage(probe.whenWaiting()))
+                .onErrorResume(TimeoutException.class, error -> Mono.fromCompletionStage(probe.whenReleased())
+                    .map(released -> HttpResponse.ok("fallback")));
+        }
+    }
+
+    /**
+     * Request filters that start a read and never complete: the filter around them stops waiting.
+     */
+    @ServerFilter("/release/cancel/filter")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class CancelledReadingFilter {
+        private final Probe probe;
+
+        CancelledReadingFilter(Probe probe) {
+            this.probe = probe;
+        }
+
+        @RequestFilter("/elements")
+        CompletionStage<@Nullable HttpResponse<?>> elements(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.elements(Person.class).forEach(person -> never()));
+            probe.waiting(request);
+            return never();
+        }
+
+        @RequestFilter("/elements-mono")
+        Mono<HttpResponse<?>> elementsMono(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.elements(Person.class).forEach(person -> never()));
+            probe.waiting(request);
+            return Mono.never();
+        }
+
+        @RequestFilter("/transfer")
+        CompletionStage<@Nullable HttpResponse<?>> transfer(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.transferTo(probe.destination()));
+            probe.waitingForFile(request);
+            return never();
+        }
+
+        @RequestFilter("/transfer-mono")
+        Mono<HttpResponse<?>> transferMono(HttpRequest<?> request, AsyncRequestBody body) {
+            probe.track(body.transferTo(probe.destination()));
+            probe.waitingForFile(request);
+            return Mono.never();
         }
     }
 

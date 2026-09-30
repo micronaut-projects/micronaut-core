@@ -56,6 +56,11 @@ public interface ReleasableRequestBody {
      * added as suppressed to a failure of the flow. A reactive flow stays reactive, and releases
      * when it is subscribed to and completes.
      *
+     * <p>A flow that is cancelled before it completed, e.g. by a filter that stops waiting for
+     * the rest of the chain, releases the body when it is cancelled: nobody waits for that
+     * release, and its failure is logged. The body is released once, whether the flow completed,
+     * was cancelled, or both.</p>
+     *
      * @param flow The flow of the method
      * @param body The body the method was invoked with
      * @param <T>  The result type
@@ -63,24 +68,37 @@ public interface ReleasableRequestBody {
      */
     static <T> ExecutionFlow<T> releaseAfter(ExecutionFlow<T> flow, ReleasableRequestBody body) {
         if (flow instanceof ReactiveExecutionFlow<T> reactive) {
-            Mono<T> released = Mono.from(reactive.toPublisher())
-                .materialize()
-                .flatMap(signal -> Mono.<T>create(sink -> release(body).whenComplete((ignored, releaseError) -> {
-                    Throwable error = signal.getThrowable();
-                    Throwable failure = failure(error, releaseError);
-                    if (failure != null) {
-                        sink.error(failure);
-                    } else if (signal.hasValue()) {
-                        sink.success(signal.get());
-                    } else {
-                        sink.success();
-                    }
-                })));
+            Mono<T> released = Mono.defer(() -> {
+                RequestBodyRelease release = new RequestBodyRelease(body);
+                return Mono.from(reactive.toPublisher())
+                    .materialize()
+                    .flatMap(signal -> Mono.<T>create(sink -> release.whenCompleted().whenComplete((ignored, releaseError) -> {
+                        Throwable error = signal.getThrowable();
+                        Throwable failure = failure(error, releaseError);
+                        if (failure != null) {
+                            sink.error(failure);
+                        } else if (signal.hasValue()) {
+                            sink.success(signal.get());
+                        } else {
+                            sink.success();
+                        }
+                    })))
+                    // a cancelled subscription delivers no completion to release after
+                    .doOnCancel(release::whenCancelled);
+            });
             return ReactiveExecutionFlow.fromPublisher(released);
         }
+        RequestBodyRelease release = new RequestBodyRelease(body);
         DelayedExecutionFlow<T> result = DelayedExecutionFlow.create();
-        result.onCancel(flow::cancel);
-        flow.onComplete((value, error) -> release(body).whenComplete((ignored, releaseError) -> {
+        result.onCancel(() -> {
+            try {
+                flow.cancel();
+            } finally {
+                // a cancelled flow may never complete
+                release.whenCancelled();
+            }
+        });
+        flow.onComplete((value, error) -> release.whenCompleted().whenComplete((ignored, releaseError) -> {
             Throwable failure = failure(error, releaseError);
             if (failure != null) {
                 result.completeExceptionally(failure);
