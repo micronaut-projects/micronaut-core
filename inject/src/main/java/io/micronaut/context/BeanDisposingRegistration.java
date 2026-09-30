@@ -37,6 +37,8 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Nullable
     private final List<BeanRegistration<?>> dependents;
     @Nullable
+    private volatile AbstractBeanResolutionContext proxyTargetContext;
+    @Nullable
     private final List<?> interceptorRegistrations;
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -71,6 +73,19 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         if (closed.compareAndSet(false, true)) {
             beanContext.destroyBean(this);
         }
+    }
+
+    /**
+     * @return The resolution context a lazy proxy retains to resolve its target, or {@code null} if the bean is
+     * not such a proxy
+     */
+    @Nullable
+    AbstractBeanResolutionContext getProxyTargetContext() {
+        return proxyTargetContext;
+    }
+
+    void setProxyTargetContext(@Nullable AbstractBeanResolutionContext proxyTargetContext) {
+        this.proxyTargetContext = proxyTargetContext;
     }
 
     /**

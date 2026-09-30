@@ -8,6 +8,7 @@ import io.micronaut.context.DependentBeanProvider
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
+import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -190,6 +191,29 @@ class DestroyDependentBeanSpec extends Specification {
         TrackedDependency.DESTROYED.size() == 2
         TrackedDependency.DESTROYED.any { it.is(TrackedDependency.CREATED[0]) }
         TrackedDependency.DESTROYED.any { it.is(TrackedDependency.CREATED[1]) }
+    }
+
+    void "the targets of a lazy proxy that does not cache its target are not retained"() {
+        given:
+        UncachedLazyBean proxy = context.getBean(UncachedLazyBean)
+        List<WeakReference<Object>> targets = (1..50).collect { new WeakReference<Object>(proxy.target()) }
+
+        expect: "each call resolved a target of its own"
+        targets.collect { System.identityHashCode(it.get()) }.unique().size() > 1
+
+        when:
+        boolean collected = false
+        for (int attempt = 0; attempt < 100 && !collected; attempt++) {
+            System.gc()
+            collected = targets.every { it.get() == null }
+            if (!collected) {
+                Thread.sleep(50)
+            }
+        }
+
+        then: "nothing the context or the proxy holds keeps a target, although its dependent references it"
+        collected
+        proxy != null
     }
 
     void "a context that does not implement it refuses rather than destroy the registration in its own right"() {
