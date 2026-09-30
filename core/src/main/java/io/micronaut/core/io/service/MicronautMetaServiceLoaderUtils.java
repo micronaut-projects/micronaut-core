@@ -96,6 +96,24 @@ public final class MicronautMetaServiceLoaderUtils {
      * @throws IOException The exception
      */
     public static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader, String serviceName) throws IOException {
+        return findMicronautMetaServiceEntries(classLoader, serviceName, ServiceScanner.findServiceIndex(classLoader));
+    }
+
+    /**
+     * Find Micronaut service entries for a lookup that has already asked for the service index.
+     *
+     * <p>A lookup asks for the index once, on the thread that starts it, and hands the answer to its fork-join tasks.
+     * A task must not ask again: reading the registered index can wait for the initialization of
+     * {@link io.micronaut.core.optim.StaticOptimizations}, and if the thread that runs that initialization is the one
+     * that waits for the task, because one of its loaders looks a service up, neither would ever finish.</p>
+     *
+     * @param classLoader The classloader
+     * @param serviceName The service name
+     * @param index       The service index that applies to the class loader, or null to scan the class path
+     * @return The entries
+     * @throws IOException The exception
+     */
+    static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader, String serviceName, @Nullable ServiceIndex index) throws IOException {
         ExclusiveStaticServiceDefinitions staticDefinitions = ServiceScanner.findStaticServiceDefinitions();
         if (staticDefinitions != null) {
             Set<String> serviceEntries = staticDefinitions.serviceTypeMap().get(serviceName);
@@ -103,7 +121,6 @@ public final class MicronautMetaServiceLoaderUtils {
                 return serviceEntries;
             }
         }
-        ServiceIndex index = ServiceIndex.find(classLoader);
         if (index != null) {
             return index.micronautServices().getOrDefault(serviceName, Set.of());
         }
@@ -357,6 +374,8 @@ public final class MicronautMetaServiceLoaderUtils {
         private final String serviceName;
         @Nullable
         private final Predicate<S> predicate;
+        @Nullable
+        private final ServiceIndex index;
         private final List<RecursiveActionValuesCollector<S>> tasks = new ArrayList<>();
         private int size;
 
@@ -364,12 +383,14 @@ public final class MicronautMetaServiceLoaderUtils {
             this.classLoader = classLoader;
             this.serviceName = serviceName;
             this.predicate = predicate;
+            // asked for here, on the thread that starts the lookup, and not in compute(), which a pool thread can run
+            this.index = ServiceScanner.findServiceIndex(classLoader);
         }
 
         @Override
         protected void compute() {
             try {
-                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
+                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, index);
                 size = serviceEntries.size();
                 for (String serviceEntry : serviceEntries) {
                     final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(classLoader, serviceEntry, predicate);
@@ -398,7 +419,7 @@ public final class MicronautMetaServiceLoaderUtils {
                 return collection;
             }
             try {
-                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
+                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, index);
                 List<S> collection = new ArrayList<>(serviceEntries.size());
                 for (String serviceEntry : serviceEntries) {
                     S val = instantiate(serviceEntry, classLoader);

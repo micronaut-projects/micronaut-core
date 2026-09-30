@@ -50,7 +50,10 @@ import java.util.Set;
  * <ul>
  *     <li>It is only served for the {@link #classLoader() class loader} it was built for. Any other class loader,
  *     including a child of that class loader, scans the class path.</li>
- *     <li>It is ignored in native image code, where the service table built by the native image feature is used.</li>
+ *     <li>It is ignored in native image code, where the service table built by the native image feature is used. An
+ *     index that a loader registers there, which includes the build of the image, is dropped and never read. A
+ *     producer must therefore not emit an index for a native packaging: the generated loader and its names would
+ *     only add to the image.</li>
  *     <li>A {@link SoftServiceLoader.StaticServiceLoader} registered for a type through
  *     {@link SoftServiceLoader.Optimizations} is still used for that type.</li>
  *     <li>The name condition given to {@link SoftServiceLoader#load(Class, ClassLoader, java.util.function.Predicate)}
@@ -75,7 +78,8 @@ import java.util.Set;
 @Experimental
 public record ServiceIndex(ClassLoader classLoader,
                            Map<String, Set<String>> micronautServices,
-                           Map<String, List<String>> standardServices) {
+                           Map<String, List<String>> standardServices)
+    implements StaticOptimizations.SetOnce, StaticOptimizations.JvmOnly {
 
     /**
      * The system property that switches the index off when it is set to {@code false}.
@@ -94,23 +98,18 @@ public record ServiceIndex(ClassLoader classLoader,
     }
 
     /**
-     * Finds the registered index that applies to a lookup.
+     * Returns this index if it applies to a lookup.
      *
-     * @param classLoader The class loader of the lookup
-     * @return The index, or null if the class path must be scanned
+     * @param lookupClassLoader The class loader of the lookup
+     * @return This index, or null if the class path must be scanned
      */
-    static @Nullable ServiceIndex find(ClassLoader classLoader) {
-        if (NativeImageUtils.inImageCode()) {
-            // the service table of the native image is used there, and the index is not even read
-            return null;
-        }
-        ServiceIndex index = Registered.INDEX;
-        if (index == null
-            || index.classLoader != classLoader
+    @Nullable ServiceIndex forLookup(ClassLoader lookupClassLoader) {
+        if (classLoader != lookupClassLoader
+            || NativeImageUtils.inImageCode()
             || StringUtils.FALSE.equalsIgnoreCase(System.getProperty(ENABLED_PROPERTY))) {
             return null;
         }
-        return index;
+        return this;
     }
 
     private static Map<String, Set<String>> copyOfSets(Map<String, Set<String>> services) {
@@ -127,13 +126,5 @@ public record ServiceIndex(ClassLoader classLoader,
             copy.put(entry.getKey(), List.copyOf(entry.getValue()));
         }
         return Collections.unmodifiableMap(copy);
-    }
-
-    /**
-     * Holds the index registered through {@link StaticOptimizations}, read once, on the first lookup.
-     */
-    private static final class Registered {
-        @Nullable
-        private static final ServiceIndex INDEX = StaticOptimizations.get(ServiceIndex.class).orElse(null);
     }
 }

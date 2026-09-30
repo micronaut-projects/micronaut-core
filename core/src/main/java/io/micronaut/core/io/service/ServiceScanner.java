@@ -16,6 +16,7 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.util.NativeImageUtils;
 import org.jspecify.annotations.Nullable;
 import org.graalvm.nativeimage.ImageSingletons;
@@ -50,6 +51,9 @@ import java.util.function.Predicate;
  */
 @Internal
 final class ServiceScanner<S> {
+    // the name of ServiceIndex, written out because a class literal would load the class
+    private static final String SERVICE_INDEX = "io.micronaut.core.io.service.ServiceIndex";
+
     private final ClassLoader classLoader;
     private final String serviceName;
     private final Predicate<String> lineCondition;
@@ -58,7 +62,7 @@ final class ServiceScanner<S> {
     private final ServiceIndex index;
 
     public ServiceScanner(ClassLoader classLoader, String serviceName, Predicate<String> lineCondition, Function<String, S> transformer) {
-        this(classLoader, serviceName, lineCondition, transformer, ServiceIndex.find(classLoader));
+        this(classLoader, serviceName, lineCondition, transformer, findServiceIndex(classLoader));
     }
 
     /**
@@ -82,6 +86,29 @@ final class ServiceScanner<S> {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Finds the registered service index that applies to a lookup.
+     *
+     * <p>The registered index is read on each lookup, and not once: an index that a
+     * {@link StaticOptimizations.Loader} registers after a lookup, for example because a loader that runs before it
+     * looks a service up, is used from then on. It is read by name and without recording the read, so an
+     * application without an index does not load {@link ServiceIndex}, and the read does not make the registration
+     * that follows fail.</p>
+     *
+     * <p>A lookup calls this method once, on the thread that starts it, and never from one of its fork-join tasks:
+     * see {@link MicronautMetaServiceLoaderUtils#findMicronautMetaServiceEntries(ClassLoader, String, ServiceIndex)}.</p>
+     *
+     * @param classLoader The class loader of the lookup
+     * @return The index, or null if the class path must be scanned
+     */
+    static @Nullable ServiceIndex findServiceIndex(ClassLoader classLoader) {
+        Object registered = StaticOptimizations.findSetOnce(SERVICE_INDEX);
+        if (registered == null) {
+            return null;
+        }
+        return ((ServiceIndex) registered).forLookup(classLoader);
     }
 
     /**
@@ -186,7 +213,8 @@ final class ServiceScanner<S> {
                     return;
                 }
                 scanStandardServiceConfigs();
-                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
+                // no index applied when the lookup started, and a task does not ask for it again
+                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, null);
                 for (String serviceEntry : serviceEntries) {
                     final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
                     tasks.add(task);

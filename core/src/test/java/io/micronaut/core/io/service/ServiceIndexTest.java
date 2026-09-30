@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -19,6 +20,7 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -56,7 +58,7 @@ public class ServiceIndexTest {
     void servesTheRegisteredIndexForItsClassLoader() {
         ClassLoader classLoader = TestServiceIndexLoader.CLASS_LOADER;
 
-        assertSame(TestServiceIndexLoader.INDEX, ServiceIndex.find(classLoader));
+        assertSame(TestServiceIndexLoader.INDEX, ServiceScanner.findServiceIndex(classLoader));
         // the index lists the standard names first, then the META-INF/micronaut names
         assertEquals(List.of(Hello.class, Hi.class, Hey.class), types(SoftServiceLoader.load(Greeter.class, classLoader).collectAll()));
         assertEquals(List.of(Hey.class), types(MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(classLoader, Greeter.class, null)));
@@ -67,7 +69,7 @@ public class ServiceIndexTest {
         // the test class path has no service files for Greeter, so only the index knows its services
         try (URLClassLoader child = new URLClassLoader(new URL[0], TestServiceIndexLoader.CLASS_LOADER)) {
             for (ClassLoader classLoader : List.of(ServiceIndexTest.class.getClassLoader(), child)) {
-                assertNull(ServiceIndex.find(classLoader));
+                assertNull(ServiceScanner.findServiceIndex(classLoader));
                 assertEquals(List.of(), SoftServiceLoader.load(Greeter.class, classLoader).collectAll());
                 assertEquals(Set.of(), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, Greeter.class.getName()));
             }
@@ -91,11 +93,38 @@ public class ServiceIndexTest {
         String previous = System.getProperty(ServiceIndex.ENABLED_PROPERTY);
         try {
             System.setProperty(ServiceIndex.ENABLED_PROPERTY, "false");
-            assertNull(ServiceIndex.find(TestServiceIndexLoader.CLASS_LOADER));
+            assertNull(ServiceScanner.findServiceIndex(TestServiceIndexLoader.CLASS_LOADER));
             assertEquals(List.of(), SoftServiceLoader.load(Greeter.class, TestServiceIndexLoader.CLASS_LOADER).collectAll());
 
             System.setProperty(ServiceIndex.ENABLED_PROPERTY, "true");
-            assertSame(TestServiceIndexLoader.INDEX, ServiceIndex.find(TestServiceIndexLoader.CLASS_LOADER));
+            assertSame(TestServiceIndexLoader.INDEX, ServiceScanner.findServiceIndex(TestServiceIndexLoader.CLASS_LOADER));
+        } finally {
+            restoreProperty(ServiceIndex.ENABLED_PROPERTY, previous);
+        }
+    }
+
+    @Test
+    void isAskedForOnceWhenALookupStarts() {
+        ClassLoader classLoader = TestServiceIndexLoader.CLASS_LOADER;
+        String hey = Hey.class.getName();
+        String previous = System.getProperty(ServiceIndex.ENABLED_PROPERTY);
+        try {
+            // the index only starts to apply after the lookup has started: the lookup goes on scanning
+            System.setProperty(ServiceIndex.ENABLED_PROPERTY, "false");
+            SoftServiceLoader.ServiceCollector<String> scanning = SoftServiceLoader.newCollector(Greeter.class.getName(), name -> true, classLoader, Function.identity());
+            System.setProperty(ServiceIndex.ENABLED_PROPERTY, "true");
+            for (boolean fork : List.of(true, false)) {
+                List<String> names = new ArrayList<>();
+                scanning.collect(names, fork);
+                assertEquals(List.of(), names);
+            }
+
+            // and the other way round
+            SoftServiceLoader.ServiceCollector<String> indexed = SoftServiceLoader.newCollector(Greeter.class.getName(), name -> true, classLoader, Function.identity());
+            System.setProperty(ServiceIndex.ENABLED_PROPERTY, "false");
+            List<String> names = new ArrayList<>();
+            indexed.collect(names, true);
+            assertEquals(List.of(Hello.class.getName(), Hi.class.getName(), hey), names);
         } finally {
             restoreProperty(ServiceIndex.ENABLED_PROPERTY, previous);
         }
@@ -107,19 +136,19 @@ public class ServiceIndexTest {
         try {
             for (String imageCode : List.of(NativeImageUtils.PROPERTY_IMAGE_CODE_VALUE_BUILDTIME, NativeImageUtils.PROPERTY_IMAGE_CODE_VALUE_RUNTIME)) {
                 System.setProperty(NativeImageUtils.PROPERTY_IMAGE_CODE_KEY, imageCode);
-                assertNull(ServiceIndex.find(TestServiceIndexLoader.CLASS_LOADER));
+                assertNull(ServiceScanner.findServiceIndex(TestServiceIndexLoader.CLASS_LOADER));
             }
         } finally {
             restoreProperty(NativeImageUtils.PROPERTY_IMAGE_CODE_KEY, previous);
         }
-        assertNotNull(ServiceIndex.find(TestServiceIndexLoader.CLASS_LOADER));
+        assertNotNull(ServiceScanner.findServiceIndex(TestServiceIndexLoader.CLASS_LOADER));
     }
 
     @Test
     void cannotBeRegisteredTwice() {
         ServiceIndex second = new ServiceIndex(ServiceIndexTest.class.getClassLoader(), Map.of(), Map.of());
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> StaticOptimizations.set(second));
-        assertTrue(e.getMessage().contains("at most one service index"), e.getMessage());
+        assertEquals("An optimization of class io.micronaut.core.io.service.ServiceIndex was already set: it can only be set once", e.getMessage());
         assertSame(TestServiceIndexLoader.INDEX, StaticOptimizations.get(ServiceIndex.class).orElseThrow());
     }
 
@@ -129,6 +158,7 @@ public class ServiceIndexTest {
         micronautServices.put(SERVICE, new LinkedHashSet<>(List.of("c", "a", "b")));
         Map<String, List<String>> standardServices = new HashMap<>();
         standardServices.put(SERVICE, new ArrayList<>(List.of("z", "x", "z")));
+
 
         ServiceIndex index = new ServiceIndex(ServiceIndexTest.class.getClassLoader(), micronautServices, standardServices);
         micronautServices.get(SERVICE).add("d");
@@ -140,6 +170,73 @@ public class ServiceIndexTest {
         assertEquals(Set.of(SERVICE), index.micronautServices().keySet());
         assertThrows(UnsupportedOperationException.class, () -> index.micronautServices().get(SERVICE).add("d"));
         assertThrows(UnsupportedOperationException.class, () -> index.standardServices().put(OTHER_SERVICE, List.of()));
+    }
+
+    @Test
+    void isRegisteredAfterALoaderThatLooksAServiceUpWhileTheOptimizationsAreInitialized() throws Exception {
+        // an application of its own, whose optimizations are yet to be initialized, with two loaders: the first one
+        // looks a service up, which forks, and the second one registers the index
+        Path loaders = Files.createDirectories(tempDir.resolve("loaders"));
+        Files.writeString(Files.createDirectories(loaders.resolve("META-INF/services")).resolve(StaticOptimizations.Loader.class.getName()),
+            LookingUpLoader.class.getName() + "\n" + TestServiceIndexLoader.class.getName() + "\n");
+        URL[] classPath = {
+            SoftServiceLoader.class.getProtectionDomain().getCodeSource().getLocation(),
+            org.slf4j.Logger.class.getProtectionDomain().getCodeSource().getLocation(),
+            ServiceIndexTest.class.getProtectionDomain().getCodeSource().getLocation(),
+            loaders.toUri().toURL()
+        };
+        try (RecordingClassLoader application = new RecordingClassLoader(classPath)) {
+            // on a thread of its own, which is given up if the initialization never ends
+            List<String> served = assertTimeoutPreemptively(Duration.ofSeconds(60), () -> {
+                Thread.currentThread().setContextClassLoader(application);
+                Class<?> lookingUp = application.loadClass(LookingUpLoader.class.getName());
+                lookingUp.getField("lookUp").set(null, true);
+
+                // the initialization runs the loaders
+                Class<?> optimizations = Class.forName(StaticOptimizations.class.getName(), true, application);
+
+                // the lookup of the first loader scanned the class path, which has no such service
+                assertEquals(List.of(), lookingUp.getField("found").get(null));
+                Object registered = optimizations.getMethod("findSetOnce", String.class).invoke(null, ServiceIndex.class.getName());
+                assertNotNull(registered);
+                // and the lookups that follow are served from the index
+                Object classLoader = registered.getClass().getMethod("classLoader").invoke(registered);
+                Class<?> loader = application.loadClass(SoftServiceLoader.class.getName());
+                Object services = loader.getMethod("load", Class.class, ClassLoader.class).invoke(null, application.loadClass(Greeter.class.getName()), classLoader);
+                List<String> types = new ArrayList<>();
+                for (Object service : (List<?>) loader.getMethod("collectAll").invoke(services)) {
+                    types.add(service.getClass().getName());
+                }
+                return types;
+            });
+            assertEquals(List.of(Hello.class.getName(), Hi.class.getName(), Hey.class.getName()), served);
+        }
+    }
+
+    @Test
+    void isNotLoadedByAnApplicationWithoutAnIndex() throws Exception {
+        // the classes of core, loaded again by a class loader that does not see the loaders the tests register
+        URL[] classPath = {
+            SoftServiceLoader.class.getProtectionDomain().getCodeSource().getLocation(),
+            org.slf4j.Logger.class.getProtectionDomain().getCodeSource().getLocation()
+        };
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try (RecordingClassLoader application = new RecordingClassLoader(classPath)) {
+            Thread.currentThread().setContextClassLoader(application);
+            Class<?> loader = application.loadClass(SoftServiceLoader.class.getName());
+            assertSame(application, loader.getClassLoader());
+
+            Object services = loader.getMethod("load", Class.class, ClassLoader.class).invoke(null, Runnable.class, application);
+            assertEquals(List.of(), loader.getMethod("collectAll").invoke(services));
+            assertEquals(Set.of(), application.loadClass(MicronautMetaServiceLoaderUtils.class.getName())
+                .getMethod("findMicronautMetaServiceEntries", ClassLoader.class, String.class).invoke(null, application, Runnable.class.getName()));
+
+            assertTrue(application.hasLoaded(ServiceScanner.class.getName()));
+            assertTrue(application.hasLoaded(StaticOptimizations.class.getName()));
+            assertFalse(application.hasLoaded(ServiceIndex.class.getName()));
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
     }
 
     @Test
@@ -340,6 +437,20 @@ public class ServiceIndexTest {
         }
     }
 
+    /**
+     * A class loader that tells which classes it has loaded.
+     */
+    private static final class RecordingClassLoader extends URLClassLoader {
+
+        RecordingClassLoader(URL[] urls) {
+            super(urls, ClassLoader.getPlatformClassLoader());
+        }
+
+        boolean hasLoaded(String name) {
+            return findLoadedClass(name) != null;
+        }
+    }
+
     public interface Greeter {
     }
 
@@ -374,6 +485,26 @@ public class ServiceIndexTest {
         @Override
         public ServiceIndex load() {
             return INDEX;
+        }
+    }
+
+    /**
+     * A loader that runs before the loader of the index and that, when it is told to, looks a service up.
+     */
+    public static final class LookingUpLoader implements StaticOptimizations.Loader<LookingUpLoader.Loaded> {
+
+        public static volatile boolean lookUp;
+        public static volatile List<Greeter> found;
+
+        @Override
+        public Loaded load() {
+            if (lookUp) {
+                found = SoftServiceLoader.load(Greeter.class, TestServiceIndexLoader.CLASS_LOADER).collectAll();
+            }
+            return new Loaded();
+        }
+
+        public static final class Loaded {
         }
     }
 }

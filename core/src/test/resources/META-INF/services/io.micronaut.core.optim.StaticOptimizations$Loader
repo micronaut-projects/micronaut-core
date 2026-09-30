@@ -1,2 +1,3 @@
 io.micronaut.core.optim.StaticOptimizationsTest$TestOptimizationsLoader
+io.micronaut.core.io.service.ServiceIndexTest$LookingUpLoader
 io.micronaut.core.io.service.ServiceIndexTest$TestServiceIndexLoader
