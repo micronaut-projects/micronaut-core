@@ -1,11 +1,13 @@
 A JDK AOT cache (`-XX:AOTCacheOutput`), a dynamic CDS archive (`-XX:ArchiveClassesAtExit`), a GraalVM profile for profile-guided optimization (`.iprof`) and the `native-image-agent` configuration are all written when the JVM exits after a representative run of the application. A Micronaut application does not exit on its own, so the build would have to start it, wait until it is ready, send it some requests and stop it.
 
-A _training run_ does this from inside the application. Set `micronaut.application.training.enabled` to `true`, for example with `-Dmicronaut.application.training.enabled=true` or the `MICRONAUT_APPLICATION_TRAINING_ENABLED=true` environment variable. Only `true` turns the switch on, in any case (`TRUE` works too); any other value, `yes` and `on` included, leaves it off. `Micronaut.run` then:
+A _training run_ does this from inside the application. Set `micronaut.application.training.enabled` to `true`, for example with `-Dmicronaut.application.training.enabled=true` or the `MICRONAUT_APPLICATION_TRAINING_ENABLED=true` environment variable. `Micronaut.run` then:
 
 . logs a warning that this JVM is a training run and does not serve traffic, before the application starts,
 . starts the application as usual and waits until startup has completed and every startup event listener has run,
 . logs a second warning, stops the application and closes the application context,
 . exits the JVM with status 0.
+
+Only `true` turns the switch on, in any case (`TRUE` works too). Any other text, `yes` and `on` included, leaves it off when the value is a string: a system property, an environment variable, a `.properties` file or a quoted YAML value. An unquoted `yes` or `on` in a YAML file is different: YAML reads it as the boolean `true`, so `enabled: yes` in `application.yml` turns the training run on.
 
 A failure during startup, the warm-up included, still exits with a non-zero status, so a failed training run fails the build. This applies to every embedded application, including messaging applications without an HTTP server. In the `test` environment the application is stopped, but `System.exit` is not called.
 
