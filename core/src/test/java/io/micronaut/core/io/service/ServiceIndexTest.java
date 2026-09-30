@@ -156,6 +156,31 @@ public class ServiceIndexTest {
     }
 
     @Test
+    void isAskedForOnceWhenACollectionOfMicronautServicesStarts() {
+        // the collector that loads the bean definitions: findMetaMicronautServiceEntries creates one and collects
+        ClassLoader classLoader = TestServiceIndexLoader.CLASS_LOADER;
+        String type = Greeter.class.getName();
+        String previous = System.getProperty(ServiceIndex.ENABLED_PROPERTY);
+        try {
+            // with fork, a task of the pool reads the entries, and without, the calling thread does
+            for (boolean fork : List.of(true, false)) {
+                // the index only starts to apply after the collector was created: it goes on scanning
+                System.setProperty(ServiceIndex.ENABLED_PROPERTY, "false");
+                MicronautMetaServiceLoaderUtils.MicronautServiceCollector<Greeter> scanning = new MicronautMetaServiceLoaderUtils.MicronautServiceCollector<>(classLoader, type, null);
+                System.setProperty(ServiceIndex.ENABLED_PROPERTY, "true");
+                assertEquals(List.of(), scanning.collect(fork), "fork: " + fork);
+
+                // and the other way round
+                MicronautMetaServiceLoaderUtils.MicronautServiceCollector<Greeter> indexed = new MicronautMetaServiceLoaderUtils.MicronautServiceCollector<>(classLoader, type, null);
+                System.setProperty(ServiceIndex.ENABLED_PROPERTY, "false");
+                assertEquals(List.of(Hey.class), types(indexed.collect(fork)), "fork: " + fork);
+            }
+        } finally {
+            restoreProperty(ServiceIndex.ENABLED_PROPERTY, previous);
+        }
+    }
+
+    @Test
     void isIgnoredInNativeImageCode() {
         String previous = System.getProperty(NativeImageUtils.PROPERTY_IMAGE_CODE_KEY);
         try {
