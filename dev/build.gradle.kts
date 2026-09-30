@@ -20,6 +20,8 @@ dependencies {
     compileOnly(libs.managed.ksp.api)
     compileOnly(libs.ksp.commonDeps)
     compileOnly(libs.ksp.aaEmbeddable)
+    // the embedded Python compiler exists when the Pyronaut compiler is on the launch classpath
+    compileOnly(projects.micronautInjectPython)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
     compileOnly(libs.bytebuddy.agent)
     // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
@@ -89,6 +91,8 @@ noReflection {
     allowIn("io.micronaut.dev.compile.KspCompilation", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.KspCompilation", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.KspCompilation", "SERVICE_LOADING")
+    allowIn("io.micronaut.dev.compile.PythonSourceCompiler", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.compile.PythonSourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
