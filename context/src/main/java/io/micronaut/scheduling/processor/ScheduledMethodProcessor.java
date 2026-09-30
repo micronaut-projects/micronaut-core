@@ -32,6 +32,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.scheduling.ScheduledExecution;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExceptionHandler;
 import io.micronaut.scheduling.TaskExecutors;
@@ -142,10 +143,14 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     }
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
+                        // tells an interceptor of the method that the scheduler invoked it, and by which schedule
+                        ScheduledExecution previous = ScheduledExecution.enter(new ScheduledExecution(method, scheduledAnnotation));
                         try {
                             boundExecutable.invoke(bean);
                         } catch (Throwable e) {
                             handleException(beanDefinition.getBeanType(), bean, e);
+                        } finally {
+                            ScheduledExecution.exit(previous);
                         }
                     }
                 } catch (NoSuchBeanException noSuchBeanException) {
