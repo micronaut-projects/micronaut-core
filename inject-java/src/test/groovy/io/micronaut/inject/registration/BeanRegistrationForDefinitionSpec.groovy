@@ -170,7 +170,7 @@ class BeanRegistrationForDefinitionSpec extends Specification {
         JavaCaller.resolveAsSameType(context, context.getBeanDefinition(StringBox), Argument.of(StringBox)) instanceof StringBox
     }
 
-    void "a registry that does not implement it resolves a definition of a custom scope to one instance"() {
+    void "a registry that does not implement it refuses rather than resolve under another scope key"() {
         given:
         BeanDefinitionRegistry registry = (BeanDefinitionRegistry) Proxy.newProxyInstance(
                 getClass().classLoader,
@@ -179,41 +179,24 @@ class BeanRegistrationForDefinitionSpec extends Specification {
                     method.isDefault() ? InvocationHandler.invokeDefault(proxy, method, args) : method.invoke(context, args)
                 } as InvocationHandler
         )
-        def definition = context.getBeanDefinition(ScopedService)
 
         when:
-        def first = registry.getBeanRegistration(definition, Argument.of(ScopedService))
-        def second = registry.getBeanRegistration(definition, Argument.of(ScopedService))
+        registry.getBeanRegistration(context.getBeanDefinition(ScopedService), Argument.of(ScopedService))
 
         then:
-        first.bean.is(second.bean)
-        ScopedService.created == 1
+        thrown(UnsupportedOperationException)
+        ScopedService.created == 0
     }
 
-    void "a registry that does not implement it narrows a lookup of the type to the definition"() {
+    void "a definition of a custom scope resolves to the instance an earlier lookup put in the scope"() {
         given:
-        BeanDefinitionRegistry registry = (BeanDefinitionRegistry) Proxy.newProxyInstance(
-                getClass().classLoader,
-                [BeanDefinitionRegistry] as Class[],
-                { Object proxy, Method method, Object[] args ->
-                    method.isDefault() ? InvocationHandler.invokeDefault(proxy, method, args) : method.invoke(context, args)
-                } as InvocationHandler
-        )
+        ScopedService lookedUp = context.getBean(ScopedService)
 
         when:
-        def string = registry.getBeanRegistration(context.getBeanDefinition(StringBox), Argument.of(Box, String))
-        def integer = registry.getBeanRegistration(context.getBeanDefinition(IntegerBox), Argument.of(Box, Integer))
+        def registration = context.getBeanRegistration(context.getBeanDefinition(ScopedService), Argument.of(ScopedService))
 
         then:
-        string.bean instanceof StringBox
-        integer.bean instanceof IntegerBox
-
-        when:
-        def prototype = registry.getBeanRegistration(context.getBeanDefinition(PrototypeService), Argument.of(PrototypeService))
-        context.destroyBean(prototype)
-
-        then:
-        PrototypeService.destroyed == 1
-        PrototypeDependency.destroyed == 1
+        registration.bean.is(lookedUp)
+        ScopedService.created == 1
     }
 }

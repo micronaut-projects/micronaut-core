@@ -408,21 +408,21 @@ public interface BeanDefinitionRegistry {
      * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
      * interface it implements.</p>
      *
-     * <p>The default narrows a lookup of the bean type to the definition, with a qualifier that is equal for equal
-     * definitions, so a scope that keys its beans by qualifier holds one bean however often the definition is
-     * resolved. {@link DefaultBeanContext} resolves the definition directly.</p>
+     * <p>A bean of a scope is the one an ordinary lookup returns: the definition is resolved under the key its scope
+     * holds it by. A registry can only guarantee that by resolving the definition itself, so the default throws an
+     * {@link UnsupportedOperationException} rather than narrow a lookup with a qualifier, which would become part of
+     * that key. {@link DefaultBeanContext} implements it.</p>
      *
      * @param beanDefinition The bean definition
      * @param beanType       The potentially parameterized bean type to resolve the definition as
      * @param <T>            The concrete type
      * @return The bean registration
      * @throws NoSuchBeanException if the definition is not a candidate for the bean type
+     * @throws UnsupportedOperationException if the registry cannot resolve a definition as a given type
      * @since 5.3.0
      */
     default <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType) {
-        Objects.requireNonNull(beanDefinition, "Bean definition cannot be null");
-        Objects.requireNonNull(beanType, "Bean type cannot be null");
-        return getBeanRegistration(beanType, new BeanDefinitionQualifier<>(beanDefinition));
+        throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support resolving a bean definition as a given type");
     }
 
     /**
