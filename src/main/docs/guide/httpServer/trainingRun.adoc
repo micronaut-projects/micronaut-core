@@ -11,6 +11,8 @@ Only `true` turns the switch on, in any case (`TRUE` works too). Any other text,
 
 A failure during startup, the warm-up included, still exits with a non-zero status, so a failed training run fails the build. This applies to every embedded application, including messaging applications without an HTTP server. In the `test` environment the application is stopped, but `System.exit` is not called.
 
+This is the `start` mode of a training run, the default. It creates the beans of the application, so it needs the services they use. If the application cannot start where the training runs, for example because it needs a database and the training is a step of a container image build, use the `load` mode described in <<trainingRunLoad, Training without starting the application>>.
+
 WARNING: Never set `micronaut.application.training.enabled` or `MICRONAUT_APPLICATION_TRAINING_ENABLED` on a deployment target, whether in the configuration of the deployed application or in an environment variable shared by a platform or a cluster. The application would start, stop right away and exit with status 0, which most orchestrators read as a clean shutdown: the service restarts in a loop and nothing reports an error. The exit status has to stay 0 for the tools that write their output at exit, so the two warnings in the log are the only signal. Set the switch only in the build step that runs the training.
 
 The switch acts on the api:runtime.EmbeddedApplication[] of the application, such as the HTTP server or a messaging application. An application without one is not stopped: `Micronaut.run` logs a warning that says so and returns as usual. The beans that require the switch are still created, so a startup listener written for the training run still runs. If such an application starts non-daemon threads of its own, the training run does not end until they do, so the application has to stop them itself.
@@ -75,4 +77,61 @@ public class CustomWarmup implements ApplicationEventListener<ServerStartupEvent
 
 The `pattern` matches `true` in any case, as the switch does: with `value = "true"` a training run started with `TRUE` would stop the application without running the listener. For a messaging application, listen for api:runtime.event.ApplicationStartupEvent[] instead.
 
-WARNING: A training run executes application code, including the warm-up requests. If the application needs external services such as a database, run the training with an environment that configures them, or with Test Resources.
+WARNING: A training run in `start` mode executes application code, including the warm-up requests. If the application needs external services such as a database, run the training with an environment that configures them, with Test Resources, or in `load` mode.
+
+[[trainingRunLoad]]
+=== Training without starting the application
+
+Set `micronaut.application.training.mode` to `load`, next to the switch, for a training run that does not start the application. The environment variable is `MICRONAUT_APPLICATION_TRAINING_MODE=load`:
+
+[source,bash]
+----
+$ java -XX:AOTCacheOutput=app.aot \
+    -Dmicronaut.application.training.enabled=true \
+    -Dmicronaut.application.training.mode=load \
+    -jar app.jar
+----
+
+`Micronaut.run` then:
+
+. reads the configuration of the application as usual,
+. logs a warning that this JVM is a training run and does not serve traffic,
+. reads the bean definitions and evaluates their conditions without starting the application context, as `configure()` of api:context.ConfigurableBeanContext[] does,
+. loads every enabled bean definition and the classes it names: the bean class, the classes generated for AOP advice, and the types of its constructor, of its injected fields and methods and of its executable methods,
+. logs how many bean definitions it loaded, logs a second warning and closes the application context,
+. exits the JVM with status 0.
+
+No bean is created and no bean class is initialized. No constructor, `@PostConstruct` method or startup event listener runs, no `@Context` or other eager bean is created, no method is scheduled, the api:runtime.EmbeddedApplication[] is not started and no port is bound. A bean that opens a connection when it is created therefore does not fail the run. A bean definition that cannot be loaded, for example because it names a class of an optional dependency that is absent, is skipped: the run logs it with the cause, and counts it in the line that ends the loading:
+
+----
+Training run (micronaut.application.training.mode=load): loaded 359 of 411 bean definitions and the 655 types they name in 43ms, skipped 0 that could not be loaded
+----
+
+The mode is read only when `micronaut.application.training.enabled` is `true`. Its values are `start`, the default, and `load`, in any case; any other value fails the training run. The `load` mode works for every application, including one without an `EmbeddedApplication`, which a `start` run cannot stop. In the `test` environment `System.exit` is not called and `Micronaut.run` returns the application context, closed and never started.
+
+The warm-up does not apply to the `load` mode, because no server is started. If `micronaut.application.training.warmup` settings are present, a warning says that they are ignored.
+
+What still runs in `load` mode is the code that runs whenever an application context is configured:
+
+* the property source loaders. If the application reads distributed configuration at startup through the bootstrap context, it still does, and the beans of the bootstrap context that read it are created.
+* the api:context.ApplicationContextConfigurer[] classes of the application.
+* the conditions of the bean definitions, custom api:context.condition.Condition[] classes included. A condition that looks up a bean creates that bean.
+
+==== Choosing a mode
+
+The tools that a training run feeds record what the JVM loads and what it executes. A `load` run loads the classes of the beans and executes the framework code that builds the application context, but none of the code that creates the beans, starts the server and handles requests. A JDK AOT cache or a CDS archive trained in `load` mode therefore holds fewer classes, and none of the linked lambdas and method profiles of that code: the application starts faster than without a cache, but slower than with a cache trained in `start` mode.
+
+|===
+|Training run |When to use it
+
+|`start` with warm-up paths
+|The application can start where the training runs: the services it needs are available, or a training environment or Test Resources replace them. This gives the most complete cache.
+
+|`start` without warm-up paths
+|As above, when the application has no request that is safe to send.
+
+|`load`
+|The application cannot start where the training runs. The cache is smaller and keeps only part of the gain.
+|===
+
+For a GraalVM profile for profile-guided optimization or for the `native-image-agent`, use the `start` mode: both record what the application executes, and a `load` run executes almost none of it.
