@@ -140,8 +140,9 @@ proxy (ann:runtime.http.scope.RequestScope[], ann:runtime.context.scope.ThreadLo
 ann:runtime.context.scope.Refreshable[]) and every advised bean a ann:context.annotation.Factory[] method produces use,
 is two beans to the context: the proxy and the target. By default the proxy resolves its interceptors once, as it is
 constructed, and intercepts every target it fronts with them. A non-singleton interceptor is then one instance per
-proxy, shared by every target the proxy resolves, and not the instance that intercepts the construction,
-post-construct and pre-destroy of the target.
+proxy, shared by every target the proxy resolves, and not the instance that intercepts the construction and
+post-construct of the target. When the proxy is destroyed together with a target it holds, the target is destroyed
+first: its pre-destroy is intercepted by the instance of the proxy, which is destroyed after it.
 
 [.lang-java.lang-groovy.lang-kotlin]
 --

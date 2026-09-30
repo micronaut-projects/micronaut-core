@@ -1436,24 +1436,38 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T> void destroyProxyTargetBean(BeanRegistration<T> registration, boolean dependent) {
-        Set<Object> destroyed = Collections.emptySet();
-        if (registration instanceof BeanDisposingRegistration<?> disposingRegistration) {
-            if (disposingRegistration.getDependents() != null) {
-                destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
-                for (BeanRegistration<?> beanRegistration : disposingRegistration.getDependents()) {
-                    destroyDependentBean(beanRegistration);
-                    destroyed.add(beanRegistration.bean);
-                }
-            }
-        }
         BeanDefinition<T> proxyTargetBeanDefinition = findProxyTargetBeanDefinition(registration.beanDefinition)
             .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
         Optional<CustomScope<?>> declaredScope = customScopeRegistry.findDeclaredScope(proxyTargetBeanDefinition);
+        List<BeanRegistration<?>> proxyDependents = registration instanceof BeanDisposingRegistration<?> disposingRegistration
+            ? disposingRegistration.getDependents()
+            : null;
+        if (declaredScope.isEmpty()
+            && !proxyTargetBeanDefinition.isSingleton()
+            && registration.bean instanceof InterceptedBeanProxy
+            && ((InterceptedBeanProxy<T>) registration.bean).hasCachedInterceptedTarget()) {
+            // Scope is not present, try to get the actual target bean and destroy it
+            InterceptedBeanProxy<T> interceptedProxy = (InterceptedBeanProxy<T>) registration.bean;
+            T interceptedTarget = interceptedProxy.interceptedTarget();
+            BeanRegistration<T> targetRegistration = interceptedProxy.interceptedTargetRegistration();
+            if (!(targetRegistration instanceof BeanDisposingRegistration && targetRegistration.bean == interceptedTarget)
+                && destroyProxyTargetBeforeProxyDependents(registration, proxyTargetBeanDefinition, interceptedTarget, proxyDependents)) {
+                interceptedProxy.clearCachedInterceptedTarget();
+                return;
+            }
+        }
+        Set<Object> destroyed = Collections.emptySet();
+        if (proxyDependents != null) {
+            destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (BeanRegistration<?> beanRegistration : proxyDependents) {
+                destroyDependentBean(beanRegistration);
+                destroyed.add(beanRegistration.bean);
+            }
+        }
         if (declaredScope.isEmpty()) {
             if (proxyTargetBeanDefinition.isSingleton()) {
                 return;
             }
-            // Scope is not present, try to get the actual target bean and destroy it
             if (registration.bean instanceof InterceptedBeanProxy) {
                 InterceptedBeanProxy<T> interceptedProxy = (InterceptedBeanProxy<T>) registration.bean;
                 if (interceptedProxy.hasCachedInterceptedTarget()) {
@@ -1469,18 +1483,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                             destroyBean(targetRegistration);
                         }
                         interceptedProxy.clearCachedInterceptedTarget();
-                        return;
                     }
-                    // a proxy that holds no registration of its target: the target is destroyed with the dependents
-                    // created with it. Those of the proxy went above and are not destroyed again: the target is
-                    // given them so that its pre-destroy is intercepted by the interceptors the proxy held
-                    destroyBean(BeanRegistration.of(this,
-                        new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
-                        proxyTargetBeanDefinition,
-                        interceptedTarget,
-                        withProxyDependents(takeCachedProxyTargetDependents(registration), registration)
-                    ));
-                    interceptedProxy.clearCachedInterceptedTarget();
                 }
             }
             return;
@@ -1499,22 +1502,93 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @Nullable
-    private static List<BeanRegistration<?>> withProxyDependents(@Nullable List<BeanRegistration<?>> targetDependents,
-                                                                 BeanRegistration<?> proxyRegistration) {
-        List<BeanRegistration<?>> proxyDependents = proxyRegistration instanceof BeanDisposingRegistration<?> disposingRegistration
-            ? disposingRegistration.getDependents()
-            : null;
-        if (proxyDependents == null || proxyDependents.isEmpty()) {
-            return targetDependents;
+    /**
+     * Destroys the target of a proxy that resolved its interceptors for itself before the dependents of the proxy.
+     *
+     * <p>The target is destroyed with the dependents of the proxy and its own as one: its pre-destroy is intercepted
+     * by the interceptors the proxy held, which are still alive then, and every dependent is destroyed once, after
+     * it. An interceptor created with the target gives way to the one of the same definition the proxy held, so that
+     * the pre-destroy is intercepted once, and is destroyed after the target too.</p>
+     *
+     * @return {@code false} when the target is among the dependents of the proxy with a registration that cannot
+     * be marked destroyed, and is left to be destroyed with them
+     */
+    private <T> boolean destroyProxyTargetBeforeProxyDependents(BeanRegistration<T> proxyRegistration,
+                                                               BeanDefinition<T> targetDefinition,
+                                                               T target,
+                                                               @Nullable List<BeanRegistration<?>> proxyDependents) {
+        BeanRegistration<?> tracked = null;
+        if (proxyDependents != null) {
+            for (BeanRegistration<?> dependent : proxyDependents) {
+                if (dependent.bean == target) {
+                    tracked = dependent;
+                    break;
+                }
+            }
         }
-        if (targetDependents == null || targetDependents.isEmpty()) {
-            return proxyDependents;
+        List<BeanRegistration<?>> targetDependents;
+        List<?> targetInterceptorRegistrations = null;
+        if (tracked == null) {
+            // the dependents created with a target a lazy proxy caches are kept on the context the proxy retains
+            targetDependents = takeCachedProxyTargetDependents(proxyRegistration);
+        } else if (tracked instanceof BeanDisposingRegistration<?> trackedRegistration) {
+            if (!trackedRegistration.markDestroyed()) {
+                // destroyed already: only the dependents of the proxy are left
+                return false;
+            }
+            targetDependents = trackedRegistration.getDependents();
+            targetInterceptorRegistrations = trackedRegistration.getInterceptorRegistrations();
+        } else {
+            return false;
         }
-        List<BeanRegistration<?>> dependents = new ArrayList<>(proxyDependents.size() + targetDependents.size());
-        dependents.addAll(proxyDependents);
-        dependents.addAll(targetDependents);
-        return dependents;
+        List<BeanRegistration<?>> dependents = new ArrayList<>();
+        List<BeanRegistration<?>> shadowed = null;
+        if (proxyDependents != null) {
+            for (BeanRegistration<?> dependent : proxyDependents) {
+                if (dependent != tracked) {
+                    dependents.add(dependent);
+                }
+            }
+        }
+        if (targetDependents != null) {
+            for (BeanRegistration<?> dependent : targetDependents) {
+                if (isInterceptorOfDefinitionIn(dependent, proxyDependents)) {
+                    if (shadowed == null) {
+                        shadowed = new ArrayList<>(2);
+                    }
+                    shadowed.add(dependent);
+                } else {
+                    dependents.add(dependent);
+                }
+            }
+        }
+        BeanRegistration<T> targetRegistration = BeanRegistration.of(this,
+            new BeanKey<>(targetDefinition, targetDefinition.getDeclaredQualifier()),
+            targetDefinition,
+            target,
+            dependents,
+            targetInterceptorRegistrations
+        );
+        // a target found among the dependents of the proxy is destroyed as one of them, as before
+        destroyBean(targetRegistration, tracked != null);
+        if (shadowed != null) {
+            for (int i = shadowed.size() - 1; i >= 0; i--) {
+                destroyDependentBean(shadowed.get(i));
+            }
+        }
+        return true;
+    }
+
+    private static boolean isInterceptorOfDefinitionIn(BeanRegistration<?> registration, @Nullable List<BeanRegistration<?>> proxyDependents) {
+        if (proxyDependents != null
+            && registration instanceof BeanDisposingRegistration<?> disposingRegistration && disposingRegistration.isCreatedAsInterceptor()) {
+            for (BeanRegistration<?> dependent : proxyDependents) {
+                if (dependent != registration && dependent.beanDefinition.equals(registration.beanDefinition)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private <T> void triggerBeanDestroyedListeners(BeanDefinition<T> beanDefinition, T bean) {
