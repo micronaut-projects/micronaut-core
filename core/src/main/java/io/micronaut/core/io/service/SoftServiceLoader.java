@@ -397,9 +397,12 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * {@link #findAll(Predicate)} and {@link #load(Predicate, Predicate)}, which test it on the name of each entry.
      * When no condition was given, the instances are loaded through {@link #load(Predicate)}.</p>
      *
-     * <p>The default {@link #load(Predicate, Predicate)} loads the entries one after the other, on the calling thread.
-     * The class path scan it replaces forks one task per entry, so a loader used on the JVM should override both
-     * {@code load} methods to do the same, and join the tasks in order to keep the order of the entries.</p>
+     * <p>The default {@code load} methods load the entries through the stream that {@link #findAll(Predicate)}
+     * returns: one after the other, on the calling thread, unless that stream is parallel. The class path scan that a
+     * loader replaces forks one task per entry. To load its entries concurrently as well, a loader either returns a
+     * parallel stream from {@code findAll}, or overrides both {@code load} methods and joins its tasks in the order of
+     * the entries. A loader that overrides only {@link #load(Predicate)} is bypassed whenever a name condition is
+     * given: the instances are then loaded by the default {@link #load(Predicate, Predicate)}.</p>
      *
      * @param <S> The service type
      */
@@ -424,8 +427,9 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
 
         /**
-         * Loads the entries whose name matches the condition. By default, the entries are loaded one after the
-         * other, on the calling thread.
+         * Loads the entries whose name matches the condition. By default, the entries are loaded through the stream
+         * that {@link #findAll(Predicate)} returns: one after the other, on the calling thread, unless that stream is
+         * parallel.
          *
          * @param condition The condition, tested on the name of each entry, or null to load every entry
          * @param predicate The predicate to filter the instances, or null if not needed

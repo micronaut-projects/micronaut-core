@@ -24,6 +24,19 @@ RFC 7230 defines a header value over octets — `field-vchar = VCHAR / obs-text`
 
 Characters in `%x80-FF` are unaffected and remain valid, so a `Content-Disposition` filename using Latin-1 accented characters continues to work. Only characters above `U+00FF` — for example CJK text or emoji — are rejected, and those were already being replaced with `?` on the wire.
 
+=== The name condition of `SoftServiceLoader.load` is tested on every service entry (5.3)
+
+The `Predicate<String>` given to the three-argument `load(Class, ClassLoader, Predicate)` of api:core.io.service.SoftServiceLoader[] is documented to be passed the class name of each service. Previously it was only tested on the lines of `META-INF/services` files, comment included. Since Micronaut 5.3 it is tested on the name of every entry, so a caller that passes a condition can get different results:
+
+* Entries under `META-INF/micronaut`, and the entries of the service table of a native image, are no longer returned when the condition rejects them. Previously the condition was not tested on them.
+* With a `SoftServiceLoader.StaticServiceLoader` registered for the service type, `collectAll()` only returns the entries that the condition accepts. Previously it ignored the condition.
+* With such a loader, `iterator()`, and `first()`, `firstAvailable()` and `firstOr(..)`, which use it, now return the entries that the condition accepts. Previously the condition was tested on `java.lang.String` instead of the name of each entry, so for most conditions the iterator was empty.
+* For a `META-INF/services` line with a trailing comment, such as `com.example.Foo # comment`, the condition is tested on `com.example.Foo`. Previously it was tested on the whole line.
+
+The name of a `META-INF/services` entry is now read the way `java.util.ServiceLoader` reads it: without the whitespace around it. This also applies without a condition. Previously an indented entry, or one followed by whitespace, was not loaded.
+
+Callers of the `load` methods without a condition are otherwise not affected.
+
 == 5.0
 
 === Core Changes
