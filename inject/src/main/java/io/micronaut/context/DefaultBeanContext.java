@@ -3428,7 +3428,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
             }
         );
-        if (created != null && bean != null) {
+        if (created != null) {
             // the scope hands back the bean alone: the registration it stores is the one created above, or on a hit
             // the one it finds for the bean
             BeanRegistration<T> registration = created.get();
@@ -3805,30 +3805,32 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         List<BeanRegistration<?>> createdRegistrations = new ArrayList<>(candidates.size());
         try {
             for (BeanDefinition<I> candidate : candidates) {
-                if (!isUnscoped(candidate)) {
-                    addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
-                    continue;
-                }
-                BeanRegistration<I> existing = resolutionContext.findInterceptor(candidate);
+                BeanRegistration<I> existing = isUnscoped(candidate) ? resolutionContext.findInterceptor(candidate) : null;
                 if (existing != null) {
                     registrations.add(existing);
-                    continue;
-                }
-                int created = registrations.size();
-                addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
-                for (int i = created; i < registrations.size(); i++) {
-                    if (registrations.get(i) instanceof BeanDisposingRegistration<?> registration) {
-                        registration.markCreatedAsInterceptor();
-                        createdRegistrations.add(registration);
+                } else {
+                    int created = registrations.size();
+                    addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
+                    if (isUnscoped(candidate)) {
+                        markCreatedAsInterceptors(registrations.subList(created, registrations.size()), createdRegistrations);
                     }
                 }
             }
-        } catch (RuntimeException | Error e) {
+        } catch (RuntimeException e) {
             restoreDependentBeans(resolutionContext, createdRegistrations);
             throw e;
         }
         registrations.sort(OrderUtil.ORDERED_COMPARATOR);
         return registrations;
+    }
+
+    private static <I> void markCreatedAsInterceptors(List<BeanRegistration<I>> created, List<BeanRegistration<?>> createdRegistrations) {
+        for (BeanRegistration<I> registration : created) {
+            if (registration instanceof BeanDisposingRegistration<I> disposingRegistration) {
+                disposingRegistration.markCreatedAsInterceptor();
+                createdRegistrations.add(disposingRegistration);
+            }
+        }
     }
 
     /**
@@ -3908,7 +3910,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 registrations.sort(OrderUtil.ORDERED_COMPARATOR);
                 selection = new UnownedInterceptorSelection(selector.apply(registrations), created);
-            } catch (RuntimeException | Error e) {
+            } catch (RuntimeException e) {
                 destroyCreatedBeans(created, e);
                 throw e;
             }

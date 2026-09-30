@@ -111,21 +111,21 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
      * @param interceptionPoints The metadata of the interception points
      */
     private InterceptorBindingQualifier(AnnotationMetadata[] interceptionPoints) {
-        final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames = new LinkedHashMap<>();
-        final Set<String> supportedInterceptorTypes = new LinkedHashSet<>();
+        final Map<String, List<AnnotationValue<?>>> annotationNames = new LinkedHashMap<>();
+        final Set<String> interceptorTypes = new LinkedHashSet<>();
         for (AnnotationMetadata interceptionPoint : interceptionPoints) {
             final Collection<AnnotationValue<Annotation>> annotationValues = interceptionPoint.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
             findSupportedAnnotations(annotationValues, interceptionPoint).forEach((name, occurrences) -> {
-                if (!supportedAnnotationNames.containsKey(name)) {
-                    supportedAnnotationNames.put(name, occurrences == null ? null : new ArrayList<>(occurrences));
+                if (!annotationNames.containsKey(name)) {
+                    annotationNames.put(name, occurrences == null ? null : new ArrayList<>(occurrences));
                     return;
                 }
-                final List<AnnotationValue<?>> merged = supportedAnnotationNames.get(name);
+                final List<AnnotationValue<?>> merged = annotationNames.get(name);
                 if (merged == null) {
                     return;
                 }
                 if (occurrences == null) {
-                    supportedAnnotationNames.put(name, null);
+                    annotationNames.put(name, null);
                 } else {
                     for (AnnotationValue<?> occurrence : occurrences) {
                         if (!merged.contains(occurrence)) {
@@ -135,11 +135,11 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
                 }
             });
             for (AnnotationValue<?> annotationValue : annotationValues) {
-                annotationValue.annotationClassValue(META_MEMBER_INTERCEPTOR_TYPE).map(AnnotationClassValue::getName).ifPresent(supportedInterceptorTypes::add);
+                annotationValue.annotationClassValue(META_MEMBER_INTERCEPTOR_TYPE).map(AnnotationClassValue::getName).ifPresent(interceptorTypes::add);
             }
         }
-        this.supportedAnnotationNames = supportedAnnotationNames;
-        this.supportedInterceptorTypes = supportedInterceptorTypes;
+        this.supportedAnnotationNames = annotationNames;
+        this.supportedInterceptorTypes = interceptorTypes;
     }
 
     /**

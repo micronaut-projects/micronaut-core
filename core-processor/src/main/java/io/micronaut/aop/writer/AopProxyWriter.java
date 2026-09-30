@@ -719,7 +719,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addSuperinterface(TypeDef.of(isIntroduction ? Introduced.class : Intercepted.class));
 
-        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, interceptorRegistrationsField, proxyMethodsField, interceptedMethods, proxyTargetFields);
+        addConstructor(proxyBuilder, classTargetType, new ProxyFields(targetField, interceptorsField, interceptorRegistrationsField, proxyMethodsField), interceptedMethods, proxyTargetFields);
 
         List<OutputObjectDef> classes = new ArrayList<>();
         classes.add(new OutputObjectDef(proxyBuilder.build(), null, originatingElements));
@@ -741,12 +741,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private void addConstructor(ClassDef.ClassDefBuilder proxyBuilder,
                                 ClassTypeDef targetType,
-                                @Nullable FieldDef targetField,
-                                @Nullable FieldDef interceptorsField,
-                                FieldDef interceptorRegistrationsField,
-                                FieldDef proxyMethodsField,
+                                ProxyFields proxyFields,
                                 List<MethodElement> interceptedMethods,
                                 @Nullable ProxyTargetFields proxyTargetFields) {
+        FieldDef targetField = proxyFields.target();
+        FieldDef interceptorsField = proxyFields.interceptors();
+        FieldDef interceptorRegistrationsField = proxyFields.interceptorRegistrations();
+        FieldDef proxyMethodsField = proxyFields.proxyMethods();
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
         bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
@@ -852,8 +853,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     proxyBuilder.addMethod(
                         getSwapMethod(targetField, writeLockField, targetRegistrationField, fields.beanLocator())
                     );
-                    if (fields.beanLocator() != null) {
-                        FieldDef beanLocatorField = fields.beanLocator();
+                    FieldDef beanLocatorField = fields.beanLocator();
+                    if (beanLocatorField != null) {
                         proxyBuilder.addField(beanLocatorField);
                         bodyBuilders.add((aThis, methodParameters) -> aThis.field(beanLocatorField).assign(methodParameters.get(beanContextArgumentIndex)));
                     }
@@ -901,7 +902,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
             proxyBuilder.addMethod(interceptedTargetMethod);
 
-            bodyBuilders.add((aThis, methodParameters) -> initializeProxyTargetMethodsAndInterceptors(aThis, methodParameters, proxyBeanDefinitionField, interceptorsField, proxyMethodsField, interceptedMethods, targetField, targetRegistrationField));
+            bodyBuilders.add((aThis, methodParameters) -> initializeProxyTargetMethodsAndInterceptors(aThis, methodParameters, fields, interceptorsField, proxyMethodsField, interceptedMethods, targetField));
         } else {
             bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, Objects.requireNonNull(interceptorsField), proxyMethodsField, interceptedMethods));
         }
@@ -976,12 +977,12 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private StatementDef initializeProxyTargetMethodsAndInterceptors(VariableDef.This aThis,
                                                                      List<VariableDef.MethodParameter> parameters,
-                                                                     FieldDef proxyBeanDefinitionField,
+                                                                     ProxyTargetFields fields,
                                                                      @Nullable FieldDef interceptorsField,
                                                                      FieldDef proxyMethodsField,
                                                                      List<MethodElement> methods,
-                                                                     @Nullable FieldDef targetField,
-                                                                     @Nullable FieldDef targetRegistrationField) {
+                                                                     @Nullable FieldDef targetField) {
+        FieldDef proxyBeanDefinitionField = fields.proxyBeanDefinition();
         AtomicInteger index = new AtomicInteger();
         StatementDef proxyMethods = aThis.field(proxyMethodsField).assign(
             ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
@@ -1011,7 +1012,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     aThis.field(proxyBeanDefinitionField),
                     aThis.field(proxyMethodsField),
                     TypeDef.Primitive.BOOLEAN.constant(isIntroduction),
-                    aThis.field(Objects.requireNonNull(targetRegistrationField)),
+                    aThis.field(Objects.requireNonNull(fields.targetRegistration())),
                     aThis.field(Objects.requireNonNull(targetField))
                 ))
             );
@@ -1328,6 +1329,21 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             // 3rd argument: the qualifier
             qualifier
         );
+    }
+
+    /**
+     * The fields every proxy has, which its constructor assigns.
+     *
+     * @param target                   The target a proxy that fronts a separate target holds, or {@code null}
+     * @param interceptors             The interceptors of each method, or {@code null} when they are selected for
+     *                                 the target of each call
+     * @param interceptorRegistrations The interceptor registrations the constructor was given
+     * @param proxyMethods             The intercepted methods
+     */
+    private record ProxyFields(@Nullable FieldDef target,
+                               @Nullable FieldDef interceptors,
+                               FieldDef interceptorRegistrations,
+                               FieldDef proxyMethods) {
     }
 
     /**
