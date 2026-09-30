@@ -13,6 +13,8 @@ dependencies {
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(projects.micronautInjectGroovy)
+    testImplementation(platform(libs.test.boms.micronaut.serde))
+    testImplementation("io.micronaut.serde:micronaut-serde-jsonp")
 }
 
 noReflection {
