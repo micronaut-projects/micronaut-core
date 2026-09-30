@@ -531,10 +531,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public void markDependentAsFactory() {
         if (dependentBeans != null) {
-            if (dependentBeans.isEmpty()) {
-                return;
+            // an interceptor created for the construction of the bean is resolved before its factory, and is not it
+            for (int i = 0; i < dependentBeans.size(); i++) {
+                if (!(dependentBeans.get(i) instanceof BeanDisposingRegistration<?> registration && registration.isCreatedAsInterceptor())) {
+                    dependentFactory = dependentBeans.remove(i);
+                    return;
+                }
             }
-            dependentFactory = dependentBeans.removeFirst();
         }
     }
 
@@ -680,6 +683,53 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public <T> T getProxyTargetBean(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return context.getProxyTargetBean(this, definition, beanType, qualifier);
+    }
+
+    @Override
+    public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return context.getInterceptorRegistrations(this, interceptorType, binding);
+    }
+
+    /**
+     * Finds the interceptor of the given definition created for the bean this context resolves for, among its
+     * dependents.
+     *
+     * @param definition The definition of the interceptor
+     * @param <I>        The interceptor type
+     * @return The registration, or {@code null} when none was created for the bean
+     */
+    @Nullable
+    <I> BeanRegistration<I> findInterceptor(BeanDefinition<I> definition) {
+        return findInterceptor(getDependentBeans(), definition);
+    }
+
+    /**
+     * Finds the interceptor of the given definition among dependents, one created to intercept the bean they depend
+     * on rather than injected into it.
+     *
+     * @param dependents The dependents, or {@code null}
+     * @param definition The definition of the interceptor
+     * @param <I>        The interceptor type
+     * @return The registration, or {@code null}
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    static <I> BeanRegistration<I> findInterceptor(@Nullable List<BeanRegistration<?>> dependents, BeanDefinition<I> definition) {
+        if (dependents != null) {
+            for (BeanRegistration<?> dependent : dependents) {
+                if (dependent instanceof BeanDisposingRegistration<?> registration
+                    && registration.isCreatedAsInterceptor()
+                    && registration.beanDefinition.equals(definition)) {
+                    return (BeanRegistration<I>) registration;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getProxyTargetBeanRegistration(this, definition, beanType, qualifier);
     }
 
     /**
