@@ -51,10 +51,10 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  */
 @NullMarked
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
+    static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
-    private static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
 
@@ -76,12 +76,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
         try {
 
+            // The training mode decides whether the context starts at all, so the switch is read before
+            // applicationContext.start(), from the environment that start() would otherwise start first
+            Environment environment = applicationContext.getEnvironment();
+            environment.start();
+            boolean trainingRun = isTrainingRun(environment);
+            if (trainingRun && TrainingLoad.isSelected(environment)) {
+                TrainingLoad.run(applicationContext);
+                return applicationContext;
+            }
+
             applicationContext.start();
 
             EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
-            boolean trainingRun = isTrainingRun(applicationContext.getEnvironment());
             if (trainingRun) {
-                announceTrainingRun(applicationContext.getEnvironment(), embeddedApplication != null);
+                announceTrainingRun(environment, embeddedApplication != null);
             }
 
             if (embeddedApplication != null) {
@@ -213,9 +222,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * any case, turns it on. A {@code Boolean} conversion would also accept the strings
      * {@code yes} and {@code on}, which those beans do not match.
      *
-     * <p>Every application runs this on startup, so it is a plain call: no lambda to link.</p>
+     * <p>Every application runs this on startup, so it is a plain call: no lambda to link. It is
+     * the only thing an application that is not training pays for: the mode
+     * ({@link ApplicationConfiguration#TRAINING_MODE}) is only read when the switch is on.</p>
      *
-     * @param environment The environment
+     * @param environment The started environment
      * @return Whether this run is a training run
      */
     private static boolean isTrainingRun(Environment environment) {

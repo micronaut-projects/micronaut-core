@@ -290,16 +290,20 @@ class TrainingRunTest {
         }
     }
 
-    private record ChildJvm(int exitCode, String output) {
+    record ChildJvm(int exitCode, String output) {
         static ChildJvm run(Map<String, String> environment, String... jvmArgs) {
+            return run(Main.class, System.getProperty("java.class.path"), environment, jvmArgs);
+        }
+
+        static ChildJvm run(Class<?> mainClass, String classPath, Map<String, String> environment, String... jvmArgs) {
             List<String> command = new ArrayList<>();
             command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
             // The child runs next to the forked test JVMs: bound its heap and its GC threads
             command.addAll(List.of("-Xmx128m", "-XX:+UseSerialGC"));
             command.addAll(List.of(jvmArgs));
             command.add("-cp");
-            command.add(System.getProperty("java.class.path"));
-            command.add(Main.class.getName());
+            command.add(classPath);
+            command.add(mainClass.getName());
             try {
                 ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
                 builder.environment().putAll(environment);

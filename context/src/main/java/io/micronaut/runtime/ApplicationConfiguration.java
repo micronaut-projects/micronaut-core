@@ -57,7 +57,7 @@ public class ApplicationConfiguration {
      * Property name for the training run switch. When it is {@code true}, in any case,
      * {@link Micronaut#start()} stops the application once it has started, then exits the JVM with
      * status 0 unless the {@code test} environment is active. Off by default, and any other value
-     * leaves it off.
+     * leaves it off. {@link #TRAINING_MODE} selects a run that does not start the application.
      *
      * <p>A training run does not serve traffic, so this property must never be set on a deployment
      * target.</p>
@@ -69,6 +69,30 @@ public class ApplicationConfiguration {
      * @since 5.3.0
      */
     public static final String TRAINING_ENABLED = PREFIX + ".training.enabled";
+
+    /**
+     * Property name for the mode of a training run, which says how far {@link Micronaut#start()}
+     * goes before it exits. It is only read when {@link #TRAINING_ENABLED} is on, in any case:
+     * <ul>
+     *     <li>{@code start}, the default: the application starts, every startup event listener
+     *     runs, then the application is stopped. The run creates the beans of the application, so
+     *     it needs the services they use, such as a database.</li>
+     *     <li>{@code load}: the environment is started and the bean definitions are read as
+     *     {@link io.micronaut.context.ConfigurableBeanContext#configure()} does, then every enabled
+     *     bean definition is loaded together with the classes it names. No bean is created, no
+     *     startup event is published and the {@link EmbeddedApplication} is not started, so the run
+     *     needs none of those services. A bean definition that cannot be loaded, for example
+     *     because a class it names is absent, is skipped. This mode also ends an application that
+     *     has no {@link EmbeddedApplication}.</li>
+     * </ul>
+     *
+     * <p>Any other value fails the training run. In the {@code test} environment a {@code load}
+     * run does not exit the JVM either: {@link Micronaut#start()} returns the
+     * {@link io.micronaut.context.ApplicationContext}, closed and never started.</p>
+     *
+     * @since 5.3.0
+     */
+    public static final String TRAINING_MODE = PREFIX + ".training.mode";
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
     @Nullable

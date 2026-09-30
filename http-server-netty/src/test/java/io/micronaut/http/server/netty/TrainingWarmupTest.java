@@ -325,6 +325,24 @@ class TrainingWarmupTest {
         assertFalse(child.output().contains("exiting with status 0"), child::output);
     }
 
+    @Test
+    @Tag(CHILD_JVM)
+    void loadModeExitsWithZeroWithoutStartingTheServerOrWarmingUp() {
+        // repeat=0 fails a training run that starts the server: the load mode does not even bind the warm-up settings
+        ChildJvm child = ChildJvm.run(
+            "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true",
+            "-D" + ApplicationConfiguration.TRAINING_MODE + "=load",
+            "-D" + PATHS + "=" + OK_PATH,
+            "-D" + REPEAT + "=0");
+
+        assertEquals(0, child.exitCode(), child::output);
+        assertTrue(child.output().contains("the " + TrainingWarmupConfiguration.PREFIX + " settings are ignored, because this mode starts no server and sends no warm-up request"), child::output);
+        assertTrue(child.output().contains("bean definitions loaded, closing the context and exiting with status 0"), child::output);
+        // The server was not started, so nothing was bound and nothing was requested
+        assertFalse(child.output().contains("Startup completed"), child::output);
+        assertEquals(0, child.output().lines().filter(line -> line.startsWith(WarmupController.REQUEST_LOG)).count(), child::output);
+    }
+
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/training-warmup")
     static class WarmupController {
