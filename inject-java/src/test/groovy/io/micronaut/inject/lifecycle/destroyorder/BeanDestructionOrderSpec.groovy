@@ -33,6 +33,33 @@ class Log {
 }
 '''
 
+    /**
+     * A consumer that resolves its provider through the context while the application runs. RECORD is replaced by the
+     * statement, if any, that records the dependency the definitions do not declare.
+     */
+    static final String RUNTIME_DEPENDENCY = '''
+@Singleton
+class AProvider {
+    private boolean closed;
+    void use() { Log.add(closed ? "used a after it was closed" : "used a"); }
+    @PreDestroy void close() { closed = true; Log.add("a closed"); }
+}
+@Singleton
+class ZConsumer {
+    private final io.micronaut.context.BeanContext context;
+    private AProvider provider;
+    ZConsumer(io.micronaut.context.BeanContext context) { this.context = context; }
+    void start() {
+        io.micronaut.context.BeanRegistration<AProvider> registration = context.getBeanRegistration(AProvider.class, null);
+        provider = registration.getBean();
+        RECORD
+    }
+    @PreDestroy void close() { provider.use(); Log.add("z closed"); }
+}
+'''
+
+    static final String RECORD_ONCE = 'context.registerDependency(context.findBeanRegistration(this).get(), registration);'
+
     void "field injected dependency #dependency outlives dependent #dependent"() {
         given:
         ApplicationContext ctx = buildContext(HEADER + """
@@ -322,6 +349,116 @@ class Gamma {
 
         then: "the cycle is broken at Beta, the first bean on the cycle, so Aardvark still outlives it"
         log.EVENTS == ['beta', 'aardvark', 'gamma']
+    }
+
+
+    void "a dependency resolved at runtime is invisible to the destruction order"() {
+        given: "a consumer that resolves its provider itself, so that no definition declares the dependency"
+        ApplicationContext ctx = buildContext(HEADER + RUNTIME_DEPENDENCY.replace('RECORD', ''))
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass("test.ZConsumer")).start()
+
+        expect: "the consumer declares no dependency on the provider"
+        ctx.getBeanDefinition(ctx.classLoader.loadClass("test.ZConsumer")).requiredComponents
+                .every { !it.name.startsWith('test.') }
+
+        when:
+        ctx.close()
+
+        then: "the provider is destroyed first, in bean name order, and the consumer closes over a closed bean"
+        log.EVENTS == ['a closed', 'used a after it was closed', 'z closed']
+    }
+
+    void "a dependency recorded at runtime outlives its dependent"() {
+        given:
+        ApplicationContext ctx = buildContext(HEADER + RUNTIME_DEPENDENCY.replace('RECORD', RECORD_ONCE))
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass("test.ZConsumer")).start()
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS == ['used a', 'z closed', 'a closed']
+    }
+
+    void "recording the same dependency repeatedly is allowed"() {
+        given:
+        ApplicationContext ctx = buildContext(HEADER + RUNTIME_DEPENDENCY.replace('RECORD', RECORD_ONCE))
+        def log = ctx.classLoader.loadClass('test.Log')
+        def consumer = ctx.getBean(ctx.classLoader.loadClass("test.ZConsumer"))
+        3.times { consumer.start() }
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS == ['used a', 'z closed', 'a closed']
+    }
+
+    void "the singletons of a prototype recorded at runtime outlive its dependent"() {
+        given: "a consumer that resolves a prototype, the only bean holding the provider"
+        ApplicationContext ctx = buildContext(HEADER + '''
+@Singleton
+class AProvider {
+    private boolean closed;
+    void use() { Log.add(closed ? "used a after it was closed" : "used a"); }
+    @PreDestroy void close() { closed = true; Log.add("a closed"); }
+}
+@io.micronaut.context.annotation.Prototype
+class Task {
+    final AProvider provider;
+    Task(AProvider provider) { this.provider = provider; }
+}
+@Singleton
+class ZConsumer {
+    private final io.micronaut.context.BeanContext context;
+    private Task task;
+    ZConsumer(io.micronaut.context.BeanContext context) { this.context = context; }
+    void start() {
+        io.micronaut.context.BeanRegistration<Task> registration = context.getBeanRegistration(Task.class, null);
+        task = registration.getBean();
+        context.registerDependency(context.findBeanRegistration(this).get(), registration);
+    }
+    @PreDestroy void close() { task.provider.use(); Log.add("z closed"); }
+}
+''')
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass("test.ZConsumer")).start()
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS == ['used a', 'z closed', 'a closed']
+    }
+
+    void "a cycle between a recorded dependency and an injected one is still destroyed"() {
+        given:
+        ApplicationContext ctx = buildContext(HEADER + '''
+@Singleton
+class Aardvark {
+    @Inject Zebra zebra;
+    @PreDestroy void close() { Log.add("aardvark"); }
+}
+@Singleton
+class Zebra {
+    private final io.micronaut.context.BeanContext context;
+    Zebra(io.micronaut.context.BeanContext context) { this.context = context; }
+    void start() {
+        context.registerDependency(context.findBeanRegistration(this).get(), context.getBeanRegistration(Aardvark.class, null));
+    }
+    @PreDestroy void close() { Log.add("zebra"); }
+}
+''')
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass("test.Zebra")).start()
+
+        when:
+        ctx.close()
+
+        then: "the cycle is broken at the first bean on it in name order, as it is for declared dependencies"
+        log.EVENTS == ['aardvark', 'zebra']
     }
 
     void "@Order on @EventListener methods orders ShutdownEvent listeners"() {

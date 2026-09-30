@@ -245,6 +245,30 @@ public interface BeanContext extends
     <T> void destroyBean(BeanRegistration<T> beanRegistration);
 
     /**
+     * Records that one created bean requires another, so that the required bean is destroyed after the bean that
+     * requires it.
+     *
+     * <p>The context orders the destruction of the beans it holds by the dependencies a {@link io.micronaut.inject.BeanDefinition}
+     * declares: its constructor arguments, its injection points and {@link io.micronaut.context.annotation.DependsOn}.
+     * A bean a dependent resolves for itself while the application runs, through {@link BeanLocator#getBean(Class)} say,
+     * is declared nowhere and is therefore invisible to that order; it may be destroyed before the bean using it, which
+     * then runs its own destruction logic against an instance that is already closed. Recording the dependency here
+     * puts the pair in the same order an injection point would have.</p>
+     *
+     * <p>Calling this repeatedly for the same pair, and from several threads, is allowed. Neither bean is kept alive by
+     * the record. A dependency that cannot be honoured, because it is part of a cycle, is broken the same way a cycle
+     * between declared dependencies is.</p>
+     *
+     * @param dependent The registration of the bean that requires the other, as returned by
+     *                  {@link BeanLocator#getBeanRegistration(Class)} or {@link BeanRegistration#of}
+     * @param required  The registration of the bean that has to outlive it
+     * @since 5.3.0
+     */
+    default void registerDependency(BeanRegistration<?> dependent, BeanRegistration<?> required) {
+        // a context that does not order destruction has nothing to record
+    }
+
+    /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
      *
      * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
