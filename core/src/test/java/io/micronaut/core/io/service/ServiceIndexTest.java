@@ -1,6 +1,7 @@
 package io.micronaut.core.io.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -254,6 +255,9 @@ public class ServiceIndexTest {
             ServiceIndex index = ServiceIndexBuilder.build(classLoader, List.of(SERVICE, OTHER_SERVICE, MISSING_SERVICE));
 
             assertEquals(asLists(MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader)), asLists(index.micronautServices()));
+            // the scan did find the entries of META-INF/micronaut
+            assertFalse(index.micronautServices().get(SERVICE).isEmpty());
+            assertFalse(index.micronautServices().get(BEANS).isEmpty());
             assertEquals(List.of(), index.standardServices().get(MISSING_SERVICE));
             Set<String> types = new LinkedHashSet<>(index.standardServices().keySet());
             types.addAll(index.micronautServices().keySet());
@@ -305,18 +309,35 @@ public class ServiceIndexTest {
 
     private Path jar(String name, Map<String, String> files, List<String> entries) throws IOException {
         Path jar = tempDir.resolve(name);
+        Set<String> directories = new LinkedHashSet<>();
         try (OutputStream out = Files.newOutputStream(jar); ZipOutputStream zip = new ZipOutputStream(out)) {
             for (Map.Entry<String, String> file : new TreeMap<>(files).entrySet()) {
+                putDirectories(zip, file.getKey(), directories);
                 zip.putNextEntry(new ZipEntry(file.getKey()));
                 zip.write(file.getValue().getBytes(StandardCharsets.UTF_8));
                 zip.closeEntry();
             }
             for (String entry : entries) {
+                putDirectories(zip, entry, directories);
                 zip.putNextEntry(new ZipEntry(entry));
                 zip.closeEntry();
             }
         }
         return jar;
+    }
+
+    /**
+     * Writes the entries of the directories of an entry, as the tools that build JARs do. Without the entry of
+     * {@code META-INF/micronaut/}, a class loader does not find that directory, and the scan finds none of its services.
+     */
+    private static void putDirectories(ZipOutputStream zip, String entry, Set<String> directories) throws IOException {
+        for (int slash = entry.indexOf('/'); slash != -1; slash = entry.indexOf('/', slash + 1)) {
+            String directory = entry.substring(0, slash + 1);
+            if (directories.add(directory)) {
+                zip.putNextEntry(new ZipEntry(directory));
+                zip.closeEntry();
+            }
+        }
     }
 
     public interface Greeter {
