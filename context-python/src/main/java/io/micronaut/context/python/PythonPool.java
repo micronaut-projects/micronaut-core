@@ -179,13 +179,20 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * soonest, the keyed read does almost nothing per request and keeps gaining. So there
      * is no one right answer, and this picks the best compromise rather than any peak. Of
      * the sizes measured, 6 is the only one within 25% of every scenario's own best, and it
-     * is what {@code processors / 2} yields on that machine. The cap is what keeps a
-     * many-core machine from adopting the light workload's preference at the heavy
-     * workload's expense.
+     * is what {@code processors / 2} yields on that machine.
      *
      * <p>Choosing 6 over 8 rests on the paged read falling away between them, so that pair was
      * measured twice: 2,205 and 2,193 at 6 against 1,609 and 1,437 at 8. The fall is real and
      * steeper than one run suggested.
+     *
+     * <p>Which is also the limit of what the cap can do. From sixteen processors up the default
+     * is 8, and 8 is where the paged read measured 1,609 and 1,437 against about 2,200 at 6 --
+     * so on a larger machine the heavier workload sits 27% to 35% below its own best. That is not
+     * a reason to lower the cap on this evidence: the same table has the keyed read still gaining
+     * at 12, so a lower cap would move the shortfall onto the lighter workload rather than remove
+     * it. Which way it should go depends on whether the peak travels with the core count or stays
+     * near an absolute number, and one machine cannot say. A workload of either shape on a large
+     * machine should set {@code micronaut.python.pool.size} and measure.
      *
      * <p>One machine, one application, and one run per point except that pair: the shape --
      * small, capped, not linear in core count -- is better supported than the constant, and
