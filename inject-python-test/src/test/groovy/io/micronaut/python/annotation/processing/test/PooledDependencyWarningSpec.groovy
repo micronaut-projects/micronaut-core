@@ -63,4 +63,36 @@ class Pooled:
         cleanup:
         context?.close()
     }
+
+    void "a pooled class constructed with a singleton Python dependency works at runtime"() {
+        given: "the warned shape, which has to keep working: it is what a route module does today"
+        def python = '''
+from jakarta.inject import Singleton
+from micronaut.context.python.scope import ContextPooled
+
+@Singleton
+class Greeter:
+    def greeting(self) -> str:
+        return "hello"
+
+@ContextPooled
+class Greeting:
+    def __init__(self, greeter: Greeter):
+        self.greeter = greeter
+
+    def greet(self, name: str) -> str:
+        return self.greeter.greeting() + " " + name
+'''
+        def context = buildContext(python, true, ["micronaut.python.pool.size": 4])
+        def bean = context.getBean(context.classLoader.loadClass("python.Greeting"))
+
+        when: "called often enough that contexts other than the singleton's serve it"
+        def results = (1..40).collect { bean.greet("world") }.toSet()
+
+        then: "the singleton is passed as its wrapper rather than rebuilt, so the call reaches it"
+        results == ["hello world"] as Set
+
+        cleanup:
+        context?.close()
+    }
 }

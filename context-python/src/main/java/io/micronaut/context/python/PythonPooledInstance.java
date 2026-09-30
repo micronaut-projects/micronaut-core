@@ -223,7 +223,7 @@ public final class PythonPooledInstance {
         }
         Value type = PythonContextRuntime.findClass(reference, context);
         Value created = type.canInstantiate()
-            ? type.newInstance(PythonCoercion.coerceArgumentsToContext(context, constructorArguments))
+            ? type.newInstance(PythonCoercion.coerceDependenciesToContext(context, constructorArguments))
             : type;
         attachOwner(created);
         synchronized (instances) {
