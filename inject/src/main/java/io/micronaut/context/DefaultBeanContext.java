@@ -211,6 +211,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final Map<BeanKey, CollectionHolder> singletonBeanRegistrations = new ConcurrentHashMap<>(50);
 
+    private final ProxyTargetDependents proxyTargetDependents = new ProxyTargetDependents();
+
     private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache =
         new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
@@ -497,6 +499,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanConcreteCandidateCache.clear();
             beanCandidateCache.clear();
             beanProxyTargetCache.clear();
+            proxyTargetDependents.clear();
             containsBeanCache.clear();
             indexExhaustiveCache.clear();
             beanConfigurations.clear();
@@ -1430,11 +1433,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     if (destroyed.contains(interceptedTarget)) {
                         return;
                     }
+                    // the target is destroyed with the dependents created with it; those of the proxy went above
                     destroyBean(BeanRegistration.of(this,
                         new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
                         proxyTargetBeanDefinition,
                         interceptedTarget,
-                        registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
+                        interceptedTarget == null ? null : proxyTargetDependents.remove(interceptedTarget)
                     ));
                     interceptedProxy.clearCachedInterceptedTarget();
                 }
@@ -1650,6 +1654,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (registration.bean == null) {
             // let the customizer decide what a null target becomes, as bean lookup does
             registration = resolveNullBeanRegistration(beanType, beanType, registration);
+        }
+        if (registration.bean != null
+            && registration instanceof BeanDisposingRegistration<T> disposingRegistration
+            && !registration.beanDefinition.isSingleton()) {
+            // the proxy keeps the target and not its registration: remember what was created with the target,
+            // so that it is destroyed with the target when the proxy is
+            List<BeanRegistration<?>> dependents = disposingRegistration.getDependents();
+            if (dependents != null && !dependents.isEmpty()) {
+                proxyTargetDependents.put(registration.bean, dependents);
+            }
         }
         return registration.bean;
     }

@@ -23,6 +23,8 @@ class DestroyDependentBeanSpec extends Specification {
         PrototypeBean.destroyed = 0
         NestedDependency.destroyed = 0
         LifeCycleBean.stopped = 0
+        TrackedDependency.CREATED.clear()
+        TrackedDependency.DESTROYED.clear()
     }
 
     void "a scoped proxy destroyed as a dependent leaves the bean of the scope alive"() {
@@ -168,6 +170,26 @@ class DestroyDependentBeanSpec extends Specification {
 
         then:
         NestedDependency.destroyed == 1
+    }
+
+    void "a lazy proxy with a cached target is destroyed with its own dependent and the target's, each once"() {
+        given:
+        def resolved = resolveAsDependent(CachedLazyBean)
+        TrackedDependency ofTarget = resolved.bean.dependency()
+
+        expect: "one dependent was created with the proxy and another with its target"
+        TrackedDependency.CREATED.size() == 2
+        !TrackedDependency.CREATED[0].is(TrackedDependency.CREATED[1])
+        TrackedDependency.CREATED[1].is(ofTarget)
+
+        when:
+        context.destroyDependentBean(resolved.registration)
+        context.destroyDependentBean(resolved.registration)
+
+        then:
+        TrackedDependency.DESTROYED.size() == 2
+        TrackedDependency.DESTROYED.any { it.is(TrackedDependency.CREATED[0]) }
+        TrackedDependency.DESTROYED.any { it.is(TrackedDependency.CREATED[1]) }
     }
 
     void "a context that does not implement it refuses rather than destroy the registration in its own right"() {
