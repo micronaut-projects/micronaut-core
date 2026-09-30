@@ -28,6 +28,12 @@ import jdk.jfr.FlightRecorder;
  * Every way of starting a recording ({@code -XX:StartFlightRecording}, {@code jcmd JFR.start},
  * {@code new Recording()}, {@code RecordingStream}, the MXBean) creates the Flight Recorder
  * first.
+ * <p>
+ * The event classes are therefore initialized, and their event types registered with JFR, by the
+ * first request or carrier task that starts after a Flight Recorder exists. Until then
+ * {@link FlightRecorder#getEventTypes()} does not list them, even if requests were served before.
+ * A recording that enables an event by name before its type is registered still gets the events,
+ * because JFR applies the settings of a recording to an event type when the type is registered.
  *
  * @author Álvaro Sánchez-Mariscal
  * @since 5.3.0
