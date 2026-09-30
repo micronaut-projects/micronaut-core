@@ -154,10 +154,11 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                         ScheduledExecution execution = new ScheduledExecution(method, finalAnnotationValue);
                         // created for this invocation alone, so the method receives the execution of this call
                         executable.supply(arguments, execution);
-                        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty()
-                            .plus(execution)
-                            .propagate()) {
-                            method.invoke(bean, arguments);
+                        try {
+                            // a block, so that it is the Runnable overload: the result of the method is not used
+                            PropagatedContext.getOrEmpty().plus(execution).propagate(() -> {
+                                method.invoke(bean, arguments);
+                            });
                         } catch (Throwable e) {
                             handleException(beanDefinition.getBeanType(), bean, e);
                         }

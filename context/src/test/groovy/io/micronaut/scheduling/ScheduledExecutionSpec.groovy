@@ -97,6 +97,23 @@ class ScheduledExecutionSpec extends Specification {
         context.close()
     }
 
+    void 'the execution is gone after a call that throws'() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+            'spec.name': 'ScheduledExecutionSpec.throwing',
+            'micronaut.executors.single.type': 'scheduled',
+            'micronaut.executors.single.core-pool-size': 1)
+        ThrowsOnSingleThread task = context.getBean(ThrowsOnSingleThread)
+
+        expect:
+        new PollingConditions(timeout: 10).eventually {
+            task.seen == [during: true, afterOnTheSameThread: false]
+        }
+
+        cleanup:
+        context.close()
+    }
+
     void 'a call the application makes has no current execution'() {
         given:
         ApplicationContext context = ApplicationContext.run('spec.name': 'ScheduledExecutionSpec')
@@ -210,6 +227,28 @@ class ScheduledExecutionSpec extends Specification {
             if (execution.is(ScheduledExecution.current().orElse(null))) {
                 initialDelays.add(execution.schedule().stringValue('initialDelay').orElse(''))
             }
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledExecutionSpec.throwing')
+    static class ThrowsOnSingleThread {
+
+        final Map<String, Boolean> seen = new ConcurrentHashMap<>()
+        private final ScheduledExecutorService scheduler
+
+        ThrowsOnSingleThread(@Named('single') ExecutorService scheduler) {
+            this.scheduler = (ScheduledExecutorService) scheduler
+        }
+
+        @Scheduled(initialDelay = '10ms', scheduler = 'single')
+        void run() {
+            seen.during = ScheduledExecution.current().isPresent()
+            // the scheduler has a single thread, so this runs on it once this call has thrown
+            scheduler.schedule({
+                seen.afterOnTheSameThread = ScheduledExecution.current().isPresent()
+            } as Runnable, 1, TimeUnit.MILLISECONDS)
+            throw new IllegalStateException('thrown by the scheduled method')
         }
     }
 }
