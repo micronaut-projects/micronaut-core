@@ -38,10 +38,12 @@ import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.nio.channels.ClosedChannelException;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -97,6 +99,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * complete. Used for HTTP pipelining.
      */
     private boolean outgoingInFlight;
+
+    /**
+     * Whether the channel is closed or this handler removed, so that queued and further messages are discarded.
+     */
+    private boolean outgoingDiscarded;
 
     /**
      * @param inClass  The in class
@@ -351,7 +358,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
             receivedOutMessage(ctx);
             outgoing.add(new Outgoing<>((Out) msg, promise));
-            proceedWriteOutgoing(ctx);
+            if (outgoingDiscarded) {
+                discardOutgoing();
+            } else {
+                proceedWriteOutgoing(ctx);
+            }
 
         } else if (msg instanceof LastHttpContent) {
 
@@ -366,6 +377,59 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
         proceedWriteOutgoing(ctx);
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        outgoingDiscarded = true;
+        discardOutgoing();
+        super.channelInactive(ctx);
+    }
+
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        outgoingDiscarded = true;
+        discardOutgoing();
+        super.handlerRemoved(ctx);
+    }
+
+    /**
+     * Discard the messages that are queued behind the message being written. Their bodies may already hold
+     * buffers, which are released: the body is consumed and every item released.
+     */
+    private void discardOutgoing() {
+        Outgoing<Out> out;
+        while ((out = outgoing.poll()) != null) {
+            Out message = out.message;
+            if (message instanceof StreamedHttpMessage) {
+                ((StreamedHttpMessage) message).subscribe(new Subscriber<HttpContent>() {
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        s.request(Long.MAX_VALUE);
+                    }
+
+                    @Override
+                    public void onNext(HttpContent httpContent) {
+                        ReferenceCountUtil.release(httpContent);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        // discarded
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        // discarded
+                    }
+                });
+            } else {
+                ReferenceCountUtil.release(message);
+            }
+            if (!out.promise.isVoid()) {
+                out.promise.tryFailure(new ClosedChannelException());
+            }
+        }
     }
 
     private void proceedWriteOutgoing(ChannelHandlerContext ctx) {
