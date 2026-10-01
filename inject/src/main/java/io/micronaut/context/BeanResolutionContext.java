@@ -28,6 +28,8 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.proxy.InterceptedBean;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -165,6 +167,38 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 5.3.0
      */
     default void prepareProxyTarget(BeanDefinition<?> definition, List<?> registrations) {
+    }
+
+    /**
+     * Captures the complete lifecycle candidate set before a generated definition initializes its bean.
+     * Retains construction candidates or reuses the candidates held by the proxy, including an empty result.
+     * Destruction-only targets can reuse advice borrowed from their owning proxy without changing the
+     * candidates used for target initialization.
+     *
+     * @param definition The definition being instantiated
+     * @param bean The constructed instance
+     * @param interceptorType The interceptor argument, supplied by AOP to avoid an inject dependency on AOP
+     * @param initialization Whether post-construct interception needs its own candidates
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default void captureBeanInterceptors(BeanDefinition<?> definition, @Nullable Object bean,
+                                         Argument<?> interceptorType, boolean initialization) {
+        if (bean == null || getBeanInterceptors(definition) != null) {
+            return;
+        }
+        if (!initialization) {
+            List<?> destructionCandidates = getBeanDestructionInterceptors(definition);
+            if (destructionCandidates != null) {
+                setBeanInterceptors(definition, destructionCandidates);
+                return;
+            }
+        }
+        List<?> candidates = bean instanceof InterceptedBean proxy
+            ? proxy.$interceptorRegistrations()
+            : List.copyOf(getInterceptorRegistrations(
+                interceptorType, Qualifiers.byInterceptorBinding(definition.getAnnotationMetadata())));
+        setBeanInterceptors(definition, candidates);
     }
 
     /**

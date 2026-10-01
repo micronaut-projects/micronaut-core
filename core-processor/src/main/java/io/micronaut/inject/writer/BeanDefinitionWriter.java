@@ -15,9 +15,9 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.beandefinition.DisposableIntercepted;
 import io.micronaut.aop.beandefinition.InitializableIntercepted;
-import io.micronaut.aop.beandefinition.LifecycleInterceptorRegistrations;
 import io.micronaut.aop.beandefinition.ParameterizedInterceptedBeanDefinition;
 import io.micronaut.aop.beandefinition.ProxyInterceptedBeanDefinition;
 import io.micronaut.aop.beandefinition.ParameterizedProxyBeanDefinition;
@@ -243,7 +243,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final String ARGUMENT_MEMBER = "argument";
 
     private static final Method CAPTURE_LIFECYCLE_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
-        LifecycleInterceptorRegistrations.class, "capture", BeanResolutionContext.class, BeanDefinition.class, Object.class, boolean.class);
+        BeanResolutionContext.class, "captureBeanInterceptors", BeanDefinition.class, Object.class, Argument.class, boolean.class);
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method INJECT_BEAN_METHOD =
@@ -1946,8 +1946,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return beanInstance.newLocal("instance", instanceVar -> {
             List<StatementDef> statements = new ArrayList<>();
             if (needsInterceptorCandidates) {
-                statements.add(ClassTypeDef.of(LifecycleInterceptorRegistrations.class).invokeStatic(
-                    CAPTURE_LIFECYCLE_INTERCEPTORS, methodParameters.get(0), aThis, instanceVar, ExpressionDef.constant(isPostConstructIntercepted())
+                statements.add(methodParameters.get(0).invoke(
+                    CAPTURE_LIFECYCLE_INTERCEPTORS, aThis, instanceVar,
+                    ClassTypeDef.of(Interceptor.class).getStaticField("ARGUMENT", TypeDef.of(Argument.class)),
+                    ExpressionDef.constant(isPostConstructIntercepted())
                 ));
             }
             if (needsInjectMethod) {
