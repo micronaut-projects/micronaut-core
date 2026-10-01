@@ -90,6 +90,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -130,6 +131,10 @@ public final class AnnotationMetadataSupport {
         }
     };
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
+    /**
+     * The names of the annotation types registered by this class itself, before any generated code ran.
+     */
+    private static final Set<String> CORE_ANNOTATION_TYPES;
 
     /**
      * The annotation default values provider.
@@ -187,6 +192,7 @@ public final class AnnotationMetadataSupport {
                 Factory.class).forEach(ann ->
                 ANNOTATION_TYPES.put(ann.getName(), ann)
         );
+        CORE_ANNOTATION_TYPES = Set.copyOf(ANNOTATION_TYPES.keySet());
 
         Map<String, Map<CharSequence, Object>> coreAnnotationsDefaults = new HashMap<>(100);
         coreAnnotationsDefaults.put(
@@ -448,6 +454,20 @@ public final class AnnotationMetadataSupport {
             return Optional.of(type);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether an annotation type is one this class registers itself, whatever ran in the JVM. Code generation
+     * consults this rather than {@link #getRegisteredAnnotationType(String)}: the types registered at runtime
+     * depend on what the JVM ran before, and a compiler embedded in a running application, as in development
+     * mode, would otherwise write different classes for the same sources.
+     *
+     * @param name The name of the annotation type
+     * @return True if the type is registered statically
+     * @since 5.3.0
+     */
+    static boolean isCoreAnnotationType(String name) {
+        return CORE_ANNOTATION_TYPES.contains(name);
     }
 
     /**
