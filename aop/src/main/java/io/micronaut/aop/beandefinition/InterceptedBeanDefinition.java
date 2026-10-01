@@ -16,7 +16,7 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.ConstructorInterceptorChain;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
@@ -96,12 +96,11 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         if (interceptors != null) {
             resolutionContext.setBeanInterceptors(this, interceptors);
         }
-        return ConstructorInterceptorChain.instantiate(
+        return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
             resolutionContext,
-            context,
-            interceptors,
             this,
             constructor,
+            interceptors,
             0,
             values
         );

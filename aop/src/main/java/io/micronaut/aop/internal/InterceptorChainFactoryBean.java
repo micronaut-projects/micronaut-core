@@ -16,6 +16,7 @@
 package io.micronaut.aop.internal;
 
 import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.chain.DefaultInterceptorChainFactory;
 import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
@@ -49,12 +50,12 @@ public final class InterceptorChainFactoryBean implements InstantiatableBeanDefi
 
     @Override
     public Class<?>[] getIndexes() {
-        return new Class[]{InterceptorChainFactory.class};
+        return new Class[]{InterceptorChainFactory.class, DefaultInterceptorChainFactory.class};
     }
 
     @Override
     public Set<Class<?>> getExposedTypes() {
-        return Set.of(InterceptorChainFactory.class);
+        return Set.of(InterceptorChainFactory.class, DefaultInterceptorChainFactory.class);
     }
 
     @Override
@@ -119,7 +120,7 @@ public final class InterceptorChainFactoryBean implements InstantiatableBeanDefi
 
     @Override
     public InterceptorChainFactory instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
-        return new InterceptorChainFactory(resolutionContext.getBean(InterceptorRegistry.ARGUMENT));
+        return new DefaultInterceptorChainFactory(resolutionContext.getBean(InterceptorRegistry.ARGUMENT));
     }
 
     @Override

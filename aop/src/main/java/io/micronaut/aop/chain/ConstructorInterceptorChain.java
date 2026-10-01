@@ -78,7 +78,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @param additionalInterceptorParametersCount The additional interceptor parameters count
      */
     @UsedByGeneratedCode
-    ConstructorInterceptorChain(
+    public ConstructorInterceptorChain(
         BeanDefinition<T> beanDefinition,
         BeanConstructor<T> beanConstructor,
         Interceptor<T, T>[] interceptors,
@@ -192,12 +192,19 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         int additionalProxyConstructorParametersCount,
         @Nullable Object... parameters) {
 
-        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).build(
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
             resolutionContext, definition, constructor, interceptors, additionalProxyConstructorParametersCount, parameters
-        ).instantiate();
+        );
     }
 
-    private T instantiate() {
+    /**
+     * Executes construction advice, preserving the distinction between constructor-body and advice failures.
+     * Unlike {@link #proceed()}, this entry point carries advice failures to the bean creation boundary and
+     * rejects a null construction result even when no advice matches.
+     * @return The constructed bean
+     * @since 5.3.0
+     */
+    public T instantiate() {
         T bean;
         try {
             bean = proceed();

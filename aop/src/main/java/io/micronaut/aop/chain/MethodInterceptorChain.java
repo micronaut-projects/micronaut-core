@@ -80,7 +80,16 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         this(interceptors, target, executionHandle, kind, EMPTY_OBJECT_ARRAY);
     }
 
-    MethodInterceptorChain(
+    /**
+     * Creates an invocation with an explicit kind and arguments.
+     * @param interceptors The selected interceptors
+     * @param target The invocation target
+     * @param executionHandle The executable method
+     * @param kind The interception kind
+     * @param originalParameters The invocation arguments
+     * @since 5.3.0
+     */
+    public MethodInterceptorChain(
         Interceptor<T, R>[] interceptors,
         T target,
         ExecutableMethod<T, R> executionHandle,
@@ -149,8 +158,14 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         }
     }
 
+    /**
+     * Executes a lifecycle invocation, preserving nullable unadvised results and rejecting null advice results.
+     * @param definition The lifecycle owner
+     * @return The invocation result
+     * @since 5.3.0
+     */
     @Nullable
-    private R proceedLifecycle(BeanDefinition<T> definition) {
+    public R proceedLifecycle(BeanDefinition<T> definition) {
         if (interceptorCount == 0) {
             return executionHandle.invoke(target);
         }
@@ -248,14 +263,11 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).build(
-            resolutionContext,
-            definition,
-            postConstructMethod,
-            bean,
-            InterceptorKind.POST_CONSTRUCT,
-            interceptors
-        ).proceedLifecycle(definition);
+        // Older generated callers use an empty explicit set to request discovery.
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).initialize(
+            resolutionContext, definition, postConstructMethod, bean,
+            interceptors == null || interceptors.isEmpty() ? null : interceptors
+        );
     }
 
     /**
@@ -290,8 +302,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * Variant of {@link #dispose(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object)} that
      * reuses registrations already resolved for this bean.
      *
-     * <p>Explicit registrations take precedence over the candidates retained on the destruction context.
-     * Callers without either use the compatibility resolution path.</p>
+     * <p>Non-empty explicit registrations take precedence over candidates retained on the destruction context.
+     * Null or empty explicit registrations preserve legacy discovery behavior; an empty retained set is authoritative.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext       The bean context
@@ -313,13 +325,10 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).build(
-            resolutionContext,
-            definition,
-            preDestroyMethod,
-            bean,
-            InterceptorKind.PRE_DESTROY,
-            interceptors
-        ).proceedLifecycle(definition);
+        // Older generated callers use an empty explicit set to request discovery.
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).dispose(
+            resolutionContext, definition, preDestroyMethod, bean,
+            interceptors == null || interceptors.isEmpty() ? null : interceptors
+        );
     }
 }
