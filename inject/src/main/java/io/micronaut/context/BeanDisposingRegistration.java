@@ -199,7 +199,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                 // closed, or being destroyed: nothing becomes the bean's any more
                 return null;
             }
-            S selection = getDependencies().resolve((DefaultBeanContext) beanContext, getBeanDefinition(), selector::apply);
+            S selection = getDependencies().resolve((DefaultBeanContext) beanContext, getBeanDefinition(), selector);
             keptSelection = new KeptSelection(key, selection);
             return selection;
         }
