@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.test
+package io.micronaut.inject.writer
 
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -25,7 +26,6 @@ import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.AnnotationMetadataSupport
-import io.micronaut.inject.writer.BeanDefinitionDescriptor
 
 import java.lang.reflect.Field
 
@@ -57,7 +57,7 @@ class BeanDefinitionDescriptors {
     /**
      * The directory of the entries.
      */
-    static final String ENTRIES = "META-INF/micronaut/" + BeanDefinitionReference.name + "/"
+    private static final String ENTRIES = "META-INF/micronaut/" + BeanDefinitionReference.name + "/"
 
     private static final Map<String, Integer> FLAGS = [
         CONTEXT_SCOPE             : FLAG_CONTEXT_SCOPE,
@@ -140,6 +140,7 @@ class BeanDefinitionDescriptors {
      * @param name The name of the definition
      * @return The content, or {@code null} if there is no entry
      */
+    @PackageScope
     static byte[] read(ClassLoader classLoader, String name) {
         URL entry = classLoader.getResource(ENTRIES + name)
         return entry == null ? null : entry.bytes
@@ -153,6 +154,7 @@ class BeanDefinitionDescriptors {
      * @return The reference, or {@code null} if its class does not load or did not initialise, in which case
      * it answers for nothing
      */
+    @PackageScope
     static BeanDefinitionReference<?> load(ClassLoader classLoader, String name) {
         try {
             def reference = (BeanDefinitionReference<?>) classLoader.loadClass(name).getDeclaredConstructor().newInstance()
@@ -169,7 +171,7 @@ class BeanDefinitionDescriptors {
      * @param reference The reference it describes
      * @return The differences, empty if they agree
      */
-    static List<String> differences(BeanDefinitionDescriptor descriptor, BeanDefinitionReference<?> reference) {
+    private static List<String> differences(BeanDefinitionDescriptor descriptor, BeanDefinitionReference<?> reference) {
         List<String> differences = []
         Closure<Void> check = { String what, Object described, Object answered ->
             if (described != answered) {
@@ -232,7 +234,7 @@ class BeanDefinitionDescriptors {
      * @param reference The reference
      * @return The combination of the flags of a descriptor
      */
-    static int flags(BeanDefinitionReference<?> reference) {
+    private static int flags(BeanDefinitionReference<?> reference) {
         Object[] postLoadConditions = (Object[]) field(reference, "postLoadConditions")
         return (reference.isContextScope() ? FLAG_CONTEXT_SCOPE : 0) |
             (reference.isParallel() ? FLAG_PARALLEL : 0) |
@@ -252,7 +254,7 @@ class BeanDefinitionDescriptors {
      * @param flags The flags
      * @return Their names
      */
-    static List<String> flagNames(int flags) {
+    private static List<String> flagNames(int flags) {
         FLAGS.findAll { (flags & it.value) != 0 }.keySet().toList()
     }
 
@@ -262,7 +264,7 @@ class BeanDefinitionDescriptors {
      * @param type The type
      * @return The name
      */
-    static String typeName(Class<?> type) {
+    private static String typeName(Class<?> type) {
         type.isArray() ? typeName(type.componentType) + "[]" : type.name
     }
 
@@ -273,7 +275,7 @@ class BeanDefinitionDescriptors {
      * @param value The value
      * @return The value in a shape that compares by content
      */
-    static Object shape(Object value) {
+    private static Object shape(Object value) {
         if (value instanceof AnnotationValue) {
             Map<String, Object> values = [:]
             for (Map.Entry<CharSequence, Object> member : ((AnnotationValue<?>) value).getValues().entrySet()) {

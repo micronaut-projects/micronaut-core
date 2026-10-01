@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.processing.definition;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.ObjectDef;
 import org.jspecify.annotations.Nullable;
@@ -33,7 +34,21 @@ import org.jspecify.annotations.Nullable;
 public record OutputObjectDef(ObjectDef objectDef,
                               @Nullable Class<?> serviceClass,
                               OriginatingElements originatingElements,
-                              byte @Nullable [] serviceContent) {
+                              @Internal byte @Nullable [] serviceContent) {
+
+    /**
+     * The canonical constructor, which takes the content of the service entry. Internal: the Micronaut processors
+     * create it with that content. Other processors use the three-argument constructor.
+     *
+     * @param objectDef           The generated object definition
+     * @param serviceClass        The service to be registered
+     * @param originatingElements The originating elements
+     * @param serviceContent      The content of the {@code META-INF/micronaut} entry of the service, or {@code null}
+     *                            to leave the entry empty
+     */
+    @Internal
+    public OutputObjectDef {
+    }
 
     /**
      * An object definition whose service entry is empty.

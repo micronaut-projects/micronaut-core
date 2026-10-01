@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.Element;
 
@@ -98,13 +98,16 @@ public interface ClassWriterOutputVisitor {
      * class; the content is what the service keeps about it, and an empty entry is always valid. A visitor that does
      * not write content leaves the entry empty.
      *
+     * <p>Internal: the Micronaut processors call it to write the descriptor of a bean definition. It is not for type
+     * element visitors, which use {@link #visitServiceDescriptor(String, String, Element)}.</p>
+     *
      * @param type               the fully qualified service name
      * @param classname          the fully qualified classname
      * @param originatingElement The originating element
      * @param content            The content of the entry, or {@code null} to leave it empty
      * @since 5.3.0
      */
-    @Experimental
+    @Internal
     default void visitServiceDescriptor(String type, String classname, Element originatingElement, byte @Nullable [] content) {
         visitServiceDescriptor(type, classname, originatingElement);
     }

@@ -252,7 +252,7 @@ class ServiceLoaderFeature implements Feature {
      * @param path The path of the resource
      * @param content The content
      */
-    protected void addResource(String path, byte[] content) {
+    void addResource(String path, byte[] content) {
         RuntimeResourceAccess.addResource(getClass().getClassLoader().getUnnamedModule(), path, content);
     }
 

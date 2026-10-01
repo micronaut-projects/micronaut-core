@@ -114,95 +114,95 @@ import java.util.TreeSet;
  * @since 5.3.0
  */
 @Internal
-public record BeanDefinitionDescriptor(int flags,
-                                       String beanType,
-                                       List<String> exposedTypes,
-                                       List<String> indexes,
-                                       SortedMap<String, Integer> annotations,
-                                       SortedMap<String, String> repeatableContainers,
-                                       List<String> nonBindingMembers,
-                                       List<AnnotationValue<?>> qualifiers,
-                                       List<Condition> preLoadConditions) {
+record BeanDefinitionDescriptor(int flags,
+                                String beanType,
+                                List<String> exposedTypes,
+                                List<String> indexes,
+                                SortedMap<String, Integer> annotations,
+                                SortedMap<String, String> repeatableContainers,
+                                List<String> nonBindingMembers,
+                                List<AnnotationValue<?>> qualifiers,
+                                List<Condition> preLoadConditions) {
 
     /**
      * The first four bytes of a descriptor: {@code MNBD}.
      */
-    public static final int MAGIC = 0x4D4E4244;
+    static final int MAGIC = 0x4D4E4244;
 
     /**
      * The version of the format.
      */
-    public static final int VERSION = 1;
+    static final int VERSION = 1;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isContextScope()}.
      */
-    public static final int FLAG_CONTEXT_SCOPE = 1;
+    static final int FLAG_CONTEXT_SCOPE = 1;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isParallel()}.
      */
-    public static final int FLAG_PARALLEL = 1 << 1;
+    static final int FLAG_PARALLEL = 1 << 1;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isProxiedBean()}.
      */
-    public static final int FLAG_PROXIED_BEAN = 1 << 2;
+    static final int FLAG_PROXIED_BEAN = 1 << 2;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isProxyTarget()}.
      */
-    public static final int FLAG_PROXY_TARGET = 1 << 3;
+    static final int FLAG_PROXY_TARGET = 1 << 3;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isSingleton()}.
      */
-    public static final int FLAG_SINGLETON = 1 << 4;
+    static final int FLAG_SINGLETON = 1 << 4;
 
     /**
      * {@link io.micronaut.inject.BeanType#isPrimary()}.
      */
-    public static final int FLAG_PRIMARY = 1 << 5;
+    static final int FLAG_PRIMARY = 1 << 5;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isConfigurationProperties()}.
      */
-    public static final int FLAG_CONFIGURATION_PROPERTIES = 1 << 6;
+    static final int FLAG_CONFIGURATION_PROPERTIES = 1 << 6;
 
     /**
      * {@link io.micronaut.inject.BeanType#isContainerType()}.
      */
-    public static final int FLAG_CONTAINER_TYPE = 1 << 7;
+    static final int FLAG_CONTAINER_TYPE = 1 << 7;
 
     /**
      * {@link io.micronaut.inject.BeanType#requiresMethodProcessing()}.
      */
-    public static final int FLAG_REQUIRES_METHOD_PROCESSING = 1 << 8;
+    static final int FLAG_REQUIRES_METHOD_PROCESSING = 1 << 8;
 
     /**
      * The bean has conditions that can only be checked once the definition is loaded.
      */
-    public static final int FLAG_POST_LOAD_CONDITIONS = 1 << 9;
+    static final int FLAG_POST_LOAD_CONDITIONS = 1 << 9;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasDeclaredAnnotation(String)}.
      */
-    public static final int MEMBERSHIP_DECLARED_ANNOTATION = 1;
+    static final int MEMBERSHIP_DECLARED_ANNOTATION = 1;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasAnnotation(String)}.
      */
-    public static final int MEMBERSHIP_ANNOTATION = 1 << 1;
+    static final int MEMBERSHIP_ANNOTATION = 1 << 1;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasDeclaredStereotype(String)}.
      */
-    public static final int MEMBERSHIP_DECLARED_STEREOTYPE = 1 << 2;
+    static final int MEMBERSHIP_DECLARED_STEREOTYPE = 1 << 2;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasStereotype(String)}.
      */
-    public static final int MEMBERSHIP_STEREOTYPE = 1 << 3;
+    static final int MEMBERSHIP_STEREOTYPE = 1 << 3;
 
     private static final int HEADER_LENGTH = 10;
     private static final int MAX_COUNT = 0xFFFF;
@@ -239,7 +239,7 @@ public record BeanDefinitionDescriptor(int flags,
      * Copies the collections: the exposed types are a set and are kept sorted, as the names of the maps are, so
      * that the same definition always gives the same bytes.
      */
-    public BeanDefinitionDescriptor {
+    BeanDefinitionDescriptor {
         exposedTypes = List.copyOf(new TreeSet<>(exposedTypes));
         indexes = List.copyOf(indexes);
         annotations = Collections.unmodifiableSortedMap(new TreeMap<>(annotations));
@@ -255,7 +255,7 @@ public record BeanDefinitionDescriptor(int flags,
      * @param flag One of the {@code FLAG_} constants
      * @return Whether the reference answers true for it
      */
-    public boolean is(int flag) {
+    boolean is(int flag) {
         return (flags & flag) != 0;
     }
 
@@ -266,7 +266,7 @@ public record BeanDefinitionDescriptor(int flags,
      * @param membership One of the {@code MEMBERSHIP_} constants
      * @return Whether the annotation metadata of the bean answers true for it
      */
-    public boolean has(String annotation, int membership) {
+    boolean has(String annotation, int membership) {
         Integer memberships = annotations.get(annotation);
         return memberships != null && (memberships & membership) != 0;
     }
@@ -277,7 +277,7 @@ public record BeanDefinitionDescriptor(int flags,
      * @return The content of the entry, or {@code null} if the format cannot describe the definition: the entry
      * is then left empty
      */
-    public byte @Nullable [] toByteArray() {
+    byte @Nullable [] toByteArray() {
         var payload = new ByteArrayOutputStream(512);
         try (var out = new DataOutputStream(payload)) {
             writePayload(out);
@@ -301,7 +301,7 @@ public record BeanDefinitionDescriptor(int flags,
      * @return The descriptor, or {@code null} if the entry has none that this version reads: it is empty, it is
      * not a descriptor, it is of another version, or it has been cut or added to
      */
-    public static @Nullable BeanDefinitionDescriptor read(byte[] content) {
+    static @Nullable BeanDefinitionDescriptor read(byte[] content) {
         if (content.length < HEADER_LENGTH) {
             return null;
         }

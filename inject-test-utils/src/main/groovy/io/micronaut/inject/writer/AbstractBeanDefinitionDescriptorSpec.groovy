@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer
 
+import groovy.transform.PackageScope
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
@@ -39,7 +40,6 @@ import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.micronaut.inject.test.BeanDefinitionDescriptors
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -388,7 +388,8 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
      * @param bean The simple name of a bean class, or of a definition without its suffix
      * @return The descriptor of its definition
      */
-    protected BeanDefinitionDescriptor descriptor(String bean) {
+    @PackageScope
+    BeanDefinitionDescriptor descriptor(String bean) {
         BeanDefinitionDescriptor.read(content('test.$' + bean + '$Definition'))
     }
 
@@ -396,7 +397,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
      * @param beanType The name of a bean type
      * @return The descriptor of the one definition of a bean of that type
      */
-    protected BeanDefinitionDescriptor describedAs(String beanType) {
+    private BeanDefinitionDescriptor describedAs(String beanType) {
         List<BeanDefinitionDescriptor> descriptors = definitions().collect { BeanDefinitionDescriptor.read(content(it)) }.findAll { it?.beanType() == beanType }
         assert descriptors.size() == 1
         return descriptors[0]
@@ -406,21 +407,21 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
      * @param bean The simple name of a bean class
      * @return The flags of the descriptor of its definition
      */
-    protected List<Integer> flags(String bean) {
+    private List<Integer> flags(String bean) {
         flags(descriptor(bean))
     }
 
-    protected List<Integer> flags(BeanDefinitionDescriptor descriptor) {
+    private List<Integer> flags(BeanDefinitionDescriptor descriptor) {
         (0..<Integer.SIZE).collect { 1 << it }.findAll { descriptor.is(it) }
     }
 
-    protected byte[] content(String definition) {
+    private byte[] content(String definition) {
         byte[] content = BeanDefinitionDescriptors.read(classLoader, definition)
         assert content != null
         return content
     }
 
-    protected Class<?> type(String simpleName) {
+    private Class<?> type(String simpleName) {
         classLoader.loadClass('test.' + simpleName)
     }
 

@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -119,6 +120,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
+    @Internal
     @SuppressWarnings("java:S1075")
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement, byte @Nullable [] content) {
         final String path = "META-INF/micronaut/" + type + "/" + classname;

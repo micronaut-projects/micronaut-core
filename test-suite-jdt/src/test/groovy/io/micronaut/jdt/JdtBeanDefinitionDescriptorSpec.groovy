@@ -1,6 +1,6 @@
 package io.micronaut.jdt
 
-import io.micronaut.inject.test.BeanDefinitionDescriptors
+import io.micronaut.inject.writer.BeanDefinitionDescriptors
 import spock.lang.Specification
 
 /**

@@ -1,10 +1,6 @@
 package io.micronaut.inject.writer
 
-import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.JavaParser
-import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.visitor.TypeElementVisitor
-import io.micronaut.inject.visitor.VisitorContext
 import spock.lang.Shared
 import spock.lang.TempDir
 
@@ -51,51 +47,6 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
         expect:
         descriptor.beanType() == 'test.Library'
         descriptor.exposedTypes() == ['test.Library']
-    }
-
-    void "the content a type element visitor gives the entry of a service is written"() {
-        given: "a visitor that adds a service of its own with content"
-        byte[] content = [1, 2, 3]
-        TypeElementVisitor visitor = new TypeElementVisitor<Object, Object>() {
-            @Override
-            TypeElementVisitor.VisitorKind getVisitorKind() {
-                return TypeElementVisitor.VisitorKind.ISOLATING
-            }
-
-            @Override
-            void visitClass(ClassElement element, VisitorContext context) {
-                if (element.simpleName == 'Visited') {
-                    context.visitServiceDescriptor('test.Service', element.name, element, content)
-                }
-            }
-        }
-        JavaParser parser = new JavaParser() {
-            @Override
-            protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
-                return new TypeElementVisitorProcessor() {
-                    @Override
-                    protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-                        return [visitor]
-                    }
-                }
-            }
-        }
-
-        when:
-        JavaFileObject entry = parser.generate('test.Visited', '''
-package test;
-
-@jakarta.inject.Singleton
-class Visited {
-}
-''').find { it.name == CLASS_OUTPUT + 'META-INF/micronaut/test.Service/test.Visited' }
-
-        then:
-        entry != null
-        entry.openInputStream().withCloseable { it.bytes } == content
-
-        cleanup:
-        parser.close()
     }
 
     private static final String BEANS = '''
