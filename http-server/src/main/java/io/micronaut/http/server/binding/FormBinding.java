@@ -87,7 +87,8 @@ import java.util.function.Supplier;
  * {@link FormData} with an argument that reads its field by itself (a {@link FormPart} or a type
  * of {@code io.micronaut.http.multipart}); a {@link FormParts} with any argument that reads a
  * form field (a {@link Part}, a {@link FileUpload}, a {@link FormPart} or a type of
- * {@code io.micronaut.http.multipart}).</p>
+ * {@code io.micronaut.http.multipart}). This is not a compile-time check: when a filter replaces
+ * the body of the request, every argument is bound from the form it set and nothing is refused.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
