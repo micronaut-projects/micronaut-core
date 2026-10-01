@@ -36,7 +36,22 @@ micronaut:
         repeat: 3
 ----
 
-include::{includedir}configurationProperties/io.micronaut.http.server.TrainingWarmupConfiguration.adoc[]
+.Configuration Properties for the training warm-up
+|===
+|Property |Type |Description |Default value
+
+| `+micronaut.application.training.warmup.paths+`
+|java.util.List<java.lang.String>
+|The paths the warm-up sends a GET request to, in order, including the context path if the server has one. A path may carry a query string.
+|none, so no warm-up requests are sent
+
+| `+micronaut.application.training.warmup.repeat+`
+|int
+|How many times the warm-up requests the paths. It must be at least 1.
+|1
+|===
+
+The <<configurationreference#io.micronaut.http.server.TrainingWarmupConfiguration,configuration reference>> lists these properties too.
 
 The warm-up runs once the server has started and listens on its port, after the other api:runtime.server.event.ServerStartupEvent[] listeners, for the server the application runs (not for other servers built with a server factory). It sends each path in order, `repeat` times, with `java.net.HttpURLConnection`, so no HTTP client is needed. `repeat` must be at least 1: a lower value fails the training run, even when no paths are set. The requests go to the configured `micronaut.server.host`, or to the loopback address when no host or a wildcard address such as `0.0.0.0` is set. The paths are sent as they are, so they include the context path if the server has one.
 
