@@ -104,6 +104,12 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         return getDependencies().markDestroyed();
     }
 
+    /**
+     * Returns the dependents using the legacy nullable contract.
+     * @return The dependents, or {@code null} when none are retained
+     * @deprecated Use {@link #dependentBeans()}, which returns an empty list when there are no dependents.
+     */
+    @Deprecated(since = "5.3.0", forRemoval = false)
     @Nullable
     public List<BeanRegistration<?>> getDependents() {
         List<BeanRegistration<?>> dependents = dependentBeans();
@@ -140,14 +146,19 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
-     * Stops resolution and transfers the dependents to the destruction caller exactly once.
-     *
-     * @return The dependents
+     * Clears the interceptor selection retained for this registration.
      */
     synchronized void takeSelection() {
         keptSelection = null;
     }
 
+    /**
+     * Clears the retained interceptor selection and transfers the owned dependents exactly once.
+     * @return The dependents
+     * @deprecated Destruction now uses {@link BeanDependencies#close(DefaultBeanContext)} through
+     * the registration's dependency owner. Retained for compatibility with older callers in this package.
+     */
+    @Deprecated(since = "5.3.0", forRemoval = false)
     synchronized List<BeanRegistration<?>> takeDependents() {
         takeSelection();
         return getDependencies().takeDependents();
