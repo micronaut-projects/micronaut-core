@@ -51,12 +51,22 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
                               @Nullable List<?> interceptorRegistrations) {
+        this(beanContext, identifier, beanDefinition, createdBean, dependents, interceptorRegistrations, new BeanDependencies());
+    }
+
+    BeanDisposingRegistration(BeanContext beanContext,
+                              BeanIdentifier identifier,
+                              BeanDefinition<BT> beanDefinition,
+                              BT createdBean,
+                              @Nullable List<BeanRegistration<?>> dependents,
+                              @Nullable List<?> interceptorRegistrations,
+                              BeanDependencies dependencies) {
         super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         // The resolver is a dependent bean itself. Its registration holds the same ownership state, so normal
         // destruction and shutdown graph traversal need no resolver-specific path.
         this.dependencies = createdBean instanceof DefaultBeanDependencyResolver resolver
-            ? resolver.dependencies : new BeanDependencies();
+            ? resolver.dependencies : dependencies;
         this.dependencies.initialize(dependents, interceptorRegistrations);
         this.interceptorRegistrations = interceptorRegistrations;
     }

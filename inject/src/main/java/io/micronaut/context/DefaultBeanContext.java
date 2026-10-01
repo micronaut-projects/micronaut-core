@@ -115,13 +115,11 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.AbstractMap;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -132,7 +130,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1464,6 +1461,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         BeanDefinition<T> proxyTargetBeanDefinition = findProxyTargetBeanDefinition(registration.beanDefinition)
             .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
         Optional<CustomScope<?>> declaredScope = customScopeRegistry.findDeclaredScope(proxyTargetBeanDefinition);
+        if (registration.bean instanceof InterceptedBeanProxy<?> proxy
+            && proxy.interceptedBeanDependencies() != null) {
+            // The proxy retains the original owner even if the caller only retained the bean instance.
+            // Its prototype target and advice are ordinary dependents; scoped and swapped-in targets are borrowed.
+            try {
+                proxy.interceptedBeanDependencies().close();
+            } finally {
+                proxy.clearCachedInterceptedTarget();
+            }
+            if (!dependent && declaredScope.isPresent()) {
+                CustomScope<?> scope = declaredScope.get();
+                scope.findBeanRegistration(proxyTargetBeanDefinition).ifPresent(target -> scope.remove(target.identifier));
+            }
+            return;
+        }
         List<BeanRegistration<?>> proxyDependents = registration instanceof BeanDisposingRegistration<?> disposingRegistration
             ? disposingRegistration.dependentBeans()
             : null;
@@ -1851,6 +1863,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                  BeanDefinition<T> definition,
                                                                  Argument<T> beanType,
                                                                  @Nullable Qualifier<T> qualifier) {
+        if (resolutionContext instanceof AbstractBeanResolutionContext retained
+            && retained.isLazyProxyTarget() && retained.lazyProxyDependencies != null
+            && definition.booleanValue(AROUND_TYPE, "cacheableLazyTarget").orElse(false)
+            && isUnscoped(definition)) {
+            return retained.lazyProxyDependencies.resolve(this, null, resolution -> {
+                resolution.copyStateFrom(retained);
+                return resolveTargetRegistration(resolution, definition, beanType, qualifier);
+            });
+        }
+        return resolveTargetRegistration(resolutionContext, definition, beanType, qualifier);
+    }
+
+    private <T> BeanRegistration<T> resolveTargetRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                              BeanDefinition<T> definition,
+                                                              Argument<T> beanType,
+                                                              @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> registration = Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier, true));
         if (registration.bean == null) {
             registration = resolveNullBeanRegistration(beanType, beanType, registration);
@@ -3673,61 +3701,66 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 path.pushBeanCreate(definition, resolvedBeanType);
             }
             try {
-                List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
-                BeanRegistration<T> beanRegistration;
+                AbstractBeanResolutionContext creatingContext = context instanceof AbstractBeanResolutionContext creating ? creating : null;
+                BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
+                BeanCreationState creation = creatingContext == null
+                    ? new BeanCreationState(definition, List.of()) : creatingContext.beginCreation(definition);
                 try {
-                    T bean;
-                    if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                        bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                    } else {
-                        throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
-                    }
-                    List<?> interceptorRegistrations = null;
-                    if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                        Object value = registrations.remove(definition);
-                        if (value instanceof List<?> list) {
-                            interceptorRegistrations = list;
+                    List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
+                    BeanRegistration<T> beanRegistration;
+                    try {
+                        T bean;
+                        if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                            bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
+                        } else {
+                            throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                         }
-                    }
-                    bean = postBeanCreated(context, definition, beanType, qualifier, bean);
-                    if (customizeNull && bean == null) {
-                        bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
-                    }
+                        List<?> interceptorRegistrations = creation.lifecycleInterceptors();
+                        if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                            Object value = registrations.remove(definition);
+                            if (value instanceof List<?> list) {
+                                interceptorRegistrations = list;
+                            }
+                        }
+                        bean = postBeanCreated(context, definition, beanType, qualifier, bean);
+                        if (customizeNull && bean == null) {
+                            bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
+                        }
 
-                    BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
-                    if (dependentFactoryBean != null) {
-                        destroyBean(dependentFactoryBean);
+                        BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
+                        if (dependentFactoryBean != null) {
+                            destroyBean(dependentFactoryBean);
+                        }
+                        Qualifier<T> registrationQualifier = qualifier;
+                        if (registrationQualifier == null) {
+                            registrationQualifier = definition.getDeclaredQualifier();
+                        }
+                        BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
+                        List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
+                        beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
+                            dependentBeans, interceptorRegistrations, creation.dependencies);
+                    } catch (RuntimeException | Error e) {
+                        destroyDependentsOfFailedBean(context, e);
+                        destroyCreatedBeans(creation.dependencies.takeDependents(), e);
+                        context.pushDependentBeans(parentDependentBeans);
+                        throw e;
                     }
-                    Qualifier<T> registrationQualifier = qualifier;
-                    if (registrationQualifier == null) {
-                        registrationQualifier = definition.getDeclaredQualifier();
+                    if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
+                        && context instanceof AbstractBeanResolutionContext creating
+                        && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
+                        // the context a lazy proxy retains holds what is created with the target it caches
+                        disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
                     }
-                    BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
-                    List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                    beanRegistration = BeanRegistration.of(
-                        this,
-                        beanKey,
-                        definition,
-                        bean,
-                        dependentBeans,
-                        interceptorRegistrations
-                    );
-                } catch (RuntimeException | Error e) {
-                    destroyDependentsOfFailedBean(context, e);
                     context.pushDependentBeans(parentDependentBeans);
-                    throw e;
+                    if (dependent) {
+                        context.addDependentBean(beanRegistration);
+                    }
+                    return beanRegistration;
+                } finally {
+                    if (creatingContext != null) {
+                        creatingContext.creationState = previousCreation;
+                    }
                 }
-                if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
-                    && context instanceof AbstractBeanResolutionContext creating
-                    && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
-                    // the context a lazy proxy retains holds what is created with the target it caches
-                    disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
-                }
-                context.pushDependentBeans(parentDependentBeans);
-                if (dependent) {
-                    context.addDependentBean(beanRegistration);
-                }
-                return beanRegistration;
             } finally {
                 if (isNewPath) {
                     path.close();
@@ -4185,7 +4218,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * Whether no scope holds a bean of the given definition: a prototype, one with no scope, or one of a scope
      * nothing implements, which is created for whoever asks for it.
      */
-    private boolean isUnscoped(BeanDefinition<?> definition) {
+    boolean isUnscoped(BeanDefinition<?> definition) {
         if (definition.isSingleton()) {
             return false;
         }
@@ -4496,6 +4529,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         if (registration instanceof DependentBeanProvider provider) {
             for (BeanRegistration<?> owned : provider.dependentBeans()) {
+                stopDependencyResolution(owned, visited);
+            }
+        }
+        if (registration.getBean() instanceof InterceptedBeanProxy<?> proxy
+            && proxy.interceptedBeanDependencies() instanceof DefaultBeanDependencyResolver owner) {
+            owner.dependencies.stopResolving();
+            for (BeanRegistration<?> owned : owner.dependencies.dependentBeans()) {
                 stopDependencyResolution(owned, visited);
             }
         }
