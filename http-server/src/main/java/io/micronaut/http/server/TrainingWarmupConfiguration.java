@@ -25,7 +25,9 @@ import java.util.List;
 
 /**
  * The warm-up of a training run ({@link ApplicationConfiguration#TRAINING_ENABLED}): once the
- * server has started, it sends GET requests to itself before the application stops.
+ * server has started, it sends GET requests to itself before the application stops. Only the
+ * {@code start} mode, the default ({@link ApplicationConfiguration#TRAINING_MODE}), starts the
+ * server; the {@code load} mode starts no server and ignores these settings.
  *
  * @since 5.3.0
  */

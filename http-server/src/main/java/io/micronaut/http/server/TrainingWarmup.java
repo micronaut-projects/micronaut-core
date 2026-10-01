@@ -46,6 +46,15 @@ import java.util.concurrent.TimeUnit;
  * stops the application. It runs after the other {@link ServerStartupEvent} listeners, only for the
  * server that is the {@link EmbeddedApplication} of the context.
  *
+ * <p>Only a training run in the {@code start} mode, the default
+ * ({@link ApplicationConfiguration#TRAINING_MODE}), sends these requests. That mode starts the
+ * application as usual, so the HTTP server starts, binds its port and publishes the
+ * {@link ServerStartupEvent} that this listener receives. The requests go to that port while the
+ * server runs; then {@link io.micronaut.runtime.Micronaut#start()} stops the server and exits. The
+ * {@code load} mode does not start the application: it creates no bean, this listener included,
+ * starts no server and sends no request, and it logs a warning that the warm-up settings, if any
+ * are set, are ignored.</p>
+ *
  * <p>An I/O error or a status of 500 or more fails the startup. A status from 400 to 499 is logged
  * at WARN and the warm-up continues: a request the application rejects, for example with 401 or
  * 403 behind security, has still exercised the server.</p>
@@ -59,6 +68,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Internal
 @Singleton
+// The switch alone, whatever the mode: the load mode creates no bean, so this listener only exists in a run that starts the server
 @Requires(property = ApplicationConfiguration.TRAINING_ENABLED, pattern = TrainingWarmupConfiguration.ENABLED_PATTERN)
 final class TrainingWarmup implements ApplicationEventListener<ServerStartupEvent>, Ordered {
 
@@ -85,6 +95,7 @@ final class TrainingWarmup implements ApplicationEventListener<ServerStartupEven
 
     @Override
     public void onApplicationEvent(ServerStartupEvent event) {
+        // The server has started and listens on its port: the requests below are served by it
         List<String> paths = warmupConfiguration.getPaths();
         if (paths.isEmpty()) {
             return;
