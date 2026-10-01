@@ -55,6 +55,7 @@ class DevRuntimeTest {
         Files.write(project.resolve("cp.argfile"), classpath);
         Files.writeString(manifestFile, """
             micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
             micronaut.dev.reloadable=build/classes
             micronaut.dev.resources.config=src/main/resources
             micronaut.dev.compile-classpath=@cp.argfile
@@ -143,6 +144,59 @@ class DevRuntimeTest {
         }
         assertTrue(runtime.context().map(context -> !context.isRunning()).orElse(true));
         assertEquals(1, RetainedPool.DESTROYED.get());
+    }
+
+    @Test
+    void aBodyOnlyEditIsAppliedInPlaceWhenTheManifestAllowsItAndAnAgentIsThere() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=auto
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            Class<?> type = first.getClassLoader().loadClass("app.Greeter");
+            Object bean = first.getBean(type);
+            assertEquals("one", type.getMethod("greet").invoke(bean));
+            assertEquals(io.micronaut.context.reload.ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+
+            // a body-only edit: the same generation, the same context, the same bean, a new body
+            Files.writeString(greeter, greeter("two"));
+            runtime.reload();
+            assertEquals(1, runtime.redefinitions());
+            assertEquals(1, runtime.generation());
+            assertSame(first, runtime.context().orElseThrow());
+            assertEquals("two", type.getMethod("greet").invoke(bean));
+
+            // a structural edit still restarts
+            Files.writeString(greeter, "package app; @jakarta.inject.Singleton public class Greeter { public String greet() { return \"three\"; } public int extra() { return 3; } }");
+            runtime.reload();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertNotSame(first, second);
+            assertEquals("three", greet(runtime, second));
+            assertEquals(1, runtime.redefinitions());
+        } finally {
+            runtime.close();
+        }
     }
 
     private static String greeter(String greeting) {
