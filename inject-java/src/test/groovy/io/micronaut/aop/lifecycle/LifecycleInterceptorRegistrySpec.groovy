@@ -2,9 +2,10 @@ package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.InterceptorRegistry
+import io.micronaut.aop.chain.InterceptorChainFactory
 
 class LifecycleInterceptorRegistrySpec extends AbstractTypeElementSpec {
-    void 'lifecycle dispatch preserves custom registry selection and context isolation'() {
+    void 'lifecycle service preserves custom registry selection and context isolation'() {
         given:
         def source = '''
 package lifecycle.registry;
@@ -30,16 +31,18 @@ class CustomRegistry implements InterceptorRegistry {
     }
     public <T> Interceptor<T, T>[] resolveConstructorInterceptors(BeanConstructor<T> constructor,
             Collection<BeanRegistration<Interceptor<T, T>>> candidates) {
+        seen.add(InterceptorKind.AROUND_CONSTRUCT);
         return delegate.resolveConstructorInterceptors(constructor, candidates);
     }
 }
 @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.TYPE)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)
 @InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
 @InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
 @interface Tracked {}
 @Singleton @InterceptorBean(Tracked.class)
-class Advice implements MethodInterceptor<Object, Object> {
-    public Object intercept(MethodInvocationContext<Object, Object> context) { return context.proceed(); }
+class Advice implements Interceptor<Object, Object> {
+    public Object intercept(InvocationContext<Object, Object> context) { return context.proceed(); }
 }
 @Prototype @Tracked class Subject {}
 '''
@@ -53,22 +56,24 @@ class Advice implements MethodInterceptor<Object, Object> {
         def secondRegistry = second.getBean(InterceptorRegistry)
 
         then:
+        first.getBean(InterceptorChainFactory).is(first.getBean(InterceptorChainFactory))
+        !first.getBean(InterceptorChainFactory).is(second.getBean(InterceptorChainFactory))
         !firstRegistry.is(secondRegistry)
-        firstRegistry.seen*.name() == ['POST_CONSTRUCT']
-        secondRegistry.seen*.name() == ['POST_CONSTRUCT']
+        firstRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT']
+        secondRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT']
 
         when:
         first.destroyBean(firstBean)
 
         then:
-        firstRegistry.seen*.name() == ['POST_CONSTRUCT', 'PRE_DESTROY']
-        secondRegistry.seen*.name() == ['POST_CONSTRUCT']
+        firstRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'PRE_DESTROY']
+        secondRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT']
 
         when:
         second.destroyBean(secondBean)
 
         then:
-        secondRegistry.seen*.name() == ['POST_CONSTRUCT', 'PRE_DESTROY']
+        secondRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'PRE_DESTROY']
 
         cleanup:
         first.close()

@@ -15,17 +15,11 @@
  */
 package io.micronaut.aop;
 
-import io.micronaut.aop.chain.DefaultInterceptorRegistry;
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 
@@ -69,31 +63,4 @@ public interface InterceptorRegistry {
         BeanConstructor<T> constructor,
         Collection<BeanRegistration<Interceptor<T, T>>> interceptors
     );
-
-    /**
-     * Resolves and invokes one bean lifecycle event using its retained interceptor candidates.
-     * A recorded empty candidate set is authoritative; legacy callers without retained candidates
-     * keep their existing resolution behavior. Implementations that customize interceptor matching
-     * continue to participate through {@link #resolveInterceptors(Executable, Collection, InterceptorKind)}.
-     *
-     * @param resolutionContext The lifecycle resolution context
-     * @param definition The bean definition
-     * @param interceptedMethod The lifecycle method
-     * @param bean The bean instance
-     * @param kind The post-construct or pre-destroy kind
-     * @param shared Explicit candidates from an older generated caller, or {@code null}
-     * @param <T1> The bean type
-     * @return The lifecycle result
-     * @since 5.3.0
-     */
-    @Internal
-    default <T1> @Nullable T1 interceptLifecycle(
-        BeanResolutionContext resolutionContext,
-        BeanDefinition<T1> definition,
-        ExecutableMethod<T1, T1> interceptedMethod,
-        T1 bean,
-        InterceptorKind kind,
-        @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> shared) {
-        return DefaultInterceptorRegistry.interceptLifecycle(this, resolutionContext, definition, interceptedMethod, bean, kind, shared);
-    }
 }

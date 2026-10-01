@@ -17,7 +17,6 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
@@ -34,6 +33,7 @@ import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.Objects;
 
 import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
 
@@ -77,7 +77,16 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         T target,
         ExecutableMethod<T, R> executionHandle,
         @Nullable InterceptorKind kind) {
-        super(interceptors, target, executionHandle, EMPTY_OBJECT_ARRAY);
+        this(interceptors, target, executionHandle, kind, EMPTY_OBJECT_ARRAY);
+    }
+
+    MethodInterceptorChain(
+        Interceptor<T, R>[] interceptors,
+        T target,
+        ExecutableMethod<T, R> executionHandle,
+        @Nullable InterceptorKind kind,
+        @Nullable Object... originalParameters) {
+        super(interceptors, target, executionHandle, originalParameters);
         this.kind = kind;
     }
 
@@ -140,6 +149,14 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         }
     }
 
+    @Nullable
+    private R proceedLifecycle(BeanDefinition<T> definition) {
+        if (interceptorCount == 0) {
+            return executionHandle.invoke(target);
+        }
+        return Objects.requireNonNull(proceed(), getKind().name() + " interceptor chain illegal returned null for type: " + definition.getBeanType());
+    }
+
     @Override
     public String getMethodName() {
         return executionHandle.getMethodName();
@@ -178,12 +195,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Internal method that handles the logic for executing {@link InterceptorKind#POST_CONSTRUCT} interception.
      *
-     * <p>Superseded by
-     * {@link #initialize(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object, Collection)},
-     * which is what the framework calls now so that post-construct interception can reuse the interceptors already
-     * resolved while the bean was constructed. This form resolves interceptors by binding, and nothing in the
-     * framework or in currently generated code calls it. It is kept because it is part of the generated-code surface:
-     * bean definitions compiled by earlier versions call it directly.</p>
+     * <p>Delegates to the chain factory, which reuses the candidates retained during creation.
+     * Earlier generated definitions without retained candidates keep their binding-based resolution behavior.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext The bean context
@@ -212,8 +225,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      *
      * <p>Called for a bean whose interceptors were resolved once while it was constructed, so that a
      * {@code @Prototype} interceptor which ran the constructor also runs {@code @PostConstruct}. Passing
-     * {@code null} resolves interceptors by binding, which is what the five-argument form does and what generated
-     * code from earlier versions continues to do.</p>
+     * {@code null} uses the candidates retained in the resolution context, falling back to binding-based
+     * resolution for earlier generated definitions without retained candidates.</p>
      *
      * @param resolutionContext  The resolution context
      * @param beanContext        The bean context
@@ -235,22 +248,22 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return beanContext.getBean(InterceptorRegistry.ARGUMENT).interceptLifecycle(
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).build(
             resolutionContext,
             definition,
             postConstructMethod,
             bean,
             InterceptorKind.POST_CONSTRUCT,
             interceptors
-        );
+        ).proceedLifecycle(definition);
     }
 
     /**
      * Internal method that handles the logic for executing {@link InterceptorKind#PRE_DESTROY} interception.
      *
-     * <p>Resolves interceptors by binding. Unlike post-construct, destruction has nothing resolved in advance to hand
-     * over, because it runs with a fresh resolution context, so this remains the form the framework calls; the
-     * overload taking registrations exists for a caller that does hold them.</p>
+     * <p>The chain factory reuses the candidates installed on the destruction context by the bean's
+     * dependency owner. Earlier generated definitions without retained candidates keep their existing resolution
+     * behavior.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext The bean context
@@ -277,9 +290,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * Variant of {@link #dispose(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object)} that
      * reuses registrations already resolved for this bean.
      *
-     * <p>Nothing supplies registrations here today: destruction runs with a fresh resolution context, so a bean
-     * reaches its interceptors either through the field on its proxy or through the registrations the container
-     * passes to the dispose call. The parameter exists so a caller that does hold them can hand them over.</p>
+     * <p>Explicit registrations take precedence over the candidates retained on the destruction context.
+     * Callers without either use the compatibility resolution path.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext       The bean context
@@ -301,13 +313,13 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return beanContext.getBean(InterceptorRegistry.ARGUMENT).interceptLifecycle(
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).build(
             resolutionContext,
             definition,
             preDestroyMethod,
             bean,
             InterceptorKind.PRE_DESTROY,
             interceptors
-        );
+        ).proceedLifecycle(definition);
     }
 }
