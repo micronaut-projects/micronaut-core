@@ -90,7 +90,20 @@ class PollingWatchServiceTest {
             }
             assertTrue(found, "a file created in a directory created after the start is reported");
         }
+        // closing wakes a retrieval blocked on the service
+        java.util.concurrent.CompletableFuture<Throwable> blocked = new java.util.concurrent.CompletableFuture<>();
+        Thread taker = new Thread(() -> {
+            try {
+                service.take();
+                blocked.complete(null);
+            } catch (Throwable e) {
+                blocked.complete(e);
+            }
+        });
+        taker.start();
+        Thread.sleep(100);
         service.close();
+        assertTrue(blocked.get(5, TimeUnit.SECONDS) instanceof ClosedWatchServiceException);
         assertThrows(ClosedWatchServiceException.class, service::poll);
         assertThrows(ClosedWatchServiceException.class, () -> service.register(directory));
     }
