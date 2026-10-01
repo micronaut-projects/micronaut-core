@@ -17,7 +17,7 @@ import java.util.List;
  * <p>The work is done by the static initializer, so that running it does not need reflection or method handles on
  * a class defined at run time. The results go to {@link RuntimeProbeResults}.</p>
  */
-public class RuntimeProbe {
+final class RuntimeProbe {
 
     static {
         ClassLoader classLoader = RuntimeProbe.class.getClassLoader();

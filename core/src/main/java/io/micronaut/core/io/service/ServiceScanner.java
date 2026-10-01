@@ -61,7 +61,7 @@ final class ServiceScanner<S> {
      * @param lineCondition The condition tested on the name of each service entry, or null to accept every entry
      * @param transformer   The transformer of the entry names
      */
-    public ServiceScanner(ClassLoader classLoader, String serviceName, @Nullable Predicate<String> lineCondition, Function<String, S> transformer) {
+    ServiceScanner(ClassLoader classLoader, String serviceName, @Nullable Predicate<String> lineCondition, Function<String, S> transformer) {
         this.classLoader = classLoader;
         this.serviceName = serviceName;
         this.lineCondition = lineCondition == null ? name -> true : lineCondition;

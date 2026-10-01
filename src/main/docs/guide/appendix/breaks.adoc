@@ -40,8 +40,6 @@ The `Predicate<String>` given to the three-argument `load(Class, ClassLoader, Pr
 
 The name of a `META-INF/services` entry is now read without the whitespace around it, as `java.util.ServiceLoader` reads an entry that is padded with spaces or tabs. This also applies without a condition. Previously an indented entry, or one followed by whitespace, was not loaded: `collectAll()` left it out, and `iterator()`, `first()` and `firstOr(..)` returned it as a definition that is not present, under the name with its whitespace. For a line that has only whitespace, or only whitespace before a comment, they returned a definition that is not present, with a blank name. Now such an entry is returned under its class name, and such a line is skipped.
 
-The same applies to the `lineCondition` given to the public `SoftServiceLoader.newCollector(String, Predicate, ClassLoader, Function)`: it is now tested on `META-INF/micronaut` entries and on the entries of the service table of a native image too, and on the name of a `META-INF/services` entry without its comment and the whitespace around it. That name is also what the transformer receives, and a line that has only whitespace, or only whitespace before a comment, no longer reaches either of them. A `null` `lineCondition` accepts every entry.
-
 Callers of the `load` methods without a condition are otherwise not affected.
 
 === A reflectively dispatched executable method propagates the method's exception

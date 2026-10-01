@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.core.io.service;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
@@ -100,8 +101,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param service The service type
      * @param loader The class loader to use
      * @param condition A {@link Predicate} to use to conditionally load the service. The predicate is passed the service class name
-     * of each entry, whether the entry comes from {@code META-INF/services}, {@code META-INF/micronaut}, the service table of
-     * a native image or a registered {@link StaticServiceLoader}
+     * of every entry, whatever its source
      * @param <S> The service generic type
      * @return A new service loader
      */
@@ -276,19 +276,16 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     }
 
     /**
-     * Creates a collector of the entries of a service type: the lines of its {@code META-INF/services} files and its
-     * entries under {@code META-INF/micronaut}, or only its entries in the service table of a native image when that
-     * table has the service type.
+     * For internal use: creates the collector that scans the entries of a service type.
      *
      * @param serviceName   The name of the service type
-     * @param lineCondition The condition tested on the name of each entry, whichever source the entry comes from, or
-     *                      null to accept every entry
+     * @param lineCondition The condition tested on the name of each entry, or null to accept every entry
      * @param classLoader   The class loader
-     * @param transformer   The function that turns the name of an accepted entry into a result. An entry with a null
-     *                      result is left out
+     * @param transformer   The transformer of the accepted names; a null result leaves the entry out
      * @param <S>           The result type
      * @return The collector
      */
+    @Internal
     public static <S> ServiceCollector<S> newCollector(String serviceName,
                                                        @Nullable Predicate<String> lineCondition,
                                                        ClassLoader classLoader,
@@ -333,11 +330,9 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * {@link java.lang.Class#getDeclaredConstructor()}. Depending on module and security configuration,
      * this may allow invoking non-public no-argument constructors.
      *
-     * <p>A static definition is always {@link #isPresent() present}: its class is not checked until it is
-     * {@link #load() loaded}.</p>
-     *
      * @param <S> The service type
      */
+    @Internal
     public static final class StaticDefinition<S> implements ServiceDefinition<S> {
 
         private final String name;
@@ -357,7 +352,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
 
         /**
-         * @return Always {@code true}, without checking that the class of the definition can be loaded
+         * @return {@code true}, without checking that the class of the definition can be loaded
          */
         @Override
         public boolean isPresent() {
@@ -404,50 +399,37 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     }
 
     /**
-     * Service loader that uses {@link StaticDefinition}. A loader registered through {@link Optimizations} replaces
-     * the scan of the class path for its service type.
-     *
-     * <p>The name condition given to {@link SoftServiceLoader#load(Class, ClassLoader, Predicate)} is passed to
-     * {@link #findAll(Predicate)} and {@link #load(Predicate, Predicate)}, which test it on the name of each entry.
-     * When no condition was given, the instances are loaded through {@link #load(Predicate)}.</p>
-     *
-     * <p>The default {@code load} methods load the entries through the stream that {@link #findAll(Predicate)}
-     * returns: one after the other, on the calling thread, unless that stream is parallel. The class path scan that a
-     * loader replaces forks one task per entry. To load its entries concurrently as well, a loader either returns a
-     * parallel stream from {@code findAll}, or overrides both {@code load} methods and joins its tasks in the order of
-     * the entries. A loader that overrides only {@link #load(Predicate)} is bypassed whenever a name condition is
-     * given: the instances are then loaded by the default {@link #load(Predicate, Predicate)}.</p>
+     * Service loader that uses {@link StaticDefinition}.
      *
      * @param <S> The service type
      */
+    @Internal
     public interface StaticServiceLoader<S> {
 
         /**
          * Finds the definitions of the entries whose name matches the predicate.
          *
          * @param predicate The predicate, tested on the name of each entry
-         * @return The definitions, in the order of the entries
+         * @return The definitions
          */
         Stream<StaticDefinition<S>> findAll(Predicate<String> predicate);
 
         /**
-         * Loads every entry. By default, delegates to {@link #load(Predicate, Predicate)}.
+         * Loads the instances of every entry.
          *
          * @param predicate The predicate to filter the instances, or null if not needed
-         * @return The instances, in the order of the entries
+         * @return The instances
          */
         default List<S> load(@Nullable Predicate<S> predicate) {
             return load(n -> true, predicate);
         }
 
         /**
-         * Loads the entries whose name matches the condition. By default, the entries are loaded through the stream
-         * that {@link #findAll(Predicate)} returns: one after the other, on the calling thread, unless that stream is
-         * parallel.
+         * Loads the instances of the entries whose name matches the condition.
          *
          * @param condition The condition, tested on the name of each entry, or null to load every entry
          * @param predicate The predicate to filter the instances, or null if not needed
-         * @return The instances, in the order of the entries
+         * @return The instances
          */
         default List<S> load(@Nullable Predicate<String> condition, @Nullable Predicate<S> predicate) {
             return findAll(condition == null ? n -> true : condition)
@@ -460,6 +442,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     /**
      * Static optimizations for service loaders.
      */
+    @Internal
     public static final class Optimizations {
         private final Map<String, SoftServiceLoader.StaticServiceLoader<?>> serviceLoaders;
 

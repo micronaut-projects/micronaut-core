@@ -26,10 +26,10 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class ServiceNameConditionTest {
 
-    static final String A = ServiceA.class.getName();
-    static final String B = ServiceB.class.getName();
-    static final String C = ServiceC.class.getName();
-    static final String D = ServiceD.class.getName();
+    private static final String A = ServiceA.class.getName();
+    private static final String B = ServiceB.class.getName();
+    private static final String C = ServiceC.class.getName();
+    private static final String D = ServiceD.class.getName();
 
     @TempDir
     Path tempDir;
@@ -170,7 +170,7 @@ class ServiceNameConditionTest {
         return type.getProtectionDomain().getCodeSource().getLocation();
     }
 
-    public interface NamedService {
+    interface NamedService {
     }
 
     public static final class ServiceA implements NamedService {
@@ -179,9 +179,9 @@ class ServiceNameConditionTest {
     public static final class ServiceB implements NamedService {
     }
 
-    public static final class ServiceC implements NamedService {
+    static final class ServiceC implements NamedService {
     }
 
-    public static final class ServiceD implements NamedService {
+    static final class ServiceD implements NamedService {
     }
 }
