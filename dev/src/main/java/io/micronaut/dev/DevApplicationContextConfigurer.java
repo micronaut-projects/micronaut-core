@@ -21,6 +21,7 @@ import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.dev.manifest.DevMode;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 
 import java.util.Map;
@@ -40,7 +41,8 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
     @Override
     public void configure(ApplicationContextBuilder builder) {
         DevRuntime runtime = DevRuntime.current();
-        if (runtime == null) {
+        if (runtime == null || runtime.manifest().mode() == DevMode.TEST) {
+            // in test mode the tests start their own contexts, as they would in the build, on the generation that loaded them
             return;
         }
         // the generation loader itself, never the facade: the JVM records the loader Class.forName was called

@@ -101,6 +101,7 @@ noReflection {
     // the selected test classes are loaded through the generation's loader and handed to the engines
     allowIn("io.micronaut.dev.test.JUnitPlatformExecution", "CLASS_LOADING")
     allowIn("io.micronaut.dev.test.TestEventListeners", "SERVICE_LOADING")
+    allowIn("io.micronaut.dev.TestSession", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")

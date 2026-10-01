@@ -17,14 +17,40 @@ package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.dev.CompileFailure;
+
+import java.util.Set;
 
 /**
  * A report of the runs, registered as a service: an HTML renderer, an IDE bridge, a terminal UI. It receives
- * the same events as the JUnit XML reports, in {@link #getOrder() order}.
+ * the same events as the JUnit XML reports, in {@link #getOrder() order}, and hears of a change that did not
+ * compile, which runs no test.
  *
  * @author graemerocher
  * @since 5.3.0
  */
 @Experimental
 public interface TestReportListener extends TestEventListener, Ordered {
+
+    /**
+     * A change did not compile, so no test ran for it: the tests that ran last still stand.
+     *
+     * @param failure The failure
+     */
+    default void compilationFailed(CompileFailure failure) {
+    }
+
+    /**
+     * The compilation that failed compiles again.
+     */
+    default void compilationRecovered() {
+    }
+
+    /**
+     * Test classes were deleted: their results are gone.
+     *
+     * @param classNames The classes, by binary name
+     */
+    default void testClassesRemoved(Set<String> classNames) {
+    }
 }
