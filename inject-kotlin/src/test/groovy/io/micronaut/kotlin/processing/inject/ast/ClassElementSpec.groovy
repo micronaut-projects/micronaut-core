@@ -1318,8 +1318,7 @@ class MyBean {
             validateMyBookArgument(returnType)
     }
 
-    @PendingFeature
-    void "test how the type annotations from the type are propagated - pending 1"() {
+    void "test type annotations on a generic occurrence are propagated"() {
         given:
             ClassElement ce = buildClassElementTransformed('test.MyBean','''\
 package test;
