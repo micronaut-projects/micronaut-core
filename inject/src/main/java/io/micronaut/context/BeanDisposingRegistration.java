@@ -104,6 +104,12 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         return getDependencies().markDestroyed();
     }
 
+    @Nullable
+    public List<BeanRegistration<?>> getDependents() {
+        List<BeanRegistration<?>> dependents = dependentBeans();
+        return dependents.isEmpty() ? null : dependents;
+    }
+
     @Override
     BeanDependencies getDependencies() {
         return Objects.requireNonNull(super.getDependencies());

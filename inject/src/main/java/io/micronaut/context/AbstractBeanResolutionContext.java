@@ -102,10 +102,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
-        if (creationState != null && creationState.definition.equals(definition)) {
-            return creationState.interceptors;
+        // Older AOP callers store candidates in the attributes, even while a creation frame is active.
+        List<?> legacy = BeanResolutionContext.super.getBeanInterceptors(definition);
+        if (legacy != null) {
+            return legacy;
         }
-        return BeanResolutionContext.super.getBeanInterceptors(definition);
+        return creationState != null && creationState.definition.equals(definition) ? creationState.interceptors : null;
     }
 
     @Override
