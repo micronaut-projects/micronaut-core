@@ -22,7 +22,10 @@ import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.EnvironmentPropertySource;
+import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
@@ -79,11 +82,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             // The training mode decides whether the context starts at all, so the switch is read before
             // applicationContext.start(), from the environment that start() would otherwise start first
             Environment environment = applicationContext.getEnvironment();
-            environment.start();
+            // Test Resources reads the configuration together with the environment, so a training run that is
+            // already known disables it first
+            boolean trainingRunBeforeStart = isTrainingRunBeforeStart(environment);
+            startEnvironment(environment, trainingRunBeforeStart);
             boolean trainingRun = isTrainingRun(environment);
-            if (trainingRun && TrainingLoad.isSelected(environment)) {
-                TrainingLoad.run(applicationContext);
-                return applicationContext;
+            if (trainingRun) {
+                TrainingTestResources.checkDisabled(environment, trainingRunBeforeStart);
+                if (TrainingLoad.isSelected(environment)) {
+                    TrainingLoad.run(applicationContext);
+                    return applicationContext;
+                }
             }
 
             applicationContext.start();
@@ -222,15 +231,75 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * any case, turns it on. A {@code Boolean} conversion would also accept the strings
      * {@code yes} and {@code on}, which those beans do not match.
      *
-     * <p>Every application runs this on startup, so it is a plain call: no lambda to link. It is
-     * the only thing an application that is not training pays for: the mode
-     * ({@link ApplicationConfiguration#TRAINING_MODE}) is only read when the switch is on.</p>
+     * <p>Every application runs this on startup, so it is a plain call: no lambda to link. With
+     * {@link #isTrainingRunBeforeStart(Environment)}, it is the only thing an application that is
+     * not training pays for: the mode ({@link ApplicationConfiguration#TRAINING_MODE}) is only read
+     * when the switch is on.</p>
+     *
+     * <p>This read decides whether this run is a training run. The one before the start only
+     * decides whether Micronaut Test Resources is disabled while the environment starts.</p>
      *
      * @param environment The started environment
      * @return Whether this run is a training run
      */
     private static boolean isTrainingRun(Environment environment) {
         return StringUtils.TRUE.equalsIgnoreCase(environment.getProperty(ApplicationConfiguration.TRAINING_ENABLED, String.class).orElse(null));
+    }
+
+    /**
+     * Reads the training run switch before the environment starts, from the sources that the
+     * environment does not have to read: the system properties, the environment variables, and the
+     * properties and the arguments given to this builder. They take precedence over the configuration
+     * files, so when one of them sets the switch, the environment reads the same value once it has
+     * started. A switch that is only set in the configuration of the application is not seen here.
+     *
+     * <p>Every application runs this on startup: two lookups and a look at the property sources that
+     * this builder has added, usually none or one.</p>
+     *
+     * @param environment The environment, not started
+     * @return Whether this run is a training run
+     */
+    private boolean isTrainingRunBeforeStart(Environment environment) {
+        @Nullable String value = null;
+        int order = Integer.MIN_VALUE;
+        if (isEnableDefaultPropertySources()) {
+            value = CachedEnvironment.getProperty(ApplicationConfiguration.TRAINING_ENABLED);
+            order = SystemPropertiesPropertySource.POSITION;
+            if (value == null && isEnvironmentPropertySource()) {
+                value = CachedEnvironment.getenv(TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
+                order = EnvironmentPropertySource.POSITION;
+            }
+        }
+        // The source with the highest order wins, and the sources of the builder win a tie, as in the started environment
+        for (PropertySource propertySource : environment.getPropertySources()) {
+            Object sourceValue = propertySource.get(ApplicationConfiguration.TRAINING_ENABLED);
+            if (sourceValue != null && (value == null || propertySource.getOrder() >= order)) {
+                value = sourceValue.toString();
+                order = propertySource.getOrder();
+            }
+        }
+        return StringUtils.TRUE.equalsIgnoreCase(value);
+    }
+
+    /**
+     * Starts the environment. In a training run that is known before the start, the Micronaut Test
+     * Resources client is disabled while the environment reads the configuration (see
+     * {@link TrainingTestResources}).
+     *
+     * @param environment The environment
+     * @param trainingRun Whether the switch is on before the environment starts
+     */
+    private static void startEnvironment(Environment environment, boolean trainingRun) {
+        if (!trainingRun) {
+            environment.start();
+            return;
+        }
+        @Nullable String testResourcesClient = TrainingTestResources.disableClient();
+        try {
+            environment.start();
+        } finally {
+            TrainingTestResources.restoreClient(testResourcesClient);
+        }
     }
 
     /**

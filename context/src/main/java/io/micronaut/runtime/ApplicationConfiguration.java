@@ -62,6 +62,14 @@ public class ApplicationConfiguration {
      * <p>A training run does not serve traffic, so this property must never be set on a deployment
      * target.</p>
      *
+     * <p>A training run, in either mode, disables Micronaut Test Resources, which would otherwise
+     * supply the properties that the configuration lacks and start a container for each of them
+     * that is read. Set this property as a system property, as the
+     * {@code MICRONAUT_APPLICATION_TRAINING_ENABLED} environment variable or as an argument of the
+     * application, where it is read before the configuration: if Test Resources is on the class path
+     * and the switch is only set in the configuration of the application, or Test Resources cannot
+     * be disabled, the training run fails.</p>
+     *
      * <p>In the {@code test} environment {@link Micronaut#start()} does not exit the JVM: it
      * returns the {@link io.micronaut.context.ApplicationContext} it has already closed, so the
      * caller can only check that the run ended and must not look up beans in it.</p>

@@ -17,14 +17,13 @@ WARNING: Never set `micronaut.application.training.enabled` or `MICRONAUT_APPLIC
 
 The switch acts on the api:runtime.EmbeddedApplication[] of the application, such as the HTTP server or a messaging application. An application without one is not stopped: `Micronaut.run` logs a warning that says so and returns as usual. The beans that require the switch are still created, so a startup listener written for the training run still runs. If such an application starts non-daemon threads of its own, the training run does not end until they do, so the application has to stop them itself.
 
-To warm up the application before it stops, list the paths the HTTP server should send GET requests to itself:
+To warm up the application before it stops, list the paths the HTTP server should send GET requests to itself, next to the switch:
 
 [configuration]
 ----
 micronaut:
   application:
     training:
-      enabled: true
       warmup:
         paths:
           - /hello
@@ -77,7 +76,7 @@ public class CustomWarmup implements ApplicationEventListener<ServerStartupEvent
 
 The `pattern` matches `true` in any case, as the switch does: with `value = "true"` a training run started with `TRUE` would stop the application without running the listener. For a messaging application, listen for api:runtime.event.ApplicationStartupEvent[] instead.
 
-WARNING: A training run in `start` mode executes application code, including the warm-up requests. If the application needs external services such as a database, run the training with an environment that configures them, with Test Resources, or in `load` mode.
+WARNING: A training run in `start` mode executes application code, including the warm-up requests. If the application needs external services such as a database, run the training with an environment that configures them, or in `load` mode. Micronaut Test Resources cannot replace them: a training run disables it, as described in <<trainingRunTestResources, Test Resources>>.
 
 [[trainingRunLoad]]
 === Training without starting the application
@@ -113,7 +112,7 @@ The warm-up does not apply to the `load` mode, because no server is started. If 
 
 What still runs in `load` mode is the code that runs whenever an application context is configured:
 
-* the property source loaders. If the application reads distributed configuration at startup through the bootstrap context, it still does, and the beans of the bootstrap context that read it are created.
+* the property source loaders. The one of Micronaut Test Resources supplies nothing, because a training run disables it (see <<trainingRunTestResources, Test Resources>>). If the application reads distributed configuration at startup through the bootstrap context, it still does, and the beans of the bootstrap context that read it are created.
 * the api:context.ApplicationContextConfigurer[] classes of the application.
 * the conditions of the bean definitions, custom api:context.condition.Condition[] classes included. A condition cannot look up a bean: the application context is not running, so the lookup throws an `IllegalStateException` and no bean is created. The bean definition with that condition is skipped and logged with that cause, although a normal start evaluates the condition.
 
@@ -125,7 +124,7 @@ The tools that a training run feeds record what the JVM loads and what it execut
 |Training run |When to use it
 
 |`start` with warm-up paths
-|The application can start where the training runs: the services it needs are available, or a training environment or Test Resources replace them. This gives the most complete cache.
+|The application can start where the training runs: the services it needs are available, or a training environment replaces them. This gives the most complete cache.
 
 |`start` without warm-up paths
 |As above, when the application has no request that is safe to send.
@@ -135,3 +134,14 @@ The tools that a training run feeds record what the JVM loads and what it execut
 |===
 
 For a GraalVM profile for profile-guided optimization or for the `native-image-agent`, use the `start` mode: both record what the application executes, and a `load` run executes almost none of it.
+
+[[trainingRunTestResources]]
+=== Test Resources
+
+https://micronaut-projects.github.io/micronaut-test-resources/latest/guide/[Micronaut Test Resources] supplies the properties that the configuration of an application lacks, such as `datasources.default.url`, and starts a container for each one that is read. Left enabled in a training run, it would change what the run trains: a `load` run would ask the Test Resources server which properties it can supply while it reads the configuration, and a condition that compares the value of such a property would make the server start a container; a `start` run would train against the containers. A training run therefore disables Test Resources, in both modes:
+
+* Before it reads the configuration, the training run sets the system property `micronaut.test.resources.enabled` to `false`, the switch of the Test Resources client. The client then contacts no server, supplies no property and starts no container. The previous value of the system property is restored once the configuration has been read.
+* This needs the training run switch before the configuration is read: set `micronaut.application.training.enabled` as a system property, as the `MICRONAUT_APPLICATION_TRAINING_ENABLED` environment variable or as an argument of the application. If Test Resources is on the class path and the switch is only set in the configuration of the application, for example in a configuration file, the training run fails with a message that says so.
+* A Test Resources module that does not read that switch, such as `micronaut-test-resources-embedded`, cannot be disabled: if one is on the class path, the training run fails.
+
+The Micronaut Gradle plugin adds the Test Resources client to the `developmentOnly` and `testRuntimeOnly` configurations, and a Maven project generated by Micronaut Launch declares it with the `provided` scope. Neither is part of the runtime class path that a JAR or a container image is built from, so a training run in an image build only sees Test Resources if the build adds it to that class path.

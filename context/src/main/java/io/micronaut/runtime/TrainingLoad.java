@@ -57,6 +57,13 @@ import java.util.concurrent.TimeUnit;
  * converter, eager or parallel bean is created, no method is processed and no startup event is
  * published.</p>
  *
+ * <p>The configuration it reads is the one the application has: Micronaut Test Resources, which
+ * supplies the properties that the configuration lacks, is disabled before the environment starts
+ * ({@link TrainingTestResources}), as in a {@code start} run. Otherwise a condition that compares
+ * the value of such a property, for example {@code @Requires(property = "datasources.default.url",
+ * pattern = ...)}, would make Test Resources start a container while the conditions are
+ * evaluated.</p>
+ *
  * <p>{@link Micronaut#start()} only refers to this class once the training run switch is on, so an
  * application that is not training never loads it.</p>
  *
