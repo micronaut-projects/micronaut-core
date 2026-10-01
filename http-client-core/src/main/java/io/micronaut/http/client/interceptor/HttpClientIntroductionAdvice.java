@@ -182,10 +182,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
-        if (httpClient == null) {
-            // try other introduction advice
-            return context.proceed();
-        }
         clientMethod = resolveClientMethod(context, annotationMetadata, clientMethod);
         if (clientMethod.mapped()) {
             HttpMethod httpMethod = clientMethod.httpMethod();
