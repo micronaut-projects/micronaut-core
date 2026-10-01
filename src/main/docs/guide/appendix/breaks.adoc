@@ -15,6 +15,8 @@ A `logback.xml` file in the working directory is still used when nothing else se
 
 A file set with `logger.config`, or with `logback.configurationFile` in Micronaut configuration unless its value is exactly that of the JVM system property of the same name, now takes precedence over any `Configurator` service, and startup still fails when it does not exist or cannot be parsed. The logging system of the loggers management endpoint now honors `logback.configurationFile` as well.
 
+That logging system, `io.micronaut.management.endpoint.loggers.impl.LogbackLoggingSystem`, is created by the Micronaut framework when the loggers endpoint is enabled. Its public constructor, which reads only `logger.config`, is deprecated for removal, and with `null` it no longer defaults to `logback.xml`: the refresh then configures Logback the way Logback configures itself at startup. Do not construct the class: obtain the bean from the application context, for example by injecting `LoggingSystem` or `ManagedLoggingSystem`, or replace it with a bean of your own that implements both, annotated with `@Replaces(LogbackLoggingSystem.class)`, rather than extending it.
+
 === Construct advice no longer wraps injection and `@PostConstruct` (5.3)
 
 A api:aop.ConstructorInterceptor[] now wraps only the constructor call. Fields and methods of the bean are injected, and

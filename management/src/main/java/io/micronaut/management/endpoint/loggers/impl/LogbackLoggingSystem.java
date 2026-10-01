@@ -23,7 +23,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
-import io.micronaut.logging.impl.LogbackUtils;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
@@ -45,8 +44,8 @@ import java.util.stream.Collectors;
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 @Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
 public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.logging.LoggingSystem {
-    private final @Nullable String logbackExternalConfigLocation;
-    private final @Nullable String logbackXmlLocation;
+    // The refresh is the one of the logging system that this bean replaces
+    private final io.micronaut.logging.impl.LogbackLoggingSystem refreshDelegate;
 
     /**
      * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
@@ -58,16 +57,19 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
         @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
         @Nullable @Property(name = "logger.config") String logbackXmlLocation
     ) {
-        this.logbackExternalConfigLocation = logbackExternalConfigLocation;
-        this.logbackXmlLocation = logbackXmlLocation;
+        this.refreshDelegate = new io.micronaut.logging.impl.LogbackLoggingSystem(logbackExternalConfigLocation, logbackXmlLocation);
     }
 
     /**
      * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
-     * @deprecated The framework creates this bean with a constructor that also honours
-     * {@code logback.configurationFile}, and this one is kept for binary compatibility only. Passing
-     * {@code null} no longer defaults to {@code logback.xml}: without a location, the refresh configures
-     * Logback the way Logback's own startup does.
+     * @deprecated Do not construct this class. The Micronaut framework creates this bean when the loggers
+     * endpoint is enabled, with a constructor that also honours {@code logback.configurationFile}. Obtain
+     * it from the application context, for example by injecting {@link io.micronaut.logging.LoggingSystem}
+     * or {@link ManagedLoggingSystem}. To change it, replace it with a bean of your own that implements both
+     * and is annotated with {@code @Replaces(LogbackLoggingSystem.class)}, rather than extending it. This
+     * constructor ignores {@code logback.configurationFile} and is kept for binary compatibility only.
+     * Passing {@code null} no longer defaults to {@code logback.xml}: without a location, the refresh
+     * configures Logback the way Logback's own startup does.
      */
     @Deprecated(since = "5.3", forRemoval = true)
     public LogbackLoggingSystem(@Nullable String logbackXmlLocation) {
@@ -145,8 +147,6 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
 
     @Override
     public void refresh() {
-        LoggerContext context = getLoggerContext();
-        context.reset();
-        LogbackUtils.configure(getClass().getClassLoader(), context, logbackExternalConfigLocation, logbackXmlLocation);
+        refreshDelegate.refresh();
     }
 }

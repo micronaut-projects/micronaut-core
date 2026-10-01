@@ -23,7 +23,6 @@ import ch.qos.logback.classic.util.DefaultJoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
 import ch.qos.logback.core.util.Loader;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.logging.LoggingSystemException;
 import org.jspecify.annotations.Nullable;
@@ -49,7 +48,9 @@ public final class LogbackUtils {
     }
 
     /**
-     * Configures a Logger Context, typically after a {@link LoggerContext#reset()}.
+     * Configures a Logger Context, typically after a {@link LoggerContext#reset()}. Only
+     * {@link LogbackLoggingSystem#refresh()} calls it, also for the logging system of the loggers
+     * endpoint, which delegates its refresh to that class.
      * <p>
      * A location that only Micronaut can see wins: {@code logback.configurationFile} of the
      * Micronaut configuration, unless its value is exactly that of the JVM system property of the
@@ -85,20 +86,18 @@ public final class LogbackUtils {
      * @throws LoggingSystemException if the location set in Micronaut configuration does not exist, if
      *                                that location or the {@code logback.xml} in the working directory
      *                                cannot be parsed, or if Logback fails to configure the context
-     * @since 5.3.0
      */
-    @Internal
-    public static void configure(ClassLoader classLoader,
-                                 LoggerContext context,
-                                 @Nullable String configurationFile,
-                                 @Nullable String loggerConfig) {
+    static void configure(ClassLoader classLoader,
+                          LoggerContext context,
+                          @Nullable String configurationFile,
+                          @Nullable String loggerConfig) {
         // ContextInitializer.autoConfig(), which Logback's startup calls, uses this class loader
         configure(classLoader, Loader.getClassLoaderOfClass(Configurator.class), new File(ClassicConstants.AUTOCONFIG_FILE),
             context, configurationFile, loggerConfig);
     }
 
     /**
-     * Visible for testing: production code goes through the public method, which passes the class
+     * Visible for testing: production code goes through the overload above, which passes the class
      * loader that loaded Logback and the {@code logback.xml} file of the working directory. Only tests
      * call this overload directly, to make Logback's lookup see {@link Configurator} services and
      * default files that are not on their classpath, and to put the working-directory file elsewhere.
