@@ -40,6 +40,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -194,6 +195,28 @@ final class TestSession {
         if (!removedTests.isEmpty()) {
             testClassesRemoved(removedTests);
         }
+        // a file of tests discovered from their files, deleted, or failed and deleted since: its results go, and its failure
+        Set<String> goneFiles = new LinkedHashSet<>();
+        allTestSources.forEach((kind, change) -> {
+            if (!isJvmKind(kind)) {
+                for (Path deleted : change.deleted()) {
+                    goneFiles.addAll(resultNamesOf(deleted));
+                }
+            }
+        });
+        synchronized (this) {
+            for (String failed : failedClasses) {
+                if (isTestFileName(failed) && !isTestFile(failed)) {
+                    goneFiles.add(failed);
+                }
+            }
+        }
+        if (!goneFiles.isEmpty()) {
+            testClassesRemoved(goneFiles);
+        }
+        // a test discovered from its source file, as a pytest function, has no class whose change can be followed
+        boolean fileTestsChanged = allTestSources.entrySet().stream()
+            .anyMatch(entry -> !isJvmKind(entry.getKey()) && (!entry.getValue().changed().isEmpty() || !entry.getValue().deleted().isEmpty()));
         ChangeSet changes = runtime.takeOutputChanges();
         Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
         changed.addAll(testRound.affectedClasses());
@@ -201,11 +224,14 @@ final class TestSession {
             changed.add(ClassDependencyIndex.topLevelOf(className));
         }
         changed.removeAll(removedTests);
+        // nor can a change of the application be followed to them: with such tests, every change runs every test
+        boolean fileTests = tests.sourceRoots().stream().anyMatch(root -> !isJvmKind(root.kind()));
+        fileTestsChanged |= fileTests && (!changed.isEmpty() || allSources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty()));
         boolean resourcesChanged = resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())
             || !changes.changedResources().isEmpty() || !changes.removedResources().isEmpty();
         synchronized (this) {
             owedChanges.addAll(changed);
-            owedAll |= full || resourcesChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
+            owedAll |= full || resourcesChanged || fileTestsChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
         }
         if (requested != null) {
             run(requested(requested), requested != TestRequest.FAILED);
@@ -372,12 +398,72 @@ final class TestSession {
         }
         synchronized (this) {
             for (String failed : failedClasses) {
-                if (testClasses.contains(failed)) {
+                // a class of the outputs, or a file of tests an engine discovers from their source files, as pytest's
+                if (testClasses.contains(failed) || isTestFile(failed)) {
                     selected.add(failed);
                 }
             }
         }
         return selected.isEmpty() ? null : TestSelection.ofClasses(selected, description);
+    }
+
+    /**
+     * Whether results are grouped under a file of a test source root whose tests are discovered from their files, as
+     * pytest's, rather than under a class: the file is selected again by that name.
+     */
+    private boolean isTestFile(String name) {
+        for (SourceRoot root : tests.sourceRoots()) {
+            SourceKind kind = root.kind();
+            if (isJvmKind(kind)) {
+                continue;
+            }
+            for (String extension : kind.extensions()) {
+                if (name.endsWith("." + extension)
+                    && (Files.isRegularFile(root.path().resolve(name).normalize()) || Files.isRegularFile(root.path().resolveSibling(name).normalize()))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a name of results names a file of tests discovered from their files, whether or not it is there.
+     */
+    private boolean isTestFileName(String name) {
+        for (SourceRoot root : tests.sourceRoots()) {
+            if (!isJvmKind(root.kind())) {
+                for (String extension : root.kind().extensions()) {
+                    if (name.endsWith("." + extension)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The names the results of a file of tests discovered from their files may be grouped under: its path relative to
+     * its test source root, or to the directory holding the root.
+     */
+    private Set<String> resultNamesOf(Path file) {
+        Set<String> names = new LinkedHashSet<>();
+        Path absolute = file.toAbsolutePath().normalize();
+        for (SourceRoot root : tests.sourceRoots()) {
+            Path base = root.path().toAbsolutePath().normalize();
+            if (!isJvmKind(root.kind()) && absolute.startsWith(base)) {
+                names.add(base.relativize(absolute).toString().replace('\\', '/'));
+                if (base.getParent() != null) {
+                    names.add(base.getParent().relativize(absolute).toString().replace('\\', '/'));
+                }
+            }
+        }
+        return names;
+    }
+
+    private static boolean isJvmKind(SourceKind kind) {
+        return kind == SourceKind.JAVA || kind == SourceKind.KOTLIN || kind == SourceKind.GROOVY;
     }
 
     private static List<Path> outputs(DevManifest target, List<SourceRoot> roots) {

@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -46,11 +47,13 @@ import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -93,6 +96,7 @@ public final class HtmlTestReport implements TestReportListener {
     private static final Logger LOG = LoggerFactory.getLogger(HtmlTestReport.class);
     private static final String TEMPLATE = "META-INF/micronaut-dev/test-report/index.html";
     private static final String LOGO = "META-INF/micronaut-dev/test-report/micronaut-logo.svg";
+    private static final String BRAND = "META-INF/micronaut-dev/test-report/brand.properties";
     private static final int HISTORY = 30;
     // the captured output kept per stream and test: the JUnit XML reports keep it all
     private static final int MAX_OUTPUT = 64 * 1024;
@@ -365,7 +369,7 @@ public final class HtmlTestReport implements TestReportListener {
             Files.createDirectories(target);
             replace(target.resolve("state.json"), state);
             String page = resource(TEMPLATE)
-                .replace("<!--logo-->", resource(LOGO).strip())
+                .replace("<!--logo-->", logo(HtmlTestReport.class.getClassLoader()))
                 .replace("/*state*/null", state);
             replace(target.resolve("index.html"), page);
         } catch (IOException | UncheckedIOException e) {
@@ -473,6 +477,50 @@ public final class HtmlTestReport implements TestReportListener {
     private static String projectName(Path directory) {
         Path name = directory.toAbsolutePath().normalize().getFileName();
         return name == null ? "" : name.toString();
+    }
+
+    /**
+     * The logo in the page's header: the Micronaut logo, or the one a product built on Micronaut names in a
+     * {@code META-INF/micronaut-dev/test-report/brand.properties} of the launch classpath, with {@code name}, the
+     * product's name, and {@code logo}, the resource of an SVG, which is inlined, or a PNG, which is embedded.
+     *
+     * @param loader The loader to find the brand and the logo with
+     * @return The logo's HTML
+     */
+    static String logo(ClassLoader loader) {
+        Properties brand = new Properties();
+        try (InputStream in = loader.getResourceAsStream(BRAND)) {
+            if (in != null) {
+                brand.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            LOG.warn("Cannot read the test report's brand {}: {}", BRAND, e.getMessage());
+        }
+        String logo = brand.getProperty("logo", "").strip();
+        String name = brand.getProperty("name", "").strip();
+        if (logo.isEmpty()) {
+            return resource(LOGO).strip();
+        }
+        try (InputStream in = loader.getResourceAsStream(logo)) {
+            if (in == null) {
+                LOG.warn("The test report's logo {} is not on the classpath", logo);
+                return resource(LOGO).strip();
+            }
+            byte[] bytes = in.readAllBytes();
+            if (logo.endsWith(".svg")) {
+                return new String(bytes, StandardCharsets.UTF_8).replaceFirst("^\\s*<\\?xml[^>]*\\?>", "").strip();
+            }
+            String type = logo.endsWith(".png") ? "image/png" : logo.endsWith(".webp") ? "image/webp" : "image/jpeg";
+            return "<img src=\"data:" + type + ";base64," + Base64.getEncoder().encodeToString(bytes) + "\" alt=\""
+                + escape(name.isEmpty() ? "Logo" : name) + "\">";
+        } catch (IOException e) {
+            LOG.warn("Cannot read the test report's logo {}: {}", logo, e.getMessage());
+            return resource(LOGO).strip();
+        }
+    }
+
+    private static String escape(String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     private static String resource(String name) {
