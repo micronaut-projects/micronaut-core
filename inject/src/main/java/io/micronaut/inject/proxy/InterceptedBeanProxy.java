@@ -16,6 +16,7 @@
 package io.micronaut.inject.proxy;
 
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.qualifiers.Qualified;
 import org.jspecify.annotations.Nullable;
@@ -64,6 +65,15 @@ public interface InterceptedBeanProxy<T> extends InterceptedBean, Qualified<T> {
      * @since 5.3.0
      */
     default @Nullable BeanRegistration<T> interceptedTargetRegistration() {
+        return null;
+    }
+
+    /**
+     * Returns the ownership retained by a generated proxy, without initializing its target.
+     * @return The dependency group, or {@code null} for previously generated proxies
+     * @since 5.3.0
+     */
+    default @Nullable BeanDependencyGroup interceptedBeanDependencies() {
         return null;
     }
 
