@@ -104,7 +104,9 @@ public interface ParameterizedInterceptedBeanDefinition<T>
             return ConstructorInterceptorChain.instantiate(resolutionContext, context, declared, this, constructor, values);
         }
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveLifecycleInterceptors(resolutionContext, constructor);
-        SharedInterceptorRegistrations.store(resolutionContext, this, interceptors);
+        if (interceptors != null) {
+            resolutionContext.setBeanInterceptors(this, interceptors);
+        }
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,
             context,
