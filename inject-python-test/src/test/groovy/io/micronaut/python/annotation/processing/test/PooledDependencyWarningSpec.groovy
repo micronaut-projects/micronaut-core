@@ -1,5 +1,7 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.python.compiler.PyronautCompiler
+
 /**
  * A pooled type that depends on a singleton Python bean is warned about: the pooled type
  * exists once per context, the singleton exists once in one context, so calls through that
@@ -11,18 +13,40 @@ package io.micronaut.python.annotation.processing.test
  */
 class PooledDependencyWarningSpec extends AbstractPythonTypeElementSpec {
 
+    private static final String SINGLETON_DEPENDENCY = '''
+from jakarta.inject import Singleton
+from micronaut.context.python.scope import ContextPooled
+
+@Singleton
+class NotPooled:
+    def value(self) -> str:
+        return "value"
+
+@ContextPooled
+class Pooled:
+    def __init__(self, dependency: NotPooled):
+        self.dependency = dependency
+'''
+
     /**
      * Compiles and returns what the processor reported. Compile only: these features are about
      * what is reported, which happens whether or not a context is ever started.
      */
-    private String warningsFrom(String python) {
+    private String warningsFrom(String python, String ignoreOption = null) {
         // The compiler collects its diagnostics and prints the processor's notes and warnings to
         // stderr, so that is where a `VisitorContext.warn` ends up here.
         def captured = new ByteArrayOutputStream()
         def previous = System.err
         System.setErr(new PrintStream(captured, true))
         try {
-            buildClassElement(python, "NoSuchClass") { it }
+            def options = ignoreOption == null
+                ? []
+                : ["-Amicronaut.python.pooled.ignoreDependencies=" + ignoreOption]
+            def compiler = PyronautCompiler.builder()
+                .pythonCode(python)
+                .options(options)
+                .build()
+            compiler.buildClassLoader()
         } finally {
             System.setErr(previous)
         }
@@ -176,5 +200,45 @@ class Greeting:
 
         cleanup:
         context?.close()
+    }
+
+    void "the warning can be turned off entirely"() {
+        given: "an application that has weighed the cost and does not want it reported"
+        when:
+        def reported = warningsFrom(SINGLETON_DEPENDENCY, "false")
+
+        then:
+        !reported.contains("depends on the singleton Python bean")
+    }
+
+    void "a named dependency can be left unreported while the others still warn"() {
+        given: """the point of a filter rather than a switch: a bean reached once per request loses
+                  little by living in one context, and silencing it must not silence the next one"""
+        def python = '''
+from jakarta.inject import Singleton
+from micronaut.context.python.scope import ContextPooled
+
+@Singleton
+class Accepted:
+    def value(self) -> str:
+        return "accepted"
+
+@Singleton
+class NotAccepted:
+    def value(self) -> str:
+        return "not accepted"
+
+@ContextPooled
+class Pooled:
+    def __init__(self, accepted: Accepted, other: NotAccepted):
+        self.accepted = accepted
+        self.other = other
+'''
+        when:
+        def reported = warningsFrom(python, "Accepted")
+
+        then:
+        !reported.contains("singleton Python bean [Accepted]")
+        reported.contains("singleton Python bean [NotAccepted]")
     }
 }

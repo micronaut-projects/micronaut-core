@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -42,6 +43,7 @@ import io.micronaut.sourcegen.model.TypeDef;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,6 +68,13 @@ import static io.micronaut.python.processing.PythonStubGenerator.pythonClassRefe
 import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 
 final class PythonPooledStubGenerator {
+    /**
+     * The option naming the dependencies whose pooling cost this compilation already accepts, or
+     * {@code false} to report none of them. Camel case in the tail because javac accepts only a
+     * dot-separated sequence of identifiers as the key of a {@code -A} option.
+     */
+    static final String IGNORE_OPTION = "micronaut.python.pooled.ignoreDependencies";
+
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
     private static final ClassTypeDef POOLED_INSTANCE = ClassTypeDef.of("io.micronaut.context.python.PythonPooledInstance");
@@ -76,6 +85,9 @@ final class PythonPooledStubGenerator {
     private static final TypeDef VALUE_FACTORY = TypeDef.parameterized(
         ClassTypeDef.of("java.util.function.Function"), POLYGLOT_CONTEXT, POLYGLOT_VALUE);
     private static final String REPORTED_POOLED_DEPENDENCIES = "micronaut.python.reported-pooled-dependencies";
+
+    /** The marker for "report nothing", which {@code false} selects. */
+    private static final String ALL = "*";
 
     /**
      * Warns about a pooled type whose Python dependency is pinned to a single context.
@@ -103,9 +115,16 @@ final class PythonPooledStubGenerator {
     private static void warnAboutContextBoundDependencies(VisitorContext context,
                                                           ClassElement element,
                                                           List<? extends TypedElement> dependencies) {
+        Set<String> ignored = ignoredPooledDependencies(context);
+        if (ignored.contains(ALL)) {
+            return;
+        }
         for (TypedElement dependency : dependencies) {
             ClassElement dependencyType = dependency.getGenericType();
             if (!isPythonType(dependencyType) || dependencyType.hasStereotype(CONTEXT_POOLED)) {
+                continue;
+            }
+            if (ignored.contains(dependencyType.getSimpleName()) || ignored.contains(dependencyType.getName())) {
                 continue;
             }
             if (dependencyType.hasStereotype(AnnotationUtil.SINGLETON)) {
@@ -119,6 +138,45 @@ final class PythonPooledStubGenerator {
                 }
             }
         }
+    }
+
+    /**
+     * The dependencies this compilation does not want reported.
+     *
+     * <p>The warning names a cost, not a fault, and the shape it names is sometimes the one the
+     * application wants: a bean that is reached once per request rather than per row, or one whose
+     * work is a Java call anyway, loses little by living in a single context. Until this option
+     * existed there was no way to say so, and a warning that cannot be acted on or silenced is one
+     * that gets ignored wholesale -- including the pairing that does matter.
+     *
+     * <p>Read from {@code -A}{@value #IGNORE_OPTION}{@code =...}, a comma-separated list of the
+     * dependency types to leave unreported, by simple or qualified name. The value {@code false}
+     * turns the warning off altogether. Following {@code PythonReflectionGate}, the same name is
+     * accepted as a system property of the compiler JVM, so a build that cannot pass {@code -A}
+     * options has a way in.
+     *
+     * @param context The visitor context
+     * @return The dependency names to skip, or a set containing {@link #ALL}
+     */
+    private static Set<String> ignoredPooledDependencies(VisitorContext context) {
+        String value = context.getOptions().get(IGNORE_OPTION);
+        if (StringUtils.isEmpty(value)) {
+            value = System.getProperty(IGNORE_OPTION);
+        }
+        if (StringUtils.isEmpty(value)) {
+            return Set.of();
+        }
+        if (StringUtils.FALSE.equalsIgnoreCase(value.trim())) {
+            return Set.of(ALL);
+        }
+        Set<String> names = new HashSet<>();
+        for (String name : value.split(",")) {
+            String trimmed = name.trim();
+            if (!trimmed.isEmpty()) {
+                names.add(trimmed);
+            }
+        }
+        return names;
     }
 
     /**
