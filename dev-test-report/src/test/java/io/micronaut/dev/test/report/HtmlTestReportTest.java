@@ -97,8 +97,8 @@ class HtmlTestReportTest {
     @Test
     void theServerServesThePageAndAnOpenPageFollowsTheRunTestByTest(@TempDir Path directory) throws Exception {
         try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
-            HtmlTestReport html = new HtmlTestReport(directory, server, List.of());
-            assertEquals("http://localhost:" + server.port() + HtmlTestReport.PREFIX, html.url());
+            HtmlTestReport html = new HtmlTestReport(directory, server, List.of(), "/reports/tests/");
+            assertEquals("http://localhost:" + server.port() + "/reports/tests/", html.url());
             HttpClient client = HttpClient.newHttpClient();
             LinkedBlockingQueue<String> events = listen(client, server);
 
@@ -116,11 +116,11 @@ class HtmlTestReportTest {
             String state = next(events, "state");
             assertTrue(state.contains("\"live\":true"));
 
-            HttpResponse<String> page = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + HtmlTestReport.PREFIX)).build(),
+            HttpResponse<String> page = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/reports/tests/")).build(),
                 HttpResponse.BodyHandlers.ofString());
             assertEquals(200, page.statusCode());
             assertTrue(page.body().contains("aria-label=\"Micronaut\""));
-            HttpResponse<String> json = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + HtmlTestReport.PREFIX + "state.json")).build(),
+            HttpResponse<String> json = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/reports/tests/state.json")).build(),
                 HttpResponse.BodyHandlers.ofString());
             assertEquals(200, json.statusCode());
             assertTrue(json.body().startsWith("{\"version\":1"));
@@ -140,6 +140,20 @@ class HtmlTestReportTest {
 
         html.runFinished(new TestRunSummary("run-1", 1, 0, 0, 0, Duration.ofMillis(3), false, true));
         assertTrue(html.state().contains("\"current\":[]"));
+    }
+
+    @Test
+    void aProductBuiltOnMicronautPutsItsOwnLogoInTheHeader(@TempDir Path directory) throws Exception {
+        Path brand = Files.createDirectories(directory.resolve("META-INF/micronaut-dev/test-report"));
+        Files.writeString(brand.resolve("brand.properties"), "name=Pyronaut & co\nlogo=brand/wordmark.png\n");
+        Files.createDirectories(directory.resolve("brand"));
+        Files.write(directory.resolve("brand/wordmark.png"), new byte[] {(byte) 0x89, 'P', 'N', 'G'});
+
+        try (java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {directory.toUri().toURL()}, null)) {
+            assertEquals("<img src=\"data:image/png;base64,iVBORw==\" alt=\"Pyronaut &amp; co\">", HtmlTestReport.logo(loader));
+        }
+        // without a brand, the Micronaut logo
+        assertTrue(HtmlTestReport.logo(getClass().getClassLoader()).contains("aria-label=\"Micronaut\""));
     }
 
     @Test

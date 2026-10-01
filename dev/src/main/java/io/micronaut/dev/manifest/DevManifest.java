@@ -193,6 +193,7 @@ public final class DevManifest {
             Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "once", "false")),
             path(directory, properties.getProperty(PREFIX + TEST + "reports", "build/micronaut-dev/test-results")),
             path(directory, properties.getProperty(PREFIX + TEST + "html-report", "build/micronaut-dev/test-report")),
+            servedPath(properties.getProperty(PREFIX + TEST + "html-report-path", "/tests/")),
             options(directory, properties.getProperty(PREFIX + TEST + "filter", "")),
             parameters
         );
@@ -524,6 +525,27 @@ public final class DevManifest {
             throw new IllegalArgumentException("The manifest lacks " + PREFIX + key);
         }
         return value.trim();
+    }
+
+    /**
+     * A path the LiveReload server serves a page at: with a leading and a trailing slash, of plain segments, and
+     * neither the root nor a path of the server's own.
+     */
+    private static String servedPath(String value) {
+        String path = value.trim();
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        if (!path.endsWith("/")) {
+            path = path + "/";
+        }
+        if (!path.matches("(/[A-Za-z0-9._~-]+)+/") || path.contains("/./") || path.contains("/../")) {
+            throw new IllegalArgumentException("Not a path to serve the test report at: " + value + " (as /tests/, of plain segments)");
+        }
+        if (path.startsWith("/livereload/") || path.startsWith("/livereload.js") || path.startsWith("/micronaut-dev/")) {
+            throw new IllegalArgumentException("The path " + value + " is the LiveReload server's own: choose another for the test report");
+        }
+        return path;
     }
 
     private static Path path(Path directory, String value) {

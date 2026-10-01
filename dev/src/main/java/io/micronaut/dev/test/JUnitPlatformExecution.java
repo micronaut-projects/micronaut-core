@@ -15,6 +15,8 @@
  */
 package io.micronaut.dev.test;
 
+import io.micronaut.dev.compile.SourceKind;
+import io.micronaut.dev.compile.SourceRoot;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.platform.engine.DiscoverySelector;
@@ -35,6 +37,8 @@ import org.junit.platform.launcher.TestPlan;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,6 +68,8 @@ final class JUnitPlatformExecution {
     private static final String STDOUT_KEY = "stdout";
     private static final String STDERR_KEY = "stderr";
     private static final String CLASS_ERROR = "initializationError";
+    // the languages whose tests are classes of the test class output, which the class path roots select
+    private static final Set<SourceKind> JVM_KINDS = Set.of(SourceKind.JAVA, SourceKind.KOTLIN, SourceKind.GROOVY);
 
     private final TestRunRequest request;
     private final TestEventListener listener;
@@ -129,8 +135,23 @@ final class JUnitPlatformExecution {
         List<DiscoverySelector> selectors = new ArrayList<>();
         if (selection.everything()) {
             selectors.addAll(DiscoverySelectors.selectClasspathRoots(new LinkedHashSet<>(request.testClassOutputs())));
+            // the tests an engine discovers from their source files, as pytest's, are in no class output
+            for (SourceRoot root : request.testSources()) {
+                if (!JVM_KINDS.contains(root.kind()) && Files.isDirectory(root.path())) {
+                    selectors.add(DiscoverySelectors.selectDirectory(root.path().toFile()));
+                }
+            }
         } else {
             for (String className : selection.classes()) {
+                // a test without a class, as a pytest function, is grouped under its file: the file is selected
+                if (isFileName(className)) {
+                    // a file that is gone runs nothing: the run, complete, clears its results
+                    Path file = sourceFile(className);
+                    if (file != null) {
+                        selectors.add(DiscoverySelectors.selectFile(file.toFile()));
+                    }
+                    continue;
+                }
                 Class<?> type = load(className);
                 if (type != null) {
                     selectors.add(DiscoverySelectors.selectClass(type));
@@ -160,6 +181,55 @@ final class JUnitPlatformExecution {
         parameters.putAll(request.parameters());
         builder.configurationParameters(parameters);
         return builder.build();
+    }
+
+    /**
+     * Whether a name of results is a file's rather than a class's: a binary name holds no separator and does not
+     * end with a source file's extension.
+     */
+    private boolean isFileName(String name) {
+        if (name.contains("/") || name.contains("\\")) {
+            return true;
+        }
+        for (SourceRoot root : request.testSources()) {
+            if (!JVM_KINDS.contains(root.kind())) {
+                for (String extension : root.kind().extensions()) {
+                    if (name.endsWith("." + extension)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The test source file a name of results stands for: a path to a file of a test source root of a language whose
+     * tests are discovered from their files, rather than a class name.
+     */
+    @Nullable
+    private Path sourceFile(String name) {
+        Path given;
+        try {
+            given = Path.of(name);
+        } catch (InvalidPathException e) {
+            return null;
+        }
+        for (SourceRoot root : request.testSources()) {
+            if (JVM_KINDS.contains(root.kind())) {
+                continue;
+            }
+            Path base = root.path().toAbsolutePath().normalize();
+            // relative to the root, or to the directory holding it, as a file's results are named
+            List<Path> candidates = given.isAbsolute() ? List.of(given) : base.getParent() == null ? List.of(base.resolve(given)) : List.of(base.resolve(given), base.getParent().resolve(given));
+            for (Path candidate : candidates) {
+                Path file = candidate.normalize();
+                if (file.startsWith(base) && Files.isRegularFile(file)) {
+                    return file;
+                }
+            }
+        }
+        return null;
     }
 
     /**
