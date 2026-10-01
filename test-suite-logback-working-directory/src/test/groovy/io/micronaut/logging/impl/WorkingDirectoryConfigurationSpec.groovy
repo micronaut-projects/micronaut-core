@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * The spec is in this package to reach the package-private {@code LogbackUtils.configure} that takes the class
  * loader of Logback's own lookup. That makes {@code io.micronaut.logging.impl} a split package between
  * micronaut-context and this module's tests, which only works on the class path. If micronaut-context is ever
- * sealed or put on the module path, the features that call that overload have to go through the public method.
+ * sealed or put on the module path, the features that call that overload have to go through the logging system's refresh().
  */
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
 @Stepwise

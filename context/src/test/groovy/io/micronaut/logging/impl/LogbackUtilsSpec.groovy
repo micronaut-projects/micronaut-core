@@ -25,8 +25,8 @@ import java.nio.file.Path
  * root appender is {@code STDOUT}.
  * <p>
  * Logback's startup looks the {@link Configurator} services up with the class loader that loaded Logback,
- * and so does the public {@code configure}. These features therefore go through its package-private
- * overload, which takes that class loader. The public method differs from it by that one argument and by
+ * and so does the four-argument {@code configure}. These features therefore go through the six-argument
+ * overload, which takes that class loader. The four-argument method differs from it by that one argument and by
  * the {@code logback.xml} file of the working directory, and the feature about the class loader that loaded
  * Logback is the one that goes through it. The other features pass a {@code logback.xml} in a temporary
  * directory instead of the working directory's, and only the features about that file write it.
@@ -104,7 +104,7 @@ class LogbackUtilsSpec extends Specification {
         rootAppenders() == ['CUSTOM']
     }
 
-    void "the public method looks the Configurator services up with the class loader that loaded Logback"() {
+    void "the four-argument method looks the Configurator services up with the class loader that loaded Logback"() {
         when: 'the class loader for the locations of the Micronaut configuration holds a Configurator service'
         LogbackUtils.configure(classLoader([StubConfigurator]), context, null, null)
 
