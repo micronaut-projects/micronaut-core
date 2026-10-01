@@ -38,6 +38,17 @@ public interface ServerSslBuilder {
      */
     Optional<SslContext> build();
 
+    /**
+     * Drops what the builder holds from the configuration sources, such as a key store read from its
+     * path, so that the next {@link #build()} reads them again. The server calls it before rebuilding
+     * its pipelines for a refreshed configuration: a store file replaced in place keeps its path.
+     *
+     * @since 5.3.0
+     */
+    @Experimental
+    default void reload() {
+    }
+
     @Experimental
     default Optional<QuicSslContext> buildQuic() {
         throw new UnsupportedOperationException("QUIC not supported");

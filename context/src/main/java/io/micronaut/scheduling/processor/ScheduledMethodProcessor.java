@@ -20,8 +20,12 @@ import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.context.watch.BeanWatch;
+import io.micronaut.context.watch.ExecutableMethodChange;
+import io.micronaut.context.watch.ExecutableMethodWatcher;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.BoundExecutable;
@@ -52,12 +56,14 @@ import java.io.Closeable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation.
@@ -67,7 +73,7 @@ import java.util.concurrent.ScheduledFuture;
  */
 @Internal
 @Singleton
-public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable {
+public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, ExecutableMethodWatcher<Scheduled>, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskScheduler.class);
     private static final String MEMBER_FIXED_RATE = "fixedRate";
@@ -80,8 +86,17 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
     private final BeanContext beanContext;
     private final ConversionService conversionService;
-    private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
-    private final List<ScheduledDefinition<?>> scheduledMethodsDefinitions = new ArrayList<>();
+    /**
+     * The futures of each scheduled method, so that a method that comes back in a new generation with the
+     * same schedule keeps its running timers, and one that goes has its timers cancelled.
+     */
+    private final Map<ExecutableMethodChange.Entry<Scheduled>, ScheduledMethod> scheduledTasks = new ConcurrentHashMap<>();
+    private volatile @Nullable BeanWatch watch;
+    /**
+     * What scheduling the startup batch threw, if anything: the watch isolates a watcher's failure, and a
+     * schedule that cannot be read must still fail the startup as it always has.
+     */
+    private volatile @Nullable RuntimeException startupFailure;
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
     /**
@@ -95,24 +110,81 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         this.taskExceptionHandler = taskExceptionHandler;
     }
 
+    /**
+     * Does nothing: the methods are watched, not processed.
+     *
+     * @param beanDefinition The bean definition to process
+     * @param method The executable method
+     * @param <B> The bean type
+     * @deprecated The processor watches the {@link Scheduled} methods through
+     * {@link io.micronaut.context.WatchableBeanContext#watchMethods(Class, ExecutableMethodWatcher)} since 5.3.0
+     */
     @Override
+    @Deprecated(since = "5.3.0", forRemoval = true)
     public <B> void process(BeanDefinition<B> beanDefinition, ExecutableMethod<B, ?> method) {
-        scheduledMethodsDefinitions.add(new ScheduledDefinition(beanDefinition, method));
+        // the watch registered at startup delivers every scheduled method, this one included
     }
 
     /**
-     * On startup event listener that schedules the active tasks.
+     * On startup, registers the watch: its first batch is every scheduled method present, and the later
+     * ones are what a reload retires and adds.
+     *
      * @param ignore The startup event.
      */
     @EventListener
     void scheduleTasks(StartupEvent ignore) {
-        scheduledMethodsDefinitions.parallelStream().forEach(this::scheduleTask);
-        scheduledMethodsDefinitions.clear();
+        if (beanContext instanceof WatchableBeanContext watchable) {
+            watch = watchable.watchMethods(Scheduled.class, this);
+            RuntimeException failure = startupFailure;
+            if (failure != null) {
+                startupFailure = null;
+                throw failure;
+            }
+        }
     }
 
-    private <B> void scheduleTask(ScheduledDefinition<B> scheduledDefinition) {
-        ExecutableMethod<B, ?> method = scheduledDefinition.method();
-        BeanDefinition<B> beanDefinition = scheduledDefinition.definition();
+    @Override
+    public void onChange(ExecutableMethodChange<Scheduled> change) {
+        for (ExecutableMethodChange.Entry<Scheduled> gone : change.removed()) {
+            ScheduledMethod scheduled = scheduledTasks.remove(gone);
+            if (scheduled == null) {
+                continue;
+            }
+            Optional<ExecutableMethodChange.Entry<Scheduled>> back = change.replacementOf(gone);
+            if (back.isPresent() && sameSchedule(gone, back.get())) {
+                // the same schedule in the new generation: the running timers stay, and from now on invoke the
+                // replacement method on the new generation's bean
+                scheduled.retarget(back.get());
+                scheduledTasks.put(back.get(), scheduled);
+            } else {
+                scheduled.cancel();
+            }
+        }
+        try {
+            (change.initial() ? change.added().parallelStream() : change.added().stream())
+                .filter(entry -> !scheduledTasks.containsKey(entry))
+                .forEach(this::scheduleTask);
+        } catch (RuntimeException e) {
+            if (change.initial()) {
+                // surfaced by the startup listener once the watch is registered, as it always failed the startup
+                startupFailure = e;
+                return;
+            }
+            throw e;
+        }
+    }
+
+    private static boolean sameSchedule(ExecutableMethodChange.Entry<Scheduled> before, ExecutableMethodChange.Entry<Scheduled> after) {
+        return before.method().getAnnotationValuesByType(Scheduled.class).equals(after.method().getAnnotationValuesByType(Scheduled.class));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <B> void scheduleTask(ExecutableMethodChange.Entry<Scheduled> entry) {
+        ScheduledMethod scheduled = new ScheduledMethod(entry);
+        List<ScheduledFuture<?>> futures = scheduled.futures;
+        scheduledTasks.put(entry, scheduled);
+        ExecutableMethod<B, ?> method = (ExecutableMethod<B, ?>) entry.method();
+        BeanDefinition<B> beanDefinition = (BeanDefinition<B>) entry.definition();
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
             String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
@@ -137,13 +209,17 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
             TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
             Runnable task = () -> {
+                // the method and the definition of the moment: a timer kept across a generation invokes the replacement
+                ExecutableMethodChange.Entry<Scheduled> current = scheduled.target();
+                ExecutableMethod<B, ?> currentMethod = (ExecutableMethod<B, ?>) current.method();
+                BeanDefinition<B> currentDefinition = (BeanDefinition<B>) current.definition();
                 try {
                     ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
                     // a ScheduledExecution argument is not a bean: it is this invocation, supplied once it exists
-                    ExecutionAwareExecutable<B> executable = new ExecutionAwareExecutable<>(method);
+                    ExecutionAwareExecutable<B> executable = new ExecutionAwareExecutable<>(currentMethod);
                     BoundExecutable<B, ?> boundExecutable = binder.bind(executable, beanContext);
                     @Nullable Object[] arguments = executable.arguments(boundExecutable.getBoundArguments());
-                    B bean = beanContext.getBean(beanDefinition);
+                    B bean = beanContext.getBean(currentDefinition);
                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
                         finalAnnotationValue = evaluated.withArguments(bean, arguments);
@@ -151,25 +227,25 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
                         // tells an interceptor of the method that the scheduler invoked it, and by which schedule
-                        ScheduledExecution execution = new ScheduledExecution(method, finalAnnotationValue);
+                        ScheduledExecution execution = new ScheduledExecution(currentMethod, finalAnnotationValue);
                         // created for this invocation alone, so the method receives the execution of this call
                         executable.supply(arguments, execution);
                         try {
                             // a block, so that it is the Runnable overload: the result of the method is not used
                             PropagatedContext.getOrEmpty().plus(execution).propagate(() -> {
-                                method.invoke(bean, arguments);
+                                currentMethod.invoke(bean, arguments);
                             });
                         } catch (Throwable e) {
-                            handleException(beanDefinition.getBeanType(), bean, e);
+                            handleException(currentDefinition.getBeanType(), bean, e);
                         }
                     }
                 } catch (NoSuchBeanException noSuchBeanException) {
                     // ignore: a timing issue can occur when the context is being shutdown. If a scheduled job runs and the context
                     // is shutdown and available beans cleared then the bean is no longer available. The best thing to do here is just ignore the failure.
-                    LOG.debug("Scheduled job skipped for context shutdown: {}.{}", beanDefinition.getBeanType().getSimpleName(), method.getDescription(true));
+                    LOG.debug("Scheduled job skipped for context shutdown: {}.{}", currentDefinition.getBeanType().getSimpleName(), currentMethod.getDescription(true));
                 } catch (Exception e) {
-                    TaskExceptionHandler<B, Throwable> finalHandler = findHandler(beanDefinition.getBeanType(), e);
-                    finalHandler.handleCreationFailure(beanDefinition, e);
+                    TaskExceptionHandler<B, Throwable> finalHandler = findHandler(currentDefinition.getBeanType(), e);
+                    finalHandler.handleCreationFailure(currentDefinition, e);
                 }
             };
 
@@ -183,7 +259,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 }
 
                 ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(cronExpr, zoneIdStr, task);
-                scheduledTasks.add(scheduledFuture);
+                futures.add(scheduledFuture);
             } else if (StringUtils.isNotEmpty(fixedRate)) {
                 Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
                 Duration duration = converted.orElseThrow(() ->
@@ -195,7 +271,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 }
 
                 ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
-                scheduledTasks.add(scheduledFuture);
+                futures.add(scheduledFuture);
             } else if (StringUtils.isNotEmpty(fixedDelay)) {
                 Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
                 Duration duration = converted.orElseThrow(() ->
@@ -207,11 +283,10 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 }
 
                 ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
-                scheduledTasks.add(scheduledFuture);
+                futures.add(scheduledFuture);
             } else if (initialDelay != null) {
                 ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(initialDelay, task);
-
-                scheduledTasks.add(scheduledFuture);
+                futures.add(scheduledFuture);
             } else {
                 throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
             }
@@ -232,15 +307,25 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @Override
     @PreDestroy
     public void close() {
+        BeanWatch registered = watch;
+        if (registered != null) {
+            registered.close();
+            watch = null;
+        }
         try {
-            for (ScheduledFuture<?> scheduledTask : scheduledTasks) {
-                if (!scheduledTask.isCancelled()) {
-                    scheduledTask.cancel(false);
-                }
+            for (ScheduledMethod scheduled : scheduledTasks.values()) {
+                scheduled.cancel();
             }
         } finally {
             scheduledTasks.clear();
         }
+    }
+
+    /**
+     * @return How many scheduled methods hold timers
+     */
+    public int scheduledMethods() {
+        return scheduledTasks.size();
     }
 
     /**
@@ -327,8 +412,32 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         }
     }
 
-    private record ScheduledDefinition<B>(BeanDefinition<B> definition,
-                                          ExecutableMethod<B, ?> method) {
+    /**
+     * The timers of one scheduled method and the method they invoke, which a replacement updates.
+     */
+    private static final class ScheduledMethod {
+        final List<ScheduledFuture<?>> futures = new ArrayList<>(1);
+        private final AtomicReference<ExecutableMethodChange.Entry<Scheduled>> target;
+
+        ScheduledMethod(ExecutableMethodChange.Entry<Scheduled> entry) {
+            this.target = new AtomicReference<>(entry);
+        }
+
+        ExecutableMethodChange.Entry<Scheduled> target() {
+            return Objects.requireNonNull(target.get());
+        }
+
+        void retarget(ExecutableMethodChange.Entry<Scheduled> entry) {
+            target.set(entry);
+        }
+
+        void cancel() {
+            for (ScheduledFuture<?> future : futures) {
+                if (!future.isCancelled()) {
+                    future.cancel(false);
+                }
+            }
+        }
     }
 
 }

@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 
 /**
  * Receives the changes to the resources a {@link ResourceSelector} selects, registered with
- * {@link io.micronaut.context.BeanContext#watchResources(ResourceSelector, ResourceWatcher)}.
+ * {@link io.micronaut.context.WatchableBeanContext#watchResources(ResourceSelector, ResourceWatcher)}.
  *
  * @author graemerocher
  * @since 5.3.0

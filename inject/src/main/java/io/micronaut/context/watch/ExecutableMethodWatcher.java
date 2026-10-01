@@ -21,7 +21,7 @@ import java.lang.annotation.Annotation;
 
 /**
  * Receives the changes to the executable methods carrying an annotation, registered with
- * {@link io.micronaut.context.BeanContext#watchMethods(Class, ExecutableMethodWatcher)}. The reload-aware
+ * {@link io.micronaut.context.WatchableBeanContext#watchMethods(Class, ExecutableMethodWatcher)}. The reload-aware
  * successor of {@link io.micronaut.context.processor.ExecutableMethodProcessor}: it sees what went as well
  * as what came, paired where a method came back in a new generation.
  *
