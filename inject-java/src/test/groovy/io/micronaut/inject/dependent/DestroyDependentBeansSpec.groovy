@@ -100,20 +100,20 @@ class DestroyDependentBeansSpec extends Specification {
         then:
             registration
         when:
-            List<BeanRegistration> dependents = registration.dependentBeans()
+            List<BeanRegistration> dependents = registration.dependents
         then: "Validate dependents"
             dependents.size() == 5
             dependents[0].bean instanceof BeanB
 
         when:
 
-            List<BeanRegistration> beanBDependents = dependents[0].dependentBeans()
+            List<BeanRegistration> beanBDependents = dependents[0].dependents
         then:"Validate BeanB dependents"
             beanBDependents.size() == 2
             beanBDependents[0].bean instanceof TestInterceptor
-            beanBDependents[0].dependentBeans().empty
+            beanBDependents[0].dependents == null
             beanBDependents[1].bean instanceof BeanC
-            beanBDependents[1].dependentBeans().empty
+            beanBDependents[1].dependents == null
 
         when:"When the context is stopped"
             context.stop()
@@ -150,19 +150,19 @@ class DestroyDependentBeansSpec extends Specification {
             !bean.beanBMethod.destroyed
 
         when:
-            List<BeanRegistration> dependents = registration.dependentBeans()
+            List<BeanRegistration> dependents = registration.dependents
         then: "Validate dependents"
             dependents.size() == 5
             dependents[0].bean instanceof BeanB
 
         when:
-            List<BeanRegistration> beanBDependents = dependents[0].dependentBeans()
+            List<BeanRegistration> beanBDependents = dependents[0].dependents
         then:"Validate BeanB dependents"
             beanBDependents.size() == 2
             beanBDependents[0].bean instanceof TestInterceptor
-            beanBDependents[0].dependentBeans().empty
+            beanBDependents[0].dependents == null
             beanBDependents[1].bean instanceof BeanC
-            beanBDependents[1].dependentBeans().empty
+            beanBDependents[1].dependents == null
 
         when:"When the context is stopped"
             context.destroyBean(registration)
