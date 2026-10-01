@@ -17,7 +17,6 @@ package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,17 +32,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -83,12 +78,7 @@ public final class JUnitXmlReportWriter implements TestReportListener {
     private static final String REPORT_SUFFIX = ".xml";
 
     private final Path directory;
-    // the latest result of every test, across the runs of this writer, by class and by test
-    private final Map<String, Map<String, Case>> latest = new LinkedHashMap<>();
-    private final Map<String, Map<String, Case>> run = new LinkedHashMap<>();
-    private final Map<String, Case> running = new LinkedHashMap<>();
-    private Instant startedAt = Instant.now();
-    private TestSelection selection = TestSelection.all();
+    private final TestResults results = new TestResults();
 
     /**
      * @param directory Where the reports go
@@ -105,85 +95,42 @@ public final class JUnitXmlReportWriter implements TestReportListener {
     }
 
     @Override
-    public synchronized void runStarted(TestRunStarted event) {
-        run.clear();
-        running.clear();
-        startedAt = event.startedAt();
-        selection = event.selection();
+    public void runStarted(TestRunStarted event) {
+        results.runStarted(event);
     }
 
     @Override
-    public synchronized void testStarted(TestId test) {
-        running.put(test.uniqueId(), new Case(test));
+    public void testStarted(TestId test) {
+        results.testStarted(test);
     }
 
     @Override
-    public synchronized void output(TestId test, TestOutput stream, String text) {
-        Case current = running.computeIfAbsent(test.uniqueId(), id -> new Case(test));
-        (stream == TestOutput.STDOUT ? current.out : current.err).append(text);
+    public void output(TestId test, TestOutput stream, String text) {
+        results.output(test, stream, text);
     }
 
     @Override
-    public synchronized void testFinished(TestId test, TestOutcome outcome) {
-        Case finished = running.remove(test.uniqueId());
-        if (finished == null) {
-            finished = new Case(test);
-        }
-        finished.outcome = outcome;
-        run.computeIfAbsent(test.className(), name -> new LinkedHashMap<>()).put(test.uniqueId(), finished);
+    public void testFinished(TestId test, TestOutcome outcome) {
+        results.testFinished(test, outcome);
     }
 
     @Override
     public synchronized void runFinished(TestRunSummary summary) {
-        Set<String> touched = new LinkedHashSet<>(run.keySet());
-        boolean replaces = summary.complete() && selection.patterns().isEmpty();
-        boolean full = replaces && selection.everything();
-        if (full) {
-            // every test there is ran: whatever the earlier runs saw and this one did not is gone
-            touched.addAll(latest.keySet());
-            latest.clear();
-        } else if (replaces) {
-            // what was selected by name ran in full: its earlier results are replaced, a test that is gone with them
-            for (String className : selection.classes()) {
-                // the class and the classes nested in it, whose tests are grouped under their own names
-                latest.keySet().removeIf(name -> {
-                    boolean replaced = name.equals(className) || name.startsWith(className + "$");
-                    if (replaced) {
-                        touched.add(name);
-                    }
-                    return replaced;
-                });
-                touched.add(className);
-            }
-            for (String method : selection.methods()) {
-                int hash = method.indexOf('#');
-                if (hash > 0) {
-                    String className = method.substring(0, hash);
-                    String methodName = method.substring(hash + 1);
-                    Map<String, Case> cases = latest.get(className);
-                    if (cases != null) {
-                        cases.values().removeIf(test -> isOfMethod(test.id, methodName));
-                    }
-                    touched.add(className);
-                }
-            }
-        }
-        run.forEach((className, cases) -> latest.computeIfAbsent(className, name -> new LinkedHashMap<>()).putAll(cases));
+        TestResults.Applied applied = results.runFinished(summary);
         try {
             Files.createDirectories(directory);
             Set<Path> written = new HashSet<>();
-            for (String className : touched) {
-                Map<String, Case> cases = latest.get(className);
+            for (String className : applied.classes()) {
+                List<TestResults.Result> cases = results.of(className);
                 Path report = reportOf(className);
-                if (cases == null || cases.isEmpty()) {
-                    latest.remove(className);
+                if (cases.isEmpty()) {
                     Files.deleteIfExists(report);
                 } else {
-                    write(className, cases.values());
+                    write(className, cases);
                     written.add(report);
                 }
             }
-            if (full) {
+            if (applied.full()) {
                 // reports an earlier process left for classes that are gone
                 try (Stream<Path> reports = Files.list(directory)) {
                     for (Path report : reports.filter(JUnitXmlReportWriter::isReport).toList()) {
@@ -204,35 +151,13 @@ public final class JUnitXmlReportWriter implements TestReportListener {
      * @param className The class, by binary name
      */
     public synchronized void remove(String className) {
-        Set<String> gone = new LinkedHashSet<>();
-        for (String name : latest.keySet()) {
-            if (name.equals(className) || name.startsWith(className + "$")) {
-                gone.add(name);
-            }
-        }
-        gone.add(className);
-        for (String name : gone) {
-            latest.remove(name);
+        for (String name : results.remove(className)) {
             try {
                 Files.deleteIfExists(reportOf(name));
             } catch (IOException e) {
                 LOG.error("Cannot remove the test report of {}: {}", name, e.getMessage(), e);
             }
         }
-    }
-
-    /**
-     * Whether a test belongs to a method: it is the method, {@code adds()}, an invocation of it, {@code adds(int)[1]},
-     * or a test the method produced, as a {@code @TestFactory}'s dynamic tests, whose unique identifier descends from
-     * a segment naming the method, such as {@code [test-factory:generated()]}.
-     */
-    private static boolean isOfMethod(TestId test, String methodName) {
-        String name = test.name();
-        if (name.equals(methodName) || name.startsWith(methodName + "(") || name.startsWith(methodName + "[")) {
-            return true;
-        }
-        String uniqueId = test.uniqueId();
-        return uniqueId.contains(":" + methodName + "(") || uniqueId.contains(":" + methodName + "]");
     }
 
     /**
@@ -280,14 +205,14 @@ public final class JUnitXmlReportWriter implements TestReportListener {
         return name.startsWith(REPORT_PREFIX) && name.endsWith(REPORT_SUFFIX) && Files.isRegularFile(file);
     }
 
-    private void write(String className, Collection<Case> cases) throws IOException {
+    private void write(String className, List<TestResults.Result> cases) throws IOException {
         Path report = reportOf(className);
         Path temporary = report.resolveSibling(report.getFileName() + ".tmp");
         int failures = 0;
         int errors = 0;
         int skipped = 0;
         Duration time = Duration.ZERO;
-        for (Case test : cases) {
+        for (TestResults.Result test : cases) {
             TestOutcome outcome = test.outcome();
             time = time.plus(outcome.duration());
             switch (outcome.status()) {
@@ -309,17 +234,17 @@ public final class JUnitXmlReportWriter implements TestReportListener {
             xml.writeAttribute("skipped", String.valueOf(skipped));
             xml.writeAttribute("failures", String.valueOf(failures));
             xml.writeAttribute("errors", String.valueOf(errors));
-            xml.writeAttribute("timestamp", TIMESTAMP.format(LocalDateTime.ofInstant(startedAt.truncatedTo(ChronoUnit.SECONDS), ZoneId.systemDefault())));
+            xml.writeAttribute("timestamp", TIMESTAMP.format(LocalDateTime.ofInstant(results.startedAt().truncatedTo(ChronoUnit.SECONDS), ZoneId.systemDefault())));
             xml.writeAttribute("time", seconds(time));
             xml.writeCharacters("\n  ");
             xml.writeStartElement("properties");
             xml.writeCharacters("\n    ");
             xml.writeEmptyElement("property");
             xml.writeAttribute("name", SELECTION_PROPERTY);
-            xml.writeAttribute("value", clean(selection.description()));
+            xml.writeAttribute("value", clean(results.selection().description()));
             xml.writeCharacters("\n  ");
             xml.writeEndElement();
-            for (Case test : cases) {
+            for (TestResults.Result test : cases) {
                 writeCase(xml, className, test);
             }
             xml.writeCharacters("\n");
@@ -337,11 +262,11 @@ public final class JUnitXmlReportWriter implements TestReportListener {
         }
     }
 
-    private static void writeCase(XMLStreamWriter xml, String className, Case test) throws XMLStreamException {
+    private static void writeCase(XMLStreamWriter xml, String className, TestResults.Result test) throws XMLStreamException {
         TestOutcome outcome = test.outcome();
         xml.writeCharacters("\n  ");
         xml.writeStartElement("testcase");
-        xml.writeAttribute("name", clean(test.id.name()));
+        xml.writeAttribute("name", clean(test.test().name()));
         xml.writeAttribute("classname", clean(className));
         xml.writeAttribute("time", seconds(outcome.duration()));
         TestFailure failure = outcome.failure();
@@ -369,19 +294,19 @@ public final class JUnitXmlReportWriter implements TestReportListener {
                 // passed
             }
         }
-        writeOutput(xml, "system-out", test.out);
-        writeOutput(xml, "system-err", test.err);
+        writeOutput(xml, "system-out", test.out());
+        writeOutput(xml, "system-err", test.err());
         xml.writeCharacters("\n  ");
         xml.writeEndElement();
     }
 
-    private static void writeOutput(XMLStreamWriter xml, String element, StringBuilder text) throws XMLStreamException {
+    private static void writeOutput(XMLStreamWriter xml, String element, String text) throws XMLStreamException {
         if (text.isEmpty()) {
             return;
         }
         xml.writeCharacters("\n    ");
         xml.writeStartElement(element);
-        xml.writeCharacters(clean(text.toString()));
+        xml.writeCharacters(clean(text));
         xml.writeEndElement();
     }
 
@@ -415,25 +340,5 @@ public final class JUnitXmlReportWriter implements TestReportListener {
             }
         }
         return cleaned == null ? text : cleaned.toString();
-    }
-
-    /**
-     * One test case of a report.
-     */
-    private static final class Case {
-        private final TestId id;
-        private final StringBuilder out = new StringBuilder();
-        private final StringBuilder err = new StringBuilder();
-        @Nullable
-        private TestOutcome outcome;
-
-        Case(TestId id) {
-            this.id = id;
-        }
-
-        TestOutcome outcome() {
-            TestOutcome current = outcome;
-            return current != null ? current : new TestOutcome(TestStatus.ERRORED, Duration.ZERO, null, null);
-        }
     }
 }
