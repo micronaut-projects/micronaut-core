@@ -20,7 +20,9 @@ import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevMode;
 import io.micronaut.dev.manifest.ResourceRoot;
+import io.micronaut.dev.test.TestRunSummary;
 import org.jspecify.annotations.NullMarked;
 
 import java.lang.reflect.InvocationTargetException;
@@ -35,7 +37,7 @@ import java.util.Map;
 /**
  * The entry point of development mode: {@code java -cp @runtime.argfile io.micronaut.dev.MicronautDevMain --manifest build/micronaut-dev/dev.properties}.
  * Reads the manifest, builds the reloadable class loader over the project's outputs, starts the
- * {@link DevRuntime} and runs the application's own main through it.
+ * {@link DevRuntime} and runs the application's own main through it, or in test mode its tests.
  *
  * <p>Open for subclassing: a launcher for another language, such as Pyronaut, overrides the template
  * methods to add compilers, choose the loader's roots, or run something other than a Java main.</p>
@@ -53,13 +55,21 @@ public class MicronautDevMain {
     public static final String MANIFEST_OPTION = "--manifest";
 
     /**
+     * What {@link #runForStatus(String[])} returns while the runtime keeps running in the background.
+     */
+    public static final int RUNNING = -1;
+
+    /**
      * Runs the launcher.
      *
      * @param args {@code --manifest <file>}, or the {@code micronaut.dev.manifest} system property, followed by the application's arguments
      * @throws Exception if the launch fails
      */
     public static void main(String[] args) throws Exception {
-        new MicronautDevMain().run(args);
+        int status = new MicronautDevMain().runForStatus(args);
+        if (status != RUNNING) {
+            System.exit(status);
+        }
     }
 
     /**
@@ -69,6 +79,21 @@ public class MicronautDevMain {
      * @throws Exception if the launch fails
      */
     public void run(String[] args) throws Exception {
+        runForStatus(args);
+    }
+
+    /**
+     * Runs the launcher with the given arguments and keeps the JVM alive while the application, or in test mode the
+     * watching, runs. In test mode the call returns once the runtime is closed, with the status the process exits with:
+     * 0 when the last run passed, 1 otherwise; with {@code micronaut.dev.test.once} the tests run once first. On a terminal, test mode also reads single keys: space
+     * runs the last tests again, {@code a} every test, {@code f} the failures, {@code w} turns watching on or off, and
+     * {@code q} exits with the last run's status.
+     *
+     * @param args The arguments
+     * @return The status to exit with, or {@link #RUNNING} while the runtime runs in the background
+     * @throws Exception if the launch fails
+     */
+    public int runForStatus(String[] args) throws Exception {
         List<String> remaining = new ArrayList<>();
         String manifestPath = System.getProperty(DevManifest.MANIFEST_PROPERTY);
         for (int i = 0; i < args.length; i++) {
@@ -85,7 +110,20 @@ public class MicronautDevMain {
         }
         DevManifest manifest = DevManifest.load(Path.of(manifestPath));
         DevRuntime runtime = launch(manifest, remaining.toArray(new String[0]));
+        if (manifest.mode() == DevMode.TEST && manifest.testSettings().once()) {
+            TestRunSummary summary = runtime.lastTestRun().orElse(null);
+            runtime.close();
+            return summary != null && summary.isSuccess() ? 0 : 1;
+        }
         Runtime.getRuntime().addShutdownHook(new Thread(runtime::close, "micronaut-dev-shutdown"));
+        if (manifest.mode() == DevMode.TEST) {
+            // no application thread keeps the JVM alive in test mode: the launcher waits until the runtime is closed
+            TestConsole.startIfInteractive(runtime);
+            runtime.awaitClose();
+            TestRunSummary summary = runtime.lastTestRun().orElse(null);
+            return summary != null && summary.isSuccess() ? 0 : 1;
+        }
+        return RUNNING;
     }
 
     /**
@@ -100,9 +138,16 @@ public class MicronautDevMain {
         Map<SourceKind, SourceCompiler> compilers = createCompilers(manifest);
         // a clean checkout has no class output yet: compile before the loader snapshots the roots
         DevRuntime.compileMissingOutputs(manifest, compilers);
+        if (manifest.mode() == DevMode.TEST) {
+            DevRuntime.compileMissingOutputs(manifest.testView(), compilers);
+        }
         DevClassLoader classLoader = createClassLoader(manifest);
         DevRuntime runtime = new DevRuntime(manifest, classLoader, this::launchApplication, compilers);
-        runtime.start(args);
+        if (manifest.mode() == DevMode.TEST) {
+            runtime.startTests();
+        } else {
+            runtime.start(args);
+        }
         return runtime;
     }
 
