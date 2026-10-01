@@ -62,7 +62,11 @@ import java.util.List;
  *
  * @author Denis Stepanov
  * @since 5.2.0
+ * @deprecated New code should use {@link BeanResolutionContext#setBeanInterceptors(BeanDefinition, List)}
+ * and {@link BeanResolutionContext#getBeanInterceptors(BeanDefinition)}. This helper retains the legacy
+ * storage and stack behavior for compatibility with older callers.
  */
+@Deprecated(since = "5.3.0", forRemoval = false)
 @Internal
 public final class SharedInterceptorRegistrations {
 
@@ -132,7 +136,10 @@ public final class SharedInterceptorRegistrations {
      * @param definition        The definition being instantiated
      * @param registrations     The registrations
      * @since 5.2.0
+     * @deprecated Use {@link BeanResolutionContext#setBeanInterceptors(BeanDefinition, List)} for new callers.
+     * This legacy entry point continues to ignore null or empty candidate lists.
      */
+    @Deprecated(since = "5.3.0", forRemoval = false)
     @SuppressWarnings("unchecked")
     public static void store(BeanResolutionContext resolutionContext,
                              BeanDefinition<?> definition,
