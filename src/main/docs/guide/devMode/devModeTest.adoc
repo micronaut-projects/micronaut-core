@@ -26,4 +26,4 @@ Add `micronaut-dev-test-report` to the development runtime classpath, as the bui
 
 A product built on Micronaut puts its own logo in the header with a `META-INF/micronaut-dev/test-report/brand.properties` on the launch classpath, naming the product, `name`, and the resource of its logo, `logo`, an SVG or a PNG.
 
-With `micronaut-dev-livereload` on the classpath as well, the LiveReload server serves the page at `http://localhost:35729/tests/`, which the launcher logs, and the page follows each run test by test over the event channel's `tests` topic, without reloading. Opened from the file system, the page shows the state it was written with.
+With `micronaut-dev-livereload` on the classpath as well, the LiveReload server serves the page at `http://localhost:35729/tests/`, or the path `micronaut.dev.test.html-report-path` names, such as `/reports/tests/`, which the launcher logs, and the page follows each run test by test over the event channel's `tests` topic, without reloading. Opened from the file system, the page shows the state it was written with.

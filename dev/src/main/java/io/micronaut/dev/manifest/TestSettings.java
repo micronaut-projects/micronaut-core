@@ -32,6 +32,7 @@ import java.util.Objects;
  * @param once Whether the runtime runs the tests once and stops, for a build that wants the result
  * @param reports Where the JUnit XML reports go
  * @param htmlReport Where a report that renders the runs as a page, such as micronaut-dev-test-report, writes it
+ * @param htmlReportPath The path the LiveReload server serves that page at, {@code /tests/} by default
  * @param patterns The {@code --tests} patterns every run is filtered by
  * @param parameters The runner's configuration parameters
  * @author graemerocher
@@ -39,7 +40,7 @@ import java.util.Objects;
  */
 @Experimental
 @NullMarked
-public record TestSettings(String runner, boolean affectedOnly, boolean initialRun, boolean once, Path reports, Path htmlReport, List<String> patterns, Map<String, String> parameters) {
+public record TestSettings(String runner, boolean affectedOnly, boolean initialRun, boolean once, Path reports, Path htmlReport, String htmlReportPath, List<String> patterns, Map<String, String> parameters) {
 
     /**
      * Validating constructor.
@@ -50,6 +51,7 @@ public record TestSettings(String runner, boolean affectedOnly, boolean initialR
      * @param once Whether the runtime stops after one run
      * @param reports The reports directory
      * @param htmlReport The page report directory
+     * @param htmlReportPath The page report path
      * @param patterns The patterns
      * @param parameters The parameters
      */
@@ -57,7 +59,24 @@ public record TestSettings(String runner, boolean affectedOnly, boolean initialR
         Objects.requireNonNull(runner, "runner");
         Objects.requireNonNull(reports, "reports");
         Objects.requireNonNull(htmlReport, "htmlReport");
+        Objects.requireNonNull(htmlReportPath, "htmlReportPath");
         patterns = List.copyOf(Objects.requireNonNull(patterns, "patterns"));
         parameters = Map.copyOf(Objects.requireNonNull(parameters, "parameters"));
+    }
+
+    /**
+     * Settings whose page report is served at {@code /tests/}.
+     *
+     * @param runner The runner
+     * @param affectedOnly Whether only affected tests run
+     * @param initialRun Whether every test runs at start
+     * @param once Whether the runtime stops after one run
+     * @param reports The reports directory
+     * @param htmlReport The page report directory
+     * @param patterns The patterns
+     * @param parameters The parameters
+     */
+    public TestSettings(String runner, boolean affectedOnly, boolean initialRun, boolean once, Path reports, Path htmlReport, List<String> patterns, Map<String, String> parameters) {
+        this(runner, affectedOnly, initialRun, once, reports, htmlReport, "/tests/", patterns, parameters);
     }
 }

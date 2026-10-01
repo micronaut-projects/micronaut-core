@@ -84,7 +84,8 @@ public final class HtmlTestReport implements TestReportListener {
     public static final String TOPIC = "tests";
 
     /**
-     * The path the LiveReload server serves the report at.
+     * The path the LiveReload server serves the report at by default: {@code micronaut.dev.test.html-report-path} sets
+     * another.
      */
     public static final String PREFIX = "/tests/";
 
@@ -133,13 +134,25 @@ public final class HtmlTestReport implements TestReportListener {
      * @param sourceRoots The source directories stack frames link to
      */
     public HtmlTestReport(Path directory, @Nullable LiveReloadServer server, List<Path> sourceRoots) {
+        this(directory, server, sourceRoots, PREFIX);
+    }
+
+    /**
+     * A report written to a directory, and served by a LiveReload server at a path when there is one.
+     *
+     * @param directory Where the page goes
+     * @param server The LiveReload server to serve it from and publish on, or null
+     * @param sourceRoots The source directories stack frames link to
+     * @param path The path the server serves the page at, such as {@code /tests/}
+     */
+    public HtmlTestReport(Path directory, @Nullable LiveReloadServer server, List<Path> sourceRoots, String path) {
         this.directory = Objects.requireNonNull(directory, "directory");
         this.server = server;
         this.sourceRoots = List.copyOf(sourceRoots);
         this.project = projectName(directory);
         this.configured = true;
         if (server != null) {
-            this.url = server.serve(PREFIX, directory);
+            this.url = server.serve(path, directory);
         }
         // the page is there before the first event, at the address the server serves
         write();
@@ -405,7 +418,7 @@ public final class HtmlTestReport implements TestReportListener {
         LiveReloadServer liveReload = runtime.liveReload().orElse(null);
         if (liveReload != null && !manifest.testSettings().once()) {
             server = liveReload;
-            url = liveReload.serve(PREFIX, directory);
+            url = liveReload.serve(manifest.testSettings().htmlReportPath(), directory);
             LOG.info("Test report: {}", url);
         } else {
             LOG.info("Test report: {}", directory.resolve("index.html").toUri());

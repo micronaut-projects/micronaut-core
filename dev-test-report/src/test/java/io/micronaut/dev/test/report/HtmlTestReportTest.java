@@ -97,8 +97,8 @@ class HtmlTestReportTest {
     @Test
     void theServerServesThePageAndAnOpenPageFollowsTheRunTestByTest(@TempDir Path directory) throws Exception {
         try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
-            HtmlTestReport html = new HtmlTestReport(directory, server, List.of());
-            assertEquals("http://localhost:" + server.port() + HtmlTestReport.PREFIX, html.url());
+            HtmlTestReport html = new HtmlTestReport(directory, server, List.of(), "/reports/tests/");
+            assertEquals("http://localhost:" + server.port() + "/reports/tests/", html.url());
             HttpClient client = HttpClient.newHttpClient();
             LinkedBlockingQueue<String> events = listen(client, server);
 
@@ -116,11 +116,11 @@ class HtmlTestReportTest {
             String state = next(events, "state");
             assertTrue(state.contains("\"live\":true"));
 
-            HttpResponse<String> page = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + HtmlTestReport.PREFIX)).build(),
+            HttpResponse<String> page = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/reports/tests/")).build(),
                 HttpResponse.BodyHandlers.ofString());
             assertEquals(200, page.statusCode());
             assertTrue(page.body().contains("aria-label=\"Micronaut\""));
-            HttpResponse<String> json = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + HtmlTestReport.PREFIX + "state.json")).build(),
+            HttpResponse<String> json = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/reports/tests/state.json")).build(),
                 HttpResponse.BodyHandlers.ofString());
             assertEquals(200, json.statusCode());
             assertTrue(json.body().startsWith("{\"version\":1"));
