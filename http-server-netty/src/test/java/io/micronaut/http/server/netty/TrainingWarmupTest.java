@@ -352,19 +352,19 @@ class TrainingWarmupTest {
 
         @Get("/ok")
         String ok(HttpRequest<?> request) {
-            record(request);
+            recordRequest(request);
             return "ok";
         }
 
         @Get("/rejected")
         HttpResponse<String> rejected(HttpRequest<?> request) {
-            record(request);
+            recordRequest(request);
             return HttpResponse.status(HttpStatus.FORBIDDEN).body("rejected");
         }
 
         @Get("/unauthorized")
         HttpResponse<String> unauthorized(HttpRequest<?> request) {
-            record(request);
+            recordRequest(request);
             return HttpResponse.<String>status(HttpStatus.UNAUTHORIZED)
                 .header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"training\"")
                 .body("unauthorized");
@@ -372,13 +372,13 @@ class TrainingWarmupTest {
 
         @Get("/rate-limited")
         HttpResponse<String> rateLimited(HttpRequest<?> request) {
-            record(request);
+            recordRequest(request);
             return HttpResponse.<String>status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, "1")
                 .body("rate limited");
         }
 
-        private static void record(HttpRequest<?> request) {
+        private static void recordRequest(HttpRequest<?> request) {
             String uri = request.getUri().toString();
             REQUESTS.add(uri);
             HOSTS.add(request.getHeaders().get(HttpHeaders.HOST));

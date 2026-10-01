@@ -610,6 +610,7 @@ class TrainingLoadTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Requires(property = OPTIONAL, value = "true")
     static final class UsesOptionalDependency {
+        @SuppressWarnings("java:S1172") // The parameter is the point: it makes the definition name the absent class
         UsesOptionalDependency(OptionalDependency dependency) {
         }
     }
@@ -709,6 +710,7 @@ class TrainingLoadTest {
 
         @Inject
         void method(MethodType method) {
+            // Empty: only the type of the injection point matters, the definition names it
         }
     }
 
@@ -815,6 +817,7 @@ class TrainingLoadTest {
         private final boolean server;
         private volatile boolean running;
 
+        @SuppressWarnings("java:S1172") // The client is injected so that it is created, and connects, when the application is
         TestApplication(ApplicationContext applicationContext,
                         ApplicationConfiguration applicationConfiguration,
                         @Nullable PostConstructClient client,
