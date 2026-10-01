@@ -43,6 +43,18 @@ public interface SourceCompiler extends Closeable {
     Set<SourceKind> kinds();
 
     /**
+     * The languages this compiler compiles together with its own when they share its class output: the
+     * Python compiler compiles the Java sources of a Python module, since the stubs it generates and the
+     * Java sources reference each other. Such a language is not compiled on its own: its roots are in
+     * this compiler's requests and its changes come with them.
+     *
+     * @return The languages, none by default
+     */
+    default Set<SourceKind> jointKinds() {
+        return Set.of();
+    }
+
+    /**
      * Whether the compiler can run in this JVM.
      *
      * @return True if its implementation is present
