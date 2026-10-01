@@ -63,7 +63,7 @@ public record CompilationRequest(
      * Validating constructor.
      *
      * @param kind The language
-     * @param sourceRoots The roots
+     * @param sourceRoots The roots: the language's own, and any of another language the compiler reads, such as the Java roots for Kotlin
      * @param changed The changed sources
      * @param deleted The deleted sources
      * @param full Whether every source is compiled
@@ -90,7 +90,7 @@ public record CompilationRequest(
      * A request with no classes affected by another language.
      *
      * @param kind The language
-     * @param sourceRoots The roots
+     * @param sourceRoots The roots: the language's own, and any of another language the compiler reads, such as the Java roots for Kotlin
      * @param changed The changed sources
      * @param deleted The deleted sources
      * @param full Whether full

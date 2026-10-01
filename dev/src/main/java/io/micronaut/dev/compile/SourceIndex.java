@@ -93,7 +93,8 @@ final class SourceIndex {
         Map<Path, Set<String>> classesBySource = new LinkedHashMap<>();
         Map<String, Path> sourceByClass = new LinkedHashMap<>();
         for (SourceRoot root : roots) {
-            if (!Files.isDirectory(root.path())) {
+            // a request may carry the roots of another language the compiler reads, Java for Kotlin: they are not its sources
+            if (root.kind() != kind || !Files.isDirectory(root.path())) {
                 continue;
             }
             try (Stream<Path> files = Files.walk(root.path())) {

@@ -27,6 +27,10 @@ The launcher compiles every language whose class output does not exist yet, so i
 
 TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property, and api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@Requires(condition = DevelopmentMode.Active.class)`.
 
+=== Compilers
+
+The launcher compiles each language with a compiler of its own, all of them incrementally: the changed sources and every source whose classes reference them are compiled together against the previous output, and the outputs replace the old ones only when the compilation succeeded. Java compiles through the JDK's own `javac` with the annotation processors of the processor path. Groovy compiles through the project's own Groovy on the launch classpath, with the Micronaut AST transformations the compile classpath carries. Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version, and runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version; the `-A` options of the language pass to the processors, and the other options to `kotlinc`. The build plugins put these artifacts on the launch classpath for the languages the project uses, so `micronaut-dev` itself depends on neither Kotlin nor Groovy.
+
 === LiveReload
 
 Add `micronaut-dev-livereload` to the development runtime classpath and the launcher starts a LiveReload server on port 35729 (`micronaut.dev.livereload.port`): browsers reload when the application restarted or a template changed, and swap a stylesheet in place when only a stylesheet changed. Pages get the client script appended before their closing body tag (`micronaut.dev.livereload.inject-script=false` for users of a browser extension), and a api:dev.livereload.LiveReloadTrigger[] bean lets a module ask for a refresh. Adding the module is the switch: there is no other setting to turn it on.

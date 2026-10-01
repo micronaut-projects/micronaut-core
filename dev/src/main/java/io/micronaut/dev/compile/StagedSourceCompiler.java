@@ -77,6 +77,18 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     @Nullable
     protected abstract Produced runCompilation(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) throws IOException;
 
+    /**
+     * Whether a batch that selects no source to compile, one that only deletes sources, still runs
+     * {@link #runCompilation}, with an empty set: a compiler whose processors keep state between runs and
+     * regenerate what depends on every source, as KSP does, needs to see the deletion, and what the run
+     * produces replaces what the deleted sources produced. By default such a batch only removes.
+     *
+     * @return True to run the compilation for an empty batch
+     */
+    protected boolean compilesEmptyBatches() {
+        return false;
+    }
+
     @Override
     public CompilationResult compile(CompilationRequest request) {
         long start = System.nanoTime();
@@ -87,7 +99,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             deletedClasses.addAll(sources.classesOf(deleted));
         }
         Set<Path> toCompile = selectSources(request, sources, deletedClasses);
-        if (toCompile.isEmpty()) {
+        if (toCompile.isEmpty() && !compilesEmptyBatches()) {
             return removeOnly(request, sources, deletedClasses, start);
         }
         Path staging = staging(classOutput);
