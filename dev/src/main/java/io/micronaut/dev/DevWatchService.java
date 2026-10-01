@@ -46,7 +46,6 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
 
     private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
     private static final String MAC_SERVICE = "io.methvin.watchservice.MacOSXListeningWatchService";
-    private static final String SENSITIVITY_MODIFIER = "com.sun.nio.file.SensitivityWatchEventModifier";
 
     /**
      * @return The best service this JVM offers
@@ -62,7 +61,13 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
             }
         }
         WatchService service = FileSystems.getDefault().newWatchService();
-        DirectoryWatcher.WatchKeyRegistrar registrar = ClassUtils.isPresent(SENSITIVITY_MODIFIER, loader) ? HighSensitivity.registrar() : DirectoryWatcher.defaultRegistrar();
+        DirectoryWatcher.WatchKeyRegistrar registrar;
+        try {
+            // linked rather than looked up by name: a native image finds by name only the classes registered for reflection
+            registrar = HighSensitivity.registrar();
+        } catch (LinkageError e) {
+            registrar = DirectoryWatcher.defaultRegistrar();
+        }
         return new DevWatchService(service, registrar, null);
     }
 
@@ -84,10 +89,12 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     private static final class HighSensitivity {
         static DirectoryWatcher.WatchKeyRegistrar registrar() {
+            // resolved now, so that a JDK without the modifier fails here rather than at the first registration
+            java.nio.file.WatchEvent.Modifier high = com.sun.nio.file.SensitivityWatchEventModifier.HIGH;
             return (directory, service) -> directory.register(
                 service,
                 new java.nio.file.WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
-                com.sun.nio.file.SensitivityWatchEventModifier.HIGH
+                high
             );
         }
     }
