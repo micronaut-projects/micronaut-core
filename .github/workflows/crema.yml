@@ -12,14 +12,14 @@ on:
       - main
       - '[0-9]+.[0-9]+.x'
     types: [opened, synchronize, reopened, ready_for_review]
-    # The module's tests depend on micronaut-core only. These are the sources they exercise, and the inject-java
-    # specs of the same package (SoftServiceLoaderSpec, ServiceLoaderFeatureSpec), so that a change to the service
-    # loading behaviour those specs pin down also runs the native tests.
+    # The package io.micronaut.core.io.service in every module that has it: its sources in core, and its tests in
+    # core and inject-java, which change with the behaviour the native tests check. Then the rest of micronaut-core
+    # those tests depend on directly, this module and this file. The callers of SoftServiceLoader in other packages,
+    # such as DefaultEnvironment in micronaut-inject, are left out: the module depends on micronaut-core only.
     paths:
-      - 'core/src/main/java/io/micronaut/core/io/service/**'
+      - '**/io/micronaut/core/io/service/**'
       - 'core/src/main/java/io/micronaut/core/util/NativeImageUtils.java'
       - 'core/src/main/resources/META-INF/native-image/**'
-      - 'inject-java/src/test/groovy/io/micronaut/core/io/service/**'
       - 'test-suite-crema-graalvm/**'
       - '.github/workflows/crema.yml'
   schedule:
@@ -51,6 +51,11 @@ jobs:
       # remote build cache. Set explicitly: the setup-gradle token makes the micronaut-build settings plugin
       # detect CI, which would otherwise push.
       ORG_GRADLE_PROJECT_cachePush: false
+      # The GraalVM workflows set these two on their build step. Here they are set for the job, so that they are
+      # in the environment when setup-graalvm runs: for native-image-job-reports, it appends
+      # -H:BuildOutputJSONFile to NATIVE_IMAGE_OPTIONS through GITHUB_ENV, which a step-level value would replace.
+      GRAALVM_QUICK_BUILD: true
+      NATIVE_IMAGE_OPTIONS: "-H:+ReportExceptionStackTraces"
     steps:
       # https://github.com/actions/virtual-environments/issues/709
       - name: "Remove system JDKs"
@@ -100,8 +105,6 @@ jobs:
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
-          GRAALVM_QUICK_BUILD: true
-          NATIVE_IMAGE_OPTIONS: "-H:+ReportExceptionStackTraces"
         run: |
           ./gradlew :test-suite-crema-graalvm:nativeTest -PcremaTests=true --no-daemon --continue
 
