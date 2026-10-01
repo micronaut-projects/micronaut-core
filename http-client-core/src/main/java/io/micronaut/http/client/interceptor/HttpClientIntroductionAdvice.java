@@ -171,10 +171,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         ClientMethod clientMethod = methodCache.get(annotationMetadata);
-        if (clientMethod == null) {
-            if (!context.hasStereotype(Client.class)) {
-                throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
-            }
+        if (clientMethod == null && !context.hasStereotype(Client.class)) {
+            throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
         }
 
         Class<?> declaringType = context.getDeclaringType();
@@ -184,10 +182,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
-        if (httpClient != null) {
-            clientMethod = resolveClientMethod(context, annotationMetadata, clientMethod);
+        if (httpClient == null) {
+            // try other introduction advice
+            return context.proceed();
         }
-        if (clientMethod != null && clientMethod.mapped() && httpClient != null) {
+        clientMethod = resolveClientMethod(context, annotationMetadata, clientMethod);
+        if (clientMethod.mapped()) {
             HttpMethod httpMethod = clientMethod.httpMethod();
             String httpMethodName = clientMethod.httpMethodName();
 
@@ -306,7 +306,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Class<?> javaReturnType = returnType.getType();
         BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
-        RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, clientMethod, interceptedMethod, annotationMetadata);
+        RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, clientMethod, interceptedMethod);
         String clientName = declaringType.getName();
 
         if (binderResult.isError()) {
@@ -348,7 +348,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                          Class<?> reactiveValueType,
                                          Class<?> declaringType) {
         try {
-            RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, clientMethod, interceptedMethod, annotationMetadata);
+            RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, clientMethod, interceptedMethod);
             CompletableFuture<@Nullable Object> future = new CompletableFuture<>();
             if (binderResult.isError()) {
                 future.complete(binderResult.errorResult());
@@ -407,7 +407,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 HttpStatus.class == reactiveValueType;
 
         Publisher<RequestBinderResult> requestPublisher = Mono.fromCallable(() ->
-            bindRequest(context, httpMethod, httpMethodName, clientMethod, interceptedMethod, annotationMetadata));
+            bindRequest(context, httpMethod, httpMethodName, clientMethod, interceptedMethod));
         Publisher<?> publisher;
         if (!isSingle && httpClient instanceof StreamingHttpClient client) {
             publisher = httpClientResponseStreamingPublisher(client, context, requestPublisher, errorType, valueType);
@@ -434,8 +434,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                             HttpMethod httpMethod,
                                             String httpMethodName,
                                             ClientMethod clientMethod,
-                                            InterceptedMethod interceptedMethod,
-                                            AnnotationMetadata annotationMetadata) {
+                                            InterceptedMethod interceptedMethod) {
         MutableHttpRequest<?> request = HttpRequest.create(httpMethod, "", httpMethodName);
 
         UriBinding uriBinding = clientMethod.uriBinding();
@@ -883,8 +882,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         private final Argument<?> errorType;
         private final List<Class<? extends Annotation>> methodBinderTypes;
         private final boolean clientDefinition;
+        // The lazily computed values below are immutable once published (the array is never
+        // modified), so volatile is enough to publish them safely. A race only computes them twice.
+        @SuppressWarnings("java:S3077")
         private volatile @Nullable UriBinding uriBinding;
+        @SuppressWarnings("java:S3077")
         private volatile MediaType @Nullable [] acceptTypes;
+        @SuppressWarnings("java:S3077")
         private volatile @Nullable MediaType contentType;
 
         private ClientMethod(boolean mapped,
@@ -922,15 +926,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (httpMethodMapping.isEmpty() || !context.hasStereotype(HttpMethodMapping.class)) {
                 return NOT_MAPPED;
             }
-            if (values == null) {
-                values = MethodValues.read(context);
-            }
-            String mappedUri = values.mappedUri();
+            MethodValues methodValues = values != null ? values : MethodValues.read(context);
+            String mappedUri = methodValues.mappedUri();
             String uri = StringUtils.isEmpty(mappedUri) ? "/" + context.getMethodName() : mappedUri;
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
-            String httpMethodName = values.customMethod() != null ? values.customMethod() : httpMethod.name();
+            String customMethod = methodValues.customMethod();
+            String httpMethodName = customMethod != null ? customMethod : httpMethod.name();
 
             Argument<?> errorType = annotationMetadata.classValue(Client.class, "errorType")
                 .<Argument<?>>map(Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
@@ -945,7 +948,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             return new ClientMethod(
                 true,
                 annotationMetadata.hasPropertyExpressions(),
-                values,
+                methodValues,
                 httpMethod,
                 httpMethodName,
                 uri,
