@@ -55,6 +55,8 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
     private final Http2Connection.PropertyKey messageKey;
     private final boolean propagateSettings;
     private final Http2Connection.PropertyKey dataReadKey;
+    private final Http2Connection.PropertyKey endOfStreamKey;
+    private ChannelHandlerContext ctx;
 
     /**
      * Default constructor.
@@ -75,6 +77,7 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
         this.propagateSettings = propagateSettings;
         messageKey = connection.newKey();
         dataReadKey = connection.newKey();
+        endOfStreamKey = connection.newKey();
     }
 
     /**
@@ -119,6 +122,21 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
     @Override
     public void onStreamRemoved(Http2Stream stream) {
         removeMessage(stream);
+    }
+
+    /**
+     * A stream that closes before its end of stream was read (reset by either side, or the connection is
+     * closed) fires a {@link Http2StreamClosedEvent}, so that the request body of the stream is failed and
+     * the data it holds released. Only called when this adapter is added as a listener of the connection.
+     *
+     * @param stream The closed stream
+     */
+    @Override
+    public void onStreamClosed(Http2Stream stream) {
+        if (ctx != null && stream.getProperty(dataReadKey) != null && stream.getProperty(endOfStreamKey) == null) {
+            stream.setProperty(endOfStreamKey, Boolean.TRUE);
+            ctx.fireUserEventTriggered(new Http2StreamClosedEvent(stream.id()));
+        }
     }
 
     /**
@@ -239,7 +257,9 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
             Http2Stream stream,
             HttpMessage msg,
             boolean endOfStream) {
+        this.ctx = ctx;
         if (endOfStream) {
+            stream.setProperty(endOfStreamKey, Boolean.TRUE);
             if (connection.isServer()) {
                 HttpRequest existing = (HttpRequest) msg;
                 msg = new DefaultFullHttpRequest(
@@ -288,7 +308,9 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
 
         }
 
+        this.ctx = ctx;
         if (endOfStream) {
+            stream.setProperty(endOfStreamKey, Boolean.TRUE);
             // end of stream, emits a LastHttpContent
             // will be released by HttpStreamsHandler
             if (dataReadableBytes > 0) {

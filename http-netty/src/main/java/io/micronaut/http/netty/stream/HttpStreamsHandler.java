@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -249,6 +250,16 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         }
 
                         @Override
+                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                            if (evt instanceof Http2StreamClosedEvent && ((Http2StreamClosedEvent) evt).streamId() == streamId) {
+                                // fail the body and release what it holds
+                                exceptionCaught(ctx, new IOException("Connection closed before the request body of HTTP/2 stream " + streamId + " was complete"));
+                            } else {
+                                super.userEventTriggered(ctx, evt);
+                            }
+                        }
+
+                        @Override
                         protected void cancelled() {
                             if (ctx.executor().inEventLoop()) {
                                 handleCancelled(ctx, inMsg);
@@ -301,6 +312,23 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             return ((io.netty.handler.codec.http.HttpMessage) msg).headers().getInt(AbstractNettyHttpRequest.STREAM_ID, -1);
         }
         return -1;
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof Http2StreamClosedEvent) {
+            In msg = currentlyStreamedMessage;
+            if (msg != null && getStreamId(msg) == ((Http2StreamClosedEvent) evt).streamId()) {
+                // the body of the stream will not complete
+                ctx.fireUserEventTriggered(evt);
+                currentlyStreamedMessage = null;
+                ignoreBodyRead = false;
+                removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
+                consumedInMessage(ctx);
+            }
+        } else {
+            super.userEventTriggered(ctx, evt);
+        }
     }
 
     private void handleCancelled(ChannelHandlerContext ctx, In msg) {
