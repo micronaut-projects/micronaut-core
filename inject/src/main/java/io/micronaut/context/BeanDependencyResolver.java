@@ -110,15 +110,11 @@ public interface BeanDependencyResolver {
      * @param <T> The bean type
      * @return The registration
      */
-    default <T> BeanRegistration<T> getBeanRegistration(Argument<T> type, @Nullable Qualifier<T> qualifier) {
-        throw new UnsupportedOperationException("Registration lookup is not supported by this resolver");
-    }
+    <T> BeanRegistration<T> getBeanRegistration(Argument<T> type, @Nullable Qualifier<T> qualifier);
 
     /**
      * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.
      * @return The child group
      */
-    default BeanDependencyGroup createGroup() {
-        throw new UnsupportedOperationException("Child groups are not supported by this resolver");
-    }
+    BeanDependencyGroup createGroup();
 }

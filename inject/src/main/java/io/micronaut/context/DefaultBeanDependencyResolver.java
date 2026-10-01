@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -66,7 +67,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup {
     }
 
     @Override
-    public <T> BeanRegistration<T> createBeanRegistration(io.micronaut.inject.BeanDefinition<T> definition) {
+    public <T> BeanRegistration<T> createBeanRegistration(BeanDefinition<T> definition) {
         return dependencies.resolve(context, null, resolution ->
             context.createFreshRegistration(resolution, definition));
     }
