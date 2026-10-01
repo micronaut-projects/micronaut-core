@@ -36,6 +36,43 @@ final class BeanDependencies implements DependentBeanProvider {
     private List<BeanRegistration<?>> required = List.of();
     private boolean closing;
     private boolean destroyed;
+    private final boolean destructionInvocation;
+
+    BeanDependencies() {
+        this(false);
+    }
+
+    BeanDependencies(boolean destructionInvocation) {
+        this.destructionInvocation = destructionInvocation;
+    }
+
+    synchronized boolean remove(BeanRegistration<?> registration) {
+        List<BeanRegistration<?>> remaining = new ArrayList<>(owned);
+        boolean removed = remaining.removeIf(candidate -> candidate == registration);
+        if (removed) {
+            owned = List.copyOf(remaining);
+        }
+        return removed;
+    }
+
+    void close(DefaultBeanContext context) {
+        RuntimeException failure = null;
+        List<BeanRegistration<?>> taken = takeDependents();
+        for (int i = taken.size() - 1; i >= 0; i--) {
+            try {
+                context.destroyDependentBean(taken.get(i));
+            } catch (RuntimeException e) {
+                if (failure == null) {
+                    failure = e;
+                } else if (failure != e) {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
 
     @Override
     public synchronized List<BeanRegistration<?>> dependentBeans() {
@@ -101,7 +138,7 @@ final class BeanDependencies implements DependentBeanProvider {
     }
 
     synchronized void checkOpen(DefaultBeanContext context) {
-        if (closing || context.isDependencyResolutionClosed()) {
+        if (closing || context.isDependencyResolutionClosed() && !(destructionInvocation && context.isDestructionInvocationActive())) {
             throw new IllegalStateException("Cannot resolve a dependency after owner destruction or context shutdown has begun");
         }
     }
