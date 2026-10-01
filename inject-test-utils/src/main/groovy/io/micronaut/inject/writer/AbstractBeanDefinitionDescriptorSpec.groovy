@@ -76,10 +76,10 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
     private static final String SERVICE = BeanDefinitionReference.name
 
     @Shared
-    URL[] output
+    private URL[] output
 
     @Shared
-    ClassLoader classLoader
+    private ClassLoader classLoader
 
     /**
      * Compiles the beans.
