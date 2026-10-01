@@ -143,6 +143,20 @@ class HtmlTestReportTest {
     }
 
     @Test
+    void aProductBuiltOnMicronautPutsItsOwnLogoInTheHeader(@TempDir Path directory) throws Exception {
+        Path brand = Files.createDirectories(directory.resolve("META-INF/micronaut-dev/test-report"));
+        Files.writeString(brand.resolve("brand.properties"), "name=Pyronaut & co\nlogo=brand/wordmark.png\n");
+        Files.createDirectories(directory.resolve("brand"));
+        Files.write(directory.resolve("brand/wordmark.png"), new byte[] {(byte) 0x89, 'P', 'N', 'G'});
+
+        try (java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {directory.toUri().toURL()}, null)) {
+            assertEquals("<img src=\"data:image/png;base64,iVBORw==\" alt=\"Pyronaut &amp; co\">", HtmlTestReport.logo(loader));
+        }
+        // without a brand, the Micronaut logo
+        assertTrue(HtmlTestReport.logo(getClass().getClassLoader()).contains("aria-label=\"Micronaut\""));
+    }
+
+    @Test
     void stringsAreEscapedForJsonInsideAPage() {
         String json = new Json().beginObject()
             .field("text", "a\"b\\c\n</script><!-- & \u2028 \u0001 \ud800")
