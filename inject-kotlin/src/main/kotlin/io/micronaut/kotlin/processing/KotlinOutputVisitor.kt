@@ -19,6 +19,7 @@ import com.google.devtools.ksp.containingFile
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSFile
+import io.micronaut.core.annotation.Internal
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
@@ -42,6 +43,7 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
         visitServiceDescriptor(type, classname, originatingElement, null)
     }
 
+    @Internal
     override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element, content: ByteArray?) {
         val fileName = "${type}${File.separator}${classname}"
         val packageName = "META-INF.micronaut"

@@ -37,6 +37,7 @@ import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Origin
+import io.micronaut.core.annotation.Internal
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
@@ -451,6 +452,7 @@ internal class KotlinVisitorContext(
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
     }
 
+    @Internal
     override fun visitServiceDescriptor(
         type: String,
         classname: String,
