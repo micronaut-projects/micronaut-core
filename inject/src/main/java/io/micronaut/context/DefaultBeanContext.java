@@ -249,6 +249,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     // the interceptors of targets this context holds no registration for, by the definition of the target
     private final Map<Object, UnownedInterceptorSelection> unownedInterceptorSelections = new ConcurrentHashMap<>();
     private final BeanResolutionCustomizer beanResolutionCustomizer;
+    private final RuntimeBeanDefinition<BeanDependencyResolver> dependencyResolverDefinition = RuntimeBeanDefinition
+        .<BeanDependencyResolver>builder(BeanDependencyResolver.class, () -> new DefaultBeanDependencyResolver(this))
+        .disposer((context, resolver) -> ((DefaultBeanDependencyResolver) resolver).destroy())
+        .build();
 
     private @Nullable BeanDefinitionValidator beanValidator;
     private @Nullable List<BeanConfiguration> beanConfigurationsList;
@@ -1282,6 +1286,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T> void destroyBean(BeanRegistration<T> registration, boolean dependent) {
+        stopDependencyResolution(registration, Collections.newSetFromMap(new IdentityHashMap<>()));
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
@@ -3086,6 +3091,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             );
             return BeanRegistration.of(this, BeanIdentifier.of(beanClass.getName()), def, (T) this);
         }
+        if (beanClass == BeanDependencyResolver.class && qualifier == null) {
+            if (resolutionContext == null || resolutionContext.getPath().isEmpty()) {
+                throw new BeanContextException("BeanDependencyResolver must be injected into a managed bean");
+            }
+            @SuppressWarnings("unchecked")
+            BeanRegistration<T> resolver = (BeanRegistration<T>) createRegistration(resolutionContext,
+                Argument.of(BeanDependencyResolver.class), null, dependencyResolverDefinition, true);
+            return resolver;
+        }
         if (InjectionPoint.class.isAssignableFrom(beanClass)) {
             return provideInjectionPoint(resolutionContext, beanType, qualifier, throwNoSuchBean);
         }
@@ -4372,18 +4386,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
-     * Sorts the singleton registrations into the order in which they should be destroyed.
-     *
-     * <p>A bean is destroyed before every bean it requires, whether the requirement comes from an injection point or
-     * from {@link DependsOn}, so that a dependency outlives its dependents. Where the dependencies leave the order
-     * open, beans are destroyed in bean name order so that the sequence is stable between runs. A dependency cycle
-     * cannot satisfy that guarantee for every one of its members, so it is broken by destroying the first bean in
-     * name order that lies on a cycle; beans that merely depend on a cycle are never chosen to break it.</p>
-     *
-     * @param beans The registrations
-     * @return The registrations in destruction order
-     */
-    /**
      * Destroys the given singleton registrations, skipping any bean already present in {@code processed}.
      *
      * @param registrations The registrations to destroy
@@ -4392,17 +4394,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private void destroySingletons(Collection<BeanRegistration> registrations, Set<Object> processed) {
         // need to sort registered singletons so that beans with that require other beans appear first
         List<BeanRegistration> objects = topologicalSort(registrations);
-
-        Map<Boolean, List<BeanRegistration>> result = objects.stream().collect(Collectors.groupingBy(br -> br.bean != null
-            && (br.bean instanceof BeanPreDestroyEventListener || br.bean instanceof BeanDestroyedEventListener)));
-
-        List<BeanRegistration> listeners = result.get(true);
-        if (listeners != null) {
-            // destroy all bean destroy listeners at the end
-            objects.clear();
-            objects.addAll(result.getOrDefault(false, Collections.emptyList()));
-            objects.addAll(listeners);
-        }
 
         for (BeanRegistration beanRegistration : objects) {
             Object bean = beanRegistration.bean;
@@ -4424,12 +4415,91 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
+    boolean isDependencyResolutionClosed() {
+        return terminating.get() || !configured.get();
+    }
+
+    private static void stopDependencyResolution(BeanRegistration<?> registration, Set<BeanRegistration<?>> visited) {
+        if (!visited.add(registration)) {
+            return;
+        }
+        if (registration.getBean() instanceof DefaultBeanDependencyResolver resolver) {
+            resolver.stopResolving();
+            for (BeanRegistration<?> owned : resolver.dependentBeans()) {
+                stopDependencyResolution(owned, visited);
+            }
+        }
+        if (registration instanceof DependentBeanProvider provider) {
+            for (BeanRegistration<?> owned : provider.dependentBeans()) {
+                stopDependencyResolution(owned, visited);
+            }
+        }
+    }
+
+    private static void collectDependencyRegistrations(BeanRegistration<?> registration,
+                                                        Set<BeanRegistration<?>> visited) {
+        if (!visited.add(registration)) {
+            return;
+        }
+        if (registration instanceof DependentBeanProvider provider) {
+            for (BeanRegistration<?> owned : provider.dependentBeans()) {
+                collectDependencyRegistrations(owned, visited);
+            }
+        }
+        if (registration.getBean() instanceof DefaultBeanDependencyResolver resolver) {
+            for (BeanRegistration<?> owned : resolver.dependentBeans()) {
+                collectDependencyRegistrations(owned, visited);
+            }
+            // Shared dependencies are leaves of this owner's tree. Their own lifecycle is represented by their
+            // singleton node, and must not be acquired or destroyed by this owner.
+            visited.addAll(resolver.requiredBeans());
+        }
+        if (registration.getBean() instanceof InterceptedBeanProxy<?> proxy && proxy.hasCachedInterceptedTarget()) {
+            BeanRegistration<?> target = proxy.interceptedTargetRegistration();
+            if (target != null) {
+                collectDependencyRegistrations(target, visited);
+            }
+            if (registration instanceof BeanDisposingRegistration<?> disposing && disposing.getProxyTargetContext() != null) {
+                for (BeanRegistration<?> owned : disposing.getProxyTargetContext().getCachedProxyTargetDependents()) {
+                    collectDependencyRegistrations(owned, visited);
+                }
+            }
+        }
+        if (registration instanceof BeanDisposingRegistration<?> disposing && disposing.getInterceptorRegistrations() != null) {
+            for (Object interceptor : disposing.getInterceptorRegistrations()) {
+                if (interceptor instanceof BeanRegistration<?> bean) {
+                    visited.add(bean);
+                }
+            }
+        }
+    }
+
+    /**
+     * Sorts the singleton registrations into the order in which they should be destroyed.
+     *
+     * <p>A bean is destroyed before every bean it requires, whether the requirement comes from an injection point or
+     * from {@link DependsOn}, or from dynamically resolved dependencies, so that a dependency outlives its dependents.
+     * Where the dependencies leave the order open, destruction listeners are kept last and beans are destroyed in
+     * bean name order so that the sequence is stable between runs. A dependency cycle
+     * cannot satisfy that guarantee for every one of its members, so it is broken by destroying the first bean in
+     * name order that lies on a cycle; beans that merely depend on a cycle are never chosen to break it.</p>
+     *
+     * @param beans The registrations
+     * @return The registrations in destruction order
+     */
     private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
         final int size = beans.size();
-        // Nodes are indexed in bean name order so that the destruction sequence is deterministic
+        // Node indexes provide a stable tie-breaker for the destruction sequence.
         final List<BeanRegistration> nodes = new ArrayList<>(beans);
-        nodes.sort(Comparator.comparing(registration -> registration.getBeanDefinition().getName()));
+        // Keep destruction listeners alive as long as possible, but respect their own dependencies too.
+        nodes.sort(Comparator.<BeanRegistration, Boolean>comparing(registration ->
+                registration.bean instanceof BeanPreDestroyEventListener || registration.bean instanceof BeanDestroyedEventListener)
+            .thenComparing(registration -> registration.getBeanDefinition().getName()));
 
+        final Map<Object, List<Integer>> nodesByInstance = new IdentityHashMap<>(size);
+        for (int i = 0; i < size; i++) {
+            nodesByInstance.computeIfAbsent(nodes.get(i).getBean(), bean -> new ArrayList<>(1)).add(i);
+        }
         final Map<Class<?>, List<Integer>> nodesByType = new HashMap<>(size);
         for (int i = 0; i < size; i++) {
             nodesByType.computeIfAbsent(nodes.get(i).getBeanDefinition().getBeanType(), type -> new ArrayList<>(1)).add(i);
@@ -4441,8 +4511,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         final List<List<Integer>> dependencies = new ArrayList<>(size);
         final int[] dependents = new int[size];
         for (int i = 0; i < size; i++) {
-            final Collection<Class<?>> required = nodes.get(i).getBeanDefinition().getRequiredComponents();
-            final List<Integer> nodeDependencies = new ArrayList<>(required.size());
+            Set<BeanRegistration<?>> resolved = Collections.newSetFromMap(new IdentityHashMap<>());
+            collectDependencyRegistrations(nodes.get(i), resolved);
+            final Set<Class<?>> required = new HashSet<>(nodes.get(i).getBeanDefinition().getRequiredComponents());
+            final List<Integer> nodeDependencies = new ArrayList<>();
+            for (BeanRegistration<?> dependency : resolved) {
+                List<Integer> matches = nodesByInstance.get(dependency.getBean());
+                if (matches != null) {
+                    for (int j : matches) {
+                        if (j != i && !nodeDependencies.contains(j)) {
+                            nodeDependencies.add(j);
+                            dependents[j]++;
+                        }
+                    }
+                } else {
+                    // An owned prototype's injected dependencies must also outlive the owning singleton.
+                    required.addAll(dependency.getBeanDefinition().getRequiredComponents());
+                }
+            }
             for (Class<?> requiredType : required) {
                 final List<Integer> candidates = candidatesByRequiredType.computeIfAbsent(requiredType, type -> {
                     final List<Integer> assignable = new ArrayList<>();
