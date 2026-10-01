@@ -167,12 +167,6 @@ public final class DevManifest {
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
         this.retainAnnotated = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-annotated", "true").trim());
         this.maxGenerations = maxGenerations(properties.getProperty(MAX_GENERATIONS));
-        if (mode == DevMode.TEST && (maxGenerations == 1 || maxGenerations == 2)) {
-            // test mode loads the classes of generation one and runs every test run on a generation of its own: the
-            // first run takes the second, so a budget of two would relaunch after it, and the relaunched process would
-            // run it again, without end
-            throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": " + maxGenerations + ", test mode runs its first tests on the second generation and needs at least 3");
-        }
         String generationsDir = properties.getProperty(PREFIX + "generations");
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
@@ -225,6 +219,16 @@ public final class DevManifest {
             options(directory, properties.getProperty(PREFIX + TEST + "filter", "")),
             parameters
         );
+        if (mode == DevMode.TEST && !testSettings.once() && maxGenerations > 0) {
+            // test mode loads the classes of generation one and runs every test run on a generation of its own, and checks
+            // the budget after a run: the first run takes the second generation, so a budget of two would relaunch after
+            // the first run, and a relaunched process that runs its tests when it starts would do so without end
+            int minimum = testSettings.initialRun() ? 3 : 2;
+            if (maxGenerations < minimum) {
+                throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": " + maxGenerations + ", test mode needs at least " + minimum
+                    + (testSettings.initialRun() ? " when it runs the tests when it starts" : ": its first run takes the second generation"));
+            }
+        }
     }
 
     /**
@@ -443,8 +447,9 @@ public final class DevManifest {
      * {@link io.micronaut.dev.MicronautDevMain#RELAUNCH}, for whoever started it to start it again. Unlimited, zero, on
      * the JVM, which unloads a retired generation once nothing refers to it; {@link #NATIVE_MAX_GENERATIONS} in a
      * native image, which never does. {@code unlimited} or {@code 0} lifts it.
-     * Test mode runs its tests on a generation of their own from the second on, so it takes at least three, and checks
-     * the budget after a run, so that a run is never lost to the relaunch.
+     * Test mode runs its tests on a generation of their own from the second on, and checks the budget after a run, so that
+     * a run is never lost to the relaunch: watching, it takes at least three, or two without a first run, and run once it
+     * takes any.
      *
      * @return The budget, zero when unlimited
      */
