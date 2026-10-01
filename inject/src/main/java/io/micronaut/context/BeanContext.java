@@ -16,11 +16,14 @@
 package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
@@ -66,8 +69,8 @@ public interface BeanContext extends
      * @return The created instance and its lifecycle
      * @since 5.3.0
      */
-    @io.micronaut.core.annotation.Experimental
-    default <T> io.micronaut.context.scope.CreatedBean<T> createBeanRegistration(io.micronaut.inject.BeanDefinition<T> definition) {
+    @Experimental
+    default <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
         throw new UnsupportedOperationException("Fresh registrations are not supported by this context");
     }
 
@@ -78,7 +81,7 @@ public interface BeanContext extends
      * @return The group
      * @since 5.3.0
      */
-    @io.micronaut.core.annotation.Experimental
+    @Experimental
     default BeanDependencyGroup createDependencyGroup() {
         throw new UnsupportedOperationException("Dependency groups are not supported by this context");
     }
@@ -92,7 +95,7 @@ public interface BeanContext extends
      * @return The result (which must not retain an owned dependency)
      * @since 5.3.0
      */
-    @io.micronaut.core.annotation.Experimental
+    @Experimental
     default <R> R withDependencies(java.util.function.Function<BeanDependencyGroup, R> action) {
         try (BeanDependencyGroup group = createDependencyGroup()) {
             return action.apply(group);
