@@ -3734,8 +3734,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (dependentFactoryBean != null) {
             try {
                 destroyBean(dependentFactoryBean);
-            } catch (RuntimeException e) {
-                failure.addSuppressed(e);
+            } catch (RuntimeException | Error e) {
+                if (failure != e) {
+                    failure.addSuppressed(e);
+                }
             }
         }
     }
@@ -4122,22 +4124,34 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @param created The registrations of the beans
      * @param failure The failure they are destroyed for, which a failure to destroy one is added to as suppressed,
-     *                or {@code null} to log it
+     *                or {@code null} to log runtime exceptions and rethrow errors after attempting all destructions
      */
     void destroyCreatedBeans(@Nullable List<BeanRegistration<?>> created, @Nullable Throwable failure) {
         if (created == null) {
             return;
         }
+        Error cleanupError = null;
         for (int i = created.size() - 1; i >= 0; i--) {
             try {
                 destroyDependentBean(created.get(i));
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | Error e) {
                 if (failure != null) {
-                    failure.addSuppressed(e);
+                    if (failure != e) {
+                        failure.addSuppressed(e);
+                    }
+                } else if (e instanceof Error error) {
+                    if (cleanupError == null) {
+                        cleanupError = error;
+                    } else if (cleanupError != error) {
+                        cleanupError.addSuppressed(error);
+                    }
                 } else if (LOG.isErrorEnabled()) {
                     LOG.error(e.getMessage(), e);
                 }
             }
+        }
+        if (cleanupError != null) {
+            throw cleanupError;
         }
     }
 

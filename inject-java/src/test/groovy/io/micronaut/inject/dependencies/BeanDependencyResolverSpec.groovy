@@ -99,6 +99,40 @@ class Log {
         ctx.close()
     }
 
+    void "failed creation preserves its exception when dependent cleanup throws an error"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Failure implements io.micronaut.context.event.BeanPreDestroyEventListener<Resource> {
+    public Resource onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Resource> event) {
+        Log.EVENTS.add("attempt" + event.getBean().id);
+        throw new AssertionError("cleanup");
+    }
+}
+@Prototype class Broken {
+    Broken(Resource first, Resource second) { throw new IllegalStateException("creation"); }
+}
+@Singleton class Owner {
+    final BeanDependencyResolver resolver;
+    Owner(BeanDependencyResolver resolver) { this.resolver = resolver; }
+}
+''')
+        def owner = ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def broken = ctx.classLoader.loadClass('test.Broken')
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        owner.resolver.getBean(broken)
+
+        then:
+        def failure = thrown(BeanInstantiationException)
+        failure.message.contains('creation')
+        failure.suppressed*.message == ['cleanup', 'cleanup']
+        log.EVENTS == ['attempt2', 'attempt1']
+
+        cleanup:
+        ctx.close()
+    }
+
     void "a dependency reached through owned advice outlives all consumers"() {
         given:
         def ctx = buildContext(HEADER + '''
