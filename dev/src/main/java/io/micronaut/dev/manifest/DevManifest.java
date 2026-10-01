@@ -165,6 +165,10 @@ public final class DevManifest {
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
         this.retainAnnotated = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-annotated", "true").trim());
         this.maxGenerations = maxGenerations(properties.getProperty(MAX_GENERATIONS));
+        if (mode == DevMode.TEST && maxGenerations == 1) {
+            // test mode loads the classes of generation one but runs every test run on a generation of its own
+            throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": 1, test mode runs its first tests on the second generation and needs at least 2");
+        }
         String generationsDir = properties.getProperty(PREFIX + "generations");
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
@@ -435,6 +439,8 @@ public final class DevManifest {
      * {@link io.micronaut.dev.MicronautDevMain#RELAUNCH}, for whoever started it to start it again. Unlimited, zero, on
      * the JVM, which unloads a retired generation once nothing refers to it; {@link #NATIVE_MAX_GENERATIONS} in a
      * native image, which never does. {@code unlimited} or {@code 0} lifts it.
+     * Test mode runs its tests on a generation of their own from the second on, so it takes at least two, and checks the
+     * budget after a run, so that a run is never lost to the relaunch.
      *
      * @return The budget, zero when unlimited
      */
