@@ -22,12 +22,16 @@ import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.EnvironmentPropertySource;
+import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -35,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +55,7 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  */
 @NullMarked
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
+    static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
@@ -74,9 +80,31 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
         try {
 
+            // The training mode decides whether the context starts at all, so the switch is read before
+            // applicationContext.start(), from the environment that start() would otherwise start first
+            Environment environment = applicationContext.getEnvironment();
+            // Test Resources reads the configuration together with the environment, so a training run that is
+            // already known disables it first
+            boolean trainingRunBeforeStart = isTrainingRunBeforeStart(environment);
+            startEnvironment(environment, trainingRunBeforeStart);
+            boolean trainingRun = isTrainingRun(environment);
+            if (trainingRun) {
+                TrainingTestResources.checkDisabled(environment, trainingRunBeforeStart);
+                if (TrainingLoad.isSelected(environment)) {
+                    TrainingLoad.run(applicationContext);
+                    return applicationContext;
+                }
+            } else if (trainingRunBeforeStart) {
+                // A source that the environment only reads when it starts turned the switch off again
+                TrainingTestResources.warnNotATrainingRun(environment);
+            }
+
             applicationContext.start();
 
             EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
+            if (trainingRun) {
+                announceTrainingRun(environment, embeddedApplication != null);
+            }
 
             if (embeddedApplication != null) {
                 try {
@@ -110,6 +138,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             }
                             keepAlive = embeddedApplication.isServer();
                         }
+                    }
+
+                    if (trainingRun) {
+                        finishTrainingRun(applicationContext, embeddedApplication);
+                        return applicationContext;
                     }
 
                     Thread mainThread = Thread.currentThread();
@@ -194,6 +227,161 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
     private static long elapsedMillis(long startNanos) {
         return TimeUnit.MILLISECONDS.convert(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
+    }
+
+    /**
+     * Reads the training run switch the way the beans of a training run do with
+     * {@code @Requires(property = TRAINING_ENABLED, pattern = "(?i)true")}: only {@code true}, in
+     * any case, turns it on. A {@code Boolean} conversion would also accept the strings
+     * {@code yes} and {@code on}, which those beans do not match.
+     *
+     * <p>Every application runs this on startup, so it is a plain call: no lambda to link. With
+     * {@link #isTrainingRunBeforeStart(Environment)}, it is the only thing an application that is
+     * not training pays for: the mode ({@link ApplicationConfiguration#TRAINING_MODE}) is only read
+     * when the switch is on.</p>
+     *
+     * <p>This read decides whether this run is a training run. The one before the start only
+     * decides whether Micronaut Test Resources is disabled while the environment starts.</p>
+     *
+     * @param environment The started environment
+     * @return Whether this run is a training run
+     */
+    private static boolean isTrainingRun(Environment environment) {
+        return StringUtils.TRUE.equalsIgnoreCase(environment.getProperty(ApplicationConfiguration.TRAINING_ENABLED, String.class).orElse(null));
+    }
+
+    /**
+     * Reads the training run switch before the environment starts, from the sources that the
+     * environment does not have to read and that take precedence over the configuration files: the
+     * system properties, the environment variables (with the includes and the excludes of this
+     * builder, as the environment reads them), the properties and the arguments given to this
+     * builder, and the property sources given to this builder whose order is at least that of the
+     * environment variables. A switch that is only set in the configuration of the application, or
+     * in a property source of this builder with a lower order, which a configuration file can
+     * override, is not seen here.
+     *
+     * <p>A source that the environment only reads when it starts and that takes precedence over
+     * these, such as distributed configuration, can still turn the switch off. {@link #start()} then
+     * logs a warning, because Micronaut Test Resources was disabled for a run that is not a training
+     * run (see {@link TrainingTestResources}).</p>
+     *
+     * <p>Every application runs this on startup: two lookups and a look at the property sources that
+     * this builder has added, usually none or one.</p>
+     *
+     * @param environment The environment, not started
+     * @return Whether this run is a training run
+     */
+    private boolean isTrainingRunBeforeStart(Environment environment) {
+        @Nullable String value = null;
+        int order = Integer.MIN_VALUE;
+        if (isEnableDefaultPropertySources()) {
+            value = CachedEnvironment.getProperty(ApplicationConfiguration.TRAINING_ENABLED);
+            order = SystemPropertiesPropertySource.POSITION;
+            if (value == null && readsTrainingVariable()) {
+                value = CachedEnvironment.getenv(TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
+                order = EnvironmentPropertySource.POSITION;
+            }
+        }
+        // The source with the highest order wins, and the sources of the builder win a tie, as in the started environment
+        for (PropertySource propertySource : environment.getPropertySources()) {
+            int sourceOrder = propertySource.getOrder();
+            // Below the environment variables, a configuration file, which is not read yet, could override it
+            if (sourceOrder < EnvironmentPropertySource.POSITION) {
+                continue;
+            }
+            Object sourceValue = propertySource.get(ApplicationConfiguration.TRAINING_ENABLED);
+            if (sourceValue != null && (value == null || sourceOrder >= order)) {
+                value = sourceValue.toString();
+                order = sourceOrder;
+            }
+        }
+        return StringUtils.TRUE.equalsIgnoreCase(value);
+    }
+
+    /**
+     * @return Whether the started environment reads {@value #TRAINING_ENABLED_ENVIRONMENT_VARIABLE}:
+     * the environment variables are a property source, and the includes and the excludes of this
+     * builder let that variable through, as {@link EnvironmentPropertySource} applies them
+     */
+    private boolean readsTrainingVariable() {
+        if (!isEnvironmentPropertySource()) {
+            return false;
+        }
+        @Nullable List<String> includes = getEnvironmentVariableIncludes();
+        @Nullable List<String> excludes = getEnvironmentVariableExcludes();
+        return (includes == null || includes.contains(TRAINING_ENABLED_ENVIRONMENT_VARIABLE))
+            && (excludes == null || !excludes.contains(TRAINING_ENABLED_ENVIRONMENT_VARIABLE));
+    }
+
+    /**
+     * Starts the environment. In a training run that is known before the start, the Micronaut Test
+     * Resources client is disabled while the environment reads the configuration (see
+     * {@link TrainingTestResources}).
+     *
+     * @param environment The environment
+     * @param trainingRun Whether the switch is on before the environment starts
+     */
+    private static void startEnvironment(Environment environment, boolean trainingRun) {
+        if (!trainingRun) {
+            environment.start();
+            return;
+        }
+        @Nullable String testResourcesClient = TrainingTestResources.disableClient();
+        try {
+            environment.start();
+        } finally {
+            TrainingTestResources.restoreClient(testResourcesClient);
+        }
+    }
+
+    /**
+     * Says as soon as the switch is read that this JVM is a training run, so that a switch set by
+     * mistake on a deployment target is visible before the application stops itself. Without an
+     * {@link EmbeddedApplication} it says that nothing stops the application.
+     *
+     * @param environment The environment
+     * @param hasEmbeddedApplication Whether the context has an {@link EmbeddedApplication} to stop
+     */
+    private static void announceTrainingRun(Environment environment, boolean hasEmbeddedApplication) {
+        if (!LOG.isWarnEnabled()) {
+            return;
+        }
+        if (hasEmbeddedApplication) {
+            LOG.warn("Training run ({}=true): this JVM is a training run and does not serve traffic. It stops the application as soon as startup has completed{}. "
+                    + "Never set this property or {} on a deployment target",
+                ApplicationConfiguration.TRAINING_ENABLED, exitsAfterTrainingRun(environment) ? " and exits with status 0" : "", TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
+        } else {
+            // The beans that require the switch are still created: only the stop and the exit are missing
+            LOG.warn("Training run ({}=true): the application is not stopped, because it has no EmbeddedApplication. The JVM exits when the application's own threads end",
+                ApplicationConfiguration.TRAINING_ENABLED);
+        }
+    }
+
+    private static boolean exitsAfterTrainingRun(Environment environment) {
+        return !environment.getActiveNames().contains(Environment.TEST);
+    }
+
+    /**
+     * Ends a training run ({@link ApplicationConfiguration#TRAINING_ENABLED}): the application has
+     * started and every startup listener, warm-up included, has run. Stops the application, closes
+     * the context and exits with status 0, except in the {@code test} environment.
+     *
+     * @param applicationContext The application context
+     * @param embeddedApplication The started application
+     */
+    @SuppressWarnings("java:S1147") // Exiting the JVM is the point of a training run
+    private static void finishTrainingRun(ApplicationContext applicationContext, EmbeddedApplication<?> embeddedApplication) {
+        boolean exit = exitsAfterTrainingRun(applicationContext.getEnvironment());
+        if (LOG.isWarnEnabled()) {
+            LOG.warn("Training run ({}=true): startup completed, stopping the application{}. This JVM was a training run and served no traffic",
+                ApplicationConfiguration.TRAINING_ENABLED, exit ? " and exiting with status 0" : "");
+        }
+        try (applicationContext) {
+            embeddedApplication.stop();
+        }
+        if (exit) {
+            System.exit(0);
+        }
     }
 
     @Override
