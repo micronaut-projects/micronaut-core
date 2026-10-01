@@ -1067,20 +1067,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             );
         }
         return StatementDef.multi(
-            aThis.field(proxyMethodsField).assign(
-                ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
-                    methods.stream().map(methodElement ->
-                        aThis.field(proxyBeanDefinitionField).invoke(
-                            METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD,
-
-                            ExpressionDef.constant(methodElement.getName()),
-                            TypeDef.CLASS.array().instantiate(
-                                Arrays.stream(methodElement.getSuspendParameters()).map(p -> ExpressionDef.constant(TypeDef.erasure(p.getGenericType()))).toList()
-                            )
-                        )
-                    ).toList()
-                )
-            ),
+            proxyMethods,
             aThis.field(interceptorsField).assign(
                 ClassTypeDef.of(Interceptor.class).array(2).instantiate(
                     methods.stream().map(methodElement ->

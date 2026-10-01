@@ -149,7 +149,7 @@ final class BeanDependencies implements DependentBeanProvider {
     }
 
     <T> T resolve(DefaultBeanContext context, @Nullable BeanDefinition<?> definition,
-                  Function<DefaultBeanResolutionContext, T> operation) {
+                  Function<? super DefaultBeanResolutionContext, T> operation) {
         checkOpen(context);
         // User factories run outside the owner lock. Publication is atomic with closing.
         List<BeanRegistration<?>> created = List.of();
