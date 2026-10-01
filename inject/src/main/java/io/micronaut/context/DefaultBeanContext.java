@@ -1389,9 +1389,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private <T> void disposeBean(DisposableBeanDefinition<T> definition,
                                  BeanRegistration<T> registration,
                                  T beanToDestroy) {
-        List<BeanRegistration<?>> dependents = registration instanceof DependentBeanProvider provider
-            ? provider.dependentBeans()
-            : Collections.emptyList();
+        List<BeanRegistration<?>> dependents = registration.dependentBeans();
         List<?> interceptorRegistrations = registration instanceof BeanDisposingRegistration<?> disposingRegistration
             ? disposingRegistration.getInterceptorRegistrations()
             : null;
@@ -4542,20 +4540,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!visited.add(registration)) {
             return;
         }
-        if (registration instanceof BeanDisposingRegistration<?> disposing) {
-            disposing.getDependencies().stopResolving();
+        BeanDependencies dependencies = registration.getDependencies();
+        if (dependencies != null) {
+            dependencies.stopResolving();
         }
-        if (registration instanceof DependentBeanProvider provider) {
-            for (BeanRegistration<?> owned : provider.dependentBeans()) {
-                stopDependencyResolution(owned, visited);
-            }
-        }
-        if (registration.getBean() instanceof InterceptedBeanProxy<?> proxy
-            && proxy.interceptedBeanDependencies() instanceof DefaultBeanDependencyResolver owner) {
-            owner.dependencies.stopResolving();
-            for (BeanRegistration<?> owned : owner.dependencies.dependentBeans()) {
-                stopDependencyResolution(owned, visited);
-            }
+        for (BeanRegistration<?> owned : registration.dependentBeans()) {
+            stopDependencyResolution(owned, visited);
         }
         if (registration.getBean() instanceof InterceptedBeanProxy<?> proxy && proxy.hasCachedInterceptedTarget()
             && findProxyTargetBeanDefinition(registration.getBeanDefinition()).map(this::isUnscoped).orElse(false)) {
