@@ -723,7 +723,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private boolean generateExecutableMethodsDefinitionWriter = true;
 
     // What the static initializer is generated from, for the descriptor of the definition
-    private Collection<String> exposedTypeNames = List.of();
+    private Collection<String> descriptorExposedTypes = List.of();
     private List<String> indexedTypeNames = List.of();
     private List<Condition> preLoadConditions = List.of();
     private boolean hasPostLoadConditions;
@@ -1658,7 +1658,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return new BeanDefinitionDescriptor(
             flags,
             getClassName(beanTypeElement),
-            List.copyOf(exposedTypeNames),
+            List.copyOf(descriptorExposedTypes),
             indexedTypeNames.isEmpty() ? indexedTypeNames(runtimeMetadata) : indexedTypeNames,
             annotations,
             new TreeMap<>(AnnotationMetadataGenUtils.repeatableAnnotationContainers(annotationMetadataDefaults)),
@@ -2919,7 +2919,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             // This should never happen
             return StatementDef.multi();
         }
-        this.exposedTypeNames = exposedTypeNames;
+        descriptorExposedTypes = exposedTypeNames;
         FieldDef exposedTypesField = FieldDef.builder(FIELD_EXPOSED_TYPES, TypeDef.parameterized(Set.class, TypeDef.Primitive.CLASS))
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
             .build();

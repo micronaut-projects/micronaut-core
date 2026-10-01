@@ -20,6 +20,9 @@ import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.ObjectDef;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * Aggregates the generated {@link ObjectDef} together with service metadata.
  *
@@ -59,5 +62,29 @@ public record OutputObjectDef(ObjectDef objectDef,
      */
     public OutputObjectDef(ObjectDef objectDef, @Nullable Class<?> serviceClass, OriginatingElements originatingElements) {
         this(objectDef, serviceClass, originatingElements, null);
+    }
+
+    // The generated methods would compare and print the content array by identity
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        return o instanceof OutputObjectDef that
+            && objectDef.equals(that.objectDef)
+            && Objects.equals(serviceClass, that.serviceClass)
+            && originatingElements.equals(that.originatingElements)
+            && Arrays.equals(serviceContent, that.serviceContent);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * Objects.hash(objectDef, serviceClass, originatingElements) + Arrays.hashCode(serviceContent);
+    }
+
+    @Override
+    public String toString() {
+        return "OutputObjectDef[objectDef=" + objectDef
+            + ", serviceClass=" + serviceClass
+            + ", originatingElements=" + originatingElements
+            + ", serviceContent=" + Arrays.toString(serviceContent) + ']';
     }
 }

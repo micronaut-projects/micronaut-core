@@ -20,14 +20,18 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
     protected URL[] compile() {
         try (JavaParser parser = new JavaParser()) {
             for (JavaFileObject file : parser.generate('test.Advised', BEANS)) {
-                if (file.name.startsWith(CLASS_OUTPUT)) {
-                    Path target = classes.resolve(file.name.substring(CLASS_OUTPUT.length()))
-                    Files.createDirectories(target.parent)
-                    file.openInputStream().withCloseable { Files.copy(it, target) }
-                }
+                copyClassOutput(file)
             }
         }
         return [classes.toUri().toURL()] as URL[]
+    }
+
+    private void copyClassOutput(JavaFileObject file) {
+        if (file.name.startsWith(CLASS_OUTPUT)) {
+            Path target = classes.resolve(file.name.substring(CLASS_OUTPUT.length()))
+            Files.createDirectories(target.parent)
+            file.openInputStream().withCloseable { Files.copy(it, target) }
+        }
     }
 
     @Override
