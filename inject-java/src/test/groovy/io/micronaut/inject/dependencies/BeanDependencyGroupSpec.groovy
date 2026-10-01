@@ -267,14 +267,14 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         ctx.close()
     }
 
-    void "failed destruction invocations release all temporary dependencies and suppress cleanup failures"() {
+    void "failed destruction invocations release all temporary dependencies and suppress cleanup failures for #failureType"() {
         given:
-        def ctx = buildContext(HEADER + '''
+        def ctx = buildContext(HEADER + """
 @Singleton class Owner { }
 @Singleton class Failure implements io.micronaut.context.event.BeanPreDestroyEventListener<Resource> {
     public Resource onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Resource> event) {
         Log.events.add("attempt");
-        throw new IllegalStateException("cleanup");
+        throw new ${failureType}("cleanup");
     }
 }
 @Singleton class Disposer implements io.micronaut.context.event.BeanPreDestroyEventListener<Owner> {
@@ -292,7 +292,7 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         return event.getBean();
     }
 }
-''')
+""")
         ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
         def disposer = ctx.classLoader.loadClass('test.Disposer')
         def log = ctx.classLoader.loadClass('test.Log')
@@ -307,6 +307,8 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         disposer.failure.suppressed[0].suppressed.length == 1
         disposer.escaped.closed
         log.events == ['attempt', 'attempt']
+        where:
+        failureType << ['IllegalStateException', 'AssertionError']
     }
 
     void "closing during creation rolls back the unpublished registration"() {
