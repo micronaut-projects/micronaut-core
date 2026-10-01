@@ -199,6 +199,29 @@ public final class JUnitXmlReportWriter implements TestReportListener {
     }
 
     /**
+     * Forgets a test class whose source is gone, and the classes nested in it, and removes their reports.
+     *
+     * @param className The class, by binary name
+     */
+    public synchronized void remove(String className) {
+        Set<String> gone = new LinkedHashSet<>();
+        for (String name : latest.keySet()) {
+            if (name.equals(className) || name.startsWith(className + "$")) {
+                gone.add(name);
+            }
+        }
+        gone.add(className);
+        for (String name : gone) {
+            latest.remove(name);
+            try {
+                Files.deleteIfExists(reportOf(name));
+            } catch (IOException e) {
+                LOG.error("Cannot remove the test report of {}: {}", name, e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
      * Whether a test belongs to a method: it is the method, {@code adds()}, an invocation of it, {@code adds(int)[1]},
      * or a test the method produced, as a {@code @TestFactory}'s dynamic tests, whose unique identifier descends from
      * a segment naming the method, such as {@code [test-factory:generated()]}.
