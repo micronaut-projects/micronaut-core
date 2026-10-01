@@ -160,7 +160,7 @@ public class MicronautDevMain {
      */
     protected DevClassLoader createClassLoader(DevManifest manifest) {
         ClassLoader parent = parentClassLoader();
-        Path generations = manifest.projectDir().resolve("build").resolve("micronaut-dev").resolve("generations");
+        Path generations = manifest.generations();
         // the resource roots are read live, ahead of the snapshotted build output, so an edited configuration
         // file or template is what a generation serves, without a copy step by the build
         List<Path> live = new ArrayList<>();

@@ -33,6 +33,8 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
@@ -66,9 +68,17 @@ public final class GenerationClassLoader extends URLClassLoader {
     private final List<Path> sources;
     private final List<Path> roots;
     private final Cleaner.Cleanable snapshotCleanup;
+    // the URLs of the directories read live, whose resources hide the build output's copies of them
+    private final List<String> live;
 
-    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, @Nullable Path snapshot, @Nullable ClassLoader parent) {
+    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, int liveCount, @Nullable Path snapshot, @Nullable ClassLoader parent) {
         super("micronaut-dev-generation-" + generation, toUrls(roots), parent);
+        URL[] urls = getURLs();
+        List<String> liveUrls = new ArrayList<>(liveCount);
+        for (int i = 0; i < liveCount; i++) {
+            liveUrls.add(urls[i].toExternalForm());
+        }
+        this.live = List.copyOf(liveUrls);
         this.generation = generation;
         this.sources = List.copyOf(sources);
         this.roots = List.copyOf(roots);
@@ -84,7 +94,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @param parent The parent loader, holding the libraries
      */
     public GenerationClassLoader(int generation, List<Path> roots, @Nullable ClassLoader parent) {
-        this(generation, roots, roots, null, parent);
+        this(generation, roots, roots, 0, null, parent);
     }
 
     /**
@@ -115,7 +125,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @throws UncheckedIOException if the directories cannot be copied
      */
     public static GenerationClassLoader snapshot(int generation, List<Path> liveRoots, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
-        List<Path> roots = new java.util.ArrayList<>(liveRoots.size() + sources.size());
+        List<Path> roots = new ArrayList<>(liveRoots.size() + sources.size());
         roots.addAll(liveRoots);
         try {
             deleteRecursively(snapshotDir);
@@ -128,9 +138,9 @@ public final class GenerationClassLoader extends URLClassLoader {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot snapshot the reloadable directories into " + snapshotDir, e);
         }
-        List<Path> all = new java.util.ArrayList<>(liveRoots);
+        List<Path> all = new ArrayList<>(liveRoots);
         all.addAll(sources);
-        return new GenerationClassLoader(generation, all, roots, snapshotDir, parent);
+        return new GenerationClassLoader(generation, all, roots, liveRoots.size(), snapshotDir, parent);
     }
 
     /**
@@ -213,6 +223,41 @@ public final class GenerationClassLoader extends URLClassLoader {
     @Nullable
     URL findInGenerationResource(String name) {
         return findResource(name);
+    }
+
+    /**
+     * The resources of a name, without the build output's copies of those a live directory holds: a resource the
+     * build copied from a resource root would be found twice, which configuration loading rejects as a duplicate,
+     * and the copy may be stale. Resources under {@code META-INF/} are left alone: a processor generates those into
+     * the class output beside the ones a resource root holds, as service descriptors, and every one counts.
+     *
+     * @param name The resource name
+     * @return The resources
+     * @throws IOException if the directories cannot be read
+     */
+    @Override
+    public Enumeration<URL> findResources(String name) throws IOException {
+        List<URL> all = Collections.list(super.findResources(name));
+        if (live.isEmpty() || name.startsWith("META-INF/") || all.stream().noneMatch(this::isLive)) {
+            return Collections.enumeration(all);
+        }
+        List<URL> kept = new ArrayList<>(all.size());
+        for (URL url : all) {
+            if (isLive(url)) {
+                kept.add(url);
+            }
+        }
+        return Collections.enumeration(kept);
+    }
+
+    private boolean isLive(URL url) {
+        String external = url.toExternalForm();
+        for (String root : live) {
+            if (external.startsWith(root)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
