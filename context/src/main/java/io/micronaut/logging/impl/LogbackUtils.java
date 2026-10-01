@@ -91,22 +91,26 @@ public final class LogbackUtils {
                                  @Nullable String configurationFile,
                                  @Nullable String loggerConfig) {
         // ContextInitializer.autoConfig(), which Logback's startup calls, uses this class loader
-        configure(classLoader, Loader.getClassLoaderOfClass(Configurator.class), context, configurationFile, loggerConfig);
+        configure(classLoader, Loader.getClassLoaderOfClass(Configurator.class), new File(ClassicConstants.AUTOCONFIG_FILE),
+            context, configurationFile, loggerConfig);
     }
 
     /**
      * Visible for testing: production code goes through the public method, which passes the class
-     * loader that loaded Logback. Only tests call this overload directly, to make Logback's lookup
-     * see {@link Configurator} services and default files that are not on their classpath.
+     * loader that loaded Logback and the {@code logback.xml} file of the working directory. Only tests
+     * call this overload directly, to make Logback's lookup see {@link Configurator} services and
+     * default files that are not on their classpath, and to put the working-directory file elsewhere.
      *
-     * @param classLoader        The class loader to look up a location set in Micronaut configuration with
-     * @param logbackClassLoader The class loader that Logback's own lookup uses
-     * @param context            The Logger Context
-     * @param configurationFile  The {@code logback.configurationFile} property of the Micronaut configuration, if any
-     * @param loggerConfig       The {@code logger.config} property of the Micronaut configuration, if any
+     * @param classLoader          The class loader to look up a location set in Micronaut configuration with
+     * @param logbackClassLoader   The class loader that Logback's own lookup uses
+     * @param workingDirectoryFile The {@code logback.xml} file of the working directory
+     * @param context              The Logger Context
+     * @param configurationFile    The {@code logback.configurationFile} property of the Micronaut configuration, if any
+     * @param loggerConfig         The {@code logger.config} property of the Micronaut configuration, if any
      */
     static void configure(ClassLoader classLoader,
                           ClassLoader logbackClassLoader,
+                          File workingDirectoryFile,
                           LoggerContext context,
                           @Nullable String configurationFile,
                           @Nullable String loggerConfig) {
@@ -116,10 +120,10 @@ public final class LogbackUtils {
             return;
         }
         try {
-            URL workingDirectoryFile = findWorkingDirectoryFile(logbackClassLoader);
-            if (workingDirectoryFile != null) {
-                context.getStatusManager().add(new InfoStatus("Found resource [" + ClassicConstants.AUTOCONFIG_FILE + "] in the working directory at [" + workingDirectoryFile + "]", context));
-                configureByUrl(context, workingDirectoryFile);
+            URL workingDirectoryUrl = findWorkingDirectoryFile(workingDirectoryFile, logbackClassLoader);
+            if (workingDirectoryUrl != null) {
+                context.getStatusManager().add(new InfoStatus("Found resource [" + ClassicConstants.AUTOCONFIG_FILE + "] in the working directory at [" + workingDirectoryUrl + "]", context));
+                configureByUrl(context, workingDirectoryUrl);
             } else {
                 new ContextInitializer(context).autoConfig(logbackClassLoader);
             }
@@ -188,14 +192,14 @@ public final class LogbackUtils {
      * when only {@code logback-test.xml} was on the classpath. Logback's lookup finds it, so it now
      * takes precedence.
      *
+     * @param file               The {@code logback.xml} file of the working directory
      * @param logbackClassLoader The class loader that Logback's own lookup uses
-     * @return The {@code logback.xml} file in the working directory, if it exists and no
-     * {@link Configurator} service, {@code logback.configurationFile} JVM system property or default
-     * file on the classpath takes precedence over it
+     * @return The URL of that file, if it exists and no {@link Configurator} service,
+     * {@code logback.configurationFile} JVM system property or default file on the classpath takes
+     * precedence over it
      * @throws MalformedURLException if the file cannot be converted to a URL
      */
-    private static @Nullable URL findWorkingDirectoryFile(ClassLoader logbackClassLoader) throws MalformedURLException {
-        File file = new File(ClassicConstants.AUTOCONFIG_FILE);
+    private static @Nullable URL findWorkingDirectoryFile(File file, ClassLoader logbackClassLoader) throws MalformedURLException {
         // The file is checked first because it rarely exists, and then nothing else is looked up
         if (!file.exists()
             || System.getProperty(ClassicConstants.CONFIG_FILE_PROPERTY) != null
@@ -250,6 +254,7 @@ public final class LogbackUtils {
      * @param location The location of the xml logback config file
      * @param resource The resource at that location, if it exists
      */
+    @SuppressWarnings("java:S106") // the context being configured has no appender to log this error with
     private static void configureByResource(LoggerContext context, String location, @Nullable URL resource) {
         if (resource == null) {
             System.err.println("ERROR: Logback configuration file " + location + " not found");

@@ -26,8 +26,10 @@ import java.nio.file.Path
  * <p>
  * Logback's startup looks the {@link Configurator} services up with the class loader that loaded Logback,
  * and so does the public {@code configure}. These features therefore go through its package-private
- * overload, which takes that class loader. The public method differs from it by that one argument, and
- * the feature about the class loader that loaded Logback is the one that goes through it.
+ * overload, which takes that class loader. The public method differs from it by that one argument and by
+ * the {@code logback.xml} file of the working directory, and the feature about the class loader that loaded
+ * Logback is the one that goes through it. The other features pass a {@code logback.xml} in a temporary
+ * directory instead of the working directory's, and only the features about that file write it.
  */
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
 @RestoreSystemProperties
@@ -112,7 +114,7 @@ class LogbackUtilsSpec extends Specification {
 
     void "a Configurator service that #description fails with a LoggingSystemException"() {
         when:
-        LogbackUtils.configure(getClass().classLoader, classLoader(services), context, null, null)
+        LogbackUtils.configure(getClass().classLoader, classLoader(services), workingDirectoryFile(), context, null, null)
 
         then:
         LoggingSystemException e = thrown()
@@ -123,6 +125,44 @@ class LogbackUtilsSpec extends Specification {
         description        | services                                         | cause
         'throws'           | [ThrowingConfigurator]                           | LogbackException
         'cannot be loaded' | ['io.micronaut.logging.impl.NoSuchConfigurator'] | ServiceConfigurationError
+    }
+
+    void "a logback.xml in the working directory is used when nothing else selects a configuration"() {
+        given:
+        writeWorkingDirectoryFile()
+
+        when:
+        LogbackUtils.configure(getClass().classLoader, classLoader([], true), workingDirectoryFile(), context, null, null)
+
+        then:
+        rootAppenders() == ['WORKING_DIRECTORY']
+    }
+
+    void "the logback.xml in the working directory is not used when #description"() {
+        given:
+        writeWorkingDirectoryFile()
+        if (systemProperty != null) {
+            System.setProperty(ClassicConstants.CONFIG_FILE_PROPERTY, location(systemProperty))
+        }
+        if (defaultFile != null) {
+            Files.writeString(dir.resolve(defaultFile), '<configuration/>')
+        }
+
+        when:
+        LogbackUtils.configure(getClass().classLoader, classLoader(configurators, true), workingDirectoryFile(), context, null, null)
+
+        then: 'Logback configures the context by itself'
+        rootAppenders() == expected
+
+        where:
+        // STDOUT, not the empty file of the temporary directory: DefaultJoranConfigurator searches with the class
+        // loader that loaded it, which finds this module's logback.xml. In production the two class loaders are the
+        // same one.
+        description                            | configurators      | systemProperty | defaultFile                           | expected
+        '-Dlogback.configurationFile is set'   | []                 | CUSTOM         | null                                  | ['CUSTOM']
+        'logback-test.xml is on the classpath' | []                 | null           | ClassicConstants.TEST_AUTOCONFIG_FILE | ['STDOUT']
+        'logback.xml is on the classpath'      | []                 | null           | ClassicConstants.AUTOCONFIG_FILE      | ['STDOUT']
+        'there is a Configurator service'      | [StubConfigurator] | null           | null                                  | ['STUB']
     }
 
     void "a missing location set only in Micronaut configuration fails, whatever configurators exist"() {
@@ -162,17 +202,43 @@ class LogbackUtilsSpec extends Specification {
     }
 
     private void configure(List<Class<? extends Configurator>> configurators, String configurationFile, String loggerConfig) {
-        LogbackUtils.configure(getClass().classLoader, classLoader(configurators), context, configurationFile, loggerConfig)
+        LogbackUtils.configure(getClass().classLoader, classLoader(configurators), workingDirectoryFile(), context, configurationFile, loggerConfig)
     }
 
     /**
-     * @param configurators The {@link Configurator} classes, or their names, to register as services
+     * @return The {@code logback.xml} that stands for the one of the working directory. It is not on the class
+     * path of {@link #classLoader}, which holds its parent directory.
      */
-    private ClassLoader classLoader(List<?> configurators) {
+    private File workingDirectoryFile() {
+        dir.resolve('working-directory').resolve(ClassicConstants.AUTOCONFIG_FILE).toFile()
+    }
+
+    private void writeWorkingDirectoryFile() {
+        File file = workingDirectoryFile()
+        file.parentFile.mkdirs()
+        file.text = '''\
+            <configuration>
+                <appender name="WORKING_DIRECTORY" class="ch.qos.logback.core.read.ListAppender"/>
+                <root level="info">
+                    <appender-ref ref="WORKING_DIRECTORY"/>
+                </root>
+            </configuration>
+            '''.stripIndent()
+    }
+
+    /**
+     * @param configurators    The {@link Configurator} classes, or their names, to register as services
+     * @param hideDefaultFiles Whether to hide the {@code logback-test.xml} and {@code logback.xml} of this module's
+     *                         classpath, as if the only ones were those in the temporary directory
+     */
+    private ClassLoader classLoader(List<?> configurators, boolean hideDefaultFiles = false) {
         Path services = dir.resolve('META-INF/services')
         Files.createDirectories(services)
         Files.write(services.resolve(Configurator.name), configurators.collect { it instanceof Class ? it.name : it as String })
-        URLClassLoader classLoader = new URLClassLoader([dir.toUri().toURL()] as URL[], getClass().classLoader)
+        URL[] urls = [dir.toUri().toURL()] as URL[]
+        URLClassLoader classLoader = hideDefaultFiles
+                ? new NoDefaultFilesClassLoader(urls, getClass().classLoader)
+                : new URLClassLoader(urls, getClass().classLoader)
         classLoaders << classLoader
         return classLoader
     }
@@ -230,6 +296,21 @@ class LogbackUtilsSpec extends Specification {
         @Override
         ExecutionStatus configure(LoggerContext loggerContext) {
             throw new IllegalStateException('broken')
+        }
+    }
+
+    static class NoDefaultFilesClassLoader extends URLClassLoader {
+
+        NoDefaultFilesClassLoader(URL[] urls, ClassLoader parent) {
+            super(urls, parent)
+        }
+
+        @Override
+        URL getResource(String name) {
+            if (name == ClassicConstants.TEST_AUTOCONFIG_FILE || name == ClassicConstants.AUTOCONFIG_FILE) {
+                return findResource(name)
+            }
+            return super.getResource(name)
         }
     }
 

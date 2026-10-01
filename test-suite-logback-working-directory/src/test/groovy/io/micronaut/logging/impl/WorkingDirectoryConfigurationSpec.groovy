@@ -92,7 +92,7 @@ class WorkingDirectoryConfigurationSpec extends Specification {
         CountingConfigurator.INSTANCES.set(0)
 
         when:
-        LogbackUtils.configure(getClass().classLoader, classLoader, freshContext, null, null)
+        LogbackUtils.configure(getClass().classLoader, classLoader, new File(ClassicConstants.AUTOCONFIG_FILE), freshContext, null, null)
 
         then: 'Logback configures the context by itself, as at startup'
         rootAppenders(freshContext) == expected
@@ -124,7 +124,7 @@ class WorkingDirectoryConfigurationSpec extends Specification {
         URLClassLoader classLoader = new URLClassLoader([dir.toUri().toURL()] as URL[], getClass().classLoader)
 
         when:
-        LogbackUtils.configure(getClass().classLoader, classLoader, freshContext, null, null)
+        LogbackUtils.configure(getClass().classLoader, classLoader, new File(ClassicConstants.AUTOCONFIG_FILE), freshContext, null, null)
 
         then: 'the file in the working directory is left alone, and Logback configures the context by itself'
         // Not CLASSPATH: DefaultJoranConfigurator searches with the class loader that loaded it, which does not
