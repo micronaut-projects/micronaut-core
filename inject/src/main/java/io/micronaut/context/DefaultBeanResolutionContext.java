@@ -68,7 +68,7 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     }
 
     @Override
-    public <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+    public <R> R withDependencies(java.util.function.Function<BeanDependencyGroup, R> action) {
         if (closed) {
             throw new IllegalStateException("Cannot resolve dependencies through a closed resolution context");
         }

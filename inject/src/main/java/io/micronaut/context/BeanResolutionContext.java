@@ -101,15 +101,15 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Resolves dependencies for a synchronous invocation and closes the temporary group afterwards.
      * A context supplied by the container for destruction permits temporary lookups during shutdown,
      * only on the destruction thread and until that invocation returns. Other contexts follow the ordinary
-     * shutdown restrictions of {@link BeanContext#withDependencies(Function)}.
+     * shutdown restrictions of {@link BeanContext#withDependencies(java.util.function.Function)}.
      * Cleanup failures are suppressed on an invocation failure. Do not retain an owned dependency in the result.
      * @param action The invocation
      * @param <R> The result type
      * @return The result
      * @since 5.3.0
      */
-    @Experimental
-    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+    @io.micronaut.core.annotation.Experimental
+    default <R> R withDependencies(java.util.function.Function<BeanDependencyGroup, R> action) {
         return getContext().withDependencies(action);
     }
 
