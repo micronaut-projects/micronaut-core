@@ -556,10 +556,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 BeanIntrospectionWriter writer,
                                 boolean describeConstructors,
                                 VisitorContext context) {
-        if (isAlreadyWritten(ce, writer)) {
-            processed.add(ce.getName());
-            return;
-        }
         List<PropertyElement> beanProperties = ce.getBeanProperties(propertyElementQuery).stream()
             .filter(p -> !p.isExcluded())
             .toList();
@@ -622,6 +618,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         addExecutableMethods(ce, writer, beanProperties);
 
         processed.add(ce.getName());
+        if (isAlreadyWritten(ce, writer)) {
+            return;
+        }
         for (OutputObjectDef outputObjectDef : writer.build()) {
             write(outputObjectDef, context);
         }
