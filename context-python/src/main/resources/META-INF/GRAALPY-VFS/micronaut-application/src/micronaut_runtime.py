@@ -526,3 +526,540 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
 from micronaut_java_imports import _MicronautJavaType, __micronaut_java_annotation, __micronaut_java_imports, \
     __micronaut_java_package_member, __micronaut_java_package_attribute, __micronaut_java_package_initialised, \
     __micronaut_reset_java_imports, __micronaut_install_java_import_finder
+
+
+# ---------------------------------------------------------------------------------------------------------
+# Patching application modules in place (development mode)
+#
+# A body-only edit of a Python module leaves the generated Java classes byte for byte the same: the
+# development runtime then patches the module into every running context instead of starting a new
+# generation. The generated classes, the class and module caches of the runtime and the AOP proxies hold
+# the module, class and function objects of the running code, so those objects are kept and what they run
+# is changed: a function gets the new code, a class gets the new members, and the module's other globals
+# are rebound. What cannot be followed that way is refused, before anything is changed where possible, and
+# the runtime restarts instead.
+# ---------------------------------------------------------------------------------------------------------
+
+class MicronautHotPatchRefused(Exception):
+    """A change that cannot be patched in place: the development runtime restarts the application instead."""
+
+
+# the flags that make a function a generator or a coroutine: callers handle the two kinds differently
+_MICRONAUT_CODE_KIND_FLAGS = inspect.CO_GENERATOR | inspect.CO_COROUTINE | inspect.CO_ASYNC_GENERATOR | \
+    inspect.CO_ITERABLE_COROUTINE
+
+# class attributes a merge leaves to the class: its identity, and the state the class machinery keeps
+_MICRONAUT_CLASS_KEPT = frozenset((
+    "__dict__", "__weakref__", "__module__", "__qualname__", "__orig_bases__", "__parameters__",
+    "__abstractmethods__", "_abc_impl", "__slots__", "__firstlineno__", "__static_attributes__",
+))
+
+
+def _micronaut_slot_descriptor_types():
+    """The types of the descriptors of slots and of the instance dictionary, bound to the class that created them."""
+    class Slotted:
+        __slots__ = ("slot",)
+
+    class Plain:
+        pass
+    return type(Slotted.__dict__["slot"]), type(Plain.__dict__["__dict__"])
+
+
+_MICRONAUT_SLOT_DESCRIPTORS = _micronaut_slot_descriptor_types()
+
+
+# the attributes of a function the merge sets itself, which an implementation may keep in the function's __dict__
+_MICRONAUT_FUNCTION_KEPT = frozenset((
+    "__annotations__", "__doc__", "__name__", "__qualname__", "__module__", "__defaults__", "__kwdefaults__",
+    "__code__", "__globals__", "__closure__", "__dict__", "__type_params__", "__builtins__",
+))
+
+# module globals the import system owns
+_MICRONAUT_MODULE_KEPT = frozenset((
+    "__name__", "__file__", "__package__", "__spec__", "__loader__", "__builtins__", "__path__", "__cached__",
+))
+
+
+def _micronaut_vfs_source_roots():
+    """The directories of the virtual file system the application modules are imported from."""
+    roots = []
+    for entry in sys.path:
+        if isinstance(entry, str) and entry.replace("\\", "/").rstrip("/").endswith("graalpy_vfs/src"):
+            if entry not in roots:
+                roots.append(entry)
+    return roots or ["/graalpy_vfs/src"]
+
+
+def _micronaut_is_injected_global(annotations, name):
+    """Whether a module global is declared Annotated, which marks the globals the Java side injects or binds.
+
+    Their values were set from Java after the module ran (``Annotated[Repository, Inject]``); executing the
+    module again would rebind them to their declared default, so they keep their current value.
+    """
+    annotation = annotations.get(name) if isinstance(annotations, dict) else None
+    if annotation is None:
+        return False
+    if isinstance(annotation, str):
+        return annotation.lstrip().split("[", 1)[0].rsplit(".", 1)[-1] == "Annotated"
+    return getattr(annotation, "__metadata__", None) is not None
+
+
+def _micronaut_same_class(a, b, mapping):
+    """Whether class a, created by executing the module again, stands for class b."""
+    if a is b or mapping.get(id(a)) is b:
+        return True
+    return isinstance(a, type) and isinstance(b, type) and a.__module__ == b.__module__ \
+        and a.__qualname__ == b.__qualname__
+
+
+def _micronaut_new_cell(value):
+    import types
+    return types.CellType(value)
+
+
+class _MicronautModulePatch:
+    """The patch of one module in one context: planned first, the module's own objects are changed after.
+
+    The new code is executed into the module's own namespace, so that the functions it defines see the
+    module's globals, as the old ones do; the names it rebinds are put back to the old objects as soon as the
+    plan is made, so that a module patched after this one, which imports from it, sees the old objects too.
+    """
+
+    def __init__(self, module, path):
+        self.module = module
+        self.path = path
+        self.saved = None
+        self.actions = []
+        self.classes = {}
+        self.functions = set()
+
+    def refuse(self, reason):
+        raise MicronautHotPatchRefused(f"{self.module.__name__}: {reason}")
+
+    def load_code(self):
+        import importlib.util
+        import marshal
+        spec = getattr(self.module, "__spec__", None)
+        loader = getattr(spec, "loader", None) or getattr(self.module, "__loader__", None)
+        if loader is None or not hasattr(loader, "get_data"):
+            self.refuse("the module has no loader that reads files")
+        source = loader.get_data(self.path)
+        data = None
+        try:
+            data = loader.get_data(importlib.util.cache_from_source(self.path))
+        except (OSError, NotImplementedError, ValueError):
+            data = None
+        if data is not None and len(data) >= 16 and data[:4] == importlib.util.MAGIC_NUMBER:
+            flags = int.from_bytes(data[4:8], "little")
+            if flags & 0x1:
+                # the checked-hash bytecode the compiler wrote for a module the runtime transformer rewrites:
+                # its code is the transformed one, which compiling the source would not reproduce
+                if (flags & 0x2) and data[8:16] != importlib.util.source_hash(source):
+                    self.refuse("its bytecode was compiled from another version of the source")
+                return marshal.loads(data[16:])
+        return compile(source, self.path, "exec", dont_inherit=True)
+
+    def prepare(self):
+        code = self.load_code()
+        namespace = self.module.__dict__
+        self.saved = dict(namespace)
+        try:
+            exec(code, namespace)
+            self.plan(code)
+        except BaseException:
+            self.rollback()
+            raise
+
+    def rollback(self):
+        if self.saved is not None:
+            namespace = self.module.__dict__
+            namespace.clear()
+            namespace.update(self.saved)
+
+    def plan(self, code):
+        namespace = self.module.__dict__
+        saved = self.saved
+        annotations = saved.get("__annotations__")
+        # the classes first: a global holding an instance of a class the module defines is moved to the old class
+        for name, new in list(namespace.items()):
+            old = saved.get(name, namespace)
+            if old is not namespace and isinstance(old, type) and isinstance(new, type) and old is not new:
+                self.classes.setdefault(id(new), old)
+        for name, new in list(namespace.items()):
+            if name not in saved:
+                continue
+            old = saved[name]
+            if old is new:
+                continue
+            if name in _MICRONAUT_MODULE_KEPT or name.startswith("__micronaut") \
+                    or _micronaut_is_injected_global(annotations, name):
+                namespace[name] = old
+                continue
+            bound_value = self.plan_value(old, new, f"global '{name}'")
+            namespace[name] = bound_value
+            if bound_value is new and _micronaut_member_kind(new) is None and old is not None and not isinstance(old, bool):
+                self.refuse_if_imported(name, old)
+        module_annotations = namespace.get("__annotations__")
+        if isinstance(module_annotations, dict):
+            # executing the module again filled its annotations, the same dictionary, with the new classes
+            self.actions.append(lambda: module_annotations.update(self.remap_annotations(module_annotations)))
+        bound = set(code.co_names)
+        module_name = self.module.__name__
+        for name, old in self.saved.items():
+            if name in namespace and name not in bound and namespace[name] is old \
+                    and _micronaut_member_kind(old) in ("function", "class") and getattr(old, "__module__", None) == module_name \
+                    and getattr(old, "__qualname__", None) == name:
+                # a function or class the module defined that the new code no longer does: gone, as after a restart.
+                # A value the module computed cannot be told from one set on the module from outside, and stays
+                del namespace[name]
+
+    def plan_value(self, old, new, what):
+        """Plans the merge of a new value into an old one; returns the value the name is bound to."""
+        old_kind = _micronaut_member_kind(old)
+        new_kind = _micronaut_member_kind(new)
+        if old_kind != new_kind and (old_kind is not None or new_kind is not None):
+            self.refuse(f"{what} changed from {old_kind or 'a value'} to {new_kind or 'a value'}")
+        if new_kind == "function":
+            self.plan_function(old, new, what)
+            return old
+        if new_kind == "class":
+            self.plan_class(old, new, what)
+            return old
+        if new_kind in ("staticmethod", "classmethod"):
+            if _micronaut_member_kind(old.__func__) == "function" and _micronaut_member_kind(new.__func__) == "function":
+                self.plan_function(old.__func__, new.__func__, what)
+                return old
+            return new
+        if new_kind == "property":
+            return self.plan_property(old, new, what)
+        moved = self.classes.get(id(type(new)))
+        if moved is not None:
+            self.actions.append(lambda: _micronaut_set_class(new, moved))
+        return new
+
+    def plan_property(self, old, new, what):
+        parts = []
+        replaced = False
+        for accessor in ("fget", "fset", "fdel"):
+            old_part = getattr(old, accessor)
+            new_part = getattr(new, accessor)
+            if old_part is not None and new_part is not None and _micronaut_member_kind(old_part) == "function" \
+                    and _micronaut_member_kind(new_part) == "function":
+                self.plan_function(old_part, new_part, f"{what}.{accessor}")
+                parts.append(old_part)
+            else:
+                replaced = replaced or old_part is not new_part
+                parts.append(new_part)
+        if not replaced and old.__doc__ == new.__doc__:
+            return old
+        return property(parts[0], parts[1], parts[2], new.__doc__)
+
+    def plan_function(self, old, new, what):
+        if old is new or id(new) in self.functions:
+            return
+        self.functions.add(id(new))
+        old_code = old.__code__
+        new_code = new.__code__
+        if old_code.co_freevars != new_code.co_freevars:
+            self.refuse(f"the variables {what} closes over changed")
+        if (old_code.co_flags ^ new_code.co_flags) & _MICRONAUT_CODE_KIND_FLAGS:
+            self.refuse(f"{what} changed between a function, a generator and a coroutine")
+        for index, variable in enumerate(old_code.co_freevars):
+            old_cell = old.__closure__[index]
+            new_cell = new.__closure__[index]
+            try:
+                old_value = old_cell.cell_contents
+            except ValueError:
+                old_value = old_cell
+            try:
+                new_value = new_cell.cell_contents
+            except ValueError:
+                new_value = new_cell
+            if variable == "__class__":
+                if not _micronaut_same_class(new_value, old_value, self.classes):
+                    self.refuse(f"{what} is a method of another class")
+                continue
+            if old_value is new_value or old_value is old_cell or new_value is new_cell:
+                continue
+            kind = _micronaut_member_kind(new_value)
+            if kind == _micronaut_member_kind(old_value) and kind in ("function", "class"):
+                # a decorator's wrapper closes over the function it wraps
+                self.plan_value(old_value, new_value, f"{what} (closure '{variable}')")
+            else:
+                self.actions.append(lambda cell=old_cell, value=new_value: setattr(cell, "cell_contents", value))
+        attributes = {}
+        for key, value in new.__dict__.items():
+            old_value = old.__dict__.get(key)
+            if key == "__wrapped__" and old_value is not None and _micronaut_member_kind(old_value) == "function" \
+                    and _micronaut_member_kind(value) == "function":
+                self.plan_function(old_value, value, f"{what}.__wrapped__")
+                continue
+            if key.startswith("__micronaut") or key in _MICRONAUT_FUNCTION_KEPT:
+                # set from the new function below, or owned by the function; GraalPy keeps some of them in __dict__
+                continue
+            attributes[key] = value
+        defaults = new.__defaults__
+        kwdefaults = new.__kwdefaults__
+        doc = new.__doc__
+        annotations = new.__annotations__
+
+        def apply():
+            old.__code__ = new_code
+            old.__defaults__ = None if defaults is None else tuple(self.adopt_value(value) for value in defaults)
+            old.__kwdefaults__ = None if kwdefaults is None else {key: self.adopt_value(value) for key, value in kwdefaults.items()}
+            old.__doc__ = doc
+            old.__annotations__ = self.remap_annotations(annotations)
+            for key in [key for key in old.__dict__ if key not in attributes and not key.startswith("__micronaut")
+                        and key not in _MICRONAUT_FUNCTION_KEPT and key != "__wrapped__"]:
+                # set by a decorator the edit removed
+                del old.__dict__[key]
+            old.__dict__.update(attributes)
+        self.actions.append(apply)
+
+    def plan_class(self, old, new, what):
+        mapped = self.classes.get(id(new))
+        if mapped is not None and mapped is not old:
+            self.refuse(f"{what} stands for two classes")
+        if id(new) in self.functions:
+            return
+        self.functions.add(id(new))
+        self.classes[id(new)] = old
+        if not _micronaut_same_class(type(new), type(old), self.classes):
+            self.refuse(f"the metaclass of {what} changed")
+        if len(old.__bases__) != len(new.__bases__) or not all(
+                _micronaut_same_class(new_base, old_base, self.classes)
+                for old_base, new_base in zip(old.__bases__, new.__bases__)):
+            self.refuse(f"the bases of {what} changed")
+        if old.__dict__.get("__slots__") != new.__dict__.get("__slots__"):
+            self.refuse(f"the slots of {what} changed")
+        old_members = old.__dict__
+        new_members = new.__dict__
+        enum_members = set()
+        import enum
+        is_enum = isinstance(old, enum.EnumMeta)
+        if is_enum:
+            old_values = [(member.name, member.value) for member in old]
+            new_values = [(member.name, member.value) for member in new]
+            if old_values != new_values:
+                self.refuse(f"the members of the enum {what} changed")
+            enum_members = set(old.__members__)
+        introduction = old_members.get("__micronaut_introduction__", False)
+        for name, new_value in new_members.items():
+            if name in _MICRONAUT_CLASS_KEPT or name.startswith("__micronaut") or name in enum_members:
+                continue
+            if isinstance(new_value, _MICRONAUT_SLOT_DESCRIPTORS):
+                # the descriptor of a slot belongs to the class that declared it: the old class keeps its own
+                continue
+            if is_enum and _micronaut_member_kind(new_value) not in ("function", "staticmethod", "classmethod", "property"):
+                # the enum machinery's own state, created again with the class: the old class keeps its own
+                continue
+            if introduction and (name == "_is_protocol" or getattr(new_value, "__isabstractmethod__", False)):
+                # the runtime made the introduction instantiable once: its stubs and flags stay
+                continue
+            if name == "__annotations__" and isinstance(new_value, dict):
+                self.actions.append(lambda v=new_value: setattr(old, "__annotations__", self.remap_annotations(v)))
+                continue
+            member = f"{what}.{name}"
+            if name in old_members:
+                old_value = old_members[name]
+                if old_value is new_value:
+                    continue
+                bound = self.plan_value(old_value, new_value, member)
+                if bound is not old_value:
+                    self.actions.append(lambda n=name, v=bound: setattr(old, n, self.adopt(v, old)))
+            else:
+                self.actions.append(lambda n=name, v=new_value: setattr(old, n, self.adopt(v, old)))
+        for name, old_value in list(old_members.items()):
+            if name in new_members or name in _MICRONAUT_CLASS_KEPT or name in enum_members:
+                continue
+            if isinstance(old_value, _MICRONAUT_SLOT_DESCRIPTORS):
+                continue
+            if is_enum and _micronaut_member_kind(old_value) not in ("function", "staticmethod", "classmethod", "property"):
+                continue
+            if name.startswith("__micronaut") or name.startswith("_micronaut"):
+                continue
+            if getattr(old_value, "__module__", old.__module__) != old.__module__:
+                # added by the runtime, such as the default methods of the Java interfaces the class implements
+                continue
+            self.actions.append(lambda n=name: delattr(old, n))
+
+    def refuse_if_imported(self, name, old):
+        """A value another module imported by name keeps the old value there, which a restart would not."""
+        for other_name, other in list(sys.modules.items()):
+            if other is self.module:
+                continue
+            namespace = getattr(other, "__dict__", None)
+            if isinstance(namespace, dict) and namespace.get(name, namespace) is old:
+                self.refuse(f"the module {other_name} imported '{name}', whose value changed")
+
+    def remap_annotations(self, annotations):
+        """Annotations naming a class of the module name its old class, which the module keeps."""
+        if not isinstance(annotations, dict):
+            return annotations
+        return {key: self.remap_annotation(value) for key, value in annotations.items()}
+
+    def remap_annotation(self, annotation):
+        """An annotation with the classes of the module it names, at any depth (list[Point], Point | None), mapped."""
+        if isinstance(annotation, type) and not hasattr(annotation, "__origin__"):
+            return self.classes.get(id(annotation), annotation)
+        args = getattr(annotation, "__args__", None)
+        if not isinstance(args, tuple) or not args:
+            return annotation
+        mapped = tuple(self.remap_annotation(arg) for arg in args)
+        metadata = getattr(annotation, "__metadata__", None)
+        if metadata is None and all(new is old for new, old in zip(mapped, args)):
+            return annotation
+        try:
+            import types
+            import typing
+            if metadata is not None:
+                return typing.Annotated[(self.remap_annotation(annotation.__origin__),) + tuple(metadata)]
+            if isinstance(annotation, types.UnionType):
+                import functools
+                import operator
+                return functools.reduce(operator.or_, mapped)
+            if isinstance(annotation, types.GenericAlias):
+                return types.GenericAlias(annotation.__origin__, mapped)
+            copy_with = getattr(annotation, "copy_with", None)
+            if copy_with is not None:
+                return copy_with(mapped)
+        except Exception:
+            pass
+        return annotation
+
+    def adopt_value(self, value):
+        """A value the new code created, such as a default argument: a class of the module stands for its old
+        class, and an instance of one is moved to the old class."""
+        if isinstance(value, type):
+            return self.classes.get(id(value), value)
+        moved = self.classes.get(id(type(value)))
+        if moved is not None:
+            _micronaut_set_class(value, moved)
+        return value
+
+    def adopt(self, value, owner):
+        """A member the edit added to a class, whose methods calling super() would name the discarded class."""
+        kind = _micronaut_member_kind(value)
+        if kind == "function":
+            return self.adopt_function(value, owner)
+        if kind == "staticmethod":
+            return staticmethod(self.adopt_function(value.__func__, owner)) \
+                if _micronaut_member_kind(value.__func__) == "function" else value
+        if kind == "classmethod":
+            return classmethod(self.adopt_function(value.__func__, owner)) \
+                if _micronaut_member_kind(value.__func__) == "function" else value
+        if kind == "property":
+            parts = [self.adopt_function(part, owner) if part is not None and _micronaut_member_kind(part) == "function"
+                     else part for part in (value.fget, value.fset, value.fdel)]
+            return property(parts[0], parts[1], parts[2], value.__doc__)
+        return value
+
+    def adopt_function(self, function, owner):
+        import types
+        code = function.__code__
+        if "__class__" not in code.co_freevars:
+            return function
+        index = code.co_freevars.index("__class__")
+        closure = list(function.__closure__)
+        try:
+            if closure[index].cell_contents is owner:
+                return function
+        except ValueError:
+            pass
+        closure[index] = _micronaut_new_cell(owner)
+        adopted = types.FunctionType(code, function.__globals__, function.__name__, function.__defaults__, tuple(closure))
+        adopted.__kwdefaults__ = function.__kwdefaults__
+        adopted.__qualname__ = function.__qualname__
+        adopted.__doc__ = function.__doc__
+        adopted.__annotations__ = function.__annotations__
+        adopted.__dict__.update(function.__dict__)
+        return adopted
+
+    def apply(self):
+        for action in self.actions:
+            action()
+
+
+def _micronaut_member_kind(value):
+    import types
+    if isinstance(value, types.FunctionType):
+        return "function"
+    if isinstance(value, type):
+        return "class"
+    if isinstance(value, staticmethod):
+        return "staticmethod"
+    if isinstance(value, classmethod):
+        return "classmethod"
+    if isinstance(value, property):
+        return "property"
+    return None
+
+
+def _micronaut_set_class(instance, cls):
+    try:
+        instance.__class__ = cls
+    except TypeError as e:
+        raise MicronautHotPatchRefused(f"an instance of {cls.__qualname__} cannot be moved to the patched class: {e}")
+
+
+def __micronaut_hot_patch(relative_paths):
+    """Patches the application modules of the given files in place, in this context.
+
+    The paths are relative to the source root of the virtual file system: ``app/hello.py``, or the bytecode
+    the compiler wrote for it, ``app/__pycache__/hello.graalpy253-313.pyc``. A module this context has not
+    imported is left alone; it imports the new version when it is first needed. Every module is planned
+    before any is changed: a refusal (``MicronautHotPatchRefused``) or any other error raised while planning
+    leaves the modules as they were.
+    Returns ``(names, None)`` with the names of the modules patched, or ``(None, reason)`` when the change was
+    refused or failed: the failure is a value rather than an exception, so that the host reports it without
+    walking the guest frames of the merge.
+    """
+    try:
+        return (_micronaut_hot_patch(relative_paths), None)
+    except MicronautHotPatchRefused as e:
+        return (None, str(e))
+    except BaseException as e:
+        import traceback
+        return (None, f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+
+def _micronaut_hot_patch(relative_paths):
+    import importlib.util
+    import os
+    importlib.invalidate_caches()
+    files = set()
+    for relative in relative_paths:
+        relative = str(relative)
+        for root in _micronaut_vfs_source_roots():
+            path = os.path.join(root, *relative.split("/"))
+            if path.endswith(".pyc"):
+                try:
+                    path = importlib.util.source_from_cache(path)
+                except ValueError:
+                    # bytecode of another implementation, which this one never reads
+                    continue
+            files.add(os.path.normpath(path))
+    patches = []
+    seen = set()
+    for name, module in list(sys.modules.items()):
+        file = getattr(module, "__file__", None)
+        if not isinstance(file, str) or id(module) in seen:
+            continue
+        path = os.path.normpath(file)
+        if path in files:
+            seen.add(id(module))
+            patches.append(_MicronautModulePatch(module, file))
+    prepared = []
+    try:
+        for patch in patches:
+            patch.prepare()
+            prepared.append(patch)
+    except BaseException:
+        for patch in reversed(prepared):
+            patch.rollback()
+        raise
+    for patch in patches:
+        patch.apply()
+    # parameter layouts are cached by function, and a patched function may lay out its defaults differently
+    _micronaut_self_invocation_layouts.clear()
+    return [patch.module.__name__ for patch in patches]
