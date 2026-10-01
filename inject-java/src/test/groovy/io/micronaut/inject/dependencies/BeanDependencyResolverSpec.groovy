@@ -257,9 +257,9 @@ class Log {
         log.EVENTS == ['resource2', 'resource1']
     }
 
-    void "qualified factory products keep their nested dependents"() {
+    void "qualified factory products keep their nested dependents through #lookup"() {
         given:
-        def ctx = buildContext(HEADER + '''
+        def ctx = buildContext(HEADER + """
 class Product<T> {
     void close() { Log.EVENTS.add("product"); }
 }
@@ -270,10 +270,10 @@ class Product<T> {
 }
 @Singleton class Owner {
     Owner(BeanDependencyResolver resolver) {
-        resolver.getBean(Argument.of(Product.class, String.class), Qualifiers.byName("chosen"));
+        resolver.${lookup};
     }
 }
-''')
+""")
         ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
         def log = ctx.classLoader.loadClass('test.Log')
 
@@ -282,6 +282,13 @@ class Product<T> {
 
         then:
         log.EVENTS == ['product', 'resource1']
+
+        where:
+        lookup << [
+            'getBean(Argument.of(Product.class, String.class), Qualifiers.byName("chosen"))',
+            'getBeanRegistration(Product.class, Qualifiers.byName("chosen"))',
+            'getBeanRegistration(Argument.of(Product.class, String.class), Qualifiers.byName("chosen"))'
+        ]
     }
 
     void "a native prototype interceptor retains runtime dependencies for its target"() {

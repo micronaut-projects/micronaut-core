@@ -86,6 +86,8 @@ class Handler {
 
 Each lookup follows the usual scope and qualifier rules. A newly created prototype belongs to the consumer, including its nested dependents. Core destroys these resources after the consumer's destruction callbacks, in reverse acquisition order. Resources acquired during construction are also cleaned up if construction fails. A failed lookup cleans up resources created by that lookup without releasing previous successful acquisitions.
 
+Use `resolver.getBeanRegistration(type)` when you need the dependency's registration and bean definition as well as its instance. Overloads accept either `Class<T>` or `Argument<T>`, with an optional qualifier. These lookups retain the same ownership as `getBean(...)`; returning a registration does not transfer ownership to the caller.
+
 Singletons and custom-scoped beans remain owned by their scopes. Dynamically resolved singleton dependencies participate in context shutdown ordering, including those reached through a consumer's owned prototype interceptors. The resolver does not extend a custom scope's lifetime or prevent explicit destruction of a shared bean. Dependency cycles use the same deterministic cycle handling as injected dependencies.
 
 The resolver can be used during construction and retained for later use. It must be injected into a managed consumer; it is unavailable through a standalone context lookup. As with other dependent resources, callers obtaining standalone prototypes should retain and close their api:context.BeanRegistration[]. Ordinary api:context.BeanContext[] and api:context.BeanProvider[] lookups keep their existing lifecycle behavior.

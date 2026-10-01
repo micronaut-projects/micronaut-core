@@ -35,10 +35,15 @@ final class DefaultBeanDependencyResolver implements BeanDependencyResolver {
 
     @Override
     public <T> T getBean(Argument<T> type, @Nullable Qualifier<T> qualifier) {
+        return getBeanRegistration(type, qualifier).getBean();
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getBeanRegistration(Argument<T> type, @Nullable Qualifier<T> qualifier) {
         return dependencies.resolve(context, null, resolution -> {
             BeanRegistration<T> registration = context.getBeanRegistration(resolution, type, qualifier);
             resolution.require(registration);
-            return registration.getBean();
+            return registration;
         });
     }
 }

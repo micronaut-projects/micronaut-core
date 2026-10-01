@@ -69,4 +69,48 @@ public interface BeanDependencyResolver {
      * @throws IllegalStateException if destruction or context shutdown has begun
      */
     <T> T getBean(Argument<T> type, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves a registration by type using the same scope and ownership rules as {@link #getBean(Class)}.
+     * @param type The bean type
+     * @param <T> The bean type
+     * @return The registration; ownership remains with the consumer or the bean's scope
+     */
+    default <T> BeanRegistration<T> getBeanRegistration(Class<T> type) {
+        return getBeanRegistration(Argument.of(type), null);
+    }
+
+    /**
+     * Resolves a registration by type and qualifier using the same ownership rules as {@link #getBean(Class, Qualifier)}.
+     * @param type The bean type
+     * @param qualifier The qualifier, or {@code null}
+     * @param <T> The bean type
+     * @return The registration; ownership remains with the consumer or the bean's scope
+     */
+    default <T> BeanRegistration<T> getBeanRegistration(Class<T> type, @Nullable Qualifier<T> qualifier) {
+        return getBeanRegistration(Argument.of(type), qualifier);
+    }
+
+    /**
+     * Resolves a registration by type, including generic arguments.
+     * @param type The requested type, including generic arguments
+     * @param <T> The bean type
+     * @return The registration; ownership remains with the consumer or the bean's scope
+     */
+    default <T> BeanRegistration<T> getBeanRegistration(Argument<T> type) {
+        return getBeanRegistration(type, null);
+    }
+
+    /**
+     * Resolves a registration using the same ownership rules as {@link #getBean(Argument, Qualifier)}.
+     * Shared registrations remain scope-owned. Returning a registration does not transfer ownership to the caller.
+     * @param type The requested type, including generic arguments
+     * @param qualifier The qualifier, or {@code null}
+     * @param <T> The bean type
+     * @return The registration
+     */
+    default <T> BeanRegistration<T> getBeanRegistration(Argument<T> type, @Nullable Qualifier<T> qualifier) {
+        throw new UnsupportedOperationException("Registration lookup is not supported by this resolver");
+    }
+
 }
