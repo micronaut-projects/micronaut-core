@@ -187,12 +187,29 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @throws IOException if the file cannot be written
      */
     public boolean replaceClassFile(String name, byte[] classFile) throws IOException {
-        String relative = name.replace('.', '/') + ".class";
-        for (Path root : roots) {
-            Path file = root.resolve(relative);
+        return replaceResource(name.replace('.', '/') + ".class", classFile);
+    }
+
+    /**
+     * Replaces a file in the generation's snapshot, so that the generation reads the new contents from now on:
+     * a class not loaded yet, or a resource such as a Python module that an interpreter reads again. The
+     * directories read live are left alone, as they hold the current contents already.
+     *
+     * @param resource The resource name, relative to the roots, with {@code /} as separator
+     * @param contents The new contents
+     * @return Whether a file of that name was in the snapshot and is replaced
+     * @throws IOException if the file cannot be written
+     * @since 5.3.0
+     */
+    public boolean replaceResource(String resource, byte[] contents) throws IOException {
+        if (resource.isEmpty() || resource.startsWith("/") || java.util.Arrays.asList(resource.split("/")).contains("..")) {
+            throw new IllegalArgumentException("Not a resource of the generation: " + resource);
+        }
+        for (int i = live.size(); i < roots.size(); i++) {
+            Path file = roots.get(i).resolve(resource);
             if (Files.isRegularFile(file)) {
                 Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
-                Files.write(temporary, classFile);
+                Files.write(temporary, contents);
                 Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 return true;
             }

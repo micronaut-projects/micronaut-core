@@ -20,6 +20,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.reload.BeanRetentionPolicy;
 import io.micronaut.context.reload.ClassChangeEvent;
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ReloadCompletedEvent;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.reload.ResourceKind;
@@ -100,7 +101,10 @@ import java.util.stream.Stream;
  * finds it from any context the application builds. A change is handled as one batch on the
  * runtime's own thread: sources are compiled per language, the class output is compared with the
  * previous snapshot, and a difference in classes restarts the application while a difference in
- * resources only reaches the resource watches of the running context. A configuration file
+ * resources only reaches the resource watches of the running context. A difference in the class output
+ * that holds no class, such as a Python module whose generated classes stayed the same, is first offered to
+ * the running context's {@link io.micronaut.context.reload.InPlaceResourceReloader}s, which patch it into the
+ * running application without a restart. A configuration file
  * change restarts as well, retaining nothing, until the configuration refresh lands. A failed
  * compilation leaves the running generation as it is and is reported until the next success.</p>
  *
@@ -148,6 +152,7 @@ public final class DevRuntime implements Closeable {
     private @Nullable LiveReloadServer liveReload;
     private @Nullable Instrumentation instrumentation;
     private volatile int redefinitions;
+    private volatile int inPlacePatches;
     private @Nullable Thread worker;
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     private final @Nullable TestSession tests;
@@ -307,6 +312,14 @@ public final class DevRuntime implements Closeable {
      */
     public int redefinitions() {
         return redefinitions;
+    }
+
+    /**
+     * @return How many times a change of resources alone was patched into the running application by an
+     *         {@link InPlaceResourceReloader}, without a restart, since the start
+     */
+    public int inPlacePatches() {
+        return inPlacePatches;
     }
 
     /**
@@ -1148,8 +1161,9 @@ public final class DevRuntime implements Closeable {
                 }
             }
         }
+        OutputSnapshot previous = snapshot;
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
-        ChangeSet changeSet = snapshot.diff(latest);
+        ChangeSet changeSet = previous.diff(latest);
         snapshot = latest;
         ConfigurationChange configurationChange = null;
         if (configurationChanged) {
@@ -1181,6 +1195,9 @@ public final class DevRuntime implements Closeable {
             if (compiled) {
                 LOG.info("Nothing to reload: the classes did not change");
             }
+            return;
+        }
+        if (configurationChange == null && !batch.forcesRestart() && !startFailed && patchInPlace(changeSet, previous, start)) {
             return;
         }
         if (configurationChange == null && !batch.forcesRestart() && !startFailed && redefine(changeSet, start)) {
@@ -1374,8 +1391,85 @@ public final class DevRuntime implements Closeable {
         return true;
     }
 
+    /**
+     * Tier one: a change of resources alone, none added or removed and no class changed, is offered to the running
+     * context's {@link InPlaceResourceReloader}s; the first that takes the whole change gets the new contents in the
+     * generation's snapshot, then applies them to the running application. A Python module whose generated classes
+     * stayed byte for byte the same is such a change. Anything a reloader refuses, by answering no or by throwing,
+     * restarts as before, and the restart's new generation discards a half-applied patch.
+     *
+     * @return Whether the change was applied this way
+     */
+    private boolean patchInPlace(ChangeSet changeSet, OutputSnapshot previous, long startNanos) {
+        Set<String> changed = changeSet.changedResources();
+        if (!manifest.patchInPlace() || changeSet.hasClassChanges() || changed.isEmpty() || !changeSet.removedResources().isEmpty()) {
+            return false;
+        }
+        Set<String> before = previous.resourcePaths();
+        if (!before.containsAll(changed)) {
+            // a resource added: a reloader reads an index of the resources it knows, a Python file system its file list
+            return false;
+        }
+        ApplicationContext current = context;
+        if (current == null || !current.isRunning()) {
+            return false;
+        }
+        GenerationClassLoader generation = classLoader.current();
+        InPlaceResourceReloader reloader = null;
+        try {
+            List<InPlaceResourceReloader> reloaders = new ArrayList<>(current.getBeansOfType(InPlaceResourceReloader.class));
+            OrderUtil.sort(reloaders);
+            for (InPlaceResourceReloader candidate : reloaders) {
+                if (candidate.canReload(changed, Set.of())) {
+                    reloader = candidate;
+                    break;
+                }
+            }
+        } catch (RuntimeException e) {
+            LOG.debug("Cannot look up the in-place reloaders: restarting instead", e);
+            return false;
+        }
+        if (reloader == null) {
+            return false;
+        }
+        InPlaceResourceReloader.Result result;
+        try {
+            // the snapshot first: the reloader reads the new contents through the generation's loader
+            for (String resource : changed) {
+                byte[] contents = resourceFile(manifest.reloadableRoots(), resource);
+                if (contents == null || !generation.replaceResource(resource, contents)) {
+                    LOG.info("Cannot patch {} in place, the generation does not hold it: restarting instead", resource);
+                    return false;
+                }
+            }
+            result = reloader.reload(changed);
+        } catch (Exception | LinkageError e) {
+            LOG.info("Cannot patch {} resource(s) in place ({}): restarting instead", changed.size(), e.getMessage());
+            LOG.debug("The in-place patch failed", e);
+            return false;
+        }
+        inPlacePatches++;
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
+        ClassChangeEvent event = new ClassChangeEvent(this, generation.generation(), Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
+        try {
+            current.publishEvent(event);
+            current.publishEvent(new ReloadCompletedEvent(this, event, List.of(), List.of(), elapsed));
+        } catch (RuntimeException e) {
+            LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+        }
+        LOG.info("Patched {} {} in place in {} ms: generation {} keeps running", result.count(), result.unit(), elapsed.toMillis(), generation.generation());
+        LiveReloadServer server = liveReload;
+        if (server != null) {
+            server.reload("/", false);
+        }
+        return true;
+    }
+
     private static byte @Nullable [] classFile(List<Path> roots, String className) {
-        String relative = className.replace('.', '/') + ".class";
+        return resourceFile(roots, className.replace('.', '/') + ".class");
+    }
+
+    private static byte @Nullable [] resourceFile(List<Path> roots, String relative) {
         for (Path root : roots) {
             Path file = root.resolve(relative);
             if (Files.isRegularFile(file)) {
