@@ -38,7 +38,7 @@ micronaut:
       warn-wait: 2s
 ----
 
-`enabled` defaults to `true`. `size` is the target number of additional GraalPy contexts; a value of `0` selects the default, which is half the number of available processors, at least `2` and at most `8`. Contexts are created lazily and each one consumes memory and requires initialization work. Compiled Python code is shared across contexts where possible. Set `warn-wait` to a useful threshold, such as `2s`, to log when requests wait for an available context, and use that signal when tuning `size`.
+`enabled` defaults to `true`. `size` is the target number of additional GraalPy contexts; a value of `0` selects the default, which is half the number of available processors, at least `2` and at most `8`. Contexts are created lazily and each one consumes memory and requires initialization work. Compiled Python code is shared across contexts where possible. `warn-wait`, `2s` by default, is how long a request waits for an available context before a warning is logged, and is the signal to use when tuning `size`; set it to `0s` to turn the warning off.
 
 ==== Choosing a pool size
 
