@@ -22,6 +22,8 @@ dependencies {
     compileOnly(libs.ksp.aaEmbeddable)
     // the embedded Python compiler exists when the Pyronaut compiler is on the launch classpath
     compileOnly(projects.micronautInjectPython)
+    // the built-in test runner exists when the project's JUnit Platform launcher is on the launch classpath
+    compileOnly(libs.junit.platform.launcher)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
     compileOnly(libs.bytebuddy.agent)
     // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
@@ -35,6 +37,7 @@ dependencies {
     testCompileOnly(projects.micronautManagement)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
+    testImplementation(libs.junit.platform.launcher)
     testImplementation(projects.micronautRuntimeOsx)
     testImplementation(libs.managed.kotlin.build.tools.impl)
     testImplementation(libs.managed.kotlin.stdlib)
@@ -93,6 +96,11 @@ noReflection {
     allowIn("io.micronaut.dev.compile.KspCompilation", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.compile.PythonSourceCompiler", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.PythonSourceCompiler", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.test.JUnitPlatformTestRunner", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.test.JUnitPlatformTestRunner", "CLASS_LOADING")
+    // the selected test classes are loaded through the generation's loader and handed to the engines
+    allowIn("io.micronaut.dev.test.JUnitPlatformExecution", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.test.TestEventListeners", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
