@@ -17,6 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -32,7 +33,9 @@ import java.nio.file.WatchService;
  * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds
  * by default, so the native FSEvents service of {@code micronaut-runtime-osx} is used when that
  * module is on the development runtime classpath, which the build plugins put there on macOS;
- * without it the JDK's service is registered at its highest sensitivity, two seconds.
+ * without it the JDK's service is registered at its highest sensitivity, two seconds. A native image cannot load
+ * that module's service, which uses JNA, at runtime: on macOS it compares the watched directories every
+ * {@value #NATIVE_POLL_MILLIS} milliseconds instead ({@link PollingWatchService}).
  *
  * @param service The service
  * @param registrar How directories are registered with it
@@ -44,6 +47,11 @@ import java.nio.file.WatchService;
 @NullMarked
 record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar registrar, @Nullable Runnable closeAction) {
 
+    /**
+     * How often a native image on macOS compares the watched directories, in milliseconds.
+     */
+    static final int NATIVE_POLL_MILLIS = 250;
+
     private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
     private static final String MAC_SERVICE = "io.methvin.watchservice.MacOSXListeningWatchService";
 
@@ -53,7 +61,12 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     static DevWatchService create() throws IOException {
         ClassLoader loader = DevWatchService.class.getClassLoader();
-        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac") && ClassUtils.isPresent(MAC_SERVICE, loader)) {
+        boolean mac = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
+        if (mac && NativeImageUtils.inImageRuntimeCode()) {
+            PollingWatchService polling = new PollingWatchService(java.time.Duration.ofMillis(NATIVE_POLL_MILLIS));
+            return new DevWatchService(polling, (directory, service) -> polling.register(directory), null);
+        }
+        if (mac && ClassUtils.isPresent(MAC_SERVICE, loader)) {
             try {
                 return MacOs.create();
             } catch (Exception | LinkageError e) {

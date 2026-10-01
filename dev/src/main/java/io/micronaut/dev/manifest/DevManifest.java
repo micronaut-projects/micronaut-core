@@ -71,7 +71,7 @@ import java.util.Properties;
  * micronaut.dev.build-tool=gradle
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
- * micronaut.dev.max-generations=50
+ * micronaut.dev.max-generations=10
  * </pre>
  *
  * @author graemerocher
@@ -101,8 +101,10 @@ public final class DevManifest {
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
      * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
      * the interpreter's data for them on the heap, for the life of the process.
+     * Measured on a Pyronaut application whose generations each hold a GraalPy context: every generation the process
+     * retains costs about 110 MB of resident memory, so ten keep a development process under 2 GB before it relaunches.
      */
-    public static final int NATIVE_MAX_GENERATIONS = 50;
+    public static final int NATIVE_MAX_GENERATIONS = 10;
 
     private static final String TEST = "test.";
 
