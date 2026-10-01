@@ -75,6 +75,7 @@ import java.util.Date;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -155,6 +156,14 @@ public class DefaultMutableConversionService implements MutableConversionService
     private final Map<ConvertiblePair, TypeConverter> converterCache = new ConcurrentHashMap<>();
 
     /**
+     * The converter each pair was registered for: the pair's own converter, or the one a variation of
+     * the source type was registered with, so that a removal takes the variations that still belong
+     * to the converter and leaves a pair something else registered since.
+     */
+    private final Map<ConvertiblePair, Registration> internalConverterOwners = CollectionUtils.newHashMap(300);
+    private final Map<ConvertiblePair, Registration> customConverterOwners = new ConcurrentHashMap<>();
+
+    /**
      * The mutable conversion service which is adding new converters to the internal collection which is not synchronized.
      */
     private final MutableConversionService internalMutableConversionService = new MutableConversionService() {
@@ -167,6 +176,16 @@ public class DefaultMutableConversionService implements MutableConversionService
         @Override
         public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
             addInternalConverter(sourceType, targetType, typeConverter);
+        }
+
+        @Override
+        public <S, T> boolean removeConverter(Class<S> sourceType, Class<T> targetType) {
+            return removeConverterAnalyzeSource(internalConverters, sourceType, targetType, null);
+        }
+
+        @Override
+        public <S, T> boolean removeConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+            return removeConverterAnalyzeSource(internalConverters, sourceType, targetType, typeConverter);
         }
 
         @Override
@@ -287,7 +306,24 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     @Override
     public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        addConverterAnalyzeSource(customConverters, sourceType, targetType, typeConverter);
+        // a registration and a removal of custom converters do not overlap: a removal takes what it read
+        synchronized (customConverterOwners) {
+            addConverterAnalyzeSource(customConverters, sourceType, targetType, typeConverter, new Registration(typeConverter, sourceType, targetType));
+        }
+    }
+
+    @Override
+    public <S, T> boolean removeConverter(Class<S> sourceType, Class<T> targetType) {
+        synchronized (customConverterOwners) {
+            return removeConverterAnalyzeSource(customConverters, sourceType, targetType, null);
+        }
+    }
+
+    @Override
+    public <S, T> boolean removeConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        synchronized (customConverterOwners) {
+            return removeConverterAnalyzeSource(customConverters, sourceType, targetType, typeConverter);
+        }
     }
 
     /**
@@ -301,14 +337,15 @@ public class DefaultMutableConversionService implements MutableConversionService
      */
     @Internal
     public <S, T> void addInternalConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        addConverterAnalyzeSource(internalConverters, sourceType, targetType, typeConverter);
+        addConverterAnalyzeSource(internalConverters, sourceType, targetType, typeConverter, new Registration(typeConverter, sourceType, targetType));
     }
 
     private <S, T> void addConverterAnalyzeSource(Map<ConvertiblePair, TypeConverter> typeConverters,
                                                   Class<S> sourceType,
                                                   Class<T> targetType,
-                                                  TypeConverter<S, T> typeConverter) {
-        addConverterToMap(typeConverters, sourceType, targetType, typeConverter);
+                                                  TypeConverter<S, T> typeConverter,
+                                                  Registration owner) {
+        addConverterToMap(typeConverters, sourceType, targetType, typeConverter, owner);
         // Add variations of common representations of the source type
         if (sourceType == CharSequence.class) {
             TypeConverter<String, T> converter;
@@ -328,43 +365,79 @@ public class DefaultMutableConversionService implements MutableConversionService
             } else {
                 converter = (value, theTarget, context) -> typeConverter.convert((S) value.toString(), theTarget, context);
             }
-            addConverterToMap(typeConverters, String.class, targetType, converter);
+            addConverterToMap(typeConverters, String.class, targetType, converter, owner);
         } else if (sourceType == String.class) {
-            addConverterToMap(typeConverters, CharSequence.class, targetType, (TypeConverter) typeConverter);
+            addConverterToMap(typeConverters, CharSequence.class, targetType, (TypeConverter) typeConverter, owner);
         } else if (sourceType == Iterable.class) {
             // Recursively add implementations
-            addConverterAnalyzeSource(typeConverters, Collection.class, targetType, (TypeConverter) typeConverter);
+            addConverterAnalyzeSource(typeConverters, Collection.class, targetType, (TypeConverter) typeConverter, owner);
         } else if (sourceType == Collection.class) {
             // Recursively add implementations
-            addConverterAnalyzeSource(typeConverters, List.class, targetType, (TypeConverter) typeConverter);
-            addConverterAnalyzeSource(typeConverters, Set.class, targetType, (TypeConverter) typeConverter);
-            addConverterAnalyzeSource(typeConverters, Queue.class, targetType, (TypeConverter) typeConverter);
-            addConverterAnalyzeSource(typeConverters, Deque.class, targetType, (TypeConverter) typeConverter);
+            addConverterAnalyzeSource(typeConverters, List.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterAnalyzeSource(typeConverters, Set.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterAnalyzeSource(typeConverters, Queue.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterAnalyzeSource(typeConverters, Deque.class, targetType, (TypeConverter) typeConverter, owner);
         } else if (sourceType == Queue.class) {
             // Recursively add implementations
-            addConverterAnalyzeSource(typeConverters, Deque.class, targetType, (TypeConverter) typeConverter);
+            addConverterAnalyzeSource(typeConverters, Deque.class, targetType, (TypeConverter) typeConverter, owner);
         } else if (sourceType == List.class) {
-            addConverterToMap(typeConverters, ArrayList.class, targetType, (TypeConverter) typeConverter);
-            addConverterToMap(typeConverters, LinkedList.class, targetType, (TypeConverter) typeConverter);
+            addConverterToMap(typeConverters, ArrayList.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterToMap(typeConverters, LinkedList.class, targetType, (TypeConverter) typeConverter, owner);
         } else if (sourceType == Set.class) {
-            addConverterToMap(typeConverters, HashSet.class, targetType, (TypeConverter) typeConverter);
-            addConverterToMap(typeConverters, LinkedHashSet.class, targetType, (TypeConverter) typeConverter);
+            addConverterToMap(typeConverters, HashSet.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterToMap(typeConverters, LinkedHashSet.class, targetType, (TypeConverter) typeConverter, owner);
         } else if (sourceType == Map.class) {
-            addConverterToMap(typeConverters, HashMap.class, targetType, (TypeConverter) typeConverter);
-            addConverterToMap(typeConverters, LinkedHashMap.class, targetType, (TypeConverter) typeConverter);
-            addConverterToMap(typeConverters, ConcurrentHashMap.class, targetType, (TypeConverter) typeConverter);
+            addConverterToMap(typeConverters, HashMap.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterToMap(typeConverters, LinkedHashMap.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterToMap(typeConverters, ConcurrentHashMap.class, targetType, (TypeConverter) typeConverter, owner);
         } else if (sourceType == Deque.class) {
-            addConverterToMap(typeConverters, LinkedList.class, targetType, (TypeConverter) typeConverter);
-            addConverterToMap(typeConverters, ArrayDeque.class, targetType, (TypeConverter) typeConverter);
+            addConverterToMap(typeConverters, LinkedList.class, targetType, (TypeConverter) typeConverter, owner);
+            addConverterToMap(typeConverters, ArrayDeque.class, targetType, (TypeConverter) typeConverter, owner);
         }
+    }
+
+    /**
+     * Removes the converters registered for the source and target types, whatever formatting annotation
+     * they carry, or only the given one when it is not null, and the variations
+     * {@link #addConverterAnalyzeSource} registered with each of them that still belong to it: a variation
+     * something else registered over since is left alone, and so is the same converter registered for
+     * other types.
+     */
+    private boolean removeConverterAnalyzeSource(Map<ConvertiblePair, TypeConverter> typeConverters, Class<?> sourceType, Class<?> targetType, @Nullable TypeConverter<?, ?> converter) {
+        Map<ConvertiblePair, Registration> owners = ownersOf(typeConverters);
+        // the registrations for these types themselves, not a variation another registered over the pair
+        Set<Registration> removed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Registration registration : owners.values()) {
+            if (registration.source == sourceType && registration.target == targetType && (converter == null || registration.converter == converter)) {
+                removed.add(registration);
+            }
+        }
+        if (removed.isEmpty()) {
+            return false;
+        }
+        owners.entrySet().removeIf(entry -> {
+            if (!removed.contains(entry.getValue())) {
+                return false;
+            }
+            typeConverters.remove(entry.getKey());
+            return true;
+        });
+        converterCache.clear();
+        return true;
+    }
+
+    private Map<ConvertiblePair, Registration> ownersOf(Map<ConvertiblePair, TypeConverter> typeConverters) {
+        return typeConverters == internalConverters ? internalConverterOwners : customConverterOwners;
     }
 
     private <S, T> void addConverterToMap(Map<ConvertiblePair, TypeConverter> typeConverters,
                                           Class<S> sourceType,
                                           Class<T> targetType,
-                                          TypeConverter<S, T> typeConverter) {
+                                          TypeConverter<S, T> typeConverter,
+                                          Registration owner) {
         ConvertiblePair pair = newPair(sourceType, targetType, typeConverter);
         typeConverters.put(pair, typeConverter);
+        ownersOf(typeConverters).put(pair, owner);
         if (typeConverters != internalConverters) {
             addToConverterCache(pair, typeConverter);
         }
@@ -1295,6 +1368,8 @@ public class DefaultMutableConversionService implements MutableConversionService
     public final void reset() {
         internalConverters.clear();
         customConverters.clear();
+        internalConverterOwners.clear();
+        customConverterOwners.clear();
         converterCache.clear();
         registerDefaultConverters();
     }
@@ -1302,6 +1377,16 @@ public class DefaultMutableConversionService implements MutableConversionService
     /**
      * Binds the source and target.
      */
+    /**
+     * A converter as registered: the converter, and the source and target types it was registered for.
+     *
+     * @param converter The converter
+     * @param source The source type it was registered for
+     * @param target The target type it was registered for
+     */
+    private record Registration(TypeConverter<?, ?> converter, Class<?> source, Class<?> target) {
+    }
+
     private static final class ConvertiblePair {
         final Class<?> source;
         final Class<?> target;
