@@ -16,6 +16,8 @@
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -40,6 +42,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     final BeanDefinition<T> beanDefinition;
     final T bean;
     private final int order;
+    private final @Nullable BeanDependencies dependencies;
 
     /**
      * @param identifier     The bean identifier
@@ -47,6 +50,20 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @param bean           The bean instance
      */
     public BeanRegistration(BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean) {
+        this(identifier, beanDefinition, bean, null);
+    }
+
+    BeanRegistration(BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean,
+                     @Nullable BeanDependencies dependencies) {
+        // A wrapper around a retained proxy or resolver shares its original owner, including closure state.
+        if (bean instanceof DefaultBeanDependencyResolver resolver) {
+            this.dependencies = resolver.dependencies;
+        } else if (bean instanceof InterceptedBeanProxy<?> proxy
+            && proxy.interceptedBeanDependencies() instanceof DefaultBeanDependencyResolver owner) {
+            this.dependencies = owner.dependencies;
+        } else {
+            this.dependencies = dependencies;
+        }
         this.identifier = identifier;
         this.beanDefinition = beanDefinition;
         this.bean = bean;
@@ -119,6 +136,21 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                       @Nullable List<BeanRegistration<?>> dependents,
                                       @Nullable List<?> interceptorRegistrations) {
         return new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents, interceptorRegistrations);
+    }
+
+    @Nullable
+    BeanDependencies getDependencies() {
+        return dependencies;
+    }
+
+    /**
+     * Returns the dependents retained by this registration's owner.
+     * @return An immutable snapshot of the dependent registrations
+     * @since 5.3.0
+     */
+    @Internal
+    public List<BeanRegistration<?>> dependentBeans() {
+        return dependencies == null ? List.of() : dependencies.dependentBeans();
     }
 
     @Override
