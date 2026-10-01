@@ -19,6 +19,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
@@ -164,11 +165,12 @@ class TrainingTestResourcesTest {
         Files.writeString(config.resolve("application.properties"),
             ApplicationConfiguration.TRAINING_ENABLED + "=true\n" + ApplicationConfiguration.TRAINING_MODE + "=load\n");
 
-        ApplicationStartupException failure = assertThrows(ApplicationStartupException.class, () -> Micronaut.build(new String[0])
+        ApplicationContextBuilder builder = Micronaut.build(new String[0])
             .classLoader(classLoaderWith(FakeTestResourcesClient.Loader.class))
             .properties(Map.of("spec.name", SPEC_NAME))
-            .overrideConfigLocations("file:" + config)
-            .start());
+            .overrideConfigLocations("file:" + config);
+
+        ApplicationStartupException failure = assertThrows(ApplicationStartupException.class, builder::start);
 
         ConfigurationException cause = assertInstanceOf(ConfigurationException.class, failure.getCause());
         assertEquals("Micronaut Test Resources (" + FakeTestResourcesClient.Loader.class.getName() + ") has read the configuration of this training run, which must not resolve properties with it. "
@@ -190,10 +192,11 @@ class TrainingTestResourcesTest {
 
     @Test
     void aTestResourcesModuleThatIgnoresTheSwitchFailsTheTrainingRun() throws IOException {
-        ApplicationStartupException failure = assertThrows(ApplicationStartupException.class, () -> Micronaut.build(new String[0])
+        Micronaut micronaut = Micronaut.build(new String[0])
             .classLoader(classLoaderWith(FakeEmbeddedTestResources.Loader.class))
-            .properties(Map.of("spec.name", SPEC_NAME, ApplicationConfiguration.TRAINING_ENABLED, "true", ApplicationConfiguration.TRAINING_MODE, "load"))
-            .start());
+            .properties(Map.of("spec.name", SPEC_NAME, ApplicationConfiguration.TRAINING_ENABLED, "true", ApplicationConfiguration.TRAINING_MODE, "load"));
+
+        ApplicationStartupException failure = assertThrows(ApplicationStartupException.class, micronaut::start);
 
         ConfigurationException cause = assertInstanceOf(ConfigurationException.class, failure.getCause());
         assertEquals("Micronaut Test Resources (" + FakeEmbeddedTestResources.Loader.class.getName() + ") is on the class path of this training run and cannot be disabled: "
