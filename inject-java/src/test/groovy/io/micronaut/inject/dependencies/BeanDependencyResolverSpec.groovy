@@ -456,4 +456,76 @@ class Advice implements io.micronaut.aop.MethodInterceptor<Object, Object> {
         used << [false, true]
     }
 
+    void "destroying an owner stops resolution in its cached prototype target"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@io.micronaut.aop.Around(proxyTarget = true, lazy = true, cacheableLazyTarget = true)
+@interface Lazy {}
+@Singleton @io.micronaut.aop.InterceptorBean(Lazy.class)
+class Advice implements io.micronaut.aop.MethodInterceptor<Object, Object> {
+    public Object intercept(io.micronaut.aop.MethodInvocationContext<Object, Object> invocation) {
+        return invocation.proceed();
+    }
+}
+@Prototype @Lazy class Target {
+    @Inject BeanDependencyResolver resolver;
+    public Resource acquire() { return resolver.getBean(Resource.class); }
+}
+@Singleton class Owner {
+    final Target target;
+    Owner(Target target) { this.target = target; }
+    @PreDestroy void close() {
+        try { target.acquire(); }
+        catch (IllegalStateException expected) { Log.EVENTS.add("rejected"); }
+    }
+}
+''')
+        def owner = ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def log = ctx.classLoader.loadClass('test.Log')
+        owner.target.acquire()
+
+        when:
+        ctx.destroyBean(owner)
+
+        then:
+        log.EVENTS == ['rejected', 'resource1']
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "a failing dependent destruction still releases its siblings"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class FailingListener implements io.micronaut.context.event.BeanPreDestroyEventListener<Resource> {
+    public Resource onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Resource> event) {
+        if (event.getBean().id == 2) {
+            Log.EVENTS.add("failed2");
+            throw new IllegalStateException("cannot destroy resource2");
+        }
+        return event.getBean();
+    }
+}
+@Singleton class Owner {
+    Owner(BeanDependencyResolver resolver) {
+        resolver.getBean(Resource.class);
+        resolver.getBean(Resource.class);
+    }
+}
+''')
+        def owner = ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.destroyBean(owner)
+
+        then:
+        thrown(io.micronaut.context.exceptions.BeanDestructionException)
+        log.EVENTS == ['failed2', 'resource1']
+
+        cleanup:
+        ctx.close()
+    }
+
 }
