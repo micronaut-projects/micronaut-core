@@ -31,6 +31,7 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,7 +59,9 @@ import java.util.stream.Stream;
 final class PollingWatchService implements WatchService {
 
     private final Map<Path, Key> keys = new ConcurrentHashMap<>();
-    private final LinkedBlockingQueue<Key> signalled = new LinkedBlockingQueue<>();
+    // the signalled keys, and once closed the marker that wakes every retrieval blocked on the queue
+    private final LinkedBlockingQueue<Object> signalled = new LinkedBlockingQueue<>();
+    private final Object closedMarker = new Object();
     private final Thread poller;
     private final long intervalMillis;
     private volatile boolean closed;
@@ -105,24 +108,38 @@ final class PollingWatchService implements WatchService {
             key.cancel();
         }
         keys.clear();
+        signalled.add(closedMarker);
     }
 
     @Override
     public @Nullable WatchKey poll() {
         checkOpen();
-        return signalled.poll();
+        return key(signalled.poll());
     }
 
     @Override
     public @Nullable WatchKey poll(long timeout, TimeUnit unit) throws InterruptedException {
         checkOpen();
-        return signalled.poll(timeout, unit);
+        return key(signalled.poll(timeout, unit));
     }
 
     @Override
     public WatchKey take() throws InterruptedException {
         checkOpen();
-        return signalled.take();
+        WatchKey key = key(signalled.take());
+        if (key == null) {
+            throw new ClosedWatchServiceException();
+        }
+        return key;
+    }
+
+    private @Nullable WatchKey key(@Nullable Object taken) {
+        if (taken == closedMarker) {
+            // for the next retrieval blocked on the queue
+            signalled.add(closedMarker);
+            throw new ClosedWatchServiceException();
+        }
+        return (WatchKey) taken;
     }
 
     private void checkOpen() {
@@ -150,7 +167,7 @@ final class PollingWatchService implements WatchService {
             children.forEach(child -> {
                 try {
                     BasicFileAttributes attributes = Files.readAttributes(child, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-                    entries.put(child.getFileName().toString(), new Entry(attributes.lastModifiedTime().toMillis(), attributes.size(), attributes.isDirectory()));
+                    entries.put(child.getFileName().toString(), new Entry(attributes.lastModifiedTime(), attributes.size(), attributes.isDirectory()));
                 } catch (IOException e) {
                     // deleted while listed: absent
                 }
@@ -164,11 +181,11 @@ final class PollingWatchService implements WatchService {
     /**
      * The state of an entry the comparison looks at.
      *
-     * @param modified The modification time, in milliseconds
+     * @param modified The modification time, at the precision the file system keeps
      * @param size The size
      * @param directory Whether it is a directory
      */
-    private record Entry(long modified, long size, boolean directory) {
+    private record Entry(FileTime modified, long size, boolean directory) {
     }
 
     /**

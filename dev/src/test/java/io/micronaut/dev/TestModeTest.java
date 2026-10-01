@@ -297,23 +297,45 @@ class TestModeTest {
     void theRunThatSpendsTheGenerationBudgetCompletesThenTheRuntimeClosesForARelaunch() throws Exception {
         Path main = Files.createDirectories(project.resolve("src/main/java/app"));
         Path test = Files.createDirectories(project.resolve("src/test/java/app"));
-        Files.writeString(main.resolve("Greeter.java"), greeter("one"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
         Files.writeString(test.resolve("GreeterTest.java"), greeterTest("one"));
-        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\n"), "the first run takes the second generation");
+        // the first run takes the second generation: a budget of two would relaunch after it, and the relaunched process
+        // would run it again, without end
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\n"));
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=2\n"));
 
-        // the first run takes generation two, the last of the budget: it runs, then the runtime closes
-        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.max-generations=2\n"), new String[0]);
-        assertEquals(1, runtime.testRuns());
-        assertTrue(runtime.lastTestRun().orElseThrow().isSuccess());
-        assertTrue(runtime.isRelaunchRequested());
-        runtime.awaitClose();
+        writeManifest("micronaut.dev.max-generations=3\n");
+        int[] status = {-2};
+        Thread launcher = new Thread(() -> {
+            try {
+                status[0] = new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()});
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        launcher.start();
+        long deadline = System.nanoTime() + TIMEOUT.toNanos();
+        while ((DevRuntime.current() == null || DevRuntime.current().testRuns() < 1) && System.nanoTime() < deadline) {
+            Thread.sleep(50);
+        }
+        DevRuntime current = DevRuntime.current();
+        assertFalse(current.isGenerationBudgetSpent());
+
+        // a change runs its tests on generation three, the last of the budget: they run, then the runtime closes
+        Files.writeString(greeter, greeter("two"));
+        Files.writeString(test.resolve("GreeterTest.java"), greeterTest("two"));
+        current.changed(List.of(greeter, test.resolve("GreeterTest.java")), List.of());
+        launcher.join(TIMEOUT.toMillis());
+        assertFalse(launcher.isAlive());
+        assertEquals(MicronautDevMain.RELAUNCH, status[0]);
+        assertEquals(2, current.testRuns());
+        assertTrue(current.lastTestRun().orElseThrow().isSuccess());
+        assertTrue(current.isRelaunchRequested());
         assertNull(DevRuntime.current());
 
-        // the launcher returns the relaunch status once the runtime closed
-        writeManifest("micronaut.dev.max-generations=2\n");
-        assertEquals(MicronautDevMain.RELAUNCH, new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()}));
         // run once, the budget does not matter: the status is the tests'
-        writeManifest("micronaut.dev.max-generations=2\nmicronaut.dev.test.once=true\n");
+        writeManifest("micronaut.dev.max-generations=3\nmicronaut.dev.test.once=true\n");
         assertEquals(0, new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()}));
     }
 
