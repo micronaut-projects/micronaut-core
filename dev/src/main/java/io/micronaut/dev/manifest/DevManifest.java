@@ -110,6 +110,7 @@ public final class DevManifest {
     private final String buildTool;
     @Nullable
     private final Path buildToolTrigger;
+    private final Path generations;
     private final List<String> retain;
     private final boolean retainAnnotated;
     private final LiveReload liveReload;
@@ -144,6 +145,8 @@ public final class DevManifest {
         this.buildToolTrigger = trigger == null ? null : path(directory, trigger);
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
         this.retainAnnotated = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-annotated", "true").trim());
+        String generationsDir = properties.getProperty(PREFIX + "generations");
+        this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
             Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true"))
@@ -379,6 +382,17 @@ public final class DevManifest {
     @Nullable
     public Path buildToolTrigger() {
         return buildToolTrigger;
+    }
+
+    /**
+     * The directory the class loader snapshots each generation into, {@code micronaut.dev.generations}: by default
+     * {@code build/micronaut-dev/generations} under the project, which a Maven build points into {@code target}. The
+     * launcher owns it and empties it when it starts.
+     *
+     * @return The directory
+     */
+    public Path generations() {
+        return generations;
     }
 
     /**

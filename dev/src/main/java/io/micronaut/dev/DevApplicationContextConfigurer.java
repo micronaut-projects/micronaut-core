@@ -18,6 +18,7 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextConfigurer;
+import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
@@ -41,8 +42,16 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
     @Override
     public void configure(ApplicationContextBuilder builder) {
         DevRuntime runtime = DevRuntime.current();
-        if (runtime == null || runtime.manifest().mode() == DevMode.TEST) {
-            // in test mode the tests start their own contexts, as they would in the build, on the generation that loaded them
+        if (runtime == null) {
+            return;
+        }
+        if (runtime.manifest().mode() == DevMode.TEST) {
+            // in test mode the tests start their own contexts, as they would in the build, on the generation that
+            // loaded them: a context built without a class of the tests, ApplicationContext.run(), would otherwise
+            // load the beans of the launcher's loader, which holds none of the project's; a loader the test chose stays
+            if (builder instanceof BeanContextConfiguration configuration && configuration.getClassLoader() == runtime.classLoader().getParent()) {
+                builder.classLoader(runtime.classLoader().current());
+            }
             return;
         }
         // the generation loader itself, never the facade: the JVM records the loader Class.forName was called
