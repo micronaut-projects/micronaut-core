@@ -18,8 +18,18 @@ package io.micronaut.http.context.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.http.HttpRequest;
 /**
- * An event fired when an {@link HttpRequest} is finalized by the server. Note that the event is fired asynchronously and
- * consumers of the event should generally not perform I/O, instead this designed for tracing of headers, URI etc.
+ * An event fired when an {@link HttpRequest} is finalized by the server, once the server is done
+ * with the request (the response has been handed to the transport, which does not mean it was
+ * delivered, or the request was discarded). Consumers of the event should generally not perform
+ * I/O, instead this is designed for tracing of headers, URI etc.
+ * <p>
+ * Listeners are invoked on the thread the server selects for request handling, which with the
+ * default {@code micronaut.server.thread-selection} ({@code MANUAL}, and also with {@code AUTO})
+ * is the Netty event loop of the connection. A listener that blocks or does slow work delays every
+ * other connection on that event loop. Listeners that need to block must hand off, for example with {@code @Async} on the
+ * {@code @EventListener} method, or the server can be configured with
+ * {@code micronaut.server.thread-selection=BLOCKING} which moves the listeners (and controllers)
+ * off the event loop.
  *
  * @author graemerocher
  * @since 1.2.0

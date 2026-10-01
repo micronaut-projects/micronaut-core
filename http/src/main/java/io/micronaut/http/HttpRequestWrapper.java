@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.cookie.Cookies;
 import org.jspecify.annotations.Nullable;
 
@@ -23,7 +24,9 @@ import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
@@ -135,5 +138,68 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     @Override
     public boolean isSecure() {
         return getDelegate().isSecure();
+    }
+
+    /**
+     * Whether the given request is a wrapper whose body is not the body of the request it wraps,
+     * e.g. a wrapper a filter continued with that returns a replacement from {@code getBody()}:
+     * the bytes of the requests it wraps are then not its body.
+     *
+     * <p>A wrapper that cannot have replaced the body is never asked for it: a plain
+     * {@link HttpRequestWrapper}, a {@link MutableHttpRequestWrapper} whose body was not set and
+     * a {@link BodyPreservingRequestWrapper}. Asking a wrapper for its body decodes the body of
+     * the request it wraps, and a request may decode a new body on each call. Any other wrapper
+     * replaced the body if its body is not, by identity, the body of the request it wraps.</p>
+     *
+     * @param request The request
+     * @return Whether it is a wrapper that replaced the body of the request it wraps
+     * @since 5.3.0
+     */
+    @Internal
+    @SuppressWarnings("ReferenceEquality") // by identity
+    public static boolean replacesBody(HttpRequest<?> request) {
+        if (!(request instanceof HttpRequestWrapper<?> wrapper) || request instanceof BodyPreservingRequestWrapper) {
+            return false;
+        }
+        Class<?> type = wrapper.getClass();
+        if (type == HttpRequestWrapper.class) {
+            // does not override getBody
+            return false;
+        }
+        if (type == MutableHttpRequestWrapper.class) {
+            return ((MutableHttpRequestWrapper<?>) wrapper).isBodySet();
+        }
+        // by identity: a replacement that only compares equal, e.g. a sanitized copy, is still a replacement
+        return wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null);
+    }
+
+    /**
+     * The layers of a request: the request itself, then the request each
+     * {@link HttpRequestWrapper} wraps, down to the innermost request, which is not a wrapper.
+     *
+     * @param request The request
+     * @return The request and the requests it wraps, outermost first
+     * @since 5.3.0
+     */
+    @Internal
+    public static Iterable<HttpRequest<?>> unwrap(HttpRequest<?> request) {
+        return () -> new Iterator<>() {
+            private @Nullable HttpRequest<?> next = request;
+
+            @Override
+            public boolean hasNext() {
+                return next != null;
+            }
+
+            @Override
+            public HttpRequest<?> next() {
+                HttpRequest<?> current = next;
+                if (current == null) {
+                    throw new NoSuchElementException();
+                }
+                next = current instanceof HttpRequestWrapper<?> wrapper ? wrapper.getDelegate() : null;
+                return current;
+            }
+        };
     }
 }

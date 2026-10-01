@@ -1,4 +1,4 @@
-As an alternative to the ann:context.annotation.Import[] annotation the ann:context.annotation.ClassImport[] annotation allows to process already compiled classes as if they were ordinary non-compiled classes. Internally all the type visitors will be run, allowing to create necessary metadata.
+As an alternative to the ann:context.annotation.Import[] annotation the ann:context.annotation.ClassImport[] annotation allows processing already compiled classes as if they were ordinary non-compiled classes. Internally all the type visitors will be run, allowing to create necessary metadata.
 
 NOTE: Class import is currently only supported in the Java language as other languages have limitations on classpath scanning during source code processing.
 

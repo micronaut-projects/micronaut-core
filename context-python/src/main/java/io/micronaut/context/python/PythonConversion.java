@@ -15,23 +15,31 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
@@ -56,12 +64,53 @@ import org.jspecify.annotations.Nullable;
 public final class PythonConversion {
 
     private static final String UTC_OFFSET = "__micronaut_utc_offset";
+    private static final int MAX_META_PARENT_DEPTH = 16;
 
     private static final String LEN = "__len__";
 
     private static final String GETITEM = "__getitem__";
 
     private static final String ISOFORMAT = "isoformat";
+
+    private static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
+
+    /** The Java package of the classes of a top-level Python module. */
+    private static final String TOP_LEVEL_PACKAGE = "python";
+
+    /**
+     * Per declared wrapper type, the generated subclass factory for the Python classes seen as values of
+     * that type, keyed by the Python class name; an empty entry records a Python class with no generated
+     * subclass wrapper (the declared type itself included).
+     */
+    private static final ClassValue<ConcurrentHashMap<String, Optional<Method>>> SUBCLASS_FACTORIES = new ClassValue<>() {
+        @Override
+        protected ConcurrentHashMap<String, Optional<Method>> computeValue(Class<?> type) {
+            return new ConcurrentHashMap<>();
+        }
+    };
+
+    /**
+     * The Python class a generated wrapper type is generated for, from its {@code PythonClass} annotation:
+     * the reference and the key of the class in the per-context class cache. Empty for a type that is not a
+     * generated wrapper.
+     */
+    private static final ClassValue<Optional<OwnPythonClass>> OWN_PYTHON_CLASSES = new ClassValue<>() {
+        @Override
+        protected Optional<OwnPythonClass> computeValue(Class<?> type) {
+            PythonClass annotation = type.getAnnotation(PythonClass.class);
+            if (annotation == null) {
+                return Optional.empty();
+            }
+            PythonContextRuntime.PythonClassReference reference = new PythonContextRuntime.PythonClassReference(
+                annotation.packageName(),
+                annotation.rootName(),
+                annotation.nestedMemberNames(),
+                annotation.displayName(),
+                annotation.cacheKey()
+            );
+            return Optional.of(new OwnPythonClass(annotation, PythonContextRuntime.classCacheKey(reference)));
+        }
+    };
 
     private PythonConversion() {
     }
@@ -188,6 +237,152 @@ public final class PythonConversion {
     }
 
     /**
+     * The wrapper of a Python object for the generated subclass it is an instance of, when the object's
+     * own class is a generated subclass of the declared wrapper type: a Python subclass instance passed
+     * or returned as its Python base type then keeps its runtime type, and with it its introspection.
+     * Returns {@code null} when the object is of the declared type itself, of a class with no generated
+     * wrapper, or not a Python object at all, in which case the caller wraps it as the declared type.
+     *
+     * <p>The lookup reads the module and qualified name of the object's class; the resolved factory
+     * is cached per declared type and Python class.</p>
+     *
+     * @param value        The Python object
+     * @param declaredType The declared wrapper type
+     * @param <T>          The declared wrapper type
+     * @return The wrapper of the object's own generated class, or {@code null}
+     */
+    @UsedByGeneratedCode
+    public static <T> @Nullable T subclassWrapper(@Nullable Value value, Class<T> declaredType) {
+        if (value == null || value.isNull() || value.isHostObject() || value.isProxyObject() || !value.hasMembers()) {
+            return null;
+        }
+        Method factory;
+        try {
+            Value pythonClass = value.getMetaObject();
+            if (pythonClass == null || !pythonClass.hasMembers() || isOwnPythonClass(pythonClass, declaredType, value.getContext())) {
+                return null;
+            }
+            String qualifiedName = stringMember(pythonClass, "__qualname__");
+            if (qualifiedName == null || qualifiedName.contains("<locals>")) {
+                return null;
+            }
+            String moduleName = stringMember(pythonClass, "__module__");
+            String key = moduleName == null ? qualifiedName : moduleName + '.' + qualifiedName;
+            factory = SUBCLASS_FACTORIES.get(declaredType)
+                .computeIfAbsent(key, ignored -> Optional.ofNullable(findSubclassFactory(declaredType, moduleName, qualifiedName)))
+                .orElse(null);
+        } catch (RuntimeException e) {
+            // a value whose class cannot be inspected is wrapped as the declared type
+            return null;
+        }
+        if (factory == null) {
+            return null;
+        }
+        try {
+            return declaredType.cast(factory.invoke(null, value));
+        } catch (IllegalAccessException e) {
+            throw wrapFailure(factory, e);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause() == null ? e : e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw wrapFailure(factory, cause);
+        }
+    }
+
+    private static IllegalStateException wrapFailure(Method factory, Throwable cause) {
+        String message = "Cannot wrap Python value as [%s]: %s".formatted(factory.getDeclaringClass().getName(), cause.getMessage());
+        return new IllegalStateException(message, cause);
+    }
+
+    /**
+     * Whether a Python class is the one the declared wrapper type is generated for: the common case of an
+     * object of exactly the declared type, answered without reading the class's name members. The class
+     * is looked up in the per-context class cache only; a class the runtime never resolved in the context
+     * is compared by name instead.
+     */
+    private static boolean isOwnPythonClass(Value pythonClass, Class<?> declaredType, Context context) {
+        Optional<OwnPythonClass> own = OWN_PYTHON_CLASSES.get(declaredType);
+        if (own.isEmpty()) {
+            return false;
+        }
+        Value ownClass = PythonContextRegistry.state(context).classes.get(own.get().cacheKey());
+        return ownClass != null && ownClass.equals(pythonClass);
+    }
+
+    /**
+     * The {@code fromPolyglotValue} factory of the generated wrapper of a Python class, when that wrapper is
+     * a proper subtype of the declared type. A Python class {@code C} of the module {@code a.b.m} is
+     * generated as {@code a.b.C} (a nested class {@code O.I} as {@code a.b.O$I}); a class of a source-root
+     * module has the default package, and a subclass is also looked up next to the declared type. A
+     * candidate is accepted only when its {@code PythonClass} annotation names the object's class: the
+     * root name of the qualified name, in the package of the module (or the module itself, for a class of
+     * a package initializer; {@code python} for a top-level module), so a same-named class of another
+     * module is not mistaken for it.
+     */
+    private static @Nullable Method findSubclassFactory(Class<?> declaredType, @Nullable String moduleName, String qualifiedName) {
+        String simpleName = qualifiedName.replace('.', '$');
+        Set<String> candidates = new LinkedHashSet<>();
+        if (moduleName != null && !moduleName.isBlank()) {
+            int lastDot = moduleName.lastIndexOf('.');
+            if (lastDot > 0) {
+                candidates.add(moduleName.substring(0, lastDot) + '.' + simpleName);
+            }
+            candidates.add(moduleName + '.' + simpleName);
+        }
+        candidates.add(declaredType.getPackageName() + '.' + simpleName);
+        candidates.add(TOP_LEVEL_PACKAGE + '.' + simpleName);
+        ClassLoader classLoader = declaredType.getClassLoader();
+        for (String candidate : candidates) {
+            Class<?> type = null;
+            try {
+                type = Class.forName(candidate, false, classLoader);
+            } catch (ClassNotFoundException | LinkageError e) {
+            }
+            if (type != null && type != declaredType && declaredType.isAssignableFrom(type) && isGeneratedFor(type, moduleName, qualifiedName)) {
+                try {
+                    Method factory = type.getMethod(FROM_POLYGLOT_VALUE, Value.class);
+                    // the factory must be the subclass's own: an inherited one is the declared type's, which
+                    // would wrap the value as the declared type again
+                    if (Modifier.isStatic(factory.getModifiers()) && factory.getDeclaringClass() == type) {
+                        return factory;
+                    }
+                } catch (NoSuchMethodException e) {
+                    // not a generated wrapper
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether a generated wrapper type is the one of the Python class with the given module and qualified
+     * name, by its {@code PythonClass} annotation.
+     */
+    private static boolean isGeneratedFor(Class<?> type, @Nullable String moduleName, String qualifiedName) {
+        Optional<OwnPythonClass> own = OWN_PYTHON_CLASSES.get(type);
+        if (own.isEmpty()) {
+            return false;
+        }
+        PythonClass annotation = own.get().annotation();
+        int firstDot = qualifiedName.indexOf('.');
+        String rootName = firstDot > 0 ? qualifiedName.substring(0, firstDot) : qualifiedName;
+        if (!annotation.rootName().equals(rootName)) {
+            return false;
+        }
+        String packageName = annotation.packageName();
+        if (moduleName == null || moduleName.isBlank()) {
+            return TOP_LEVEL_PACKAGE.equals(packageName);
+        }
+        int lastDot = moduleName.lastIndexOf('.');
+        if (lastDot < 0) {
+            return TOP_LEVEL_PACKAGE.equals(packageName) || moduleName.equals(packageName);
+        }
+        return moduleName.equals(packageName) || moduleName.substring(0, lastDot).equals(packageName);
+    }
+
+    /**
      * Return a value as {@link Object} so generated code can perform unchecked generic casts.
      *
      * @param <T> The target object type
@@ -233,16 +428,10 @@ public final class PythonConversion {
         if (isNone(graalValue)) {
             return null;
         }
-        if (graalValue.isHostObject()) {
-            Object host = graalValue.as(Object.class);
-            if (host instanceof List<?> list) {
-                List<T> out = new ArrayList<>(list.size());
-                for (Object o : list) {
-                    @SuppressWarnings("unchecked") T cast = (T) o;
-                    out.add(cast);
-                }
-                return out;
-            }
+        if (graalValue.isHostObject() && graalValue.asHostObject() instanceof List<?> list) {
+            // a Java list that went through Python comes back as the same list, not a copy
+            @SuppressWarnings("unchecked") List<T> host = (List<T>) list;
+            return host;
         }
         // A failing element conversion is an error, not an empty result.
         return convertElements(graalValue, element -> convertValue(element, elementType));
@@ -337,17 +526,10 @@ public final class PythonConversion {
         if (isNone(graalValue)) {
             return null;
         }
-        if (graalValue.isHostObject()) {
-            Object host = graalValue.as(Object.class);
-            if (host instanceof Map<?, ?> map) {
-                Map<K, V> out = new HashMap<>();
-                for (Map.Entry<?, ?> e : map.entrySet()) {
-                    @SuppressWarnings("unchecked") K k = (K) e.getKey();
-                    @SuppressWarnings("unchecked") V v = (V) e.getValue();
-                    out.put(k, v);
-                }
-                return out;
-            }
+        if (graalValue.isHostObject() && graalValue.asHostObject() instanceof Map<?, ?> map) {
+            // a Java map that went through Python comes back as the same map, not a copy
+            @SuppressWarnings("unchecked") Map<K, V> host = (Map<K, V>) map;
+            return host;
         }
         Map<K, V> result = new HashMap<>();
         if (graalValue.hasHashEntries()) {
@@ -427,14 +609,12 @@ public final class PythonConversion {
             return null;
         }
 
-        Set<@Nullable T> result = new HashSet<>();
         if (graalValue.isHostObject() && graalValue.asHostObject() instanceof Set<?> hostSet) {
-            for (Object element : hostSet) {
-                @SuppressWarnings("unchecked") T cast = (T) element;
-                result.add(cast);
-            }
-            return result;
+            // a Java set that went through Python comes back as the same set, not a copy
+            @SuppressWarnings("unchecked") Set<T> host = (Set<T>) hostSet;
+            return host;
         }
+        Set<@Nullable T> result = new HashSet<>();
         if (!graalValue.hasIterator()) {
             throw new IllegalArgumentException("Cannot convert Python value to a Set: " + graalValue);
         }
@@ -488,7 +668,93 @@ public final class PythonConversion {
         if (mappedWrapper != null) {
             return mappedWrapper;
         }
+        Object container = convertNestedContainer(value, targetType);
+        if (container != null) {
+            return (T) container;
+        }
         return value.as(targetType);
+    }
+
+    /**
+     * Convert a Python container whose element types are unknown (the element of a {@code list[list[int]]}
+     * attribute reaches this method as a plain {@link List}) to a Java collection with value semantics, so two
+     * conversions of equal Python data are equal. {@link Value#as(Class)} would return a view of the Python object
+     * that compares by identity, which breaks the generated {@code equals}/{@code hashCode} of the classes holding
+     * such attributes. Nested containers are converted the same way; every other element is mapped by GraalPy.
+     *
+     * @param value The value
+     * @param targetType The target type
+     * @return The Java collection, or {@code null} when the target is not a plain collection type
+     */
+    private static @Nullable Object convertNestedContainer(Value value, Class<?> targetType) {
+        if (value.isHostObject() || value.isString() || value.isNull()) {
+            return null;
+        }
+        if ((targetType == List.class || targetType == Collection.class || targetType == Iterable.class) && value.hasArrayElements()) {
+            return convertElements(value, PythonConversion::convertNestedElement);
+        }
+        if (targetType == Set.class && value.hasIterator() && !value.hasArrayElements()) {
+            Set<@Nullable Object> result = new HashSet<>();
+            Value iterator = value.getIterator();
+            while (iterator.hasIteratorNextElement()) {
+                result.add(convertNestedElement(iterator.getIteratorNextElement()));
+            }
+            return result;
+        }
+        if (targetType == Map.class && value.hasHashEntries()) {
+            Map<@Nullable Object, @Nullable Object> result = new HashMap<>();
+            Value entries = value.getHashEntriesIterator();
+            while (entries.hasIteratorNextElement()) {
+                Value entry = entries.getIteratorNextElement();
+                result.put(convertNestedElement(entry.getArrayElement(0)), convertNestedElement(entry.getArrayElement(1)));
+            }
+            return result;
+        }
+        return null;
+    }
+
+    private static @Nullable Object convertNestedElement(Value element) {
+        if (!element.isHostObject() && !element.isString() && !element.isNull()) {
+            if (element.hasArrayElements()) {
+                return convertNestedContainer(element, List.class);
+            }
+            if (element.hasHashEntries()) {
+                return convertNestedContainer(element, Map.class);
+            }
+            if (isPythonSet(element)) {
+                return convertNestedContainer(element, Set.class);
+            }
+        }
+        return convertValue(element, Object.class);
+    }
+
+    private static boolean isPythonSet(Value value) {
+        if (!value.hasIterator()) {
+            return false;
+        }
+        Value metaObject = value.getMetaObject();
+        return metaObject != null && isPythonSetType(metaObject, 0);
+    }
+
+    /**
+     * Whether a Python type is {@code set} or {@code frozenset} or derives from one of them: the parents of
+     * the type are walked, so a {@code set} subclass converts like a set.
+     */
+    private static boolean isPythonSetType(Value metaObject, int depth) {
+        String typeName = metaObject.getMetaSimpleName();
+        if ("set".equals(typeName) || "frozenset".equals(typeName)) {
+            return true;
+        }
+        if (depth > MAX_META_PARENT_DEPTH || !metaObject.hasMetaParents()) {
+            return false;
+        }
+        Value parents = metaObject.getMetaParents();
+        for (long i = 0; i < parents.getArraySize(); i++) {
+            if (isPythonSetType(parents.getArrayElement(i), depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -514,7 +780,7 @@ public final class PythonConversion {
             if (value.isHostObject()) {
                 return convertObjectResponseBody(value.asHostObject());
             }
-            ValueCoercible host = ValueCoercibles.hostObject(value);
+            Object host = ValueCoercibles.hostObject(value, Object.class);
             if (host != null) {
                 return host;
             }
@@ -537,8 +803,9 @@ public final class PythonConversion {
      */
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
         try {
-            ValueCoercible host = ValueCoercibles.hostObject(value);
-            if (host != null && targetType.isInstance(host)) {
+            // a generated wrapper, or the AOP proxy a Python scoped proxy stands in for
+            Object host = ValueCoercibles.hostObject(value, targetType);
+            if (host != null) {
                 return targetType.cast(host);
             }
             if (value.isHostObject()) {
@@ -684,5 +951,14 @@ public final class PythonConversion {
             return memberValue.asString();
         }
         return memberValue.toString();
+    }
+
+    /**
+     * The Python class a generated wrapper type is generated for.
+     *
+     * @param annotation The annotation of the wrapper type
+     * @param cacheKey The key of the class in the per-context class cache
+     */
+    private record OwnPythonClass(PythonClass annotation, String cacheKey) {
     }
 }

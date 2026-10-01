@@ -16,23 +16,29 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2ConnectionAdapter;
 import io.netty.handler.codec.http2.Http2ConnectionDecoder;
 import io.netty.handler.codec.http2.Http2ConnectionEncoder;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -46,10 +52,12 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
-import java.util.EnumMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -61,16 +69,34 @@ import java.util.Objects;
  */
 @Internal
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
-    private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
+    private static final Map<Http2Error, Exception> HTTP2_ERRORS;
 
     @Nullable
     private Http2ConnectionHandler connectionHandler;
     private Http2Connection. @Nullable PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
+    /**
+     * Whether to expose the stream attachment in {@link HttpAccessLogHandler#RESPONSE_REQUEST}
+     * while response headers are written. Set when the access log is enabled.
+     */
+    private boolean exposeResponseRequest = false;
+    /**
+     * Flushes requested outside a read are coalesced into one per event loop turn.
+     */
+    @Nullable
+    private FlushCoalescer flushCoalescer;
+    /**
+     * Streams whose request headers were read since the last read complete, without the end of
+     * the stream. These are the only streams that can still need {@link MultiplexedStream#devolveToStreaming()}
+     * at the next read complete: that call accepts every such stream, so none survive it.
+     */
+    private final List<Http2Stream> pendingStreams = new ArrayList<>();
 
     static {
-        for (Http2Error value : Http2Error.values()) {
+        Http2Error[] errors = Http2Error.values();
+        HTTP2_ERRORS = CollectionUtils.newEnumMap(errors);
+        for (Http2Error value : errors) {
             Exception e;
             if (value == Http2Error.CANCEL) {
                 e = StacklessStreamClosedChannelException.INSTANCE;
@@ -87,7 +113,21 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     private void init(Http2ConnectionHandler connectionHandler) {
         this.connectionHandler = connectionHandler;
-        streamKey = connectionHandler.connection().newKey();
+        Http2Connection.PropertyKey key = connectionHandler.connection().newKey();
+        streamKey = key;
+        connectionHandler.connection().addListener(new Http2ConnectionAdapter() {
+            @Override
+            public void onStreamClosed(io.netty.handler.codec.http2.Http2Stream s) {
+                // A stream can close before read complete hands its buffered data to a request:
+                // reset by the peer in the same read, reset by us, or closed with the
+                // connection. Netty's local flow controller returns the unconsumed bytes of a
+                // closed stream to the connection window itself.
+                Http2Stream stream = s.getProperty(key);
+                if (stream != null) {
+                    stream.discardBufferedContent();
+                }
+            }
+        });
     }
 
     private Http2ConnectionHandler requiredConnectionHandler() {
@@ -99,8 +139,16 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         // while reading, hold back flushes for efficiency.
         // Http2ConnectionHandler.readComplete does a flush.
         if (!reading) {
-            requiredConnectionHandler().flush(requiredCtx());
+            Objects.requireNonNull(flushCoalescer, "flushCoalescer").schedule();
         }
+    }
+
+    /**
+     * Perform a flush that was scheduled by the {@link #flushCoalescer}.
+     */
+    private void flushNow() {
+        endTurn();
+        requiredConnectionHandler().flush(requiredCtx());
     }
 
     @Override
@@ -123,11 +171,35 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         Http2Stream stream = new Http2Stream(str);
         Http2Stream existing = str.setProperty(streamKey, stream);
         if (existing != null) {
-            // ignore trailer and revert the setProperty. should not be hot path
+            // the trailers of the request. revert the setProperty. should not be hot path
             str.setProperty(streamKey, existing);
+            HttpHeaders trailers = new DefaultHttpHeaders(false);
+            HttpConversionUtil.addHttp2ToHttpHeaders(streamId, headers, trailers, HttpVersion.HTTP_1_1, true, true);
+            existing.onTrailersRead(trailers, endOfStream);
             return;
         }
         stream.onHeadersRead(HttpConversionUtil.toHttpRequest(streamId, headers, true), endOfStream);
+        if (!endOfStream) {
+            pendingStreams.add(stream);
+        }
+    }
+
+    /**
+     * Devolve the streams whose body did not arrive in full during this read batch to streaming.
+     * Streams that were closed in the meantime (reset by either side, or by a connection error)
+     * are skipped, like the previous walk over the active streams skipped them.
+     */
+    private void devolvePendingStreams() {
+        // devolveToStreaming calls into the request handler, which may close a later pending
+        // stream synchronously, hence the state check per stream. The list itself is only
+        // changed by onHeadersRead, which the decoder cannot call while read complete runs.
+        for (int i = 0; i < pendingStreams.size(); i++) {
+            Http2Stream stream = pendingStreams.get(i);
+            if (stream.stream.state() != io.netty.handler.codec.http2.Http2Stream.State.CLOSED) {
+                stream.devolveToStreaming();
+            }
+        }
+        pendingStreams.clear();
     }
 
     @Override
@@ -205,17 +277,36 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private final Http2ServerHandler handler;
         @Nullable
         private final Http2AccessLogManager accessLogManager;
+        private final int connectionWindowSize;
+        private boolean connectionWindowRaised;
 
-        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, @Nullable Http2AccessLogManager accessLogManager) {
+        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, ConnectionHandlerBuilder builder) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
-            this.handler = handler;
-            this.accessLogManager = accessLogManager;
+            this.handler = builder.frameListener;
+            this.accessLogManager = builder.accessLogManager;
+            this.connectionWindowSize = Http2ConnectionWindow.effectiveWindowSize(initialSettings, builder.initialConnectionWindowSize);
         }
 
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
             handler.ctx = ctx;
+            handler.flushCoalescer = new FlushCoalescer(ctx.executor(), handler::flushNow);
             super.handlerAdded(ctx);
+            // the preface has been sent if the channel is active, the WINDOW_UPDATE must come after it
+            raiseConnectionWindow(ctx);
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            super.channelActive(ctx);
+            raiseConnectionWindow(ctx);
+        }
+
+        private void raiseConnectionWindow(ChannelHandlerContext ctx) throws Http2Exception {
+            if (!connectionWindowRaised && ctx.channel().isActive()) {
+                connectionWindowRaised = true;
+                Http2ConnectionWindow.raise(ctx, connection(), connectionWindowSize);
+            }
         }
 
         @Override
@@ -226,14 +317,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-            connection().forEachActiveStream(s -> {
-                Http2ServerHandler.Http2Stream stream = s.getProperty(handler.streamKey);
-                if (stream != null) {
-                    stream.devolveToStreaming();
-                }
-                return true;
-            });
+            handler.devolvePendingStreams();
+            handler.endTurn();
             handler.reading = false;
+            // the superclass flushes now, which also covers a flush scheduled before this read
+            Objects.requireNonNull(handler.flushCoalescer, "flushCoalescer").cancel();
             super.channelReadComplete(ctx);
         }
 
@@ -244,6 +332,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 Http2ServerHandler.Http2Stream stream = s.getProperty(handler.streamKey);
                 if (stream != null) {
                     stream.onGoAwayRead(StacklessStreamClosedChannelException.INSTANCE);
+                    // nothing is read after the handler is removed, so there is no read complete
+                    stream.discardBufferedContent();
                 }
                 return true;
             });
@@ -259,10 +349,18 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 }
                 io.netty.handler.codec.http2.Http2Stream cs = connection().stream(1);
                 handleFakeRequest(cs, fhr);
-            } else if (evt instanceof IdleStateEvent idle) {
-                if (idle.state() == IdleState.ALL_IDLE) {
+            } else {
+                if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.ALL_IDLE) {
+                    // consumed: the connection is going away. On a real channel close() only
+                    // schedules the teardown, so without the return the event would still be
+                    // forwarded to whatever is behind us.
                     ctx.close();
+                    return;
                 }
+                // forward everything we do not consume ourselves. Our superclass
+                // ByteToMessageDecoder needs ChannelInputShutdownEvent, and handlers further down
+                // the pipeline may be interested in other events, e.g. SslCloseCompletionEvent or
+                // CleartextHttp2ServerUpgradeHandler.PriorKnowledgeUpgradeEvent.
                 super.userEventTriggered(ctx, evt);
             }
         }
@@ -297,6 +395,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Nullable
         private Http2AccessLogManager accessLogManager;
         private boolean decompress = true;
+        @Nullable
+        private Integer initialConnectionWindowSize;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
@@ -323,9 +423,17 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
-            if (compressionStrategy.isEnabled()) {
-                frameListener.compressor(new Compressor(compressionStrategy));
-            }
+            return compressor(Compressor.create(compressionStrategy));
+        }
+
+        /**
+         * Set the response compressor. The server shares one instance between its connections.
+         *
+         * @param compressor The compressor, or {@code null} to disable compression
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder compressor(@Nullable Compressor compressor) {
+            frameListener.compressor(compressor);
             return this;
         }
 
@@ -339,6 +447,19 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return this;
         }
 
+        /**
+         * Set the receive window of the connection as a whole (stream 0). The window is derived
+         * from the stream window in the initial settings when this is {@code null} or smaller
+         * than that, see {@link Http2ConnectionWindow#effectiveWindowSize(Http2Settings, Integer)}.
+         *
+         * @param initialConnectionWindowSize The connection window size, or {@code null} for the default
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder initialConnectionWindowSize(@Nullable Integer initialConnectionWindowSize) {
+            this.initialConnectionWindowSize = initialConnectionWindowSize;
+            return this;
+        }
+
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
@@ -346,6 +467,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
+                frameListener.exposeResponseRequest = true;
             }
             frameListener(fl);
             return super.build();
@@ -356,7 +478,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (accessLogManager != null) {
                 encoder = new Http2AccessLogConnectionEncoder(encoder, accessLogManager);
             }
-            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), frameListener, accessLogManager);
+            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), this);
             frameListener.init(ch);
             return ch;
         }
@@ -402,7 +524,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         void closeInput() {
             closeInput = true;
             if (stream.state() == io.netty.handler.codec.http2.Http2Stream.State.HALF_CLOSED_LOCAL) {
-                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.CANCEL.code(), requiredCtx().voidPromise());
+                // We have sent a complete response, but the peer is still sending the request body.
+                // RFC 9113 §8.1 allows us to stop reading it, but the response was delivered in
+                // full, so this is not an error: NO_ERROR keeps clients from reporting the request
+                // as failed. Genuine cancellation is signalled with CANCEL in reset(Throwable).
+                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.NO_ERROR.code(), requiredCtx().voidPromise());
                 flush();
             }
         }
@@ -413,7 +539,18 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(headers, true), 0, endStream, promise);
+            Http2Headers http2Headers = HttpConversionUtil.toHttp2Headers(headers, true);
+            if (exposeResponseRequest) {
+                Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+                attribute.set(attachment());
+                try {
+                    requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+                } finally {
+                    attribute.set(null);
+                }
+            } else {
+                requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+            }
         }
 
         @Override
@@ -423,6 +560,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise.addListener(future -> closeInput());
             }
             requiredConnectionHandler().encoder().writeData(requiredCtx(), stream.id(), data, 0, endStream, promise);
+        }
+
+        @Override
+        void writeTrailers(HttpHeaders trailers, ChannelPromise promise) {
+            if (closeInput) {
+                promise = promise.unvoid();
+                promise.addListener(future -> closeInput());
+            }
+            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(trailers, true), 0, true, promise);
         }
     }
 

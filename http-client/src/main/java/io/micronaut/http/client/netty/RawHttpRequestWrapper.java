@@ -16,9 +16,17 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.cookie.ClientCookieEncoder;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
@@ -27,7 +35,7 @@ import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.netty.handler.codec.http.HttpRequest;
 
 import java.io.Closeable;
-import java.io.IOException;
+import java.util.Optional;
 
 /**
  * This is a combination of a {@link HttpRequest} with a {@link ByteBody}. It implements
@@ -39,10 +47,18 @@ import java.io.IOException;
  */
 @Internal
 final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder, ServerHttpRequest<B>, Closeable {
+    private final ConversionService conversionService;
     private final CloseableByteBody byteBody;
+    /**
+     * Whether {@link #body(Object)} replaced the raw bytes, e.g. in a client filter.
+     */
+    private boolean bodyReplaced;
+    @Nullable
+    private Object replacementBody;
 
     public RawHttpRequestWrapper(ConversionService conversionService, MutableHttpRequest<B> delegate, CloseableByteBody byteBody) {
         super(conversionService, delegate);
+        this.conversionService = conversionService;
         this.byteBody = byteBody;
     }
 
@@ -53,12 +69,69 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
 
     @Override
     public @Nullable ByteBody byteBodyDirect() {
-        return byteBody;
+        return bodyReplaced ? null : byteBody;
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public Optional<B> getBody() {
+        if (bodyReplaced) {
+            return Optional.ofNullable((B) replacementBody);
+        }
+        return super.getBody();
+    }
+
+    @Override
+    public <T> Optional<T> getBody(Class<T> type) {
+        if (bodyReplaced) {
+            return replacementBody == null ? Optional.empty() : conversionService.convert(replacementBody, ConversionContext.of(type));
+        }
+        return super.getBody(type);
+    }
+
+    @Override
+    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+        if (bodyReplaced) {
+            return replacementBody == null ? Optional.empty() : conversionService.convert(replacementBody, conversionContext);
+        }
+        return super.getBody(conversionContext);
+    }
+
+    /**
+     * Replace the raw bytes with the given body, which is encoded like the body of any other
+     * request. The raw bytes are released.
+     *
+     * @param body The new body, or {@code null} to send none
+     * @param <T>  The body type
+     * @return This request
+     */
+    @Override
+    @SuppressWarnings("unchecked")
     public <T> MutableHttpRequest<T> body(@Nullable T body) {
-        throw new UnsupportedOperationException("Changing the body of raw requests is currently not supported");
+        if (!bodyReplaced) {
+            bodyReplaced = true;
+            byteBody.close();
+        }
+        replacementBody = body;
+        return (MutableHttpRequest<T>) this;
+    }
+
+    /**
+     * A failure of the exchange of this request does not hand the raw bytes back once a filter
+     * replaced them: they were released, see
+     * {@link io.micronaut.http.client.RawRequestOptions#isReturnUnsentBody()}.
+     *
+     * @param flow The exchange flow
+     * @param <T>  The response type
+     * @return The flow
+     */
+    <T> ExecutionFlow<T> keepReplacedBody(ExecutionFlow<T> flow) {
+        return flow.onErrorResume(e -> {
+            if (bodyReplaced && e instanceof UnprocessedRequestException unprocessed) {
+                unprocessed.markBodySent();
+            }
+            return ExecutionFlow.error(e);
+        });
     }
 
     @Override
@@ -67,7 +140,33 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public void close() throws IOException {
+    public HttpRequest toHttpRequestWithoutBody(String requestTarget) {
+        return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody(requestTarget);
+    }
+
+    @Override
+    public MutableHttpRequest<B> cookie(Cookie cookie) {
+        // the relayed request is sent with the headers of the wrapped request: a cookie a client
+        // filter adds goes to its Cookie header, like for a client request
+        MutableHttpHeaders headers = getHeaders();
+        StringBuilder value = new StringBuilder();
+        String existing = headers.get(HttpHeaders.COOKIE);
+        if (existing != null) {
+            // a cookie of the same name is replaced
+            String prefix = cookie.getName() + "=";
+            for (String pair : existing.split(";")) {
+                String trimmed = pair.trim();
+                if (!trimmed.isEmpty() && !trimmed.startsWith(prefix)) {
+                    value.append(trimmed).append("; ");
+                }
+            }
+        }
+        headers.set(HttpHeaders.COOKIE, value.append(ClientCookieEncoder.INSTANCE.encode(cookie)).toString());
+        return this;
+    }
+
+    @Override
+    public void close() {
         byteBody.close();
     }
 }

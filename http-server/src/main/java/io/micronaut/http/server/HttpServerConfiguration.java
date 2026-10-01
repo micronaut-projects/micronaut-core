@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
@@ -193,6 +194,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     private boolean escapeHtmlUrl = false;
     private boolean notFoundOnMissingBody = true;
     private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
+    private boolean http10KeepAlive;
+    private boolean rejectUnsupportedHttpVersions;
     private int maxParams = DEFAULT_MAX_PARAMS;
 
     /**
@@ -596,7 +599,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
 
     /**
      * Sets when unhandled exception messages should be included in error responses.
-     * Default value ({@value #DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE}).
+     * Default value ({@link #DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE}).
      *
      * @param errorResponseIncludeMessage When unhandled exception messages should be included
      * @since 5.1.11
@@ -745,6 +748,59 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      */
     public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
         this.semicolonIsNormalChar = semicolonIsNormalChar;
+    }
+
+    /**
+     * Whether the server keeps the connection of an HTTP/1.0 client that sends
+     * {@code Connection: keep-alive} after a response of known length, answering with
+     * {@code Connection: keep-alive}. A response has a known length when it has a
+     * {@code Content-Length} or has no body, e.g. a {@code 204} or {@code 304} response or the
+     * response to a {@code HEAD} request. A
+     * response of unknown length still ends with the connection. Supported by the Netty server.
+     *
+     * @return {@code true} to keep such a connection; {@code false}, the default, to end the
+     * connection of an HTTP/1.0 client after each response
+     * @since 5.3.0
+     */
+    @Experimental
+    public boolean isHttp10KeepAlive() {
+        return http10KeepAlive;
+    }
+
+    /**
+     * @param http10KeepAlive Whether to keep the connection of an HTTP/1.0 keep-alive client
+     * @see #isHttp10KeepAlive()
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setHttp10KeepAlive(boolean http10KeepAlive) {
+        this.http10KeepAlive = http10KeepAlive;
+    }
+
+    /**
+     * Whether the server answers a request of an HTTP major version other than 1, e.g.
+     * {@code HTTP/9.9} or {@code HTTP/2.0} on an HTTP/1 connection, which the request decoder
+     * accepts, with {@code 505} over HTTP/1.1 and closes the connection. A later minor version of
+     * HTTP/1, e.g. {@code HTTP/1.2}, is served as HTTP/1.1 (RFC 9112 section 2.3). Supported by
+     * the Netty server.
+     *
+     * @return {@code true} to reject such a request; {@code false}, the default, to serve it and
+     * answer with its version
+     * @since 5.3.0
+     */
+    @Experimental
+    public boolean isRejectUnsupportedHttpVersions() {
+        return rejectUnsupportedHttpVersions;
+    }
+
+    /**
+     * @param rejectUnsupportedHttpVersions Whether to reject a request of an unsupported HTTP version
+     * @see #isRejectUnsupportedHttpVersions()
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setRejectUnsupportedHttpVersions(boolean rejectUnsupportedHttpVersions) {
+        this.rejectUnsupportedHttpVersions = rejectUnsupportedHttpVersions;
     }
 
     /**
@@ -1342,7 +1398,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     }
 
     /**
-     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
+     * Allows configuration of properties for the {@link io.micronaut.http.server.body.AbstractFileBodyWriter}.
      *
      * @author James Kleeh
      * @author graemerocher

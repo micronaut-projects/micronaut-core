@@ -1,5 +1,6 @@
 package io.micronaut.inject.annotation
 
+import io.micronaut.core.annotation.AnnotationClassValue
 import spock.lang.Specification
 
 class AnnotationTypeClassLoaderSpec extends Specification {
@@ -38,6 +39,59 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         AnnotationMetadataSupport.getAnnotationType(Portable.name, null).get().is(Portable)
     }
 
+    void "a caller naming no loader is served for the thread context loader"() {
+        given: "a child-first deployment loader under the application loader, defining its own copy of an annotation the application loader also sees"
+        def deployment = new OwnCopy(Deployed.classLoader)
+        def own = deployment.define(Deployed.name)
+
+        and: "the generated metadata of that deployment registering its copy"
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(own))
+
+        and: "metadata of that deployment carrying the annotation"
+        def metadata = new MutableAnnotationMetadata()
+        metadata.addAnnotation(Deployed.name, [:])
+
+        and: "another deployment defining a copy of its own, which the registry does not hold"
+        def other = new OwnCopy(Deployed.classLoader)
+        def otherOwn = other.define(Deployed.name)
+
+        expect: "the deployment that registered its copy is served that copy, not the one the loader of the support class resolves again"
+        !own.is(Deployed)
+        withContext(deployment) { AnnotationMetadataSupport.getAnnotationType(Deployed.name).get() }.is(own)
+        withContext(deployment) { metadata.getAnnotationType(Deployed.name).get() }.is(own)
+
+        and: "so is a thread of the application the deployment runs in, whose context loader is a parent of the deployment"
+        withContext(Deployed.classLoader) { AnnotationMetadataSupport.getAnnotationType(Deployed.name).get() }.is(own)
+
+        and: "so is a thread with no context loader"
+        withContext(null) { AnnotationMetadataSupport.getAnnotationType(Deployed.name).get() }.is(own)
+
+        and: "another deployment is served its own copy"
+        withContext(other) { AnnotationMetadataSupport.getAnnotationType(Deployed.name).get() }.is(otherOwn)
+        withContext(other) { metadata.getAnnotationType(Deployed.name).get() }.is(otherOwn)
+    }
+
+    void "a name nothing registered is loaded through the thread context loader first"() {
+        given: "a deployment loader defining its own copy of an annotation nothing registered"
+        def deployment = new OwnCopy()
+        def own = deployment.define(Unregistered.name)
+
+        expect:
+        !own.is(Unregistered)
+        withContext(deployment) { AnnotationMetadataSupport.getAnnotationType(Unregistered.name).get() }.is(own)
+    }
+
+    private static <T> T withContext(ClassLoader loader, Closure<T> action) {
+        def thread = Thread.currentThread()
+        def previous = thread.contextClassLoader
+        thread.contextClassLoader = loader
+        try {
+            return action.call()
+        } finally {
+            thread.contextClassLoader = previous
+        }
+    }
+
     void "an annotation type of the JDK is served whatever the loader asks"() {
         expect: "a type the bootstrap loader defines cannot be shadowed"
         Deprecated.classLoader == null
@@ -51,8 +105,8 @@ class AnnotationTypeClassLoaderSpec extends Specification {
      */
     static class OwnCopy extends ClassLoader {
 
-        OwnCopy() {
-            super(ClassLoader.platformClassLoader)
+        OwnCopy(ClassLoader parent = ClassLoader.platformClassLoader) {
+            super(parent)
         }
 
         Class<?> define(String name) {

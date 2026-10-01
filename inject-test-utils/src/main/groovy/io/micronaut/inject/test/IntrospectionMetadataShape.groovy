@@ -17,6 +17,7 @@ package io.micronaut.inject.test
 
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
@@ -64,7 +65,9 @@ class IntrospectionMetadataShape {
 
     /**
      * Every answer an annotation metadata gives: the names, the declared names, the stereotypes, and for each
-     * annotation its values, its default values and the annotations it is a stereotype of.
+     * annotation its values, its default values and the annotations it is a stereotype of. The one member the
+     * two introspections are compiled to differ on, {@link Introspected#members()}, is left out of the values
+     * of {@code @Introspected}.
      *
      * @param metadata The metadata
      * @return The rendered metadata
@@ -76,11 +79,20 @@ class IntrospectionMetadataShape {
         lines << "stereotypes=" + metadata.stereotypeAnnotationNames.toSorted()
         lines << "declaredStereotypes=" + metadata.declaredStereotypeAnnotationNames.toSorted()
         for (String name : metadata.annotationNames.toSorted()) {
-            lines << name + " values=" + metadata.getAnnotationValuesByName(name)*.toString() +
+            lines << name + " values=" + metadata.getAnnotationValuesByName(name).collect { withoutMembersFlag(it) }*.toString() +
                     " defaults=" + canonical(metadata.getDefaultValues(name)) +
                     " byStereotype=" + metadata.getAnnotationNamesByStereotype(name).toSorted()
         }
         return lines.join("\n")
+    }
+
+    private static AnnotationValue<?> withoutMembersFlag(AnnotationValue<?> value) {
+        if (value.annotationName != Introspected.name || !value.contains("members")) {
+            return value
+        }
+        Map<CharSequence, Object> values = new LinkedHashMap<>(value.values)
+        values.remove("members")
+        return new AnnotationValue<>(value.annotationName, values)
     }
 
     private static Object canonical(Object value) {

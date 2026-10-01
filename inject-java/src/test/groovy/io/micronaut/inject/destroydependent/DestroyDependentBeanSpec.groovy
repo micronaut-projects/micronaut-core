@@ -1,0 +1,278 @@
+package io.micronaut.inject.destroydependent
+
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanContext
+import io.micronaut.context.BeanRegistration
+import io.micronaut.context.DefaultBeanResolutionContext
+import io.micronaut.context.DependentBeanProvider
+import spock.lang.AutoCleanup
+import spock.lang.Specification
+
+import java.lang.ref.WeakReference
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+
+class DestroyDependentBeanSpec extends Specification {
+
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run("spec": getClass().getSimpleName())
+
+    def setup() {
+        SharedBean.created = 0
+        SharedBean.destroyed = 0
+        PrototypeBean.destroyed = 0
+        NestedDependency.destroyed = 0
+        LifeCycleBean.stopped = 0
+        TrackedDependency.CREATED.clear()
+        TrackedDependency.DESTROYED.clear()
+    }
+
+    void "a scoped proxy destroyed as a dependent leaves the bean of the scope alive"() {
+        given:
+        SharedScopeImpl scope = context.getBean(SharedScopeImpl)
+        def resolved = resolveAsDependent(SharedBean)
+        SharedBean proxy = resolved.bean
+        int id = proxy.id()
+
+        expect: "the proxy is what the resolution reported, and its target is in the scope"
+        resolved.registration.bean.is(proxy)
+        scope.beans.size() == 1
+        SharedBean.created == 1
+
+        when:
+        context.destroyDependentBean(resolved.registration)
+
+        then: "the target is neither destroyed nor taken out of the scope"
+        SharedBean.destroyed == 0
+        scope.beans.size() == 1
+        context.getBean(SharedBean).id() == id
+        SharedBean.created == 1
+    }
+
+    void "a scoped proxy destroyed in its own right takes the bean out of the scope"() {
+        given:
+        SharedScopeImpl scope = context.getBean(SharedScopeImpl)
+        def resolved = resolveAsDependent(SharedBean)
+        resolved.bean.id()
+
+        when:
+        context.destroyBean(resolved.registration)
+
+        then:
+        SharedBean.destroyed == 1
+        scope.beans.isEmpty()
+    }
+
+    void "a prototype destroyed as a dependent gets its pre-destroy, and its own dependents are destroyed"() {
+        given:
+        def resolved = resolveAsDependent(PrototypeBean)
+
+        when:
+        context.destroyDependentBean(resolved.registration)
+
+        then:
+        PrototypeBean.destroyed == 1
+        NestedDependency.destroyed == 1
+    }
+
+    void "a life cycle bean destroyed as a dependent is not stopped"() {
+        given:
+        def dependent = resolveAsDependent(LifeCycleBean)
+        def own = resolveAsDependent(LifeCycleBean)
+
+        when:
+        context.destroyDependentBean(dependent.registration)
+
+        then: "it is destroyed, with its own dependents, but not stopped"
+        NestedDependency.destroyed == 1
+        LifeCycleBean.stopped == 0
+
+        when: "destroyed in its own right, it is"
+        context.destroyBean(own.registration)
+
+        then:
+        NestedDependency.destroyed == 2
+        LifeCycleBean.stopped == 1
+    }
+
+    void "destroying a dependent twice destroys it once"() {
+        given:
+        def prototype = resolveAsDependent(PrototypeBean)
+        def closedFirst = resolveAsDependent(PrototypeBean)
+        def scoped = resolveAsDependent(SharedBean)
+        int id = scoped.bean.id()
+
+        when:
+        context.destroyDependentBean(prototype.registration)
+        context.destroyDependentBean(prototype.registration)
+        prototype.registration.close()
+
+        then:
+        PrototypeBean.destroyed == 1
+        NestedDependency.destroyed == 1
+
+        when:
+        closedFirst.registration.close()
+        context.destroyDependentBean(closedFirst.registration)
+
+        then:
+        PrototypeBean.destroyed == 2
+        NestedDependency.destroyed == 2
+
+        when:
+        context.destroyDependentBean(scoped.registration)
+        context.destroyDependentBean(scoped.registration)
+
+        then:
+        SharedBean.destroyed == 0
+        context.getBean(SharedBean).id() == id
+    }
+
+    void "a nested dependent destroyed after its parent is destroyed once"() {
+        given:
+        def parent = resolveAsDependent(PrototypeBean)
+        BeanRegistration<?> child = ((DependentBeanProvider) parent.registration).dependentBeans()[0]
+
+        when:
+        context.destroyDependentBean(parent.registration)
+        context.destroyDependentBean(child)
+
+        then:
+        PrototypeBean.destroyed == 1
+        NestedDependency.destroyed == 1
+    }
+
+    void "a nested dependent destroyed before its parent is destroyed once"() {
+        given:
+        def parent = resolveAsDependent(PrototypeBean)
+        BeanRegistration<?> child = ((DependentBeanProvider) parent.registration).dependentBeans()[0]
+
+        when:
+        context.destroyDependentBean(child)
+        context.destroyDependentBean(parent.registration)
+
+        then:
+        PrototypeBean.destroyed == 1
+        NestedDependency.destroyed == 1
+    }
+
+    void "a dependent of a lazy proxy destroyed before the uninitialized proxy is destroyed once"() {
+        given:
+        def proxy = resolveAsDependent(SharedWithDependency)
+        BeanRegistration<?> child = ((DependentBeanProvider) proxy.registration).dependentBeans()[0]
+
+        expect:
+        child.bean instanceof NestedDependency
+
+        when:
+        context.destroyDependentBean(child)
+        context.destroyDependentBean(proxy.registration)
+
+        then:
+        NestedDependency.destroyed == 1
+    }
+
+    void "a lazy proxy with a cached target is destroyed with its own dependent and the target's, each once"() {
+        given:
+        def resolved = resolveAsDependent(CachedLazyBean)
+        TrackedDependency ofTarget = resolved.bean.dependency()
+
+        expect: "one dependent was created with the proxy and another with its target"
+        TrackedDependency.CREATED.size() == 2
+        !TrackedDependency.CREATED[0].is(TrackedDependency.CREATED[1])
+        TrackedDependency.CREATED[1].is(ofTarget)
+
+        when:
+        context.destroyDependentBean(resolved.registration)
+        context.destroyDependentBean(resolved.registration)
+
+        then:
+        TrackedDependency.DESTROYED.size() == 2
+        TrackedDependency.DESTROYED.any { it.is(TrackedDependency.CREATED[0]) }
+        TrackedDependency.DESTROYED.any { it.is(TrackedDependency.CREATED[1]) }
+    }
+
+    void "a lazy proxy destroyed through a registration the context did not create is destroyed without its target's dependents"() {
+        given:
+        def resolved = resolveAsDependent(CachedLazyBean)
+        resolved.bean.dependency()
+        def untracked = new BeanRegistration(resolved.registration.identifier, resolved.registration.beanDefinition, resolved.bean)
+
+        when:
+        context.destroyDependentBean(untracked)
+
+        then: "such a registration carries neither the dependents of the proxy nor the context the proxy retains"
+        noExceptionThrown()
+        TrackedDependency.DESTROYED.isEmpty()
+
+        when:
+        context.destroyDependentBean(resolved.registration)
+
+        then: "the registration the context created still destroys the dependent of the proxy"
+        TrackedDependency.DESTROYED.size() == 1
+        TrackedDependency.DESTROYED[0].is(TrackedDependency.CREATED[0])
+    }
+
+    void "the targets of a lazy proxy that does not cache its target are not retained"() {
+        given:
+        UncachedLazyBean proxy = context.getBean(UncachedLazyBean)
+        List<WeakReference<Object>> targets = (1..50).collect { new WeakReference<Object>(proxy.target()) }
+
+        expect: "each call resolved a target of its own"
+        targets.collect { System.identityHashCode(it.get()) }.unique().size() > 1
+
+        when:
+        boolean collected = false
+        for (int attempt = 0; attempt < 100 && !collected; attempt++) {
+            System.gc()
+            collected = targets.every { it.get() == null }
+            if (!collected) {
+                Thread.sleep(50)
+            }
+        }
+
+        then: "nothing the context or the proxy holds keeps a target, although its dependent references it"
+        collected
+        proxy != null
+    }
+
+    void "a context that does not implement it refuses rather than destroy the registration in its own right"() {
+        given:
+        BeanContext beanContext = (BeanContext) Proxy.newProxyInstance(
+                getClass().classLoader,
+                [BeanContext] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    method.isDefault() ? InvocationHandler.invokeDefault(proxy, method, args) : method.invoke(context, args)
+                } as InvocationHandler
+        )
+        def resolved = resolveAsDependent(LifeCycleBean)
+
+        when:
+        beanContext.destroyDependentBean(resolved.registration)
+
+        then:
+        thrown(UnsupportedOperationException)
+        NestedDependency.destroyed == 0
+        LifeCycleBean.stopped == 0
+    }
+
+    private <T> Resolved<T> resolveAsDependent(Class<T> type) {
+        try (def resolutionContext = new DefaultBeanResolutionContext(context, null)) {
+            T bean = resolutionContext.getBean(type)
+            List<BeanRegistration<?>> dependents = resolutionContext.getAndResetDependentBeans()
+            assert dependents.size() == 1
+            return new Resolved<T>(bean, (BeanRegistration<T>) dependents[0])
+        }
+    }
+
+    static class Resolved<T> {
+        final T bean
+        final BeanRegistration<T> registration
+
+        Resolved(T bean, BeanRegistration<T> registration) {
+            this.bean = bean
+            this.registration = registration
+        }
+    }
+}

@@ -15,6 +15,9 @@
  */
 package io.micronaut.context.python;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +42,7 @@ import org.reactivestreams.Subscription;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -123,6 +127,7 @@ class PythonConversionTest {
 
                 @Override
                 public void onComplete() {
+                    // the result is asserted once the synchronous publisher has completed
                 }
             });
 
@@ -168,6 +173,133 @@ class PythonConversionTest {
             assertThrows(RuntimeException.class, () -> awareTime.as(LocalTime.class));
             Value customZone = mappedContext.eval("python", "type('CustomZone', (__import__('datetime').tzinfo,), {'utcoffset': lambda self, value: __import__('datetime').timedelta(hours=1)})()");
             assertThrows(RuntimeException.class, () -> customZone.as(ZoneOffset.class));
+        }
+    }
+
+    /**
+     * Python {@code bytes} reaching an erased {@code Object} parameter.
+     * <p>
+     * A generic Java API used with its type arguments erased, {@code RedisCommands<byte[], byte[]>} on a
+     * raw-typed bean, takes {@code Object} parameters at the interop boundary. Only a declared
+     * {@code byte[]} parameter had a mapping, so a Python {@code bytes} value arrived as a foreign
+     * buffer and callers had to write {@code ByteBuffer.wrap(b"...").array()}.
+     */
+    @Test
+    void pythonBytesReachAnErasedObjectParameterAsAByteArray() {
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            var store = new ErasedStore<byte[], byte[]>();
+            mappedContext.getBindings("python").putMember("store", store);
+
+            mappedContext.eval("python", "store.set(b'key', bytearray(b'value'))");
+
+            assertArrayEquals("key".getBytes(StandardCharsets.UTF_8), (byte[]) store.key());
+            assertArrayEquals("value".getBytes(StandardCharsets.UTF_8), (byte[]) store.value());
+        }
+    }
+
+    /**
+     * A Python string keeps reaching an erased {@code Object} parameter as a string, and a Java
+     * {@code byte[]} that went to Python comes back as the same array.
+     */
+    @Test
+    void otherValuesKeepReachingAnErasedObjectParameterUnchanged() {
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            var store = new ErasedStore<Object, Object>();
+            byte[] payload = "payload".getBytes(StandardCharsets.UTF_8);
+            mappedContext.getBindings("python").putMember("store", store);
+            mappedContext.getBindings("python").putMember("payload", payload);
+
+            mappedContext.eval("python", "store.set('key', payload)");
+
+            assertEquals("key", store.key());
+            assertSame(payload, store.value());
+        }
+    }
+
+    @Test
+    void convertsPythonStandardLibraryValuesForErasedParameters() {
+        ErasedParameter parameter = new ErasedParameter();
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            mappedContext.getBindings("python").putMember("parameter", parameter);
+            mappedContext.eval("python", """
+                import datetime
+                import uuid
+
+                parameter.accept(datetime.date(2026, 7, 21))
+                parameter.accept(datetime.time(12, 34, 56, 123000))
+                parameter.accept(datetime.datetime(2026, 7, 21, 12, 34, 56, 123000))
+                parameter.accept(datetime.timedelta(microseconds=-1))
+                parameter.accept(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+                parameter.accept(uuid.UUID('123e4567-e89b-12d3-a456-426614174000'))
+                """);
+        }
+
+        assertEquals(
+            List.of(
+                LocalDate.of(2026, 7, 21),
+                LocalTime.of(12, 34, 56, 123_000_000),
+                LocalDateTime.of(2026, 7, 21, 12, 34, 56, 123_000_000),
+                Duration.ofSeconds(-1, 999_999_000),
+                ZoneOffset.ofHoursMinutes(5, 30),
+                UUID.fromString("123e4567-e89b-12d3-a456-426614174000")
+            ),
+            parameter.received()
+        );
+    }
+
+    @Test
+    void keepsAPythonValueWithoutAJavaCounterpartForAnErasedParameter() {
+        ErasedParameter parameter = new ErasedParameter();
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            mappedContext.getBindings("python").putMember("parameter", parameter);
+            mappedContext.eval("python", """
+                import datetime
+
+                parameter.accept(datetime.time(12, tzinfo=datetime.timezone.utc))
+                parameter.accept(datetime.datetime(2026, 9, 24, 12, tzinfo=datetime.timezone.utc))
+                parameter.accept(datetime.timezone(datetime.timedelta(microseconds=1500)))
+                """);
+        }
+
+        // Asserting the exact type matters. A value the conversion cannot take has to keep the
+        // mapping it would have had, which means the predicate must refuse it: refusing inside the
+        // converter instead leaves the parameter holding a polyglot Value, because Truffle passes a
+        // converter's result through once its predicate has said yes.
+        assertEquals(3, parameter.received().size());
+        for (Object received : parameter.received()) {
+            assertFalse(received instanceof Value, "a refused value must not arrive as a polyglot Value");
+            assertTrue(received instanceof Map, "a refused value keeps the default mapping: " + received.getClass());
+        }
+    }
+
+    @Test
+    void findsAnEntityByTheIdentifierReadBackFromIt() {
+        UUID id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        ErasedRepository<UUID> repository = new ErasedRepository<>();
+        repository.save(id, "row");
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            mappedContext.getBindings("python").putMember("repository", repository);
+            // the identifier as Python sees it once it has been read back off an entity
+            mappedContext.getBindings("python").putMember("id", PythonCoercion.coerceToContext(id, mappedContext));
+
+            assertEquals("uuid.UUID", mappedContext.eval("python", "type(id).__module__ + '.' + type(id).__name__").asString());
+            assertTrue(mappedContext.eval("python", "repository.existsById(id)").asBoolean());
+            assertEquals("row", mappedContext.eval("python", "repository.findById(id).get()").asString());
         }
     }
 
@@ -337,6 +469,26 @@ class PythonConversionTest {
     @Test
     void testCoerceMapNull() {
         assertNull(PythonCoercion.coerceMap(null));
+    }
+
+    @Test
+    void testCoerceMapCoercesKeysAndValues() {
+        Value pythonKey = context.eval("python", "object()");
+        Value pythonValue = context.eval("python", "object()");
+        ValueCoercible key = () -> pythonKey;
+        ValueCoercible value = () -> pythonValue;
+        Map<Object, Object> keyed = new java.util.LinkedHashMap<>();
+        keyed.put(1, "one");
+        keyed.put(key, value);
+        keyed.put("none", null);
+
+        Map<Object, Object> coerced = PythonCoercion.coerceMap(keyed);
+
+        assertEquals(3, coerced.size());
+        assertEquals("one", coerced.get(1));
+        assertSame(pythonValue, coerced.get(pythonKey));
+        assertTrue(coerced.containsKey("none"));
+        assertNull(coerced.get("none"));
     }
 
     @Test
@@ -841,6 +993,70 @@ class PythonConversionTest {
     public static final class ClassAcceptor {
         public static String name(Class<?> type) {
             return type.getName();
+        }
+    }
+
+    /**
+     * A generic API used with its type arguments erased, as {@code RedisCommands<byte[], byte[]>} is on
+     * a raw-typed bean: the parameters of {@code set} are {@code Object} at the interop boundary.
+     *
+     * @param <K> The key type
+     * @param <V> The value type
+     */
+    public static final class ErasedStore<K, V> {
+        private Object key;
+        private Object value;
+
+        public void set(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public Object key() {
+            return key;
+        }
+
+        public Object value() {
+            return value;
+        }
+    }
+
+    /**
+     * A method parameter that is a type variable: it erases to {@code Object}, which is the signature a
+     * call from Python resolves against.
+     */
+    public static final class ErasedParameter {
+
+        private final List<Object> received = new ArrayList<>();
+
+        public <T> void accept(T value) {
+            received.add(value);
+        }
+
+        List<Object> received() {
+            return received;
+        }
+    }
+
+    /**
+     * The shape of a Micronaut Data repository: the identifier of {@code CrudRepository.findById(ID)}
+     * and {@code existsById(ID)} is a type variable, so a Python {@code uuid.UUID} passed to either
+     * reaches an {@code Object} parameter.
+     */
+    public static final class ErasedRepository<ID> {
+
+        private final Map<Object, String> rows = new LinkedHashMap<>();
+
+        void save(ID id, String row) {
+            rows.put(id, row);
+        }
+
+        public boolean existsById(ID id) {
+            return rows.containsKey(id);
+        }
+
+        public Optional<String> findById(ID id) {
+            return Optional.ofNullable(rows.get(id));
         }
     }
 }

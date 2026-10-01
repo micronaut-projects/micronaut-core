@@ -1,2 +1,5 @@
 io.micronaut.python.annotation.processing.test.factory.mapped.TestConfigurationMapper
 io.micronaut.python.annotation.processing.test.introduction.mapped.ListenerAdviceMarkerMapper
+io.micronaut.python.annotation.processing.test.visitorintegration.ConvertedPropertyMapper
+io.micronaut.python.annotation.processing.test.visitorintegration.JsonNamingClassMapper
+pythontest.introduction.reflective.FakeAiServiceMapper

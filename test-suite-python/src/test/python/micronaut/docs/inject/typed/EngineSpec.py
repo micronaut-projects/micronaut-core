@@ -6,6 +6,9 @@ from jakarta.inject import Inject
 from typing import Annotated
 import java
 
+from .Engine import Engine
+from .V8Engine import V8Engine
+
 NoSuchBeanException = java.type("io.micronaut.context.exceptions.NoSuchBeanException")
 
 # tag::class[]
@@ -16,8 +19,6 @@ class EngineSpec:
     @Test
     def test_engine(self) -> None:
         # tag::start[]
-        V8Engine = java.type("micronaut.docs.inject.typed.V8Engine")
-        Engine = java.type("micronaut.docs.inject.typed.Engine")
         try:
             self.context.getBean(V8Engine)
             assert False # should not get here

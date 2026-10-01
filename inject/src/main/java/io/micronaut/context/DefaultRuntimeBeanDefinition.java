@@ -173,6 +173,12 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     }
 
     @Override
+    public Argument<T> getDeclaredBeanType() {
+        // the bean type a runtime definition was registered with is its declaration
+        return beanType;
+    }
+
+    @Override
     public boolean isPrimary() {
         return qualifier == PrimaryQualifier.INSTANCE || RuntimeBeanDefinition.super.isPrimary();
     }

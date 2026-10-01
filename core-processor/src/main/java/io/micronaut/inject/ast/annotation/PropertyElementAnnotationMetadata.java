@@ -71,21 +71,13 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
             ParameterElement[] parameters = setter.getParameters();
             if (parameters.length > 0) {
                 ParameterElement parameter = parameters[0];
-                MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = parameter.getType().getTypeAnnotationMetadata();
-                if (!typeAnnotationMetadata.isEmpty()) {
-                    writeElements.add(typeAnnotationMetadata);
-                    readElements.add(typeAnnotationMetadata);
-                }
+                addTypeAnnotations(parameter.getType(), writeElements, readElements);
             }
         }
         if (constructorParameter != null) {
             writeElements.add(constructorParameter);
             readElements.add(constructorParameter);
-            MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = constructorParameter.getType().getTypeAnnotationMetadata();
-            if (!typeAnnotationMetadata.isEmpty()) {
-                writeElements.add(typeAnnotationMetadata);
-                readElements.add(typeAnnotationMetadata);
-            }
+            addTypeAnnotations(constructorParameter.getType(), writeElements, readElements);
         }
         if (field != null && (!field.isSynthetic() || includeSynthetic)) {
             ClassElement genericFieldType = field.getGenericType();
@@ -103,24 +95,17 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
                     }
                 }
             } else {
-                writeElements.add(field);
-                readElements.add(field);
-                MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
-                if (!typeAnnotationMetadata.isEmpty()) {
-                    writeElements.add(typeAnnotationMetadata);
-                    readElements.add(typeAnnotationMetadata);
-                }
+                MutableAnnotationMetadataDelegate<?> fieldAnnotationMetadata = propertyFieldAnnotationMetadata(field);
+                writeElements.add(fieldAnnotationMetadata);
+                readElements.add(fieldAnnotationMetadata);
+                addTypeAnnotations(field.getType(), writeElements, readElements);
             }
         }
 
         if (getter != null && (!getter.isSynthetic() || includeSynthetic)) {
             writeElements.add(getter.getMethodAnnotationMetadata());
             readElements.add(getter.getMethodAnnotationMetadata());
-            MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = getter.getReturnType().getTypeAnnotationMetadata();
-            if (!typeAnnotationMetadata.isEmpty()) {
-                writeElements.add(typeAnnotationMetadata);
-                readElements.add(typeAnnotationMetadata);
-            }
+            addTypeAnnotations(getter.getReturnType(), writeElements, readElements);
         }
 
         // The instance AnnotationMetadata of each element can change after a modification
@@ -132,6 +117,23 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
         this.propertyWriteAnnotationMetadata =
             writeHierarchy.length == 1 ? writeHierarchy[0] : new AnnotationMetadataHierarchy(true, writeHierarchy);
         this.writeElements = writeElements;
+    }
+
+    /**
+     * The annotation metadata of the field as a component of the property. A property is resolved for the type it is
+     * read through, so annotating it annotates the field for that type only, not for the other types the field is
+     * inherited by.
+     *
+     * @param field The field
+     * @return The annotation metadata to read and write
+     */
+    private static MutableAnnotationMetadataDelegate<?> propertyFieldAnnotationMetadata(FieldElement field) {
+        if (field instanceof AbstractAnnotationElement element
+            && element.presetAnnotationMetadata == null
+            && element.getElementAnnotationMetadataFactory() instanceof AbstractElementAnnotationMetadataFactory<?, ?> factory) {
+            return factory.buildForPropertyField(field);
+        }
+        return field;
     }
 
     @Override
@@ -207,5 +209,22 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
      */
     public AnnotationMetadata getWriteAnnotationMetadata() {
         return propertyWriteAnnotationMetadata;
+    }
+
+    /**
+     * Reads the type annotations of a member's type through the property and writes the property's mutations to
+     * them, except for a primitive: what was written on a use of a primitive is read through the property, but a
+     * mutation of the property is not propagated into it.
+     */
+    private static void addTypeAnnotations(ClassElement type,
+                                           List<MutableAnnotationMetadataDelegate<?>> writeElements,
+                                           List<AnnotationMetadata> readElements) {
+        MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = type.getTypeAnnotationMetadata();
+        if (!typeAnnotationMetadata.isEmpty()) {
+            if (!type.isPrimitive()) {
+                writeElements.add(typeAnnotationMetadata);
+            }
+            readElements.add(typeAnnotationMetadata);
+        }
     }
 }

@@ -211,8 +211,8 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
          * Register a dynamic proxy of the given interfaces.
          *
          * <p>The interfaces are the complete interface list of a single proxy, in the order they are
-         * passed to {@link java.lang.reflect.Proxy#getProxyClass(ClassLoader, Class[])}. Registering
-         * {@code A} and registering {@code A, B} are two distinct proxies.</p>
+         * passed to {@link java.lang.reflect.Proxy#newProxyInstance(ClassLoader, Class[], java.lang.reflect.InvocationHandler)}.
+         * Registering {@code A} and registering {@code A, B} are two distinct proxies.</p>
          *
          * @param interfaces The interfaces implemented by the proxy
          */

@@ -31,6 +31,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 import io.netty.contrib.multipart.DecoderQuirk;
+import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
@@ -1017,6 +1018,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @ConfigurationProperties("http2")
     public static class Http2Settings {
         private final io.netty.handler.codec.http2.Http2Settings settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings();
+        @Nullable
+        private Integer initialConnectionWindowSize;
 
         /**
          * Returns netty's http2 settings.
@@ -1115,6 +1118,47 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             if (value != null) {
                 settings.initialWindowSize(value);
             }
+        }
+
+        /**
+         * Gets the initial flow-control window size of the connection as a whole. If not
+         * configured, returns {@code null}.
+         *
+         * @return The connection window size or {@code null}.
+         * @see #setInitialConnectionWindowSize(Integer)
+         * @since 5.2.2
+         */
+        @Nullable
+        public Integer getInitialConnectionWindowSize() {
+            return initialConnectionWindowSize;
+        }
+
+        /**
+         * Sets the initial flow-control window size of the connection as a whole (HTTP/2 stream
+         * 0), i.e. how many request body bytes a client may send across all streams of one
+         * connection before the server has to acknowledge them with a {@code WINDOW_UPDATE}.
+         * <p>
+         * {@code SETTINGS_INITIAL_WINDOW_SIZE} ({@link #setInitialWindowSize(Integer)}) only
+         * applies to individual streams. The connection window always starts at the protocol
+         * default of 65535 bytes, which caps the combined upload throughput of all streams on a
+         * connection at about 64 KiB per round trip unless it is raised. By default, the
+         * connection window is raised by twice the amount by which {@code initial-window-size}
+         * exceeds 65535, so that a single stream cannot use up the whole connection window;
+         * this is the same rule netty's {@code Http2FrameCodec} applies. This property raises
+         * the connection window further, to the given number of bytes; it has no effect when
+         * the default derived from the stream window is already larger. The value must be at
+         * least 65535 and at most 2^31-1; the connection window can only be raised above the
+         * protocol default, never lowered.
+         *
+         * @param value The connection window size in bytes.
+         * @throws IllegalArgumentException if the value is out of range.
+         * @since 5.2.2
+         */
+        public void setInitialConnectionWindowSize(@Nullable Integer value) {
+            if (value != null && value < Http2CodecUtil.DEFAULT_WINDOW_SIZE) {
+                throw new IllegalArgumentException("initial-connection-window-size must be at least " + Http2CodecUtil.DEFAULT_WINDOW_SIZE + " but was " + value);
+            }
+            this.initialConnectionWindowSize = value;
         }
 
         /**

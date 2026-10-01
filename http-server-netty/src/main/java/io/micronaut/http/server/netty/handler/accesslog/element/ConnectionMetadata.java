@@ -76,7 +76,7 @@ public interface ConnectionMetadata {
             return Optional.of(addr.getPath().toString())
                 // remote address is empty string
                 .filter(s -> !s.isEmpty());
-        } else if (ConnectionMetadataImpl.DOMAIN_SOCKET_ADDRESS.isInstance(a)) {
+        } else if (ConnectionMetadataImpl.DOMAIN_SOCKET_ADDRESS != null && ConnectionMetadataImpl.DOMAIN_SOCKET_ADDRESS.isInstance(a)) {
             String path = ConnectionMetadataImpl.DomainSocketUtil.getPath(a);
             if (path.isEmpty() || path.equals("\0")) {
                 return Optional.empty();

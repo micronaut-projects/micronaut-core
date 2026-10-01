@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericElement;
@@ -43,6 +44,20 @@ public interface ElementAnnotationMetadataFactory {
      * @return the element's metadata
      */
     ElementAnnotationMetadata buildTypeAnnotations(ClassElement element);
+
+    /**
+     * Builds the type annotation metadata of a type use that has no element of its own to look the metadata up
+     * for, such as an annotated use of a primitive, from the cache entry the language implementation built for
+     * it. Mutations are written to the entry, so every element created for the same use sees them.
+     *
+     * @param cacheEntry  The cache entry
+     * @param description The description of the use, for {@link Object#toString()}
+     * @return The type annotation metadata
+     * @since 5.3.0
+     */
+    default ElementAnnotationMetadata buildTypeAnnotations(AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cacheEntry, Object description) {
+        throw new UnsupportedOperationException("Factory of type [" + getClass() + "] does not support building type annotations from a cache entry");
+    }
 
     /**
      * Build new generic element type annotation metadata from the class element.

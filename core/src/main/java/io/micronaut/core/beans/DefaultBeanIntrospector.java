@@ -20,11 +20,14 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +49,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
 
     @Nullable
-    @SuppressWarnings("java:S3077") // resolveIntrospections returns an immutable Map.copyOf, published once under double checked locking
+    @SuppressWarnings("java:S3077") // resolveIntrospections returns an unmodifiable map, published once under double checked locking
     private volatile Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     @Nullable
     @SuppressWarnings("java:S3077") // resolveFallbacks returns an immutable List.copyOf, published once under double checked locking
@@ -100,7 +103,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .stream()
                 .filter(filter)
                 .map(BeanIntrospectionReference::getBeanType)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @Override
@@ -109,7 +112,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ClassLoader effectiveClassLoader = resolveClassLoader();
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
-                (BeanIntrospectionReference<T>) findIntrospectionReference(beanType);
+                (BeanIntrospectionReference<T>) findIntrospectionReference(beanType, effectiveClassLoader);
         try {
             if (reference != null) {
                 return Optional.of(reference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
@@ -118,21 +121,6 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     }
                     return ref.load();
                 });
-            }
-            if (useContextClassLoader && Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
-                ClassLoader beanClassLoader = beanType.getClassLoader();
-                if (beanClassLoader != null && beanClassLoader != effectiveClassLoader) {
-                    @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> beanClassLoaderReference =
-                            (BeanIntrospectionReference<T>) getIntrospections(beanClassLoader).get(beanType.getName());
-                    if (beanClassLoaderReference != null) {
-                        return Optional.of(beanClassLoaderReference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Found BeanIntrospection for type: {},", ref.getBeanType());
-                            }
-                            return ref.load();
-                        });
-                    }
-                }
             }
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
@@ -162,16 +150,22 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         return Optional.empty();
     }
 
+    /**
+     * The introspection reference of the class loader the introspections are resolved with, or else of the class loader
+     * of the bean type, which may be a child class loader that the introspector cannot see.
+     * The class loader of the bean type is only asked when it shares this class' {@link BeanIntrospectionReference}:
+     * one that loads Micronaut on its own, as the application class loader does under a test harness that runs Micronaut
+     * in a class loader of its own, has introspections that cannot be cast to it, and a type from there is a lookup miss.
+     */
     @Nullable
-    private BeanIntrospectionReference<Object> findIntrospectionReference(Class<?> beanType) {
+    private BeanIntrospectionReference<Object> findIntrospectionReference(Class<?> beanType, ClassLoader effectiveClassLoader) {
         String beanTypeName = beanType.getName();
-        BeanIntrospectionReference<Object> reference = getIntrospections().get(beanTypeName);
+        BeanIntrospectionReference<Object> reference = getIntrospections(effectiveClassLoader).get(beanTypeName);
         if (reference != null) {
             return reference;
         }
         ClassLoader beanClassLoader = beanType.getClassLoader();
-        ClassLoader effectiveClassLoader = resolveClassLoader();
-        if (beanClassLoader != null && beanClassLoader != effectiveClassLoader) {
+        if (beanClassLoader != null && beanClassLoader != effectiveClassLoader && sharesBeanIntrospectionReference(beanClassLoader)) {
             return resolveIntrospections(beanClassLoader).get(beanTypeName);
         }
         return null;
@@ -230,19 +224,41 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private ClassLoader resolveClassLoader() {
         if (useContextClassLoader && Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-            if (contextClassLoader != null) {
+            if (contextClassLoader != null && (contextClassLoader == classLoader || sharesBeanIntrospectionReference(contextClassLoader))) {
                 return contextClassLoader;
             }
         }
         return classLoader;
     }
 
+    /**
+     * Whether the given class loader resolves {@link BeanIntrospectionReference} to this class' own, so that the
+     * introspections and fallbacks it lists as services can be used here. A class loader that fails to answer, as a
+     * restricted or custom class loader may with any runtime exception, is taken as not sharing them.
+     *
+     * @param otherClassLoader The class loader
+     * @return Whether it shares the introspection types of this class
+     */
+    private static boolean sharesBeanIntrospectionReference(ClassLoader otherClassLoader) {
+        try {
+            return Class.forName(BeanIntrospectionReference.class.getName(), false, otherClassLoader) == BeanIntrospectionReference.class;
+        } catch (ClassNotFoundException | RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
+    /**
+     * The introspections keyed by name, in a {@link HashMap}. {@link #findIntrospections(Predicate)} and
+     * {@link #findIntrospectedTypes(Predicate)} iterate this map, so its order is what they return: a {@code HashMap}
+     * of names iterates the same way on every run, where a {@code Map.copyOf} is randomized per JVM. The order is
+     * kept as it was before the map was made immutable, since consumers came to depend on it.
+     */
     private Map<String, BeanIntrospectionReference<Object>> resolveIntrospections(ClassLoader classLoader) {
-        Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = new HashMap<>(30);
         List<BeanIntrospectionReference<Object>> beanIntrospectionReferences = BeanIntrospectionProviders.get().provide(classLoader);
+        Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = CollectionUtils.newHashMap(beanIntrospectionReferences.size());
         for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
             resolvedIntrospectionMap.put(reference.getName(), reference);
         }
-        return Map.copyOf(resolvedIntrospectionMap);
+        return Collections.unmodifiableMap(resolvedIntrospectionMap);
     }
 }

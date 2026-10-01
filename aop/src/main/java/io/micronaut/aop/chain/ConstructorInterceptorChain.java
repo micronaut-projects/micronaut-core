@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.AdvisedBeanType;
@@ -37,6 +38,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -200,7 +202,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
             final AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
             final Collection<AnnotationValue<?>> annotationValues = resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
 
-            final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = resolutionContext.getBeanRegistrations(
+            final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = resolutionContext.getInterceptorRegistrations(
                 Interceptor.ARGUMENT,
                 Qualifiers.byInterceptorBindingValues(annotationValues)
             );
@@ -322,6 +324,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
          * empty: this view only exists when the proxy constructor declares such parameters.
          */
         private final @Nullable Object[] internalParameters;
+        private final TargetConstructorCache<T> targetConstructor = new TargetConstructorCache<>();
 
         private InterceptedTargetConstructor(BeanConstructor<T> proxyConstructor,
                                              Class<T> declaringBeanType,
@@ -346,6 +349,13 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return proxyConstructor.getAnnotationMetadata();
+        }
+
+        @Override
+        public @Nullable Constructor<T> getTargetConstructor() {
+            // Resolved against the intercepted type and the parameters the bean declares, not the proxy
+            // constructor, which appends the internal parameters
+            return targetConstructor.get(() -> TargetConstructorCache.resolve(this));
         }
 
         @Override

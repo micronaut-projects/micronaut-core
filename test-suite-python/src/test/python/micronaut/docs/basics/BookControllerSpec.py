@@ -11,7 +11,6 @@ from org.junit.jupiter.api import Test
 from .Book import Book
 
 Flux = java.type("reactor.core.publisher.Flux")
-BookClass = java.type("micronaut.docs.basics.Book")
 
 
 @MicronautTest
@@ -24,13 +23,13 @@ class BookControllerSpec:
         call = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/amazon/book/{title}", Book("The Stand")),
-                BookClass,
+                Book,
             )
         )
         # end::posturitemplate[]
 
         response = call.blockFirst()
-        message = response.getBody(BookClass)  # <2>
+        message = response.getBody(Book)  # <2>
         assert HttpStatus.CREATED == response.getStatus(), f"status={response.getStatus()}, body={message}"  # <3>
         assert message.isPresent()
         assert "The Stand" == message.get().title
@@ -42,13 +41,13 @@ class BookControllerSpec:
             self.client.exchange(
                 HttpRequest.POST("/amazon/book/{title}", Book("The Stand"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED),
-                BookClass,
+                Book,
             )
         )
         # end::postform[]
 
         response = call.blockFirst()
-        message = response.getBody(BookClass)  # <2>
+        message = response.getBody(Book)  # <2>
         assert HttpStatus.CREATED == response.getStatus(), f"status={response.getStatus()}, body={message}"  # <3>
         assert message.isPresent()
         assert "The Stand" == message.get().title

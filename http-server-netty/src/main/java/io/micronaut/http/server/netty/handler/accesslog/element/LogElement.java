@@ -19,8 +19,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.EnumSet;
 import java.util.Set;
 
 /**
@@ -36,8 +34,8 @@ public interface LogElement {
     enum Event {
         ON_REQUEST_HEADERS, ON_RESPONSE_HEADERS, ON_RESPONSE_WRITE, ON_LAST_RESPONSE_WRITE;
 
-        public static final Set<Event> REQUEST_HEADERS_EVENTS = Collections.unmodifiableSet(EnumSet.of(Event.ON_REQUEST_HEADERS));
-        public static final Set<Event> RESPONSE_HEADERS_EVENTS = Collections.unmodifiableSet(EnumSet.of(Event.ON_RESPONSE_HEADERS));
+        public static final Set<Event> REQUEST_HEADERS_EVENTS = Set.of(Event.ON_REQUEST_HEADERS);
+        public static final Set<Event> RESPONSE_HEADERS_EVENTS = Set.of(Event.ON_RESPONSE_HEADERS);
     }
 
     /**

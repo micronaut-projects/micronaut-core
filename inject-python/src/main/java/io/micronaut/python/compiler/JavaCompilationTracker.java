@@ -51,16 +51,37 @@ final class JavaCompilationTracker implements TaskListener {
     // resolving a file object's real path costs two syscalls and is asked for once per recorded
     // reference, so remember it; a compilation does not move its sources underneath itself
     private final Map<URI, Optional<String>> sourceKeys = new LinkedHashMap<>();
+    private CompilationProfiler profiler;
 
     JavaCompilationTracker(JavacTask task) {
         this.trees = Trees.instance(task);
     }
 
     @Override
+    public void started(TaskEvent event) {
+        if (event.getKind() == TaskEvent.Kind.ANNOTATION_PROCESSING_ROUND) {
+            CompilationProfiler.increment(profiler, "javac.rounds", 1);
+        }
+    }
+
+    /**
+     * Sets the profiler counting the rounds and the units javac analyses and generates, or null.
+     *
+     * @param profiler The profiler
+     */
+    void setProfiler(CompilationProfiler profiler) {
+        this.profiler = profiler;
+    }
+
+    @Override
     public void finished(TaskEvent event) {
+        if (event.getKind() == TaskEvent.Kind.GENERATE) {
+            CompilationProfiler.increment(profiler, "javac.generated-types", 1);
+        }
         if (event.getKind() != TaskEvent.Kind.ANALYZE || event.getCompilationUnit() == null) {
             return;
         }
+        CompilationProfiler.increment(profiler, "javac.analyzed-units", 1);
         CompilationUnitTree compilationUnit = event.getCompilationUnit();
         String source = sourceKey(compilationUnit.getSourceFile());
         if (source == null) {

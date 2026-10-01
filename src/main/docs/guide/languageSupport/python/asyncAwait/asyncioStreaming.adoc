@@ -1,0 +1,52 @@
+Python-native streaming lets a coroutine consume a Java `Publisher` one item at a time with `async for`, and lets an async generator supply a Java `Publisher` or an HTTP streaming response, without writing Reactor pipelines. Demand, cancellation, ordering, errors and interpreter ownership are preserved across the language boundary: the Python side of a stream only ever runs on the Micronaut-managed asyncio loop that owns it, and reactive signals arriving on other threads are queued onto that loop first.
+
+The adapters are exported by the `micronaut_asyncio` module that the Python runtime provides:
+
+snippet::micronaut.docs.asyncio.streaming.StreamController[tags="imports", indent=0, title="Importing the streaming adapters"]
+
+Streams need a loop that keeps running after the calling function returns, which the Micronaut-managed loop provides. Both adapters therefore require the asyncio bridge to be enabled (`micronaut.python.asyncio.enabled`, the default) and a request handled by a Netty event loop with `micronaut-context-python-netty` on the classpath, or a coroutine already running on such a loop. A call outside of those conditions raises a `RuntimeError` naming the requirement, rather than falling back to driving the generator synchronously.
+
+== Consuming a Publisher with async for
+
+`as_async_iterable(publisher)` returns an async iterator that is also an async context manager. Use it with `async with` so leaving the loop early cancels the subscription:
+
+snippet::micronaut.docs.asyncio.streaming.StreamController[tags="consume", indent=0, title="Consuming a streaming client"]
+
+<1> The declarative client returns a `Publisher` of items; the adapter subscribes lazily, on the first iteration.
+<2> Each iteration requests exactly one item from upstream; at most one item is buffered.
+<3> `break` leaves the `async with` block, which cancels the subscription exactly once. Iterating to exhaustion closes it as well, and `aclose()` does so explicitly.
+
+The client used above is an ordinary streaming client:
+
+snippet::micronaut.docs.asyncio.streaming.TickClient[tags="client", indent=0, title="A streaming client"]
+
+<1> A JSON stream of a Python dataclass type.
+
+A publisher error is raised from `__anext__` as a `MicronautJavaException` (or the `OSError` subclass used for networking failures) whose `java_exception` attribute is the Java cause. Task cancellation, a timeout and request cancellation while an iteration is pending cancel the subscription. Overlapping `__anext__` calls on one iterator are refused, and a publisher that emits more items than were requested is cancelled and the iteration fails, so memory stays bounded.
+
+Awaiting a `Publisher` directly, as described above, keeps its meaning: one item is requested, the await completes with it and the subscription is cancelled. `as_async_iterable` is the way to consume every item.
+
+== Supplying a Publisher from an async generator
+
+`as_publisher(factory)` exposes an async generator function, or any other factory of async iterables, as a cold `Publisher`. Each subscription calls the factory for an iterator of its own, and the iterator is only advanced when the subscriber has requested an element:
+
+snippet::micronaut.docs.asyncio.streaming.StreamController[tags="explicit", indent=0, title="A JSON stream from an async generator"]
+
+<1> An async generator function; it is called once per subscription.
+<2> Awaiting inside the generator suspends it on the event loop; nothing is buffered ahead of demand.
+<3> The publisher is returned from a plain `def` route; the route's `Publisher[Tick]` annotation gives the element type for serialization.
+
+Passing an async iterator object instead of a factory yields a publisher that can be subscribed to once. Cancelling the subscription cancels a pending `__anext__` and then closes the iterator with `aclose()` on its loop, so `finally` blocks and `async with` cleanup in the generator run when an HTTP client disconnects or the application shuts down. Exhaustion completes the stream once; an exception ends it with an error carrying the Python failure and its traceback. A yielded `None` fails the stream, since Reactive Streams does not allow null elements; use an explicit envelope object when an empty payload is part of your protocol.
+
+An open stream counts as an active Python execution, so graceful shutdown waits for its cleanup the way it waits for a running coroutine.
+
+== Async generator routes
+
+A controller method, client method or classless route declared with `async def` that contains a `yield` is an async generator and is bridged as a `Publisher` automatically; `as_publisher` is not needed. Annotate the return type with `AsyncIterator[T]`, `AsyncIterable[T]` or `AsyncGenerator[T, None]` to declare the element type, or with `Publisher[T]` directly. An unannotated async generator streams `object` elements.
+
+snippet::micronaut.docs.asyncio.streaming.StreamController[tags="generator", indent=0, title="A server-sent event stream from an async generator route"]
+
+<1> The route streams `Event[Tick]` elements as `text/event-stream`.
+<2> Each `yield` produces one event, once the client has requested it.
+
+The explicit adapter and the automatic route behave identically: the HTTP writer requests elements as the connection is writable, the generator runs on the request's event loop, and a client disconnect cancels the subscription and closes the generator. A synchronous generator (`def` with `yield`) is not bridged as a stream; return a list, or use an async generator.

@@ -35,8 +35,12 @@ import io.micronaut.context.beans.definition.ConstructorDefinition;
 import io.micronaut.context.beans.definition.FieldDefinition;
 import io.micronaut.context.beans.definition.MethodDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -49,6 +53,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -123,7 +128,65 @@ public class BeanInjectionUtils {
      * @return The constructor definition
      */
     public static ConstructorDefinition<ClassElement, MethodElement> createConstructorDefinition(MethodElement constructorElement, VisitorContext visitorContext) {
-        return createConstructorDefinition(constructorElement, visitorContext, !constructorElement.isAccessible());
+        return createConstructorDefinition(constructorElement, visitorContext, constructorElement.isReflectionRequired());
+    }
+
+    /**
+     * Finds the constructor a bean of the given type is instantiated with.
+     *
+     * <p>This is {@link ClassElement#getPrimaryConstructor()} extended to private constructors, which that lookup
+     * never selects. A private constructor annotated with {@link AnnotationUtil#INJECT} or {@link Creator} takes
+     * precedence over an unannotated accessible one when it is annotated with {@link ReflectiveAccess}, and a type
+     * whose only constructor is private is instantiated with it only when it is annotated with
+     * {@link ReflectiveAccess}. A private constructor is invoked with reflection, as private injected fields and
+     * methods are.</p>
+     *
+     * @param classElement The bean type
+     * @return The constructor, or a static creator method, if one is found
+     * @since 5.2.1
+     */
+    public static Optional<MethodElement> findBeanConstructor(ClassElement classElement) {
+        Optional<MethodElement> primaryConstructor = classElement.getPrimaryConstructor();
+        if ((primaryConstructor.isPresent() && isAnnotatedCreator(primaryConstructor.get()))
+            || (classElement.isInner() && !classElement.isStatic())) {
+            return primaryConstructor;
+        }
+        List<ConstructorElement> privateConstructors = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+            .stream()
+            .filter(constructor -> constructor.isPrivate() && constructor.hasAnnotation(ReflectiveAccess.class))
+            .toList();
+        for (ConstructorElement privateConstructor : privateConstructors) {
+            if (isAnnotatedCreator(privateConstructor)) {
+                return Optional.of(privateConstructor);
+            }
+        }
+        if (primaryConstructor.isEmpty() && privateConstructors.size() == 1 && classElement.getAccessibleConstructors().isEmpty()) {
+            return Optional.of(privateConstructors.get(0));
+        }
+        return primaryConstructor;
+    }
+
+    /**
+     * Validates that a constructor selected for injection can be invoked.
+     *
+     * <p>A private constructor is invoked with reflection, which has to be opted into with
+     * {@link ReflectiveAccess}. Without it {@link #findBeanConstructor(ClassElement)} skips the constructor, so
+     * the injection the annotation asks for would silently not happen.</p>
+     *
+     * @param classElement The bean type
+     * @throws ProcessingException if a constructor asks for injection but cannot be invoked
+     * @since 5.2.1
+     */
+    public static void validateBeanConstructor(ClassElement classElement) {
+        for (ConstructorElement constructor : classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+            if (constructor.isPrivate() && isAnnotatedCreator(constructor) && !constructor.hasAnnotation(ReflectiveAccess.class)) {
+                throw new ProcessingException(constructor, "Constructor is declared private and is not accessible for the instantiation. To instantiate the bean using reflection annotate the constructor with @ReflectiveAccess");
+            }
+        }
+    }
+
+    private static boolean isAnnotatedCreator(MethodElement constructor) {
+        return constructor.hasStereotype(AnnotationUtil.INJECT) || constructor.hasStereotype(Creator.class);
     }
 
     /**
@@ -353,8 +416,61 @@ public class BeanInjectionUtils {
 
             Map<String, ClassElement> typeArgs = genericType.getTypeArguments();
             if (typeArgs.size() == 2) {
-                ClassElement k = typeArgs.get("K");
-                return k != null && k.isAssignable(CharSequence.class);
+                return isKeyedByBeanName(typeArgs.get("K"), typeArgs.get("V"));
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Beans are collected into a map by their bean name, so the key type has to be resolvable from that
+     * name. A {@link CharSequence} always is.
+     *
+     * <p>An enum is too, but only for an iterable bean type - one that exists once per configuration key
+     * or per parent bean - because those names form the closed set an enum can model. That keeps an
+     * enum-keyed map of any other bean type resolving as the single bean it resolves as today. Whether a
+     * bean of the map type exists is not decided here: a map that is supplied directly still takes
+     * precedence, which is resolved at runtime where that is actually known.</p>
+     *
+     * <p>Iterability is read off the value type's own annotations, so a bean declared iterable by the
+     * {@link io.micronaut.context.annotation.Factory} method that produces it - the annotation is on the
+     * method, not on the returned class, which may not even be compiled here - is not recognised, and an
+     * enum-keyed map of it keeps resolving as a single bean. A {@link CharSequence}-keyed map of the same
+     * beans collects them, because that path never inspects the value type.</p>
+     *
+     * @param keyType  The map key type
+     * @param beanType The map value type
+     * @return Whether the map can be collected by bean name
+     */
+    private static boolean isKeyedByBeanName(@Nullable ClassElement keyType, @Nullable ClassElement beanType) {
+        if (keyType == null) {
+            return false;
+        }
+        if (keyType.isAssignable(CharSequence.class)) {
+            return true;
+        }
+        return keyType.isEnum() && beanType != null && isIterable(beanType) && !isNamedAfterParentBean(beanType);
+    }
+
+    /**
+     * Whether the beans of a type are named after the bean they belong to rather than by their own
+     * configuration key alone.
+     *
+     * <p>An iterable type nested in another iterable one exists once per parent bean as well as once per
+     * key of its own, and is named for both: the zones of a region are named {@code france-north} and
+     * {@code france-south}, not {@code north} and {@code south}. Those names are not the closed set an
+     * enum models, so a map of them keeps resolving as the single bean it resolves as today rather than
+     * being collected and failing to convert.</p>
+     *
+     * @param beanType The map value type
+     * @return Whether the bean names carry the name of a parent bean
+     */
+    private static boolean isNamedAfterParentBean(ClassElement beanType) {
+        for (ClassElement enclosing = beanType.getEnclosingType().orElse(null);
+             enclosing != null;
+             enclosing = enclosing.getEnclosingType().orElse(null)) {
+            if (isIterable(enclosing)) {
+                return true;
             }
         }
         return false;

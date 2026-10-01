@@ -11,11 +11,12 @@ from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 from org.junit.jupiter.api import Assertions
 
+from .Person import Person
+
 Flux = java.type("reactor.core.publisher.Flux")
 HttpRequest = java.type("io.micronaut.http.HttpRequest")
 HttpStatus = java.type("io.micronaut.http.HttpStatus")
 Map = java.type("java.util.Map")
-Person = java.type("micronaut.docs.server.json.Person")
 
 
 @Property(name="spec.name", value="PersonControllerSpec")
