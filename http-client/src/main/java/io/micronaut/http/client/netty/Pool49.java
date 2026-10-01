@@ -815,19 +815,14 @@ final class Pool49 implements Pool {
 
             poolPair.localPendingConnections--;
 
-            GlobalStats oldStats;
-            while (true) {
-                oldStats = globalStats.get();
-                GlobalStats newStats = oldStats.addPendingConnectionCount(-1);
-                if (this instanceof Http2PoolEntry) {
-                    newStats = newStats.addHttp2ConnectionCount(1);
-                } else {
-                    newStats = newStats.addHttp1ConnectionCount(1);
-                }
-                if (globalStats.weakCompareAndSetPlain(oldStats, newStats)) {
-                    break;
-                }
-            }
+            // The entry was made available before this accounting, so the request it was
+            // dispatched to may already have closed it again. Check for retirement here as well,
+            // otherwise such a pool would stay registered with zero counts.
+            boolean http2 = this instanceof Http2PoolEntry;
+            updateStatsAndMaybeRetire(s -> {
+                GlobalStats newStats = s.addPendingConnectionCount(-1);
+                return http2 ? newStats.addHttp2ConnectionCount(1) : newStats.addHttp1ConnectionCount(1);
+            });
 
             // since we decreased the pending connection count, another pool may have an
             // opportunity to open a connection.
