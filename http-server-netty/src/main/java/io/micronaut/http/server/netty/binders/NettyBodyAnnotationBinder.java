@@ -186,6 +186,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             if (mediaType != null
                     && mediaType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                     && !targetType.isInstance(intermediate)
+                    && !Map.class.isAssignableFrom(targetType)
                     && !targetArgument.isContainerType()
                     && !ConvertibleValues.class.isAssignableFrom(targetType)) {
                 intermediate.values().removeIf(value -> value instanceof String text && text.isEmpty());

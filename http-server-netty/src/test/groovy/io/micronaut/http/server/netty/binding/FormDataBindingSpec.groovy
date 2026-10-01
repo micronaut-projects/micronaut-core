@@ -117,6 +117,25 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     }
 
     @Unroll
+    void "test #bodyType body preserves empty property values with #contentType"() {
+        when:
+        Map result = client.exchange(HttpRequest.POST("/form/$bodyType", 'empty=&value=present')
+                .contentType(MediaType.of(contentType)), Map).body()
+
+        then:
+        result.containsKey('empty')
+        result['empty'] == ''
+        result['value'] == 'present'
+
+        where:
+        bodyType              | contentType
+        'properties'          | MediaType.APPLICATION_FORM_URLENCODED
+        'optional-properties' | MediaType.APPLICATION_FORM_URLENCODED
+        'properties'          | 'application/x-www-form-urlencoded;charset=UTF-8'
+        'optional-properties' | 'application/x-www-form-urlencoded;charset=UTF-8'
+    }
+
+    @Unroll
     void "test date bean #bodyType binds form value #value"() {
         when:
         String result = client.exchange(HttpRequest.POST("/form/$bodyType", "publishedAt=$value")
@@ -392,6 +411,16 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         @Post('/optional-convertible-values')
         Map<String, String> optionalConvertibleValues(@Body Optional<ConvertibleValues<String>> formData) {
             formData.orElseThrow().asMap()
+        }
+
+        @Post('/properties')
+        Properties properties(@Body Properties formData) {
+            formData
+        }
+
+        @Post('/optional-properties')
+        Properties optionalProperties(@Body Optional<Properties> formData) {
+            formData.orElseThrow()
         }
 
         @Post('/date-pojo')
