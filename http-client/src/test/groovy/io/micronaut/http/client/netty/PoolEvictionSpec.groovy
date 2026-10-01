@@ -67,10 +67,7 @@ class PoolEvictionSpec extends Specification {
         List<Thread> threads = (0..<4).collect { t ->
             Thread.start {
                 try {
-                    for (int i = 0; i < 50; i++) {
-                        def host = hosts[(t + i) % hosts.size()]
-                        assert client.toBlocking().retrieve("http://$host:$server.port/pool-eviction") == 'ok'
-                    }
+                    sendRequests(client, hosts, server.port, t, 50)
                 } catch (Throwable e) {
                     errors.add(e)
                 }
@@ -89,6 +86,13 @@ class PoolEvictionSpec extends Specification {
         client.close()
         server.stop()
         ctx.close()
+    }
+
+    private static void sendRequests(DefaultHttpClient client, List<String> hosts, int port, int offset, int count) {
+        for (int i = 0; i < count; i++) {
+            def host = hosts[(offset + i) % hosts.size()]
+            assert client.toBlocking().retrieve("http://$host:$port/pool-eviction") == 'ok'
+        }
     }
 
     @Requires(property = 'spec.name', value = 'PoolEvictionSpec')

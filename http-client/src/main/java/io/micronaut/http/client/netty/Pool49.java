@@ -154,9 +154,9 @@ final class Pool49 implements Pool {
         }
         try {
             return new PendingRequest(blockHint);
-        } catch (Throwable t) {
+        } catch (RuntimeException e) {
             onAcquireDone();
-            throw t;
+            throw e;
         }
     }
 
