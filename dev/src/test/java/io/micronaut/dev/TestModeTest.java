@@ -304,6 +304,10 @@ class TestModeTest {
         // would run it again, without end
         assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\n"));
         assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=2\n"));
+        // without a first run, the first run is a change's: two suffice; run once, the budget does not matter
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\nmicronaut.dev.test.initial-run=false\n"));
+        assertEquals(2, manifest("micronaut.dev.max-generations=2\nmicronaut.dev.test.initial-run=false\n").maxGenerations());
+        assertEquals(1, manifest("micronaut.dev.max-generations=1\nmicronaut.dev.test.once=true\n").maxGenerations());
 
         writeManifest("micronaut.dev.max-generations=3\n");
         int[] status = {-2};
