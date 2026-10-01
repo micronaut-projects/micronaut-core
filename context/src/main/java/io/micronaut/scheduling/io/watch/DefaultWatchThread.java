@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,28 +27,27 @@ import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.File;
+
 import java.io.IOException;
-import java.nio.file.ClosedWatchServiceException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
- * Simple watch service that simply stops the server if any changes occur. It is up to an external tool to watch the server.
+ * Watches the directories of {@link FileWatchConfiguration#getPaths()} and publishes a
+ * {@link FileChangedEvent} for every change. It is also the {@link FileWatcher} of the application
+ * context, so other components register interest in directories with it instead of watching
+ * on their own.
  *
- * <p>For example with Gradle you use <code>./gradlew run --continuous</code></p>
+ * <p>The thread delivers changes after the configured {@link FileWatchConfiguration#getQuietPeriod() quiet period},
+ * so the events of one save arrive together, and every published path is absolute.</p>
+ *
+ * <p>It is up to an external tool to restart the server if that is wanted; for example with Gradle
+ * you use <code>./gradlew run --continuous</code>.</p>
  *
  * @author graemerocher
  * @since 1.1.0
@@ -60,14 +59,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Requires(beans = WatchService.class)
 @Parallel
 @Singleton
-public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
+public class DefaultWatchThread implements LifeCycle<DefaultWatchThread>, FileWatcher {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultWatchThread.class);
     private final FileWatchConfiguration configuration;
-    private final AtomicBoolean active = new AtomicBoolean(true);
     private final ApplicationEventPublisher eventPublisher;
     private final WatchService watchService;
-    private Collection<WatchKey> watchKeys = new ConcurrentLinkedQueue<>();
+    private final DirectoryWatcher watcher;
 
     /**
      * Default constructor.
@@ -83,11 +81,17 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
         this.eventPublisher = eventPublisher;
         this.configuration = configuration;
         this.watchService = watchService;
+        this.watcher = DirectoryWatcher.builder(watchService)
+            .registrar((directory, service) -> registerPath(directory))
+            .checkInterval(configuration.getCheckInterval())
+            .quietPeriod(configuration.getQuietPeriod())
+            .closeAction(this::closeWatchService)
+            .build();
     }
 
     @Override
     public boolean isRunning() {
-        return active.get();
+        return watcher.isRunning();
     }
 
     @Override
@@ -95,51 +99,13 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     public DefaultWatchThread start() {
         try {
             final List<Path> paths = configuration.getPaths();
-            if (!paths.isEmpty()) {
-                for (Path path : paths) {
-                    if (path.toFile().exists()) {
-                        addWatchDirectory(path);
-                    }
+            for (Path path : paths) {
+                if (Files.isDirectory(path)) {
+                    watcher.watch(path, WatchOptions.DEFAULT, this::publish);
                 }
             }
-
-            if (!watchKeys.isEmpty()) {
-                new Thread(() -> {
-                    while (active.get()) {
-                        try {
-                            WatchKey watchKey = watchService.poll(configuration.getCheckInterval().toMillis(), TimeUnit.MILLISECONDS);
-                            if (watchKey != null && watchKeys.contains(watchKey)) {
-                                List<WatchEvent<?>> watchEvents = watchKey.pollEvents();
-                                for (WatchEvent<?> watchEvent : watchEvents) {
-                                    WatchEvent.Kind<?> kind = watchEvent.kind();
-                                    if (kind == StandardWatchEventKinds.OVERFLOW) {
-                                        if (LOG.isWarnEnabled()) {
-                                            LOG.warn("WatchService Overflow occurred");
-                                        }
-                                    } else {
-                                        final Object context = watchEvent.context();
-                                        if (context instanceof Path path) {
-
-                                            if (LOG.isDebugEnabled()) {
-                                                LOG.debug("File at path {} changed. Firing change event: {}", context, kind);
-                                            }
-                                            eventPublisher.publishEvent(new FileChangedEvent(
-                                                    path,
-                                                    kind
-                                            ));
-                                        }
-                                    }
-                                }
-                                watchKey.reset();
-                            }
-                        } catch (InterruptedException | ClosedWatchServiceException e) {
-                            // ignore
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                }, "micronaut-filewatch-thread").start();
-            }
-        } catch (IOException e) {
+            watcher.start();
+        } catch (RuntimeException e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error starting file watch service: {}", e.getMessage(), e);
             }
@@ -149,8 +115,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
 
     @Override
     public DefaultWatchThread stop() {
-        active.set(false);
-        closeWatchService();
+        watcher.close();
         return this;
     }
 
@@ -158,6 +123,16 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     @PreDestroy
     public void close() {
         stop();
+    }
+
+    @Override
+    public Registration watch(Path root, WatchOptions options, Consumer<FileChangeBatch> listener) {
+        return watcher.watch(root, options, listener);
+    }
+
+    @Override
+    public boolean isWatching(Path path) {
+        return watcher.isWatching(path);
     }
 
     /**
@@ -195,24 +170,13 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
         );
     }
 
-    private boolean isValidDirectoryToMonitor(File file) {
-        return file.isDirectory() && !file.isHidden() && !file.getName().startsWith(".");
-    }
-
-    private Path addWatchDirectory(Path p) throws IOException {
-        return Files.walkFileTree(p, new SimpleFileVisitor<Path>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-                    throws IOException {
-
-                if (!isValidDirectoryToMonitor(dir.toFile())) {
-                    return FileVisitResult.SKIP_SUBTREE;
-                }
-                WatchKey watchKey = registerPath(dir);
-                watchKeys.add(watchKey);
-                return FileVisitResult.CONTINUE;
+    @SuppressWarnings("unchecked")
+    private void publish(FileChangeBatch batch) {
+        for (FileChange change : batch.changes()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("File at path {} changed. Firing change event: {}", change.path(), change.type());
             }
-        });
+            eventPublisher.publishEvent(new FileChangedEvent(change.path(), change.type()));
+        }
     }
-
 }
