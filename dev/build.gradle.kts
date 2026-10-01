@@ -10,8 +10,11 @@ dependencies {
     // the gate filter and the compile-error page exist only when an HTTP server is present
     compileOnly(projects.micronautHttp)
     compileOnly(projects.micronautHttpServer)
+    // the /dev endpoint exists only when the management module is present
+    compileOnly(projects.micronautManagement)
 
     testImplementation(projects.micronautInjectJava)
+    testImplementation(projects.micronautHttp)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 

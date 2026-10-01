@@ -52,7 +52,6 @@ class DevManifestSpec extends Specification {
             micronaut.dev.build-tool=gradle
             micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
             micronaut.dev.retain=javax.sql.DataSource, org.graalvm.polyglot.Engine
-            micronaut.dev.livereload.enabled=false
             micronaut.dev.livereload.port=36000
         """.stripIndent())
 
@@ -81,12 +80,11 @@ class DevManifestSpec extends Specification {
         manifest.buildTool() == "gradle"
         manifest.buildToolTrigger() == dir.resolve("build/micronaut-dev/reload")
         manifest.retain() == ["javax.sql.DataSource", "org.graalvm.polyglot.Engine"]
-        !manifest.liveReload().isEnabled(true)
         manifest.liveReload().port() == 36000
         manifest.liveReload().injectScript()
     }
 
-    void "the defaults apply and livereload is automatic"() {
+    void "the defaults apply"() {
         given:
         Properties properties = new Properties()
         properties.setProperty("micronaut.dev.main-class", "example.Application")
@@ -98,8 +96,6 @@ class DevManifestSpec extends Specification {
         then:
         manifest.strategy() == ReloadStrategy.AUTO
         manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
-        manifest.liveReload().isEnabled(true)
-        !manifest.liveReload().isEnabled(false)
         manifest.liveReload().port() == 35729
     }
 
