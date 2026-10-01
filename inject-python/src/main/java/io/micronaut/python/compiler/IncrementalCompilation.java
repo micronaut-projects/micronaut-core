@@ -62,6 +62,8 @@ final class IncrementalCompilation {
     private static final String STATE_FILE = "state.properties";
     private static final String STATE_VERSION = "8";
     private static final String SOURCE_PREFIX = "source.";
+    private static final String JAVA_EXTENSION = ".java";
+    private static final String CLASS_EXTENSION = ".class";
     private static final String VFS_SOURCE_PREFIX = "META-INF/GRAALPY-VFS/micronaut-application/src/";
     private static final String VFS_ROOT = "META-INF/GRAALPY-VFS/micronaut-application";
     private static final String PYTHON_INIT_MODULE_SUFFIX = ".__init__";
@@ -665,7 +667,7 @@ final class IncrementalCompilation {
     private Map<String, ScannedSource> scanSources() {
         Map<String, ScannedSource> sources = new LinkedHashMap<>();
         if (javaRoot != null && Files.isDirectory(javaRoot)) {
-            scanRoot(javaRoot, ".java", Language.JAVA, sources);
+            scanRoot(javaRoot, JAVA_EXTENSION, Language.JAVA, sources);
         }
         for (Path pythonRoot : pythonRoots) {
             if (Files.isDirectory(pythonRoot)) {
@@ -961,10 +963,10 @@ final class IncrementalCompilation {
     }
 
     private static String outputTypePath(String output) {
-        if (!output.endsWith(".class")) {
+        if (!output.endsWith(CLASS_EXTENSION)) {
             return null;
         }
-        String typePath = output.substring(0, output.length() - ".class".length());
+        String typePath = output.substring(0, output.length() - CLASS_EXTENSION.length());
         int nestedType = typePath.indexOf('$');
         return nestedType == -1 ? typePath : typePath.substring(0, nestedType);
     }
