@@ -224,7 +224,8 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
         final boolean optional;
         final @Nullable BeanProperty<B, Object> property;
         private @Nullable PendingRequestBindingResult<Object> pending;
-        private @Nullable Optional<Object> value;
+        private Optional<Object> value = Optional.empty();
+        private boolean bound;
 
         Member(Argument<Object> argument, boolean optional, @Nullable BeanProperty<B, Object> property) {
             this.argument = argument;
@@ -244,6 +245,7 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
                 return true;
             }
             value = binder.memberValue(argument, result);
+            bound = true;
             return false;
         }
 
@@ -257,13 +259,17 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
          */
         void complete(RequestBeanAnnotationBinder<B> binder) {
             PendingRequestBindingResult<Object> result = pending;
-            if (result != null && value == null) {
+            if (result != null && !bound) {
                 value = binder.memberValue(argument, result);
+                bound = true;
             }
         }
 
         Optional<Object> value() {
-            return Objects.requireNonNull(value, "value");
+            if (!bound) {
+                throw new IllegalStateException("The member " + argument + " is not bound yet");
+            }
+            return value;
         }
 
         /**

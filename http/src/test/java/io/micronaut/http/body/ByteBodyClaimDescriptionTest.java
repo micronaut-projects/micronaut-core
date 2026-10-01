@@ -65,6 +65,7 @@ class ByteBodyClaimDescriptionTest {
         ByteBodyFactory.StreamingBody body = factory.createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, LIMIT), new BufferConsumer.Upstream() {
             @Override
             public void onBytesConsumed(long bytesConsumed) {
+                // the test only observes whether the body may be discarded
             }
 
             @Override

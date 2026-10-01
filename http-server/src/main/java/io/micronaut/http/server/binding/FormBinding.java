@@ -97,6 +97,7 @@ public final class FormBinding {
     private static final String ATTRIBUTE = FormBinding.class.getName();
     private static final Logger LOG = LoggerFactory.getLogger(FormBinding.class);
     private static final String ARGUMENT = "the argument [";
+    private static final String FORM_PARTS = "FormParts";
 
     private final FormCapableHttpRequest<?> request;
     /**
@@ -581,7 +582,7 @@ public final class FormBinding {
      */
     DefaultFormParts parts(FormFactory factory, Argument<?> argument) {
         if (!isRouteArgument(argument)) {
-            return consumingParts(factory, argument, "FormParts", "FormParts");
+            return consumingParts(factory, argument, FORM_PARTS, FORM_PARTS);
         }
         synchronized (this) {
             if (parts != null) {
@@ -589,10 +590,10 @@ public final class FormBinding {
             }
             if (mode == Mode.FIELDS && FormFactory.getCompleterOrNull(request) == null) {
                 mode = Mode.STREAMED;
-                reader = "FormParts";
+                reader = FORM_PARTS;
             }
             if (mode != Mode.STREAMED) {
-                throw refused("FormParts");
+                throw refused(FORM_PARTS);
             }
             DefaultFormParts created = new DefaultFormParts(request, UploadContext.of(factory, request));
             // the route releases the parts when it completed; this is the safety net for failures
