@@ -130,36 +130,59 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         thrown(IllegalStateException)
     }
 
-    void "temporary dependencies can be resolved inside destruction and are released before it returns"() {
+    void "temporary destruction dependencies use the explicit event context"() {
         given:
         def ctx = buildContext(HEADER + '''
 @Singleton class Owner {
-    final BeanContext context;
+    @PreDestroy void stop() { Log.events.add("finished"); }
+}
+@Singleton class Disposer implements io.micronaut.context.event.BeanPreDestroyEventListener<Owner> {
     static BeanDependencyGroup escaped;
-    Owner(BeanContext context) { this.context = context; }
-    @PreDestroy void stop() {
-        context.withDependencies(group -> {
+    static BeanResolutionContext invocation;
+    private final BeanContext context;
+    Disposer(BeanContext context) { this.context = context; }
+    public Owner onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Owner> event) {
+        invocation = event.getResolutionContext();
+        invocation.withDependencies(group -> {
             escaped = group;
             group.getBean(Resource.class);
+            group.createGroup().getBean(Resource.class);
+            invocation.withDependencies(nested -> {
+                nested.getBean(Resource.class);
+                Log.events.add("nested");
+                return null;
+            });
+            try {
+                context.withDependencies(ordinary -> null);
+                throw new AssertionError("ordinary context allowed resolution during shutdown");
+            } catch (IllegalStateException expected) {
+                Log.events.add("ordinary rejected");
+            }
             Log.events.add("callback");
             return null;
         });
-        Log.events.add("finished");
+        return event.getBean();
     }
 }
 ''')
-        def type = ctx.classLoader.loadClass('test.Owner')
-        ctx.getBean(type)
+        def type = ctx.classLoader.loadClass('test.Disposer')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
         def log = ctx.classLoader.loadClass('test.Log')
 
         when:
         ctx.close()
 
         then:
-        log.events == ['callback', 'resource', 'finished']
+        log.events == ['nested', 'resource', 'ordinary rejected', 'callback', 'resource', 'resource', 'finished']
 
         when:
         type.escaped.getBean(String)
+
+        then:
+        thrown(IllegalStateException)
+
+        when:
+        type.invocation.withDependencies { null }
 
         then:
         thrown(IllegalStateException)
@@ -169,6 +192,128 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
 
         then:
         thrown(IllegalStateException)
+    }
+
+    void "destruction permission cannot escape through another thread or a context copy"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Owner { }
+@Singleton class Disposer implements io.micronaut.context.event.BeanPreDestroyEventListener<Owner> {
+    public Owner onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Owner> event) {
+        BeanResolutionContext invocation = event.getResolutionContext();
+        invocation.withDependencies(group -> {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    invocation.withDependencies(other -> null);
+                    throw new AssertionError("cross-thread invocation allowed");
+                } catch (IllegalStateException expected) { Log.events.add("thread rejected"); }
+                try {
+                    group.getBean(Resource.class);
+                    throw new AssertionError("cross-thread lookup allowed");
+                } catch (IllegalStateException expected) { Log.events.add("group thread rejected"); }
+            }).join();
+            try (BeanResolutionContext copy = invocation.copy()) {
+                try {
+                    copy.withDependencies(other -> null);
+                    throw new AssertionError("copy granted destruction permission");
+                } catch (IllegalStateException expected) { Log.events.add("copy rejected"); }
+            }
+            group.getBean(Resource.class);
+            return null;
+        });
+        return event.getBean();
+    }
+}
+''')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+
+        then:
+        log.events == ['thread rejected', 'group thread rejected', 'copy rejected', 'resource']
+    }
+
+    void "disposable definitions receive an explicit context whose permission ends with destruction"() {
+        given:
+        def ctx = buildContext(HEADER)
+        def resource = ctx.classLoader.loadClass('test.Resource')
+        def log = ctx.classLoader.loadClass('test.Log')
+        def bean = new Object()
+        def invocation
+        io.micronaut.inject.DisposableBeanDefinition<Object> definition = Stub() {
+            getBeanType() >> Object
+            getAnnotationMetadata() >> io.micronaut.core.annotation.AnnotationMetadata.EMPTY_METADATA
+            dispose(_, _, _) >> { resolution, context, target ->
+                invocation = resolution
+                resolution.withDependencies { group ->
+                    group.getBean(resource)
+                    log.events.add('definition')
+                    null
+                }
+                target
+            }
+        }
+        def registration = io.micronaut.context.BeanRegistration.of(ctx,
+            io.micronaut.inject.BeanIdentifier.of('probe'), definition, bean)
+
+        when:
+        ctx.destroyBean(registration)
+
+        then:
+        log.events == ['definition', 'resource']
+
+        when: 'even while the application is still running, the destruction context cannot be reused'
+        invocation.withDependencies { null }
+
+        then:
+        thrown(IllegalStateException)
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "failed destruction invocations release all temporary dependencies and suppress cleanup failures"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Owner { }
+@Singleton class Failure implements io.micronaut.context.event.BeanPreDestroyEventListener<Resource> {
+    public Resource onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Resource> event) {
+        Log.events.add("attempt");
+        throw new IllegalStateException("cleanup");
+    }
+}
+@Singleton class Disposer implements io.micronaut.context.event.BeanPreDestroyEventListener<Owner> {
+    static RuntimeException failure;
+    static BeanDependencyGroup escaped;
+    public Owner onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Owner> event) {
+        try {
+            event.getResolutionContext().withDependencies(group -> {
+                escaped = group;
+                group.getBean(Resource.class);
+                group.getBean(Resource.class);
+                throw new IllegalArgumentException("invocation");
+            });
+        } catch (RuntimeException e) { failure = e; }
+        return event.getBean();
+    }
+}
+''')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def disposer = ctx.classLoader.loadClass('test.Disposer')
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+
+        then:
+        disposer.failure instanceof IllegalArgumentException
+        disposer.failure.message == 'invocation'
+        disposer.failure.suppressed.length == 1
+        disposer.failure.suppressed[0].suppressed.length == 1
+        disposer.escaped.closed
+        log.events == ['attempt', 'attempt']
     }
 
     void "closing during creation rolls back the unpublished registration"() {
