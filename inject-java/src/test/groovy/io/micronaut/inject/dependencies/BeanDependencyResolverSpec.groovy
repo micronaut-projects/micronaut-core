@@ -386,6 +386,41 @@ class Advice implements io.micronaut.aop.MethodInterceptor<Object, Object> {
         log.EVENTS == ['resource1', 'listener:false', 'listenerClosed:false', 'shared']
     }
 
+    void "a factory destruction listener survives a cycle among its observed beans"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Factory class AListenerFactory implements io.micronaut.context.event.BeanDestroyedEventListener<Produced> {
+    Produced created;
+    boolean closed;
+    @Singleton Produced produced(BeanDependencyResolver resolver) { return created = new Produced(resolver); }
+    public void onDestroyed(io.micronaut.context.event.BeanDestroyedEvent<Produced> event) {
+        Log.EVENTS.add("listener:" + (event.getBean() == created) + ":" + closed);
+    }
+    @PreDestroy void close() { closed = true; Log.EVENTS.add("factory"); }
+}
+class Produced {
+    final BeanDependencyResolver resolver;
+    Produced(BeanDependencyResolver resolver) { this.resolver = resolver; }
+    @PreDestroy void close() { Log.EVENTS.add("produced"); }
+}
+@Singleton class CyclicOwner {
+    CyclicOwner(Produced produced) { }
+    @PreDestroy void close() { Log.EVENTS.add("owner"); }
+}
+''')
+        def produced = ctx.getBean(ctx.classLoader.loadClass('test.Produced'))
+        produced.resolver.getBean(ctx.classLoader.loadClass('test.CyclicOwner'))
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS.count('listener:true:false') == 1
+        log.EVENTS.count('factory') == 1
+        log.EVENTS.indexOf('listener:true:false') < log.EVENTS.indexOf('factory')
+    }
+
     void "runtime dependency cycles terminate and destroy each bean once"() {
         given:
         def ctx = buildContext(HEADER + '''

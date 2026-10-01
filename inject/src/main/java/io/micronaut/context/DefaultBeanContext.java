@@ -4566,6 +4566,32 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             dependencies.add(nodeDependencies);
         }
 
+        // A listener must survive every bean whose destruction it observes, including beans in a dependency
+        // cycle. A queue tie-breaker alone lets a ready listener be destroyed before such a cycle is broken.
+        final Map<Class<?>, List<Integer>> listenersByObservedType = new HashMap<>();
+        for (int i = 0; i < size; i++) {
+            BeanRegistration<?> node = nodes.get(i);
+            if (node.getBean() instanceof BeanPreDestroyEventListener) {
+                addListener(listenersByObservedType, node.getBeanDefinition(), BeanPreDestroyEventListener.class, i);
+            }
+            if (node.getBean() instanceof BeanDestroyedEventListener) {
+                addListener(listenersByObservedType, node.getBeanDefinition(), BeanDestroyedEventListener.class, i);
+            }
+        }
+        for (Map.Entry<Class<?>, List<Integer>> entry : listenersByObservedType.entrySet()) {
+            for (int i = 0; i < size; i++) {
+                if (entry.getKey().isAssignableFrom(nodes.get(i).getBeanDefinition().getBeanType())) {
+                    List<Integer> nodeDependencies = dependencies.get(i);
+                    for (int listener : entry.getValue()) {
+                        if (listener != i && !nodeDependencies.contains(listener)) {
+                            nodeDependencies.add(listener);
+                            dependents[listener]++;
+                        }
+                    }
+                }
+            }
+        }
+
         // Kahn's algorithm: repeatedly destroy the first bean that no remaining bean requires
         final List<BeanRegistration> sorted = new ArrayList<>(size);
         final boolean[] destroyed = new boolean[size];
@@ -4593,6 +4619,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
         return sorted;
+    }
+
+    private static void addListener(Map<Class<?>, List<Integer>> listenersByObservedType,
+                                    BeanDefinition<?> definition,
+                                    Class<?> listenerType,
+                                    int index) {
+        List<Argument<?>> arguments = definition.getTypeArguments(listenerType);
+        Class<?> observedType = arguments.isEmpty() ? Object.class : arguments.getLast().getType();
+        listenersByObservedType.computeIfAbsent(observedType, type -> new ArrayList<>(1)).add(index);
     }
 
     /**
