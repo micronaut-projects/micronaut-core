@@ -34,6 +34,7 @@ import java.util.function.Function;
 final class BeanDependencies implements DependentBeanProvider {
     private List<BeanRegistration<?>> owned = List.of();
     private List<BeanRegistration<?>> required = List.of();
+    private @Nullable List<?> interceptorRegistrations;
     private boolean closing;
     private boolean destroyed;
     final @Nullable DefaultBeanResolutionContext destructionContext;
@@ -44,6 +45,14 @@ final class BeanDependencies implements DependentBeanProvider {
 
     BeanDependencies(@Nullable DefaultBeanResolutionContext destructionContext) {
         this.destructionContext = destructionContext;
+    }
+
+    synchronized @Nullable List<?> interceptorRegistrations() {
+        return interceptorRegistrations;
+    }
+
+    synchronized void interceptorRegistrations(List<?> registrations) {
+        interceptorRegistrations = registrations;
     }
 
     synchronized boolean remove(BeanRegistration<?> registration) {
@@ -110,6 +119,7 @@ final class BeanDependencies implements DependentBeanProvider {
         List<BeanRegistration<?>> taken = owned;
         owned = List.of();
         required = List.of();
+        interceptorRegistrations = null;
         return taken;
     }
 
@@ -117,6 +127,9 @@ final class BeanDependencies implements DependentBeanProvider {
      * Attaches construction dependents and records interceptor registrations already selected at construction.
      */
     synchronized void initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
+        if (resolved != null) {
+            interceptorRegistrations = resolved;
+        }
         attach(created == null ? List.of() : created, resolved == null ? List.of() : resolved);
     }
 

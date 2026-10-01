@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.aop.beandefinition.DisposableIntercepted;
 import io.micronaut.aop.beandefinition.InitializableIntercepted;
+import io.micronaut.aop.beandefinition.LifecycleInterceptorRegistrations;
 import io.micronaut.aop.beandefinition.ParameterizedInterceptedBeanDefinition;
 import io.micronaut.aop.beandefinition.ProxyInterceptedBeanDefinition;
 import io.micronaut.aop.beandefinition.ParameterizedProxyBeanDefinition;
@@ -241,6 +242,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final String BUILDER_VARIABLE_PREFIX = "builder";
     private static final String ARGUMENT_MEMBER = "argument";
 
+    private static final Method CAPTURE_LIFECYCLE_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
+        LifecycleInterceptorRegistrations.class, "capture", BeanResolutionContext.class, BeanDefinition.class, Object.class, boolean.class);
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method INJECT_BEAN_METHOD =
@@ -1602,7 +1605,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             Method resolveValuesMethod;
             Method defaultInstantiateMethod;
             ClassTypeDef interceptedInterface;
-            boolean isAopProxy = StringUtils.isNotEmpty(interceptedType);
+            // Runtime proxy creators receive only user arguments, without the generated proxy constructor tail.
+            boolean isAopProxy = StringUtils.isNotEmpty(interceptedType) && customInitializerBuilder == null;
             if (isParametrized) {
                 resolveValuesMethod = RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD;
                 if (isAopProxy) {
@@ -1627,7 +1631,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             // The interceptor chain runs in the default method of the intercepted interface, which returns as soon
             // as the chain has: members are injected and post-construct run here, on the instance it returned, so that
             // neither happens before an outer construction interceptor has completed or at all when one throws
-            boolean injectsMembers = needsInjectMethod() || needsPostConstruct();
+            boolean injectsMembers = needsInjectMethod() || needsPostConstruct() || hasInterceptedLifecycle();
 
             // Remove after AbstractInitializableBeanDefinition#doInstantiate is removed
             classDefBuilder.addMethod(MethodDef.override(PARAMETRIZED_DO_INSTANTIATE_METHOD)
@@ -1935,11 +1939,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         boolean needsInjectMethod = needsInjectMethod();
         boolean needsInjectScope = destroyInjectScopeBeans && hasInjectScope();
         boolean needsPostConstruct = needsPostConstruct();
-        if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct) {
+        boolean needsInterceptorCandidates = hasInterceptedLifecycle();
+        if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct && !needsInterceptorCandidates) {
             return beanInstance.returning();
         }
         return beanInstance.newLocal("instance", instanceVar -> {
             List<StatementDef> statements = new ArrayList<>();
+            if (needsInterceptorCandidates) {
+                statements.add(ClassTypeDef.of(LifecycleInterceptorRegistrations.class).invokeStatic(
+                    CAPTURE_LIFECYCLE_INTERCEPTORS, methodParameters.get(0), aThis, instanceVar, ExpressionDef.constant(isPostConstructIntercepted())
+                ));
+            }
             if (needsInjectMethod) {
                 statements.add(
                     aThis.invoke(INJECT_BEAN_METHOD, methodParameters.get(0), methodParameters.get(1), instanceVar)
@@ -3026,12 +3036,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     /**
      * Whether this bean definition generates intercepted post-construct or pre-destroy handling.
      *
-     * <p>Proxy generation uses this to decide whether to give the proxy a field holding its interceptor
-     * registrations. The decision belongs here rather than in the proxy writer because it must agree exactly with
-     * the decision to generate the lifecycle methods: the same proxy-target, factory-method and interceptor-bean
-     * rules apply. A proxy that retained registrations without intercepting its lifecycle would carry a field
-     * nothing reads, and one that intercepted its lifecycle without retaining them would resolve a second
-     * interceptor for the same target.</p>
+     * <p>Proxy generation uses this to include lifecycle bindings in the retained interceptor candidates.
+     * Instantiation also uses it to capture candidates before initializing the bean. Both decisions must agree
+     * with lifecycle method generation, including its proxy-target, factory-method and interceptor-bean rules.</p>
      *
      * @return {@code true} if this definition intercepts either lifecycle phase
      * @since 5.2.0

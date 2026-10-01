@@ -102,6 +102,7 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
             interceptors,
             this,
             constructor,
+            0,
             values
         );
     }

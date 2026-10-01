@@ -1392,6 +1392,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!dependents.isEmpty()) {
             resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
         }
+        if (interceptorRegistrations != null) {
+            // The same authoritative candidates serve initialization and destruction, including an empty set.
+            resolutionContext.setBeanInterceptors(definition, interceptorRegistrations);
+        }
         if (interceptorRegistrations != null && !interceptorRegistrations.isEmpty()) {
             resolutionContext.setAttribute(
                 BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS,

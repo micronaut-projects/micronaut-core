@@ -36,8 +36,6 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Nullable
     @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
     private volatile AbstractBeanResolutionContext proxyTargetContext;
-    @Nullable
-    private final List<?> interceptorRegistrations;
     // the interceptors a proxy fronting the bean selected for it, see RegisteredBeanInterceptors
     @SuppressWarnings("java:S3077") // a KeptSelection is immutable, set under the lock of this registration
     @Nullable
@@ -68,7 +66,6 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         if (getDependencies() == dependencies || createdBean instanceof DefaultBeanDependencyResolver) {
             getDependencies().initialize(dependents, interceptorRegistrations);
         }
-        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     @Override
@@ -127,7 +124,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
      */
     @Nullable
     List<?> getInterceptorRegistrations() {
-        return interceptorRegistrations;
+        return getDependencies().interceptorRegistrations();
     }
 
     /**

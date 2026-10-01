@@ -22,6 +22,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -83,13 +84,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             executableMethods = proxyBeanDefinition.getExecutableMethods();
         }
         InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
-
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getBeanRegistrations(
-            (Argument) Argument.of(Interceptor.class),
-            binding
-        ));
-        resolutionContext.setBeanInterceptors(proxyBeanDefinition, interceptors);
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = resolveCandidates(resolutionContext, proxyBeanDefinition, executableMethods);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
             Interceptor<T, ?>[] methodInterceptors = InterceptorChain.resolveAroundInterceptors(interceptorRegistry, executableMethod, interceptors);
@@ -128,13 +123,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
 
         Collection<ExecutableMethod<T, ?>> executableMethods = proxyBeanDefinition.getExecutableMethods();
         InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
-
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getBeanRegistrations(
-            (Argument) Argument.of(Interceptor.class),
-            binding
-        ));
-        resolutionContext.setBeanInterceptors(proxyBeanDefinition, interceptors);
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = resolveCandidates(resolutionContext, proxyBeanDefinition, executableMethods);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
             // Only the abstract methods are implemented by the introduction advice,
@@ -147,6 +136,24 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             }
         }
         return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, true, false, constructorValues);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> List<BeanRegistration<Interceptor<T, ?>>> resolveCandidates(
+        BeanResolutionContext resolutionContext,
+        BeanDefinition<T> definition,
+        Collection<ExecutableMethod<T, ?>> methods) {
+        // Lifecycle and construction bindings must survive even if the proxy has no intercepted methods.
+        List<AnnotationMetadata> metadata = new ArrayList<>(methods.size() + 2);
+        metadata.add(definition.getAnnotationMetadata());
+        metadata.add(definition.getConstructor().getAnnotationMetadata());
+        metadata.addAll(methods);
+        List<BeanRegistration<Interceptor<T, ?>>> candidates = new ArrayList<>(resolutionContext.getInterceptorRegistrations(
+            (Argument) Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(metadata.toArray(AnnotationMetadata[]::new)))
+        ));
+        resolutionContext.setBeanInterceptors(definition, candidates);
+        return candidates;
     }
 
     @Override

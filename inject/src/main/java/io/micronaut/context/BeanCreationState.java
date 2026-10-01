@@ -27,7 +27,6 @@ import java.util.List;
 final class BeanCreationState {
     final BeanDefinition<?> definition;
     final BeanDependencies dependencies = new BeanDependencies();
-    @Nullable List<?> interceptors;
     final List<BeanRegistration<?>> proxyInterceptors;
 
     BeanCreationState(BeanDefinition<?> definition, List<BeanRegistration<?>> proxyInterceptors) {
@@ -36,6 +35,7 @@ final class BeanCreationState {
     }
 
     @Nullable List<?> lifecycleInterceptors() {
+        List<?> interceptors = dependencies.interceptorRegistrations();
         if (proxyInterceptors.isEmpty()) {
             return interceptors;
         }

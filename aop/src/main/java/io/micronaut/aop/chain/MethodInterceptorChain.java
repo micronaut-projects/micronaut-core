@@ -27,7 +27,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
@@ -333,22 +332,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         T1 bean,
         InterceptorKind kind,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> shared) {
-        final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
-        final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
-
-        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved;
-        if (shared != null && !shared.isEmpty()) {
-            // Resolved once while the bean was created and handed to this interception point.
-            resolved = shared;
-        } else if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
-            // Retained by the generated proxy.
-            resolved = intercepted.$interceptorRegistrations();
-        } else if (kind == InterceptorKind.PRE_DESTROY) {
-            // Destruction runs with a resolution context of its own. Reuse the interceptor instances the bean owns.
-            resolved = resolveLifecycleInterceptors(resolutionContext, binding);
-        } else {
-            // the bean's own: an instance created for an earlier interception point of the bean is used again
-            resolved = resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
+        // Current generated definitions publish one complete candidate set during creation. The same set is
+        // installed on the destruction context. Empty means resolved, not a request to discover candidates again.
+        Collection<BeanRegistration<Interceptor<?, ?>>> resolved = shared != null && !shared.isEmpty()
+            ? shared : (Collection) resolutionContext.getBeanInterceptors(definition);
+        if (resolved == null) {
+            resolved = resolveLegacyInterceptors(resolutionContext, interceptedMethod, bean, kind);
         }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
@@ -372,6 +361,21 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         } else {
             return interceptedMethod.invoke(bean);
         }
+    }
+
+    /** Candidate discovery for older generated definitions and direct callers without retained lifecycle state. */
+    private static Collection<BeanRegistration<Interceptor<?, ?>>> resolveLegacyInterceptors(
+        BeanResolutionContext resolutionContext,
+        ExecutableMethod<?, ?> method,
+        Object bean,
+        InterceptorKind kind) {
+        if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
+            return intercepted.$interceptorRegistrations();
+        }
+        Collection<AnnotationValue<?>> binding = resolveInterceptorValues(method.getAnnotationMetadata(), kind);
+        return kind == InterceptorKind.PRE_DESTROY
+            ? resolveLifecycleInterceptors(resolutionContext, binding)
+            : resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
     }
 
     /**
