@@ -18,6 +18,7 @@ package io.micronaut.dev.manifest;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -69,6 +70,7 @@ import java.util.Properties;
  * micronaut.dev.build-tool=gradle
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
+ * micronaut.dev.max-generations=50
  * </pre>
  *
  * @author graemerocher
@@ -86,6 +88,19 @@ public final class DevManifest {
      * The system property naming the manifest file.
      */
     public static final String MANIFEST_PROPERTY = PREFIX + "manifest";
+
+    /**
+     * The key of the generation budget: how many generations one process creates before it closes for its launcher to
+     * relaunch it.
+     */
+    public static final String MAX_GENERATIONS = PREFIX + "max-generations";
+
+    /**
+     * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
+     * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
+     * the interpreter's data for them on the heap, for the life of the process.
+     */
+    public static final int NATIVE_MAX_GENERATIONS = 50;
 
     private static final String TEST = "test.";
 
@@ -119,6 +134,7 @@ public final class DevManifest {
     private final List<SourceRoot> testSourceRoots;
     private final List<ResourceRoot> testResourceRoots;
     private final TestSettings testSettings;
+    private final int maxGenerations;
 
     private DevManifest(Path directory, Properties properties) {
         this.directory = directory;
@@ -148,6 +164,7 @@ public final class DevManifest {
         this.buildToolTrigger = trigger == null ? null : path(directory, trigger);
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
         this.retainAnnotated = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-annotated", "true").trim());
+        this.maxGenerations = maxGenerations(properties.getProperty(MAX_GENERATIONS));
         String generationsDir = properties.getProperty(PREFIX + "generations");
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
@@ -413,6 +430,19 @@ public final class DevManifest {
     }
 
     /**
+     * The generation budget, {@code micronaut.dev.max-generations}: how many generations the runtime creates in one
+     * process. When a reload would create one more, the runtime closes and the launcher exits with
+     * {@link io.micronaut.dev.MicronautDevMain#RELAUNCH}, for whoever started it to start it again. Unlimited, zero, on
+     * the JVM, which unloads a retired generation once nothing refers to it; {@link #NATIVE_MAX_GENERATIONS} in a
+     * native image, which never does. {@code unlimited} or {@code 0} lifts it.
+     *
+     * @return The budget, zero when unlimited
+     */
+    public int maxGenerations() {
+        return maxGenerations;
+    }
+
+    /**
      * @return The names of the types whose beans are retained across a restart
      */
     public List<String> retain() {
@@ -634,6 +664,26 @@ public final class DevManifest {
             }
         }
         return Collections.unmodifiableList(entries);
+    }
+
+    static int maxGenerations(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return NativeImageUtils.inImageRuntimeCode() ? NATIVE_MAX_GENERATIONS : 0;
+        }
+        String trimmed = value.trim();
+        if ("unlimited".equalsIgnoreCase(trimmed)) {
+            return 0;
+        }
+        int budget;
+        try {
+            budget = Integer.parseInt(trimmed);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": " + trimmed + ", a number of generations or unlimited", e);
+        }
+        if (budget < 0) {
+            throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": " + trimmed + ", a number of generations or unlimited");
+        }
+        return budget;
     }
 
     private static List<SourceRoot> sourceRoots(Path directory, Properties properties) {
