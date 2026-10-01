@@ -26,6 +26,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -171,11 +172,15 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 bodies.computeIfAbsent(rff.metadata().name(), k -> new ArrayList<>(1)).add(rff.byteBody());
             }
             Map<String, Object> intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
-            Class<T> targetType = context.getArgument().getType();
+            Argument<?> targetArgument = context.getArgument();
+            if (targetArgument.isOptional()) {
+                targetArgument = targetArgument.getWrappedType();
+            }
+            Class<?> targetType = targetArgument.getType();
             if (mediaType != null
                     && mediaType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                     && !targetType.isInstance(intermediate)
-                    && !context.getArgument().isContainerType()
+                    && !targetArgument.isContainerType()
                     && !ConvertibleValues.class.isAssignableFrom(targetType)) {
                 intermediate.values().removeIf(value -> value instanceof String text && text.isEmpty());
             }

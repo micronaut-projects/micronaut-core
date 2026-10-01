@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.binding
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -34,11 +35,18 @@ import reactor.core.publisher.Flux
 import spock.lang.Issue
 import spock.lang.Unroll
 
+import java.time.LocalDateTime
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 class FormDataBindingSpec extends AbstractMicronautSpec {
+
+    @Override
+    Map<String, Object> getConfiguration() {
+        super.getConfiguration() + ['jackson.serialization-inclusion': 'ALWAYS']
+    }
 
     void "test simple string-based body parsing"() {
         when:
@@ -87,13 +95,59 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         result == '[empty:, value:present]'
     }
 
-    void "test optional string property treats an empty form value as null"() {
+    @Unroll
+    void "test optional #bodyType body preserves empty form values with #contentType"() {
         when:
-        String result = client.exchange(HttpRequest.POST('/form/optional-pojo', 'name=')
+        Map result = client.exchange(HttpRequest.POST("/form/optional-$bodyType", 'empty=&value=present')
+                .contentType(MediaType.of(contentType)), Map).body()
+
+        then:
+        result.containsKey('empty')
+        result['empty'] == expectedEmpty
+        result['value'] == expectedValue
+
+        where:
+        bodyType             | contentType                                            | expectedEmpty | expectedValue
+        'map'                | MediaType.APPLICATION_FORM_URLENCODED                  | ['']          | ['present']
+        'object'             | MediaType.APPLICATION_FORM_URLENCODED                  | ['']          | ['present']
+        'convertible-values' | MediaType.APPLICATION_FORM_URLENCODED                  | ''            | 'present'
+        'map'                | 'application/x-www-form-urlencoded;charset=UTF-8'       | ['']          | ['present']
+        'object'             | 'application/x-www-form-urlencoded;charset=UTF-8'       | ['']          | ['present']
+        'convertible-values' | 'application/x-www-form-urlencoded;charset=UTF-8'       | ''            | 'present'
+    }
+
+    @Unroll
+    void "test date bean #bodyType binds form value #value"() {
+        when:
+        String result = client.exchange(HttpRequest.POST("/form/$bodyType", "publishedAt=$value")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
 
         then:
-        result == 'null'
+        result == expected
+
+        where:
+        bodyType             | value                           | expected
+        'date-pojo'          | ''                              | 'absent'
+        'optional-date-pojo' | ''                              | 'absent'
+        'date-pojo'          | '2026-10-01T12%3A34%3A56'       | '2026-10-01T12:34:56'
+        'optional-date-pojo' | '2026-10-01T12%3A34%3A56'       | '2026-10-01T12:34:56'
+    }
+
+    @Unroll
+    void "test optional string property in #bodyType bean binds #value as #expected"() {
+        when:
+        String result = client.exchange(HttpRequest.POST("/form/$bodyType", "name=$value")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
+
+        then:
+        result == expected
+
+        where:
+        bodyType        | value  | expected
+        'optional-pojo' | ''     | 'absent'
+        'optional-bean' | ''     | 'absent'
+        'optional-pojo' | 'Fred' | '[Fred]'
+        'optional-bean' | 'Fred' | '[Fred]'
     }
 
     void "test multipart bean preserves an empty text field"() {
@@ -325,9 +379,39 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
             ((Map<String, Object>) formData).toMapString()
         }
 
+        @Post('/optional-map')
+        Map<String, Object> optionalMap(@Body Optional<Map<String, Object>> formData) {
+            formData.orElseThrow()
+        }
+
+        @Post('/optional-object')
+        Map<String, Object> optionalObject(@Body Optional<Object> formData) {
+            (Map<String, Object>) formData.orElseThrow()
+        }
+
+        @Post('/optional-convertible-values')
+        Map<String, String> optionalConvertibleValues(@Body Optional<ConvertibleValues<String>> formData) {
+            formData.orElseThrow().asMap()
+        }
+
+        @Post('/date-pojo')
+        String datePojo(@Body DatePerson person) {
+            person.publishedAt == null ? 'absent' : person.publishedAt.toString()
+        }
+
+        @Post('/optional-date-pojo')
+        String optionalDatePojo(@Body Optional<DatePerson> person) {
+            datePojo(person.orElseThrow())
+        }
+
         @Post('/optional-pojo')
         String optionalPojo(@Body OptionalPerson person) {
-            person.name.toString()
+            person.name == null ? 'absent' : person.name.map { "[$it]" }.orElse('absent')
+        }
+
+        @Post('/optional-bean')
+        String optionalBean(@Body Optional<OptionalPerson> person) {
+            optionalPojo(person.orElseThrow())
         }
 
         @EqualsAndHashCode
@@ -338,6 +422,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
         static class OptionalPerson {
             Optional<String> name
+        }
+
+        static class DatePerson {
+            LocalDateTime publishedAt
         }
     }
 
