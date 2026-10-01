@@ -1,9 +1,13 @@
 package io.micronaut.core.io.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.FileSystem;
@@ -15,11 +19,15 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -33,6 +41,82 @@ class MicronautMetaServiceLoaderUtilsTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void latestCachedLoaderCanBeCollectedWhileServiceNamesRemainReachable() throws Exception {
+        Path jar = jar("disposable.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.Bean"));
+        CachedServices cached = cacheDisposableLoader(jar);
+        try {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (!cached.loader().refersTo(null) && System.nanoTime() < deadline) {
+                System.gc();
+                Thread.sleep(50);
+            }
+            assertNull(cached.loader().get(), "The latest service-index lookup must not retain its loader");
+            assertEquals(Set.of("test.Bean"), cached.services());
+        } finally {
+            Reference.reachabilityFence(cached.services());
+        }
+    }
+
+    @Test
+    void repeatedLookupsReuseTheIndexAndDifferentLoadersDiscoverTheirOwnServices() throws IOException {
+        Path first = jar("first.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.First"));
+        Path second = jar("second.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.Second"));
+        AtomicInteger scans = new AtomicInteger();
+        try (URLClassLoader firstLoader = new URLClassLoader(new URL[]{first.toUri().toURL()}, null) {
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                if (name.equals("META-INF/micronaut/")) {
+                    scans.incrementAndGet();
+                }
+                return super.getResources(name);
+            }
+        }; URLClassLoader secondLoader = new URLClassLoader(new URL[]{second.toUri().toURL()}, null)) {
+            Set<String> entries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference");
+            assertEquals(Set.of("test.First"), entries);
+            assertSame(entries, MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference"));
+            assertEquals(Set.of(), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "missing.Service"));
+            assertEquals(1, scans.get());
+            assertEquals(Set.of("test.Second"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(secondLoader, "io.micronaut.inject.BeanDefinitionReference"));
+            assertEquals(Set.of("test.First"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference"));
+        }
+    }
+
+    private static CachedServices cacheDisposableLoader(Path jar) throws IOException {
+        try (URLClassLoader loader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, null)) {
+            Set<String> services = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(loader, "io.micronaut.inject.BeanDefinitionReference");
+            assertEquals(Set.of("test.Bean"), services);
+            return new CachedServices(new WeakReference<>(loader), services);
+        }
+    }
+
+    @Test
+    void concurrentLookupsKeepTheServicesOfEachLoaderSeparate() throws Exception {
+        Path first = jar("concurrent first.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.First"));
+        Path second = jar("concurrent second.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.Second"));
+        try (URLClassLoader firstLoader = new URLClassLoader(new URL[]{first.toUri().toURL()}, null);
+             URLClassLoader secondLoader = new URLClassLoader(new URL[]{second.toUri().toURL()}, null);
+             var executor = Executors.newFixedThreadPool(2)) {
+            var firstLookup = executor.submit(() -> {
+                for (int i = 0; i < 50; i++) {
+                    assertEquals(Set.of("test.First"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference"));
+                }
+                return null;
+            });
+            var secondLookup = executor.submit(() -> {
+                for (int i = 0; i < 50; i++) {
+                    assertEquals(Set.of("test.Second"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(secondLoader, "io.micronaut.inject.BeanDefinitionReference"));
+                }
+                return null;
+            });
+            firstLookup.get(10, TimeUnit.SECONDS);
+            secondLookup.get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    private record CachedServices(WeakReference<ClassLoader> loader, Set<String> services) {
+    }
 
     @Test
     void listsTheServicesOfAJarInTheOrderOfItsZipFileSystem() throws IOException {
