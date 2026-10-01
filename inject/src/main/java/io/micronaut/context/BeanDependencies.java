@@ -56,12 +56,12 @@ final class BeanDependencies implements DependentBeanProvider {
     }
 
     void close(DefaultBeanContext context) {
-        RuntimeException failure = null;
+        Throwable failure = null;
         List<BeanRegistration<?>> taken = takeDependents();
         for (int i = taken.size() - 1; i >= 0; i--) {
             try {
                 context.destroyDependentBean(taken.get(i));
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | Error e) {
                 if (failure == null) {
                     failure = e;
                 } else if (failure != e) {
@@ -69,8 +69,11 @@ final class BeanDependencies implements DependentBeanProvider {
                 }
             }
         }
-        if (failure != null) {
-            throw failure;
+        if (failure instanceof RuntimeException exception) {
+            throw exception;
+        }
+        if (failure instanceof Error error) {
+            throw error;
         }
     }
 

@@ -202,16 +202,16 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         ctx.close()
     }
 
-    void "invocation failure retains cleanup failures and releases every sibling"() {
+    void "invocation failure retains cleanup failures and releases every sibling for #failureType"() {
         given:
-        def ctx = buildContext(HEADER + '''
+        def ctx = buildContext(HEADER + """
 @Singleton class Failure implements io.micronaut.context.event.BeanPreDestroyEventListener<Resource> {
     public Resource onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Resource> event) {
         Log.events.add("attempt");
-        throw new IllegalStateException("cleanup");
+        throw new ${failureType}("cleanup");
     }
 }
-''')
+""")
         def type = ctx.classLoader.loadClass('test.Resource')
         def log = ctx.classLoader.loadClass('test.Log')
 
@@ -231,6 +231,8 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
 
         cleanup:
         ctx.close()
+        where:
+        failureType << ['IllegalStateException', 'AssertionError']
     }
     void "fresh registrations created through a group are released with that group"() {
         given:
