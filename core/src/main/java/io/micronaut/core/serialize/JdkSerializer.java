@@ -131,9 +131,19 @@ public final class JdkSerializer implements ObjectSerializer {
         return new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-                Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
+                ClassLoader requiredTypeLoader = requiredType.getClassLoader();
+                Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredTypeLoader);
                 if (aClass.isPresent()) {
                     return aClass.get();
+                }
+                // the required type may be a framework type (a Serializable, a Map) whose loader cannot see
+                // the application's classes: those are visible to the thread context loader
+                ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+                if (requiredTypeLoader != null && contextLoader != null && contextLoader != requiredTypeLoader) {
+                    aClass = ClassUtils.forName(desc.getName(), contextLoader);
+                    if (aClass.isPresent()) {
+                        return aClass.get();
+                    }
                 }
                 return super.resolveClass(desc);
             }
