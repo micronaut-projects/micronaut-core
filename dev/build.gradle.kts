@@ -16,11 +16,14 @@ dependencies {
     compileOnly(libs.managed.groovy)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
     compileOnly(libs.bytebuddy.agent)
+    // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
+    compileOnly(libs.managed.methvin.directoryWatcher)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
+    testImplementation(projects.micronautRuntimeOsx)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
@@ -67,4 +70,5 @@ noReflection {
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
+    allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
 }

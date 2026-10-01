@@ -23,6 +23,7 @@ import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ReloadCompletedEvent;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.reload.ResourceKind;
+import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
@@ -45,6 +46,8 @@ import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
+import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
@@ -60,7 +63,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.Instrumentation;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -510,10 +512,14 @@ public final class DevRuntime implements Closeable {
     private void startWatching() {
         DirectoryWatcher directoryWatcher;
         try {
-            directoryWatcher = DirectoryWatcher.builder(FileSystems.getDefault().newWatchService())
-                .threadName("micronaut-dev-watcher")
-                .build()
-                .start();
+            DevWatchService watchService = DevWatchService.create();
+            DirectoryWatcher.Builder builder = DirectoryWatcher.builder(watchService.service())
+                .registrar(watchService.registrar())
+                .threadName("micronaut-dev-watcher");
+            if (watchService.closeAction() != null) {
+                builder.closeAction(watchService.closeAction());
+            }
+            directoryWatcher = builder.build().start();
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot start the file watcher", e);
         }
@@ -748,7 +754,7 @@ public final class DevRuntime implements Closeable {
             // the broken language compiles again; a batch that did not touch it leaves the failure shown
             lastFailure = null;
         }
-        // resources that are not configuration reach the running context's watches; configuration restarts
+        // resources that are not configuration reach the running context's watches; configuration is refreshed
         boolean configurationChanged = false;
         ApplicationContext current = context;
         for (Map.Entry<ResourceKind, SourceChanges> entry : batch.resources.entrySet()) {
@@ -767,18 +773,157 @@ public final class DevRuntime implements Closeable {
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
         ChangeSet changeSet = snapshot.diff(latest);
         snapshot = latest;
+        ConfigurationChange configurationChange = null;
+        if (configurationChanged) {
+            // the running context reads the file again and applies what it can: the configuration beans are
+            // rebound, the refreshable beans disposed of, the watches told; a watch that cannot apply its change
+            // answers REQUIRES_RESTART, and a bean retained across restarts that watched a touched prefix is not
+            // kept when the restart comes
+            RefreshResult refresh = refreshConfiguration(current);
+            if (refresh == null) {
+                configurationChange = ConfigurationChange.ofAll();
+            } else {
+                configurationChange = refresh.change();
+                String stale = staleAfterRefresh(current, refresh.change());
+                if (stale != null) {
+                    LOG.info("Restarting for the configuration change: {}", stale);
+                } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailed) {
+                    LOG.info("Configuration refreshed in place: {} bean(s) rebound, {} recreated, {} refreshable disposed of, {} watch(es) told",
+                        refresh.rebound().size(), refresh.recreated().size(), refresh.disposed(), refresh.outcomes().size());
+                    return;
+                }
+                if (refresh.requiresRestart()) {
+                    LOG.info("A configuration watch needs a restart to apply the change");
+                }
+            }
+        }
         // a generation reads its snapshot: a resource the build wrote under a reloadable root, such as a service
         // descriptor, needs a new generation as a class does; a failed start needs one whatever changed
-        if (changeSet.isEmpty() && !configurationChanged && !batch.forcesRestart() && !startFailed) {
+        if (changeSet.isEmpty() && configurationChange == null && !batch.forcesRestart() && !startFailed) {
             if (compiled) {
                 LOG.info("Nothing to reload: the classes did not change");
             }
             return;
         }
-        if (!configurationChanged && !batch.forcesRestart() && !startFailed && redefine(changeSet, start)) {
+        if (configurationChange == null && !batch.forcesRestart() && !startFailed && redefine(changeSet, start)) {
             return;
         }
-        restart(changeSet, !configurationChanged, start);
+        restart(changeSet, configurationChange, start);
+    }
+
+    /**
+     * What a refresh cannot update: a singleton that received a changed property through {@code @Value}
+     * or {@code @Property} rather than a configuration bean, and a definition whose {@code @Requires} names a
+     * changed property, whose presence the change may have flipped. Either one makes the batch restart.
+     *
+     * @return Why a restart is needed, or null when the refresh covered the change
+     */
+    @Nullable
+    private static String staleAfterRefresh(@Nullable ApplicationContext current, ConfigurationChange change) {
+        if (current == null || change.all()) {
+            return current == null ? null : "every property may have changed";
+        }
+        // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
+        // is as stale as the singleton would be
+        Set<BeanDefinition<?>> definitions = new LinkedHashSet<>();
+        Optional<io.micronaut.context.BeanDependencyGraph> graph = current.findDependencyGraph();
+        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
+            BeanDefinition<?> definition = registration.getBeanDefinition();
+            definitions.add(definition);
+            graph.ifPresent(g -> definitions.addAll(g.transitiveDependenciesOf(definition)));
+        }
+        for (BeanDefinition<?> definition : definitions) {
+            if (definition.isConfigurationProperties()) {
+                continue;
+            }
+            if (injectsChangedProperty(definition, change)) {
+                return definition.getBeanType().getName() + " injects a changed property directly";
+            }
+        }
+        for (io.micronaut.inject.BeanDefinitionReference<?> reference : current.getBeanDefinitionReferences()) {
+            for (io.micronaut.core.annotation.AnnotationValue<io.micronaut.context.annotation.Requires> requires : reference.getAnnotationMetadata().getAnnotationValuesByType(io.micronaut.context.annotation.Requires.class)) {
+                String property = requires.stringValue("property").orElse(null);
+                if (property != null && change.touches(property)) {
+                    return reference.getBeanDefinitionName() + " requires a changed property";
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
+        for (io.micronaut.core.type.Argument<?> argument : definition.getConstructor().getArguments()) {
+            if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
+                return true;
+            }
+        }
+        for (io.micronaut.inject.FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
+            if (mentionsChangedProperty(field.getAnnotationMetadata(), change)) {
+                return true;
+            }
+        }
+        for (io.micronaut.inject.MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
+            for (io.micronaut.core.type.Argument<?> argument : method.getArguments()) {
+                if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
+     * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
+     */
+    private static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
+        // the raw values: a string value read through the metadata has its placeholders resolved already
+        Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
+        if (property != null && change.touches(property.toString())) {
+            return true;
+        }
+        Object raw = metadata.getValues(io.micronaut.context.annotation.Value.class.getName()).get("value");
+        if (raw == null) {
+            return false;
+        }
+        String expression = raw.toString();
+        if (expression.contains("#{") && expression.contains("env")) {
+            // an evaluated expression reading the environment: which keys it reads is not known, so any change counts
+            return true;
+        }
+        int start = expression.indexOf("${");
+        while (start >= 0) {
+            int end = expression.indexOf('}', start);
+            if (end < 0) {
+                break;
+            }
+            String placeholder = expression.substring(start + 2, end);
+            int colon = placeholder.indexOf(':');
+            String key = (colon >= 0 ? placeholder.substring(0, colon) : placeholder).trim();
+            if (!key.isEmpty() && change.touches(key)) {
+                return true;
+            }
+            start = expression.indexOf("${", end);
+        }
+        return false;
+    }
+
+    /**
+     * Refreshes the configuration of the running context.
+     *
+     * @return The result, or null when the context is not running or has no refresher, which restarts instead
+     */
+    @Nullable
+    private static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
+        if (current == null || !current.isRunning()) {
+            return null;
+        }
+        try {
+            return current.findBean(ConfigurationRefresher.class).map(ConfigurationRefresher::refresh).orElse(null);
+        } catch (RuntimeException e) {
+            LOG.warn("The configuration could not be refreshed in place ({}): restarting instead", e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -866,7 +1011,7 @@ public final class DevRuntime implements Closeable {
         return null;
     }
 
-    private void restart(ChangeSet changeSet, boolean retentionAllowed, long startNanos) {
+    private void restart(ChangeSet changeSet, @Nullable ConfigurationChange configurationChange, long startNanos) {
         ApplicationContext old = context;
         GenerationClassLoader retired = classLoader.swap();
         Collection<BeanRegistration<?>> retained = List.of();
@@ -878,7 +1023,7 @@ public final class DevRuntime implements Closeable {
                 LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
             }
             if (old instanceof DefaultBeanContext defaultBeanContext && old.isRunning()) {
-                retained = defaultBeanContext.stopRetaining(retentionPredicate(old, retentionAllowed));
+                retained = defaultBeanContext.stopRetaining(retentionPredicate(old, configurationChange));
             } else if (old.isRunning()) {
                 old.stop();
             }
@@ -936,24 +1081,30 @@ public final class DevRuntime implements Closeable {
         }
     }
 
-    private Predicate<BeanRegistration<?>> retentionPredicate(ApplicationContext old, boolean retentionAllowed) {
+    private Predicate<BeanRegistration<?>> retentionPredicate(ApplicationContext old, @Nullable ConfigurationChange configurationChange) {
         List<BeanRetentionPolicy> policies = new ArrayList<>(old.getBeansOfType(BeanRetentionPolicy.class));
         OrderUtil.sort(policies);
         return registration -> {
             if (isStale(registration)) {
                 return false;
             }
-            if (!retentionAllowed) {
-                // until the configuration refresh tells which prefixes changed, a configuration change drops
-                // every retained bean: a pool kept across a changed URL would be the old pool
-                return false;
-            }
+            // every policy that retains the bean has a say: a pool kept across a changed URL would be the old pool,
+            // so a touched prefix any of them declares for the bean drops it, and none declaring one keeps it
+            boolean retained = false;
             for (BeanRetentionPolicy policy : policies) {
-                if (policy.retain(registration)) {
-                    return true;
+                if (!policy.retain(registration)) {
+                    continue;
+                }
+                retained = true;
+                if (configurationChange != null) {
+                    for (String prefix : policy.observedConfigurationPrefixes(registration)) {
+                        if (configurationChange.touches(prefix)) {
+                            return false;
+                        }
+                    }
                 }
             }
-            return false;
+            return retained;
         };
     }
 

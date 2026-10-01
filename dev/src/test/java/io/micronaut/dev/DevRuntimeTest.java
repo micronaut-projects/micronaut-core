@@ -129,16 +129,42 @@ class DevRuntimeTest {
             assertEquals(3, runtime.generation());
             assertTrue(third.isRunning());
 
-            // a forced restart without a change, retaining the pool again; the edited configuration file, read live
-            // from the resource root ahead of the build output, is what the new generation sees
+            // an edited configuration file: the watcher notices it and the running context refreshes in place,
+            // no restart, the generation and the pool untouched
             Files.writeString(config, "app.label=beta\n");
+            long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
+            while (!"beta".equals(third.getEnvironment().getProperty("app.label", String.class).orElse(null)) && System.nanoTime() < deadline) {
+                Thread.sleep(200);
+            }
+            assertEquals("beta", third.getEnvironment().getProperty("app.label", String.class).orElse(null));
+            assertTrue(third.isRunning());
+            assertEquals(3, runtime.generation());
+            assertSame(pool, third.getBean(RetainedPool.class));
+
+            // a forced restart without a change, retaining the pool again; the configuration file, read live
+            // from the resource root ahead of the build output, is what the new generation sees too
+            Files.writeString(config, "app.label=gamma\n");
             Files.writeString(staticRoot.resolve("app.css"), "body { color: red }");
             assertEquals("body { color: red }", new String(third.getClassLoader().getResourceAsStream("app.css").readAllBytes()));
             runtime.restart();
             ApplicationContext fourth = runtime.awaitGeneration(4, Duration.ofMinutes(2));
             assertFalse(third.isRunning());
             assertSame(pool, fourth.getBean(RetainedPool.class));
-            assertEquals("beta", fourth.getEnvironment().getProperty("app.label", String.class).orElse(null));
+            assertEquals("gamma", fourth.getEnvironment().getProperty("app.label", String.class).orElse(null));
+
+            // a bean that injects the property directly appears: a class change restarts, and from then on an edit
+            // of that property restarts too, since no refresh reaches a @Value field, with the pool retained
+            Files.writeString(src.resolve("Labelled.java"), "package app; @jakarta.inject.Singleton public class Labelled { @io.micronaut.context.annotation.Value(\"${app.label}\") public String label; }");
+            runtime.reload();
+            ApplicationContext fifth = runtime.awaitGeneration(5, Duration.ofMinutes(2));
+            Class<?> labelled = fifth.getClassLoader().loadClass("app.Labelled");
+            assertEquals("gamma", labelled.getField("label").get(fifth.getBean(labelled)));
+            Files.writeString(config, "app.label=delta\n");
+            ApplicationContext sixth = runtime.awaitGeneration(6, Duration.ofMinutes(2));
+            assertFalse(fifth.isRunning());
+            assertSame(pool, sixth.getBean(RetainedPool.class));
+            labelled = sixth.getClassLoader().loadClass("app.Labelled");
+            assertEquals("delta", labelled.getField("label").get(sixth.getBean(labelled)));
         } finally {
             runtime.close();
         }

@@ -14,6 +14,8 @@ micronaut.dev.compile.java.output=build/classes/java/main
 micronaut.dev.retain=javax.sql.DataSource
 ----
 
+On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do: the launcher then watches through the native file system events instead of the JDK's polling service, and a save is noticed at once rather than seconds later.
+
 Relative paths resolve against the manifest's directory, `@file` reads a list from an argument file, and a system property of the same name overrides an entry. The launcher is started with the runtime classpath, which holds the framework, the libraries and `micronaut-dev` itself, but not the project's own class directories: those belong to the reloadable tier.
 
 [source,bash]
