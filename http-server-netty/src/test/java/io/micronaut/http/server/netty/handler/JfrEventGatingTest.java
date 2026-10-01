@@ -22,7 +22,6 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.netty.JfrSupport;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -277,7 +276,7 @@ class JfrEventGatingTest {
     /**
      * The application run by the child JVM.
      */
-    public static final class App {
+    static final class App {
         public static void main(String[] args) throws Exception {
             Transport transport = Transport.valueOf(args[0]);
             Scenario scenario = Scenario.valueOf(args[1]);
