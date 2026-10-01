@@ -16,6 +16,7 @@
 package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanDestructionOrder;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.exceptions.BeanDestructionException;
 import org.jspecify.annotations.Nullable;
@@ -171,7 +172,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         try {
             if (CollectionUtils.isNotEmpty(scopeMap)) {
 
-                for (CreatedBean<?> createdBean : scopeMap.values()) {
+                for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
                     try {
                         createdBean.close();
                     } catch (BeanDestructionException e) {
@@ -340,7 +341,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             if (scopeMap == null) {
                 return Optional.empty();
             }
-            for (CreatedBean<?> createdBean : scopeMap.values()) {
+            for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
                 if (createdBean.bean() == bean) {
                     return Optional.of(toBeanRegistration(createdBean));
                 }
@@ -512,7 +513,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         // closes it, the other leaves it alone and finds it gone
         while (true) {
             final List<CreatedBean<?>> closedInThisPass = new ArrayList<>();
-            for (CreatedBean<?> createdBean : new ArrayList<>(scopeMap.values())) {
+            for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
                 if (closing.add(new IdentityKey(createdBean))) {
                     closeQuietly(createdBean);
                     closedInThisPass.add(createdBean);
@@ -616,7 +617,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             return null;
         }
         final Class<?> targetDefinitionType = getTargetDefinitionType(beanDefinition);
-        for (CreatedBean<?> createdBean : scopeMap.values()) {
+        for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
             final BeanDefinition<?> held = createdBean.definition();
             if (held.equals(beanDefinition) || (targetDefinitionType != null && targetDefinitionType == unwrap(held).getClass())) {
                 return createdBean;
