@@ -714,8 +714,13 @@ public final class DevRuntime implements Closeable {
             classLoader.generation(), manifest.maxGenerations(), DevManifest.MAX_GENERATIONS);
         // not on the reload thread, which close() interrupts and which may hold the lock of a batch
         Thread thread = new Thread(() -> {
-            close();
-            relaunch.accept(this);
+            try {
+                close();
+            } catch (RuntimeException | LinkageError e) {
+                LOG.warn("The runtime did not close cleanly before the relaunch: {}", e.getMessage(), e);
+            } finally {
+                relaunch.accept(this);
+            }
         }, "micronaut-dev-relaunch");
         thread.setDaemon(false);
         thread.start();
@@ -729,31 +734,35 @@ public final class DevRuntime implements Closeable {
             }
             closed = true;
         }
-        TestSession session = tests;
-        if (session != null) {
-            session.cancelRun();
+        try {
+            TestSession session = tests;
+            if (session != null) {
+                session.cancelRun();
+            }
+            Thread thread = worker;
+            if (thread != null) {
+                thread.interrupt();
+            }
+            DirectoryWatcher directoryWatcher = watcher;
+            if (directoryWatcher != null) {
+                directoryWatcher.close();
+            }
+            LiveReloadServer server = liveReload;
+            if (server != null) {
+                server.close();
+            }
+            ApplicationContext current = context;
+            if (current != null && current.isRunning()) {
+                stopGeneration(current);
+            }
+            for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
+                compiler.close();
+            }
+        } finally {
+            // whatever failed to stop, whoever waits for the runtime to close is released
+            CURRENT.compareAndSet(this, null);
+            closedLatch.countDown();
         }
-        Thread thread = worker;
-        if (thread != null) {
-            thread.interrupt();
-        }
-        DirectoryWatcher directoryWatcher = watcher;
-        if (directoryWatcher != null) {
-            directoryWatcher.close();
-        }
-        LiveReloadServer server = liveReload;
-        if (server != null) {
-            server.close();
-        }
-        ApplicationContext current = context;
-        if (current != null && current.isRunning()) {
-            stopGeneration(current);
-        }
-        for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
-            compiler.close();
-        }
-        CURRENT.compareAndSet(this, null);
-        closedLatch.countDown();
     }
 
     /**
