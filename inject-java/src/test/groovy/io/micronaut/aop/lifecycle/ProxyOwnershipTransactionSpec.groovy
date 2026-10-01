@@ -197,4 +197,69 @@ class Advice implements MethodInterceptor<Object, Object> {
         perTarget << [false, true]
     }
 
+    void "registration ownership freezes proxy dependencies before callbacks - #wrapper perTarget #perTarget"() {
+        given:
+        def ctx = buildContext(HEADER.replace('PER_TARGET', perTarget.toString())
+            .replace('static int resources;', 'static int resources; static BeanDependencyResolver proxyResolver;') + '''
+@Prototype @Lazy class Target {
+    Target(BeanDependencyResolver resolver) {
+        if (Log.proxyResolver == null) { Log.proxyResolver = resolver; }
+    }
+    public String run() { return "ok"; }
+    @PreDestroy void stop() {
+        try {
+            Log.proxyResolver.getBean(Resource.class);
+            Log.events.add("accepted");
+        } catch (IllegalStateException expected) {
+            Log.events.add("rejected");
+        }
+        Log.events.add("target");
+    }
+}
+''')
+        def type = ctx.classLoader.loadClass('test.Target')
+        def log = ctx.classLoader.loadClass('test.Log')
+        def original = ctx.getBeanRegistration(type, null)
+        def proxy = original.bean()
+        assert proxy.run() == 'ok'
+        log.proxyResolver.getBean(ctx.classLoader.loadClass('test.Resource'))
+        def owned = original.dependentBeans()
+        def registration = switch (wrapper) {
+            case 'plain' -> new io.micronaut.context.BeanRegistration(original.id(), original.definition(), proxy)
+            case 'disposing' -> io.micronaut.context.BeanRegistration.of(ctx, original.id(), original.definition(), proxy)
+            default -> original
+        }
+
+        expect:
+        registration.dependentBeans().size() == owned.size()
+        registration.dependentBeans().every { candidate -> owned.any { it.is(candidate) } }
+
+        when:
+        if (wrapper == 'instance') {
+            ctx.destroyBean(proxy)
+        } else {
+            ctx.destroyDependentBean(registration)
+        }
+        original.close()
+        def closedWrapper = io.micronaut.context.BeanRegistration.of(ctx, original.id(), original.definition(), proxy)
+        closedWrapper.close()
+
+        then:
+        log.events.count('rejected') == 1
+        !log.events.contains('accepted')
+        log.events.count('target') == 1
+        log.events.count('resource') == 1
+        log.events.count('advice') == 1
+        log.events.indexOf('target') < log.events.indexOf('advice')
+        original.dependentBeans().isEmpty()
+        registration.dependentBeans().isEmpty()
+        closedWrapper.dependentBeans().isEmpty()
+
+        cleanup:
+        ctx.close()
+
+        where:
+        [wrapper, perTarget] << [['original', 'plain', 'disposing', 'instance'], [false, true]].combinations()
+    }
+
 }
