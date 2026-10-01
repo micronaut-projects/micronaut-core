@@ -50,6 +50,7 @@ import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
+import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
@@ -528,12 +529,31 @@ public final class DevRuntime implements Closeable {
         }
         ApplicationContext current = context;
         if (current != null && current.isRunning()) {
-            current.stop();
+            stopGeneration(current);
         }
         for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
             compiler.close();
         }
         CURRENT.compareAndSet(this, null);
+    }
+
+    /**
+     * Stops a generation as the shutdown hook {@code Micronaut.run} registers does: through the embedded
+     * applications it started, then the context. The HTTP server's {@code stop()} holds the server's lock
+     * while it stops the context, so stopping the context first, which stops the server bean under the
+     * context's lock, takes the two locks in the opposite order; when the JVM exits, both hooks run at once
+     * and would deadlock.
+     */
+    private static void stopGeneration(ApplicationContext generation) {
+        // only the applications already created: looking one up must not create it while stopping. Each is stopped
+        // whether it reports running or not, as the hook does: the hook's stop clears the flag before it stops the
+        // context, and stopping the application waits for it, where stopping the context would deadlock with it
+        for (BeanRegistration<EmbeddedApplication> registration : generation.getActiveBeanRegistrations(EmbeddedApplication.class)) {
+            registration.getBean().stop();
+        }
+        if (generation.isRunning()) {
+            generation.stop();
+        }
     }
 
     /**
