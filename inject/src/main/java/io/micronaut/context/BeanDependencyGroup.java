@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.core.annotation.Experimental;
 
 /**
@@ -26,7 +27,7 @@ import io.micronaut.core.annotation.Experimental;
  * @since 5.3.0
  */
 @Experimental
-public interface BeanDependencyGroup extends BeanDependencyResolver, AutoCloseable {
+public sealed interface BeanDependencyGroup extends BeanDependencyResolver, AutoCloseable permits DefaultBeanDependencyResolver {
     /**
      * Destroys and forgets a registration owned by this group. A shared registration is never destroyed.
      * Registration identity, rather than equality of bean definitions or instances, identifies ownership.
@@ -41,7 +42,7 @@ public interface BeanDependencyGroup extends BeanDependencyResolver, AutoCloseab
      * @param <T> The bean type
      * @return The owned registration
      */
-    <T> BeanRegistration<T> createBeanRegistration(io.micronaut.inject.BeanDefinition<T> definition);
+    <T> BeanRegistration<T> createBeanRegistration(BeanDefinition<T> definition);
 
     /**
      * Returns whether closure has begun. A false result is only a snapshot and does not reserve ownership.
