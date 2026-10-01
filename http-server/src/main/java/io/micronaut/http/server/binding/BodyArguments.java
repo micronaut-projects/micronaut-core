@@ -34,7 +34,7 @@ import java.util.Map;
  * @since 5.3.0
  */
 @Internal
-public final class BodyArguments {
+final class BodyArguments {
 
     /**
      * The name of a body argument.

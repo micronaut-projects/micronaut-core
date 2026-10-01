@@ -141,7 +141,6 @@ public interface PathVariables extends NamedValues {
      * @throws RuntimeException if the variable has no value, answered with 400
      * @since 5.3.0
      */
-    @Experimental
     default List<String> getStrings(String name) {
         return getList(name, String.class);
     }
@@ -159,7 +158,6 @@ public interface PathVariables extends NamedValues {
      * @throws RuntimeException if the variable has no value, answered with 400
      * @since 5.3.0
      */
-    @Experimental
     default <T> List<T> getList(String name, Class<T> type) {
         return getList(name, Argument.of(type));
     }
@@ -175,7 +173,6 @@ public interface PathVariables extends NamedValues {
      * @throws RuntimeException if the variable has no value, answered with 400
      * @since 5.3.0
      */
-    @Experimental
     default <T> List<T> getList(String name, Argument<T> type) {
         return get(name, Argument.listOf(type));
     }
@@ -190,7 +187,6 @@ public interface PathVariables extends NamedValues {
      * @return The values, if the variable has a value
      * @since 5.3.0
      */
-    @Experimental
     default <T> Optional<List<T>> findList(String name, Class<T> type) {
         return find(name, Argument.listOf(type));
     }

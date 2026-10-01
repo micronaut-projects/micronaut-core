@@ -740,7 +740,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     private <T> @Nullable T value(Argument<T> argument, ArgumentConversionContext<T> context, ArgumentBinder.BindingResult<T> result) {
         List<ConversionError> errors = result.getConversionErrors();
         if (!errors.isEmpty()) {
-            throw new ConversionErrorException(argument, errors.get(0));
+            throw new ConversionErrorException(argument, errors.getFirst());
         }
         Optional<ConversionError> lastError = context.getLastError();
         if (lastError.isPresent()) {
@@ -754,14 +754,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             if (argument.getType().isInstance(value)) {
                 return (T) value;
             }
-            ArgumentConversionContext<T> conversion = ConversionContext.of(argument);
-            Optional<T> converted = binder.conversionService.convert(value, argument.getType(), conversion);
-            if (converted.isPresent()) {
-                return converted.get();
-            }
-            throw conversion.getLastError()
-                .map(error -> (RuntimeException) new ConversionErrorException(argument, error))
-                .orElseGet(() -> UnsatisfiedRouteException.create(argument));
+            return binder.conversionService.convertRequired(value, argument);
         }
         if (argument.isOptional()) {
             return (T) Optional.empty();

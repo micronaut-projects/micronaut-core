@@ -854,10 +854,30 @@ public final class FormBinding {
         };
     }
 
+    /**
+     * How the arguments of the route read the form of the request, decided from the arguments of
+     * the route when the binding is created.
+     */
     private enum Mode {
+        /**
+         * No {@link FormData} and no {@link FormParts} argument: each argument reads the fields of
+         * its name through the {@link FormRouteCompleter}, and the other fields are discarded.
+         */
         FIELDS,
+        /**
+         * A {@link FormData} argument: the whole form is read once before the route runs, and the
+         * other form arguments are taken from it.
+         */
         COLLECTED,
+        /**
+         * A {@link FormParts} argument: it streams the whole form while the route runs, and no
+         * other argument reads a form field.
+         */
         STREAMED,
+        /**
+         * The arguments cannot be combined: every argument that reads the form fails with the
+         * conflict, before anything reads it.
+         */
         REFUSED
     }
 
@@ -865,8 +885,20 @@ public final class FormBinding {
      * The types {@link #bind} binds.
      */
     private enum Kind {
+        /**
+         * A {@link FileUpload}, or an {@code Optional<FileUpload>}: the first file of the name,
+         * received and stored before the route runs.
+         */
         FILE,
+        /**
+         * A {@code List<FileUpload>}: every file of the name, received and stored before the route
+         * runs.
+         */
         FILES,
+        /**
+         * A {@link FormPart}, or an {@code Optional<FormPart>}: the part of the name, handed over as
+         * its content starts to arrive, which the application reads as it arrives.
+         */
         PART;
 
         static @Nullable Kind of(Argument<?> argument) {
