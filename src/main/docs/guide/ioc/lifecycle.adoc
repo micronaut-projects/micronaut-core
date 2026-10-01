@@ -88,7 +88,7 @@ Each lookup follows the usual scope and qualifier rules. A newly created prototy
 
 Use `resolver.getBeanRegistration(type)` when you need the dependency's registration and bean definition as well as its instance. Overloads accept either `Class<T>` or `Argument<T>`, with an optional qualifier. These lookups retain the same ownership as `getBean(...)`; returning a registration does not transfer ownership to the caller. For early destruction of an owned dependency, resolve it through a dependency group and use `group.destroy(registration)`.
 
-Singletons and custom-scoped beans remain owned by their scopes. Dynamically resolved singleton dependencies participate in context shutdown ordering, including those reached through a consumer's owned prototype interceptors. The resolver does not extend a custom scope's lifetime or prevent explicit destruction of a shared bean. Dependency cycles use the same deterministic cycle handling as injected dependencies.
+Singletons and custom-scoped beans remain owned by their scopes. Dynamically resolved dependencies participate in context shutdown ordering and destruction ordering in scopes based on `AbstractConcurrentCustomScope`, including those reached through a consumer's owned prototype interceptors. The resolver does not extend a custom scope's lifetime or prevent explicit destruction of a shared bean. Dependency cycles use the same deterministic cycle handling as injected dependencies.
 
 The resolver can be used during construction and retained for later use. It must be injected into a managed consumer; it is unavailable through a standalone context lookup. As with other dependent resources, callers obtaining standalone prototypes should retain and close their api:context.BeanRegistration[]. Ordinary api:context.BeanContext[] and api:context.BeanProvider[] lookups keep their existing lifecycle behavior.
 
@@ -111,9 +111,19 @@ closed automatically with it. Independent groups must be closed by their callers
 
 For temporary method arguments, `BeanContext.withDependencies(group -> ...)` releases owned dependencies
 when the synchronous invocation ends, including when it fails. Cleanup attempts every dependent and suppresses
-cleanup failures on the invocation's exception. It rejects new groups once shutdown begins.
+cleanup failures on the invocation's exception. When invoked from a container destruction callback, it may
+resolve temporary dependencies during shutdown. This permission is confined to the destruction thread and the
+invocation: normal groups and retained injected resolvers still reject new lookups after shutdown starts.
+Do not return an owned dependency from such an invocation, since it has already been destroyed.
 
-A `BeanPreDestroyEventListener` that needs temporary dependencies while a bean is being destroyed calls
-`event.withDependencies(group -> ...)`. These lookups are allowed during shutdown, only on the destruction
-thread and until the listener returns; injected resolvers and independent groups still reject new lookups
-once shutdown starts. Do not return an owned dependency from either invocation, since it has already been destroyed.
+==== Proxy target ownership
+
+Generated target proxies retain the dependency ownership established before their construction. Eager and
+cached lazy prototype targets keep their original registrations, including constructor dependencies and
+lifecycle interceptors. Destruction closes these registrations before releasing the proxy's interceptor
+instances, even when the caller destroys a raw proxy instance instead of its registration.
+
+A cached lazy target cannot be created after proxy destruction. If creation races with destruction, Core
+releases the unpublished target and its dependents. Scoped targets remain owned by their scopes, and
+externally supplied hot-swap targets are borrowed. Existing proxy-owned and per-target interceptor selection
+rules still determine which interceptor instances handle each lifecycle phase.

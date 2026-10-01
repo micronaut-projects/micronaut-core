@@ -69,6 +69,53 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
+    @Nullable BeanCreationState creationState;
+    @Nullable BeanDependencies lazyProxyDependencies;
+    private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
+
+    record ProxyInterceptors(BeanDefinition<?> definition, List<BeanRegistration<?>> registrations) { }
+
+    BeanCreationState beginCreation(BeanDefinition<?> definition) {
+        List<BeanRegistration<?>> borrowed = getAttribute(PROXY_INTERCEPTORS) instanceof ProxyInterceptors shared
+            && shared.definition().equals(definition) ? shared.registrations() : List.of();
+        if (!borrowed.isEmpty()) {
+            removeAttribute(PROXY_INTERCEPTORS);
+        }
+        BeanCreationState state = new BeanCreationState(definition, borrowed);
+        creationState = state;
+        return state;
+    }
+
+    @Override
+    public @Nullable BeanDependencyGroup getBeanDependencyGroup() {
+        return creationState == null ? null : new DefaultBeanDependencyResolver(context, creationState.dependencies);
+    }
+
+    @Override
+    public void setBeanInterceptors(BeanDefinition<?> definition, List<?> registrations) {
+        if (creationState != null && creationState.definition.equals(definition)) {
+            creationState.interceptors = registrations;
+        } else {
+            BeanResolutionContext.super.setBeanInterceptors(definition, registrations);
+        }
+    }
+
+    @Override
+    public @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
+        if (creationState != null && creationState.definition.equals(definition)) {
+            return creationState.interceptors;
+        }
+        return BeanResolutionContext.super.getBeanInterceptors(definition);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void prepareProxyTarget(BeanDefinition<?> definition, List<?> registrations) {
+        if (context.isUnscoped(definition)) {
+            setAttribute(PROXY_INTERCEPTORS,
+                new ProxyInterceptors(definition, (List<BeanRegistration<?>>) List.copyOf(registrations)));
+        }
+    }
     @Nullable
     @SuppressWarnings("java:S3077") // the list is only ever replaced, never mutated after it is published
     private volatile List<BeanRegistration<?>> cachedProxyTargetDependents;
@@ -417,6 +464,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         copy.removeAttribute(INTERCEPTOR_REGISTRATIONS);
         if (copy instanceof AbstractBeanResolutionContext abstractCopy) {
             abstractCopy.lazyProxyTarget = true;
+            if (creationState != null) {
+                abstractCopy.lazyProxyDependencies = creationState.dependencies;
+            }
             // taken by the creation of the proxy once the proxy is instantiated, for its registration
             if (lazyProxyTargetCopies == null) {
                 lazyProxyTargetCopies = new HashMap<>(2);
