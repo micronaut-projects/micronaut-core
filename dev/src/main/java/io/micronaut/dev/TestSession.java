@@ -490,6 +490,11 @@ final class TestSession {
         synchronized (this) {
             runId = "run-" + (runs + 1);
         }
+        if (runtime.isGenerationBudgetSpent()) {
+            // the run is owed to the relaunched process, which runs the tests again when it starts
+            runtime.requestRelaunch();
+            return;
+        }
         ClassLoader generation = runtime.newGeneration();
         Cancellation cancellation = new Cancellation();
         current = cancellation;

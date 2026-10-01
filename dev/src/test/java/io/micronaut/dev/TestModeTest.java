@@ -293,6 +293,41 @@ class TestModeTest {
     }
 
     @Test
+    void aRunBeyondTheGenerationBudgetClosesTheRuntimeAndTheLauncherReturnsTheRelaunchStatus() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Files.writeString(test.resolve("GreeterTest.java"), greeterTest("one"));
+        // the first run takes generation two
+        writeManifest("micronaut.dev.max-generations=2\n");
+        int[] status = {-2};
+        Thread launcher = new Thread(() -> {
+            try {
+                status[0] = new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()});
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        launcher.start();
+        long deadline = System.nanoTime() + TIMEOUT.toNanos();
+        while ((DevRuntime.current() == null || DevRuntime.current().testRuns() < 1) && System.nanoTime() < deadline) {
+            Thread.sleep(50);
+        }
+        DevRuntime current = DevRuntime.current();
+        assertTrue(current.isGenerationBudgetSpent());
+
+        Files.writeString(greeter, greeter("two"));
+        current.changed(List.of(greeter), List.of());
+        launcher.join(TIMEOUT.toMillis());
+        assertFalse(launcher.isAlive());
+        assertEquals(MicronautDevMain.RELAUNCH, status[0]);
+        assertTrue(current.isRelaunchRequested());
+        assertEquals(1, current.testRuns());
+        assertNull(DevRuntime.current());
+    }
+
+    @Test
     void withoutAFirstRunAChangeIsComparedWithTheClassFilesTheRuntimeStartedWith() throws Exception {
         Path main = Files.createDirectories(project.resolve("src/main/java/app"));
         Path test = Files.createDirectories(project.resolve("src/test/java/app"));
