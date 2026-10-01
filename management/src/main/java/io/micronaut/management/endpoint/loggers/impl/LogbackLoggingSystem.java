@@ -54,7 +54,7 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
      * @since 5.3.0
      */
     @Inject
-    public LogbackLoggingSystem(
+    LogbackLoggingSystem(
         @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
         @Nullable @Property(name = "logger.config") String logbackXmlLocation
     ) {
@@ -64,10 +64,10 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
 
     /**
      * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
-     * @deprecated Use {@link #LogbackLoggingSystem(String, String)} instead, which also honours
-     * {@code logback.configurationFile}. Passing {@code null} no longer defaults to {@code logback.xml}:
-     * without a location, the refresh configures Logback the way Logback's own startup does, as described in
-     * {@link LogbackUtils#configure(ClassLoader, LoggerContext, String, String)}.
+     * @deprecated The framework creates this bean with a constructor that also honours
+     * {@code logback.configurationFile}, and this one is kept for binary compatibility only. Passing
+     * {@code null} no longer defaults to {@code logback.xml}: without a location, the refresh configures
+     * Logback the way Logback's own startup does.
      */
     @Deprecated(since = "5.3", forRemoval = true)
     public LogbackLoggingSystem(@Nullable String logbackXmlLocation) {

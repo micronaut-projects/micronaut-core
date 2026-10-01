@@ -23,6 +23,7 @@ import ch.qos.logback.classic.util.DefaultJoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
 import ch.qos.logback.core.util.Loader;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.logging.LoggingSystemException;
 import org.jspecify.annotations.Nullable;
@@ -86,6 +87,7 @@ public final class LogbackUtils {
      *                                cannot be parsed, or if Logback fails to configure the context
      * @since 5.3.0
      */
+    @Internal
     public static void configure(ClassLoader classLoader,
                                  LoggerContext context,
                                  @Nullable String configurationFile,
@@ -141,8 +143,8 @@ public final class LogbackUtils {
      * @param context            Logger Context
      * @param logbackXmlLocation the location of the xml logback config file
      * @deprecated This method cannot tell a location set in configuration from a default one, and
-     * it uses the first {@link Configurator} service whatever its rank and status. Use
-     * {@link #configure(ClassLoader, LoggerContext, String, String)} instead.
+     * it uses the first {@link Configurator} service whatever its rank and status. Call
+     * {@link io.micronaut.logging.LoggingSystem#refresh()} on the logging system bean instead.
      */
     @Deprecated(since = "5.3", forRemoval = true)
     public static void configure(ClassLoader classLoader,
