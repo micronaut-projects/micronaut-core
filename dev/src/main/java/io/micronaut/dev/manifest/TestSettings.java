@@ -31,6 +31,7 @@ import java.util.Objects;
  * @param initialRun Whether every test runs once when the runtime starts
  * @param once Whether the runtime runs the tests once and stops, for a build that wants the result
  * @param reports Where the JUnit XML reports go
+ * @param htmlReport Where a report that renders the runs as a page, such as micronaut-dev-test-report, writes it
  * @param patterns The {@code --tests} patterns every run is filtered by
  * @param parameters The runner's configuration parameters
  * @author graemerocher
@@ -38,7 +39,7 @@ import java.util.Objects;
  */
 @Experimental
 @NullMarked
-public record TestSettings(String runner, boolean affectedOnly, boolean initialRun, boolean once, Path reports, List<String> patterns, Map<String, String> parameters) {
+public record TestSettings(String runner, boolean affectedOnly, boolean initialRun, boolean once, Path reports, Path htmlReport, List<String> patterns, Map<String, String> parameters) {
 
     /**
      * Validating constructor.
@@ -48,12 +49,14 @@ public record TestSettings(String runner, boolean affectedOnly, boolean initialR
      * @param initialRun Whether every test runs at start
      * @param once Whether the runtime stops after one run
      * @param reports The reports directory
+     * @param htmlReport The page report directory
      * @param patterns The patterns
      * @param parameters The parameters
      */
     public TestSettings {
         Objects.requireNonNull(runner, "runner");
         Objects.requireNonNull(reports, "reports");
+        Objects.requireNonNull(htmlReport, "htmlReport");
         patterns = List.copyOf(Objects.requireNonNull(patterns, "patterns"));
         parameters = Map.copyOf(Objects.requireNonNull(parameters, "parameters"));
     }
