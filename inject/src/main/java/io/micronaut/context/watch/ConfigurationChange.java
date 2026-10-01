@@ -76,7 +76,8 @@ public record ConfigurationChange(boolean all, Set<String> changed, Map<String, 
     }
 
     /**
-     * Whether the change touches a prefix: the prefix itself, or a key below it at a dot boundary. Keys
+     * Whether the change touches a prefix: the prefix itself, or a key below it at a dot boundary, or an
+     * entry of it in bracket form ({@code prefix[0].key}). Keys
      * and prefixes are compared in a form where camel case, hyphens, dots and an environment variable's
      * underscores all name the same property, since an environment variable stands for every dot and
      * hyphen spelling at once.
@@ -91,7 +92,7 @@ public record ConfigurationChange(boolean all, Set<String> changed, Map<String, 
         String normalizedPrefix = normalize(prefix);
         for (String key : changed) {
             String normalizedKey = normalize(key);
-            if (normalizedKey.equals(normalizedPrefix) || normalizedKey.startsWith(normalizedPrefix + '.')) {
+            if (normalizedKey.equals(normalizedPrefix) || normalizedKey.startsWith(normalizedPrefix + '.') || normalizedKey.startsWith(normalizedPrefix + '[')) {
                 return true;
             }
         }
