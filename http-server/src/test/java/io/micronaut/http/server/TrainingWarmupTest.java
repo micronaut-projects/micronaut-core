@@ -16,6 +16,7 @@
 package io.micronaut.http.server;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
@@ -28,17 +29,23 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.lang.reflect.Proxy;
 import java.net.InetAddress;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Checks the parts of the training warm-up that need no server: the host the requests go to and
- * the validation of the settings. The warm-up itself is checked against the Netty server.
+ * Checks the parts of the training warm-up that need no server: the host the requests go to, the
+ * validation of the settings and the switch that creates the warm-up beans. The warm-up itself is
+ * checked against the Netty server.
  */
 class TrainingWarmupTest {
+    // The property names, which the build plugins set
+    private static final String TRAINING_ENABLED = "micronaut.application.training.enabled";
+    private static final String REPEAT = "micronaut.application.training.warmup.repeat";
 
     @ParameterizedTest
     @NullSource
@@ -70,8 +77,35 @@ class TrainingWarmupTest {
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> configuration.setRepeat(repeat));
 
-        assertEquals("micronaut.application.training.warmup.repeat must be at least 1 but was " + repeat, e.getMessage());
-        assertEquals(TrainingWarmupConfiguration.DEFAULT_REPEAT, configuration.getRepeat());
+        assertEquals(REPEAT + " must be at least 1 but was " + repeat, e.getMessage());
+        // The default
+        assertEquals(1, configuration.getRepeat());
+    }
+
+    @Test
+    void repeatBelowOneFailsTheBinding() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(TRAINING_ENABLED, "true", REPEAT, 0))) {
+            BeanInstantiationException e = assertThrows(BeanInstantiationException.class, () -> context.getBean(TrainingWarmupConfiguration.class));
+
+            assertTrue(e.getMessage().contains(REPEAT + " must be at least 1 but was 0"), e::getMessage);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"true", "TRUE", "True"})
+    void trueInAnyCaseCreatesTheWarmupSettings(String value) {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(TRAINING_ENABLED, value))) {
+            assertTrue(context.containsBean(TrainingWarmupConfiguration.class), value);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"yes", "on", "false"})
+    void otherValuesDoNotCreateTheWarmupSettings(String value) {
+        // As strings: Micronaut.start() does not stop the application for these values either
+        try (ApplicationContext context = ApplicationContext.run(Map.of(TRAINING_ENABLED, value))) {
+            assertFalse(context.containsBean(TrainingWarmupConfiguration.class), value);
+        }
     }
 
     @Test

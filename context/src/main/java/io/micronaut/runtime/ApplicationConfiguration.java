@@ -57,7 +57,7 @@ public class ApplicationConfiguration {
      * Property name for the training run switch. When it is {@code true}, in any case,
      * {@link Micronaut#start()} stops the application once it has started, then exits the JVM with
      * status 0 unless the {@code test} environment is active. Off by default, and any other value
-     * leaves it off. {@link #TRAINING_MODE} selects a run that does not start the application.
+     * leaves it off. {@code micronaut.application.training.mode} selects a run that does not start the application.
      *
      * <p>A training run does not serve traffic, so this property must never be set on a deployment
      * target.</p>
@@ -77,7 +77,7 @@ public class ApplicationConfiguration {
      *
      * @since 5.3.0
      */
-    public static final String TRAINING_ENABLED = PREFIX + ".training.enabled";
+    static final String TRAINING_ENABLED = PREFIX + ".training.enabled";
 
     /**
      * Property name for the mode of a training run, which says how far {@link Micronaut#start()}
@@ -102,7 +102,7 @@ public class ApplicationConfiguration {
      *
      * @since 5.3.0
      */
-    public static final String TRAINING_MODE = PREFIX + ".training.mode";
+    static final String TRAINING_MODE = PREFIX + ".training.mode";
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
     @Nullable

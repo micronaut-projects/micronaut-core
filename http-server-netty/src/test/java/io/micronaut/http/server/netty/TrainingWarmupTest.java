@@ -21,14 +21,12 @@ import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.server.TrainingWarmupConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.Micronaut;
@@ -57,11 +55,10 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Checks the warm-up of a training run ({@link ApplicationConfiguration#TRAINING_ENABLED}) against
+ * Checks the warm-up of a training run ({@code micronaut.application.training.enabled}) against
  * the Netty server: the exit itself runs in a fresh JVM.
  */
 class TrainingWarmupTest {
@@ -73,8 +70,12 @@ class TrainingWarmupTest {
     private static final String UNAUTHORIZED_PATH = "/training-warmup/unauthorized";
     private static final String RATE_LIMITED_PATH = "/training-warmup/rate-limited";
     private static final String FAIL_PATH = "/training-warmup/fail";
-    private static final String PATHS = TrainingWarmupConfiguration.PREFIX + ".paths";
-    private static final String REPEAT = TrainingWarmupConfiguration.PREFIX + ".repeat";
+    // The property names, which the build plugins set: the constants that hold them are not public
+    private static final String TRAINING_ENABLED = "micronaut.application.training.enabled";
+    private static final String TRAINING_MODE = "micronaut.application.training.mode";
+    private static final String WARMUP_PREFIX = "micronaut.application.training.warmup";
+    private static final String PATHS = WARMUP_PREFIX + ".paths";
+    private static final String REPEAT = WARMUP_PREFIX + ".repeat";
     private static final String WARMUP_LOGGER = "io.micronaut.http.server.TrainingWarmup";
 
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
@@ -112,7 +113,7 @@ class TrainingWarmupTest {
             .banner(false)
             .properties(Map.of(
                 "spec.name", SPEC_NAME,
-                ApplicationConfiguration.TRAINING_ENABLED, "true",
+                TRAINING_ENABLED, "true",
                 PATHS, List.of(OK_PATH, "training-warmup/ok?page=2"),
                 REPEAT, 2))
             .start();
@@ -136,7 +137,7 @@ class TrainingWarmupTest {
                 .banner(false)
                 .properties(Map.of(
                     "spec.name", SPEC_NAME,
-                    ApplicationConfiguration.TRAINING_ENABLED, value,
+                    TRAINING_ENABLED, value,
                     PATHS, List.of(OK_PATH)))
                 .start();
 
@@ -151,11 +152,11 @@ class TrainingWarmupTest {
         for (String value : List.of("yes", "on")) {
             try (ApplicationContext context = ApplicationContext.run(Map.of(
                 "spec.name", SPEC_NAME,
-                ApplicationConfiguration.TRAINING_ENABLED, value,
+                TRAINING_ENABLED, value,
                 PATHS, List.of(OK_PATH)), Environment.TEST)) {
                 context.getBean(EmbeddedServer.class).start();
 
-                assertFalse(context.containsBean(TrainingWarmupConfiguration.class), value);
+                // That the warm-up beans are absent is checked next to them, in io.micronaut.http.server.TrainingWarmupTest
                 assertEquals(List.of(), WarmupController.REQUESTS, value);
             }
         }
@@ -169,7 +170,7 @@ class TrainingWarmupTest {
             .banner(false)
             .properties(Map.of(
                 "spec.name", SPEC_NAME,
-                ApplicationConfiguration.TRAINING_ENABLED, "true",
+                TRAINING_ENABLED, "true",
                 PATHS, List.of(OK_PATH, UNAUTHORIZED_PATH, REJECTED_PATH, "/training-warmup/missing", RATE_LIMITED_PATH, OK_PATH)))
             .start();
 
@@ -206,7 +207,7 @@ class TrainingWarmupTest {
     private static String warmupRequestHost(Map<String, Object> serverProperties) {
         Map<String, Object> properties = new HashMap<>(serverProperties);
         properties.put("spec.name", SPEC_NAME);
-        properties.put(ApplicationConfiguration.TRAINING_ENABLED, "true");
+        properties.put(TRAINING_ENABLED, "true");
         properties.put(PATHS, List.of(OK_PATH));
         try (ApplicationContext context = ApplicationContext.run(properties, Environment.TEST)) {
             EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
@@ -225,25 +226,10 @@ class TrainingWarmupTest {
     }
 
     @Test
-    void repeatBelowOneIsRejected() {
-        // The server is not started: NettyHttpServer stays bound when a startup listener fails
-        try (ApplicationContext context = ApplicationContext.run(Map.of(
-            "spec.name", SPEC_NAME,
-            ApplicationConfiguration.TRAINING_ENABLED, "true",
-            PATHS, List.of(OK_PATH),
-            REPEAT, 0), Environment.TEST)) {
-
-            BeanInstantiationException e = assertThrows(BeanInstantiationException.class, () -> context.getBean(TrainingWarmupConfiguration.class));
-
-            assertTrue(e.getMessage().contains(REPEAT + " must be at least 1 but was 0"), e::getMessage);
-        }
-    }
-
-    @Test
     void doesNotWarmUpAnotherServer() {
         try (ApplicationContext context = ApplicationContext.run(Map.of(
             "spec.name", SPEC_NAME,
-            ApplicationConfiguration.TRAINING_ENABLED, "true",
+            TRAINING_ENABLED, "true",
             PATHS, List.of(OK_PATH)), Environment.TEST)) {
             NettyEmbeddedServer secondary = context.getBean(NettyEmbeddedServerFactory.class)
                 .build(new NettyHttpServerConfiguration(context.getBean(ApplicationConfiguration.class)));
@@ -261,7 +247,7 @@ class TrainingWarmupTest {
     void sendsNoRequestsWithoutPaths() {
         try (ApplicationContext context = ApplicationContext.run(Map.of(
             "spec.name", SPEC_NAME,
-            ApplicationConfiguration.TRAINING_ENABLED, "true"), Environment.TEST)) {
+            TRAINING_ENABLED, "true"), Environment.TEST)) {
             context.getBean(EmbeddedServer.class).start();
 
             assertEquals(List.of(), WarmupController.REQUESTS);
@@ -272,7 +258,7 @@ class TrainingWarmupTest {
     @Tag(CHILD_JVM)
     void warmsUpThenExitsWithZero() {
         ChildJvm child = ChildJvm.run(
-            "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true",
+            "-D" + TRAINING_ENABLED + "=true",
             "-D" + PATHS + "=" + OK_PATH + "," + OK_PATH + "?page=2",
             "-D" + REPEAT + "=3");
 
@@ -285,7 +271,7 @@ class TrainingWarmupTest {
     @Tag(CHILD_JVM)
     void failingWarmupRequestExitsWithNonZero() {
         ChildJvm child = ChildJvm.run(
-            "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true",
+            "-D" + TRAINING_ENABLED + "=true",
             "-D" + PATHS + "=" + OK_PATH + "," + REJECTED_PATH + "," + FAIL_PATH + "," + OK_PATH);
 
         assertEquals(1, child.exitCode(), child::output);
@@ -300,7 +286,7 @@ class TrainingWarmupTest {
     @Tag(CHILD_JVM)
     void serverWithSslExitsWithNonZero() {
         ChildJvm child = ChildJvm.run(
-            "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true",
+            "-D" + TRAINING_ENABLED + "=true",
             "-D" + PATHS + "=" + OK_PATH,
             "-Dmicronaut.server.ssl.enabled=true",
             "-Dmicronaut.server.ssl.build-self-signed=true",
@@ -317,7 +303,7 @@ class TrainingWarmupTest {
     void repeatBelowOneExitsWithNonZeroEvenWithoutPaths() {
         // No warm-up paths: the server still creates the warm-up and binds its settings, so an invalid one fails the run
         ChildJvm child = ChildJvm.run(
-            "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true",
+            "-D" + TRAINING_ENABLED + "=true",
             "-D" + REPEAT + "=0");
 
         assertEquals(1, child.exitCode(), child::output);
@@ -330,13 +316,13 @@ class TrainingWarmupTest {
     void loadModeExitsWithZeroWithoutStartingTheServerOrWarmingUp() {
         // repeat=0 fails a training run that starts the server: the load mode does not even bind the warm-up settings
         ChildJvm child = ChildJvm.run(
-            "-D" + ApplicationConfiguration.TRAINING_ENABLED + "=true",
-            "-D" + ApplicationConfiguration.TRAINING_MODE + "=load",
+            "-D" + TRAINING_ENABLED + "=true",
+            "-D" + TRAINING_MODE + "=load",
             "-D" + PATHS + "=" + OK_PATH,
             "-D" + REPEAT + "=0");
 
         assertEquals(0, child.exitCode(), child::output);
-        assertTrue(child.output().contains("the " + TrainingWarmupConfiguration.PREFIX + " settings are ignored, because this mode starts no server and sends no warm-up request"), child::output);
+        assertTrue(child.output().contains("the " + WARMUP_PREFIX + " settings are ignored, because this mode starts no server and sends no warm-up request"), child::output);
         assertTrue(child.output().contains("bean definitions loaded, closing the context and exiting with status 0"), child::output);
         // The server was not started, so nothing was bound and nothing was requested
         assertFalse(child.output().contains("Startup completed"), child::output);

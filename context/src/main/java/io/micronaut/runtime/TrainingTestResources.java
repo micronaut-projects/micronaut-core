@@ -84,7 +84,7 @@ final class TrainingTestResources {
      * The switch of the Micronaut Test Resources client, a system property: {@code false} makes the
      * client that the factory creates a no-op that contacts no server and supplies no property.
      */
-    static final String CLIENT_ENABLED = "micronaut.test.resources.enabled";
+    private static final String CLIENT_ENABLED = "micronaut.test.resources.enabled";
 
     // The messages of a training run come from one logger, whatever the mode
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);

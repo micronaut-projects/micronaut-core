@@ -72,8 +72,8 @@ import java.util.concurrent.TimeUnit;
 @Internal
 final class TrainingLoad {
 
-    static final String MODE_START = "start";
-    static final String MODE_LOAD = "load";
+    private static final String MODE_START = "start";
+    private static final String MODE_LOAD = "load";
 
     // The messages of a training run come from one logger, whatever the mode
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);

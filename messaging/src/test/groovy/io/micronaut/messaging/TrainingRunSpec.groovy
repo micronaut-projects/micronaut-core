@@ -18,7 +18,6 @@ package io.micronaut.messaging
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
-import io.micronaut.runtime.ApplicationConfiguration
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.event.ApplicationShutdownEvent
 import io.micronaut.runtime.event.ApplicationStartupEvent
@@ -33,10 +32,12 @@ import java.util.concurrent.TimeUnit
 
 /**
  * A messaging application is a server application, so {@link Micronaut#start()} waits for a
- * shutdown unless the training run switch ({@link ApplicationConfiguration#TRAINING_ENABLED}) is on.
+ * shutdown unless the training run switch ({@code micronaut.application.training.enabled}) is on.
  */
 class TrainingRunSpec extends Specification {
     static final String SPEC_NAME = 'TrainingRunSpec'
+    // The property name, which the build plugins set
+    static final String TRAINING_ENABLED = 'micronaut.application.training.enabled'
 
     void setup() {
         LifecycleRecorder.EVENTS.clear()
@@ -48,7 +49,7 @@ class TrainingRunSpec extends Specification {
         ApplicationContext context = Micronaut.build()
                 .environments(Environment.TEST)
                 .banner(false)
-                .properties(['spec.name': SPEC_NAME, (ApplicationConfiguration.TRAINING_ENABLED): 'true'])
+                .properties(['spec.name': SPEC_NAME, (TRAINING_ENABLED): 'true'])
                 .start()
 
         then:
@@ -64,7 +65,7 @@ class TrainingRunSpec extends Specification {
                 Path.of(System.getProperty('java.home'), 'bin', 'java').toString(),
                 // The child runs next to the forked test JVMs: bound its heap and its GC threads
                 '-Xmx128m', '-XX:+UseSerialGC',
-                '-D' + ApplicationConfiguration.TRAINING_ENABLED + '=true',
+                '-D' + TRAINING_ENABLED + '=true',
                 '-cp', System.getProperty('java.class.path'),
                 Main.name
         ]

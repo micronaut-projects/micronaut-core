@@ -21,7 +21,6 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -47,7 +46,7 @@ import java.util.concurrent.TimeUnit;
  * server that is the {@link EmbeddedApplication} of the context.
  *
  * <p>Only a training run in the {@code start} mode, the default
- * ({@link ApplicationConfiguration#TRAINING_MODE}), sends these requests. That mode starts the
+ * ({@code micronaut.application.training.mode}), sends these requests. That mode starts the
  * application as usual, so the HTTP server starts, binds its port and publishes the
  * {@link ServerStartupEvent} that this listener receives. The requests go to that port while the
  * server runs; then {@link io.micronaut.runtime.Micronaut#start()} stops the server and, outside
@@ -69,7 +68,7 @@ import java.util.concurrent.TimeUnit;
 @Internal
 @Singleton
 // The switch alone, whatever the mode: the load mode creates no bean, so this listener only exists in a run that starts the server
-@Requires(property = ApplicationConfiguration.TRAINING_ENABLED, pattern = TrainingWarmupConfiguration.ENABLED_PATTERN)
+@Requires(property = TrainingWarmupConfiguration.TRAINING_ENABLED, pattern = TrainingWarmupConfiguration.ENABLED_PATTERN)
 final class TrainingWarmup implements ApplicationEventListener<ServerStartupEvent>, Ordered {
 
     private static final Logger LOG = LoggerFactory.getLogger(TrainingWarmup.class);

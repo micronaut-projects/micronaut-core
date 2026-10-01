@@ -17,40 +17,43 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.runtime.ApplicationConfiguration;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
 
 /**
- * The warm-up of a training run ({@link ApplicationConfiguration#TRAINING_ENABLED}): once the
+ * The warm-up of a training run ({@code micronaut.application.training.enabled}): once the
  * server has started, it sends GET requests to itself before the application stops. Only the
- * {@code start} mode, the default ({@link ApplicationConfiguration#TRAINING_MODE}), starts the
+ * {@code start} mode, the default ({@code micronaut.application.training.mode}), starts the
  * server; the {@code load} mode starts no server and ignores these settings.
  *
  * @since 5.3.0
  */
 @ConfigurationProperties(TrainingWarmupConfiguration.PREFIX)
-@Requires(property = ApplicationConfiguration.TRAINING_ENABLED, pattern = TrainingWarmupConfiguration.ENABLED_PATTERN)
-public class TrainingWarmupConfiguration {
+@Requires(property = TrainingWarmupConfiguration.TRAINING_ENABLED, pattern = TrainingWarmupConfiguration.ENABLED_PATTERN)
+final class TrainingWarmupConfiguration {
 
     /**
      * The prefix of the warm-up settings.
      */
-    public static final String PREFIX = "micronaut.application.training.warmup";
+    static final String PREFIX = "micronaut.application.training.warmup";
+
+    /**
+     * The training run switch, which {@link io.micronaut.runtime.Micronaut#start()} reads.
+     */
+    static final String TRAINING_ENABLED = "micronaut.application.training.enabled";
+
+    /**
+     * The values of {@link #TRAINING_ENABLED} that turn a training run on: {@code true} in any
+     * case, as {@link io.micronaut.runtime.Micronaut#start()} reads it.
+     */
+    static final String ENABLED_PATTERN = "(?i)true";
 
     /**
      * The default number of times the warm-up requests every path.
      */
-    @SuppressWarnings("WeakerAccess")
-    public static final int DEFAULT_REPEAT = 1;
-
-    /**
-     * The values of {@link ApplicationConfiguration#TRAINING_ENABLED} that turn a training run on:
-     * {@code true} in any case, as {@link io.micronaut.runtime.Micronaut#start()} reads it.
-     */
-    static final String ENABLED_PATTERN = "(?i)true";
+    private static final int DEFAULT_REPEAT = 1;
 
     private List<String> paths = Collections.emptyList();
     private int repeat = DEFAULT_REPEAT;
@@ -81,7 +84,7 @@ public class TrainingWarmupConfiguration {
     }
 
     /**
-     * How many times the warm-up requests the paths. It must be at least 1. Default value ({@value #DEFAULT_REPEAT}).
+     * How many times the warm-up requests the paths. It must be at least 1. Default value: 1.
      *
      * @param repeat The number of rounds
      * @throws IllegalArgumentException if the value is less than 1.
