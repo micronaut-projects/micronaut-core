@@ -23,8 +23,11 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
 
     @Override
     protected List<String> getUndescribed() {
-        // KSP holds an empty array of classes as one of KClass, which the definition holds too
-        return super.getUndescribed() + ['test.$Untyped$Definition']
+        // given no element, KSP types an array by the class of its declared element when the processor can load
+        // that class: KClass for an array of classes, and the annotation itself for an array of an annotation of the
+        // class path, where an element makes them AnnotationClassValue and AnnotationValue. The definition holds the
+        // same array, and the format has no value kind for either
+        return super.getUndescribed() + ['test.$Untyped$Definition', 'test.$Unrequired$Definition']
     }
 
     @Override
@@ -35,7 +38,8 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
 
     @Override
     protected List<Class<?>> getEmptyArrayTypes() {
-        // and an empty array of anything but strings as one of objects
+        // and an empty array of int, or of an annotation of the same compilation, as one of objects, since the
+        // processor cannot load the class of the element
         return [String[], Object[], Object[]]
     }
 
@@ -149,6 +153,7 @@ annotation class Colored(
     val types: Array<KClass<*>> = [],
     val detail: Detail = Detail("none"),
     val details: Array<Detail> = [],
+    val requirements: Array<Requires> = [],
     @get:NonBinding val comment: String = ""
 )
 
@@ -163,6 +168,10 @@ class Blank
 @Singleton
 @Colored(name = "untyped", types = [])
 class Untyped
+
+@Singleton
+@Colored(name = "unrequired", requirements = [])
+class Unrequired
 
 @Singleton
 @Colored(name = "#{ 'dyn' + 'amic' }")

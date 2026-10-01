@@ -268,7 +268,13 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
     void "an array of classes that is given no element is described where the definition holds one of class values"() {
         expect:
         undescribed.contains('test.$Untyped$Definition') ||
-            descriptor('Untyped').qualifiers()[0].values.types == [] as AnnotationClassValue[]
+            emptyArrayOf(descriptor('Untyped').qualifiers()[0].values.types, AnnotationClassValue)
+    }
+
+    void "an array of an annotation of the class path that is given no element is described where the definition holds one of annotation values"() {
+        expect:
+        undescribed.contains('test.$Unrequired$Definition') ||
+            emptyArrayOf(descriptor('Unrequired').qualifiers()[0].values.requirements, AnnotationValue)
     }
 
     void "the conditions that are checked before the definition is loaded are described in their order"() {
@@ -416,6 +422,14 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
 
     protected Class<?> type(String simpleName) {
         classLoader.loadClass('test.' + simpleName)
+    }
+
+    /**
+     * Groovy compares arrays by their elements only, so that an empty {@code Object[]} equals an empty array of any
+     * type: the type is compared here.
+     */
+    private static boolean emptyArrayOf(Object value, Class<?> componentType) {
+        value != null && value.getClass().isArray() && value.getClass().componentType == componentType && java.lang.reflect.Array.getLength(value) == 0
     }
 
     private Set<String> definitions() {

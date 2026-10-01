@@ -248,6 +248,8 @@ enum Mode {
 
     Detail[] details() default {};
 
+    Requires[] requirements() default {};
+
     @NonBinding
     String comment() default "";
 }
@@ -265,6 +267,11 @@ class Blank {
 @Singleton
 @Colored(name = "untyped", types = {})
 class Untyped {
+}
+
+@Singleton
+@Colored(name = "unrequired", requirements = {})
+class Unrequired {
 }
 
 @Singleton
