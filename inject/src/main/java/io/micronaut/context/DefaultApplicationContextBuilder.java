@@ -96,6 +96,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean eventsEnabled = true;
     @Nullable
     private Boolean trackBeanDependencies;
+    private final List<BeanRegistration<?>> retainedRegistrations = new ArrayList<>();
     @Nullable
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
@@ -233,6 +234,23 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public ApplicationContextBuilder trackBeanDependencies(boolean enabled) {
         this.trackBeanDependencies = enabled;
+        return this;
+    }
+
+    @Override
+    public Collection<BeanRegistration<?>> getRetainedRegistrations() {
+        // handed over once: the context that is built adopts them, and the builder must not keep the
+        // previous context reachable through them afterwards
+        List<BeanRegistration<?>> handedOver = List.copyOf(retainedRegistrations);
+        retainedRegistrations.clear();
+        return handedOver;
+    }
+
+    @Override
+    public ApplicationContextBuilder retainedRegistrations(Collection<BeanRegistration<?>> registrations) {
+        if (registrations != null) {
+            retainedRegistrations.addAll(registrations);
+        }
         return this;
     }
 

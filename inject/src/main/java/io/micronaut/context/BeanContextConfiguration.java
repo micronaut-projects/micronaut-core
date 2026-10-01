@@ -25,6 +25,7 @@ import io.micronaut.inject.QualifiedBeanType;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -121,6 +122,22 @@ public interface BeanContextConfiguration {
      */
     default boolean isTrackBeanDependencies() {
         return DevelopmentMode.isEnabledBySystemProperty();
+    }
+
+    /**
+     * Singleton registrations of a previous context that this context adopts when it starts, so
+     * that the bean instances survive a restart. A development launcher obtains them from
+     * {@link DefaultBeanContext#stopRetaining(Predicate)} on the context it stops.
+     *
+     * <p>The registrations are consumed: a context reads them once when it starts for the first time
+     * and an implementation may hand them over and forget them, so that the previous context is not
+     * kept reachable.</p>
+     *
+     * @return The registrations to adopt, empty by default
+     * @since 5.3.0
+     */
+    default Collection<BeanRegistration<?>> getRetainedRegistrations() {
+        return Collections.emptyList();
     }
 
     /**

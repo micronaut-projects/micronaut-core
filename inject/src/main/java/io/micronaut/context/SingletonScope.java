@@ -296,8 +296,10 @@ final class SingletonScope {
      * @param <T>            The bean type
      */
     synchronized <T> void purgeCacheForBeanInstance(BeanDefinition<T> beanDefinition, T bean) {
-        singletonByBeanDefinition.remove(BeanDefinitionIdentity.of(beanDefinition));
-        singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(bean));
+        // only the registration of this instance: another instance registered under the same definition
+        // (one adopted from a previous context displacing a retained one, or the reverse) stays
+        singletonByBeanDefinition.computeIfPresent(BeanDefinitionIdentity.of(beanDefinition), (identity, registration) -> registration.bean == bean ? null : registration);
+        singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(bean) && entry.getValue().bean == bean);
     }
 
     /**
