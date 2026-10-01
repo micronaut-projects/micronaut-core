@@ -233,6 +233,12 @@ class ServiceLoaderFeature implements Feature {
      * {@code micronaut-inject} leaves these entries out, and they are registered here empty, as they were before
      * the entries had content, so that what lists or opens them in an image finds what it found then.</p>
      *
+     * <p>That exclusion has to stay in the {@code excludes} of the legacy {@code resource-config.json} of
+     * {@code micronaut-inject}: the resources of {@code reachability-metadata.json} are globs, and that format has no
+     * exclusion, so moving the configuration there would put the descriptors back into images.
+     * {@code BeanDefinitionEntriesTest} of {@code test-suite-netty-ssl-graalvm} checks that an image has the entries
+     * without content.</p>
+     *
      * @param names The names of the entries
      */
     private void registerBeanDefinitionEntries(Collection<String> names) {

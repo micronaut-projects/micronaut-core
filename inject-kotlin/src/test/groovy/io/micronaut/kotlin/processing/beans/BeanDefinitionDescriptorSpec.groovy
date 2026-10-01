@@ -38,8 +38,8 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
 
     @Override
     protected List<Class<?>> getEmptyArrayTypes() {
-        // and an empty array of int, or of an annotation of the same compilation, as one of objects, since the
-        // processor cannot load the class of the element
+        // and an empty IntArray, which is not a kotlin.Array so its element type is not looked at, and an empty array
+        // of an annotation of the same compilation, whose class the processor cannot load, as one of objects
         return [String[], Object[], Object[]]
     }
 
