@@ -93,7 +93,9 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         // One resolution for construction, post-construct and pre-destroy rather than one per interception point, so a
         // non-singleton interceptor is shared by every phase of this bean.
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveInterceptors(resolutionContext, constructor);
-        SharedInterceptorRegistrations.store(resolutionContext, this, interceptors);
+        if (interceptors != null) {
+            resolutionContext.setBeanInterceptors(this, interceptors);
+        }
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,
             context,
