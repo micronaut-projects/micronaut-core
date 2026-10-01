@@ -189,6 +189,7 @@ public final class DevManifest {
             Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "initial-run", "true")),
             Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "once", "false")),
             path(directory, properties.getProperty(PREFIX + TEST + "reports", "build/micronaut-dev/test-results")),
+            path(directory, properties.getProperty(PREFIX + TEST + "html-report", "build/micronaut-dev/test-report")),
             options(directory, properties.getProperty(PREFIX + TEST + "filter", "")),
             parameters
         );
