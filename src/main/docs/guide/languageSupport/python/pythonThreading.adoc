@@ -46,19 +46,19 @@ More contexts are not straightforwardly better, and the size that suits an appli
 
 A route module is pooled, so it exists once per context. A `@Singleton` Python bean it injects does not: it is one object in one context, and every call through it runs in that context however many the pool has. While the beans behind a route are singletons, adding contexts divides the traffic without adding throughput — so a small pool is better, and a large one is worse than a small one. Annotate a service with `@ContextPooled` and the relationship inverts, because contexts then add real concurrency. `pyronaut process` warns about each pooled type that depends on a singleton Python bean, which is the signal that this applies.
 
-That warning names a cost, not a fault, and sometimes the cost is one the application accepts: a bean reached once per request rather than once per row, or one whose body is a Java call anyway, loses little by living in a single context. Name those dependencies to stop reporting them, or set the option to `false` to stop reporting any:
+That warning names a cost, not a fault, and sometimes the cost is one the application accepts: a bean reached once per request rather than once per row, or one whose body is a Java call anyway, loses little by living in a single context. Name those dependencies to stop reporting them, or list `*` to stop reporting any:
 
 [configuration]
 ----
 micronaut:
   python:
-    pooled:
+    pool:
       ignoreDependencies:
         - MailService
         - PasswordResetTokens
 ----
 
-Pyronaut passes it to the compiler as an annotation processor option, so it takes effect at `pyronaut process` rather than at runtime; a build that drives `javac` directly can pass `-Amicronaut.python.pooled.ignoreDependencies=MailService,PasswordResetTokens` or set a system property of the same name on the compiler JVM. A name matches either the simple or the qualified name of the dependency type. Silence the pairings you have decided about rather than the warning as a whole, so the next one still reaches you.
+Pyronaut passes it to the compiler as an annotation processor option, so it takes effect at `pyronaut process` rather than at runtime; a build that drives `javac` directly can pass `-Amicronaut.python.pool.ignoreDependencies=MailService,PasswordResetTokens` or set a system property of the same name on the compiler JVM. Core 5.2.11 released the option as `micronaut.python.pooled.ignoreDependencies`; that name is still read, but only the new one is a known property of `micronaut.python.pool`, so configuration validation accepts it. A name matches either the simple or the qualified name of the dependency type. As an annotation processor option or a system property, the value `false` also stops reporting any. Silence the pairings you have decided about rather than the warning as a whole, so the next one still reaches you.
 
 The rest is workload. A request that does little Python work benefits from contexts until they outnumber what the processors can run; one that builds a large response in Python — say a page of entities projected into DTOs — reaches its best at fewer contexts, and past that point extra interpreters compete for cores rather than adding parallelism. Measured on one 12-core machine with the services pooled, a keyed read was still gaining at 12 contexts while a paged read of 20 rows peaked at 6 and had lost a third of its throughput by 12. The default is a compromise between those, not the best value for either.
 

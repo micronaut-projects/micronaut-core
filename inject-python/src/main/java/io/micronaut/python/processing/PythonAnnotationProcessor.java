@@ -35,6 +35,7 @@ import org.jspecify.annotations.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
@@ -72,10 +73,24 @@ import java.util.stream.Collectors;
  * Annotation processor for {@code io.micronaut.context.python.annotation.PythonApplication} that enables Python AST processing
  * during Java compilation.
  *
+ * <p>The {@link SupportedOptions} declaration is what makes those options configurable by a build
+ * tool rather than only by a hand-written {@code -A} flag: a tool that reads an option out of an
+ * application's own configuration has to know which options exist, and it discovers them by asking
+ * each registered processor. The options below are declared by this processor's
+ * {@link io.micronaut.inject.visitor.TypeElementVisitor}s, which a tool enumerating processors
+ * never sees; {@code TypeElementVisitorProcessor} aggregates its visitors' options for the same
+ * reason, and this processor loads its visitors too late in a round to do that dynamically.
+ *
  * @author Micronaut
  * @since 5.2.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
+@SupportedOptions({
+    PythonAnnotationProcessor.SOURCE_ROOT_OPTION,
+    PythonReflectionGate.OPTION,
+    PythonReflectionGate.WARNINGS_OPTION,
+    PythonPooledStubGenerator.IGNORE_OPTION
+})
 @Experimental
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
