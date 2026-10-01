@@ -32,6 +32,7 @@ import java.util.Set;
  * @param compiledSources The sources that were compiled, absolute
  * @param removedOutputs The output files removed for deleted sources, absolute
  * @param duration How long the compilation took
+ * @param compiledClasses The top-level classes the compilation produced, for the other languages' dependents
  * @author graemerocher
  * @since 5.3.0
  */
@@ -41,7 +42,8 @@ public record CompilationResult(Status status,
                                 List<CompileDiagnostic> diagnostics,
                                 Set<Path> compiledSources,
                                 Set<Path> removedOutputs,
-                                Duration duration) {
+                                Duration duration,
+                                Set<String> compiledClasses) {
 
     /**
      * Validating constructor.
@@ -58,6 +60,20 @@ public record CompilationResult(Status status,
         compiledSources = Set.copyOf(Objects.requireNonNull(compiledSources, "compiledSources"));
         removedOutputs = Set.copyOf(Objects.requireNonNull(removedOutputs, "removedOutputs"));
         Objects.requireNonNull(duration, "duration");
+        compiledClasses = Set.copyOf(Objects.requireNonNull(compiledClasses, "compiledClasses"));
+    }
+
+    /**
+     * A result that produced no classes worth telling another language about.
+     *
+     * @param status The status
+     * @param diagnostics The diagnostics
+     * @param compiledSources The compiled sources
+     * @param removedOutputs The removed outputs
+     * @param duration The duration
+     */
+    public CompilationResult(Status status, List<CompileDiagnostic> diagnostics, Set<Path> compiledSources, Set<Path> removedOutputs, Duration duration) {
+        this(status, diagnostics, compiledSources, removedOutputs, duration, Set.of());
     }
 
     /**
@@ -66,7 +82,7 @@ public record CompilationResult(Status status,
      * @return The result
      */
     public static CompilationResult nothingToDo() {
-        return new CompilationResult(Status.NOTHING_TO_DO, List.of(), Set.of(), Set.of(), Duration.ZERO);
+        return new CompilationResult(Status.NOTHING_TO_DO, List.of(), Set.of(), Set.of(), Duration.ZERO, Set.of());
     }
 
     /**

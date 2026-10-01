@@ -40,6 +40,7 @@ import java.util.Set;
  * @param classOutput Where class files and resources the compiler generates go
  * @param generatedSources Where generated sources go
  * @param options The compiler options, as the build passes them
+ * @param affectedClasses Top-level classes another language's compilation changed in this batch, whose dependents among these sources are recompiled too
  * @author graemerocher
  * @since 5.3.0
  */
@@ -55,7 +56,8 @@ public record CompilationRequest(
     List<Path> processorPath,
     Path classOutput,
     Path generatedSources,
-    List<String> options) {
+    List<String> options,
+    Set<String> affectedClasses) {
 
     /**
      * Validating constructor.
@@ -81,6 +83,35 @@ public record CompilationRequest(
         classOutput = Objects.requireNonNull(classOutput, "classOutput").toAbsolutePath().normalize();
         generatedSources = Objects.requireNonNull(generatedSources, "generatedSources").toAbsolutePath().normalize();
         options = List.copyOf(Objects.requireNonNull(options, "options"));
+        affectedClasses = Set.copyOf(Objects.requireNonNull(affectedClasses, "affectedClasses"));
+    }
+
+    /**
+     * A request with no classes affected by another language.
+     *
+     * @param kind The language
+     * @param sourceRoots The roots
+     * @param changed The changed sources
+     * @param deleted The deleted sources
+     * @param full Whether full
+     * @param compileClasspath The compile classpath
+     * @param processorPath The processor path
+     * @param classOutput The class output
+     * @param generatedSources The generated sources directory
+     * @param options The options
+     */
+    public CompilationRequest(SourceKind kind, List<SourceRoot> sourceRoots, Set<Path> changed, Set<Path> deleted, boolean full, List<Path> compileClasspath, List<Path> processorPath, Path classOutput, Path generatedSources, List<String> options) {
+        this(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of());
+    }
+
+    /**
+     * This request with the classes another language's compilation changed.
+     *
+     * @param classes The top-level classes
+     * @return The request
+     */
+    public CompilationRequest withAffectedClasses(Set<String> classes) {
+        return new CompilationRequest(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, classes);
     }
 
     /**
@@ -96,6 +127,6 @@ public record CompilationRequest(
      * @return The full request
      */
     public CompilationRequest asFull() {
-        return new CompilationRequest(kind, sourceRoots, Set.of(), Set.of(), true, compileClasspath, processorPath, classOutput, generatedSources, options);
+        return new CompilationRequest(kind, sourceRoots, Set.of(), Set.of(), true, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of());
     }
 }
