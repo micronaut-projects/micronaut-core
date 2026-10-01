@@ -58,6 +58,48 @@ public interface BeanContext extends
     BeanContextConfiguration getContextConfiguration();
 
     /**
+     * Creates a fresh instance of the exact definition, bypassing its scope, and retains its complete
+     * dependency tree in the returned registration. Dependencies still obey their own scope rules.
+     * For a contextual target behind a proxy, supply the target definition. The caller owns the result.
+     * @param definition The definition to instantiate
+     * @param <T> The bean type
+     * @return The created instance and its lifecycle
+     * @since 5.3.0
+     */
+    @io.micronaut.core.annotation.Experimental
+    default <T> io.micronaut.context.scope.CreatedBean<T> createBeanRegistration(io.micronaut.inject.BeanDefinition<T> definition) {
+        throw new UnsupportedOperationException("Fresh registrations are not supported by this context");
+    }
+
+    /**
+     * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
+     * New lookups are rejected during shutdown. Use {@link #withDependencies(java.util.function.Function)}
+     * for temporary dependencies required by a destruction callback.
+     * @return The group
+     * @since 5.3.0
+     */
+    @io.micronaut.core.annotation.Experimental
+    default BeanDependencyGroup createDependencyGroup() {
+        throw new UnsupportedOperationException("Dependency groups are not supported by this context");
+    }
+
+    /**
+     * Resolves dependencies for a synchronous invocation and always releases them afterwards. Cleanup failures
+     * are suppressed on an invocation failure. During a container destruction callback, this operation may create
+     * temporary dependents until the callback returns; it cannot be used after shutdown completes.
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result (which must not retain an owned dependency)
+     * @since 5.3.0
+     */
+    @io.micronaut.core.annotation.Experimental
+    default <R> R withDependencies(java.util.function.Function<BeanDependencyGroup, R> action) {
+        try (BeanDependencyGroup group = createDependencyGroup()) {
+            return action.apply(group);
+        }
+    }
+
+    /**
      * The predicate the context was built with, as passed to
      * {@link ApplicationContextBuilder#beansPredicate(java.util.function.Predicate)}.
      *

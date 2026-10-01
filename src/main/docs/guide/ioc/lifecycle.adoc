@@ -86,10 +86,32 @@ class Handler {
 
 Each lookup follows the usual scope and qualifier rules. A newly created prototype belongs to the consumer, including its nested dependents. Core destroys these resources after the consumer's destruction callbacks, in reverse acquisition order. Resources acquired during construction are also cleaned up if construction fails. A failed lookup cleans up resources created by that lookup without releasing previous successful acquisitions.
 
-Use `resolver.getBeanRegistration(type)` when you need the dependency's registration and bean definition as well as its instance. Overloads accept either `Class<T>` or `Argument<T>`, with an optional qualifier. These lookups retain the same ownership as `getBean(...)`; returning a registration does not transfer ownership to the caller.
+Use `resolver.getBeanRegistration(type)` when you need the dependency's registration and bean definition as well as its instance. Overloads accept either `Class<T>` or `Argument<T>`, with an optional qualifier. These lookups retain the same ownership as `getBean(...)`; returning a registration does not transfer ownership to the caller. For early destruction of an owned dependency, resolve it through a dependency group and use `group.destroy(registration)`.
 
 Singletons and custom-scoped beans remain owned by their scopes. Dynamically resolved singleton dependencies participate in context shutdown ordering, including those reached through a consumer's owned prototype interceptors. The resolver does not extend a custom scope's lifetime or prevent explicit destruction of a shared bean. Dependency cycles use the same deterministic cycle handling as injected dependencies.
 
 The resolver can be used during construction and retained for later use. It must be injected into a managed consumer; it is unavailable through a standalone context lookup. As with other dependent resources, callers obtaining standalone prototypes should retain and close their api:context.BeanRegistration[]. Ordinary api:context.BeanContext[] and api:context.BeanProvider[] lookups keep their existing lifecycle behavior.
 
 New resolver lookups are rejected once destruction of the consumer or context shutdown begins. Existing dependencies remain available to destruction callbacks. A lookup racing destruction releases newly created dependents if it cannot attach them to the consumer. The resolver does not retain the consumer's construction path; do not use it to resolve the consumer recursively during construction.
+
+==== Explicit dependency ownership
+
+`BeanContext.createBeanRegistration(definition)` creates a fresh instance of an exact bean definition,
+regardless of its declared scope, and returns a `CreatedBean` that retains its dependent instances.
+Close the returned registration to destroy the instance and its dependents. It neither replaces nor removes
+an existing scoped instance of the same definition. To create a contextual target behind a separate proxy,
+pass the target definition.
+
+`BeanContext.createDependencyGroup()` creates a caller-owned, `AutoCloseable` dependency group.
+Its lookups respect scopes, retain newly created dependents, and leave shared beans owned by their scopes.
+Use `group.destroy(registration)` for early destruction: it removes only a registration owned by that group,
+using registration identity. `group.createBeanRegistration(definition)` creates a fresh owned instance.
+A group returned by an injected `BeanDependencyResolver.createGroup()` also belongs to the consumer and is
+closed automatically with it. Independent groups must be closed by their callers.
+
+For temporary method arguments, `BeanContext.withDependencies(group -> ...)` releases owned dependencies
+when the synchronous invocation ends, including when it fails. Cleanup attempts every dependent and suppresses
+cleanup failures on the invocation's exception. When invoked from a container destruction callback, it may
+resolve temporary dependencies during shutdown. This permission is confined to the destruction thread and the
+invocation: normal groups and retained injected resolvers still reject new lookups after shutdown starts.
+Do not return an owned dependency from such an invocation, since it has already been destroyed.

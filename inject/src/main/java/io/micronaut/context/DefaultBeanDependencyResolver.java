@@ -25,12 +25,21 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Internal
-final class DefaultBeanDependencyResolver implements BeanDependencyResolver {
+final class DefaultBeanDependencyResolver implements BeanDependencyGroup {
     private final DefaultBeanContext context;
-    final BeanDependencies dependencies = new BeanDependencies();
+    final BeanDependencies dependencies;
 
     DefaultBeanDependencyResolver(DefaultBeanContext context) {
+        this(context, false);
+    }
+
+    DefaultBeanDependencyResolver(DefaultBeanContext context, boolean destructionInvocation) {
+        this(context, new BeanDependencies(destructionInvocation));
+    }
+
+    DefaultBeanDependencyResolver(DefaultBeanContext context, BeanDependencies dependencies) {
         this.context = context;
+        this.dependencies = dependencies;
     }
 
     @Override
@@ -45,5 +54,39 @@ final class DefaultBeanDependencyResolver implements BeanDependencyResolver {
             resolution.require(registration);
             return registration;
         });
+    }
+
+    @Override
+    public BeanDependencyGroup createGroup() {
+        return dependencies.resolve(context, null, resolution -> {
+            BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration();
+            resolution.addDependentBean(child);
+            return (BeanDependencyGroup) child.bean();
+        });
+    }
+
+    @Override
+    public <T> BeanRegistration<T> createBeanRegistration(io.micronaut.inject.BeanDefinition<T> definition) {
+        return dependencies.resolve(context, null, resolution ->
+            context.createFreshRegistration(resolution, definition));
+    }
+
+    @Override
+    public boolean destroy(BeanRegistration<?> registration) {
+        if (dependencies.remove(registration)) {
+            context.destroyDependentBean(registration);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isClosed() {
+        return dependencies.isClosing();
+    }
+
+    @Override
+    public void close() {
+        dependencies.close(context);
     }
 }
