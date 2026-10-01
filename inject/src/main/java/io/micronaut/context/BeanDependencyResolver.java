@@ -103,7 +103,8 @@ public interface BeanDependencyResolver {
 
     /**
      * Resolves a registration using the same ownership rules as {@link #getBean(Argument, Qualifier)}.
-     * Shared registrations remain scope-owned. Returning a registration does not transfer ownership to the caller.
+     * Shared registrations remain scope-owned; use {@link BeanDependencyGroup#destroy(BeanRegistration)}
+     * for early destruction of owned instances rather than closing a shared registration.
      * @param type The requested type, including generic arguments
      * @param qualifier The qualifier, or {@code null}
      * @param <T> The bean type
@@ -113,4 +114,11 @@ public interface BeanDependencyResolver {
         throw new UnsupportedOperationException("Registration lookup is not supported by this resolver");
     }
 
+    /**
+     * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.
+     * @return The child group
+     */
+    default BeanDependencyGroup createGroup() {
+        throw new UnsupportedOperationException("Child groups are not supported by this resolver");
+    }
 }
