@@ -1326,6 +1326,187 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'unused pools are evicted once their connections close'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        List<EmbeddedTestConnectionHttp1> conns = (0..<3).collect {
+            def conn = new EmbeddedTestConnectionHttp1()
+            conn.setupHttp1()
+            conn
+        }
+        patch(client, *conns)
+
+        conns.eachWithIndex { conn, i ->
+            def host = "host${i}.example".toString()
+            conn.testExchangeResponse(conn.testExchangeRequest(client, host), "keep-alive", host)
+        }
+        // idle connections keep their pools alive
+        assert client.connectionManager.poolCount() == 3
+        assertPoolConnections(client, 3)
+
+        when:
+        conns.each {
+            it.clientChannel.close()
+            it.advance()
+        }
+
+        then:
+        client.connectionManager.poolCount() == 0
+        assertPoolConnections(client, 0)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'pool with an idle connection is kept and a new pool is created after eviction'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        def pool = client.connectionManager.pools().values().first()
+
+        // the idle connection is reused, and the pool stays
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        assert client.connectionManager.poolCount() == 1
+        assert client.connectionManager.pools().values().first() == pool
+        assertPoolConnections(client, 1)
+
+        conn1.clientChannel.close()
+        conn1.advance()
+        assert client.connectionManager.poolCount() == 0
+        assert ((Pool49) pool.pool).isRetired()
+        // a retired pool refuses new requests, so that callers look up a fresh one
+        assert pool.acquire(null, null) == null
+
+        when:
+        // the next connection is conn2, make sure the request prefers its event loop
+        ((EmbeddedConnectionManager) client.connectionManager).preferredPoolCounter.set(1)
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        then:
+        client.connectionManager.poolCount() == 1
+        client.connectionManager.pools().values().first() != pool
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'request does not get stuck on a retired pool that is still in the pool map'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        def key = client.connectionManager.pools().keySet().first()
+        def pool = client.connectionManager.pools().get(key)
+        conn1.clientChannel.close()
+        conn1.advance()
+        assert ((Pool49) pool.pool).isRetired()
+
+        // simulate a request that looked up the pool just before it retired
+        client.connectionManager.pools().put(key, pool)
+
+        when:
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        then:
+        client.connectionManager.poolCount() == 1
+        client.connectionManager.pools().get(key) != pool
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    @Timeout(30)
+    def 'failed connect evicts the pool'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        conn.openFuture = new CompletableFuture<>() // delay open
+        patch(client, conn)
+
+        def future = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+        conn.advance()
+        assert !future.isDone()
+        assert client.connectionManager.poolCount() == 1
+
+        when:
+        conn.openFuture.completeExceptionally(new IOException('connect failed'))
+        conn.advance()
+
+        then:
+        future.isCompletedExceptionally()
+        client.connectionManager.poolCount() == 0
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    @Timeout(30)
+    def 'pending acquire still completes when another connect fails'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-pending-connections': 1,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        conn1.openFuture = new CompletableFuture<>() // delay open
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        def future1 = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+        conn1.advance()
+        // can't open a second connection, so this request waits in the pool
+        def future2 = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+        conn2.advance()
+        assert !future1.isDone()
+        assert !future2.isDone()
+
+        when:
+        conn1.openFuture.completeExceptionally(new IOException('connect failed'))
+        conn1.advance()
+        conn2.advance()
+
+        then:
+        future1.isCompletedExceptionally()
+        // the pool must not retire while future2 is still waiting
+        client.connectionManager.poolCount() == 1
+
+        when:
+        conn2.testExchangeResponse(future2)
+
+        then:
+        client.connectionManager.poolCount() == 1
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'max http1 connections'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.pool.max-pending-connections': 1,
@@ -2129,18 +2310,18 @@ class ConnectionManagerSpec extends Specification {
             serverChannel.writeOutbound(response)
         }
 
-        CompletableFuture<HttpResponse<?>> testExchangeRequest(HttpClient client) {
-            def future = Mono.from(client.exchange(scheme + '://example.com/foo')).toFuture()
+        CompletableFuture<HttpResponse<?>> testExchangeRequest(HttpClient client, String host = 'example.com') {
+            def future = Mono.from(client.exchange(scheme + '://' + host + '/foo')).toFuture()
             future.exceptionally(t -> t.printStackTrace())
             advance()
             return future
         }
 
-        void testExchangeResponse(CompletableFuture<HttpResponse<?>> future, String connectionHeader = "keep-alive") {
+        void testExchangeResponse(CompletableFuture<HttpResponse<?>> future, String connectionHeader = "keep-alive", String host = 'example.com') {
             io.netty.handler.codec.http.HttpRequest request = serverChannel.readInbound()
             assert request.uri() == '/foo'
             assert request.method() == HttpMethod.GET
-            assert request.headers().get('host') == 'example.com'
+            assert request.headers().get('host') == host
             assert request.headers().get("connection") == connectionHeader
 
             def tail = serverChannel.readInbound()
