@@ -98,7 +98,25 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @throws UncheckedIOException if the directories cannot be copied
      */
     public static GenerationClassLoader snapshot(int generation, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
-        List<Path> roots = new java.util.ArrayList<>(sources.size());
+        return snapshot(generation, List.of(), sources, snapshotDir, parent);
+    }
+
+    /**
+     * Creates a generation over live directories followed by a snapshot of others. The live directories
+     * are read as they are: the resource roots the developer edits, which the generation must serve
+     * fresh; the snapshot isolates the generation from the build output the compiler rewrites.
+     *
+     * @param generation The number of the generation, counted from one
+     * @param liveRoots The directories read live, searched first
+     * @param sources The directories to snapshot, searched after the live ones
+     * @param snapshotDir Where the snapshot goes; emptied first
+     * @param parent The parent loader
+     * @return The generation
+     * @throws UncheckedIOException if the directories cannot be copied
+     */
+    public static GenerationClassLoader snapshot(int generation, List<Path> liveRoots, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
+        List<Path> roots = new java.util.ArrayList<>(liveRoots.size() + sources.size());
+        roots.addAll(liveRoots);
         try {
             deleteRecursively(snapshotDir);
             for (int i = 0; i < sources.size(); i++) {
@@ -110,7 +128,9 @@ public final class GenerationClassLoader extends URLClassLoader {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot snapshot the reloadable directories into " + snapshotDir, e);
         }
-        return new GenerationClassLoader(generation, sources, roots, snapshotDir, parent);
+        List<Path> all = new java.util.ArrayList<>(liveRoots);
+        all.addAll(sources);
+        return new GenerationClassLoader(generation, all, roots, snapshotDir, parent);
     }
 
     /**
