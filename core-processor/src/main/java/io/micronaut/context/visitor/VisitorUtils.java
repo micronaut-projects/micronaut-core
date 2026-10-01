@@ -36,8 +36,11 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,12 +55,48 @@ import java.util.stream.Collectors;
 @Internal
 public class VisitorUtils {
 
+    /**
+     * Collects all class imports, merging annotations for overlapping imports with the same target package.
+     * Conflicting target packages for the same class are reported as compilation errors.
+     *
+     * @param element The importing class
+     * @param context The visitor context
+     * @return The imported classes in discovery order, without duplicates
+     */
     public static List<ClassElement> collectImportedElements(ClassElement element, VisitorContext context) {
-        List<ClassElement> importedElements = new ArrayList<>();
-        AnnotationValue<ClassImport> annotation = element.getAnnotation(ClassImport.class);
-        if (annotation == null) {
-            return importedElements;
+        Map<String, ImportedElement> imports = new LinkedHashMap<>();
+        for (AnnotationValue<ClassImport> annotation : element.getAnnotationValuesByType(ClassImport.class)) {
+            String targetPackage = annotation.stringValue("targetPackage").orElse(element.getPackageName());
+            List<String> annotate = Arrays.asList(annotation.stringValues("annotate"));
+            for (ClassElement classElement : collectImportedElements(element, context, annotation)) {
+                ImportedElement importedElement = imports.get(classElement.getName());
+                if (importedElement == null) {
+                    imports.put(classElement.getName(), new ImportedElement(classElement, targetPackage, new LinkedHashSet<>(annotate)));
+                } else if (!importedElement.targetPackage().equals(targetPackage)) {
+                    context.fail("Cannot import class [" + classElement.getName() + "] into conflicting target packages ["
+                        + importedElement.targetPackage() + "] and [" + targetPackage + "]", element);
+                } else {
+                    importedElement.annotations().addAll(annotate);
+                }
+            }
         }
+        List<ClassElement> importedElements = new ArrayList<>(imports.size());
+        // Resolve every occurrence's filters before adding synthetic annotations to the imported classes.
+        for (ImportedElement importedElement : imports.values()) {
+            ClassElement classElement = importedElement.classElement();
+            classElement.annotate(ImportedClass.class,
+                builder -> builder.member("targetPackage", importedElement.targetPackage())
+                    .member("originatingElement", element.getName()));
+            for (String newAnnotation : importedElement.annotations()) {
+                classElement.annotate(newAnnotation);
+            }
+            importedElements.add(classElement);
+        }
+        return importedElements;
+    }
+
+    private static List<ClassElement> collectImportedElements(ClassElement element, VisitorContext context, AnnotationValue<ClassImport> annotation) {
+        List<ClassElement> importedElements = new ArrayList<>();
         String[] includedAnnotations = annotation.stringValues("includedAnnotations");
         String[] excludedAnnotations = annotation.stringValues("excludedAnnotations");
         final String[] classNames = annotation.stringValues("classes");
@@ -85,16 +124,6 @@ public class VisitorUtils {
                     }
                     importedElements.add(classElement);
                 }
-            }
-        }
-        String targetPackage = annotation.stringValue("targetPackage").orElse(element.getPackageName());
-        String[] annotate = annotation.stringValues("annotate");
-        for (ClassElement classElement : importedElements) {
-            classElement.annotate(ImportedClass.class,
-                builder -> builder.member("targetPackage", targetPackage)
-                    .member("originatingElement", element.getName()));
-            for (String newAnnotation : annotate) {
-                classElement.annotate(newAnnotation);
             }
         }
         return importedElements;
@@ -310,6 +339,9 @@ public class VisitorUtils {
                 findAnnotationsToRemove(new AnnotationMetadataHierarchy(source, targetParameter))
             );
         }
+    }
+
+    private record ImportedElement(ClassElement classElement, String targetPackage, Set<String> annotations) {
     }
 
 }
