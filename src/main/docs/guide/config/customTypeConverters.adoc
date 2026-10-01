@@ -1,5 +1,0 @@
-.Supply Configuration
-[source,groovy]
-----
-include::{testsdir}/config/converters/Book.java[tags=start, indent=0]
-----

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Property(name = "micronaut.server.error-response-include-message", value = "always")
 @Property(name = "spec.name", value = "DefaultHtmlErrorResponseBodyProviderCacheMaxSize")
 @MicronautTest
 class DefaultHtmlErrorResponseBodyProviderCacheMaxSizeTest {

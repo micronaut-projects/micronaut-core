@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.type
 
+import io.micronaut.core.annotation.AnnotationMetadata
 import spock.lang.Specification
 import spock.lang.Unroll
 /**
@@ -169,6 +170,37 @@ class ArgumentSpec extends Specification {
         arg.getTypeParameters()[0].getTypeParameters()[0].getType() == Long.class
     }
 
+    void "a raw argument keeps the type parameters it is given and says it is raw"() {
+        given:
+        def raw = Argument.ofRawType(List, 'raw', null, [Argument.ofTypeVariable(Object, 'E')] as Argument[])
+
+        expect:
+        raw.isRawType()
+        raw.type == List
+        raw.name == 'raw'
+        raw.typeParameters*.type == [Object]
+
+        and: 'an argument written with its type arguments is not raw, nor is a variable'
+        !Argument.of(List, 'concrete', Argument.of(String, 'E')).isRawType()
+        !Argument.ofTypeVariable(Object, 'E').isRawType()
+        !Argument.OBJECT_ARGUMENT.isRawType()
+
+        and: 'renaming it or giving it other metadata keeps it raw'
+        raw.withName('other').isRawType()
+        raw.withName('other').name == 'other'
+        raw.withName('other').typeParameters*.type == [Object]
+        raw.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).isRawType()
+
+        and: 'a raw argument of no name is not given one by being rebuilt, as a placeholder is not'
+        Argument.ofRawType(List, null, null, Argument.ZERO_ARGUMENTS)
+                .withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).toString() ==
+                Argument.ofRawType(List, null, null, Argument.ZERO_ARGUMENTS).toString()
+
+        and: 'rawness does not take part in equality, as it does not for a type variable'
+        raw == Argument.of(List, 'raw', Argument.ofTypeVariable(Object, 'E'))
+        raw.hashCode() == Argument.of(List, 'raw', Argument.ofTypeVariable(Object, 'E')).hashCode()
+    }
+
     @Unroll
     void 'test #field type is equals the argument parameterized type'() {
         given:
@@ -182,6 +214,40 @@ class ArgumentSpec extends Specification {
 
         where:
             field << ["justString", "stringList", "mapStringInteger", "objectMap", "noTypeMap"]
+    }
+
+    void 'a nested wildcard is compared by the type it is bounded by in equalsType and typeHashCode'() {
+        given: 'the JVM signature of a Kotlin Map<String, Any>: Map<String, ? extends Object>'
+        def wildcard = Argument.ofWildcard(Object, 'V', null, null, null, null)
+        def kotlinMap = Argument.of(Map, 'headers', Argument.of(String, 'K'), wildcard)
+        def map = Argument.mapOf(String, Object)
+        def upperBounded = Argument.of(List, 'numbers', Argument.ofWildcard(Number, 'E', null, null, [Argument.of(Number)] as Argument[], null))
+        def lowerBounded = Argument.of(List, 'numbers', Argument.ofWildcard(Number, 'E', null, null, null, [Argument.of(Number)] as Argument[]))
+        def nested = Argument.of(List, 'nested', Argument.of(Map, 'E', Argument.of(String, 'K'), wildcard))
+
+        expect:
+        kotlinMap.equalsType(map)
+        map.equalsType(kotlinMap)
+        kotlinMap.typeHashCode() == map.typeHashCode()
+        !kotlinMap.equalsType(Argument.mapOf(String, String))
+
+        and: 'whichever way the wildcard is bounded, as the processors compiled it before the bounds were kept'
+        upperBounded.equalsType(Argument.listOf(Number))
+        upperBounded.typeHashCode() == Argument.listOf(Number).typeHashCode()
+        lowerBounded.equalsType(Argument.listOf(Number))
+        lowerBounded.typeHashCode() == Argument.listOf(Number).typeHashCode()
+
+        and: 'at any depth, a type argument being matched by the name of the type parameter it stands for'
+        nested.equalsType(Argument.listOf(map.withName('E')))
+        Argument.listOf(map.withName('E')).equalsType(nested)
+        nested.typeHashCode() == Argument.listOf(map.withName('E')).typeHashCode()
+        !nested.equalsType(Argument.listOf(Argument.mapOf(String, String).withName('E')))
+
+        and: 'equals keeps telling a wildcard from a plain argument, in both directions'
+        wildcard != Argument.of(Object, 'V')
+        Argument.of(Object, 'V') != wildcard
+        kotlinMap != Argument.of(Map, 'headers', Argument.of(String, 'K'), Argument.of(Object, 'V'))
+        Argument.of(Map, 'headers', Argument.of(String, 'K'), Argument.of(Object, 'V')) != kotlinMap
     }
 
 /*

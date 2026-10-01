@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test.annotate
 
+import io.micronaut.python.compiler.JavaImportsManifest
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Property
@@ -204,16 +205,11 @@ class Test:
 ''')
 
         when:
-        def resource = definition.class.classLoader.getResource(
-            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/context/annotation/ConfigurationProperties.py'
-        )
-        def stub = resource?.text
+        def manifest = JavaImportsManifest.read(definition.class.classLoader)
 
-        then:
-        resource != null
-        stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationProperties"')
-        !stub.contains('@ConfigurationReader')
-        !stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationReader")')
+        then: "the imported annotation is recorded for the runtime, its meta-annotation is not imported with it"
+        manifest.member("micronaut.context.annotation", "ConfigurationProperties") == ["io.micronaut.context.annotation.ConfigurationProperties", "annotation"]
+        manifest.member("micronaut.context.annotation", "ConfigurationReader") == null
 
         and:
         definition.annotationMetadata.stringValue(ConfigurationReader, "prefix").get() == "xyz"
@@ -446,13 +442,11 @@ class Test:
 ''')
 
         when:
-        def resource = definition.class.classLoader.getResource(
-            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/core/annotation/Nullable.py'
-        )
+        def manifest = JavaImportsManifest.read(definition.class.classLoader)
 
         then:
-        resource != null
-        !resource.text.contains('jakarta.annotation.Nullable')
+        manifest.member("micronaut.core.annotation", "Nullable") == ["io.micronaut.core.annotation.Nullable", "annotation"]
+        !manifest.packages.containsKey("jakarta.annotation")
     }
 
     void "test PEP 604 nullable annotated parameter is captured in method parameter metadata"() {

@@ -4,8 +4,9 @@ import io.micronaut.docs.ioc.mappers.ChristmasTypes.ChristmasPresent;
 import io.micronaut.docs.ioc.mappers.ChristmasTypes.Present;
 import io.micronaut.docs.ioc.mappers.ChristmasTypes.PresentPackaging;
 
-// tag::mapper[]
+//tag::imports[]
 import io.micronaut.context.annotation.Mapper.Mapping;
+//end::imports[]
 
 //tag::mapper[]
 public interface ChristmasMappers {

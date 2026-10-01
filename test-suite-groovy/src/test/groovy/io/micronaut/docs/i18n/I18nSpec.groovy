@@ -16,11 +16,13 @@
 package io.micronaut.docs.i18n
 
 import io.micronaut.context.MessageSource
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.MessageSource.MessageContext
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
 
+@Property(name = "spec.name", value = "I18nSpec")
 @MicronautTest(startApplication = false)
 class I18nSpec extends Specification {
 

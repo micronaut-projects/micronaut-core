@@ -154,30 +154,72 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     }
 
     /**
-     * Lookup annotation metadata for the parameter.
+     * Lookup annotation metadata for the parameter. The entry is keyed by the declaring type of the method, not
+     * by the owning type, so that a parameter of an inherited method shares one entry whichever class it is read
+     * through.
      *
      * @param parameterElement The element
      * @return The annotation metadata
      */
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
+        MethodElement methodElement = parameterElement.getMethodElement();
         return metadataBuilder.lookupOrBuildForParameter(
-            getNativeElement(parameterElement.getMethodElement().getOwningType()),
-            getNativeElement(parameterElement.getMethodElement()),
+            getNativeElement(methodElement.getDeclaringType()),
+            getNativeElement(methodElement),
             getNativeElement(parameterElement)
         );
     }
 
     /**
-     * Lookup annotation metadata for the field.
+     * Lookup annotation metadata for the field. The entry is keyed by the declaring type of the field, not by the
+     * owning type, so that an inherited field shares one entry whichever class it is read through.
      *
      * @param fieldElement The element
      * @return The annotation metadata
      */
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement) {
+        return lookupForField(fieldElement, false);
+    }
+
+    /**
+     * Lookup annotation metadata for the field read through its owning type. A mutation made on the field is keyed
+     * by the declaring type, a mutation made on the field as a component of a bean property belongs to the owning
+     * type.
+     *
+     * @param fieldElement      The element
+     * @param propertyComponent Whether a mutation is made on the field as a component of a bean property
+     * @return The annotation metadata
+     * @see AbstractAnnotationMetadataBuilder#lookupOrBuildForField(Object, Object, Object, boolean)
+     * @since 5.2.1
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement, boolean propertyComponent) {
         return metadataBuilder.lookupOrBuildForField(
             getNativeElement(fieldElement.getOwningType()),
-            getNativeElement(fieldElement)
+            getNativeElement(fieldElement.getDeclaringType()),
+            getNativeElement(fieldElement),
+            propertyComponent
         );
+    }
+
+    /**
+     * Build the annotation metadata of a field as a component of a bean property of the field's owning type.
+     *
+     * @param fieldElement The field element
+     * @return The element annotation metadata
+     */
+    ElementAnnotationMetadata buildForPropertyField(FieldElement fieldElement) {
+        return new AbstractElementAnnotationMetadata() {
+
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return lookupForField(fieldElement, true);
+            }
+
+            @Override
+            public String toString() {
+                return fieldElement.toString();
+            }
+        };
     }
 
     /**

@@ -1,4 +1,5 @@
 import io.micronaut.build.docs.PublishGuideTask
+import io.micronaut.build.python.MicronautPythonPlugin
 import org.gradle.api.tasks.PathSensitivity
 
 plugins {
@@ -48,13 +49,17 @@ tasks.named("updateVersionCatalogs") {
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
 
-def pythonProjects = [
+// Projects whose tests exercise Python without having Python sources of their own. Projects with
+// Python sources apply the io.micronaut.build.internal.python plugin, which takes care of them itself.
+def pythonTestProjects = [
         ":micronaut-inject-python",
         ":micronaut-inject-python-test",
         ":micronaut-context-python",
-        ":micronaut-context-python-netty",
-        ":test-suite-python"
+        ":micronaut-context-python-netty"
 ]
+// Projects whose tests all run in the first Python CI job instead of being split across the jobs
+def pythonUnshardedProjects = []
+def pythonProjects = pythonTestProjects + [":test-suite-python"]
 
 if (System.getenv("SONAR_TOKEN") != null) {
     // deprecated and compile time only classes excluded from analysis
@@ -75,11 +80,16 @@ if (System.getenv("SONAR_TOKEN") != null) {
     def pythonCoverageExcludes = pythonProjects.collect {
         "${project(it).projectDir.name}/**/*"
     }
+    // GraalVM Feature code only ever executes during native image generation, so it can never be
+    // covered by the JVM test suite. It is still analysed for issues, just not for coverage.
+    def coverageExcludes = pythonCoverageExcludes + [
+        "**/ServiceLoaderFeature.java"
+    ]
     sonarqube {
         skipProject = project.name.contains("test")
         properties {
             property "sonar.exclusions", analysisExcludes.join(",")
-            property "sonar.coverage.exclusions", pythonCoverageExcludes.join(",")
+            property "sonar.coverage.exclusions", coverageExcludes.join(",")
         }
     }
 }
@@ -91,12 +101,54 @@ configurations.javadocAggregatorBase.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
 }
 
-if (!providers.gradleProperty("python-ci").isPresent()) {
-    subprojects { project ->
-        if (project.path in pythonProjects) {
+// Python tests need a GraalVM runtime and are slow: they only run in the Python CI workflow,
+// which runs `pythonCheck -Ppython-ci`, split across the jobs of a matrix (python-ci-shards in
+// gradle.properties) which each run one shard of the test classes. The
+// `io.micronaut.build.internal.python` plugin applies the same conventions to the projects with
+// Python sources and adds them to `pythonCheck`.
+def pythonCiShard = providers.gradleProperty("python-ci-shard")
+subprojects { project ->
+    if (project.path in pythonTestProjects) {
+        if (!providers.gradleProperty("python-ci").isPresent()) {
             project.tasks.withType(Test).configureEach {
                 enabled = false
             }
         }
+        if (project.path in pythonUnshardedProjects) {
+            project.tasks.withType(Test).configureEach {
+                onlyIf("the tests of ${project.path} run in the first Python CI job") {
+                    pythonCiShard.map { it.startsWith("1/") }.getOrElse(true)
+                }
+            }
+        } else {
+            MicronautPythonPlugin.shardTests(project)
+        }
     }
+}
+// A Python test runs its guest code too briefly for Truffle's compiled code to pay off, and every
+// GraalPy engine a test creates compiles its code again: with runtime compilation on, the Truffle
+// and host compiler threads used two thirds of the CPU of a Python test JVM. The host code runs
+// with C2, which compiles far less eagerly than the Graal JIT.
+subprojects { project ->
+    if (project.path in pythonProjects) {
+        project.tasks.withType(Test).configureEach {
+            jvmArgs(
+                    "-XX:+UnlockExperimentalVMOptions",
+                    "-XX:-UseJVMCICompiler",
+                    // with compilation off a fifth of the CPU went to G1
+                    "-XX:+UseParallelGC",
+                    // Truffle's interpreter-only runtime: unlike polyglot.engine.Compilation=false it exists on
+                    // every GraalVM, including one whose Truffle version doesn't match GraalPy's
+                    "-Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime",
+                    "-Dpolyglot.engine.WarnInterpreterOnly=false"
+            )
+        }
+    }
+}
+tasks.matching { it.name == "pythonCheck" }.configureEach {
+    dependsOn pythonTestProjects.collect { "${it}:check" }
+}
+// The benchmarks have no tests: the Java CI already compiles them
+if (providers.gradleProperty("python-ci").isPresent()) {
+    gradle.startParameter.excludedTaskNames.add(":benchmarks:check")
 }

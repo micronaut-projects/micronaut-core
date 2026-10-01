@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * Implementation of {@link GenericPlaceholder}.
  *
@@ -30,7 +32,19 @@ final class DefaultGenericPlaceholder<T>
         extends DefaultArgument<T>
         implements GenericPlaceholder<T> {
     @Nullable
+    private final String name;
+    @Nullable
     private final String variableName;
+    /**
+     * The declared bounds, or {@code null} when they were not recorded.
+     */
+    @Nullable
+    private final List<Argument<?>> bounds;
+    /**
+     * The type the variable erases to, answered when no bounds were recorded, computed once.
+     */
+    @Nullable
+    private List<Argument<?>> erasedBounds;
 
     /**
      * Constructor for where@author variable name and argument name are@author same.
@@ -45,8 +59,7 @@ final class DefaultGenericPlaceholder<T>
             @Nullable String name,
             @Nullable AnnotationMetadata annotationMetadata,
             Argument<?> @Nullable ... genericTypes) {
-        super(type, name, annotationMetadata, genericTypes);
-        this.variableName = name;
+        this(type, name, name, annotationMetadata, genericTypes, (List<Argument<?>>) null);
     }
 
     /**
@@ -64,8 +77,55 @@ final class DefaultGenericPlaceholder<T>
             String variableName,
             @Nullable AnnotationMetadata annotationMetadata,
             Argument<?>... genericTypes) {
+        this(type, name, variableName, annotationMetadata, genericTypes, (List<Argument<?>>) null);
+    }
+
+    /**
+     * Constructor for a placeholder that keeps the bounds declared for its type variable.
+     *
+     * @param type               The type
+     * @param name               The name
+     * @param variableName       The variable name, {@code null} when it is the argument name
+     * @param annotationMetadata The annotation metadata
+     * @param genericTypes       The generic types
+     * @param bounds             The declared bounds, {@code null} or empty when they were not recorded
+     * @since 5.2.0
+     */
+    DefaultGenericPlaceholder(
+            Class<T> type,
+            @Nullable String name,
+            @Nullable String variableName,
+            @Nullable AnnotationMetadata annotationMetadata,
+            Argument<?> @Nullable [] genericTypes,
+            Argument<?> @Nullable [] bounds) {
+        this(type, name, variableName, annotationMetadata, genericTypes,
+            bounds == null || bounds.length == 0 ? null : List.of(bounds));
+    }
+
+    private DefaultGenericPlaceholder(
+            Class<T> type,
+            @Nullable String name,
+            @Nullable String variableName,
+            @Nullable AnnotationMetadata annotationMetadata,
+            Argument<?> @Nullable [] genericTypes,
+            @Nullable List<Argument<?>> bounds) {
         super(type, name, annotationMetadata, genericTypes);
+        this.name = name;
         this.variableName = variableName;
+        this.bounds = bounds;
+    }
+
+    @Override
+    public List<Argument<?>> getBounds() {
+        if (bounds != null) {
+            return bounds;
+        }
+        List<Argument<?>> erased = erasedBounds;
+        if (erased == null) {
+            erased = GenericPlaceholder.super.getBounds();
+            erasedBounds = erased;
+        }
+        return erased;
     }
 
     @Override
@@ -76,5 +136,17 @@ final class DefaultGenericPlaceholder<T>
     @Override
     public boolean isTypeVariable() {
         return true;
+    }
+
+    @Override
+    public Argument<T> withName(@Nullable String name) {
+        // Renaming the argument does not rename the variable it stands for, so an implicit variable name,
+        // the name this argument was given, is resolved before the new one replaces it
+        return new DefaultGenericPlaceholder<>(getType(), name, getVariableName(), getAnnotationMetadata(), getTypeParameters(), bounds);
+    }
+
+    @Override
+    public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return new DefaultGenericPlaceholder<>(getType(), name, variableName, annotationMetadata, getTypeParameters(), bounds);
     }
 }

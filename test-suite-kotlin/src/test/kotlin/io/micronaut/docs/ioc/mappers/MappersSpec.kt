@@ -23,4 +23,23 @@ internal class MappersSpec {
             // end::mappers[]
         }
     }
+
+    @Test
+    fun testMerging() {
+        ApplicationContext.run().use { context ->
+            // tag::merge[]
+            val mappers = context.getBean(ChristmasMappers::class.java)
+
+            val result = mappers.merge(
+                ChristmasTypes.PresentPackaging(1f, "red"),
+                ChristmasTypes.Present(10f, "teddy bear")
+            )
+
+            Assertions.assertEquals(11f, result.weight)
+            Assertions.assertEquals("red", result.packagingColor)
+            Assertions.assertEquals("teddy bear", result.type)
+            Assertions.assertEquals("Merry christmas", result.greetingCard)
+            // end::merge[]
+        }
+    }
 }

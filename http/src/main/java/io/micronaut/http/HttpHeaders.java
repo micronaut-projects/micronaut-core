@@ -222,6 +222,20 @@ public interface HttpHeaders extends Headers {
     String CONTENT_RANGE = "Content-Range";
 
     /**
+     * {@code "Content-Security-Policy"}.
+     *
+     * @since 5.2.0
+     */
+    String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
+
+    /**
+     * {@code "Content-Security-Policy-Report-Only"}.
+     *
+     * @since 5.2.0
+     */
+    String CONTENT_SECURITY_POLICY_REPORT_ONLY = "Content-Security-Policy-Report-Only";
+
+    /**
      * {@code "Content-Type"}.
      */
     String CONTENT_TYPE = "Content-Type";
@@ -230,6 +244,13 @@ public interface HttpHeaders extends Headers {
      * {@code "Cookie"}.
      */
     String COOKIE = "Cookie";
+
+    /**
+     * {@code "Cross-Origin-Embedder-Policy"}.
+     *
+     * @since 5.2.0
+     */
+    String CROSS_ORIGIN_EMBEDDER_POLICY = "Cross-Origin-Embedder-Policy";
 
     /**
      * {@code "Cross-Origin-Resource-Policy"}.
@@ -390,6 +411,34 @@ public interface HttpHeaders extends Headers {
      * {@code "Save-Data"}.
      */
     String SAVE_DATA = "Save-Data";
+
+    /**
+     * {@code "Sec-Fetch-Dest"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_DEST = "Sec-Fetch-Dest";
+
+    /**
+     * {@code "Sec-Fetch-Mode"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_MODE = "Sec-Fetch-Mode";
+
+    /**
+     * {@code "Sec-Fetch-Site"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_SITE = "Sec-Fetch-Site";
+
+    /**
+     * {@code "Sec-Fetch-User"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_USER = "Sec-Fetch-User";
 
     /**
      * {@code "Sec-WebSocket-Key1"}.
@@ -565,8 +614,11 @@ public interface HttpHeaders extends Headers {
         CONTENT_TRANSFER_ENCODING,
         CONTENT_MD5,
         CONTENT_RANGE,
+        CONTENT_SECURITY_POLICY,
+        CONTENT_SECURITY_POLICY_REPORT_ONLY,
         CONTENT_TYPE,
         COOKIE,
+        CROSS_ORIGIN_EMBEDDER_POLICY,
         CROSS_ORIGIN_RESOURCE_POLICY,
         DATE,
         DEVICE_MEMORY,
@@ -599,6 +651,10 @@ public interface HttpHeaders extends Headers {
         RETRY_AFTER,
         RTT,
         SAVE_DATA,
+        SEC_FETCH_DEST,
+        SEC_FETCH_MODE,
+        SEC_FETCH_SITE,
+        SEC_FETCH_USER,
         SEC_WEBSOCKET_KEY1,
         SEC_WEBSOCKET_KEY2,
         SEC_WEBSOCKET_LOCATION,

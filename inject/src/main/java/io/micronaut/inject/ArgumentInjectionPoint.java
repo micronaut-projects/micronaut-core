@@ -17,6 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An injection point for a method or constructor argument.
@@ -29,8 +30,10 @@ import io.micronaut.core.type.ArgumentCoercible;
 public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B>, ArgumentCoercible<T> {
 
     /**
-     * @return The outer injection point (method or constructor)
+     * @return The outer injection point (method or constructor), or {@code null} when the
+     * injection point is not an argument of a callable, such as a field
      */
+    @Nullable
     CallableInjectionPoint<B> getOuterInjectionPoint();
 
     /**

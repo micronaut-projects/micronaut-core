@@ -31,7 +31,29 @@ import io.micronaut.kotlin.processing.visitor.KotlinMethodNativeElement
  * @author Denis Stepanov
  * @since 4.3.0
  */
-internal class KotlinNativeElementsHelper(var resolver: Resolver) : NativeElementsHelper<KSClassDeclaration, KSFunctionDeclaration>() {
+internal class KotlinNativeElementsHelper(resolver: Resolver) : NativeElementsHelper<KSClassDeclaration, KSFunctionDeclaration>() {
+
+    var resolver: Resolver = resolver
+        set(value) {
+            // A new resolver is a new round and a new Analysis API session, so nothing memoized
+            // against the old one may be reused.
+            field = value
+            overridesCache.clear()
+        }
+
+    /*
+     * Memo for the pairwise override predicate.
+     *
+     * NativeElementsHelper already skips pairs whose names differ and caches
+     * findOverriddenMethods per (class, method), but the same *pair* is still re-tested for every
+     * subclass that inherits it, and every re-test pays a fresh session entry.
+     *
+     * The key is the pair alone: this implementation ignores `owner` and delegates to
+     * Resolver.overrides(m1, m2), which is a pure function of the two declarations. Keying on the
+     * declarations is sound because KSP memoizes function declarations on the underlying KaSymbol,
+     * which the Analysis API interns.
+     */
+    private val overridesCache = HashMap<Pair<KSFunctionDeclaration, KSFunctionDeclaration>, Boolean>()
 
     override fun getClassCacheKey(classElement: KSClassDeclaration): Any {
         return KotlinClassNativeElement(classElement, null, null)
@@ -53,7 +75,7 @@ internal class KotlinNativeElementsHelper(var resolver: Resolver) : NativeElemen
     }
 
     override fun overrides(m1: KSFunctionDeclaration, m2: KSFunctionDeclaration, owner: KSClassDeclaration): Boolean {
-        return resolver.overrides(m1, m2)
+        return overridesCache.getOrPut(m1 to m2) { resolver.overrides(m1, m2) }
     }
 
     override fun getMethodName(element: KSFunctionDeclaration): String {

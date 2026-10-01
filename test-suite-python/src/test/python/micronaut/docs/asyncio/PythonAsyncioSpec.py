@@ -4,12 +4,16 @@ import builtins
 import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
+from micronaut.http import HttpRequest
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
 AsyncioConcurrentClientRunner = java.type("micronaut.docs.asyncio.AsyncioConcurrentClientRunner")
+NoteClass = java.type("micronaut.docs.asyncio.Note")
+
+from .Note import Note
 
 
 @Property(name="spec.name", value="PythonAsyncioSpec")
@@ -86,7 +90,41 @@ class PythonAsyncioSpec:
         assert int(heartbeat_elapsed) < 90, f"event-loop heartbeat was delayed: elapsed={heartbeat_elapsed}ms"
 
     @Test
+    def dataclassBodyRoundTripsThroughThePooledEventLoopContext(self):
+        response = self.client.toBlocking().retrieve(
+            HttpRequest.POST("/async-demo/echo-note", Note(text="hello", priority=2)), NoteClass
+        )
+
+        assert "hello:True" == response.text
+        assert 3 == response.priority
+
+    @Test
     def asyncControllerUsesEventLoopContext(self):
         context_id = self.client.toBlocking().retrieve("/async-demo/context-id")
 
         assert context_id != builtins.__MN_CTX_ID__
+
+    @Test
+    def constructorInjectedAsyncControllerRunsInEventLoopContext(self):
+        response = self.client.toBlocking().retrieve("/async-constructor/message")
+        assert "constructor:backend!" == response, response
+
+    @Test
+    def constructorInjectedAsyncControllerCanAwaitPythonBean(self):
+        response = self.client.toBlocking().retrieve("/async-constructor/greeting")
+        assert "hello constructor!" == response, response
+
+    @Test
+    def constructorInjectedAsyncControllerCanAwaitHostBean(self):
+        response = self.client.toBlocking().retrieve("/async-constructor/exchange")
+        assert "constructor:backend" == response, response
+
+    @Test
+    def injectedPythonBeanCanAwaitItsOwnInjectedClient(self):
+        response = self.client.toBlocking().retrieve("/async-bean-await/backend-greeting")
+        assert "hello backend" == response, response
+
+    @Test
+    def asyncControllerCanAwaitInjectedPythonBean(self):
+        response = self.client.toBlocking().retrieve("/async-bean-await/greeting")
+        assert "hello attribute" == response, response

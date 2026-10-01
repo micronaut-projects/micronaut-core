@@ -12,5 +12,5 @@ public class ShoppingCartController {
     HttpResponse<String> checkSession(@ShoppingCart Long sessionId) { //<1>
         return HttpResponse.ok("Session:" + sessionId);
     }
-    // end::method
+    // end::method[]
 }

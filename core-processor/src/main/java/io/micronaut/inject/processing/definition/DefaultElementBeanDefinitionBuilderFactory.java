@@ -38,6 +38,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.processing.ProxyableTypeValidator;
 import io.micronaut.inject.utils.BeanInjectionUtils;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -73,7 +74,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
 
     @Override
     public ElementBeanDefinitionBuilder<OutputObjectDef> ofType(ClassElement classElement) {
-        MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
+        MethodElement constructorElement = BeanInjectionUtils.findBeanConstructor(classElement).orElse(null);
         if (constructorElement != null) {
             return constructor(
                 BeanInjectionUtils.createConstructorDefinition(constructorElement, visitorContext)
@@ -157,12 +158,16 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
                                                             AnnotationMetadata aopElementAnnotationProcessor,
                                                             ElementBeanDefinitionBuilder<OutputObjectDef> targetBeanDefinitionBuilder) {
 
-        if (targetType.isFinal()) {
-            throw new ProcessingException(targetType, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetType.getName());
-        }
+        ProxyableTypeValidator.validateProxyable(targetType, targetType);
         BeanDefinitionWriter targetBeanWriter = (BeanDefinitionWriter) targetBeanDefinitionBuilder;
         MemberDefinition<ClassElement> elementProducerDefinition = targetBeanWriter.getElementProducerDefinition();
         boolean isFactoryMethod = !(elementProducerDefinition instanceof ConstructorDefinition<ClassElement, ?>);
+        if (elementProducerDefinition instanceof ConstructorDefinition<ClassElement, ?> constructorDefinition
+            && constructorDefinition.constructorElement() instanceof MethodElement constructor
+            && constructor.isPrivate()) {
+            // The generated proxy extends the bean type, and its constructor has to invoke the bean constructor
+            throw new ProcessingException(constructor, "Cannot apply AOP advice to a bean created with a private constructor. The constructor must be made non-private to support proxying: " + targetType.getName());
+        }
 
         Map<CharSequence, Boolean> settings = new LinkedHashMap<>();
         OptionalValues<Boolean> aroundSettings = aopElementAnnotationProcessor.getValues(AnnotationUtil.ANN_AROUND, Boolean.class);
@@ -211,6 +216,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
 
     @Override
     public ElementProxyBuilder<OutputObjectDef> introductionProxy(ClassElement target) {
+        ProxyableTypeValidator.validateProxyable(target, target);
         AnnotationMetadata annotationMetadata = target.getAnnotationMetadata();
 
         List<ClassElement> interfaceTypes = Arrays.stream(annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(EMPTY_STRING_ARRAY))
@@ -291,7 +297,9 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
                 // Configuration beans are validated at the startup and don't require validation advice
                 beanDefinitionWriter.setRequiresPostConstructBeanValidation(true);
             } else {
-                for (MethodElement methodElement : target.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(am -> am.hasAnnotation(ANN_REQUIRES_VALIDATION)))) {
+                // NOTE: the method's annotation metadata combines the class and the method annotations,
+                // only the methods that declare `@RequiresValidation` themselves should get the validation advice
+                for (MethodElement methodElement : target.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(am -> am.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)))) {
                     methodElement.annotate(ANN_VALIDATED);
                 }
             }

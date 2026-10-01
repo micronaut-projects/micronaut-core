@@ -1,2 +1,4 @@
 io.micronaut.kotlin.processing.aop.compile.TestStereotypeAnnTransformer
 io.micronaut.kotlin.processing.aop.compile.AroundConstructAnnTransformer
+io.micronaut.annotation.mapping.MyOverridesTransformer
+io.micronaut.annotation.mapping.MyOverridesListTransformer

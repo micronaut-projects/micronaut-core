@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.function.Executable;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
+import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
@@ -74,7 +76,52 @@ public class ErrorHandlerFluxTest {
             HttpRequest.GET("/errors/flux-chunked-immediate-error"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Internal Server Error")
+                .body(BodyAssertion.builder().body("Cannot process request.").doesntContain())
+                .build()));
+    }
+
+    @Test
+    void testErrorHandlerWithFluxChunkedSignaledImmediateErrorIncludesMessageWhenConfigured() throws IOException {
+        asserts(SPEC_NAME,
+            Map.of("micronaut.server.error-response-include-message", "always"),
+            HttpRequest.GET("/errors/flux-chunked-immediate-error"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Internal Server Error: Cannot process request.")
+                .build()));
+    }
+
+    @Test
+    void testErrorHandlerWithFluxChunkedSignaledImmediateErrorIncludesMessageOnParam() throws IOException {
+        asserts(SPEC_NAME,
+            Map.of("micronaut.server.error-response-include-message", "on-param"),
+            HttpRequest.GET("/errors/flux-chunked-immediate-error?message"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Internal Server Error: Cannot process request.")
+                .build()));
+    }
+
+    @Test
+    void testErrorHandlerWithFluxChunkedSignaledImmediateErrorExcludesMessageOnParamFalse() throws IOException {
+        asserts(SPEC_NAME,
+            Map.of("micronaut.server.error-response-include-message", "on-param"),
+            HttpRequest.GET("/errors/flux-chunked-immediate-error?message=false"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(BodyAssertion.builder().body("Cannot process request.").doesntContain())
+                .build()));
+    }
+
+    @Test
+    void testErrorHandlerWithFluxChunkedSignaledImmediateErrorExcludesMessageWithoutParam() throws IOException {
+        asserts(SPEC_NAME,
+            Map.of("micronaut.server.error-response-include-message", "on-param"),
+            HttpRequest.GET("/errors/flux-chunked-immediate-error"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(BodyAssertion.builder().body("Cannot process request.").doesntContain())
                 .build()));
     }
 

@@ -31,7 +31,6 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
-import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.WildcardElement;
@@ -111,6 +110,43 @@ public final class ArgumentExpUtils {
         String.class,
         String.class,
         AnnotationMetadata.class,
+        Argument[].class
+    );
+
+    private static final Method METHOD_CREATE_ARGUMENT_CLASS = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "of",
+        Class.class
+    );
+
+    private static final Method METHOD_CREATE_TYPE_VAR_WITH_BOUNDS = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "ofTypeVariable",
+        Class.class,
+        String.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        Argument[].class
+    );
+
+    private static final Method METHOD_CREATE_RAW_TYPE = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "ofRawType",
+        Class.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class
+    );
+
+    private static final Method METHOD_CREATE_WILDCARD = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "ofWildcard",
+        Class.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        Argument[].class,
         Argument[].class
     );
 
@@ -242,6 +278,10 @@ public final class ArgumentExpUtils {
 
         boolean hasAnnotations = !annotationMetadata.isEmpty();
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        // The bounds are read from the placeholder, before it is replaced by the type it resolves to
+        List<? extends ClassElement> bounds = recordedBounds(argumentType);
+        // As is the rawness, which is a property of the usage rather than of the type it resolves to
+        boolean isRawType = isRawType(argumentType);
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Persist resolved placeholder for backward compatibility
             argumentType = placeholderElement.getResolved().orElse(placeholderElement);
@@ -261,7 +301,7 @@ public final class ArgumentExpUtils {
         // 2nd argument: The argument name
         values.add(ExpressionDef.constant(argumentName));
 
-        if (!hasAnnotations && !hasTypeArguments && !isTypeVariable) {
+        if (!hasAnnotations && !hasTypeArguments && !isTypeVariable && !isRawType) {
             return TYPE_ARGUMENT.invokeStatic(
                 METHOD_CREATE_ARGUMENT_SIMPLE,
                 values.stream().toList()
@@ -301,15 +341,27 @@ public final class ArgumentExpUtils {
         }
 
         if (isTypeVariable) {
+            if (!bounds.isEmpty()) {
+                // Argument.ofTypeVariable( .. ) keeping the bounds declared for the variable
+                return TYPE_ARGUMENT.invokeStatic(
+                    METHOD_CREATE_TYPE_VAR_WITH_BOUNDS,
+                    argumentTypeConstant,
+                    ExpressionDef.constant(argumentName),
+                    hasVariableName ? ExpressionDef.constant(variableName) : ExpressionDef.nullValue(),
+                    values.get(values.size() - 2),
+                    values.get(values.size() - 1),
+                    pushBounds(annotationMetadataWithDefaults, owningType, bounds, new HashSet<>(5), loadClassValueExpressionFn)
+                );
+            }
             // Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
                 hasVariableName ? METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS,
                 values
             );
         } else {
-            // Argument.create( .. )
+            // Argument.ofRawType( .. ) / Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
-                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
+                isRawType ? METHOD_CREATE_RAW_TYPE : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
                 values
             );
         }
@@ -358,7 +410,7 @@ public final class ArgumentExpUtils {
      * @param loadClassValueExpressionFn     The load type expression fn
      * @return The expression
      */
-    static ExpressionDef pushTypeArgumentElements(
+    public static ExpressionDef pushTypeArgumentElements(
         AnnotationMetadata annotationMetadataWithDefaults,
         ClassTypeDef owningType,
         ClassElement declaringType,
@@ -399,7 +451,11 @@ public final class ArgumentExpUtils {
             String argumentName = entry.getKey();
             ClassElement classElement = entry.getValue();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
-            if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
+            if (CollectionUtils.isNotEmpty(typeArguments)
+                || !classElement.getAnnotationMetadata().isEmpty()
+                || classElement instanceof WildcardElement
+                || isRawType(classElement)
+                || !recordedBounds(classElement).isEmpty()) {
                 return buildArgumentWithGenerics(
                     annotationMetadataWithDefaults,
                     owningType,
@@ -438,14 +494,23 @@ public final class ArgumentExpUtils {
 
         List<ExpressionDef> values = new ArrayList<>();
 
+        // The bounds and the variable's own name are read from the placeholder, before it is replaced by the
+        // type it resolves to
+        List<? extends ClassElement> bounds = recordedBounds(argumentType);
+        // As is the rawness, which is a property of the usage rather than of the type it resolves to
+        boolean isRawType = isRawType(argumentType);
+        String variableName = argumentType instanceof GenericPlaceholderElement placeholder
+            ? placeholder.getVariableName() : null;
+
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Persist resolved placeholder for backward compatibility
             argumentType = placeholderElement.getResolved().orElse(argumentType);
         }
 
         // Persist only type annotations added to the type argument
-        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
+        MutableAnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
+        boolean isWildcard = argumentType instanceof WildcardElement;
 
         boolean isRecursiveType = false;
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
@@ -466,7 +531,7 @@ public final class ArgumentExpUtils {
         values.add(ExpressionDef.constant(argumentName));
 
 
-        if (isRecursiveType || !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
+        if (isRecursiveType || !isWildcard && !typeVariable && !isRawType && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             // Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
                 METHOD_CREATE_ARGUMENT_SIMPLE,
@@ -483,7 +548,7 @@ public final class ArgumentExpUtils {
 
             values.add(
                 AnnotationMetadataGenUtils.instantiateNewMetadata(
-                    (MutableAnnotationMetadata) annotationMetadata,
+                    annotationMetadata,
                     loadClassValueExpressionFn
                 )
             );
@@ -504,11 +569,136 @@ public final class ArgumentExpUtils {
             )
         );
 
+        if (argumentType instanceof WildcardElement wildcardElement) {
+            // The argument is the bound the wildcard resolves to; the bounds are kept the way
+            // java.lang.reflect.WildcardType reports them: Object above unless declared otherwise
+            List<? extends ClassElement> upperBounds = List.of();
+            List<? extends ClassElement> lowerBounds = List.of();
+            if (wildcardElement.hasExplicitLowerBound()) {
+                lowerBounds = wildcardElement.getLowerBounds();
+            } else if (wildcardElement.hasExplicitUpperBound()) {
+                upperBounds = wildcardElement.getUpperBounds();
+            }
+            // 5th and 6th arguments: the bounds
+            values.add(pushBounds(annotationMetadataWithDefaults, owningType, upperBounds, visitedTypes, loadClassValueExpressionFn));
+            values.add(pushBounds(annotationMetadataWithDefaults, owningType, lowerBounds, visitedTypes, loadClassValueExpressionFn));
+            // Argument.ofWildcard( .. )
+            return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_WILDCARD, values);
+        }
+
+        if (typeVariable && !bounds.isEmpty()) {
+            // Argument.ofTypeVariable( .. ) keeping the bounds declared for the variable
+            return TYPE_ARGUMENT.invokeStatic(
+                METHOD_CREATE_TYPE_VAR_WITH_BOUNDS,
+                values.get(0),
+                values.get(1),
+                // The name the variable was declared with, which is not the name of the argument: a type
+                // argument is named after the parameter it stands in for - the E of List<E> - while the
+                // variable is the M of List<M>
+                variableName == null ? ExpressionDef.nullValue() : ExpressionDef.constant(variableName),
+                values.get(2),
+                values.get(3),
+                pushBounds(annotationMetadataWithDefaults, owningType, bounds, visitedTypes, loadClassValueExpressionFn)
+            );
+        }
+
+        if (isRawType && !typeVariable) {
+            // Argument.ofRawType( .. )
+            return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_RAW_TYPE, values);
+        }
+
         // Argument.create( .. )
         return TYPE_ARGUMENT.invokeStatic(
             typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
             values
         );
+    }
+
+    /**
+     * Whether the element is a type written without its type arguments, a raw type.
+     *
+     * <p>A raw usage compiles to the type arguments the declaring type declares, so it is otherwise
+     * indistinguishable from a usage written with those variables. Java marks the usage itself, while Groovy
+     * marks only the placeholders it compiles to, so both are asked. A wildcard is not asked: Kotlin marks the
+     * argument of a star projection raw, and {@code List<*>} is {@code List<?>} rather than a raw usage.</p>
+     *
+     * @param element The element
+     * @return true if the type is raw
+     */
+    private static boolean isRawType(TypedElement element) {
+        if (element instanceof GenericPlaceholderElement || element instanceof WildcardElement
+            || !(element instanceof ClassElement classElement)) {
+            // a variable or a wildcard is written as such, it is never a raw usage of a type
+            return false;
+        }
+        if (classElement.isRawType()) {
+            return true;
+        }
+        Collection<ClassElement> typeArguments = classElement.getTypeArguments().values();
+        return !typeArguments.isEmpty() && typeArguments.stream()
+            .allMatch(typeArgument -> typeArgument instanceof GenericPlaceholderElement && typeArgument.isRawType());
+    }
+
+    /**
+     * The bounds to record for a type variable, empty when the type the variable compiles to already says what
+     * they are: a variable with a single bound erases to that bound, so only several bounds, or a resolved
+     * variable whose erasure is no longer its bound, need them written out.
+     *
+     * @param element The element
+     * @return The bounds to record
+     */
+    private static List<? extends ClassElement> recordedBounds(TypedElement element) {
+        if (element instanceof WildcardElement || !(element instanceof GenericPlaceholderElement placeholderElement)) {
+            return List.of();
+        }
+        List<? extends ClassElement> bounds = placeholderElement.getBounds();
+        if (bounds.size() < 2 && placeholderElement.getResolved().isEmpty()) {
+            return List.of();
+        }
+        return bounds;
+    }
+
+    private static ExpressionDef pushBounds(AnnotationMetadata annotationMetadataWithDefaults,
+                                            ClassTypeDef owningType,
+                                            List<? extends ClassElement> bounds,
+                                            Set<Object> visitedTypes,
+                                            Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        if (bounds.isEmpty()) {
+            return ExpressionDef.nullValue();
+        }
+        return TYPE_ARGUMENT_ARRAY.instantiate(bounds.stream().map(bound -> {
+            ExpressionDef.Constant boundTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(bound)));
+            Map<String, ClassElement> boundTypeArguments = bound.getTypeArguments();
+            // Persist only type annotations added to the bound
+            MutableAnnotationMetadata boundAnnotationMetadata = MutableAnnotationMetadata.of(bound.getTypeAnnotationMetadata());
+            if (boundTypeArguments.isEmpty() && boundAnnotationMetadata.isEmpty()) {
+                // Argument.of(Class)
+                return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_ARGUMENT_CLASS, boundTypeConstant);
+            }
+            ExpressionDef annotationMetadataExp;
+            if (boundAnnotationMetadata.isEmpty()) {
+                annotationMetadataExp = ExpressionDef.nullValue();
+            } else {
+                MutableAnnotationMetadata.contributeDefaults(annotationMetadataWithDefaults, boundAnnotationMetadata);
+                annotationMetadataExp = AnnotationMetadataGenUtils.instantiateNewMetadata(boundAnnotationMetadata, loadClassValueExpressionFn);
+            }
+            // Argument.of(Class, null, AnnotationMetadata, Argument[])
+            return TYPE_ARGUMENT.invokeStatic(
+                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
+                boundTypeConstant,
+                ExpressionDef.nullValue(),
+                annotationMetadataExp,
+                boundTypeArguments.isEmpty() ? ExpressionDef.nullValue() : pushTypeArgumentElements(
+                    annotationMetadataWithDefaults,
+                    owningType,
+                    bound,
+                    bound,
+                    boundTypeArguments,
+                    visitedTypes,
+                    loadClassValueExpressionFn
+                )
+            );
+        }).toList());
     }
 
     /**
@@ -622,7 +812,7 @@ public final class ArgumentExpUtils {
                 genericType.getTypeAnnotationMetadata()
             ).merge();
 
-            if (parameterElement instanceof KotlinParameterElement kp && kp.hasDefault()) {
+            if (parameterElement.hasDefault()) {
                 annotationMetadata.removeAnnotation(AnnotationUtil.NON_NULL);
                 annotationMetadata.addAnnotation(AnnotationUtil.NULLABLE, Map.of());
                 annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());

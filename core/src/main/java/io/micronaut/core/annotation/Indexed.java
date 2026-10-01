@@ -28,6 +28,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * An annotation that can be used on types where there may be many implementations of a
  * particular interface. This triggers building of an index internal to the bean context that speeds up bean lookups by type.
  *
+ * <p>A bean is enumerable through {@code BeanContext.getBeanDefinitions(Class)} by every type it is indexed by,
+ * whether the annotation is declared on the bean, inherited from a stereotype annotation or added at compile time,
+ * even if the bean does not implement that type. Injecting or resolving a bean instance
+ * (for example via {@code BeanContext.getBean(Class)}) by a type the bean does not implement remains unsupported.</p>
+ *
  * @since 1.1
  * @author graemerocher
  */

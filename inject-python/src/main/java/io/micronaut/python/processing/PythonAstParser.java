@@ -17,13 +17,16 @@ package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.ScriptDef;
+import io.micronaut.python.processing.util.PythonJavaTypes;
+import io.micronaut.python.processing.util.PythonKeywords;
+import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.ScriptDef;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -43,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Parses Python source files into the internal Python processing model.
@@ -52,12 +56,6 @@ public final class PythonAstParser {
 
     public static final String PYTHON = "python";
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
-    private static final Set<String> PYTHON_KEYWORDS = Set.of(
-        "False", "None", "True", "and", "as", "assert", "async", "await", "break",
-        "class", "continue", "def", "del", "elif", "else", "except", "finally",
-        "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
-        "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
-    );
     private static final Source COMPILE_RUNTIME_AST_SOURCE = Source.newBuilder(PYTHON, """
         import importlib.util as _mn_runtime_importlib_util
         import marshal as _mn_runtime_marshal
@@ -75,6 +73,19 @@ public final class PythonAstParser {
                 header + _mn_runtime_marshal.dumps(code)
             )
         """, "micronaut-runtime-ast-compiler.py").cached(true).buildLiteral();
+    // The driver snippets read their inputs from the context bindings, so one cached Source serves
+    // every file: GraalPy parses a cached Source once per context instead of once per evaluation.
+    private static final Source PROCESSOR_SOURCE = Source.newBuilder(PYTHON, getSource(), "micronaut-processor-driver.py").cached(true).buildLiteral();
+    private static final Source CALL_EXTRACTION_SOURCE = Source.newBuilder(PYTHON, getCallExtractionSource(), "micronaut-call-extraction.py").cached(true).buildLiteral();
+    private static final Source TRANSFORM_SOURCE = Source.newBuilder(PYTHON, getTransformSource(), "micronaut-transform-driver.py").cached(true).buildLiteral();
+
+    /**
+     * The run time strips a leading {@code io.} from every Java package when it derives the Python
+     * module name, so {@code io.swagger.v3.oas.annotations} is imported as
+     * {@code swagger.v3.oas.annotations}. Compile-time lookups therefore have to try the prefixed
+     * name as well, for any library and not only {@code io.micronaut}.
+     */
+    private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
     private final Context context;
     private final Value runtimeAstCompiler;
     private final IdentityHashMap<TransformResult, RuntimeArtifact> runtimeArtifacts = new IdentityHashMap<>();
@@ -88,7 +99,27 @@ public final class PythonAstParser {
     }
 
     PythonAstParser(ClassLoader classLoader, boolean incremental) {
-        var contextBuilder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+        // Each parser owns its engine. A JVM-wide shared engine was tried to keep compiled code warm
+        // across compilations, but an engine pins every context created on it until that context is
+        // closed, and the optimizing runtime keeps compiled code per engine: the compile-time test
+        // suite, which creates hundreds of parsers in one JVM, ran out of heap on GraalVM CE.
+        this.context = buildTolerantly(classLoader, incremental);
+        context.initialize(PYTHON);
+        context.eval(COMPILE_RUNTIME_AST_SOURCE);
+        runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
+    }
+
+    /**
+     * The GraalPy context the processor sources run in; used by tests that execute Python-level unit tests.
+     *
+     * @return The context
+     */
+    Context context() {
+        return context;
+    }
+
+    private static Context.Builder newContextBuilder(ClassLoader classLoader) {
+        return GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
                 .build())
@@ -96,6 +127,19 @@ public final class PythonAstParser {
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+    }
+
+    /**
+     * Builds the context, retrying without the optimizing-runtime tuning options if the runtime does
+     * not recognise them.
+     *
+     * @param contextBuilder The builder, already carrying the tuning options when incremental
+     * @param incremental    Whether the tuning options were applied
+     * @param classLoader    The host class loader, needed to rebuild from scratch
+     * @return The context
+     */
+    private static Context buildTolerantly(ClassLoader classLoader, boolean incremental) {
+        Context.Builder contextBuilder = newContextBuilder(classLoader);
         if (incremental) {
             // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
             // and avoid paying for a core-count-based compiler thread pool.
@@ -103,10 +147,18 @@ public final class PythonAstParser {
                 .option("engine.Mode", "latency")
                 .option("engine.CompilerThreads", "1");
         }
-        this.context = contextBuilder.build();
-        context.initialize(PYTHON);
-        context.eval(COMPILE_RUNTIME_AST_SOURCE);
-        runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
+        // Both of those options exist only on the optimizing Truffle runtime. On the fallback
+        // runtime - any JVM without JVMCI, which includes stock OpenJDK and a GraalVM CE not started
+        // with -XX:+EnableJVMCI - build() throws IllegalArgumentException and Pyronaut cannot compile
+        // Python at all. Tuning is not worth failing the build over, so fall back without them.
+        try {
+            return contextBuilder.build();
+        } catch (IllegalArgumentException e) {
+            if (!incremental) {
+                throw e;
+            }
+            return newContextBuilder(classLoader).build();
+        }
     }
 
     PythonBytecodeCompiler bytecodeCompiler() {
@@ -144,10 +196,7 @@ public final class PythonAstParser {
         bindings.putMember("visitor_context", visitorContext);
         bindings.putMember("file_name", "Unknown");
         bindings.putMember("src_root", "");
-        context.eval(Source.create(
-            PYTHON,
-            getSource()
-        ));
+        context.eval(PROCESSOR_SOURCE);
         return new PythonEnvironment(
             classes,
             scripts,
@@ -157,19 +206,19 @@ public final class PythonAstParser {
     }
 
     private static @NotNull String resolveQualifiedName(String packageName, ClassDef classDef) {
-        String qualifiedName = classDef.name();
-        if (!StringUtils.isEmpty(packageName)) {
-            qualifiedName = packageName + "." + qualifiedName;
-        }
-        return qualifiedName;
+        return javaTypeName(packageName, classDef.name());
     }
 
     private static @NotNull String resolveScriptQualifiedName(String packageName, ScriptDef scriptDef) {
-        String qualifiedName = scriptDef.name();
-        if (!StringUtils.isEmpty(packageName)) {
-            qualifiedName = packageName + "." + qualifiedName;
-        }
-        return qualifiedName;
+        return javaTypeName(packageName, scriptDef.name());
+    }
+
+    /**
+     * The name of the Java type generated for a Python definition; unlike {@code packageName + "." + name}
+     * a definition of the root package is not prefixed with a dot.
+     */
+    private static @NotNull String javaTypeName(String packageName, String simpleName) {
+        return StringUtils.isEmpty(packageName) ? simpleName : packageName + "." + simpleName;
     }
 
     /**
@@ -196,14 +245,19 @@ public final class PythonAstParser {
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
 
+        // Every top-level class and every script generates a Java class, so two definitions of one
+        // Java type name in different sources would silently overwrite each other; they are keyed by
+        // that name here and resolved once all sources are parsed (see resolveDefinition)
+        Map<String, List<Definition>> definitions = new LinkedHashMap<>();
+        String[] currentSource = new String[1];
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
-                String qualifiedName = resolveQualifiedName(classDef.packageName(), classDef);
-                classes.put(qualifiedName, classDef);
+                String typeName = javaTypeName(classDef.packageName(), classDef.name());
+                definitions.computeIfAbsent(typeName, k -> new ArrayList<>()).add(new Definition(currentSource[0], classDef));
             } else if (o instanceof ScriptDef scriptDef) {
-                String qualifiedName = resolveScriptQualifiedName(scriptDef.packageName(), scriptDef);
-                scripts.put(qualifiedName, scriptDef);
+                String typeName = javaTypeName(scriptDef.packageName(), scriptDef.javaSimpleName());
+                definitions.computeIfAbsent(typeName, k -> new ArrayList<>()).add(new Definition(currentSource[0], scriptDef));
             } else if (o instanceof DecoratorDef decoratorDef) {
                 decorators.put(decoratorDef.annotationName(), decoratorDef);
             }
@@ -211,19 +265,20 @@ public final class PythonAstParser {
         });
 
         for (Source source : sources) {
+            String path = source.getPath();
+            currentSource[0] = path != null ? path : source.getName();
+            boolean processed = false;
             for (String srcDir : srcDirs) {
-                String path = source.getPath();
                 if (path == null) {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
                     bindings.putMember("package_name", packageName);
-                    bindings.putMember("file_name", "Unnamed");
+                    String fileName = source.getName();
+                    bindings.putMember("file_name", fileName == null || fileName.isBlank() ? "Unnamed" : fileName);
                     bindings.putMember("visitor_context", visitorContext);
                     bindings.putMember("src_root", srcDir);
-                    context.eval(Source.create(
-                        PYTHON,
-                        getSource()
-                    ));
+                    context.eval(PROCESSOR_SOURCE);
+                    processed = true;
                 } else if (isWithinSourceDir(srcDir, path)) {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
@@ -231,27 +286,111 @@ public final class PythonAstParser {
                     bindings.putMember("file_name", source.getName());
                     bindings.putMember("visitor_context", visitorContext);
                     bindings.putMember("src_root", srcDir);
-                    context.eval(Source.create(
-                        PYTHON,
-                        getSource()
-                    ));
+                    context.eval(PROCESSOR_SOURCE);
+                    processed = true;
                 }
             }
+            if (!processed) {
+                // Never skip a source quietly: its classes would be missing from the compiled application
+                throw new ProcessingException(
+                    null,
+                    "Python source [" + currentSource[0] + "] is not located in any of the Python source directories " + srcDirs + " and cannot be processed"
+                );
+            }
         }
+        Map<String, List<String>> shadowedTypes = new LinkedHashMap<>();
+        definitions.forEach((typeName, candidates) -> {
+            String winningSource = resolveDefinition(typeName, candidates, decorators, visitorContext).source();
+            for (Definition candidate : candidates) {
+                // a module and its class of one name (implementation.py defining Implementation) are both kept
+                if (!candidate.source().equals(winningSource)) {
+                    if (candidate.element() instanceof ClassDef classDef) {
+                        // the package initializer imports the winner only, so the runtime resolves the same definition
+                        shadowedTypes.computeIfAbsent(candidate.source(), k -> new ArrayList<>()).add(classDef.name());
+                    }
+                } else if (candidate.element() instanceof ClassDef classDef) {
+                    classes.put(resolveQualifiedName(classDef.packageName(), classDef), classDef);
+                } else if (candidate.element() instanceof ScriptDef scriptDef) {
+                    scripts.put(resolveScriptQualifiedName(scriptDef.packageName(), scriptDef), scriptDef);
+                }
+            }
+        });
         return new PythonEnvironment(
             classes,
             scripts,
             decorators,
+            shadowedTypes,
             context
         );
     }
 
-    private static boolean isWithinSourceDir(String srcDir, String path) {
-        return path.startsWith(srcDir) || path.startsWith("/private" + srcDir);
+    /**
+     * Pick the source a generated Java type is built from. Only a definition that yields a bean,
+     * an introspection or another generated member (a class carrying Java annotations, a module with
+     * functions or decorators) conflicts with another such definition of the same name; a plain
+     * module-private class ({@code Helper}, {@code Config}) may be defined in several modules of a
+     * package, in which case the annotated definition, or else the last one, provides the Java stub.
+     */
+    private static Definition resolveDefinition(String typeName, List<Definition> candidates, Map<String, DecoratorDef> decorators, VisitorContext visitorContext) {
+        Definition winner = candidates.get(0);
+        if (candidates.size() == 1) {
+            return winner;
+        }
+        boolean winnerSignificant = winner.isSignificant(decorators, visitorContext);
+        for (Definition candidate : candidates.subList(1, candidates.size())) {
+            boolean significant = candidate.isSignificant(decorators, visitorContext);
+            if (winner.conflictsWith(winnerSignificant, candidate, significant)) {
+                throw new ProcessingException(
+                    null,
+                    "Duplicate Python type [" + typeName + "] defined in [" + candidate.source() + "] and [" + winner.source() + "]: "
+                        + "an annotated top-level class or a module with functions generates a Java class named after it, so the two "
+                        + "definitions would overwrite each other; rename one of them or move it to another package"
+                );
+            }
+            boolean replace = significant || !winnerSignificant;
+            if (!winner.source().equals(candidate.source())) {
+                visitorContext.info("Python type [" + typeName + "] is defined in [" + winner.source() + "] and [" + candidate.source()
+                    + "]; the generated Java type follows [" + (replace ? candidate : winner).source() + "]", null);
+            }
+            if (replace) {
+                winner = candidate;
+                winnerSignificant = significant;
+            }
+        }
+        return winner;
+    }
+
+    static boolean isWithinSourceDir(String srcDir, String path) {
+        String normalizedSrcDir = normalizePath(srcDir);
+        String normalizedPath = normalizePath(path);
+        return normalizedPath.startsWith(normalizedSrcDir) || normalizedPath.startsWith("/private" + normalizedSrcDir);
+    }
+
+    private static String normalizePath(String path) {
+        if (path == null) {
+            return null;
+        }
+        String normalized = path.replace('\\', '/');
+        return normalized.length() > 2 && normalized.charAt(0) == '/' && Character.isLetter(normalized.charAt(1)) && normalized.charAt(2) == ':'
+            ? normalized.substring(1)
+            : normalized;
+    }
+
+    private static String sourceRootOf(List<String> srcDirs, Source source) {
+        String path = source.getPath();
+        if (path != null) {
+            for (String srcDir : srcDirs) {
+                if (isWithinSourceDir(srcDir, path)) {
+                    return srcDir;
+                }
+            }
+        }
+        return "";
     }
 
     public static String getPackageNameOfSource(String srcDir, Source source) {
-        String path = source.getPath();
+        String path = normalizePath(source.getPath());
+        srcDir = normalizePath(srcDir);
         String packageName = "python";
         if (StringUtils.isNotEmpty(srcDir) && StringUtils.isNotEmpty(path)) {
             int i = path.indexOf(srcDir);
@@ -298,13 +437,33 @@ public final class PythonAstParser {
             return value;
         });
         bindings.putMember("src", source.getCharacters());
-        context.eval(Source.create(PYTHON, getCallExtractionSource()));
+        context.eval(CALL_EXTRACTION_SOURCE);
         return calls;
     }
 
+    private static boolean isJavaIoPackage(String name) {
+        return name.startsWith(JAVA_IO_PACKAGE_PREFIX);
+    }
+
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
+        return transform(visitorContext, List.of(), pythonSource);
+    }
+
+    /**
+     * Transforms the given sources located within the given source directories. A source of a source
+     * directory is transformed with its package known, so the transformer can resolve the imports of
+     * sibling modules of that directory; a module found in one of the directories is a Python module,
+     * never a Java import that has to resolve on the compile classpath.
+     *
+     * @param visitorContext The visitor context
+     * @param srcDirs The source directories
+     * @param pythonSource The sources
+     * @return The transformed sources, in the order of the sources
+     */
+    public @NotNull List<TransformResult> transform(VisitorContext visitorContext, List<String> srcDirs, Source... pythonSource) {
         runtimeArtifacts.clear();
         Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("python_source_dirs", srcDirs.toArray(String[]::new));
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
         Set<String> missingClassElements = new java.util.HashSet<>();
         Map<String, Object[]> packageClassElementsCache = new LinkedHashMap<>();
@@ -320,6 +479,16 @@ public final class PythonAstParser {
                 return null;
             }
             var classElement = visitorContext.getClassElement(javaName);
+            if (classElement.isEmpty() && !javaName.equals(name)) {
+                // a class generated from a Python source of a package under micronaut.* carries no io. prefix
+                classElement = visitorContext.getClassElement(name).filter(PythonJavaTypes::isPythonClass);
+            }
+            if (classElement.isEmpty() && !isJavaIoPackage(javaName)) {
+                // The run time strips a leading "io." from every Java package, not just io.micronaut,
+                // so an import written the way the run time names it -- swagger.v3.oas.annotations for
+                // io.swagger.v3.oas.annotations -- has to resolve here too.
+                classElement = visitorContext.getClassElement(JAVA_IO_PACKAGE_PREFIX + javaName);
+            }
             if (classElement.isPresent()) {
                 classElementCache.put(javaName, classElement.get());
                 return classElement.get();
@@ -333,19 +502,26 @@ public final class PythonAstParser {
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
             return packageClassElementsCache.computeIfAbsent(
                 javaPackageName,
-                name -> visitorContext.getClassElements(name, "*")
+                name -> {
+                    Object[] elements = visitorContext.getClassElements(name, "*");
+                    if ((elements == null || elements.length == 0) && !isJavaIoPackage(name)) {
+                        // As above: io.swagger.v3.oas.annotations is imported as swagger.v3.oas.annotations.
+                        elements = visitorContext.getClassElements(JAVA_IO_PACKAGE_PREFIX + name, "*");
+                    }
+                    return elements;
+                }
             );
         });
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {
             bindings.putMember("src", source.getCharacters());
+            String sourceRoot = sourceRootOf(srcDirs, source);
+            bindings.putMember("source_root", sourceRoot);
+            bindings.putMember("package_name", sourceRoot.isEmpty() ? "" : getPackageNameOfSource(sourceRoot, source));
 
             Value result;
             try {
-                result = context.eval(Source.create(
-                    PYTHON,
-                    getTransformSource()
-                ));
+                result = context.eval(TRANSFORM_SOURCE);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
                 e.printStackTrace(new PrintWriter(stack));
@@ -353,7 +529,10 @@ public final class PythonAstParser {
             }
             Map map = result.as(Map.class);
             String code = map.containsKey("code") ? map.get("code").toString() : null;
-            String runtimeCode = map.containsKey("runtimeCode") ? map.get("runtimeCode").toString() : code;
+            Value runtimeCodeFactory = result.getHashValue("runtimeCode");
+            Supplier<String> runtimeCode = runtimeCodeFactory != null && runtimeCodeFactory.canExecute()
+                ? SupplierUtil.memoized(() -> runtimeCodeFactory.execute().asString())
+                : () -> code;
             Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
             Map<String, java.util.List<Map<String, String>>> javaClassImports =
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
@@ -405,17 +584,7 @@ public final class PythonAstParser {
     }
 
     private static String normalizeKeywordSafePackageName(String name) {
-        String[] parts = name.split("\\.");
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
-            if (part.endsWith("_")) {
-                String withoutTrailingUnderscore = part.substring(0, part.length() - 1);
-                if (PYTHON_KEYWORDS.contains(withoutTrailingUnderscore)) {
-                    parts[i] = withoutTrailingUnderscore;
-                }
-            }
-        }
-        return String.join(".", parts);
+        return PythonKeywords.toJavaDottedName(name);
     }
 
     public PythonEnvironment process(@Language("python") String sources, VisitorContext visitorContext) {
@@ -444,29 +613,35 @@ public final class PythonAstParser {
     private static @Language("python") String getTransformSource() {
         return """
             import ast
-            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, unparse
+            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
 
             tree = ast.parse(src)
-            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements)
+            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs)
             transformed_tree = transformer.visit(tree)
-            diagnostic_runtime_tree = ast.parse(src)
-            diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True)
-            transformed_diagnostic_runtime_tree = diagnostic_runtime_transformer.visit(diagnostic_runtime_tree)
+            # The diagnostic runtime source is only read by tests and error reports, so it is
+            # produced on demand instead of costing a parse, a transformer pass and an unparse per file.
+            def diagnostic_runtime_code(source=src, package_name=package_name, source_root=source_root):
+                diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True, package_name, source_root)
+                return unparse(diagnostic_runtime_transformer.visit(ast.parse(source)))
             executable_runtime_tree = ast.parse(src)
-            original_runtime_tree = ast.dump(executable_runtime_tree, include_attributes=False)
+            # Transformers mutate in place, so a pristine parse (cheaper than a deep copy) is kept for
+            # the change check; ast_equal stops at the first difference instead of serialising both trees.
+            pristine_runtime_tree = ast.parse(src)
             missing_decorator_code = transformer.get_missing_runtime_decorator_code(executable_runtime_tree)
             runtime_transformer = MicronautRuntimeTransformer(
                 callback_get_class_element,
                 callback_get_class_elements,
-                missing_decorator_code
+                missing_decorator_code,
+                package_name,
+                source_root
             )
             transformed_runtime_tree = runtime_transformer.visit(executable_runtime_tree)
             ast.fix_missing_locations(transformed_runtime_tree)
             {
                 "code": unparse(transformed_tree),
-                "runtimeCode": unparse(transformed_diagnostic_runtime_tree),
+                "runtimeCode": diagnostic_runtime_code,
                 "runtimeTree": transformed_runtime_tree,
-                "runtimeRequired": ast.dump(transformed_runtime_tree, include_attributes=False) != original_runtime_tree,
+                "runtimeRequired": not ast_equal(pristine_runtime_tree, transformed_runtime_tree),
                 "decorators": transformer.get_generated_decorator_code(),
                 "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),
@@ -509,11 +684,54 @@ public final class PythonAstParser {
     }
 
     /**
+     * A source definition of a generated Java type.
+     *
+     * @param source  The defining source
+     * @param element The class or script definition
+     */
+    private record Definition(String source, Object element) {
+
+        /**
+         * Whether the definition generates beans, introspections or bridged members: a class annotated
+         * with a Java annotation or an annotation defined by the application, or a module with
+         * functions or decorators. A module of assignments only and a plain class yield nothing that
+         * another definition of the same name could not replace.
+         */
+        boolean isSignificant(Map<String, DecoratorDef> decorators, VisitorContext visitorContext) {
+            if (element instanceof ScriptDef scriptDef) {
+                return !scriptDef.functions().isEmpty() || !scriptDef.decorators().isEmpty();
+            }
+            ClassDef classDef = (ClassDef) element;
+            return classDef.decorators().stream().anyMatch(decorator -> {
+                String annotationName = decorator.annotationName();
+                return decorators.containsKey(annotationName) || visitorContext.getClassElement(annotationName).isPresent();
+            });
+        }
+
+        /**
+         * Whether two definitions of one name overwrite each other: both are significant, or a
+         * module with functions meets a class, whose stub would replace the module's Java class
+         * regardless of its annotations.
+         */
+        boolean conflictsWith(boolean significant, Definition other, boolean otherSignificant) {
+            if (source.equals(other.source)) {
+                return false;
+            }
+            if (significant && otherSignificant) {
+                return true;
+            }
+            boolean script = element instanceof ScriptDef;
+            boolean otherScript = other.element instanceof ScriptDef;
+            return script != otherScript && (script ? significant : otherSignificant);
+        }
+    }
+
+    /**
      * The result of a transformation.
      *
      * @param originalSource   The original source
      * @param code             The transformed code
-     * @param runtimeCode      The runtime code
+     * @param runtimeCodeSupplier Produces the runtime code for diagnostics on demand
      * @param decorators       The decorators
      * @param javaClassImports The Java class imports
      * @param exportedTypes    The types that have Micronaut decorators
@@ -524,7 +742,7 @@ public final class PythonAstParser {
     public record TransformResult(
         Source originalSource,
         String code,
-        String runtimeCode,
+        Supplier<String> runtimeCodeSupplier,
         Map<String, String> decorators,
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
@@ -535,8 +753,17 @@ public final class PythonAstParser {
             return sourceWithContent(code);
         }
 
+        /**
+         * The runtime source rendered for diagnostics. It is computed on first access.
+         *
+         * @return The runtime code
+         */
+        public String runtimeCode() {
+            return runtimeCodeSupplier.get();
+        }
+
         public Source runtimeSource() {
-            return sourceWithContent(runtimeCode);
+            return sourceWithContent(runtimeCode());
         }
 
         private Source sourceWithContent(String content) {

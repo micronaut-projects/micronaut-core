@@ -65,4 +65,32 @@ class IntrospectionSpec {
         val business = introspection.instantiate("Apple")
         assertEquals("Apple", business.name)
     }
+
+    @Test
+    fun testShipmentConstructors() {
+        // tag::constructors[]
+        val introspection = BeanIntrospection.getIntrospection(Shipment::class.java)
+
+        val constructors = introspection.constructors // <1>
+
+        val byItem = constructors.first { it.arguments.size == 1 } // <2>
+
+        val shipment = byItem.instantiate("book") // <3>
+        // end::constructors[]
+
+        assertEquals(2, constructors.size)
+        assertEquals(introspection.constructor.arguments.size, constructors[0].arguments.size)
+        assertEquals("book", shipment.item)
+        assertEquals(1, shipment.quantity)
+    }
+
+    @Test
+    fun testDeliveryExecutableConstructor() {
+        val introspection = BeanIntrospection.getIntrospection(Delivery::class.java)
+        val constructors = introspection.constructors
+        val delivery = constructors.first { it.arguments.size == 1 }.instantiate("Main Street")
+
+        assertEquals(2, constructors.size)
+        assertEquals("Main Street", delivery.address)
+    }
 }

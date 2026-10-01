@@ -21,12 +21,19 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
-import io.micronaut.python.processing.visitor.ElementDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.FunctionDef;
-import io.micronaut.python.processing.visitor.PythonMethodElement;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
+import io.micronaut.python.processing.model.ElementDef;
+import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.FunctionDef;
+import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.element.PythonScriptElement;
+import io.micronaut.python.processing.model.ScriptDef;
+import io.micronaut.python.processing.model.TypeRef;
+
+import java.util.IdentityHashMap;
+import java.util.Map;
 
 /**
  * Factory for creating and managing annotation metadata for Python elements.
@@ -53,6 +60,8 @@ import io.micronaut.python.processing.visitor.PythonMethodElement;
 @Experimental
 public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnotationMetadataFactory<ElementDef, DecoratorDef> {
 
+    private final Map<TypeRef, ElementAnnotationMetadata> typeUseAnnotations = new IdentityHashMap<>();
+
     /**
      * Constructs a new factory for Python element annotation metadata.
      *
@@ -74,8 +83,41 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
         return new PythonElementAnnotationMetadataFactory(true, (PythonAnnotationMetadataBuilder) metadataBuilder);
     }
 
+    /**
+     * The type-use annotation metadata of one type node of a Python source: the decorators of an
+     * {@code Annotated[...]} type argument, or the synthetic nullability of a union. Every resolution of the same
+     * node answers the same mutable metadata, so an annotation a visitor adds to a type argument (the validation
+     * visitor marks the constrained element type of a collection parameter) is still there when the argument
+     * metadata is written, like the type-use annotations of a Java type argument.
+     *
+     * @param typeNode       The type node the metadata belongs to
+     * @param typeUseElement The synthetic element carrying the decorators of the node
+     * @return The metadata
+     */
+    public ElementAnnotationMetadata buildTypeUseAnnotations(TypeRef typeNode, ElementDef typeUseElement) {
+        return typeUseAnnotations.computeIfAbsent(typeNode, node -> new AbstractElementAnnotationMetadata() {
+
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return metadataBuilder.lookupOrBuild(new TypeUseAnnotationKey(node), typeUseElement);
+            }
+
+            @Override
+            public String toString() {
+                return node.toString();
+            }
+        });
+    }
+
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
+        if (classElement instanceof PythonScriptElement scriptElement) {
+            ScriptDef scriptDef = scriptElement.getNativeType();
+            return metadataBuilder.lookupOrBuild(
+                new TypeAnnotationKey(classElement.getNativeType(), scriptDef),
+                scriptDef
+            );
+        }
         if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
             ElementDef typeAnnotationsKey = pythonClassElement.getTypeAnnotationsKey();
             if (typeAnnotationsKey != null) {
@@ -132,11 +174,37 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
             functionDef.isStatic(),
             functionDef.isAsync(),
             functionDef.hasReturnValue(),
-            functionDef.declaringClass()
+            functionDef.hasPlaceholderBody(),
+            functionDef.declaringClass(),
+            null,
+            functionDef.isGenerator()
         );
     }
 
     private record TypeAnnotationKey(Object nativeType, Object typeAnnotationsKey) {
+    }
+
+    /**
+     * Identifies a type node by identity: two spellings of the same type in one source ({@code Annotated[str,
+     * NotBlank]} as the key and the value of a dict) are equal records but distinct type uses.
+     */
+    private static final class TypeUseAnnotationKey {
+
+        private final TypeRef typeNode;
+
+        TypeUseAnnotationKey(TypeRef typeNode) {
+            this.typeNode = typeNode;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof TypeUseAnnotationKey key && key.typeNode == typeNode;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(typeNode);
+        }
     }
 
     private record FunctionTypeAnnotationKey(Object nativeType, String functionName) {

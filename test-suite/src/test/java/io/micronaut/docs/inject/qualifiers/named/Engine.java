@@ -20,4 +20,4 @@ public interface Engine { // <1>
     int getCylinders();
     String start();
 }
-// tag::class[]
+// end::class[]

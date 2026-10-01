@@ -20,6 +20,8 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
 
+import java.util.List;
+
 /**
  * A bean definition that provides disposing hooks normally in the form of {@link jakarta.annotation.PreDestroy}
  * annotated methods.
@@ -54,4 +56,19 @@ public interface DisposableBeanDefinition<T> extends BeanDefinition<T> {
      * @return The bean instance
      */
     T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean);
+
+    /**
+     * The {@link jakarta.annotation.PreDestroy} callbacks of the bean as reflection-free executable methods, in
+     * the order {@link #dispose(BeanResolutionContext, BeanContext, Object)} invokes them.
+     *
+     * <p>Only available for a bean that intercepts its pre-destroy phase, that is one bound with
+     * {@code @InterceptorBinding(kind = PRE_DESTROY)}; every other definition, including one compiled by an
+     * earlier version, returns an empty list. The callbacks are not part of {@link #getExecutableMethods()}.</p>
+     *
+     * @return The pre-destroy callbacks, or an empty list
+     * @since 5.2.0
+     */
+    default List<ExecutableMethod<T, ?>> getPreDestroyExecutableMethods() {
+        return List.of();
+    }
 }

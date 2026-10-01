@@ -24,6 +24,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -75,6 +76,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
 
@@ -115,6 +117,11 @@ abstract class AbstractJdkHttpClient {
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     @Nullable
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    /**
+     * The client for raw exchanges: it keeps no cookies, because the exchanges a raw client
+     * relays belong to different users. Built on first use.
+     */
+    final Supplier<HttpClient> rawClient;
 
     protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
         this.loadBalancer = prototype.loadBalancer;
@@ -122,6 +129,7 @@ abstract class AbstractJdkHttpClient {
         this.configuration = prototype.configuration;
         this.contextPath = prototype.contextPath;
         this.client = prototype.client;
+        this.rawClient = prototype.rawClient;
         this.cookieManager = prototype.cookieManager;
         this.requestBinderRegistry = prototype.requestBinderRegistry;
         this.clientId = prototype.clientId;
@@ -198,6 +206,11 @@ abstract class AbstractJdkHttpClient {
             this.contextPath = null;
         }
 
+        this.client = buildClient(true);
+        this.rawClient = SupplierUtil.memoized(() -> buildClient(false));
+    }
+
+    private HttpClient buildClient(boolean cookies) {
         HttpClient.Builder builder = HttpClient.newBuilder();
         configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
 
@@ -226,9 +239,10 @@ abstract class AbstractJdkHttpClient {
             builder.version(HttpClient.Version.HTTP_1_1);
         }
 
-        builder
-            .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
-            .cookieHandler(cookieManager);
+        builder.followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER);
+        if (cookies) {
+            builder.cookieHandler(cookieManager);
+        }
 
         Optional<SocketAddress> proxyAddress = configuration.getProxyAddress();
         if (proxyAddress.isPresent()) {
@@ -240,7 +254,7 @@ abstract class AbstractJdkHttpClient {
             configureSsl(builder, sslConfiguration);
         }
 
-        this.client = builder.build();
+        return builder.build();
     }
 
     private static List<HttpFilterResolver.FilterEntry> clientFilterEntries(@Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,

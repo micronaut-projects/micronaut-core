@@ -42,7 +42,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': 'HttpClientWithCircuitBreakerSpec'
+            'spec.name': 'HttpClientWithCircuitBreakerSpec',
+            'micronaut.server.error-response-include-message': 'always'
     ])
 
     @Shared

@@ -51,10 +51,13 @@ ioc:
     introspectedAccessorsStyle: Use @Introspected with @AccessorsStyle
     accessKind: Bean Fields
     introspectedProperty: Explicit Bean Properties
+    propertyMembers: Bean Property Members
     atCreator: Constructor Methods
     staticAtCreator: Static Creator Methods
+    introspectionConstructors: Describing Constructors
     introspectionBuilders: Builders
     introspectionEnums: Introspect Enums
+    introspectionTypeArguments: Type Arguments
     introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
     introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations
     beanWrapperApi: The BeanWrapper API
@@ -67,6 +70,7 @@ ioc:
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
+  reflection: Reflection Based Metadata
   classImport: Importing Classes from Libraries
   mixin: Modifying Class Annotations With A Mixin
   nullabilityAnnotations:
@@ -100,6 +104,7 @@ aop:
   introductionAdvice: Introduction Advice
   adapterAdvice: Method Adapter Advice
   lifecycleAdvice: Bean Life Cycle Advice
+  interceptorLifecycle: Interceptor Life Cycle
   validation:
     title: Validation Advice
   caching:
@@ -163,6 +168,7 @@ httpServer:
   formData: Handling Form Data
   form:
     title: Forms
+    formBinding: Form Data Binding
     formCapable: Detailed Form API
   serverIO: Writing Response Data
   uploads: File Uploads
@@ -181,6 +187,7 @@ httpServer:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
       httpServerFilterErrorStates: HttpServerFilter Error States
+    responseHeaderPopulator: Response Header Populators
   byteBody:
     title: Advanced body access
     byteBodyPrimary: Primary operations
@@ -205,6 +212,8 @@ httpServer:
     nettyClientPipeline: Configuring the Netty Client Pipeline
     nettyServerPipeline: Configuring the Netty Server Pipeline
     listener: Advanced Listener Configuration
+    corsCrossOriginEmbedderPolicy: Cross-Origin-Embedder-Policy
+    corsCrossOriginResourcePolicy: Cross-Origin-Resource-Policy
     cors:
       title: Configuring CORS
       annotationBasedCors: Annotation-based CORS Configuration
@@ -334,14 +343,33 @@ languageSupport:
   groovy: Micronaut for Groovy
   python:
     title: Micronaut for Python
+    pythonRuntime: Runtime Requirements
+    pythonThreading: Python Threading
+    decorators: Annotations as Decorators
+    sourceRoots: Main and Test Sources
     typeOrdering: Type Ordering and Forward References
+    interfaces: Interfaces and Introduction Advice
     standardTypes: Standard Library Type Conversions
+    javaCollections: Java Collections and Serialization
+    runtimeTypes: Python Classes and Objects at Run Time
+    javaImports: Importing Java Types
     keywords: Python Keywords in Java APIs
+    nestedTypes: Nested Java Types
+    pythonExceptions: Python Exceptions Extending Java Exceptions
+    functionalInterfaces: Python Callables as Functional Interfaces
+    javaInterfaces: Implementing Java Interfaces
+    generatedClasses: Generated Java Classes
+    aopProxies: AOP Proxies
+    extendingJavaClasses: Extending Java Classes
+    moduleScripts:
+      title: Module Scripts
+      testing: JUnit 5 Module Tests
     graalTools: GraalPy Tools
     asyncAwait:
       title: Async/Await
       asyncioRuntime: Netty-Backed Asyncio Runtime
       asyncioNetworking: Asyncio Networking and TLS
+      asyncioStreaming: Python-Native Streaming
       asyncioUnsupported: Unsupported Asyncio APIs
   kotlin:
     title: Micronaut for Kotlin
@@ -383,6 +411,7 @@ management:
         title: Provided Indicators
         diskSpaceHealthIndicator: Disk Space Health Indicator
         jdbcHealthIndicator: JDBC Health Indicator
+        discoveryClientHealthIndicator: Discovery Client Health Indicator
         deadlockedThreads: Deadlocked Threads
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint

@@ -16,17 +16,20 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
@@ -46,12 +49,32 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        return exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody), null);
+        // null is equivalent to an empty body
+        CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().createEmpty()) : requestBody;
+        Flux<? extends HttpResponse<?>> response;
+        try {
+            response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body), null);
+        } catch (RuntimeException e) {
+            // building the exchange failed, so nothing else releases the body
+            body.close();
+            throw e;
+        }
+        // the body is released however the exchange ends, also when the JDK client never reads
+        // it, e.g. because the connection was refused or the request is a GET
+        return response.doFinally(signal -> body.close());
     }
 
     @Override
     public void close() {
         // Nothing to do here, we do not need to close clients
+    }
+
+    @Override
+    protected <I> Mono<java.net.http.HttpRequest> mapToHttpRequest(HttpRequest<I> request, @Nullable Argument<?> bodyType) {
+        // the request cookies are sent in its Cookie header, and must not reach the cookie store
+        // that is shared with the other clients of the same configuration
+        return resolveRequestUri(request)
+            .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build());
     }
 
     @Override
@@ -67,7 +90,8 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                         headerName -> httpRequest.headers().allValues(headerName));
                 }
                 BodySizeLimits bodySizeLimits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
-                return client.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
+                // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
+                return rawClient.get().sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
             })
             .flatMap(Mono::fromCompletionStage)
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))

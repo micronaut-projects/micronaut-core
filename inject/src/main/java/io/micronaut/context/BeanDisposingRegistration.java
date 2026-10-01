@@ -32,31 +32,45 @@ import java.util.List;
 @Internal
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
     private final BeanContext beanContext;
+    private final java.util.concurrent.atomic.AtomicBoolean closed =
+        new java.util.concurrent.atomic.AtomicBoolean();
     @Nullable
     private final List<BeanRegistration<?>> dependents;
+    @Nullable
+    private final List<?> interceptorRegistrations;
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
-                              List<BeanRegistration<?>> dependents) {
+                              List<BeanRegistration<?>> dependents,
+                              @Nullable List<?> interceptorRegistrations) {
         super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         this.dependents = dependents;
+        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
-                              BT createdBean) {
+                              BT createdBean,
+                              @Nullable List<?> interceptorRegistrations) {
         super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         this.dependents = null;
+        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     @Override
     public void close() {
-        beanContext.destroyBean(this);
+        // idempotent, as AutoCloseable asks an implementation to be: destroying a bean runs its pre-destroy
+        // listeners, its @PreDestroy and its disposer, and a registration closed twice — by a
+        // try-with-resources and an explicit close, or by two owners that each believe they hold it — must
+        // not run them twice
+        if (closed.compareAndSet(false, true)) {
+            beanContext.destroyBean(this);
+        }
     }
 
     @Nullable
@@ -67,5 +81,13 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Override
     public List<BeanRegistration<?>> dependentBeans() {
         return dependents == null ? List.of() : List.copyOf(dependents);
+    }
+
+    /**
+     * @return The interceptor registrations selected while this bean was created, or {@code null}
+     */
+    @Nullable
+    List<?> getInterceptorRegistrations() {
+        return interceptorRegistrations;
     }
 }

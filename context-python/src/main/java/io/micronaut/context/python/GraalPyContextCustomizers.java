@@ -37,7 +37,7 @@ final class GraalPyContextCustomizers {
 
     static String[] languages(ClassLoader classLoader) {
         LinkedHashSet<String> languages = new LinkedHashSet<>();
-        languages.add(GraalPyRuntimeUtil.PYTHON);
+        languages.add(PythonContextRuntime.PYTHON);
         for (GraalPyContextCustomizer customizer : load(classLoader)) {
             languages.addAll(customizer.getAdditionalLanguages());
         }

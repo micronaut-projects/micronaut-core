@@ -13,6 +13,8 @@ class Vehicle(@param:Any val engineProvider: BeanProvider<Engine>) { // <1>
     fun start() {
         engineProvider.ifPresent { it.start() } // <2>
     }
+// end::clazz[]
+
     // tag::startAll[]
     fun startAll() {
         if (engineProvider.isPresent) { // <1>

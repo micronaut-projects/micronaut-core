@@ -151,7 +151,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             def query = visitor.getVisitor().query()
             boolean includesFields = query.includesFields() || query.includesEnumConstants()
             boolean includesMethods = query.includesMethods()
-            if (includesFields || includesFields) {
+            if (includesFields || includesMethods) {
                 for (PropertyElement pn : classElement.getSyntheticBeanProperties()) {
                     visitNativeProperty(pn, query)
                 }

@@ -18,6 +18,7 @@ package io.micronaut.aop.runtime;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.chain.InterceptorChain;
+import io.micronaut.aop.beandefinition.SharedInterceptorRegistrations;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -89,6 +90,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             (Argument) Argument.of(Interceptor.class),
             binding
         ));
+        SharedInterceptorRegistrations.store(resolutionContext, proxyBeanDefinition, interceptors);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
             Interceptor<T, ?>[] methodInterceptors = InterceptorChain.resolveAroundInterceptors(interceptorRegistry, executableMethod, interceptors);
@@ -133,9 +135,14 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             (Argument) Argument.of(Interceptor.class),
             binding
         ));
+        SharedInterceptorRegistrations.store(resolutionContext, proxyBeanDefinition, interceptors);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
-            Interceptor<T, ?>[] methodInterceptors = InterceptorChain.resolveIntroductionInterceptors(interceptorRegistry, executableMethod, interceptors);
+            // Only the abstract methods are implemented by the introduction advice,
+            // the concrete ones are intercepted and proceed to the actual implementation
+            Interceptor<T, ?>[] methodInterceptors = executableMethod.isAbstract()
+                ? InterceptorChain.resolveIntroductionInterceptors(interceptorRegistry, executableMethod, interceptors)
+                : InterceptorChain.resolveAroundInterceptors(interceptorRegistry, executableMethod, interceptors);
             if (methodInterceptors.length > 0) {
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }

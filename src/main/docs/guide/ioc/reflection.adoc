@@ -1,0 +1,144 @@
+The framework describes a type through metadata the annotation processors generate when the type is compiled: api:core.annotation.AnnotationMetadata[], api:core.type.Argument[], api:inject.ExecutableMethod[], api:core.beans.BeanIntrospection[] and api:inject.BeanDefinition[]. A type that was not compiled with the processors has none, and a specification that has to handle any class - Jakarta Validation, Jakarta REST, CDI - has to describe it through `java.lang.reflect` instead.
+
+The `micronaut-reflection` module builds the same metadata from reflection, in the shape the processors give it, so that code written against generated metadata works unchanged for a type that has none. Reading a class back is what the framework is built to avoid, so an application says it wants it by adding the dependency:
+
+dependency:micronaut-reflection[]
+
+WARNING: Every type of the module is experimental, and reflective metadata is slower to build and larger to hold than generated metadata. Use it for the types you cannot compile with the processors, not instead of them.
+
+WARNING: Reflection reports the name of a parameter only for a class compiled with `-parameters`, and answers `arg0`, `arg1` and so on otherwise. Whatever reads an argument by name - a named injection point, `@Property`, binding a constructor argument to a property of the same name - therefore needs the classes it describes to carry their parameter names. The canonical constructor of a record always carries them, as the compiler records the names of the components.
+
+=== Annotation Metadata and Arguments
+
+api:reflection.ReflectionAnnotations[] builds the metadata of an `AnnotatedElement` with the stereotypes, the repeatable containers, the defaults and the non-binding members the processors record, and converts an annotation instance to an api:core.annotation.AnnotationValue[] and back. api:reflection.ReflectionArguments[] builds the arguments of parameters, fields and return types with the type-use annotations of every level of their type, resolves the type arguments a type gives to a super type, and renders an argument as a `java.lang.reflect.Type`.
+
+[source,java]
+----
+AnnotationMetadata metadata = ReflectionAnnotations.metadataOf(Order.class);
+Argument<?>[] arguments = ReflectionArguments.argumentsOf(Order.class.getDeclaredConstructors()[0]);
+Argument<?> argument = ReflectionArguments.of(Order.class.getDeclaredField("lines"));
+----
+
+An annotation composing others carries them as its retained stereotypes, the way the processors record them: the annotations it is meta-annotated with, and the ones an `@AliasFor` on one of its members reaches without composing them - `@A` setting a member of `@C` through `@B` carries `@C` itself, before the composed `@B` - each with the override applied down to the leaves.
+
+NOTE: One thing is described differently: a member of a *type-use* annotation written with the very value that is its default. An annotation instance answers every member, so a member equal to its default is dropped, as the processors record only what the source writes; which members the source wrote is read back from the class file for an annotation written on a class, a field, a method or a parameter, and the ones written on a type are held in an attribute that is not read. The member is then dropped where the processor keeps it.
+
+`ReflectionAnnotations.synthesize` goes the other way, building an annotation instance from an api:core.annotation.AnnotationValue[]. It uses the proxy the framework generates where there is one, and a JDK proxy otherwise, so an annotation type that is not public - a specification often nests one in a class of its own - is synthesized too.
+
+`ReflectionArguments.toType` renders an argument back as a `java.lang.reflect.Type`. An unresolved type variable becomes a `TypeVariable`, which is what an API describing a declaration needs; pass `false` to render it as the type it is bounded by, which is what an API comparing types by assignability needs.
+
+The mappers, transformers and remappers of the processors are not available at runtime. A library that relies on one registers a api:reflection.ReflectionAnnotationCustomizer[] service instead, which receives the values of every annotation the module converts.
+
+=== Executable Methods
+
+api:reflection.ReflectionExecutableMethod[] is an api:inject.ExecutableMethod[] over a `java.lang.reflect.Method`, and api:reflection.ReflectionBeanConstructor[] a api:core.beans.BeanConstructor[] over a `Constructor`. api:reflection.ReflectionExecutables[] resolves a `Method` named by a specification API to the best metadata available: the executable method of the bean definition when the declaring type is a bean, else the method of its bean introspection, generated or reflective, else the reflective executable method.
+
+[source,java]
+----
+ExecutableMethod<Order, Object> method = ReflectionExecutables.executableMethod(beanContext, Order.class.getMethod("total"));
+----
+
+api:reflection.MethodHierarchy[] resolves what each level of a method hierarchy declares, apart and merged, for the specifications with rules about which level may declare what.
+
+=== Bean Introspections
+
+api:reflection.ReflectionBeanIntrospection[] is a api:core.beans.BeanIntrospection[] over a class, with the properties, the constructor and the methods a generated introspection would have. It also implements api:reflection.ReflectiveIntrospection[], which describes what a generated introspection merges: every constructor of the type and the methods the type itself declares.
+
+The members a property is made of - the field, the getter and the setter, each with its own metadata, its own argument and its own accessor - are reported through `BeanProperty.getMembers()`, as <<propertyMembers,a generated introspection reports them>>. A generated introspection carries them only where ann:core.annotation.Introspected[] sets `members` to `true`, because they grow the class the processor writes; a reflective description writes nothing and describes a member only when one is asked for, so it always reports them - which is what a type the processors never saw needs, since it carries no annotation to ask with. Each member is a api:reflection.ReflectiveIntrospection.ReflectivePropertyMember[], which also reports the `java.lang.reflect` field or method it was read from. Where a declaration is shadowed - a field hidden by one of a sub class, a getter overridden - reflection reports every declaration, the one that hides the others first, as the constraints of all of them apply.
+
+api:reflection.ReflectionBeanIntrospector[] is a api:core.beans.BeanIntrospector[] serving the generated introspections of another introspector first, and reflecting only for the types that have none. It can also complete a generated introspection with the executables the processor left out, as a api:reflection.SupplementedBeanIntrospection[].
+
+[source,java]
+----
+BeanIntrospector introspector = new ReflectionBeanIntrospector(BeanIntrospector.SHARED);
+BeanIntrospection<Order> introspection = introspector.getIntrospection(Order.class);
+----
+
+`ReflectionBeanIntrospection.of` also takes the annotations the caller means the type to carry, for a specification that was told to handle a class the class itself says nothing about.
+
+==== Allowing Reflection in the Shared Introspector
+
+The shared api:core.beans.BeanIntrospector[] the framework uses - and with it `BeanIntrospection.getIntrospection(Class)`, serialization and the other features built on introspections - never reflects on a type by default. With the module on the classpath, it asks api:reflection.ReflectionBeanIntrospectionFallback[] for the types it has no generated introspection for, and the fallback describes only the types the application allowed. Allow them with the `micronaut.introspection.allow-reflection` property, as a system property or in the application configuration:
+
+[configuration]
+----
+micronaut:
+  introspection:
+    allow-reflection:
+      - com.example.model.*
+      - com.example.legacy.Order
+----
+
+A pattern is a class name where `*` stands for any sequence of characters; `*` alone allows every class. The same patterns can be allowed programmatically through api:reflection.ReflectionIntrospectionPolicy[]. The policy guards only the shared introspector: code that reflects on a type explicitly, through the types above, made its own choice.
+
+The property allows types and says nothing else about them. A type the processors compiled says how it is to be described by what it declares in ann:core.annotation.Introspected[] - what makes a property, how visible it has to be, which properties to leave out - and a type of a library, or one compiled without the processors, has no way to declare any of it. Configure those members for the types matching a pattern instead:
+
+[configuration]
+----
+micronaut:
+  introspection:
+    reflective:
+      - types: com.example.model.*
+        access-kind: FIELD
+        visibility: ANY
+        excludes: password
+      - types: com.example.api.*
+        excluded-annotations: com.example.Internal
+        indexed:
+          - annotation: com.fasterxml.jackson.annotation.JsonProperty
+            member: value
+----
+
+An entry allows the types its `types` patterns match, as `allow-reflection` does, and describes them with the members it sets: `access-kind`, `visibility`, `includes`, `excludes`, `excluded-annotations`, `annotation-metadata` and `indexed`, each the member of ann:core.annotation.Introspected[] of that name. A member left unset keeps its default.
+
+A pattern names types in bulk, so it does not displace what one of them says of itself: where a type carries ann:core.annotation.Introspected[] of its own, the members it declares win and the configuration supplies the rest. Where two entries match one type, the first sets what it sets and the second supplies the members it does not.
+
+The same is available programmatically through `ReflectionIntrospectionPolicy.configure(patterns, description)`, the description being the metadata `ReflectionAnnotations.declaring(Introspected.class, values)` builds.
+
+The policy is one per JVM, as the shared introspector is, and what each context configures is a contribution of its own: several contexts running together allow the union of their patterns, and a context that stops withdraws exactly what it contributed. `ReflectionIntrospectionPolicy.configure` returns that contribution, for code applying a configuration of its own to withdraw later, and `reset` forgets every one of them.
+
+Everything built on introspections then sees the type. Serialization, for one, asks the shared introspector for the introspection and asks for its own opt-in as well, so a class it should read without being annotated needs both:
+
+[configuration]
+----
+micronaut:
+  introspection:
+    allow-reflection:
+      - com.example.model.*
+  serde:
+    included-introspection-packages:
+      - com.example.model
+----
+
+=== Bean Definitions
+
+api:reflection.ReflectionBeanDefinition[] is a api:inject.BeanDefinition[] over a class, registered with a bean context at runtime, with the injection points, the executable methods and the life cycle a generated definition would have: the constructor the processors would select, the `@Inject`, `@Value` and `@Property` fields and methods, the `@PostConstruct` and `@PreDestroy` methods, the `@Executable` methods, and the scope, qualifier, order and conditions of the class.
+
+[source,java]
+----
+beanContext.registerBeanDefinition(ReflectionBeanDefinition.of(OrderService.class));
+
+beanContext.registerBeanDefinition(
+    ReflectionBeanDefinition.builder(OrderService.class)
+        .named("legacy")
+        .singleton(true)
+        .build()
+);
+----
+
+Each injected argument is resolved as a generated definition resolves it, including collections, arrays, streams, optionals and maps of beans, api:context.BeanRegistration[] and configuration values, and a member a super type declares of a variable the bean gives a value to is injected as that value. The bean is built the way the processors build it: a static `@Creator` factory when the class declares one, else the only accessible constructor, else the one annotated `@Inject` or `@Creator`, else the canonical constructor of a record, else the first public one. The features that need the processors - `@ConfigurationProperties` binding, `@EachProperty` and `@EachBean`, `@Parameter` arguments and AOP advice - are not available to a reflective definition.
+
+Code adapting another container has two more needs the builder covers. `additionalAnnotationMetadata` adds the annotations that container means the bean to carry without losing the ones its class declares, both counting as declared, which is how the framework reads a scope, a qualifier or a primary marker. And `postConstruct` and `preDestroy` take method names, for a container that names its life cycle methods instead of annotating them:
+
+[source,java]
+----
+beanContext.registerBeanDefinition(
+    ReflectionBeanDefinition.builder(OrderService.class)
+        .additionalAnnotationMetadata(ReflectionAnnotations.declaring(Primary.class))
+        .postConstruct("start")
+        .preDestroy("stop")
+        .build()
+);
+----
+
+`ReflectionAnnotations.declaring` builds the metadata of an annotation type with its defaults and its stereotypes, which declaring it by name alone would lose, and `ReflectionAnnotations.merge` puts two metadata together.

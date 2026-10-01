@@ -188,7 +188,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
      * @return The binding
      * @since 3.3.0
      */
-    protected static Collection<AnnotationValue<?>> resolveInterceptorValues(AnnotationMetadata annotationMetadata, InterceptorKind kind) {
+    static Collection<AnnotationValue<?>> resolveInterceptorValues(AnnotationMetadata annotationMetadata, InterceptorKind kind) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             final List<AnnotationValue<InterceptorBinding>> declaredValues =

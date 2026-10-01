@@ -32,4 +32,4 @@ class EngineFactory {
         return new V8Engine(crankShaft);
     }
 }
-// tag::class[]
+// end::class[]

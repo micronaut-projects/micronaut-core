@@ -19,6 +19,7 @@ import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.inject.DisposableBeanDefinition;
 
 import java.util.Objects;
@@ -35,6 +36,10 @@ public interface DisposableIntercepted<T> extends DisposableBeanDefinition<T> {
 
     @Override
     default T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        // One chain runs for the pre-destroy event of the bean: proceeding it reaches doDispose, which invokes every
+        // @PreDestroy callback of the bean, superclass callbacks first, in the same order as post-construct. An
+        // interceptor that does not proceed keeps all of them from running. The callbacks themselves are listed by
+        // getPreDestroyExecutableMethods().
         return Objects.requireNonNull(MethodInterceptorChain.dispose(
             resolutionContext,
             context,
@@ -42,6 +47,25 @@ public interface DisposableIntercepted<T> extends DisposableBeanDefinition<T> {
             new InterceptedDisposeMethod<>(this, resolutionContext, context, bean),
             bean
         ));
+    }
+
+    /**
+     * Invokes one {@link jakarta.annotation.PreDestroy} callback of the bean. Called by the generated
+     * {@link #doDispose(BeanResolutionContext, BeanContext, Object)} for each callback, in invocation order, with
+     * the arguments it resolved for the callback, once the interceptor chain of the event has proceeded.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param bean              The bean
+     * @param index             The index of the callback in {@link #getPreDestroyExecutableMethods()}
+     * @param arguments         The resolved arguments of the callback
+     * @return The bean
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    default T interceptPreDestroy(BeanResolutionContext resolutionContext, BeanContext context, T bean, int index, Object[] arguments) {
+        LifecycleCallbacks.invoke(getPreDestroyExecutableMethods().get(index), bean, arguments);
+        return bean;
     }
 
     /**

@@ -32,6 +32,7 @@ import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 @Property(name = 'spec.name', value = 'ServerErrorSpec')
+@Property(name = 'micronaut.server.error-response-include-message', value = 'always')
 @MicronautTest
 class ServerErrorSpec extends Specification {
 

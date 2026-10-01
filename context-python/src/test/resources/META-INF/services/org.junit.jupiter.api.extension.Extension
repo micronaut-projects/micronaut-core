@@ -1,0 +1,2 @@
+io.micronaut.context.python.ForgetClosedContextsExtension
+io.micronaut.context.python.HangWatchdogExtension

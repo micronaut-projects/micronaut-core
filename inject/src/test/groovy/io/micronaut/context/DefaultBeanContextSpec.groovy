@@ -2,7 +2,11 @@ package io.micronaut.context
 
 
 import io.micronaut.core.type.Argument
+import io.micronaut.runtime.ApplicationConfiguration
 import spock.lang.Specification
+
+import java.lang.reflect.Method
+import java.util.function.Function
 
 class DefaultBeanContextSpec extends Specification {
 
@@ -87,6 +91,58 @@ class DefaultBeanContextSpec extends Specification {
         beanContext.close()
     }
 
+    def "resolving a bean from a closed context throws IllegalStateException"() {
+        given:
+            ApplicationContext context = ApplicationContext.run()
+
+        expect:
+            context.getBean(ApplicationConfiguration) != null
+
+        when:
+            context.close()
+            context.getBean(ApplicationConfiguration)
+
+        then:
+            IllegalStateException e = thrown()
+            e.message == "Cannot resolve beans until the context is running"
+    }
+
+    def "container conversion only expands arrays and containers convertible to Iterable"() {
+        given:
+            DefaultBeanContext beanContext = new DefaultBeanContext()
+            beanContext.getConversionService().addConverter(ConvertibleContainer, Iterable, new Function<ConvertibleContainer, Iterable>() {
+                @Override
+                Iterable apply(ConvertibleContainer container) {
+                    return container.values
+                }
+            })
+            Method asIterable = DefaultBeanContext.getDeclaredMethod("asIterable", Object)
+            asIterable.accessible = true
+
+        expect:
+            invokeAsIterable(asIterable, beanContext, new ConvertibleContainer(["one", "two"] as List)) == ["one", "two"]
+            invokeAsIterable(asIterable, beanContext, new NonConvertibleContainer()) == null
+            invokeAsIterable(asIterable, beanContext, ["one", "two"] as Object[]) == ["one", "two"]
+
+        cleanup:
+            beanContext.close()
+    }
+
     static class MyBean {
+    }
+
+    static class ConvertibleContainer {
+        final List<String> values
+
+        ConvertibleContainer(List<String> values) {
+            this.values = values
+        }
+    }
+
+    static class NonConvertibleContainer {
+    }
+
+    private static Object invokeAsIterable(Method method, DefaultBeanContext beanContext, Object container) {
+        method.invoke(beanContext, (Object) container)
     }
 }

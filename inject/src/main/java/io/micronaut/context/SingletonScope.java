@@ -40,7 +40,8 @@ import java.util.concurrent.ConcurrentHashMap;
 final class SingletonScope {
 
     /**
-     * The locks used to prevent re-creating of the same singleton.
+     * The locks used to prevent re-creating of the same singleton. A lock stays until the singleton is registered,
+     * across any creation of it that failed.
      */
     private final Map<BeanDefinitionIdentity, Object> singletonsInCreationLocks = new ConcurrentHashMap<>(5, 1);
 
@@ -70,17 +71,18 @@ final class SingletonScope {
         }
         Object lock = singletonsInCreationLocks.computeIfAbsent(identity, beanDefinitionIdentity -> new Object());
         synchronized (lock) {
-            try {
-                existingRegistration = singletonByBeanDefinition.get(identity);
-                if (existingRegistration != null) {
-                    return existingRegistration;
-                }
-                BeanRegistration<T> newRegistration = beanContext.createRegistration(resolutionContext, beanType, qualifier, definition, false);
-                registerSingletonBean(newRegistration, qualifier);
-                return newRegistration;
-            } finally {
-                singletonsInCreationLocks.remove(identity);
+            existingRegistration = singletonByBeanDefinition.get(identity);
+            if (existingRegistration != null) {
+                singletonsInCreationLocks.remove(identity, lock);
+                return existingRegistration;
             }
+            BeanRegistration<T> newRegistration = beanContext.createRegistration(resolutionContext, beanType, qualifier, definition, false);
+            registerSingletonBean(newRegistration, qualifier);
+            // The lock is only let go of once the registration is in the map. A creation that threw keeps it,
+            // so that the threads blocked on it and the ones yet to arrive contend for the same object: were it
+            // removed, a newcomer would get a fresh lock and create the singleton alongside a waiter on the old one.
+            singletonsInCreationLocks.remove(identity, lock);
+            return newRegistration;
         }
     }
 

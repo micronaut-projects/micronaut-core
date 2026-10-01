@@ -24,9 +24,17 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.Issue
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
+import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.function.Supplier
 
 class SimpleTextWebSocketSpec extends Specification {
 
@@ -194,6 +202,47 @@ class SimpleTextWebSocketSpec extends Specification {
 
         where:
         scheme << ['https', 'wss'] // test with wss as well
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12610")
+    void "test concurrent first websocket connections over SSL"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder([
+                'spec.name': 'SimpleTextWebSocketSpec',
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.build-self-signed': true,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ]).run(EmbeddedServer)
+        def uri = embeddedServer.getURI()
+        uri = new URI('wss', uri.schemeSpecificPart, uri.fragment) // apply wss scheme
+        ExecutorService executor = Executors.newFixedThreadPool(8)
+        List<WebSocketClient> wsClients = []
+        List<ChatClientWebSocket> clients = []
+
+        when: "connections race to lazily initialize the websocket SSL context of a fresh client"
+        // repeated a few times because the race window is only open until the context is loaded
+        for (int attempt = 0; attempt < 4; attempt++) {
+            WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, uri)
+            wsClients.add(wsClient)
+            List<CompletableFuture<ChatClientWebSocket>> futures = (1..8).collect { int i ->
+                CompletableFuture.supplyAsync({
+                    Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/user" + i)).blockFirst(Duration.ofSeconds(30))
+                } as Supplier<ChatClientWebSocket>, executor)
+            }
+            clients.addAll(futures.collect { it.join() })
+        }
+
+        then: "all of them complete the TLS handshake instead of sending plaintext"
+        clients.size() == 32
+        clients.every { it.session.open }
+
+        cleanup:
+        clients.each { it.close() }
+        executor.shutdownNow()
+        executor.awaitTermination(30, TimeUnit.SECONDS)
+        wsClients.each { it.close() }
+        embeddedServer.close()
     }
 
     void "test simple text websocket connection with query"() {

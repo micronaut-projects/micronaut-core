@@ -105,9 +105,18 @@ public final class FormDemuxer implements BufferConsumer {
                 this.upstream = s.primary(this);
             }
             // we delay streaming until the upstream is set, so let's do that now.
-            if (state instanceof OptimisticBufferingContent opt) {
-                opt.devolveToStreaming(false);
+            if (eventLoop.inEventLoop()) {
+                devolveIfStillBuffering();
+            } else {
+                eventLoop.execute(this::devolveIfStillBuffering);
             }
+        }
+    }
+
+    private void devolveIfStillBuffering() {
+        assert eventLoop == null || eventLoop.inEventLoop();
+        if (state instanceof OptimisticBufferingContent opt) {
+            opt.devolveToStreaming(false);
         }
     }
 

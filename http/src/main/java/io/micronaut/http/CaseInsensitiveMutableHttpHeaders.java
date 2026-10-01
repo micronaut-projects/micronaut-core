@@ -175,8 +175,9 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
 
     private static int validateCharSequenceToken(CharSequence token) {
         for (int i = 0, len = token.length(); i < len; i++) {
-            byte value = (byte) token.charAt(i);
-            if (!BitSet128.contains(value, TOKEN_CHARS_HIGH, TOKEN_CHARS_LOW)) {
+            char c = token.charAt(i);
+            // a token is US-ASCII, and narrowing a character beyond it to a byte would test a different one
+            if (c > 0x7F || !BitSet128.contains((byte) c, TOKEN_CHARS_HIGH, TOKEN_CHARS_LOW)) {
                 return i;
             }
         }
@@ -193,17 +194,23 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
         //  HTAB           = %x09 ; horizontal tab
         //  See: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
         //  And: https://datatracker.ietf.org/doc/html/rfc5234#appendix-B.1
+        //
+        //  The rule is defined over octets, so anything above 0xFF is not a header value at all.
+        //  Such a character cannot be written to the wire: encoders either substitute it (Netty
+        //  replaces it with '?') or reject the value late and out of context (the JDK HTTP client
+        //  throws from its own builder), so it is rejected here instead. Characters in 0x80-0xFF
+        //  remain valid obs-text, which is what a non-ASCII Content-Disposition filename uses.
         if (value.isEmpty()) {
             return -1;
         }
         int b = value.charAt(0);
-        if (b < 0x21 || b == 0x7F) {
+        if (b < 0x21 || b == 0x7F || b > 0xFF) {
             return 0;
         }
         int length = value.length();
         for (int i = 1; i < length; i++) {
             b = value.charAt(i);
-            if (b < 0x20 && b != 0x09 || b == 0x7F) {
+            if (b < 0x20 && b != 0x09 || b == 0x7F || b > 0xFF) {
                 return i;
             }
         }

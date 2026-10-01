@@ -259,8 +259,8 @@ class ServiceLoaderFeature implements Feature {
             }
 
             @Override
-            public void registerDynamicProxy(Class<?> proxyClass) {
-                RuntimeProxyCreation.register(proxyClass);
+            public void registerDynamicProxy(Class<?>... interfaces) {
+                RuntimeProxyCreation.register(interfaces);
             }
         };
         for (GraalReflectionConfigurer configurer : configurers) {

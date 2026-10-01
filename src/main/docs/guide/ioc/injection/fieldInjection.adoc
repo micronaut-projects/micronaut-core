@@ -5,7 +5,7 @@ You can inject non-final fields by annotating the field with `jakarta.inject.Inj
 
 [.lang-python]
 --
-You can inject Python attributes by using `typing.Annotated[]` and pas `jakarta.inject.Inject`, for example:
+You can inject Python attributes by using `typing.Annotated[]` and passing `jakarta.inject.Inject`, for example:
 --
 
 .Example of Field Injection
@@ -14,9 +14,9 @@ snippet::io.micronaut.docs.ioc.injection.field.Vehicle[indent="0"]
 <1> The field is annotated with `jakarta.inject.Inject`.
 
 [.lang-kotlin]
----
+--
 NOTE: For Kotlin instead of an optional type (a type ending with `?`) you can use `lateinit var`
----
+--
 
 [.lang-kotlin.lang-java.lang-groovy]
 --

@@ -36,4 +36,4 @@ class EngineFactory {
         return engine // <3>
     }
 }
-// tag::class[]
+// end::class[]

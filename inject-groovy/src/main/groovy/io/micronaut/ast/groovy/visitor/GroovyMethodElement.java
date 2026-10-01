@@ -285,8 +285,8 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
             .map(overriddenMethod -> new GroovyMethodElement(
                     owningType,
                     visitorContext,
-                    new GroovyNativeElement.Method(methodNode),
-                    methodNode,
+                    new GroovyNativeElement.Method(overriddenMethod),
+                    overriddenMethod,
                     elementAnnotationMetadataFactory
                 )
             ).collect(Collectors.toList());

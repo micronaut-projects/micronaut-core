@@ -14,7 +14,6 @@ from org.junit.jupiter.api import Test
 Flux = java.type("reactor.core.publisher.Flux")
 Map = java.type("java.util.Map")
 String = java.type("java.lang.String")
-MessageClass = java.type("micronaut.docs.basics.Message")
 
 from .Message import Message
 
@@ -72,7 +71,7 @@ class HelloControllerSpec:
     def testRetrieveWithPOJO(self):
         # tag::jsonpojo[]
         response = Flux.from_(
-            self.client.retrieve(HttpRequest.GET("/greet/John"), MessageClass)
+            self.client.retrieve(HttpRequest.GET("/greet/John"), Message)
         )
 
         assert "Hello John" == response.blockFirst().text
@@ -83,12 +82,12 @@ class HelloControllerSpec:
         # tag::pojoresponse[]
         call = Flux.from_(
             self.client.exchange(
-                HttpRequest.GET("/greet/John"), MessageClass  # <1>
+                HttpRequest.GET("/greet/John"), Message  # <1>
             )
         )
 
         response = call.blockFirst()
-        message = response.getBody(MessageClass)  # <2>
+        message = response.getBody(Message)  # <2>
         assert HttpStatus.OK == response.getStatus()  # <3>
         assert message.isPresent()
         assert "Hello John" == message.get().text
@@ -119,13 +118,13 @@ class HelloControllerSpec:
         call = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/greet", Message("Hello John")),  # <1>
-                MessageClass,  # <2>
+                Message,  # <2>
             )
         )
         # end::postpojo[]
 
         response = call.blockFirst()
-        message = response.getBody(MessageClass)  # <2>
+        message = response.getBody(Message)  # <2>
         assert HttpStatus.CREATED == response.getStatus(), f"status={response.getStatus()}, body={message}"  # <3>
         assert message.isPresent()
         assert "Hello John" == message.get().text

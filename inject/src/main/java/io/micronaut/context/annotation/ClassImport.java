@@ -32,6 +32,10 @@ import java.lang.annotation.Target;
  *
  * <p>Note that this annotation is likely to require more use of reflection if package protected members require injection.</p>
  *
+ * <p>Note that a source generated to carry this annotation must not be annotated
+ * {@link io.micronaut.core.annotation.Generated}: the annotation processor skips elements
+ * carrying it, so the imports would never be processed.</p>
+ *
  * @author Denis Stepanov
  * @since 4.9
  */

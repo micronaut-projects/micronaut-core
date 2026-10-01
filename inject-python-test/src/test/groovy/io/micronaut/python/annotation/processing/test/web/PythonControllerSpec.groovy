@@ -14,6 +14,7 @@ import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.json.JsonMapper
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.validation.Validated
 import jakarta.inject.Singleton
 
 class PythonControllerSpec extends AbstractPythonTypeElementSpec {
@@ -807,6 +808,79 @@ class GreetingController:
 
         cleanup:
         client.close()
+        context?.close()
+    }
+
+    void "test class controller implicitly validates a Valid request body"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from typing import Annotated
+
+from jakarta.validation import Valid
+from jakarta.validation.constraints import NotBlank, Positive
+from micronaut.http.annotation import Body, Controller, Put
+from micronaut.serde.annotation import Serdeable
+
+
+@Serdeable
+@dataclass
+class Item:
+    name: Annotated[str, NotBlank]
+    price: Annotated[float, Positive]
+
+
+@Controller("/implicit-class")
+class ItemController:
+    @Put("/items/{item_id}")
+    def update_item(self, item_id: int, item: Annotated[Item, Body, Valid]) -> dict:
+        return {"item_name": item.name, "item_id": item_id}
+''', true)
+
+        def definition = context.getBeanDefinition(context.classLoader.loadClass("python.ItemController"))
+        def updateItem = definition.getExecutableMethods().find { it.methodName == "update_item" }
+
+        expect:
+        updateItem != null
+        updateItem.hasStereotype(Validated)
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test classless controller implicitly validates a Valid request body"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from typing import Annotated
+
+from jakarta.validation import Valid
+from jakarta.validation.constraints import NotBlank, Positive
+from micronaut.http.annotation import Body, Put
+from micronaut.serde.annotation import Serdeable
+
+
+@Serdeable
+@dataclass
+class Item:
+    name: Annotated[str, NotBlank]
+    price: Annotated[float, Positive]
+
+
+@Put("/implicit-classless/items/{item_id}")
+def update_item(item_id: int, item: Annotated[Item, Body, Valid]) -> dict:
+    return {"item_name": item.name, "item_id": item_id}
+''', true)
+
+        def definition = context.getAllBeanDefinitions().find { it.getBeanType().getName().contains("Script") }
+        def updateItem = definition?.getExecutableMethods()?.find { it.methodName == "update_item" }
+
+        expect:
+        definition != null
+        updateItem != null
+        updateItem.hasStereotype(Validated)
+
+        cleanup:
         context?.close()
     }
 

@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-base")
+    id("io.micronaut.build.internal.convention-python")
     id("me.champeau.jmh") version "0.7.3"
 }
 
@@ -24,6 +25,8 @@ dependencies {
     api(projects.micronautContextPython)
     api(projects.micronautHttpServer)
     api(projects.micronautHttpServerNetty)
+    // the access logger's ConnectionMetadata resolves the QUIC channel class when it is initialized
+    api(projects.micronautHttpNettyHttp3)
     api(projects.micronautHttpClient)
     api(projects.micronautJacksonDatabind)
     api(projects.micronautRouter)
@@ -48,8 +51,19 @@ val jmhWarmupIterations = providers.gradleProperty("jmh.warmupIterations").map(S
 val jmhProfilers = providers.gradleProperty("jmh.profilers")
     .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
     .getOrElse(emptyList())
+val jmhPoolSizes = providers.gradleProperty("jmh.poolSizes")
+    .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
 val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
     .map(layout.projectDirectory::file)
+// Benchmark switches read by BenchOptions in the forked JMH JVM. A -D on the Gradle command line
+// only reaches Gradle itself, so they are exposed as -P properties and forwarded as JVM arguments:
+// -Pjmh.dateHeader=true, -Pjmh.accessLog=true
+val jmhBenchSwitches = listOf(
+    "jmh.dateHeader" to "micronaut.bench.date-header",
+    "jmh.accessLog" to "micronaut.bench.access-log"
+).mapNotNull { (property, systemProperty) ->
+    providers.gradleProperty(property).orNull?.let { "-D$systemProperty=$it" }
+}
 
 jmh {
     includes = jmhIncludes
@@ -57,7 +71,13 @@ jmh {
     iterations = jmhIterations
     warmupIterations = jmhWarmupIterations
     profilers = jmhProfilers
+    providers.gradleProperty("jmh.warmupTime").orNull?.let(warmup::set)
+    providers.gradleProperty("jmh.timeOnIteration").orNull?.let(timeOnIteration::set)
+    jmhPoolSizes.orNull?.let { sizes ->
+        benchmarkParameters.put("poolSize", objects.listProperty(String::class.java).value(sizes))
+    }
     humanOutputFile.set(jmhHumanOutput)
+    jvmArgsAppend.addAll(jmhBenchSwitches)
     duplicateClassesStrategy = DuplicatesStrategy.WARN
 }
 
@@ -69,7 +89,6 @@ tasks {
     named<Jar>("jmhJar") {
         isZip64 = true
         manifest.attributes["Multi-Release"] = "true"
-        exclude("GRAALPY-VFS/**")
     }
 }
 

@@ -22,11 +22,13 @@ import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
@@ -54,6 +56,24 @@ public interface BeanContext extends
      * @since 3.0.0
      */
     BeanContextConfiguration getContextConfiguration();
+
+    /**
+     * The predicate the context was built with, as passed to
+     * {@link ApplicationContextBuilder#beansPredicate(java.util.function.Predicate)}.
+     *
+     * <p>The compiled definitions the context knows about are already narrowed by it: the references
+     * reported by {@link BeanDefinitionRegistry#getBeanDefinitionReferences()} and the definitions
+     * resolved from them are only ever ones the predicate accepted. The accessor is for code that
+     * enumerates candidates from a source of its own and has to honour the same narrowing, rather than
+     * carrying a second copy of the predicate alongside the one handed to the builder.</p>
+     *
+     * @return The beans predicate, or {@code null} if the context was not narrowed by one
+     * @since 5.2.0
+     */
+    @Nullable
+    default Predicate<QualifiedBeanType<?>> getBeansPredicate() {
+        return getContextConfiguration().beansPredicate();
+    }
 
     /**
      * Obtain an {@link io.micronaut.context.event.ApplicationEventPublisher} for the given even type.

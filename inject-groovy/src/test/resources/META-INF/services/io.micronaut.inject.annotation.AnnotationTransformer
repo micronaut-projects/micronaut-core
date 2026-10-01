@@ -1,1 +1,3 @@
 io.micronaut.inject.beanbuilder.TestInterceptorBindingTransformer
+io.micronaut.annotation.mapping.MyOverridesTransformer
+io.micronaut.annotation.mapping.MyOverridesListTransformer

@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getConstructors
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
@@ -63,7 +62,6 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.kotlin.processing.getBinaryName
 import java.util.Optional
 import java.util.function.Function
 import java.util.stream.Stream
@@ -186,7 +184,7 @@ internal open class KotlinClassElement(
     }
 
     private val internalName: String by lazy {
-        declaration.getBinaryName(visitorContext.resolver, visitorContext)
+        visitorContext.getBinaryName(declaration)
     }
 
     private val resolvedSuperTypes: Collection<ClassElement> by lazy {
@@ -422,6 +420,11 @@ internal open class KotlinClassElement(
                 val excludedAnnotations = propertyElementQuery.excludedAnnotations
                 if (hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) }) {
                     false
+                } else if (nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null) {
+                    // KSP models a Java field as a property without accessors. It cannot be read or
+                    // written as a bean property, so leave it to the field handling below, which
+                    // applies the configured access kinds and visibility.
+                    false
                 } else {
                     !propertyElementQuery.excludes.contains(el.name)
                             && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
@@ -446,8 +449,15 @@ internal open class KotlinClassElement(
                 }
             }
 
-        val allProperties: MutableList<PropertyElement> = mutableListOf()
-        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
+        val allProperties: MutableMap<String, PropertyElement> = linkedMapOf()
+        enclosedElementsQuery.getEnclosedElements(this, eq).forEach { property ->
+            // KSP can return the same logical property through multiple hierarchy paths, for example
+            // the mapped JDK collection members declared by both Map and MutableMap. Only one bean
+            // property can be written per name, so collapse them onto the most specific declaration.
+            allProperties.merge(property.name, property) { existing, candidate ->
+                if (isMoreSpecific(candidate, existing)) candidate else existing
+            }
+        }
         // unfortunate hack since these are not excluded?
         if (hasDeclaredStereotype(ConfigurationReader::class.java)) {
             val configurationBuilderQuery = ElementQuery.of(PropertyElement::class.java)
@@ -456,19 +466,17 @@ internal open class KotlinClassElement(
                 .onlyAccessible(this)
             enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
                 .forEach { e ->
-                    if (!allProperties.contains(e)) {
-                        allProperties.add(e)
-                    }
+                    allProperties.putIfAbsent(e.name, e)
                 }
         }
-        val propertyNames = allProperties.map { it.name }.toMutableSet()
+        val propertyNames = allProperties.keys
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
         val methods = ArrayList(getEnclosedElements(ElementQuery.ALL_METHODS))
         if (isJavaRecord(nativeType.declaration)) {
             propertyElementQuery.readPrefixes("")
             propertyElementQuery.writePrefixes(emptyArray())
         }
-        allProperties.forEach { prop ->
+        allProperties.values.forEach { prop ->
             methods.removeIf { m ->
                 prop.name == NameUtils.getPropertyNameForGetter(
                     m.name,
@@ -480,7 +488,7 @@ internal open class KotlinClassElement(
             }
         }
         val fields = ArrayList(getEnclosedElements(ElementQuery.ALL_FIELDS))
-        fields.removeIf { f -> allProperties.stream().anyMatch { p -> p.name == f.name }}
+        fields.removeIf { f -> allProperties.containsKey(f.name) }
         val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             {
@@ -503,8 +511,20 @@ internal open class KotlinClassElement(
                 }
             })
         resolvedProperties.addAll(methodProperties)
-        resolvedProperties.addAll(allProperties)
+        resolvedProperties.addAll(allProperties.values)
         return resolvedProperties
+    }
+
+    /**
+     * Whether a duplicate property declaration should replace the one already collected. A concrete
+     * declaration wins over an abstract one, and otherwise the declaration of the most specific type
+     * wins, so that an overriding declaration and its annotations are the ones retained.
+     */
+    private fun isMoreSpecific(candidate: PropertyElement, existing: PropertyElement): Boolean {
+        if (candidate.isAbstract != existing.isAbstract) {
+            return !candidate.isAbstract
+        }
+        return candidate.declaringType.isAssignable(existing.declaringType)
     }
 
     private fun mapToPropertyElement(value: AstBeanPropertiesUtils.BeanPropertyData) =
@@ -563,19 +583,13 @@ internal open class KotlinClassElement(
         if (internalName == type) {
             return true // Same type
         }
-        val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
+        val otherDeclaration = visitorContext.classDeclarationByName(type)
         if (otherDeclaration != null) {
             if (declaration == otherDeclaration) {
                 return true
             }
-            val thisFullName = declaration.getBinaryName(
-                visitorContext.resolver,
-                visitorContext
-            )
-            val otherFullName = otherDeclaration.getBinaryName(
-                visitorContext.resolver,
-                visitorContext
-            )
+            val thisFullName = visitorContext.getBinaryName(declaration)
+            val otherFullName = visitorContext.getBinaryName(otherDeclaration)
             if (thisFullName == otherFullName) {
                 return true
             }
@@ -655,6 +669,16 @@ internal open class KotlinClassElement(
     }
 
     override fun isAbstract(): Boolean = declaration.isAbstract()
+
+    override fun isSealed() = declaration.modifiers.contains(Modifier.SEALED)
+
+    // KSP resolves the sealed subclasses through the current round's resolver, so this has to be read while
+    // that session is live rather than from an element retained past it
+    override fun getPermittedSubclasses(): Collection<ClassElement> =
+        declaration.getSealedSubclasses()
+            .mapNotNull { it.qualifiedName?.asString() }
+            .mapNotNull { visitorContext.getClassElement(it).orElse(null) }
+            .toList()
 
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
         super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
@@ -736,16 +760,15 @@ internal open class KotlinClassElement(
             return false
         }
 
-        @OptIn(KspExperimental::class)
         override fun getElementName(element: KSNode): String {
             if (element is KSPropertyDeclaration) {
                 return element.simpleName.asString()
             }
             if (element is KSFunctionDeclaration) {
-                return element.getBinaryName(visitorContext.resolver)
+                return visitorContext.getBinaryName(element)
             }
             if (element is KSDeclaration) {
-                return element.getBinaryName(visitorContext.resolver, visitorContext)
+                return visitorContext.getBinaryName(element)
             }
             return ""
         }

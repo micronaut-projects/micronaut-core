@@ -1,0 +1,32 @@
+A api:core.beans.BeanIntrospection[] records the type arguments the introspected type binds in each of its super types, the same way api:inject.BeanDefinition[] does for a bean. This answers what a type binds without reading the class reflectively, and without the type having to be a bean.
+
+Given a type that binds both arguments of a generic interface:
+
+[source,java]
+----
+@Introspected
+class PhoneValidator implements Validator<Phone> { // <1>
+    // ...
+}
+----
+
+<1> `Validator` is a generic interface, `interface Validator<T>`
+
+the bound arguments are read back from the introspection by super type:
+
+[source,java]
+----
+BeanIntrospection<PhoneValidator> introspection = BeanIntrospection.getIntrospection(PhoneValidator.class);
+
+List<Argument<?>> arguments = introspection.getTypeArguments(Validator.class); // <1>
+assert arguments.get(0).getType() == Phone.class;
+
+assert introspection.getTypeArguments(Comparable.class).isEmpty(); // <2>
+----
+
+<1> Arguments are looked up by the super class or interface that declares them, either as a `Class` or by name
+<2> A super type the introspected type does not bind, or does not have, answers an empty list
+
+Arguments bound through an intermediate super type are resolved too, and an argument the type leaves open is reported as the type variable rather than as a resolved type.
+
+NOTE: The no-argument `getTypeArguments()` reports the arguments the introspected type itself *declares*, not what it binds in a super type. For `class PhoneValidator implements Validator<Phone>` it is empty; for `class AnyValidator<T> implements Validator<T>` it is `[T]`.

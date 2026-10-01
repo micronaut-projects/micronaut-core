@@ -61,4 +61,45 @@ class TestFactory:
         cleanup:
         context.close()
     }
+
+    void "test alias for names its target annotation by name"() {
+        given:
+        def context = buildContext('''\
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from micronaut.context.annotation import AliasFor, Executable, Factory
+from java.util.function import Function
+
+@Singleton
+@Executable
+def TestAnnotation(
+    value: Annotated[str, AliasFor(annotationName="jakarta.inject.Named", member="value")] = "",
+):
+    def decorator(func):
+        return func
+    return decorator
+
+class EchoFunction(Function[str, int]):
+    def apply(self, value: str) -> int:
+        return 10
+
+@Factory
+class TestFactory:
+
+    @TestAnnotation("bar")
+    def my_func(self) -> Function[str, int]:
+        return EchoFunction()
+''')
+
+        when:
+        def definition = context.getBeanDefinition(Function)
+
+        then:
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
+        definition.getValue(AnnotationUtil.NAMED, String).get() == "bar"
+
+        cleanup:
+        context.close()
+    }
 }

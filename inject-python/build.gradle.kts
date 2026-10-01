@@ -1,4 +1,4 @@
-import io.micronaut.build.internal.python.PythonVfsBytecodeCompile
+import io.micronaut.build.python.PythonVfsBytecodeCompile
 
 plugins {
     id("io.micronaut.build.internal.convention-library")
@@ -24,7 +24,9 @@ dependencies {
             type = "pom"
         }
     }
-    api(libs.managed.graalpy.embedding)
+    api(libs.managed.graalpy.embedding) {
+        exclude(group = "org.graalvm.python", module = "python-bouncycastle-support")
+    }
     compileOnly(libs.jetbrains.annotations)
 
     testImplementation(projects.micronautContext)

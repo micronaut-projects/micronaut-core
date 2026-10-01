@@ -31,32 +31,76 @@ class Person:
     this.address = address;
   }
 
+  public Person() {
+  }
+
+  @Override
   public Value asPolyglotValue() {
+    if (this instanceof io.micronaut.aop.InterceptedProxy) {
+      return PythonCoercion.interceptedTargetValue((InterceptedProxy) this);
+    }
     if (this.graalpyInternalValue != null) {
       if (this.graalpyInternalValueSyncing) {
         return this.graalpyInternalValue;
       } else {
         this.graalpyInternalValueSyncing = true;
-        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
-        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
+        PythonCoercion.putMember(this.graalpyInternalValue, "name", (Object) this.name);
+        PythonCoercion.putMember(this.graalpyInternalValue, "age", (Object) this.age);
+        if (this.graalpyInternalJavaOwned) {
+          PythonCoercion.putMemberByReference(this.graalpyInternalValue, "address", (Object) this.address);
+        } else {
+          PythonCoercion.putMember(this.graalpyInternalValue, "address", PythonCoercion.coerceValue(this.address));
+        }
         this.graalpyInternalValueSyncing = false;
         return this.graalpyInternalValue;
       }
     } else {
       this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance(Person.__PYTHON_CLASS_REFERENCE);
+      this.graalpyInternalJavaOwned = true;
       this.graalpyInternalValueSyncing = true;
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
+      PythonCoercion.putMember(this.graalpyInternalValue, "name", (Object) this.name);
+      PythonCoercion.putMember(this.graalpyInternalValue, "age", (Object) this.age);
+      PythonCoercion.putMemberByReference(this.graalpyInternalValue, "address", (Object) this.address);
       this.graalpyInternalValueSyncing = false;
       return this.graalpyInternalValue;
     }
   }
 
+  @Override
+  public Value asPolyglotValue(Context arg1) {
+    return PythonCoercion.coercePooledValue(this, arg1);
+  }
+
+  @Override
+  public Value reconstructPolyglotValue(Context arg1) {
+    if (PythonCoercion.isValueInContext(this.graalpyInternalValue, arg1)) {
+      PythonCoercion.rememberPooledValue(this, arg1, this.graalpyInternalValue);
+      return this.asPolyglotValue();
+    } else {
+      if (this.graalpyInternalValue == null && PythonContextRuntime.isCurrentContext(arg1)) {
+        Value targetValue = this.asPolyglotValue();
+        PythonCoercion.rememberPooledValue(this, arg1, targetValue);
+        return targetValue;
+      } else {
+        Value targetValue = PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE);
+        PythonCoercion.rememberPooledValue(this, arg1, targetValue);
+        PythonCoercion.putMembers(targetValue, new String[]{"name","age","address"}, new Object[]{PythonCoercion.coerceToContext(this.name, arg1, java.lang.String.class),PythonCoercion.coerceToContext(this.age, arg1, int.class),PythonCoercion.coerceToContext(this.address, arg1, python.Address.class)});
+        return targetValue;
+      }
+    }
+  }
+
   public static Person fromPolyglotValue(Value arg1) {
-    if (GraalPyRuntimeUtil.isNone(arg1)) {
+    if (PythonConversion.isNone(arg1)) {
       return null;
+    }
+    Object hostObject = ValueCoercibles.hostObject(arg1, Person.class);
+    if (hostObject != null) {
+      return (Person) hostObject;
+    }
+    Person subclassWrapper = PythonConversion.subclassWrapper(arg1, Person.class);
+    if (subclassWrapper != null) {
+      return subclassWrapper;
     }
     return new python.Person(arg1);
   }

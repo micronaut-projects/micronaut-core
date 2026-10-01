@@ -1,0 +1,37 @@
+{
+  "reflection": [
+    {
+      "type": "io.micronaut.core.bind.annotation.AbstractArgumentBinder",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "io.micronaut.core.convert.ConversionService"
+          ]
+        },
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "io.micronaut.core.convert.ConversionService",
+            "io.micronaut.core.type.Argument"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "io.micronaut.core.bind.DefaultExecutableBinder",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        },
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.util.Map"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -20,14 +20,21 @@ dependencies {
     api(libs.jakarta.inject.api)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit.platform.launcher)
+    testImplementation(libs.micronaut.test.junit5)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))
     testImplementation(platform(libs.test.boms.micronaut.serde))
     testImplementation(libs.managed.reactor)
+    testImplementation("io.micronaut.email:micronaut-email:3.2.0")
     testImplementation(projects.micronautInjectJavaHelper)
     testImplementation(projects.micronautRetry)
+    testImplementation(projects.micronautMessaging)
     testImplementation(libs.micronaut.validation)
+    testImplementation(libs.micronaut.validation.processor) {
+        exclude(group = "io.micronaut")
+    }
     testImplementation("io.micronaut.data:micronaut-data-processor") {
         exclude(group = "io.micronaut")
     }
@@ -40,10 +47,14 @@ dependencies {
     testImplementation("io.micronaut.serde:micronaut-serde-api") {
         exclude(group = "io.micronaut")
     }
-    testImplementation("jakarta.data:jakarta.data-api:1.1.0-M1")
+    testImplementation("jakarta.data:jakarta.data-api:1.1.0-M3")
+    // A non-Micronaut io.* package: Python's stdlib io module must not shadow it
+    testImplementation(libs.swagger.annotations)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautJacksonDatabind)
+    // stores generated Python classes reflectively, like a Java persistence library would
+    testImplementation(libs.eclipsestore.storage.embedded)
 }
 
 tasks {

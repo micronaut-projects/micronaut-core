@@ -95,4 +95,22 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     default String getHttpMethodName() {
         return getHttpMethod().name();
     }
+
+    /**
+     * Whether this route is an <em>implicit</em> {@code HEAD} route; that is, a {@code HEAD} route that
+     * was derived automatically from a {@link io.micronaut.http.annotation.Get} mapping rather than
+     * declared by the user with {@link io.micronaut.http.annotation.Head}.
+     *
+     * <p>Implicit routes are fully-fledged routes and participate in matching and content negotiation
+     * exactly like any other route. The distinction is only used as a last-resort tie-break: if a request
+     * cannot be resolved to a single route and the remaining candidates contain both implicit and
+     * explicitly declared routes, the explicitly declared ones win instead of the request being rejected
+     * as ambiguous.</p>
+     *
+     * @return {@code true} if this route was derived from a {@code @Get} mapping rather than declared
+     * @since 5.2.0
+     */
+    default boolean isImplicitHead() {
+        return false;
+    }
 }

@@ -26,7 +26,6 @@ class VehicleSpec: StringSpec({
     }
 
     "test start vehicle - invalid" {
-        // tag::start[]
         val map = mapOf(
                 "my.engine.cylinders" to "-10",
                 "my.engine.crank-shaft.rod-length" to "7.0"

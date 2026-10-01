@@ -20,6 +20,7 @@ import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.lang.reflect.Modifier;
 
 /**
  * Implementation of {@link ClassElement} backed by reflection.
@@ -46,6 +47,11 @@ class ReflectClassElement extends ReflectTypeElement<Class<?>> {
     @Override
     public boolean isInterface() {
         return type.isInterface();
+    }
+
+    @Override
+    public boolean isAbstract() {
+        return Modifier.isAbstract(type.getModifiers());
     }
 
     @Override

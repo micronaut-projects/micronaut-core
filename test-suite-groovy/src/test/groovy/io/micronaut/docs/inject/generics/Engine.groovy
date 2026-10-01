@@ -11,4 +11,4 @@ interface Engine<T extends CylinderProvider> { // <1>
 
     T getCylinderProvider()
 }
-// tag::class[]
+// end::class[]

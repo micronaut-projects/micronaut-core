@@ -113,14 +113,11 @@ public class CorsFilter implements Ordered, ConditionalFilter {
 
     @Override
     public boolean isEnabled(HttpRequest<?> request) {
-        String origin = request.getOrigin().orElse(null);
-        if (origin == null) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
-            }
-            return false;
+        if (request.getOrigin().isPresent()) {
+            return true;
         }
-        return true;
+        LOG.trace("Http Header {} not present. Proceeding with the request.", ORIGIN);
+        return false;
     }
 
     @PreMatching
@@ -526,4 +523,5 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         }
         return methods;
     }
+
 }

@@ -29,4 +29,4 @@ class EngineInitializer : BeanInitializedEventListener<EngineFactory> { // <4>
         return engineFactory
     }
 }
-// tag::class[]
+// end::class[]

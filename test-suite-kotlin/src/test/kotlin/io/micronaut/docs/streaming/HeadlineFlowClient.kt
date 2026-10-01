@@ -30,5 +30,5 @@ interface HeadlineFlowClient {
     // tag::streamingWithFlow[]
     @Get(value = "/headlinesWithFlow", processes = [MediaType.APPLICATION_JSON_STREAM]) // <1>
     fun streamFlow(): Flow<Headline> // <2>
-    // tag::streamingWithFlow[]
+    // end::streamingWithFlow[]
 }

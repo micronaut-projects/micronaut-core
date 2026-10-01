@@ -18,17 +18,18 @@ This module is framework runtime code loaded from the GraalPy virtual file
 system by :class:`PythonAsyncioRuntime`. It intentionally implements a narrow
 asyncio event loop instead of delegating to a selector loop: Micronaut owns the
 request-processing thread, and Netty owns the event loop that drives HTTP I/O.
-The classes below translate Python asyncio scheduling, timers, stream
-transports, datagram transports, and Java ``CompletionStage`` bridging into
-operations that can be driven by a Micronaut-provided Java event-loop facade.
+The classes below translate Python asyncio scheduling, timers and Java
+``CompletionStage`` bridging into operations that can be driven by a
+Micronaut-provided Java event-loop facade; stream and datagram transports are
+the Java objects that facade creates.
 
 Maintainer notes:
 * Keep Java host calls small and explicit. Public Python behavior should look
   like normal asyncio, but the implementation must avoid blocking a Netty event
   loop.
-* Prefer adding support behind capability checks on ``self._java_loop``. The
-  base ``micronaut-context-python`` module provides socket fallbacks;
-  ``micronaut-context-python-netty`` adds Netty-native factories.
+* Prefer adding support behind capability checks on ``self._java_loop``;
+  ``micronaut-context-python-netty`` provides the Netty-native factories and a
+  loop without them raises ``NotImplementedError``.
 * Do not expose raw Netty channels or handlers from this module. Java transport
   facades provide stable socket-like extras for Python callers.
 * Keep unsupported APIs deterministic. Raising ``NotImplementedError`` is
@@ -37,32 +38,193 @@ Maintainer notes:
 Implementation map:
 * ``_MicronautAsyncioHandle`` and ``_MicronautAsyncioTimerHandle`` preserve
   asyncio callback/timer cancellation state while Java owns execution timing.
-* ``_MicronautSocketTransport``, ``_MicronautDatagramTransport``, and
-  ``_MicronautServer`` are compatibility fallbacks used when Netty cannot own
-  the socket.
+* ``_MicronautNettyTransport`` and ``_MicronautNettyDatagramTransport`` are
+  the ``asyncio.Transport`` objects protocols see: thin Python classes over the
+  Java transports the Netty event loop creates for every address family, so
+  keyword arguments (``set_write_buffer_limits(high=...)``, ``sendto(data,
+  addr=...)``) and ``isinstance`` checks work. A Python socket cannot be
+  adopted, so ``sock=`` arguments raise ``NotImplementedError``. The
+  ``sock_*`` coroutines drive a caller-supplied non-blocking socket from the
+  loop by retrying.
 * ``_MicronautNettyServer`` adapts Java's Netty server facade to the Python
   ``asyncio.Server`` contract without exposing Netty implementation objects.
-* ``_MicronautAsyncioEventLoop`` is the central event-loop adapter. It prefers
-  Java/Netty capabilities and falls back only for socket APIs that can be
-  driven without blocking the caller.
+* ``_MicronautAsyncioEventLoop`` is the central event-loop adapter over the
+  Java/Netty capabilities.
 * The ``__micronaut_*`` functions at the bottom are the stable Java entry
   points used by ``PythonAsyncioRuntime``.
 """
 
 import asyncio
+import math
+import contextvars
 import errno
 import inspect
 import os
 import select
 import socket
 import ssl as _micronaut_ssl
+import threading
 import traceback
 import java
 
 from asyncio import events
 from asyncio import futures
 from asyncio import tasks
-from asyncio import transports
+
+class _PerThreadAttributes:
+    """Per-thread attribute storage that lives and dies with this context.
+
+    asyncio keeps its running loop, and the default policy its current loop, in ``threading.local``
+    objects. GraalPy stores those in a Java ``ThreadLocal`` of the calling thread, so an entry made
+    from a long-lived thread (a Netty event loop, a request thread, a test worker) keeps a closed
+    context reachable through the thread. A dict keyed by thread ident is released with the context.
+    """
+
+    def __init__(self, **defaults):
+        object.__setattr__(self, "_defaults", defaults)
+        object.__setattr__(self, "_by_thread", {})
+
+    def __getattr__(self, name):
+        by_thread = object.__getattribute__(self, "_by_thread")
+        defaults = object.__getattribute__(self, "_defaults")
+        values = by_thread.get(threading.get_ident())
+        if values is not None and name in values:
+            return values[name]
+        if name in defaults:
+            return defaults[name]
+        raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        by_thread = object.__getattribute__(self, "_by_thread")
+        defaults = object.__getattribute__(self, "_defaults")
+        ident = threading.get_ident()
+        values = by_thread.get(ident)
+        if value == defaults.get(name, _UNSET):
+            # back to the default: the thread's entry is dropped, not kept
+            if values is not None:
+                values.pop(name, None)
+                if not values:
+                    by_thread.pop(ident, None)
+            return
+        if values is None:
+            values = by_thread[ident] = {}
+        values[name] = value
+
+
+_UNSET = object()
+
+# asyncio's running-loop holder and the default policy's loop storage, without threading.local
+events._running_loop = _PerThreadAttributes(loop_pid=(None, None))
+_policy_local = getattr(asyncio.get_event_loop_policy(), "_local", None)
+if _policy_local is not None:
+    asyncio.get_event_loop_policy()._local = _PerThreadAttributes(_loop=None, _set_called=False)
+
+
+class MicronautJavaException(RuntimeError):
+    """Python exception carrying a Java ``Throwable`` that failed an awaited Java value.
+
+    GraalPy cannot attach a traceback to a foreign exception, which is what
+    ``asyncio.Future.result`` does when a stored exception is re-raised. Java
+    failures are therefore stored behind this Python exception. The bridge
+    unwraps ``java_exception`` when the failure crosses back into Java, so the
+    original Java exception type is preserved end to end. It is a ``RuntimeError``
+    so Python code that handled the previous ``RuntimeError(str(throwable))``
+    keeps working; the Java exception is available as ``java_exception``.
+    """
+
+    def __init__(self, java_exception):
+        super().__init__(str(java_exception))
+        self.java_exception = java_exception
+
+_AsyncioRuntime = java.type("io.micronaut.context.python.PythonAsyncioRuntime")
+
+
+def _report_loop_error(text):
+    """Log an event-loop error through Micronaut's logger, falling back to stderr."""
+    try:
+        _AsyncioRuntime.reportLoopError(text)
+    except BaseException:
+        import sys
+        print(text, file=sys.stderr)
+
+
+class MicronautJavaOSError(OSError):
+    """A Java I/O failure as the ``OSError`` asyncio code handles; ``java_exception`` is the Java throwable."""
+
+    def __init__(self, java_exception):
+        super().__init__(str(java_exception))
+        self.java_exception = java_exception
+
+
+class MicronautJavaConnectionRefused(ConnectionRefusedError):
+    def __init__(self, java_exception):
+        super().__init__(str(java_exception))
+        self.java_exception = java_exception
+
+
+class MicronautJavaTimeout(TimeoutError):
+    def __init__(self, java_exception):
+        super().__init__(str(java_exception))
+        self.java_exception = java_exception
+
+
+class MicronautJavaAddressError(socket.gaierror):
+    def __init__(self, java_exception):
+        super().__init__(socket.EAI_NONAME, str(java_exception))
+        self.java_exception = java_exception
+
+
+_TIMEOUT_FAILURES = (
+    "io.netty.channel.ConnectTimeoutException",
+    "io.netty.handler.ssl.SslHandshakeTimeoutException",
+    "io.netty.resolver.dns.DnsNameResolverTimeoutException",
+    "java.net.SocketTimeoutException",
+    "java.util.concurrent.TimeoutException",
+)
+
+
+def _java_class_names(throwable):
+    """The class names of a Java throwable and its superclasses, most specific first."""
+    names = []
+    try:
+        java_class = throwable.getClass()
+        while java_class is not None:
+            names.append(java_class.getName())
+            java_class = java_class.getSuperclass()
+    except Exception:
+        pass
+    return names
+
+
+def _java_failure_type(throwable):
+    """The Python exception type for a Java throwable: networking failures become OSError subclasses.
+
+    Timeouts are recognised before their broader parents (Netty's connect timeout is a
+    ConnectException, its TLS handshake timeout an IOException).
+    """
+    names = _java_class_names(throwable)
+    if any(name in _TIMEOUT_FAILURES for name in names):
+        return MicronautJavaTimeout
+    if "java.net.ConnectException" in names:
+        return MicronautJavaConnectionRefused
+    if "java.net.UnknownHostException" in names:
+        return MicronautJavaAddressError
+    if "java.io.IOException" in names:
+        return MicronautJavaOSError
+    return MicronautJavaException
+
+
+def _is_java_failure(exception):
+    return getattr(exception, "java_exception", None) is not None
+
+
+def _micronaut_java_failure(throwable):
+    failure = _java_failure_type(throwable)(throwable)
+    try:
+        failure.__cause__ = throwable
+    except Exception:
+        pass
+    return failure
 
 class _MicronautAsyncioHandle:
     """Minimal callback handle used by the Micronaut-managed event loop.
@@ -76,7 +238,9 @@ class _MicronautAsyncioHandle:
     def __init__(self, callback, args, context=None):
         self._callback = callback
         self._args = args
-        self._context = context
+        # as asyncio: a callback runs in the context of the code that scheduled it (a task passes its
+        # own context, so the steps of a coroutine share one)
+        self._context = contextvars.copy_context() if context is None else context
         self._cancelled = False
 
     def cancel(self):
@@ -88,10 +252,21 @@ class _MicronautAsyncioHandle:
     def _run(self):
         if self._cancelled:
             return
-        if self._context is None:
+        self._context.run(self._run_in_context)
+
+    def _run_in_context(self):
+        # the Java PropagatedContext of the task that owns this callback lives in its contextvars: it
+        # is restored around the callback on the loop thread, so a coroutine step resumed by the
+        # loop sees the context of its own task and not the context of whoever scheduled the step (a
+        # task setting a shared Event, a Java thread completing an awaited stage)
+        reactive_context = _micronaut_reactive_context.get()
+        if reactive_context is None:
             self._callback(*self._args)
         else:
-            self._context.run(self._callback, *self._args)
+            reactive_context.run(self._invoke)
+
+    def _invoke(self):
+        self._callback(*self._args)
 
 class _MicronautAsyncioTimerHandle(_MicronautAsyncioHandle):
     """Timer variant that can cancel the backing Java scheduled future.
@@ -114,302 +289,111 @@ class _MicronautAsyncioTimerHandle(_MicronautAsyncioHandle):
         if self._scheduled_future is not None:
             self._scheduled_future.cancel(False)
 
-class _MicronautSocketTransport(transports.Transport):
-    """Socket fallback stream transport for non-Netty paths.
+class _MicronautNettyTransport(asyncio.Transport):
+    """asyncio transport over the Java TCP/TLS/Unix transport created by the Netty event loop."""
 
-    Netty-backed transports are Java host objects supplied by
-    ``micronaut-context-python-netty``. This transport is used only when Python
-    code supplies an ordinary socket or requests an option/address family that
-    the Java event loop does not handle natively. It intentionally uses the
-    loop's socket coroutine helpers so operations are retried from the managed
-    event loop instead of blocking the caller.
-    """
+    __slots__ = ("_java",)
 
-    def __init__(self, loop, sock, protocol):
-        self._loop = loop
-        self._sock = sock
-        self._protocol = protocol
-        self._closing = False
-        self._reading = True
-        self._read_task = None
-        self._extra = {"socket": sock}
-        try:
-            self._extra["sockname"] = sock.getsockname()
-        except OSError:
-            pass
-        try:
-            self._extra["peername"] = sock.getpeername()
-        except OSError:
-            pass
-        protocol.connection_made(self)
-        self._start_reading()
-
-    def _start_reading(self):
-        if not self._closing and self._reading and self._read_task is None:
-            self._read_task = self._loop.create_task(self._read_loop())
-
-    async def _read_loop(self):
-        try:
-            while not self._closing and self._reading:
-                data = await self._loop.sock_recv(self._sock, 65536)
-                if data:
-                    self._protocol.data_received(data)
-                else:
-                    keep_open = False
-                    if hasattr(self._protocol, "eof_received"):
-                        keep_open = bool(self._protocol.eof_received())
-                    if not keep_open:
-                        self.close()
-                    break
-        except asyncio.CancelledError:
-            raise
-        except BaseException as exc:
-            self._force_close(exc)
-        finally:
-            self._read_task = None
+    def __init__(self, java_transport):
+        super().__init__()
+        self._java = java_transport
 
     def get_extra_info(self, name, default=None):
-        return self._extra.get(name, default)
+        return self._java.get_extra_info(name, default)
 
     def is_closing(self):
-        return self._closing
+        return self._java.is_closing()
 
     def close(self):
-        if self._closing:
-            return
-        self._closing = True
-        task = self._read_task
-        if task is not None:
-            task.cancel()
-        try:
-            self._sock.close()
-        finally:
-            self._loop.call_soon(self._protocol.connection_lost, None)
+        self._java.close()
 
     def abort(self):
-        self.close()
-
-    def _force_close(self, exc):
-        if self._closing:
-            return
-        self._closing = True
-        try:
-            self._sock.close()
-        finally:
-            self._loop.call_soon(self._protocol.connection_lost, exc)
-
-    def write(self, data):
-        if self._closing:
-            return
-        view = memoryview(data)
-        try:
-            sent = self._sock.send(view)
-        except (BlockingIOError, InterruptedError):
-            sent = 0
-        if sent < len(view):
-            self._loop.create_task(self._loop.sock_sendall(self._sock, view[sent:]))
-
-    def writelines(self, list_of_data):
-        self.write(b"".join(list_of_data))
-
-    def can_write_eof(self):
-        return True
-
-    def write_eof(self):
-        try:
-            self._sock.shutdown(socket.SHUT_WR)
-        except OSError:
-            pass
-
-    def get_write_buffer_size(self):
-        return 0
-
-    def get_write_buffer_limits(self):
-        return (0, 0)
-
-    def set_write_buffer_limits(self, high=None, low=None):
-        pass
-
-    def pause_reading(self):
-        self._reading = False
-
-    def resume_reading(self):
-        if self._closing or self._reading:
-            return
-        self._reading = True
-        self._start_reading()
+        self._java.abort()
 
     def set_protocol(self, protocol):
-        self._protocol = protocol
+        self._java.set_protocol(protocol)
 
     def get_protocol(self):
-        return self._protocol
+        return self._java.get_protocol()
 
-class _MicronautDatagramTransport(transports.DatagramTransport):
-    """Socket fallback datagram transport.
+    def is_reading(self):
+        return self._java.is_reading()
 
-    The Netty module provides a Java datagram transport for normal UDP usage.
-    This Python implementation exists for supplied sockets and compatibility
-    cases. Error handling mirrors asyncio's datagram protocol contract:
-    protocol ``error_received`` is preferred, otherwise the loop exception
-    handler receives contextual failure details.
-    """
+    def pause_reading(self):
+        self._java.pause_reading()
 
-    def __init__(self, loop, sock, protocol):
-        self._loop = loop
-        self._sock = sock
-        self._protocol = protocol
-        self._closing = False
-        self._read_task = None
-        self._extra = {"socket": sock}
-        try:
-            self._extra["sockname"] = sock.getsockname()
-        except OSError:
-            pass
-        try:
-            self._extra["peername"] = sock.getpeername()
-        except OSError:
-            pass
-        protocol.connection_made(self)
-        self._start_reading()
+    def resume_reading(self):
+        self._java.resume_reading()
 
-    def _start_reading(self):
-        if not self._closing and self._read_task is None:
-            self._read_task = self._loop.create_task(self._read_loop())
+    def set_write_buffer_limits(self, high=None, low=None):
+        self._java.set_write_buffer_limits(high, low)
 
-    async def _read_loop(self):
-        try:
-            while not self._closing:
-                data, address = await self._loop.sock_recvfrom(self._sock, 65536)
-                self._protocol.datagram_received(data, address)
-        except asyncio.CancelledError:
-            raise
-        except OSError as exc:
-            if not self._closing:
-                if hasattr(self._protocol, "error_received"):
-                    self._protocol.error_received(exc)
-                else:
-                    self._loop.call_exception_handler({"message": "Exception in Micronaut asyncio datagram transport", "exception": exc, "transport": self})
-        finally:
-            self._read_task = None
+    def get_write_buffer_size(self):
+        return self._java.get_write_buffer_size()
 
-    def sendto(self, data, addr=None):
-        if self._closing:
-            return
-        try:
-            if addr is None:
-                self._sock.send(data)
-            else:
-                self._sock.sendto(data, addr)
-        except (BlockingIOError, InterruptedError):
-            self._loop.create_task(self._send_later(data, addr))
-        except OSError as exc:
-            if hasattr(self._protocol, "error_received"):
-                self._protocol.error_received(exc)
-            else:
-                raise
+    def get_write_buffer_limits(self):
+        return tuple(self._java.get_write_buffer_limits())
 
-    async def _send_later(self, data, addr):
-        try:
-            if addr is None:
-                await self._loop._retry_socket_call(lambda: self._sock.send(data))
-            else:
-                await self._loop.sock_sendto(self._sock, data, addr)
-        except OSError as exc:
-            if hasattr(self._protocol, "error_received"):
-                self._protocol.error_received(exc)
-            else:
-                self._loop.call_exception_handler({"message": "Exception in Micronaut asyncio datagram send", "exception": exc, "transport": self})
+    def write(self, data):
+        self._java.write(data)
+
+    def writelines(self, list_of_data):
+        self._java.writelines(list(list_of_data))
+
+    def write_eof(self):
+        self._java.write_eof()
+
+    def can_write_eof(self):
+        return self._java.can_write_eof()
+
+
+class _MicronautNettyDatagramTransport(asyncio.DatagramTransport):
+    """asyncio datagram transport over the Java UDP transport created by the Netty event loop."""
+
+    __slots__ = ("_java",)
+
+    def __init__(self, java_transport):
+        super().__init__()
+        self._java = java_transport
 
     def get_extra_info(self, name, default=None):
-        return self._extra.get(name, default)
+        return self._java.get_extra_info(name, default)
 
     def is_closing(self):
-        return self._closing
+        return self._java.is_closing()
 
     def close(self):
-        if self._closing:
-            return
-        self._closing = True
-        task = self._read_task
-        if task is not None:
-            task.cancel()
-        try:
-            self._sock.close()
-        finally:
-            self._loop.call_soon(self._protocol.connection_lost, None)
+        self._java.close()
 
     def abort(self):
-        self.close()
+        self._java.abort()
 
-class _MicronautServer:
-    """Socket fallback server for accepted stream connections.
+    def set_protocol(self, protocol):
+        self._java.set_protocol(protocol)
 
-    Netty-backed servers are represented by ``_MicronautNettyServer`` below.
-    This fallback accepts with ``sock_accept`` and wraps accepted sockets in
-    ``_MicronautSocketTransport``. It is intentionally small: lifecycle,
-    ``sockets``, ``start_serving``, ``serve_forever``, and ``wait_closed`` are
-    implemented because those are the parts used by asyncio stream helpers.
-    """
+    def get_protocol(self):
+        return self._java.get_protocol()
 
-    def __init__(self, loop, sockets, protocol_factory, start_serving):
-        self._loop = loop
-        self._sockets = tuple(sockets)
-        self._protocol_factory = protocol_factory
-        self._closing = False
-        self._tasks = []
-        self._closed = loop.create_future()
-        if start_serving:
-            self.start_serving()
-
-    @property
-    def sockets(self):
-        return self._sockets
-
-    def start_serving(self):
-        if self._closing or self._tasks:
+    def sendto(self, data, addr=None):
+        if self.is_closing():
             return
-        for sock in self._sockets:
-            self._tasks.append(self._loop.create_task(self._accept_loop(sock)))
+        peer = self._java.get_extra_info("peername")
+        if peer is None:
+            if addr is None:
+                raise ValueError("unconnected datagram transport requires an address")
+        elif addr is not None and _normalized_address(addr) != _normalized_address(peer):
+            raise ValueError(f"Invalid address: must be None or {_normalized_address(peer)}")
+        self._java.sendto(data, addr)
 
-    async def serve_forever(self):
-        self.start_serving()
-        await self._closed
 
-    async def _accept_loop(self, sock):
-        try:
-            while not self._closing:
-                try:
-                    accepted, _ = await self._loop.sock_accept(sock)
-                except OSError:
-                    if not self._closing:
-                        raise
-                    return
-                _MicronautSocketTransport(self._loop, accepted, self._protocol_factory())
-        except asyncio.CancelledError:
-            raise
-        except BaseException as exc:
-            self._loop.call_exception_handler({"message": "Exception in Micronaut asyncio server", "exception": exc, "server": self})
+def _normalized_address(address):
+    """An address tuple as (host, port, flowinfo, scope_id): two IPv6 addresses differing only by scope differ."""
+    host = str(address[0])
+    port = int(address[1])
+    flowinfo = int(address[2]) if len(address) > 2 and address[2] is not None else 0
+    scope_id = int(address[3]) if len(address) > 3 and address[3] is not None else 0
+    return (host, port, flowinfo, scope_id)
 
-    def close(self):
-        if self._closing:
-            return
-        self._closing = True
-        for task in self._tasks:
-            task.cancel()
-        for sock in self._sockets:
-            try:
-                sock.close()
-            except OSError:
-                pass
-        if not self._closed.done():
-            self._closed.set_result(None)
-
-    async def wait_closed(self):
-        await self._closed
-
-    def is_serving(self):
-        return not self._closing and bool(self._tasks)
 
 class _MicronautNettyServer:
     """Python facade over a Java Netty-backed asyncio server.
@@ -419,29 +403,65 @@ class _MicronautNettyServer:
     invariant that no raw Netty channel leaks into application code.
     """
 
-    def __init__(self, loop, java_server):
+    def __init__(self, loop, java_servers):
         self._loop = loop
-        self._java_server = java_server
+        self._java_servers = list(java_servers)
+        self._closed = False
+        self._serving_forever = None
 
     @property
     def sockets(self):
-        return self._java_server.sockets()
+        if self._closed:
+            return []
+        return [server_socket for java_server in self._java_servers for server_socket in java_server.sockets()]
 
-    def start_serving(self):
-        self._java_server.startServing()
+    def get_loop(self):
+        return self._loop
+
+    async def start_serving(self):
+        # a coroutine, as on asyncio.Server: ``await server.start_serving()``
+        for java_server in self._java_servers:
+            java_server.startServing()
 
     async def serve_forever(self):
-        self.start_serving()
-        await self.wait_closed()
+        if self._serving_forever is not None:
+            raise RuntimeError(f"server {self!r} is already being awaited on serve_forever()")
+        if self._closed:
+            raise RuntimeError(f"server {self!r} is closed")
+        # the future close() cancels: serve_forever() then raises CancelledError, as asyncio.Server does
+        self._serving_forever = self._loop.create_future()
+        try:
+            await self.start_serving()
+            await self._serving_forever
+        except asyncio.CancelledError:
+            # cancelled from outside or by close(): the server is closed either way
+            self.close()
+            await self.wait_closed()
+            raise
+        finally:
+            self._serving_forever = None
 
     def close(self):
-        self._java_server.close()
+        self._closed = True
+        for java_server in self._java_servers:
+            java_server.close()
+        serving_forever = self._serving_forever
+        if serving_forever is not None and not serving_forever.done():
+            serving_forever.cancel()
 
     async def wait_closed(self):
-        await self._loop._completion_stage_to_future(self._java_server.waitClosed())
+        for java_server in self._java_servers:
+            await self._loop._completion_stage_to_future(java_server.waitClosed())
 
     def is_serving(self):
-        return self._java_server.isServing()
+        return not self._closed and all(java_server.isServing() for java_server in self._java_servers)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        self.close()
+        await self.wait_closed()
 
 class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
     """Asyncio event loop driven by a Micronaut ``PythonEventLoop`` facade.
@@ -450,9 +470,9 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
     coroutine code use the subset of asyncio that Micronaut can safely drive
     from Java. Methods are grouped into scheduling, future/task creation,
     executor handoff, networking, socket helpers, and deterministic unsupported
-    APIs. When ``self._java_loop`` exposes Netty factory methods, networking
-    operations take the native Netty path; otherwise they fall back to the
-    socket transports above.
+    APIs. Networking operations take the Netty path through the factory methods
+    of ``self._java_loop`` for every address family; a loop without them, or a
+    caller-supplied Python socket, raises ``NotImplementedError``.
     """
 
     def __init__(self, java_loop, time_unit, executor_adapter=None):
@@ -480,16 +500,17 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
         raise RuntimeError("Micronaut-managed asyncio loops cannot be blocked with run_until_complete")
 
     def stop(self):
-        pass
+        raise RuntimeError("Micronaut-managed asyncio loops are driven by the Netty EventLoop and cannot be stopped")
 
     def is_running(self):
         return True
 
     def is_closed(self):
-        return self._closed
+        return False
 
     def close(self):
-        self._closed = True
+        # asyncio refuses to close a running loop; this loop runs as long as its Netty event loop
+        raise RuntimeError("Cannot close a running event loop")
 
     def time(self):
         return self._java_loop.time()
@@ -497,7 +518,8 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
     def call_soon(self, callback, *args, context=None):
         self._check_closed()
         handle = _MicronautAsyncioHandle(callback, args, context)
-        self._java_loop.execute(lambda: self._run_handle(handle))
+        # executeCallback runs the Python callable inside an execution frame of this context
+        self._java_loop.executeCallback(lambda: self._run_handle(handle))
         return handle
 
     def call_soon_threadsafe(self, callback, *args, context=None):
@@ -510,7 +532,7 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
         self._check_closed()
         handle = _MicronautAsyncioTimerHandle(when, callback, args, context)
         delay = max(0.0, when - self.time())
-        handle._scheduled_future = self._java_loop.schedule(lambda: self._run_handle(handle), int(delay * 1000000000), self._time_unit)
+        handle._scheduled_future = self._java_loop.scheduleCallback(lambda: self._run_handle(handle), int(delay * 1000000000), self._time_unit)
         return handle
 
     def create_future(self):
@@ -537,20 +559,44 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
         self._exception_handler = handler
 
     def default_exception_handler(self, context):
+        """Report a callback failure the way asyncio does: log it, do not propagate it into Netty."""
+        message = context.get("message") or "Unhandled exception in event loop"
         exception = context.get("exception")
+        lines = [message]
+        for key in sorted(context):
+            if key in ("message", "exception"):
+                continue
+            lines.append(f"{key}: {context[key]!r}")
         if exception is not None:
-            raise exception
+            lines.append("".join(traceback.format_exception(type(exception), exception, exception.__traceback__)).rstrip())
+        _report_loop_error("\n".join(lines))
 
     def call_exception_handler(self, context):
         if self._exception_handler is None:
-            self.default_exception_handler(context)
-        else:
+            try:
+                self.default_exception_handler(context)
+            except BaseException as failure:
+                _report_loop_error(f"Exception in default exception handler: {failure!r}")
+            return
+        try:
             self._exception_handler(self, context)
+        except BaseException as failure:
+            # a failing custom handler is reported through the default one, as asyncio does
+            try:
+                self.default_exception_handler({
+                    "message": "Unhandled error in exception handler",
+                    "exception": failure,
+                    "context": context,
+                })
+            except BaseException as nested:
+                _report_loop_error(f"Exception in default exception handler: {nested!r}")
 
     async def shutdown_asyncgens(self):
+        # Async generators are finalised by the garbage collector: the loop keeps no registry of them.
         pass
 
     async def shutdown_default_executor(self, timeout=None):
+        # The blocking executor belongs to Micronaut and outlives the loop; there is nothing to shut down.
         pass
 
     def _check_closed(self):
@@ -559,6 +605,54 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
 
     def _unsupported(self, name):
         raise NotImplementedError(f"asyncio event-loop API [{name}] is not supported by the Micronaut Netty event loop")
+
+    @staticmethod
+    def _host_of(address):
+        """The host of an address tuple; an IPv6 scope id (the fourth element) is kept as host%scope."""
+        host = address[0]
+        if len(address) >= 4 and address[3]:
+            return f"{host}%{address[3]}"
+        return host
+
+    @staticmethod
+    def _address_family(family, python_name):
+        """The address family name the Java loop filters resolved addresses by."""
+        if family in (0, socket.AF_UNSPEC):
+            return ""
+        if family == socket.AF_INET:
+            return "inet"
+        if family == socket.AF_INET6:
+            return "inet6"
+        raise NotImplementedError(f"asyncio event-loop API [{python_name}] does not support address family {family!r} on the Micronaut Netty event loop")
+
+    def _netty_factory(self, java_name, python_name):
+        """The Java factory behind an asyncio API, or NotImplementedError for a loop without it."""
+        factory = getattr(self._java_loop, java_name, None)
+        if factory is None:
+            self._unsupported(python_name)
+        return factory
+
+    @staticmethod
+    def _has_ssl(ssl):
+        # an empty mapping still asks for TLS with defaults; only None and False mean plaintext
+        return ssl is not None and ssl is not False
+
+    @classmethod
+    def _check_ssl_timeouts(cls, ssl, ssl_handshake_timeout, ssl_shutdown_timeout, server_hostname=None):
+        if not cls._has_ssl(ssl):
+            if server_hostname is not None:
+                raise ValueError("server_hostname is only meaningful with ssl")
+            if ssl_handshake_timeout is not None:
+                raise ValueError("ssl_handshake_timeout is only meaningful with ssl")
+            if ssl_shutdown_timeout is not None:
+                raise ValueError("ssl_shutdown_timeout is only meaningful with ssl")
+            return
+        for name, timeout in (("ssl_handshake_timeout", ssl_handshake_timeout), ("ssl_shutdown_timeout", ssl_shutdown_timeout)):
+            if timeout is None:
+                continue
+            # as asyncio: a positive, finite number of seconds
+            if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+                raise ValueError(f"{name} should be a positive number, got {timeout!r}")
 
     def _check_ssl(self, ssl):
         if isinstance(ssl, _micronaut_ssl.SSLContext):
@@ -596,17 +690,14 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
         if hasattr(stage, "cancel"):
             future.add_done_callback(lambda completed: stage.cancel(False) if completed.cancelled() else None)
         def complete(value, throwable):
+            # runs on the loop, inside an execution frame of this context (see completeOnLoop)
             if future.cancelled():
                 return
-            def apply_completion():
-                if future.cancelled():
-                    return
-                if throwable is None:
-                    future.set_result(value)
-                else:
-                    future.set_exception(RuntimeError(str(throwable)))
-            self.call_soon_threadsafe(apply_completion)
-        stage.whenComplete(complete)
+            if throwable is None:
+                future.set_result(value)
+            else:
+                future.set_exception(_micronaut_java_failure(throwable))
+        _AsyncioRuntime.completeOnLoop(stage, self._java_loop, complete)
         return future
 
     def run_in_executor(self, executor, func, *args):
@@ -653,183 +744,137 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
     async def getnameinfo(self, sockaddr, flags=0):
         return await self.run_in_executor(None, lambda: socket.getnameinfo(sockaddr, flags))
 
+    @staticmethod
+    def _numeric_host(host, flags):
+        # the one getaddrinfo flag with a visible effect: with AI_NUMERICHOST every host that would
+        # be resolved must already be a literal address, as getaddrinfo would insist
+        if host is None or host == "" or not (flags & socket.AI_NUMERICHOST):
+            return
+        import ipaddress
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            raise socket.gaierror(socket.EAI_NONAME, f"Name or service not known: {host!r} is not a numeric host") from None
+
     async def create_connection(self, protocol_factory, host=None, port=None, *, ssl=None, family=0, proto=0, flags=0, sock=None, local_addr=None, server_hostname=None, ssl_handshake_timeout=None, ssl_shutdown_timeout=None, happy_eyeballs_delay=None, interleave=None, all_errors=False):
+        # Netty resolves the host itself; the family argument narrows the resolved addresses the
+        # way asyncio's getaddrinfo lookup would. proto, flags and all_errors have no Netty
+        # equivalent and are accepted; the happy-eyeballs options are refused rather than ignored.
+        self._check_ssl_timeouts(ssl, ssl_handshake_timeout, ssl_shutdown_timeout, server_hostname)
         ssl = self._java_ssl(ssl)
-        if sock is None and family in (0, socket.AF_INET) and proto == 0 and flags == 0 and host is not None and port is not None:
-            try:
-                netty_factory = self._java_loop.createConnection
-            except AttributeError:
-                netty_factory = None
-            if netty_factory is not None:
-                local_host = None
-                local_port = -1
-                if local_addr is not None:
-                    local_host = local_addr[0]
-                    local_port = local_addr[1]
-                connection = await self._completion_stage_to_future(netty_factory(protocol_factory, host, int(port), local_host, local_port, ssl, server_hostname, ssl_handshake_timeout, ssl_shutdown_timeout))
-                return connection[0], connection[1]
-        if sock is None:
-            infos = await self.getaddrinfo(host, port, family=family, type=socket.SOCK_STREAM, proto=proto, flags=flags)
-            if not infos:
-                raise OSError("getaddrinfo returned an empty list")
-            last_error = None
-            for family, type_, proto_, _, address in infos:
-                sock = socket.socket(family, type_, proto_)
-                sock.setblocking(False)
-                try:
-                    if local_addr is not None:
-                        sock.bind(local_addr)
-                    await self.sock_connect(sock, address)
-                    break
-                except OSError as exc:
-                    last_error = exc
-                    sock.close()
-                    sock = None
-            if sock is None:
-                raise last_error if last_error is not None else OSError("connection failed")
-        else:
-            sock.setblocking(False)
-        protocol = protocol_factory()
-        transport = _MicronautSocketTransport(self, sock, protocol)
-        return transport, protocol
+        if sock is not None:
+            self._unsupported("create_connection(sock=...): the Netty event loop cannot adopt a Python socket")
+        if happy_eyeballs_delay is not None or interleave is not None:
+            self._unsupported("create_connection(happy_eyeballs_delay=..., interleave=...): the Netty event loop tries the resolved addresses one after the other")
+        if proto not in (0, socket.IPPROTO_TCP):
+            self._unsupported(f"create_connection(proto={proto!r}): the Netty event loop opens TCP connections")
+        if host is None or port is None:
+            raise ValueError("host and port are required")
+        self._numeric_host(host, flags)
+        if local_addr is not None:
+            self._numeric_host(local_addr[0], flags)
+        family_name = self._address_family(family, "create_connection")
+        netty_factory = self._netty_factory("createConnection", "create_connection")
+        local_host = None
+        local_port = -1
+        if local_addr is not None:
+            local_host = self._host_of(local_addr)
+            local_port = local_addr[1]
+        try:
+            connection = await self._completion_stage_to_future(netty_factory(protocol_factory, host, int(port), local_host, local_port, ssl, server_hostname, ssl_handshake_timeout, ssl_shutdown_timeout, family_name))
+        except Exception as failure:
+            if not _is_java_failure(failure):
+                raise
+            if all_errors:
+                # every address was tried; the Java failure carries the earlier attempts as suppressed exceptions
+                attempts = [_micronaut_java_failure(suppressed) for suppressed in failure.java_exception.getSuppressed()]
+                attempts.append(failure)
+                raise ExceptionGroup("Multiple exceptions", attempts) from None
+            raise
+        return connection[0], connection[1]
 
     async def create_server(self, protocol_factory, host=None, port=None, *, family=socket.AF_UNSPEC, flags=socket.AI_PASSIVE, sock=None, backlog=100, ssl=None, reuse_address=None, reuse_port=None, keep_alive=None, ssl_handshake_timeout=None, ssl_shutdown_timeout=None, start_serving=True):
+        self._check_ssl_timeouts(ssl, ssl_handshake_timeout, ssl_shutdown_timeout)
         ssl = self._java_ssl(ssl)
-        if sock is None and family in (socket.AF_UNSPEC, socket.AF_INET) and flags in (0, socket.AI_PASSIVE) and keep_alive is None:
-            try:
-                netty_factory = self._java_loop.createServer
-            except AttributeError:
-                netty_factory = None
-            if netty_factory is not None:
-                if isinstance(host, (list, tuple)):
-                    host = host[0] if host else None
-                java_server = await self._completion_stage_to_future(netty_factory(protocol_factory, host, int(port or 0), int(backlog), reuse_address is not False, bool(reuse_port), bool(start_serving), ssl, ssl_handshake_timeout, ssl_shutdown_timeout))
-                return _MicronautNettyServer(self, java_server)
-        sockets = []
         if sock is not None:
-            sock.setblocking(False)
-            sockets.append(sock)
-        else:
-            infos = await self.getaddrinfo(host, port, family=family, type=socket.SOCK_STREAM, flags=flags)
-            bound = set()
-            for family, type_, proto_, _, address in infos:
-                if address in bound:
-                    continue
-                bound.add(address)
-                server_sock = socket.socket(family, type_, proto_)
-                try:
-                    if reuse_address is not False:
-                        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    if reuse_port:
-                        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-                    server_sock.bind(address)
-                    server_sock.listen(backlog)
-                    server_sock.setblocking(False)
-                    sockets.append(server_sock)
-                except BaseException:
-                    server_sock.close()
-                    raise
-        return _MicronautServer(self, sockets, protocol_factory, start_serving)
+            self._unsupported("create_server(sock=...): the Netty event loop cannot adopt a Python socket")
+        if keep_alive is not None:
+            self._unsupported("create_server(keep_alive=...)")
+        family_name = self._address_family(family, "create_server")
+        netty_factory = self._netty_factory("createServer", "create_server")
+        # asyncio binds one listening socket per host; every host gets its own Netty server
+        hosts = list(host) if isinstance(host, (list, tuple)) else [host]
+        if not hosts:
+            hosts = [None]
+        # asyncio: an empty host means every interface, like None
+        hosts = [None if one_host == "" else one_host for one_host in hosts]
+        for one_host in hosts:
+            self._numeric_host(one_host, flags)
+        java_servers = []
+        try:
+            for one_host in hosts:
+                java_servers.append(await self._completion_stage_to_future(netty_factory(protocol_factory, one_host, int(port or 0), int(backlog), reuse_address is not False, bool(reuse_port), bool(start_serving), ssl, ssl_handshake_timeout, ssl_shutdown_timeout, family_name)))
+        except BaseException:
+            for java_server in java_servers:
+                java_server.close()
+            raise
+        return _MicronautNettyServer(self, java_servers)
 
     async def create_unix_connection(self, protocol_factory, path=None, *, ssl=None, sock=None, server_hostname=None, ssl_handshake_timeout=None, ssl_shutdown_timeout=None):
+        self._check_ssl_timeouts(ssl, ssl_handshake_timeout, ssl_shutdown_timeout, server_hostname)
         ssl = self._java_ssl(ssl)
-        if sock is None and path is not None:
-            try:
-                netty_factory = self._java_loop.createUnixConnection
-            except AttributeError:
-                netty_factory = None
-            if netty_factory is not None:
-                connection = await self._completion_stage_to_future(netty_factory(protocol_factory, str(path), ssl, server_hostname, ssl_handshake_timeout, ssl_shutdown_timeout))
-                return connection[0], connection[1]
-        self._unsupported("create_unix_connection")
+        if sock is not None:
+            self._unsupported("create_unix_connection(sock=...): the Netty event loop cannot adopt a Python socket")
+        if path is None:
+            raise ValueError("path is required")
+        netty_factory = self._netty_factory("createUnixConnection", "create_unix_connection")
+        connection = await self._completion_stage_to_future(netty_factory(protocol_factory, str(path), ssl, server_hostname, ssl_handshake_timeout, ssl_shutdown_timeout))
+        return connection[0], connection[1]
 
     async def create_unix_server(self, protocol_factory, path=None, *, sock=None, backlog=100, ssl=None, ssl_handshake_timeout=None, ssl_shutdown_timeout=None, start_serving=True):
+        self._check_ssl_timeouts(ssl, ssl_handshake_timeout, ssl_shutdown_timeout)
         ssl = self._java_ssl(ssl)
-        if sock is None and path is not None:
-            try:
-                netty_factory = self._java_loop.createUnixServer
-            except AttributeError:
-                netty_factory = None
-            if netty_factory is not None:
-                java_server = await self._completion_stage_to_future(netty_factory(protocol_factory, str(path), int(backlog), bool(start_serving), ssl, ssl_handshake_timeout, ssl_shutdown_timeout))
-                return _MicronautNettyServer(self, java_server)
-        self._unsupported("create_unix_server")
+        if sock is not None:
+            self._unsupported("create_unix_server(sock=...): the Netty event loop cannot adopt a Python socket")
+        if path is None:
+            raise ValueError("path is required")
+        netty_factory = self._netty_factory("createUnixServer", "create_unix_server")
+        java_server = await self._completion_stage_to_future(netty_factory(protocol_factory, str(path), int(backlog), bool(start_serving), ssl, ssl_handshake_timeout, ssl_shutdown_timeout))
+        return _MicronautNettyServer(self, [java_server])
 
     async def connect_accepted_socket(self, protocol_factory, sock, *, ssl=None, ssl_handshake_timeout=None, ssl_shutdown_timeout=None):
+        self._check_ssl_timeouts(ssl, ssl_handshake_timeout, ssl_shutdown_timeout)
         ssl = self._java_ssl(ssl)
-        try:
-            netty_factory = self._java_loop.connectAcceptedSocket
-        except AttributeError:
-            netty_factory = None
-        if netty_factory is not None:
-            connection = await self._completion_stage_to_future(netty_factory(protocol_factory, sock, ssl, ssl_handshake_timeout, ssl_shutdown_timeout))
-            if connection is not None:
-                return connection[0], connection[1]
-        sock.setblocking(False)
-        protocol = protocol_factory()
-        transport = _MicronautSocketTransport(self, sock, protocol)
-        return transport, protocol
+        netty_factory = self._netty_factory("connectAcceptedSocket", "connect_accepted_socket")
+        connection = await self._completion_stage_to_future(netty_factory(protocol_factory, sock, ssl, ssl_handshake_timeout, ssl_shutdown_timeout))
+        if connection is None:
+            self._unsupported("connect_accepted_socket with a Python socket: only a channel accepted by the Netty event loop can be adopted")
+        return connection[0], connection[1]
 
     async def create_datagram_endpoint(self, protocol_factory, local_addr=None, remote_addr=None, *, family=0, proto=0, flags=0, reuse_port=None, allow_broadcast=None, sock=None):
-        if sock is None and family in (0, socket.AF_INET) and proto in (0, socket.IPPROTO_UDP) and flags == 0:
-            try:
-                netty_factory = self._java_loop.createDatagramEndpoint
-            except AttributeError:
-                netty_factory = None
-            if netty_factory is not None:
-                local_host = None
-                local_port = -1
-                remote_host = None
-                remote_port = -1
-                if local_addr is not None:
-                    local_host = local_addr[0]
-                    local_port = local_addr[1]
-                if remote_addr is not None:
-                    remote_host = remote_addr[0]
-                    remote_port = remote_addr[1]
-                endpoint = await self._completion_stage_to_future(netty_factory(protocol_factory, local_host, local_port, remote_host, remote_port, bool(allow_broadcast), bool(reuse_port)))
-                return endpoint[0], endpoint[1]
-        if sock is not None and (local_addr is not None or remote_addr is not None):
-            raise ValueError("socket modifier keyword arguments can not be used when sock is specified")
-        if sock is None:
-            lookup_host = "0.0.0.0"
-            lookup_port = 0
-            lookup_flags = flags
-            if remote_addr is not None:
-                lookup_host, lookup_port = remote_addr
-            elif local_addr is not None:
-                lookup_host, lookup_port = local_addr
-                lookup_flags |= socket.AI_PASSIVE
-            elif family == 0:
-                family = socket.AF_INET
-            infos = await self.getaddrinfo(lookup_host, lookup_port, family=family, type=socket.SOCK_DGRAM, proto=proto, flags=lookup_flags)
-            if not infos:
-                raise OSError("getaddrinfo returned an empty list")
-            last_error = None
-            for family, type_, proto_, _, address in infos:
-                sock = socket.socket(family, type_, proto_)
-                try:
-                    if reuse_port:
-                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-                    if allow_broadcast:
-                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                    if local_addr is not None:
-                        sock.bind(address if remote_addr is None else local_addr)
-                    if remote_addr is not None:
-                        sock.connect(address)
-                    sock.setblocking(False)
-                    break
-                except OSError as exc:
-                    last_error = exc
-                    sock.close()
-                    sock = None
-            if sock is None:
-                raise last_error if last_error is not None else OSError("datagram endpoint failed")
-        else:
-            sock.setblocking(False)
-        protocol = protocol_factory()
-        transport = _MicronautDatagramTransport(self, sock, protocol)
-        return transport, protocol
+        if sock is not None:
+            self._unsupported("create_datagram_endpoint(sock=...): the Netty event loop cannot adopt a Python socket")
+        if proto not in (0, socket.IPPROTO_UDP):
+            self._unsupported(f"create_datagram_endpoint(proto={proto})")
+        if not (local_addr or remote_addr) and family in (0, socket.AF_UNSPEC):
+            raise ValueError("unexpected address family")
+        family_name = self._address_family(family, "create_datagram_endpoint")
+        for address in (local_addr, remote_addr):
+            if address is not None:
+                self._numeric_host(address[0], flags)
+        netty_factory = self._netty_factory("createDatagramEndpoint", "create_datagram_endpoint")
+        local_host = None
+        local_port = -1
+        remote_host = None
+        remote_port = -1
+        if local_addr is not None:
+            local_host = self._host_of(local_addr)
+            local_port = local_addr[1]
+        if remote_addr is not None:
+            remote_host = self._host_of(remote_addr)
+            remote_port = remote_addr[1]
+        endpoint = await self._completion_stage_to_future(netty_factory(protocol_factory, local_host, local_port, remote_host, remote_port, bool(allow_broadcast), bool(reuse_port), family_name))
+        return endpoint[0], endpoint[1]
 
     def sendfile(self, *args, **kwargs):
         self._unsupported("sendfile")
@@ -900,6 +945,16 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
 
 _micronaut_asyncio_loops = {}
 
+def __micronaut_netty_transport(java_transport):
+    """Java entry point: the asyncio transport handed to ``connection_made`` for a stream channel."""
+    return _MicronautNettyTransport(java_transport)
+
+
+def __micronaut_netty_datagram_transport(java_transport):
+    """Java entry point: the asyncio transport handed to ``connection_made`` for a datagram channel."""
+    return _MicronautNettyDatagramTransport(java_transport)
+
+
 def __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter=None):
     """Install or update the Micronaut-managed loop for one Java event loop.
 
@@ -915,11 +970,104 @@ def __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapte
         _micronaut_asyncio_loops[java_loop] = loop
     else:
         loop._executor_adapter = executor_adapter
-    asyncio.set_event_loop(loop)
-    events._set_running_loop(loop)
     return loop
 
-def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None):
+
+class _CurrentLoopForCall:
+    """Make the loop current (running loop and policy loop) for one host-driven call, then restore.
+
+    The calling thread is a request or event-loop thread that outlives the call; leaving the loop
+    installed on it would keep per-thread state for every thread that ever entered this context.
+    """
+
+    def __init__(self, loop):
+        self._loop = loop
+
+    def __enter__(self):
+        local = asyncio.get_event_loop_policy()._local
+        self._saved = (events._get_running_loop(), local._loop, local._set_called)
+        asyncio.set_event_loop(self._loop)
+        events._set_running_loop(self._loop)
+        return self._loop
+
+    def __exit__(self, *exc):
+        running, policy_loop, set_called = self._saved
+        events._set_running_loop(running)
+        local = asyncio.get_event_loop_policy()._local
+        local._loop = policy_loop
+        local._set_called = set_called
+        return False
+
+class _WakeableSelector:
+    """The selector of a loop without sockets: ``select`` waits for a wake-up or the timeout."""
+
+    def __init__(self):
+        self._wake = threading.Event()
+
+    def select(self, timeout=None):
+        if timeout is None or timeout > 0:
+            self._wake.wait(timeout)
+        # a wake-up arriving after the wait and before the clear is not lost: the callback that
+        # caused it is already in the loop's ready queue, which the loop drains before it selects again
+        self._wake.clear()
+        return []
+
+    def wake(self):
+        self._wake.set()
+
+    def close(self):
+        pass
+
+    def get_map(self):
+        return {}
+
+
+class _MicronautFallbackLoop(asyncio.base_events.BaseEventLoop):
+    """A loop for driving a coroutine on the calling thread in a context without host socket access.
+
+    asyncio's selector loop opens a socket pair for its self-pipe, which the emulated POSIX layer of
+    an application context refuses; this loop waits on an event instead, so scheduled callbacks,
+    timers, ``call_soon_threadsafe`` and executors work while asyncio's own networking does not.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._selector = _WakeableSelector()
+
+    def _process_events(self, event_list):
+        pass
+
+    def _write_to_self(self):
+        self._selector.wake()
+
+    def close(self):
+        super().close()
+        self._selector.close()
+
+
+def _new_fallback_loop():
+    try:
+        return asyncio.new_event_loop()
+    except OSError:
+        # io.UnsupportedOperation ("socket was excluded"): no socket pair for the self-pipe
+        return _MicronautFallbackLoop()
+
+
+# The reactive context (``PythonReactiveContext``: the Reactor context and propagated context of the
+# subscriber, or the propagated context of the caller of an eager coroutine) a Java bridge hands the
+# coroutine it schedules. asyncio copies the variable into the task, so every ``await`` of the coroutine,
+# and of the tasks it spawns, subscribes within that context, and every callback of the task restores
+# its propagated context (``_MicronautAsyncioHandle._run_in_context``).
+_micronaut_reactive_context = contextvars.ContextVar("micronaut_reactive_context", default=None)
+
+
+def __micronaut_current_reactive_context():
+    """The reactive context of the running coroutine, or ``None`` outside a Java-scheduled coroutine."""
+
+    return _micronaut_reactive_context.get()
+
+
+def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None, reactive_context=None):
     """Drive a Python awaitable and complete the Java bridge future.
 
     This is the main Java entry point used by ``PythonAsyncioRuntime``. It
@@ -933,14 +1081,36 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
     Python task cancellation, and Python task cancellation cancels the Java
     future. Exceptions are routed through Java's ``ExceptionCompleter`` so the
     bridge keeps existing exception wrapping semantics.
+
+    ``reactive_context`` is the reactive context of the subscriber (or the
+    propagated context of the caller) that started the coroutine; the task
+    copies it, the awaits of the coroutine subscribe within it and its steps run
+    in its propagated context. Started from within a task, a coroutine without
+    a Reactor context of its own inherits the one of that task (a nested
+    coroutine started eagerly by a Java method awaited in a transaction).
     """
 
     if not inspect.isawaitable(awaitable):
         java_future.complete(awaitable)
         return java_future
+    if reactive_context is None:
+        # the task copies the current context, the enclosing task's if any
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    enclosing = _micronaut_reactive_context.get()
+    if enclosing is not None:
+        reactive_context = reactive_context.inheriting(enclosing)
+    token = _micronaut_reactive_context.set(reactive_context)
+    try:
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    finally:
+        _micronaut_reactive_context.reset(token)
+
+
+def _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter):
     if java_loop is not None:
         loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
-        task = loop.create_task(awaitable)
+        with _CurrentLoopForCall(loop):
+            task = loop.create_task(awaitable)
         java_future.setCancelCallback(lambda: loop.call_soon_threadsafe(task.cancel))
         def done(completed):
             try:
@@ -949,7 +1119,7 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
                     return
                 exception = completed.exception()
                 if exception is not None:
-                    exception_completer.completeExceptionally(java_future, exception.__class__.__name__, str(exception))
+                    exception_completer.completeExceptionally(java_future, exception)
                     return
                 java_future.complete(completed.result())
             except BaseException as exc:
@@ -959,10 +1129,30 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        # No Micronaut event loop and no running Python loop: drive the awaitable to completion on the
+        # current thread. The outcome is read from the future rather than from run_until_complete so
+        # a Java exception raised inside the coroutine is not re-raised through Future.result, which
+        # GraalPy cannot do for foreign exceptions.
         try:
-            java_future.complete(asyncio.get_event_loop().run_until_complete(awaitable))
+            fallback_loop = _new_fallback_loop()
+            try:
+                completed = asyncio.ensure_future(awaitable, loop=fallback_loop)
+                try:
+                    fallback_loop.run_until_complete(completed)
+                except BaseException:
+                    pass
+                if completed.cancelled():
+                    java_future.cancel(False)
+                else:
+                    exception = completed.exception()
+                    if exception is not None:
+                        exception_completer.completeExceptionally(java_future, exception)
+                    else:
+                        java_future.complete(completed.result())
+            finally:
+                fallback_loop.close()
         except BaseException as exc:
-            exception_completer.completeExceptionally(java_future, exc.__class__.__name__, str(exc))
+            exception_completer.completeExceptionally(java_future, exc.__class__.__name__, "".join(traceback.format_exception(exc)))
         return java_future
     task = asyncio.ensure_future(awaitable, loop=loop)
     java_future.setCancelCallback(lambda: loop.call_soon_threadsafe(task.cancel))
@@ -973,7 +1163,7 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
                 return
             exception = completed.exception()
             if exception is not None:
-                exception_completer.completeExceptionally(java_future, exception.__class__.__name__, str(exception))
+                exception_completer.completeExceptionally(java_future, exception)
                 return
             java_future.complete(completed.result())
         except BaseException as exc:
@@ -996,7 +1186,8 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
     except RuntimeError:
         if java_loop is not None:
             loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
-            future = loop.create_future()
+            with _CurrentLoopForCall(loop):
+                future = loop.create_future()
             if java_future is not None:
                 future.add_done_callback(lambda completed: java_future.cancel(False) if completed.cancelled() else None)
             return future
@@ -1007,11 +1198,423 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
     return future
 
 def __micronaut_complete_completion_stage_awaitable(future, value, throwable):
-    """Complete a Python future from a Java ``CompletionStage`` callback."""
+    """Complete a Python future from a Java ``CompletionStage`` callback.
 
+    A future belongs to the thread running its loop. A stage completing on another thread while a
+    Python loop drives the awaiting coroutine on the calling thread (a Java caller without a Micronaut
+    event loop) hands the completion to that loop, which wakes it up; completing the future directly
+    would leave the loop waiting.
+    """
+
+    loop = future.get_loop()
+    thread_id = _micronaut_loop_thread_id(loop)
+    if thread_id is not None and thread_id != threading.get_ident() and not loop.is_closed():
+        try:
+            loop.call_soon_threadsafe(_micronaut_complete_future, future, value, throwable)
+            return
+        except RuntimeError:
+            # the loop closed between the check and the hand-off (shutdown): complete the future
+            # directly rather than leave it pending
+            pass
+    _micronaut_complete_future(future, value, throwable)
+
+
+def _micronaut_loop_thread_id(loop):
+    """The id of the thread running a standard asyncio loop, or ``None`` when no hand-off is needed.
+
+    ``BaseEventLoop`` records its thread while ``run_forever`` runs (there is no public accessor);
+    the Micronaut loop has no thread of its own and its ``call_soon`` queues every callback on the
+    Netty event loop already, so a future of it is completed directly.
+    """
+    if isinstance(loop, _MicronautAsyncioEventLoop):
+        return None
+    return getattr(loop, "_thread_id", None)
+
+
+def _micronaut_complete_future(future, value, throwable):
     if future.cancelled():
         return
     if throwable is None:
         future.set_result(value)
     else:
-        future.set_exception(RuntimeError(str(throwable)))
+        future.set_exception(_micronaut_java_failure(throwable))
+
+
+# ---------------------------------------------------------------------------
+# Python-native streaming: Java publishers as async iterators and back.
+#
+# The Java half (``PythonAsyncioStreams``) owns the Reactive Streams protocol and marshals every
+# signal onto the loop that owns the stream; the classes below own the Python state: pending
+# ``__anext__`` futures, the one-item buffer, demand, and the generator's lifecycle.
+# ---------------------------------------------------------------------------
+
+_AsyncioStreams = java.type("io.micronaut.context.python.PythonAsyncioStreams")
+_MAX_DEMAND = (1 << 63) - 1
+_COMPLETED = object()
+
+
+def _micronaut_stream_loop():
+    """The loop a stream runs on: the running loop, else the Micronaut loop of the current request.
+
+    Streams need a loop that keeps running after the calling function returns, which the
+    Micronaut-managed loop does; a request without one (asyncio disabled, the Netty module absent,
+    or an event loop beyond ``max-event-loop-contexts``) cannot host a stream and fails here rather
+    than falling back to driving the generator synchronously.
+    """
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        pass
+    loop = _AsyncioRuntime.currentAsyncioLoop()
+    if loop is None:
+        raise RuntimeError(
+            "Python-native streaming needs the Micronaut asyncio runtime: call as_async_iterable/as_publisher "
+            "from a coroutine running on it, or from a request handled by a Netty event loop with "
+            "micronaut-context-python-netty on the classpath and micronaut.python.asyncio.enabled=true")
+    return loop
+
+
+def _dispatch_on(loop, micronaut_loop, callback, *args):
+    """Run a Java-originated callback on ``loop``: directly when Java already marshalled it onto the
+    Micronaut loop, otherwise by hopping onto the plain asyncio loop from the signalling thread."""
+    if micronaut_loop is not None:
+        callback(*args)
+    else:
+        loop.call_soon_threadsafe(callback, *args)
+
+
+class MicronautPublisherIterator:
+    """An async iterator (and async context manager) over a Java ``Publisher``.
+
+    One outstanding ``request(1)`` per pending ``__anext__``, nothing buffered, a single lazy
+    subscription started by the first iteration, and one cancellation: leaving the ``async with``
+    block, ``aclose()``, task cancellation during ``__anext__`` and the consumer's own exit all
+    cancel the subscription exactly once. Overlapping ``__anext__`` calls are refused. An item for
+    which no iteration is waiting is a publisher that ignored its demand: it is refused rather than
+    held, so memory cannot grow with what the publisher chooses to emit.
+    """
+
+    def __init__(self, publisher, loop, reactive_context=None):
+        self._loop = loop
+        self._micronaut_loop = getattr(loop, "_java_loop", None)
+        self._java = _AsyncioStreams.iterator(publisher, self._micronaut_loop, self, reactive_context)
+        self._waiter = None
+        self._terminal = None
+        self._closed = False
+
+    def __aiter__(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.aclose()
+        return False
+
+    async def __anext__(self):
+        if self._waiter is not None:
+            raise RuntimeError("as_async_iterable: __anext__ called while a previous __anext__ is still pending")
+        if self._closed:
+            raise StopAsyncIteration
+        if self._terminal is not None:
+            self._raise_terminal()
+        waiter = self._loop.create_future()
+        self._waiter = waiter
+        try:
+            self._java.request()
+        except BaseException:
+            self._waiter = None
+            self._close()
+            raise
+        try:
+            outcome = await waiter
+        except asyncio.CancelledError:
+            # the consumer was cancelled while waiting: the upstream demand is withdrawn with it
+            self._close()
+            raise
+        finally:
+            self._waiter = None
+        if outcome is _COMPLETED:
+            self._raise_terminal()
+        return outcome
+
+    def _raise_terminal(self):
+        terminal = self._terminal
+        self._closed = True
+        if terminal is None or terminal is _COMPLETED:
+            raise StopAsyncIteration
+        self._terminal = _COMPLETED
+        raise terminal
+
+    async def aclose(self):
+        """Cancel the subscription; a pending ``__anext__`` ends with ``StopAsyncIteration``."""
+        self._close()
+
+    def _close(self):
+        if self._closed:
+            return
+        self._closed = True
+        self._java.cancel()
+        waiter = self._waiter
+        if waiter is not None and not waiter.done():
+            waiter.set_result(_COMPLETED)
+
+    # Java entry points (see PythonAsyncioStreams.PublisherIterator)
+
+    def on_next(self, item):
+        _dispatch_on(self._loop, self._micronaut_loop, self._deliver, item)
+
+    def on_error(self, throwable):
+        _dispatch_on(self._loop, self._micronaut_loop, self._deliver_terminal, _micronaut_java_failure(throwable))
+
+    def on_complete(self):
+        _dispatch_on(self._loop, self._micronaut_loop, self._deliver_terminal, _COMPLETED)
+
+    def _deliver(self, item):
+        if self._closed or self._terminal is not None:
+            return
+        waiter = self._waiter
+        if waiter is not None and not waiter.done():
+            waiter.set_result(item)
+            return
+        # nothing is waiting for this item, so nothing requested it (the Java subscriber refuses an
+        # item beyond its demand before this point); refuse the publisher rather than hold the item
+        self._java.cancel()
+        self._terminal = RuntimeError("as_async_iterable: the publisher emitted an item that no iteration requested")
+
+    def _deliver_terminal(self, terminal):
+        if self._closed or self._terminal is not None:
+            return
+        self._terminal = terminal
+        waiter = self._waiter
+        if waiter is not None and not waiter.done():
+            waiter.set_result(_COMPLETED)
+
+
+class _MicronautGeneratorDriver:
+    """Advances one async iterator for one Java subscription, on the loop, only with demand.
+
+    Demand arithmetic saturates; the iterator is opened on the first positive demand and advanced
+    by at most one ``__anext__`` at a time. Cancellation cancels the running advance and then
+    closes the iterator on the loop; a ``None`` element, an exception and exhaustion each end the
+    stream with exactly one terminal signal, after which the Java side is told the iterator has
+    been released.
+    """
+
+    def __init__(self, loop, source, java_subscription):
+        self._loop = loop
+        self._micronaut_loop = getattr(loop, "_java_loop", None)
+        self._source = source
+        self._java = java_subscription
+        self._iterator = None
+        self._demand = 0
+        self._advancing = None
+        self._done = False
+        self._cancelled = False
+        self._released = False
+
+    # Java entry points (see PythonAsyncioStreams.GeneratorSubscription)
+
+    def request(self, n):
+        _dispatch_on(self._loop, self._micronaut_loop, self._request, int(n))
+
+    def cancel(self):
+        _dispatch_on(self._loop, self._micronaut_loop, self._cancel)
+
+    def _request(self, n):
+        if self._done or self._cancelled:
+            return
+        self._demand = min(self._demand + n, _MAX_DEMAND)
+        self._drain()
+
+    def _drain(self):
+        if self._advancing is not None or self._demand <= 0 or self._done or self._cancelled:
+            return
+        if self._iterator is None:
+            try:
+                with _CurrentLoopForCall(self._loop):
+                    self._iterator = _open_async_iterator(self._source)
+            except BaseException as exc:
+                self._finish()
+                self._java.error(exc)
+                self._release()
+                return
+        with _CurrentLoopForCall(self._loop):
+            self._advancing = self._loop.create_task(self._advance())
+
+    async def _advance(self):
+        try:
+            item = await self._iterator.__anext__()
+        except StopAsyncIteration:
+            self._advancing = None
+            self._finish()
+            self._java.complete()
+            self._release()
+            return
+        except asyncio.CancelledError:
+            self._advancing = None
+            await self._close_iterator()
+            return
+        except BaseException as exc:
+            self._advancing = None
+            self._finish()
+            self._java.error(exc)
+            self._release()
+            return
+        self._advancing = None
+        if self._cancelled or self._done:
+            await self._close_iterator()
+            return
+        if item is None:
+            self._finish()
+            await self._close_iterator(release=False)
+            self._java.error(TypeError(
+                "as_publisher: the async iterator yielded None, which Reactive Streams does not allow; "
+                "yield an explicit envelope object when an empty payload is part of the protocol"))
+            self._release()
+            return
+        self._demand -= 1
+        self._java.next(item)
+        if self._java.isDone():
+            # the subscriber cancelled from onNext, or refused the element
+            self._finish()
+            await self._close_iterator()
+            return
+        self._drain()
+
+    def _cancel(self):
+        if self._done or self._cancelled:
+            return
+        self._cancelled = True
+        self._demand = 0
+        if self._advancing is not None:
+            self._advancing.cancel()
+        elif self._iterator is not None:
+            with _CurrentLoopForCall(self._loop):
+                self._loop.create_task(self._close_iterator())
+        else:
+            self._release()
+
+    def _finish(self):
+        self._done = True
+        self._demand = 0
+
+    async def _close_iterator(self, release=True):
+        iterator = self._iterator
+        self._iterator = None
+        try:
+            aclose = getattr(iterator, "aclose", None) if iterator is not None else None
+            if aclose is not None:
+                await aclose()
+        except BaseException as exc:
+            self._loop.call_exception_handler({
+                "message": "Exception while closing an async iterator exposed as a Publisher",
+                "exception": exc,
+            })
+        finally:
+            if release:
+                self._release()
+
+    def _release(self):
+        if self._released:
+            return
+        self._released = True
+        self._java.released()
+
+
+def _open_async_iterator(source):
+    """The async iterator of a subscription: a factory is called, an async iterable is iterated."""
+    if callable(source) and not hasattr(source, "__aiter__"):
+        source = source()
+    if not hasattr(source, "__aiter__"):
+        raise TypeError(f"as_publisher expects an async generator function or an async iterable, got {type(source).__name__}")
+    return source.__aiter__()
+
+
+class _OneShotAsyncIterable:
+    """An already-created async iterator as a source that can be subscribed to once."""
+
+    def __init__(self, iterator):
+        self._iterator = iterator
+
+    def __call__(self):
+        iterator = self._iterator
+        if iterator is None:
+            raise RuntimeError("as_publisher: an async iterator can be subscribed to once; pass an async generator function for a cold publisher")
+        self._iterator = None
+        return iterator
+
+
+class MicronautPublisherAwaitable:
+    """A Java ``Publisher`` returned by an injected member, before anything subscribed to it.
+
+    ``await`` requests one item, completes with it and cancels the subscription (an empty publisher
+    awaits to ``None``); ``as_async_iterable`` takes the publisher itself and consumes every item.
+    """
+
+    __slots__ = ("publisher", "reactive_context")
+
+    def __init__(self, publisher, reactive_context=None):
+        self.publisher = publisher
+        # the reactive context of the coroutine that called the member: the subscription happens within it
+        self.reactive_context = reactive_context
+
+    def __await__(self):
+        return _AsyncioRuntime.awaitPublisher(self.publisher, self.reactive_context).__await__()
+
+    def __repr__(self):
+        return f"MicronautPublisherAwaitable({self.publisher!r})"
+
+
+def __micronaut_publisher_awaitable(publisher, reactive_context=None):
+    """Java entry point: the awaitable view of a publisher returned by a Java member."""
+    return MicronautPublisherAwaitable(publisher, reactive_context)
+
+
+def as_async_iterable(publisher):
+    """Consume a Java ``Publisher`` with ``async for``, one item per iteration.
+
+    Use it as an async context manager so leaving the loop early cancels the subscription::
+
+        async with as_async_iterable(service.updates()) as updates:
+            async for update in updates:
+                ...
+
+    Iterating to exhaustion closes the subscription as well; ``aclose()`` does so explicitly.
+    """
+    reactive_context = _micronaut_reactive_context.get()
+    if isinstance(publisher, MicronautPublisherAwaitable):
+        if publisher.reactive_context is not None:
+            reactive_context = publisher.reactive_context
+        publisher = publisher.publisher
+    return MicronautPublisherIterator(publisher, _micronaut_stream_loop(), reactive_context)
+
+
+def as_publisher(source):
+    """Expose an async generator function (or another async iterable factory) as a Java ``Publisher``.
+
+    Each subscription calls the factory for an iterator of its own and advances it only as the
+    subscriber requests elements; cancelling the subscription closes the iterator. An async
+    iterator object instead of a factory yields a publisher that can be subscribed to once.
+    Elements must not be ``None``.
+    """
+    loop = _micronaut_stream_loop()
+    if not callable(source) and hasattr(source, "__anext__"):
+        source = _OneShotAsyncIterable(source)
+    elif not callable(source) and not hasattr(source, "__aiter__"):
+        raise TypeError(f"as_publisher expects an async generator function or an async iterable, got {type(source).__name__}")
+
+    def start(java_subscription):
+        return _MicronautGeneratorDriver(loop, source, java_subscription)
+
+    return _AsyncioStreams.publisher(start, getattr(loop, "_java_loop", None))
+
+
+def __micronaut_async_iterator_publisher(iterator, java_loop, time_unit, executor_adapter=None):
+    """Java entry point: the Publisher of an async generator object a bridge method returned."""
+    if java_loop is not None:
+        loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
+        with _CurrentLoopForCall(loop):
+            return as_publisher(iterator)
+    return as_publisher(iterator)

@@ -40,3 +40,4 @@ class ProxyFilter(
         ), { response: MutableHttpResponse<*> -> response.header("X-My-Response-Header", "YYY") })
     }
 }
+// end::class[]

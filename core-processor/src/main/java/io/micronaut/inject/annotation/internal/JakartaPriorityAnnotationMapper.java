@@ -25,7 +25,25 @@ import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 
-/** Maps Jakarta's priority annotation to Micronaut's order annotation. */
+/**
+ * Maps Jakarta's priority annotation to Micronaut's order annotation.
+ *
+ * <p>The value is mapped across unchanged: {@code @Priority(10)} becomes {@code @Order(10)}. Both
+ * annotations sort the lowest value first, which is the convention Jakarta Interceptors and Jakarta
+ * RESTful Web Services use for the priorities they define, so the mapped order means the same thing
+ * as the source annotation for those. {@code jakarta.annotation.Priority} itself leaves the
+ * direction to the specification that consumes it, and a consumer following one that prefers the
+ * highest value instead (the selection of a CDI alternative, for example) has to negate the
+ * value it reads.</p>
+ *
+ * <p>An annotation mapper adds to what it reads rather than replacing it, so
+ * {@code jakarta.annotation.Priority} is still present in the metadata after mapping and
+ * {@code metadata.intValue("jakarta.annotation.Priority")} still returns the value as written. Code
+ * that needs the priority exactly as the author declared it can read the source annotation directly
+ * instead of going through {@link Order}.</p>
+ *
+ * @see Order
+ */
 @Internal
 public final class JakartaPriorityAnnotationMapper implements NamedAnnotationMapper {
 

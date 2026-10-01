@@ -24,7 +24,6 @@ import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
-import io.micronaut.inject.DisposableBeanDefinition;
 
 import java.util.List;
 import java.util.Objects;
@@ -85,7 +84,11 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     }
 
     /**
-     * Creates new bean registration. Possibly disposing registration can be returned.
+     * Creates new bean registration. The returned registration's {@link #close()} destroys the
+     * bean through {@link BeanContext#destroyBean(BeanRegistration)}, triggering
+     * {@link io.micronaut.context.event.BeanPreDestroyEventListener} and
+     * {@link io.micronaut.context.event.BeanDestroyedEventListener} instances even if the bean has
+     * no destruction logic of its own.
      *
      * @param beanContext    The bean context
      * @param identifier     The bean identifier
@@ -102,13 +105,23 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                              K bean,
                                              @Nullable
                                              List<BeanRegistration<?>> dependents) {
-        boolean hasDependents = CollectionUtils.isNotEmpty(dependents);
-        if (beanDefinition instanceof DisposableBeanDefinition || bean instanceof LifeCycle || hasDependents) {
-            return hasDependents ?
-                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents)) :
-                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
-        }
-        return new BeanRegistration<>(identifier, beanDefinition, bean);
+        return of(beanContext, identifier, beanDefinition, bean, dependents, null);
+    }
+
+    /**
+     * Creates a bean registration with optional dependent and lifecycle interceptor registrations.
+     *
+     * <p>This overload is package-private because the interceptor registrations are an internal bean-creation detail.</p>
+     */
+    static <K> BeanRegistration<K> of(BeanContext beanContext,
+                                      BeanIdentifier identifier,
+                                      BeanDefinition<K> beanDefinition,
+                                      K bean,
+                                      @Nullable List<BeanRegistration<?>> dependents,
+                                      @Nullable List<?> interceptorRegistrations) {
+        return CollectionUtils.isNotEmpty(dependents) ?
+            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents), interceptorRegistrations) :
+            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, interceptorRegistrations);
     }
 
     @Override

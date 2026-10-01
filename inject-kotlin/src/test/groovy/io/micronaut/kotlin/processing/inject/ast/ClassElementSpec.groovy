@@ -48,6 +48,49 @@ record Product2(Double price, String name) {
             properties.get(1).name == "name"
     }
 
+    void "test sealed class"() {
+        expect:
+            // getPermittedSubclasses() resolves through KSP, so it has to be read while the resolver session is live
+            buildClassElement('test.Test', """
+package test
+
+sealed class Test
+
+class TestOne : Test()
+
+class TestTwo : Test()
+""") { ClassElement classElement ->
+                assert classElement.isSealed()
+                assert classElement.getPermittedSubclasses()*.getName() as Set == ['test.TestOne', 'test.TestTwo'] as Set
+            }
+    }
+
+    void "test sealed interface"() {
+        expect:
+            buildClassElement('test.Test', """
+package test
+
+sealed interface Test
+
+class TestOne : Test
+""") { ClassElement classElement ->
+                assert classElement.isSealed()
+                assert classElement.getPermittedSubclasses()*.getName() == ['test.TestOne']
+            }
+    }
+
+    void "test non-sealed class"() {
+        expect:
+            buildClassElement('test.Test', """
+package test
+
+open class Test
+""") { ClassElement classElement ->
+                assert !classElement.isSealed()
+                assert classElement.getPermittedSubclasses().isEmpty()
+            }
+    }
+
     void "test Java annotations"() {
         def ce = buildClassElementJava('test.Product', '''
 package test;

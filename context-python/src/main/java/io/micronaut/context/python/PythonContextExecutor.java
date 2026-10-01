@@ -42,4 +42,15 @@ public interface PythonContextExecutor {
      * @return The callback result, possibly {@code null}
      */
     <T extends @Nullable Object> T withContext(Function<Context, T> callback);
+
+    /**
+     * A snapshot of the pool: its sizes, the borrows so far and how long they waited. Executors
+     * that are not pools report a disabled pool without contexts.
+     *
+     * @return The statistics
+     * @since 5.2.0
+     */
+    default PythonPoolStatistics statistics() {
+        return new PythonPoolStatistics(false, 0, 0, 0, 0, 0, 0, 0, 0, false);
+    }
 }

@@ -12,11 +12,13 @@ class PreDestroyBeanSpec extends Specification {
         ApplicationContext ctx = ApplicationContext.run()
         PreDestroyBean preDestroyBean = ctx.getBean(PreDestroyBean)
         Connection connection = ctx.getBean(Connection)
+        Cache cache = ctx.getBean(Cache)
         ctx.stop()
         // end::start[]
 
         then:
         preDestroyBean.stopped.get()
         connection.stopped.get()
+        cache.flushed.get()
     }
 }

@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -214,6 +215,30 @@ abstract class AbstractReadBufferTest {
     }
 
     @Test
+    public void bufferWithExpectedSize() throws IOException {
+        // exact hint, smaller hint (the buffer must grow), zero hint, larger hint
+        for (int expectedSize : new int[]{3, 1, 0, 8192}) {
+            try (ReadBuffer rb = factory.buffer(expectedSize, os -> os.write(new byte[]{1, 2, 3}))) {
+                assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray(), "expectedSize=" + expectedSize);
+            }
+        }
+        byte[] large = new byte[100_000];
+        for (int i = 0; i < large.length; i++) {
+            large[i] = (byte) i;
+        }
+        try (ReadBuffer rb = factory.buffer(8192, os -> {
+            for (int i = 0; i < large.length; i += 7919) {
+                os.write(large, i, Math.min(7919, large.length - i));
+            }
+        })) {
+            assertArrayEquals(large, rb.toArray());
+        }
+        try (ReadBuffer rb = factory.buffer(8192, os -> { })) {
+            assertEquals(0, rb.readable());
+        }
+    }
+
+    @Test
     public void outputStreamBuffer() throws IOException {
         ReadBuffer body;
         try (ReadBufferFactory.BufferingOutputStream bos = factory.outputStreamBuffer()) {
@@ -257,6 +282,24 @@ abstract class AbstractReadBufferTest {
         ReadBuffer b = factory.adapt(new byte[]{4, 5, 6});
         try (ReadBuffer composed = factory.compose(List.of(a, b))) {
             assertArrayEquals(new byte[]{1, 2, 3, 4, 5, 6}, composed.toArray());
+        }
+    }
+
+    @Test
+    public void composeManyKeepsContent() {
+        int count = 50;
+        int chunk = 100;
+        byte[] expected = new byte[count * chunk];
+        List<ReadBuffer> parts = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            byte[] part = new byte[chunk];
+            Arrays.fill(part, (byte) i);
+            System.arraycopy(part, 0, expected, i * chunk, chunk);
+            parts.add(factory.adapt(part));
+        }
+        try (ReadBuffer composed = factory.compose(parts)) {
+            assertEquals(expected.length, composed.readable());
+            assertArrayEquals(expected, composed.toArray());
         }
     }
 }

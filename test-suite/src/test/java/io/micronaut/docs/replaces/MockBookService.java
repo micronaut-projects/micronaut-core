@@ -34,4 +34,4 @@ public class MockBookService implements BookService {
         return bookMap.get(title);
     }
 }
-// tag::class[]
+// end::class[]

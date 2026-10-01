@@ -17,7 +17,6 @@ package io.micronaut.http.netty.channel.loom;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
-import io.micronaut.scheduling.LoomSupport;
 import io.netty.util.AttributeMap;
 import io.netty.util.concurrent.EventExecutor;
 
@@ -55,7 +54,7 @@ public sealed interface EventLoopVirtualThreadScheduler
     @Nullable
     static EventLoopVirtualThreadScheduler current() {
         if (LoomBranchSupport.isSupported()) {
-            if (!LoomSupport.isVirtual(Thread.currentThread())) {
+            if (!Thread.currentThread().isVirtual()) {
                 return null;
             }
             if (LoomBranchSupport.currentScheduler() instanceof EventLoopVirtualThreadScheduler elvts) {
@@ -65,7 +64,7 @@ public sealed interface EventLoopVirtualThreadScheduler
             }
         } else if (PrivateLoomSupport.isSupported()) {
             Thread thread = Thread.currentThread();
-            if (!LoomSupport.isVirtual(thread)) {
+            if (!thread.isVirtual()) {
                 return null;
             }
             if (PrivateLoomSupport.getScheduler(thread) instanceof EventLoopVirtualThreadScheduler elvts) {

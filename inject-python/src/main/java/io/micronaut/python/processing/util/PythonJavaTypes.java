@@ -1,0 +1,142 @@
+/*
+ * Copyright 2017-2025 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.processing.util;
+
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
+
+import java.util.Set;
+
+/**
+ * Facts about Java types that the Python transformer needs when it rewrites a class whose base is
+ * a Java type. Answered here so the transformer asks once per type instead of probing the element
+ * from Python.
+ *
+ * @since 5.2.0
+ */
+@Internal
+public final class PythonJavaTypes {
+
+    /** The annotation the generated bridge class of every Python class carries. */
+    public static final String PYTHON_CLASS_ANNOTATION = "io.micronaut.context.python.annotation.PythonClass";
+
+    /** The bases a reflection-backed element cannot answer {@code isAssignable(String)} for. */
+    private static final Set<String> THROWABLE_ROOTS = Set.of(
+        "java.lang.Throwable", "java.lang.Exception", "java.lang.RuntimeException", "java.lang.Error"
+    );
+
+    private static final Set<String> WRAPPER_TYPES = Set.of(
+        "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Double",
+        "java.lang.Float", "java.lang.Boolean", "java.lang.Character"
+    );
+
+    private PythonJavaTypes() {
+    }
+
+    /**
+     * Whether the type is a {@link Throwable}. GraalPy cannot subclass a concrete Java throwable at
+     * run time, so the transformer replaces such a base with a Python exception in runtime code.
+     *
+     * @param classElement The type
+     * @return Whether it is a throwable
+     */
+    public static boolean isThrowable(@Nullable ClassElement classElement) {
+        if (classElement == null) {
+            return false;
+        }
+        if (classElement.isAssignable(Throwable.class.getName())) {
+            return true;
+        }
+        // Reflection-backed elements (ClassElement.of(Class)) do not answer isAssignable(String).
+        return THROWABLE_ROOTS.contains(classElement.getName());
+    }
+
+    /**
+     * Whether the type is a Python class: one of the sources being compiled, or the generated bridge
+     * of a Python class compiled earlier (by another source root of the project, or into a library)
+     * found on the class path. Such a bridge is a Java class, but its Python class is what an import
+     * of it refers to at run time, so the transformer keeps the import instead of replacing it with a
+     * reference to the Java type.
+     *
+     * @param classElement The type
+     * @return Whether it is a Python class
+     */
+    public static boolean isPythonClass(@Nullable ClassElement classElement) {
+        return classElement instanceof AbstractPythonClassElement
+            || (classElement != null && classElement.hasAnnotation(PYTHON_CLASS_ANNOTATION));
+    }
+
+    /**
+     * Whether a Python class extending the type gets a generated Java class extending it and a
+     * Python base standing in for it at run time: a class (abstract or concrete) that is not a
+     * {@link Throwable}. Interfaces are stripped from the runtime bases and throwables become
+     * Python exceptions.
+     *
+     * @param classElement The type
+     * @return Whether it is a Java class a Python class extends through the generated class
+     */
+    public static boolean isExtensibleClass(@Nullable ClassElement classElement) {
+        return classElement != null && !classElement.isInterface() && !isThrowable(classElement);
+    }
+
+    /**
+     * Whether two types are the same type once primitives are boxed. A Python {@code int} hint resolves to
+     * the primitive {@code int} while a Java {@code ID} argument resolves to the boxed {@code Integer}; Python
+     * has no overloading, so a method declared with the one overrides a method declared with the other.
+     *
+     * @param left  A type
+     * @param right Another type
+     * @return {@code true} if the types are the same, or a primitive and its wrapper, with the same array dimensions
+     */
+    public static boolean isSameOrBoxedType(ClassElement left, ClassElement right) {
+        if (left.getArrayDimensions() != right.getArrayDimensions()) {
+            return false;
+        }
+        return left.getName().equals(right.getName()) || boxedTypeName(left).equals(boxedTypeName(right));
+    }
+
+    /**
+     * Whether the type is a primitive or one of the primitive wrappers.
+     *
+     * @param type The type
+     * @return {@code true} for a primitive or a wrapper such as {@link Integer}
+     */
+    public static boolean isPrimitiveOrBoxedType(ClassElement type) {
+        if (type.isArray()) {
+            return false;
+        }
+        return type.isPrimitive() || WRAPPER_TYPES.contains(type.getName());
+    }
+
+    private static String boxedTypeName(ClassElement type) {
+        if (!type.isPrimitive() || type.isArray()) {
+            return type.getName();
+        }
+        return switch (type.getName()) {
+            case "int" -> Integer.class.getName();
+            case "long" -> Long.class.getName();
+            case "short" -> Short.class.getName();
+            case "byte" -> Byte.class.getName();
+            case "double" -> Double.class.getName();
+            case "float" -> Float.class.getName();
+            case "boolean" -> Boolean.class.getName();
+            case "char" -> Character.class.getName();
+            default -> type.getName();
+        };
+    }
+}

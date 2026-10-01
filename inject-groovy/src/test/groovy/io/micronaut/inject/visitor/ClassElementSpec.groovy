@@ -67,6 +67,57 @@ class Test {
             element.getPackageName() == ""
     }
 
+    void "test sealed class"() {
+        given:
+            def element = buildClassElement("test.Test", """
+package test
+
+sealed class Test permits TestOne, TestTwo {
+}
+
+non-sealed class TestOne extends Test {
+}
+
+final class TestTwo extends Test {
+}
+""")
+
+        expect:
+            element.isSealed()
+            element.getPermittedSubclasses()*.getName() as Set == ['test.TestOne', 'test.TestTwo'] as Set
+    }
+
+    void "test sealed interface"() {
+        given:
+            def element = buildClassElement("test.Test", """
+package test
+
+sealed interface Test permits TestOne {
+}
+
+non-sealed interface TestOne extends Test {
+}
+""")
+
+        expect:
+            element.isSealed()
+            element.getPermittedSubclasses()*.getName() == ['test.TestOne']
+    }
+
+    void "test non-sealed class"() {
+        given:
+            def element = buildClassElement("""
+package test
+
+class Test {
+}
+""")
+
+        expect:
+            !element.isSealed()
+            element.getPermittedSubclasses().isEmpty()
+    }
+
     void "test equals with primitive"() {
         given:
             def element = buildClassElement("""

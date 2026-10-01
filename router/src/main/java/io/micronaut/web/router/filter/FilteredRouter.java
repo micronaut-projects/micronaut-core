@@ -19,6 +19,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
@@ -95,14 +96,17 @@ public class FilteredRouter implements Router {
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-        List<UriRouteMatch<T, R>> closestMatches = router.findAllClosest(request);
-        return closestMatches.stream().filter(routeFilter.filter(request))
-                    .collect(Collectors.toList());
+        // filter before resolving the ambiguity, otherwise a route removed by the filter can hide a less specific one
+        List<UriRouteMatch<T, R>> matches = this.<T, R>find(request).collect(Collectors.toList());
+        if (matches.size() < 2) {
+            return matches;
+        }
+        return DefaultRouter.resolveAmbiguity(request, matches);
     }
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
-        return router.find(request, uri);
+        return router.<T, R>find(request, uri).filter(routeFilter.filter(request));
     }
 
     @Override

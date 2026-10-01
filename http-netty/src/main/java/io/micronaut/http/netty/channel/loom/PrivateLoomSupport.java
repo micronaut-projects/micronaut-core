@@ -148,6 +148,12 @@ public final class PrivateLoomSupport {
     static final class PrivateLoomCondition implements Condition {
         @Override
         public boolean matches(ConditionContext context) {
+            if (!Thread.class.getModule().isOpen("java.lang", PrivateLoomCondition.class.getModule())
+                && !LoomBranchSupport.isSupported()) {
+                // answered without initializing PrivateLoomSupport, which initializes the virtual thread scheduler
+                context.fail("Failed to access loom internals. Please make sure to add the `--add-opens=java.base/java.lang=ALL-UNNAMED` JVM argument.");
+                return false;
+            }
             if (!isSupported() && !LoomBranchSupport.isSupported()) {
                 context.fail("Failed to access loom internals. Please make sure to add the `--add-opens=java.base/java.lang=ALL-UNNAMED` JVM argument. (" + FAILURE + ")");
                 return false;

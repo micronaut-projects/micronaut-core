@@ -2,7 +2,7 @@ The Micronaut framework supports a general event system through the context. The
 
 dependency::micronaut-context[]
 
-`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `Micronaut-context` dependency. 
+`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `micronaut-context` dependency.
 
 === Publishing Events
 
@@ -10,7 +10,7 @@ The api:context.event.ApplicationEventPublisher[] API supports events of any typ
 
 To publish an event, use dependency injection to obtain an instance of api:context.event.ApplicationEventPublisher[] where the generic type is the type of event and invoke the `publishEvent` method with your event object.
 
-snippet::io.micronaut.docs.context.events.SampleEvent,io.micronaut.docs.context.events.SampleEventEmitterBean[tags="class",indent=0,title="Publishing an Event]
+snippet::io.micronaut.docs.context.events.SampleEvent,io.micronaut.docs.context.events.SampleEventEmitterBean[tags="class",indent=0,title="Publishing an Event"]
 
 WARNING: Publishing an event is *synchronous* by default! The `publishEvent` method will not return until all listeners have been executed. Move this work off to a thread pool if it is time-intensive.
 

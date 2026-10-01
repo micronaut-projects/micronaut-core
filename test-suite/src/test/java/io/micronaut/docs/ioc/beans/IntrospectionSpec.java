@@ -15,10 +15,13 @@
  */
 package io.micronaut.docs.ioc.beans;
 
+import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanWrapper;
 import junit.framework.TestCase;
+
+import java.util.List;
 
 public class IntrospectionSpec extends TestCase {
 
@@ -84,5 +87,39 @@ public class IntrospectionSpec extends TestCase {
         assertEquals(2, introspection.getBeanProperties().size());
         introspection.getRequiredProperty("age", int.class).set(user, 23);
         assertEquals(23, user.age);
+    }
+
+    public void testShipmentConstructors() {
+        // tag::constructors[]
+        final BeanIntrospection<Shipment> introspection = BeanIntrospection.getIntrospection(Shipment.class);
+
+        List<BeanConstructor<Shipment>> constructors = introspection.getConstructors(); // <1>
+
+        BeanConstructor<Shipment> byItem = constructors.stream()
+                .filter(constructor -> constructor.getArguments().length == 1)
+                .findFirst()
+                .orElseThrow(); // <2>
+
+        Shipment shipment = byItem.instantiate("book"); // <3>
+        // end::constructors[]
+
+        assertEquals(2, constructors.size());
+        assertEquals(introspection.getConstructor().getArguments().length, constructors.get(0).getArguments().length);
+        assertEquals("book", shipment.getItem());
+        assertEquals(1, shipment.getQuantity());
+    }
+
+    public void testDeliveryExecutableConstructor() {
+        final BeanIntrospection<Delivery> introspection = BeanIntrospection.getIntrospection(Delivery.class);
+
+        List<BeanConstructor<Delivery>> constructors = introspection.getConstructors();
+
+        assertEquals(2, constructors.size());
+        Delivery delivery = constructors.stream()
+                .filter(constructor -> constructor.getArguments().length == 1)
+                .findFirst()
+                .orElseThrow()
+                .instantiate("Main Street");
+        assertEquals("Main Street", delivery.getAddress());
     }
 }

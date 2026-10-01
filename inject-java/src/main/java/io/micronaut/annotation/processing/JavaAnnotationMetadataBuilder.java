@@ -41,6 +41,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.NullType;
+import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
@@ -56,6 +57,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -474,6 +476,32 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return defaultValues;
     }
 
+    /**
+     * Whether the default value declared by the given annotation member should be recorded.
+     *
+     * <p>An empty string default is only recorded when {@code includeEmptyValues} is set. The distinction is
+     * deliberate and exists because the two callers want different things:</p>
+     *
+     * <ul>
+     *     <li>The annotation metadata written into bean definitions omits empty string defaults. An empty string is
+     *     by far the most common default of a {@code String} member, and omitting it keeps the generated metadata
+     *     smaller. Consumers of the written metadata read a member through
+     *     {@link io.micronaut.core.annotation.AnnotationValue#stringValue(String)}, which already answers
+     *     {@code Optional.empty()} for an absent value, so nothing observable is lost.</li>
+     *     <li>{@link io.micronaut.inject.visitor.VisitorContext#getAnnotationDefaultValues(String)} passes
+     *     {@code true}, so a compile-time consumer that has to tell "no default" apart from "the default is the
+     *     empty string" — for instance when comparing two annotations member by member — gets the complete set of
+     *     declared defaults, including empty strings and empty arrays.</li>
+     * </ul>
+     *
+     * <p>Only the empty <i>string</i> is treated as absent; an empty array default is always recorded. The Kotlin
+     * and Groovy builders apply the same rule, so all three languages report the same defaults for the same
+     * annotation.</p>
+     *
+     * @param executableElement  The annotation member
+     * @param includeEmptyValues Whether empty values should be included
+     * @return Whether the default should be recorded
+     */
     private boolean isValidDefaultValue(ExecutableElement executableElement, boolean includeEmptyValues) {
         AnnotationValue defaultValue = executableElement.getDefaultValue();
         if (defaultValue != null) {
@@ -652,6 +680,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     String className = JavaModelUtils.getClassName(element);
                     resolvedValue = new AnnotationClassValue<>(className);
                 }
+            } else if (t instanceof PrimitiveType primitiveType) {
+                resolvedValue = new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH));
             }
             return null;
         }
@@ -664,9 +694,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitAnnotation(AnnotationMirror a, Object o) {
-            if (a instanceof javax.lang.model.element.AnnotationValue) {
-                resolvedValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
-            }
+            // NOTE: don't be tempted to check that the mirror is also an AnnotationValue here.
+            // That holds for javac, where Attribute.Compound implements both interfaces, but not
+            // for other compilers such as the Eclipse JDT compiler, where it silently discards
+            // every nested annotation member.
+            resolvedValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
             return null;
         }
 
@@ -797,6 +829,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                         final String className = JavaModelUtils.getClassName(element);
                         values.add(new AnnotationClassValue<>(className));
                     }
+                } else if (t instanceof PrimitiveType primitiveType) {
+                    values.add(new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH)));
                 } else if (t instanceof ArrayType arrayType) {
                     TypeMirror componentType = arrayType.getComponentType();
                     if (componentType instanceof DeclaredType declaredType) {

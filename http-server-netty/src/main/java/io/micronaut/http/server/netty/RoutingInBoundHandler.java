@@ -58,6 +58,7 @@ import java.nio.channels.ClosedChannelException;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -72,12 +73,22 @@ import java.util.regex.Pattern;
 @SuppressWarnings("FileLength")
 public final class RoutingInBoundHandler implements RequestHandler {
 
+    /**
+     * Channel attribute that exposes the current request to access log elements (Micronaut
+     * Session's log element reads it by this name). Set when the pipeline has an access logger,
+     * and cleared again once the response has been written.
+     */
+    static final AttributeKey<NettyHttpRequest<?>> ACCESS_LOG_REQUEST_ATTRIBUTE = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
      * Also present in {@link RouteExecutor}.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
+    /**
+     * Request event listeners that take longer than this on the event loop are reported at debug level.
+     */
+    private static final long SLOW_LISTENER_THRESHOLD_NANOS = TimeUnit.MILLISECONDS.toNanos(100);
 
     final StaticResourceResolver staticResourceResolver;
     final NettyHttpServerConfiguration serverConfiguration;
@@ -140,7 +151,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
                         PropagatedContext.getOrEmpty()
                             .plus(new ServerHttpRequestContext(request))
-                            .propagate(() -> terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request)));
+                            .propagate(() -> publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request)));
                         return ExecutionFlow.empty();
                     });
                 }
@@ -160,7 +171,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
     @Override
     public void responseWritten(@Nullable Object attachment) {
         if (attachment != null) {
-            cleanupRequest((NettyHttpRequest<?>) attachment);
+            NettyHttpRequest<?> request = (NettyHttpRequest<?>) attachment;
+            if (supportLoggingHandler) {
+                // only clear our own request: with pipelining the attribute may already hold
+                // the next request on this connection
+                request.getChannelHandlerContext().channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
+            }
+            cleanupRequest(request);
         }
     }
 
@@ -226,12 +243,26 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
-        if (supportLoggingHandler && ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
+        if (supportLoggingHandler && hasAccessLogHandler(ctx)) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
-            AttributeKey<NettyHttpRequest> key = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
-            ctx.channel().attr(key).set(mnRequest);
+            ctx.channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
+    }
+
+    /**
+     * Whether the pipeline of this context carries the
+     * {@value ChannelPipelineCustomizer#HANDLER_ACCESS_LOGGER} handler. The
+     * {@link HttpPipelineBuilder.StreamPipeline} remembers this per pipeline, so it does not have
+     * to be looked up in the pipeline for every request.
+     */
+    private static boolean hasAccessLogHandler(ChannelHandlerContext ctx) {
+        HttpPipelineBuilder.StreamPipeline streamPipeline = ctx.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
+        if (streamPipeline == null) {
+            // not built by the HttpPipelineBuilder
+            return ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null;
+        }
+        return streamPipeline.hasAccessLogHandler();
     }
 
     private void handleException(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> request, Throwable throwable) {
@@ -256,9 +287,30 @@ public final class RoutingInBoundHandler implements RequestHandler {
         return ExecutionFlow.async(getRequestEventExecutor(), () -> {
             PropagatedContext.getOrEmpty()
                 .plus(new ServerHttpRequestContext(request))
-                .propagate(() -> receivedPublisher.publishEvent(new HttpRequestReceivedEvent(request)));
+                .propagate(() -> publishRequestEvent(request, receivedPublisher, new HttpRequestReceivedEvent(request)));
             return ExecutionFlow.empty();
         });
+    }
+
+    /**
+     * Publish a request event. With the default thread selection the listeners run inline on the
+     * event loop, where a slow listener holds up every connection of that loop, so at debug level
+     * the time they take is checked against {@link #SLOW_LISTENER_THRESHOLD_NANOS}.
+     */
+    private <E> void publishRequestEvent(NettyHttpRequest<?> request, ApplicationEventPublisher<E> publisher, E event) {
+        if (!LOG.isDebugEnabled()) {
+            publisher.publishEvent(event);
+            return;
+        }
+        long start = System.nanoTime();
+        try {
+            publisher.publishEvent(event);
+        } finally {
+            long taken = System.nanoTime() - start;
+            if (taken > SLOW_LISTENER_THRESHOLD_NANOS && request.getChannelHandlerContext().executor().inEventLoop()) {
+                LOG.debug("Listeners for {} took {} ms on the event loop for {}. Request event listeners must not block; use @Async on the listener or micronaut.server.thread-selection=BLOCKING", event.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(taken), request);
+            }
+        }
     }
 
     public void writeResponse(OutboundAccess outboundAccess,

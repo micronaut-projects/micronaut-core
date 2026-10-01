@@ -30,3 +30,4 @@ import io.micronaut.aop.Around
 ) // <2>
 @Around // <3>
 annotation class Tx
+// end::annotation[]

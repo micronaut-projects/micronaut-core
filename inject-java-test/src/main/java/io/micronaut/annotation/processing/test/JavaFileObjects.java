@@ -36,7 +36,7 @@ import static javax.tools.JavaFileObject.Kind.SOURCE;
  *
  * @author Gregory Kick
  */
-final class JavaFileObjects {
+public final class JavaFileObjects {
     private JavaFileObjects() { }
 
     /**
@@ -51,7 +51,7 @@ final class JavaFileObjects {
      * @param source The source
      * @return the java file object
      */
-    static JavaFileObject forSourceString(String fullyQualifiedName, String source) {
+    public static JavaFileObject forSourceString(String fullyQualifiedName, String source) {
         Objects.requireNonNull(fullyQualifiedName);
         if (fullyQualifiedName.startsWith("package ")) {
             throw new IllegalArgumentException(
@@ -79,7 +79,7 @@ final class JavaFileObjects {
      * @param lines The source
      * @return The java file object
      */
-    static JavaFileObject forSourceLines(String fullyQualifiedName, String... lines) {
+    public static JavaFileObject forSourceLines(String fullyQualifiedName, String... lines) {
         return forSourceLines(fullyQualifiedName, Arrays.asList(lines));
     }
 
@@ -90,7 +90,7 @@ final class JavaFileObjects {
      * @param lines The source
      * @return The java file object
      **/
-    static JavaFileObject forSourceLines(String fullyQualifiedName, Iterable<String> lines) {
+    public static JavaFileObject forSourceLines(String fullyQualifiedName, Iterable<String> lines) {
         return forSourceString(fullyQualifiedName, String.join("\n", lines));
     }
 

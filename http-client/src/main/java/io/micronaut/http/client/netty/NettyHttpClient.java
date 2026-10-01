@@ -187,6 +187,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -247,6 +248,8 @@ final class NettyHttpClient implements
     private final ConversionService conversionService;
     @Nullable
     private final ExecutorService blockingExecutor;
+    @Nullable
+    private final LifecycleListener lifecycleListener;
 
     NettyHttpClient(NettyHttpClientBuilder builder) {
         this.loadBalancer = builder.loadBalancer;
@@ -280,6 +283,7 @@ final class NettyHttpClient implements
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
         this.informationalServiceId = builder.informationalServiceId;
         this.blockingExecutor = builder.blockingExecutor;
+        this.lifecycleListener = builder.lifecycleListener;
 
         this.connectionManager = new ConnectionManager(log, configuration, builder);
     }
@@ -332,6 +336,9 @@ final class NettyHttpClient implements
         if (!isRunning()) {
             connectionManager.start();
         }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStart(this);
+        }
         return this;
     }
 
@@ -344,6 +351,9 @@ final class NettyHttpClient implements
     public HttpClient stop() {
         if (isRunning()) {
             connectionManager.shutdown();
+        }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStop(this);
         }
         return this;
     }
@@ -1247,7 +1257,7 @@ final class NettyHttpClient implements
     }
 
     private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, ExecutionFlow<HttpResponse<?>> publisher) {
-        if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+        if (errorType != null && (errorType != HttpClient.DEFAULT_ERROR_TYPE || configuration.isBufferErrorBodyForStreaming())) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException exception) {
                     final HttpResponse<?> response = exception.getResponse();
@@ -1281,17 +1291,18 @@ final class NettyHttpClient implements
                             public void onComplete() {
                                 try {
                                     FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, (Argument<Object>) errorType, true, conversionService);
+                                    boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;
+                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, hasErrorType ? (Argument<Object>) errorType : null, hasErrorType, conversionService);
                                     completeExceptionallySafe(delayed, decorate(new HttpClientResponseException(
                                         fullHttpResponse.status().reasonPhrase(),
                                         null,
                                         fullNettyClientHttpResponse,
-                                        new HttpClientErrorDecoder() {
+                                        hasErrorType ? new HttpClientErrorDecoder() {
                                             @Override
                                             public Argument<?> getErrorType(MediaType mediaType) {
                                                 return errorType;
                                             }
-                                        }
+                                        } : HttpClientErrorDecoder.DEFAULT
                                     )));
                                 } finally {
                                     buffer.release();
@@ -1349,23 +1360,42 @@ final class NettyHttpClient implements
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        if (requestBody == null) {
-            requestBody = NettyByteBodyFactory.empty();
-        }
+        CloseableByteBody body = requestBody == null ? NettyByteBodyFactory.empty() : requestBody;
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         ExecutionFlow<HttpResponse<?>> mono;
         try {
-            mono = sendRequestWithRedirects(
+            mono = sendRawExchange(
                 propagatedContext,
                 blockedThread == null ? null : new BlockHint(blockedThread, null),
-                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
-                (req, resp) -> ExecutionFlow.just(resp)
+                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body)
             );
         } catch (RuntimeException | Error e) {
-            requestBody.close();
+            body.close();
             throw e;
         }
-        return toMono(mono, propagatedContext).doOnTerminate(requestBody::close);
+        // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
+        return toMono(mono, propagatedContext).doFinally(signal -> body.close());
+    }
+
+    /**
+     * Send a raw request. A relative request URI is resolved against the URL of this client
+     * first, like the URI of any other request.
+     *
+     * @param propagatedContext The propagated context
+     * @param blockHint         The block hint, if any
+     * @param rawRequest        The raw request
+     * @return The response flow
+     */
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable BlockHint blockHint, MutableHttpRequest<?> rawRequest) {
+        if (rawRequest.getUri().getScheme() != null) {
+            return sendRequestWithRedirects(propagatedContext, blockHint, rawRequest, (req, resp) -> ExecutionFlow.just(resp));
+        }
+        return resolveRequestURI(rawRequest).flatMap(uri -> sendRequestWithRedirects(
+            propagatedContext,
+            blockHint,
+            rawRequest.uri(uri),
+            (req, resp) -> ExecutionFlow.just(resp)
+        ));
     }
 
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
@@ -1581,13 +1611,18 @@ final class NettyHttpClient implements
             }
         }
 
+        AtomicBoolean responded = new AtomicBoolean();
+
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
             boolean stillExpectingContinue = expectContinue;
 
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
                 poolHandle.taint();
-                completeExceptionallySafe(sink, handleResponseError(request, cause));
+                if (!sink.isCancelled()) {
+                    // nobody takes the error of a cancelled exchange, e.g. its closed connection
+                    completeExceptionallySafe(sink, handleResponseError(request, cause));
+                }
             }
 
             @Override
@@ -1604,11 +1639,25 @@ final class NettyHttpClient implements
 
             @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
+                responded.set(true);
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
-
+                if (sink.isCancelled()) {
+                    // nobody takes the response of a cancelled exchange
+                    body.close();
+                    return;
+                }
                 sink.complete(new NettyClientByteBodyResponse(response, body, conversionService));
+            }
+
+            @Override
+            public void discardLimitReached() {
+                // the rest of an abandoned body is too long to drain (e.g. an endless stream whose
+                // downstream client went away): close the connection (HTTP/1) or reset the stream
+                // (HTTP/2) instead of reading it
+                poolHandle.taint();
+                poolHandle.channel().close();
             }
 
             @Override
@@ -1636,6 +1685,14 @@ final class NettyHttpClient implements
                     byteBuf.release();
                 }
                 poolHandle.release();
+            }
+        }));
+        // cancelling the exchange before the response arrives aborts the request: the connection
+        // (HTTP/1) or the stream (HTTP/2) is closed, which also stops the request body
+        sink.onCancel(() -> poolHandle.channel().eventLoop().execute(() -> {
+            if (!responded.get()) {
+                poolHandle.taint();
+                poolHandle.channel().close();
             }
         }));
         poolHandle.notifyRequestPipelineBuilt();
@@ -2133,5 +2190,25 @@ final class NettyHttpClient implements
         String name;
         @Nullable
         Duration retry;
+    }
+
+    /**
+     * Notified whenever a client is started or stopped, so that the owner of the client can
+     * track the clients that are running.
+     */
+    interface LifecycleListener {
+        /**
+         * Called after {@link #start()}.
+         *
+         * @param client The client
+         */
+        void onStart(NettyHttpClient client);
+
+        /**
+         * Called after {@link #stop()}, including when the client is closed.
+         *
+         * @param client The client
+         */
+        void onStop(NettyHttpClient client);
     }
 }

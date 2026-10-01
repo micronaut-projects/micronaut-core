@@ -5,8 +5,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.test.IntrospectionMetadataShape
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
@@ -29,7 +31,9 @@ import javax.persistence.Version
 import jakarta.validation.Constraint
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
+import java.lang.annotation.ElementType
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractKotlinCompilerSpec {
@@ -2562,4 +2566,341 @@ class MyMessage: Message()
         then:
         noExceptionThrown()
     }
+
+    void 'test property members'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Person', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
+
+@Introspected(members = true)
+class Person {
+    @field:NotNull
+    var name: String? = null
+}
+''')
+        def members = introspection.getProperty("name").get().members
+
+        expect: "only the backing field is listed, the Kotlin generated accessors are synthetic"
+        members*.name == ["name"]
+        members*.elementType == [ElementType.FIELD]
+        members[0].annotationMetadata.hasAnnotation(NotNull)
+        members[0].readable
+        members[0].read(introspection.instantiate()) == null
+    }
+
+    void "the members do not change the metadata the previous API answers"() {
+        given: "the same hierarchy, introspected with and without the members"
+        def source = { boolean members -> """
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+import jakarta.validation.constraints.*
+
+@Introspected(accessKind = [Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD], visibility = [Introspected.Visibility.ANY]${members ? ", members = true" : ""})
+@Marker("type")
+open class Child : Parent(), Holder<String> {
+    @field:Marker("child-field") @field:Size(max = 3)
+    private val shadow: String = "shadow"
+    @get:Marker("child-getter") @get:Positive
+    override val name: String get() = "child"
+    override val value: String get() = "value"
+    @Executable @Marker("child-describe") @Negative
+    override fun describe(@Min(2) level: Int): String = "c"
+    @Executable @NotNull
+    fun other(): String = "o"
+}
+
+interface Named {
+    @get:Marker("interface-getter") @get:NotNull @get:Size(min = 1)
+    val name: String
+    @Executable @NotNull
+    fun describe(@Min(1) level: Int): String
+}
+
+interface Holder<T> {
+    @get:NotNull
+    val value: T
+}
+
+open class Parent : Named {
+    @field:Marker("field") @field:NotBlank
+    var tag: String = "parent"
+    @get:Marker("parent-getter") @get:Size(max = 10)
+    override val name: String get() = tag
+    @Executable @Size(max = 5)
+    override fun describe(@Max(9) level: Int): String = "p"
+}
+
+@Retention(AnnotationRetention.RUNTIME)
+@java.lang.annotation.Inherited
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FIELD, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER)
+annotation class Marker(val value: String)
+""" }
+        def plain = buildBeanIntrospection('test.Child', source(false))
+        def withMembers = buildBeanIntrospection('test.Child', source(true))
+
+        expect: "the members are there in the one and not in the other"
+        withMembers.separatesDeclarations()
+        !plain.separatesDeclarations()
+        !withMembers.getProperty("tag").get().members.isEmpty()
+        plain.getProperty("tag").get().members.isEmpty()
+
+        and: "the metadata the previous API answers is the same in both"
+        withMembers.propertyNames == plain.propertyNames
+        withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
+        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
+    }
+
+    void "constructors = true does not change the constructor beans are built with"() {
+        when: 'the same type is built with and without the member'
+        def source = '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(%s)
+class Order(val name: String, val quantity: Int) {
+    constructor() : this("default-ctor", 0)
+    constructor(name: String) : this(name, 7)
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        then: 'the instantiating constructor is unchanged'
+        described.constructor.arguments.length == baseline.constructor.arguments.length
+        described.constructorArguments.length == baseline.constructorArguments.length
+        described.isBuildable() == baseline.isBuildable()
+
+        and: 'instantiate still runs the same constructor'
+        described.getRequiredProperty("name", String).get(described.instantiate("abc", 1)) ==
+            baseline.getRequiredProperty("name", String).get(baseline.instantiate("abc", 1))
+
+        and: 'only the described set grew'
+        baseline.getConstructors().size() == 1
+        described.getConstructors().size() == 3
+        described.getConstructors()[0].arguments.length == baseline.constructor.arguments.length
+    }
+
+    void "a secondary constructor annotated as executable does not change the primary constructor"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+
+@Introspected
+class Order(val name: String, val quantity: Int) {
+    @Executable constructor(name: String) : this(name, 7)
+}
+''')
+
+        then: 'the Kotlin primary constructor still builds beans'
+        introspection.constructor.arguments.length == 2
+        introspection.getRequiredProperty("quantity", int).get(introspection.instantiate("abc", 1)) == 1
+
+        and: 'and is described first, ahead of the secondary one'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()[0].arguments.length == 2
+        introspection.getConstructors()[1].arguments.length == 1
+    }
+
+    void "constructors = true does not change a constructor with default parameter values"() {
+        when:
+        def source = '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(%s)
+class Order(val name: String = "default-ctor", val quantity: Int = 7)
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        then: 'the instantiating constructor is unchanged and defaults still apply'
+        described.constructor.arguments.length == baseline.constructor.arguments.length
+        described.getRequiredProperty("name", String).get(described.instantiate()) ==
+            baseline.getRequiredProperty("name", String).get(baseline.instantiate())
+        described.getRequiredProperty("name", String).get(described.instantiate()) == "default-ctor"
+    }
+
+    void "every declared constructor is described including secondary constructors"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order(val name: String, val quantity: Int) {
+    constructor() : this("none", 0)
+    constructor(name: String) : this(name, 0)
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 3
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+        introspection.getConstructors()*.arguments*.length.toSorted() == [0, 1, 2]
+    }
+
+    void "instantiating through a described constructor works"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order(val name: String) {
+    constructor() : this("none")
+}
+''')
+        def order = introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "a described constructor of a Kotlin inner class describes the enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
+
+class CustomerService {
+    @Introspected(constructors = true)
+    inner class InnerClass(@NotNull val s: String)
+}
+''')
+        def described = introspection.getConstructors()[0]
+
+        then: 'the described arguments line up with the reflective signature'
+        introspection.getConstructors().size() == 1
+        Argument.toClassArray(described.arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+
+        and: 'the enclosing instance comes first, under the name the JDK gives it'
+        described.arguments.length == 2
+        described.arguments[0].name == 'this$0'
+        described.arguments[0].type.name == 'test.CustomerService'
+
+        and: 'the source level parameter keeps its annotations'
+        described.arguments[1].type == String
+        described.arguments[1].annotationMetadata.hasAnnotation(NotNull)
+    }
+
+    void "a described constructor of a Kotlin inner class instantiates with the enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    inner class InnerClass(val name: String)
+}
+''')
+        def enclosing = introspection.getConstructors()[0].arguments[0].type
+            .getDeclaredConstructor().tap { it.accessible = true }.newInstance()
+        def inner = introspection.getConstructors()[0].instantiate(enclosing, "abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(inner) == "abc"
+
+        when: 'the enclosing instance is left out'
+        introspection.getConstructors()[0].instantiate("abc")
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "a described constructor of a Kotlin nested class does not describe an enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$Nested', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    class Nested(val name: String)
+}
+''')
+
+        then:
+        Argument.toClassArray(introspection.getConstructors()[0].arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+        introspection.getConstructors()[0].arguments.length == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
+    void "a secondary constructor of a Kotlin inner class describes the enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    inner class InnerClass(val name: String) {
+        constructor() : this("none")
+    }
+}
+''')
+
+        then: 'every described constructor carries the enclosing instance'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()*.arguments*.length.toSorted() == [1, 2]
+        introspection.getConstructors().every { it.arguments[0].name == 'this$0' }
+
+        and: 'each matches its reflective counterpart'
+        introspection.beanType.getDeclaredConstructors().collect { it.parameterTypes.length }.toSorted() ==
+            introspection.getConstructors()*.arguments*.length.toSorted()
+    }
+
+    void "a data class describes its constructor"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+data class Order(val name: String, val quantity: Int)
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == 2
+    }
+
+    void "an introspection that did not ask for constructors keeps describing one"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Order(val name: String) {
+    constructor() : this("none")
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
 }

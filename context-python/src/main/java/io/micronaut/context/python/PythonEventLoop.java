@@ -17,6 +17,8 @@ package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
+import org.graalvm.polyglot.Value;
 
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +53,34 @@ public interface PythonEventLoop {
      * @return The scheduled future.
      */
     ScheduledFuture<?> schedule(Runnable runnable, long delay, TimeUnit unit);
+
+    /**
+     * Queue a Python callback for execution on the loop.
+     * <p>
+     * A loop that owns a GraalPy context runs the callback inside an execution frame of the
+     * callback's context, so shutdown waits for callbacks scheduled with {@code call_soon}. The
+     * {@link PropagatedContext} of the callback is not captured here: it belongs to the asyncio task
+     * that owns the callback, which keeps it in its {@code contextvars} and restores it when the
+     * callback runs, so a task resumed by another task (a shared {@code asyncio.Event}) or by a
+     * Java thread completing an awaited stage keeps its own context.
+     *
+     * @param callback The Python callable.
+     */
+    default void executeCallback(Value callback) {
+        execute(callback::executeVoid);
+    }
+
+    /**
+     * Queue a Python callback after the requested delay using loop time.
+     *
+     * @param callback The Python callable.
+     * @param delay The delay.
+     * @param unit The delay unit.
+     * @return The scheduled future.
+     */
+    default ScheduledFuture<?> scheduleCallback(Value callback, long delay, TimeUnit unit) {
+        return schedule(callback::executeVoid, delay, unit);
+    }
 
     /**
      * Returns the monotonic time base exposed to Python's asyncio APIs.

@@ -76,11 +76,23 @@ public class JavaParser implements Closeable {
      * Default constructor.
      */
     public JavaParser() {
-        this.compiler = ToolProvider.getSystemJavaCompiler();
+        this.compiler = createCompiler();
         this.diagnosticCollector = new DiagnosticCollector<>();
         this.fileManager =
                 new InMemoryJavaFileManager(
                         compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8));
+    }
+
+    /**
+     * Creates the compiler to use. Subclasses can override this to compile with
+     * a different {@link JavaCompiler} implementation, for example the Eclipse JDT compiler.
+     *
+     * <p>Called from the constructor, so implementations must not rely on subclass state.</p>
+     *
+     * @return The compiler
+     */
+    protected @NonNull JavaCompiler createCompiler() {
+        return ToolProvider.getSystemJavaCompiler();
     }
 
     /**
@@ -303,7 +315,12 @@ public class JavaParser implements Closeable {
         }
     }
 
-    private Set<String> getCompilerOptions() {
+    /**
+     * The compiler options to use.
+     *
+     * @return The compiler options
+     */
+    protected Set<String> getCompilerOptions() {
         Set<String> options;
         final Jvm jvm = Jvm.getCurrent();
         if (jvm.isJava15Compatible() && !jvm.isJava17Compatible()) {
@@ -360,6 +377,15 @@ public class JavaParser implements Closeable {
      */
     protected @NonNull AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
         return new AggregatingTypeElementVisitorProcessor();
+    }
+
+    /**
+     * The files produced by the last call to {@link #generate(JavaFileObject...)}.
+     *
+     * @return The output files
+     */
+    protected Iterable<? extends JavaFileObject> getOutputFiles() {
+        return fileManager.getOutputFiles();
     }
 
     @Override

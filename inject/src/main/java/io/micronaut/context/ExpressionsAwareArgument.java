@@ -36,12 +36,14 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements BeanContextConfigurable, BeanDefinitionAware {
 
     private final EvaluatedAnnotationMetadata annotationMetadata;
+    private final boolean rawType;
 
     private ExpressionsAwareArgument(Argument<T> argument,
                                      EvaluatedAnnotationMetadata annotationMetadata) {
         super(argument.getType(), argument.getName(), argument.getAnnotationMetadata(),
             argument.getTypeVariables(), argument.getTypeParameters(), argument.isTypeVariable());
         this.annotationMetadata = annotationMetadata;
+        this.rawType = argument.isRawType();
     }
 
     public static <T> Argument<T> wrapIfNecessary(Argument<T> argument) {
@@ -76,6 +78,11 @@ final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements Be
             }
         }
         return argument;
+    }
+
+    @Override
+    public boolean isRawType() {
+        return rawType;
     }
 
     @Override

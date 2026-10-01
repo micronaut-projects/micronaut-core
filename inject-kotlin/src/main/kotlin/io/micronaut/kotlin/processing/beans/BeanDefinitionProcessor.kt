@@ -25,20 +25,17 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.Modifier
-import io.micronaut.core.annotation.Generated
-import io.micronaut.core.annotation.Vetoed
-import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
-import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.inject.writer.ByteCodeWriterUtils
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 
-internal class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
-
+internal class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
     private val processed = HashSet<String>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
@@ -49,10 +46,8 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                 file.declarations
             }
             .filterIsInstance<KSClassDeclaration>()
-            .filter { declaration: KSClassDeclaration ->
-                declaration.annotations.none { ksAnnotation ->
-                    ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Generated::class.java.name
-                }
+            .filterNot { declaration: KSClassDeclaration ->
+                declaration.hasAnnotation(AnnotationNames.GENERATED)
             }
             .toList()
 
@@ -64,9 +59,6 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         visitorContext.finish()
         return emptyList()
     }
-
-    private fun isVetoed(ksAnnotation: KSAnnotation) =
-        ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString() == Vetoed::class.java.name
 
     private fun processClassDeclarations(
         elements: List<KSClassDeclaration>,
@@ -80,12 +72,12 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                     classDeclaration.declarations
                         .filter { it is KSClassDeclaration }
                         .map { it as KSClassDeclaration }
-                        .filter { declaration: KSClassDeclaration ->
-                            declaration.annotations.none { ksAnnotation ->
-                                isVetoed(ksAnnotation)
-                            }
+                        .filterNot { declaration: KSClassDeclaration ->
+                            declaration.hasAnnotation(AnnotationNames.VETOED)
                         }
-                        .filter { declaration -> declaration.classKind == ClassKind.INTERFACE || !declaration.modifiers.contains(Modifier.INNER) || declaration.annotations.any { annotation -> annotation.annotationType.resolve().declaration.qualifiedName?.asString() == "org.junit.jupiter.api.Nested" } }
+                        .filter { declaration ->
+                            declaration.isInterface() || declaration.isOuterType() || declaration.isJUnitNestedType()
+                        }
                         .toList()
                 if (innerClasses.isNotEmpty()) {
                     processClassDeclarations(innerClasses, visitorContext)
@@ -103,6 +95,70 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                 }
             }
         }
+    }
+
+    /**
+     * Checks if the class declaration has an annotation with the specified name.
+     *
+     * @param typeName The name of the annotation to check for inclusion.
+     * @return `true` if the class declaration includes the specified annotation, `false` otherwise.
+     */
+    private fun KSClassDeclaration.hasAnnotation(typeName: String): Boolean =
+        annotations.any { annotation ->
+            annotation.isNamed(typeName)
+        }
+
+    /**
+     * Checks whether the annotation has the specified type name.
+     *
+     * @param typeName The fully qualified name of the annotation to match.
+     * @return `true` if the annotation's type name matches the specified name, `false` otherwise.
+     */
+    private fun KSAnnotation.isNamed(typeName: String): Boolean =
+        resolveTypeName() == typeName
+
+    /**
+     * Checks if the class declaration is an outer type.
+     *
+     * @return `true` if the class declaration is an outer type, `false` otherwise.
+     */
+    private fun KSClassDeclaration.isOuterType(): Boolean =
+        !isInnerType()
+
+    /**
+     * Checks if the class declaration is an inner type.
+     *
+     * @return `true` if the class declaration is an inner type, `false` otherwise.
+     */
+    private fun KSClassDeclaration.isInnerType(): Boolean =
+        modifiers.contains(Modifier.INNER)
+
+    /**
+     * Checks if the class declaration is an interface.
+     *
+     * @return `true` if the class declaration is an interface, `false` otherwise.
+     */
+    private fun KSClassDeclaration.isInterface(): Boolean =
+        classKind == ClassKind.INTERFACE
+
+    /**
+     * Checks if the class declaration is annotated as a JUnit 5 `@Nested` test class.
+     *
+     * @return `true` if the class declaration has the `@Nested` annotation, `false` otherwise.
+     */
+    private fun KSClassDeclaration.isJUnitNestedType(): Boolean =
+        hasAnnotation(AnnotationNames.NESTED)
+
+    /**
+     * Resolves the fully qualified name of the annotation type.
+     *
+     * @return The fully qualified name of the annotation type as a string, or `null` if the type name cannot be resolved.
+     */
+    private fun KSAnnotation.resolveTypeName(): String? {
+        val annotationType = annotationType.resolve()
+        val annotationDeclaration = annotationType.declaration
+        val qualifiedName = annotationDeclaration.qualifiedName
+        return qualifiedName?.asString()
     }
 
     private fun write(outputObjectDef: OutputObjectDef, visitorContext: KotlinVisitorContext, environment: SymbolProcessorEnvironment) {
@@ -141,6 +197,12 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         BeanDefinitionWriter.finish()
     }
 
+    private object AnnotationNames {
+        const val NESTED = "org.junit.jupiter.api.Nested"
+        const val GENERATED = "io.micronaut.core.annotation.Generated"
+        const val VETOED = "io.micronaut.core.annotation.Vetoed"
+    }
+
     companion object Helper {
         fun handleProcessingException(environment: SymbolProcessorEnvironment, e: ProcessingException) {
             val message = e.message
@@ -163,5 +225,4 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             }
         }
     }
-
 }

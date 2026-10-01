@@ -2,8 +2,10 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.PythonContextRuntime
+import io.micronaut.context.python.PooledValueCoercible
+import io.micronaut.context.python.PythonPool
 import io.micronaut.context.python.GraalPyContextFactory
-import io.micronaut.context.python.GraalPyRuntimeUtil
+import io.micronaut.context.python.PythonConversion
 import io.micronaut.context.python.ValueCoercible
 import io.micronaut.core.io.Writable
 import io.micronaut.json.JsonMapper
@@ -568,6 +570,92 @@ class Move:
         ctx?.close()
     }
 
+    void "introspected Python classes preserve nested identity and cycles in a pooled context"() {
+        given:
+        String py = '''
+from micronaut.core.annotation import Introspected
+
+
+@Introspected
+class Node:
+    name: str | None = None
+    next: "Node | None" = None
+
+
+@Introspected
+class Pair:
+    left: Node | None = None
+    right: Node | None = None
+
+
+'''
+        ApplicationContext ctx = buildContext(py, true, [
+            "micronaut.python.pool.enabled": true,
+            "micronaut.python.pool.size": 1
+        ])
+        Class<?> nodeClass = ctx.classLoader.loadClass('python.Node')
+        Class<?> pairClass = ctx.classLoader.loadClass('python.Pair')
+        def node = nodeClass.getDeclaredConstructor().newInstance()
+        nodeClass.getField('name').set(node, 'root')
+        nodeClass.getField('next').set(node, node)
+        def pair = pairClass.getDeclaredConstructor().newInstance()
+        pairClass.getField('left').set(pair, node)
+        pairClass.getField('right').set(pair, node)
+
+        when:
+        boolean identityPreserved = ctx.getBean(PythonPool).withContext { Context targetContext ->
+            Value targetPair = ((PooledValueCoercible) pair).asPolyglotValue(targetContext)
+            targetContext.getBindings('python').putMember('target_pair', targetPair)
+            targetContext.eval(
+                'python',
+                'target_pair.left is target_pair.right and target_pair.left.next is target_pair.left'
+            ).asBoolean()
+        }
+
+        then:
+        identityPreserved
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "ordinary Python methods keep bare list and map elements as host bridges"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+
+@dataclass
+@Introspected
+class Item:
+    name: str
+
+
+@Introspected
+class Consumer:
+    def describe(self, item: Item, items: list[Item], items_by_name: dict[str, Item]) -> str:
+        return ":".join((
+            item.getName(),
+            items[0].getName(),
+            items_by_name.get("primary").getName(),
+        ))
+
+
+'''
+        ApplicationContext ctx = buildContext(py, true)
+        Class<?> itemClass = ctx.classLoader.loadClass('python.Item')
+        Class<?> consumerClass = ctx.classLoader.loadClass('python.Consumer')
+        def item = itemClass.getDeclaredConstructor(String).newInstance('one')
+        def consumer = consumerClass.getDeclaredConstructor().newInstance()
+
+        expect:
+        consumer.describe(item, [item], [primary: item]) == 'one:one:one'
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "generated dataclass wrapper setters called from Python update Java fields"() {
         given:
         String py = '''
@@ -724,7 +812,7 @@ class TemplateWritable(Writable):
         when:
         Context polyglot = ctx.getBean(Context)
         def value = polyglot.eval("python", "TemplateWritable('generated')")
-        Writable writable = GraalPyRuntimeUtil.convertValue(value, Writable.class)
+        Writable writable = PythonConversion.convertValue(value, Writable.class)
         def out = new ByteArrayOutputStream()
         writable.writeTo(out, StandardCharsets.UTF_8)
 

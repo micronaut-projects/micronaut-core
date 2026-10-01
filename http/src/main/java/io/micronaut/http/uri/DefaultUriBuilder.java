@@ -317,7 +317,7 @@ class DefaultUriBuilder implements UriBuilder {
             }
 
             if (hasHost) {
-                host = expandOrEncode(Objects.requireNonNull(host), values);
+                host = expandOrEncodeHost(Objects.requireNonNull(host), values);
                 builder.append(host);
             }
 
@@ -401,6 +401,41 @@ class DefaultUriBuilder implements UriBuilder {
             value = encode(value);
         }
         return value;
+    }
+
+    private String expandOrEncodeHost(String host, @Nullable Map<String, ? super Object> values) {
+        boolean expanded = isTemplate(host, values);
+        if (expanded) {
+            host = UriTemplate.of(host).expand(values);
+        }
+        if (expanded || host.startsWith("[") || host.endsWith("]") || host.indexOf(':') > -1) {
+            return validateHost(host);
+        }
+        return encode(host);
+    }
+
+    private String validateHost(String host) {
+        boolean startsWithBracket = host.startsWith("[");
+        boolean endsWithBracket = host.endsWith("]");
+        if (startsWithBracket != endsWithBracket ||
+            startsWithBracket && (host.indexOf('[', 1) > -1 || host.indexOf(']') != host.length() - 1)) {
+            throw invalidHost(host);
+        }
+        String formattedHost = startsWithBracket || host.indexOf(':') < 0 ? host : '[' + host + ']';
+        try {
+            URI uri = new URI("http://" + formattedHost + '/');
+            if (!formattedHost.equals(uri.getRawAuthority()) || uri.getRawUserInfo() != null || uri.getPort() != -1 ||
+                !"/".equals(uri.getRawPath()) || uri.getRawQuery() != null || uri.getRawFragment() != null || uri.getHost() == null) {
+                throw invalidHost(host);
+            }
+            return formattedHost;
+        } catch (URISyntaxException e) {
+            throw new UriSyntaxException(e);
+        }
+    }
+
+    private UriSyntaxException invalidHost(String host) {
+        return new UriSyntaxException(new URISyntaxException(host, "Invalid host"));
     }
 
     private String encode(String userInfo) {

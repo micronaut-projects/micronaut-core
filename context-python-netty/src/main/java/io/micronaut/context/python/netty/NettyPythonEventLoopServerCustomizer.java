@@ -33,27 +33,36 @@ import org.jspecify.annotations.Nullable;
  */
 @Singleton
 @Requires(classes = NettyServerCustomizer.class)
-@Requires(property = PythonAsyncioConfiguration.ENABLED, notEquals = "false")
+@Requires(property = PythonAsyncioConfiguration.ENABLED_PROPERTY, notEquals = "false")
 final class NettyPythonEventLoopServerCustomizer implements BeanCreatedEventListener<NettyServerCustomizer.Registry> {
     static final String HANDLER_NAME = "python-asyncio-event-loop";
+
+    private final NettyPythonEventLoopProvider provider;
+
+    /**
+     * @param provider The provider whose channel tracking request handling binds to
+     */
+    NettyPythonEventLoopServerCustomizer(NettyPythonEventLoopProvider provider) {
+        this.provider = provider;
+    }
 
     @Override
     public NettyServerCustomizer.Registry onCreated(BeanCreatedEvent<NettyServerCustomizer.Registry> event) {
         NettyServerCustomizer.Registry registry = event.getBean();
-        registry.register(binderCustomizer());
+        registry.register(binderCustomizer(provider));
         return registry;
     }
 
-    static NettyServerCustomizer binderCustomizer() {
-        return new BinderCustomizer(null);
+    static NettyServerCustomizer binderCustomizer(NettyPythonEventLoopProvider provider) {
+        return new BinderCustomizer(new NettyPythonEventLoopBindingHandler(provider), null);
     }
 
-    private record BinderCustomizer(@Nullable Channel channel) implements NettyServerCustomizer {
+    private record BinderCustomizer(NettyPythonEventLoopBindingHandler handler, @Nullable Channel channel) implements NettyServerCustomizer {
 
         @Override
         public NettyServerCustomizer specializeForChannel(Channel channel, ChannelRole role) {
             return switch (role) {
-                case CONNECTION, REQUEST_STREAM -> new BinderCustomizer(channel);
+                case CONNECTION, REQUEST_STREAM -> new BinderCustomizer(handler, channel);
                 case LISTENER, PUSH_PROMISE_STREAM -> this;
             };
         }
@@ -69,18 +78,22 @@ final class NettyPythonEventLoopServerCustomizer implements BeanCreatedEventList
             channel.pipeline().addBefore(
                 ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND,
                 HANDLER_NAME,
-                NettyPythonEventLoopBindingHandler.INSTANCE
+                handler
             );
         }
     }
 
     @ChannelHandler.Sharable
     private static final class NettyPythonEventLoopBindingHandler extends ChannelInboundHandlerAdapter {
-        private static final NettyPythonEventLoopBindingHandler INSTANCE = new NettyPythonEventLoopBindingHandler();
+        private final NettyPythonEventLoopProvider provider;
+
+        private NettyPythonEventLoopBindingHandler(NettyPythonEventLoopProvider provider) {
+            this.provider = provider;
+        }
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            NettyPythonEventLoopProvider.bind(ctx.channel().eventLoop(), () -> {
+            provider.call(ctx.channel().eventLoop(), () -> {
                 super.channelRead(ctx, msg);
                 return null;
             });

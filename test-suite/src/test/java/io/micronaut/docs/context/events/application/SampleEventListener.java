@@ -35,3 +35,4 @@ public class SampleEventListener implements ApplicationEventListener<SampleEvent
         return invocationCounter;
     }
 }
+// end::class[]

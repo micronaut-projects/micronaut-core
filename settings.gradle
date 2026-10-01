@@ -6,7 +6,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '8.0.1'
+    id 'io.micronaut.build.shared.settings' version '8.1.3'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -64,6 +64,7 @@ include "management"
 include "messaging"
 include "module-info"
 include "module-info-runtime"
+include "reflection"
 include "retry"
 include "router"
 include "runtime"
@@ -94,6 +95,7 @@ include "test-utils"
 include "test-suite-annotation-remapper"
 include "test-suite-annotation-remapper-visitor"
 include "test-suite-property-source"
+include "test-suite-jdt"
 
 // benchmarks
 include "benchmarks"

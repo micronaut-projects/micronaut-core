@@ -27,6 +27,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import java.util.ArrayList;
@@ -159,6 +160,7 @@ public sealed class PackageElementVisitorProcessor extends AbstractInjectAnnotat
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        javaVisitorContext.newRound();
         if (packageVisitors.isEmpty() || processingGeneratedAnnotation(annotations)) {
             return false;
         }
@@ -166,6 +168,11 @@ public sealed class PackageElementVisitorProcessor extends AbstractInjectAnnotat
         var packageElements = new LinkedHashSet<PackageElement>();
 
         for (TypeElement annotation : annotations) {
+            if (annotation.getKind() != ElementKind.ANNOTATION_TYPE) {
+                // an annotation the compiler could not resolve arrives here as a plain class; asking
+                // the round for its annotated elements would throw and mask the real compile error
+                continue;
+            }
             Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
             if (!packageVisitors.isEmpty()) {
                 for (Element annotatedElement : annotatedElements) {

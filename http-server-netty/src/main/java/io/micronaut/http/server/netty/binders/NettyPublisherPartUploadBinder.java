@@ -102,13 +102,9 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
             // these objects consume little memory, and accept writing to disk anyway, so we
             // subscribe eagerly here to avoid backpressure.
             publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
-                .flatMap(f -> {
-                    if (f.metadata().fileName() == null) {
-                        f.close();
-                        return Flux.error(new IllegalStateException("Field was not a file upload (no filename parameter)"));
-                    }
-                    return ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f));
-                })));
+                // completeFileUpload rejects a part without a file name with the same 400 a single
+                // @Part CompletedFileUpload gets, instead of treating the malformed request as a server error
+                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeFileUpload(request, f)))));
         } else if (contentTypeClass == CompletedAttribute.class) {
             // Publisher<CompletedAttribute>
             publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))

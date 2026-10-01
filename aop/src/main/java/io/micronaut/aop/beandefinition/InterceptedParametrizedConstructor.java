@@ -20,9 +20,12 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
+
+import java.lang.reflect.Constructor;
 
 /**
  * The intercepted implementation of {@link io.micronaut.core.beans.BeanConstructor}.
@@ -38,6 +41,7 @@ final class InterceptedParametrizedConstructor<T> implements BeanConstructor<T> 
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final AnnotationMetadata annotationMetadata;
+    private final TargetConstructorCache<T> targetConstructor = new TargetConstructorCache<>();
 
     /**
      * @param interceptedInstantiateBeanDefinition The intercepted bean definition
@@ -74,5 +78,10 @@ final class InterceptedParametrizedConstructor<T> implements BeanConstructor<T> 
     @Override
     public Argument<?>[] getArguments() {
         return interceptedInstantiateBeanDefinition.getConstructor().getArguments();
+    }
+
+    @Override
+    public @Nullable Constructor<T> getTargetConstructor() {
+        return targetConstructor.get(() -> InterceptedConstructor.isFactoryProduced(interceptedInstantiateBeanDefinition) ? null : TargetConstructorCache.resolve(this));
     }
 }

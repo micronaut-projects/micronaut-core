@@ -37,3 +37,4 @@ open class DefaultsController {
 
 // tag::endclass[]
 }
+// end::endclass[]

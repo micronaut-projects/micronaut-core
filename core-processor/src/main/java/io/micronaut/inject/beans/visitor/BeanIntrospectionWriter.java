@@ -33,12 +33,12 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -46,6 +46,7 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
 import io.micronaut.inject.writer.DispatchWriter;
@@ -66,6 +67,7 @@ import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
+import java.lang.annotation.ElementType;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -76,6 +78,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -93,20 +96,40 @@ import java.util.stream.IntStream;
 @Internal
 final class BeanIntrospectionWriter implements OriginatingElements, Buildable<List<OutputObjectDef>> {
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
+    /**
+     * The longest name a generated introspection may have. The name is used as a single file name
+     * component, and file systems commonly cap those at 255 bytes.
+     */
+    private static final int MAX_INTROSPECTION_NAME_LENGTH = 240;
 
     private static final String FIELD_CONSTRUCTOR_ANNOTATION_METADATA = "$FIELD_CONSTRUCTOR_ANNOTATION_METADATA";
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
+    private static final String FIELD_BEAN_CONSTRUCTORS_REFERENCES = "$CONSTRUCTORS_REFERENCES";
     private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
+    private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
+    private static final String METADATA_METHOD_SUFFIX = "$metadata";
+    /**
+     * The name the JDK gives the synthetic enclosing instance parameter of an inner class constructor.
+     */
+    private static final String ENCLOSING_INSTANCE_PARAMETER_NAME = "this$0";
     private static final java.lang.reflect.Method FIND_PROPERTY_BY_INDEX_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class);
+
+    private static final java.lang.reflect.Method SEPARATES_DECLARATIONS_METHOD = ReflectionUtils.getRequiredMethod(
+        BeanIntrospection.class,
+        "separatesDeclarations"
+    );
 
     private static final java.lang.reflect.Method FIND_INDEXED_PROPERTY_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "findIndexedProperty", Class.class, String.class);
 
     private static final java.lang.reflect.Method GET_INDEXED_PROPERTIES =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getIndexedProperties", Class.class);
+
+    private static final java.lang.reflect.Method GET_TYPE_ARGUMENTS_MAP_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getTypeArgumentsMap");
 
     private static final java.lang.reflect.Method GET_BP_INDEXED_SUBSET_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class);
@@ -127,6 +150,12 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         AnnotationMetadata.class
     );
 
+    private static final java.lang.reflect.Constructor<?> ENUM_CONSTANT_OBJECT_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef.class,
+        Object.class,
+        AnnotationMetadata.class
+    );
+
     private static final java.lang.reflect.Constructor<?> INTROSPECTION_SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
         AbstractInitializableBeanIntrospectionAndReference.class,
         Class.class,
@@ -135,6 +164,25 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         Argument[].class,
         AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
         AbstractInitializableBeanIntrospection.BeanMethodRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> INTROSPECTION_SUPER_CONSTRUCTOR_WITH_CONSTRUCTORS = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospectionAndReference.class,
+        Class.class,
+        AnnotationMetadata.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+        AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
+        AbstractInitializableBeanIntrospection.BeanConstructorRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> BEAN_CONSTRUCTOR_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanConstructorRef.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        int.class,
+        boolean.class
     );
 
     private static final java.lang.reflect.Constructor<?> ENUM_INTROSPECTION_SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
@@ -148,6 +196,17 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class
     );
 
+    private static final java.lang.reflect.Constructor<?> ENUM_INTROSPECTION_OBJECT_SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractEnumBeanIntrospectionAndReference.class,
+        Class.class,
+        AnnotationMetadata.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+        AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
+        AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef[].class
+    );
+
     private static final java.lang.reflect.Constructor<?> BEAN_PROPERTY_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
         AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
         Argument.class,
@@ -158,6 +217,28 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         int.class,
         boolean.class,
         boolean.class
+    );
+
+    private static final java.lang.reflect.Constructor<?> BEAN_PROPERTY_REF_WITH_MEMBERS_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+        Argument.class,
+        Argument.class,
+        Argument.class,
+        int.class,
+        int.class,
+        int.class,
+        boolean.class,
+        boolean.class,
+        AbstractInitializableBeanIntrospection.BeanPropertyMemberRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> BEAN_PROPERTY_MEMBER_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.class,
+        ElementType.class,
+        AnnotationClassValue.class,
+        String.class,
+        Argument.class,
+        int.class
     );
 
     private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(
@@ -184,6 +265,21 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         "hasConstructor"
     );
 
+    private static final java.lang.reflect.Method IS_STATIC_CREATOR_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanIntrospection.class,
+        "isStaticCreator"
+    );
+
+    private static final java.lang.reflect.Method INSTANTIATE_CONSTRUCTOR_INTERNAL_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanIntrospection.class,
+        "instantiateConstructorInternal", int.class, Object[].class
+    );
+
+    private static final java.lang.reflect.Method UNKNOWN_DISPATCH_AT_INDEX_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanIntrospection.class,
+        "unknownDispatchAtIndexException", int.class
+    );
+
     private final String introspectionName;
     private final ClassTypeDef introspectionTypeDef;
     private final Map<AnnotationWithValue, String> indexByAnnotationAndValue = new HashMap<>(2);
@@ -196,14 +292,21 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
     private final List<BeanPropertyData> beanProperties = new ArrayList<>();
     private final List<BeanMethodData> beanMethods = new ArrayList<>();
+    private final List<MethodElement> declaredConstructors = new ArrayList<>();
 
     private final DispatchWriter dispatchWriter;
     private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
     private final AnnotationMetadata annotationMetadata;
+    private final Optional<MethodElement> enumValueOfMethod;
 
     private final OriginatingElements originatingElements;
 
     private CopyConstructorDispatchTarget copyConstructorDispatchTarget;
+    /**
+     * Whether the members of the properties are described, each by the type declaring it: the introspection
+     * then reports that it separates the declarations.
+     */
+    private boolean membersDescribed;
     private VisitorContext visitorContext;
 
     /**
@@ -225,6 +328,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         this.originatingElements = OriginatingElements.of(beanClassElement);
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
+        enumValueOfMethod = enumValueOfMethod(beanClassElement);
         this.visitorContext = visitorContext;
     }
 
@@ -256,6 +360,29 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         this.originatingElements = OriginatingElements.of(originatingElement);
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
+        enumValueOfMethod = enumValueOfMethod(beanClassElement);
+    }
+
+    private static Optional<MethodElement> enumValueOfMethod(ClassElement beanClassElement) {
+        if (beanClassElement instanceof EnumElement enumElement) {
+            return enumElement.getEnumValueOfMethod().map(method -> validateEnumValueOfMethod(beanClassElement, method));
+        }
+        return Optional.empty();
+    }
+
+    private static MethodElement validateEnumValueOfMethod(ClassElement beanClassElement, MethodElement method) {
+        ParameterElement[] parameters = method.getParameters();
+        boolean validParameter = parameters.length == 1 && (
+            String.class.getName().equals(parameters[0].getType().getName()) ||
+                CharSequence.class.getName().equals(parameters[0].getType().getName())
+        );
+        if (!method.isStatic() || method.isPrivate() || !validParameter || !method.getReturnType().isAssignable(beanClassElement)) {
+            throw new ProcessingException(beanClassElement,
+                "The enum value lookup method [" + method.getName() + "] for [" + beanClassElement.getName() + "] " +
+                    "must be static, non-private, accept exactly one java.lang.String or java.lang.CharSequence parameter, " +
+                    "and return a value assignable to the enum type.");
+        }
+        return method;
     }
 
     /**
@@ -293,6 +420,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      * @param writeMember The write member
      * @param writeType   The write type
      * @param isReadOnly  Is read only
+     * @param members     The individual members the property is composed of, empty if not requested
      */
     void visitProperty(
         ClassElement type,
@@ -302,7 +430,8 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         @Nullable MemberElement writeMember,
         @Nullable ClassElement readType,
         @Nullable ClassElement writeType,
-        boolean isReadOnly) {
+        boolean isReadOnly,
+        List<PropertyMemberDef> members) {
         this.evaluatedExpressionProcessor.processEvaluatedExpressions(genericType.getAnnotationMetadata(), beanClassElement);
         int readDispatchIndex = -1;
         if (readMember != null) {
@@ -377,8 +506,62 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             readDispatchIndex,
             writeDispatchIndex,
             withMethodIndex,
-            isReadOnly
+            isReadOnly,
+            visitPropertyMembers(members, readMember, readDispatchIndex)
         ));
+    }
+
+    /**
+     * Marks the members of the properties as described: the introspection reports that it
+     * {@link BeanIntrospection#separatesDeclarations() separates the declarations}.
+     */
+    void describeMembers() {
+        this.membersDescribed = true;
+    }
+
+    private List<BeanPropertyMemberData> visitPropertyMembers(List<PropertyMemberDef> members,
+                                                              @Nullable MemberElement readMember,
+                                                              int readDispatchIndex) {
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        List<BeanPropertyMemberData> result = new ArrayList<>(members.size());
+        // the members of a hierarchy are read through one accessor of the bean type: the getter an interface
+        // declares is read by invoking the getter overriding it, which is the same virtual call
+        Map<MemberElement, Integer> dispatchByAccessor = new HashMap<>();
+        for (PropertyMemberDef propertyMember : members) {
+            MemberElement member = propertyMember.member();
+            MemberElement accessor = propertyMember.accessor();
+            this.evaluatedExpressionProcessor.processEvaluatedExpressions(propertyMember.type().getAnnotationMetadata(), beanClassElement);
+            int memberReadDispatchIndex;
+            if (accessor == null) {
+                // a hidden field is read through the class declaring it, where the owning type finds the field
+                // hiding it; the introspection has to be able to name that class
+                memberReadDispatchIndex = dispatchWriter.addGetHiddenField((FieldElement) member);
+            } else if (accessor.equals(readMember)) {
+                // Reuse the accessor that was already generated for reading the property
+                memberReadDispatchIndex = readDispatchIndex;
+            } else {
+                memberReadDispatchIndex = dispatchByAccessor.computeIfAbsent(accessor, key -> {
+                    if (key instanceof FieldElement fieldElement) {
+                        return dispatchWriter.addGetField(fieldElement);
+                    } else if (key instanceof MethodElement methodElement && methodElement.getParameters().length == 0) {
+                        return dispatchWriter.addMethod(beanClassElement, methodElement, true);
+                    } else {
+                        // A write method cannot be read
+                        return -1;
+                    }
+                });
+            }
+            result.add(new BeanPropertyMemberData(
+                member instanceof FieldElement ? ElementType.FIELD : ElementType.METHOD,
+                member.getDeclaringType(),
+                member.getName(),
+                propertyMember.type(),
+                memberReadDispatchIndex
+            ));
+        }
+        return result;
     }
 
     /**
@@ -468,8 +651,22 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 loadClassValueExpressionFn
             );
         }
+        if (beanPropertyData.members.isEmpty()) {
+            return beanPropertyRefDef.instantiate(
+                BEAN_PROPERTY_REF_CONSTRUCTOR,
+
+                mainArgument,
+                readArgument == null ? ExpressionDef.nullValue() : readArgument,
+                writeArgument == null ? ExpressionDef.nullValue() : writeArgument,
+                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.isReadOnly),
+                ExpressionDef.constant(mutable)
+            );
+        }
         return beanPropertyRefDef.instantiate(
-            BEAN_PROPERTY_REF_CONSTRUCTOR,
+            BEAN_PROPERTY_REF_WITH_MEMBERS_CONSTRUCTOR,
 
             mainArgument,
             readArgument == null ? ExpressionDef.nullValue() : readArgument,
@@ -478,8 +675,42 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             ExpressionDef.constant(beanPropertyData.setDispatchIndex),
             ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
             ExpressionDef.constant(beanPropertyData.isReadOnly),
-            ExpressionDef.constant(mutable)
+            ExpressionDef.constant(mutable),
+            ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.class)
+                .array()
+                .instantiate(
+                    beanPropertyData.members.stream()
+                        .map(member -> newBeanPropertyMemberRef(beanPropertyData.name, member, loadClassValueExpressionFn))
+                        .toList()
+                )
         );
+    }
+
+    private ExpressionDef newBeanPropertyMemberRef(String propertyName,
+                                                   BeanPropertyMemberData member,
+                                                   Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.class)
+            .instantiate(
+                BEAN_PROPERTY_MEMBER_REF_CONSTRUCTOR,
+
+                // 1: element type
+                ClassTypeDef.of(ElementType.class).getStaticField(member.elementType.name(), TypeDef.of(ElementType.class)),
+                // 2: declaring type
+                loadClassValueExpressionFn.apply(member.declaringType.getName()),
+                // 3: member name
+                ExpressionDef.constant(member.name),
+                // 4: argument
+                ArgumentExpUtils.pushCreateArgument(
+                    annotationMetadata,
+                    beanClassElement,
+                    introspectionTypeDef,
+                    propertyName,
+                    member.type,
+                    loadClassValueExpressionFn
+                ),
+                // 5: read dispatch index
+                ExpressionDef.constant(member.readDispatchIndex)
+            );
     }
 
     private ExpressionDef newBeanMethodRef(BeanMethodData beanMethodData, Function<String, ExpressionDef> loadClassValueExpressionFn) {
@@ -512,19 +743,29 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     }
 
     private ExpressionDef newEnumConstantRef(EnumConstantElement enumConstantElement, Function<String, ExpressionDef> loadClassValueExpressionFn) {
-        return ClassTypeDef.of(
-            AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class
-        ).instantiate(
+        ExpressionDef annotationMetadataExpression;
+        if (enumConstantElement.getAnnotationMetadata() == null || enumConstantElement.getAnnotationMetadata().isEmpty()) {
+            annotationMetadataExpression = ClassTypeDef.of(AnnotationMetadata.class).getStaticField("EMPTY_METADATA", TypeDef.of(AnnotationMetadata.class));
+        } else {
+            annotationMetadataExpression = getAnnotationMetadataExpression(enumConstantElement.getAnnotationMetadata(), loadClassValueExpressionFn);
+        }
+        MethodElement valueOfMethod = enumValueOfMethod.orElse(null);
+        if (valueOfMethod != null) {
+            return ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef.class).instantiate(
+                ENUM_CONSTANT_OBJECT_REF_CONSTRUCTOR,
+                ClassTypeDef.of(enumConstantElement.getOwningType())
+                    .invokeStatic(valueOfMethod, List.of(ExpressionDef.constant(enumConstantElement.getName()))),
+                annotationMetadataExpression
+            );
+        }
+        return ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class).instantiate(
             ENUM_CONSTANT_DYNAMIC_REF_CONSTRUCTOR,
-
             // 1: push annotation class value
             loadClassValueExpressionFn.apply(enumConstantElement.getOwningType().getName()),
             // 2: push enum name
             ExpressionDef.constant(enumConstantElement.getName()),
             // 3: annotation metadata
-            enumConstantElement.getAnnotationMetadata() == null || enumConstantElement.getAnnotationMetadata().isEmpty() ? (
-                ClassTypeDef.of(AnnotationMetadata.class).getStaticField("EMPTY_METADATA", TypeDef.of(AnnotationMetadata.class))
-            ) : getAnnotationMetadataExpression(enumConstantElement.getAnnotationMetadata(), loadClassValueExpressionFn)
+            annotationMetadataExpression
         );
     }
 
@@ -553,6 +794,14 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         classDefBuilder.superclass(isEnum ? ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.class) : ClassTypeDef.of(AbstractInitializableBeanIntrospectionAndReference.class));
 
         classDefBuilder.addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", introspectionName).build());
+        if (membersDescribed) {
+            classDefBuilder.addMethod(
+                MethodDef.builder(SEPARATES_DECLARATIONS_METHOD.getName())
+                    .addModifiers(Modifier.PUBLIC)
+                    .returns(TypeDef.Primitive.BOOLEAN)
+                    .build((aThis, methodParameters) -> ExpressionDef.trueValue().returning())
+            );
+        }
         // init expressions at build time
         evaluatedExpressionProcessor.registerExpressionForBuildTimeInit(classDefBuilder);
 
@@ -607,7 +856,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             ClassTypeDef beanPropertyRefType = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
             List<ExpressionDef> propsExpressions = new ArrayList<>();
             for (BeanPropertyData beanProperty : beanProperties) {
-                MethodDef metadataMethod = MethodDef.builder("$property$" + beanProperty.name + "$metadata")
+                MethodDef metadataMethod = MethodDef.builder("$property$" + beanProperty.name + METADATA_METHOD_SUFFIX)
                     .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                     .returns(beanPropertyRefType)
                     .build((aThis, methodParameters) -> {
@@ -646,7 +895,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 while (!usedNames.add(methodName)) {
                     methodName += index++;
                 }
-                MethodDef metadataMethod = MethodDef.builder("$method$" + methodName + "$metadata")
+                MethodDef metadataMethod = MethodDef.builder("$method$" + methodName + METADATA_METHOD_SUFFIX)
                     .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                     .returns(beanMethodRefType)
                     .build((aThis, methodParameters) -> newBeanMethodRef(beanMethod, loadClassValueExpressionFn).returning());
@@ -671,11 +920,43 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         } else {
             beanMethodsField = null;
         }
-        if (isEnum) {
-            enumsField = FieldDef.builder(FIELD_ENUM_CONSTANTS_REFERENCES, AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class)
+        FieldDef beanConstructorsField;
+        List<MethodElement> orderedDeclaredConstructors = isEnum ? List.of() : getOrderedDeclaredConstructors();
+        if (!orderedDeclaredConstructors.isEmpty()) {
+            ClassTypeDef beanConstructorRefType = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanConstructorRef.class);
+            List<ExpressionDef> constructorsExpressions = new ArrayList<>();
+            for (int i = 0; i < orderedDeclaredConstructors.size(); i++) {
+                MethodElement declaredConstructor = orderedDeclaredConstructors.get(i);
+                int constructorIndex = i;
+                MethodDef metadataMethod = MethodDef.builder("$constructor$" + constructorIndex + METADATA_METHOD_SUFFIX)
+                    .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                    .returns(beanConstructorRefType)
+                    .build((aThis, methodParameters) -> newBeanConstructorRef(declaredConstructor, constructorIndex, loadClassValueExpressionFn).returning());
+                classDefBuilder.addMethod(metadataMethod);
+                constructorsExpressions.add(thisType.invokeStatic(metadataMethod));
+            }
+            beanConstructorsField = FieldDef.builder(FIELD_BEAN_CONSTRUCTORS_REFERENCES, AbstractInitializableBeanIntrospection.BeanConstructorRef[].class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
                 .initializer(
-                    ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class).array()
+                    beanConstructorRefType.array()
+                        .instantiate(
+                            constructorsExpressions
+                        )
+                )
+                .build();
+            classDefBuilder.addField(beanConstructorsField);
+        } else {
+            beanConstructorsField = null;
+        }
+        if (isEnum) {
+            Class<?> enumConstantRefType = enumValueOfMethod.isPresent()
+                ? AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef.class
+                : AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class;
+            ClassTypeDef enumConstantRefTypeDef = ClassTypeDef.of(enumConstantRefType);
+            enumsField = FieldDef.builder(FIELD_ENUM_CONSTANTS_REFERENCES, enumConstantRefTypeDef.array())
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .initializer(
+                    enumConstantRefTypeDef.array()
                         .instantiate(
                             ((EnumElement) beanClassElement).elements().stream()
                                 .map(e -> newEnumConstantRef(e, loadClassValueExpressionFn))
@@ -686,6 +967,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             classDefBuilder.addField(enumsField);
         } else {
             enumsField = null;
+        }
+
+        FieldDef typeArgumentsField = buildTypeArgumentsField(thisType, loadClassValueExpressionFn);
+        if (typeArgumentsField != null) {
+            classDefBuilder.addField(typeArgumentsField);
         }
 
         int indexesIndex = 0;
@@ -747,12 +1033,22 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
                     if (enumsField != null) {
                         values.add(introspectionTypeDef.getStaticField(enumsField));
-                        return aThis.superRef().invokeConstructor(ENUM_INTROSPECTION_SUPER_CONSTRUCTOR, values);
+                        java.lang.reflect.Constructor<?> enumIntrospectionSuperConstructor = enumValueOfMethod.isPresent()
+                            ? ENUM_INTROSPECTION_OBJECT_SUPER_CONSTRUCTOR
+                            : ENUM_INTROSPECTION_SUPER_CONSTRUCTOR;
+                        return aThis.superRef().invokeSuperConstructor(enumIntrospectionSuperConstructor, values);
+                    } else if (beanConstructorsField != null) {
+                        values.add(introspectionTypeDef.getStaticField(beanConstructorsField));
+                        return aThis.superRef().invokeSuperConstructor(INTROSPECTION_SUPER_CONSTRUCTOR_WITH_CONSTRUCTORS, values);
                     } else {
-                        return aThis.superRef().invokeConstructor(INTROSPECTION_SUPER_CONSTRUCTOR, values);
+                        return aThis.superRef().invokeSuperConstructor(INTROSPECTION_SUPER_CONSTRUCTOR, values);
                     }
                 })
         );
+
+        if (!orderedDeclaredConstructors.isEmpty()) {
+            classDefBuilder.addMethod(getInstantiateConstructorMethod(orderedDeclaredConstructors));
+        }
 
         MethodDef dispatchOneMethod = dispatchWriter.buildDispatchOneMethod();
         if (dispatchOneMethod != null) {
@@ -788,6 +1084,13 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 getBooleanMethod(HAS_CONSTRUCTOR_METHOD, true)
             );
         }
+        MethodElement instantiatingConstructor = constructor != null ? constructor : defaultConstructor;
+        if (beanClassElement.isEnum() || (instantiatingConstructor != null && instantiatingConstructor.isStatic())) {
+            // an enum valueOf or a static @Creator: the bean is not created through a constructor of its type
+            classDefBuilder.addMethod(
+                getBooleanMethod(IS_STATIC_CREATOR_METHOD, true)
+            );
+        }
         if (defaultConstructor != null) {
             classDefBuilder.addMethod(
                 getInstantiateMethod(defaultConstructor, INSTANTIATE_METHOD)
@@ -810,9 +1113,10 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                         getInstantiateMethod(constructor, INSTANTIATE_METHOD)
                     );
                 } else {
-                    boolean kotlinAllDefault = Arrays.stream(constructor.getParameters())
-                        .allMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
-                    if (kotlinAllDefault) {
+                    boolean allParametersHaveDefaults = MethodGenUtils.hasAllDefaultsParameters(
+                        Arrays.asList(constructor.getParameters())
+                    );
+                    if (allParametersHaveDefaults) {
                         classDefBuilder.addMethod(
                             getInstantiateMethod(constructor, INSTANTIATE_METHOD)
                         );
@@ -834,9 +1138,53 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             getBooleanMethod(HAS_BUILDER_METHOD, hasBuilder)
         );
 
+        if (typeArgumentsField != null) {
+            classDefBuilder.addMethod(
+                MethodDef.override(GET_TYPE_ARGUMENTS_MAP_METHOD)
+                    .build((aThis, methodParameters) -> thisType.getStaticField(typeArgumentsField).returning())
+            );
+        }
+
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         return classDefBuilder.build();
+    }
+
+    /**
+     * Builds the field holding the type arguments the bean binds in each of its super types, mirroring what
+     * {@code BeanDefinitionWriter} writes for a bean definition. Super types that bind nothing are left out; the
+     * accessor answers an empty list for a name it does not hold, so the result is the same and the metadata smaller.
+     *
+     * @param thisType                   The introspection type
+     * @param loadClassValueExpressionFn The load type expression fn
+     * @return The field, or {@code null} if the bean binds no type argument anywhere in its hierarchy
+     */
+    @Nullable
+    private FieldDef buildTypeArgumentsField(ClassTypeDef thisType, Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        Map<String, Map<String, ClassElement>> allTypeArguments = beanClassElement.getAllTypeArguments();
+        Map<String, Map<String, ClassElement>> typeArguments = new LinkedHashMap<>(allTypeArguments.size());
+        for (Map.Entry<String, Map<String, ClassElement>> entry : allTypeArguments.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                typeArguments.put(entry.getKey(), entry.getValue());
+            }
+        }
+        if (typeArguments.isEmpty()) {
+            return null;
+        }
+        return FieldDef.builder(FIELD_TYPE_ARGUMENTS, Map.class)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+            .initializer(
+                GenUtils.stringMapOf(
+                    typeArguments, true, null, types -> ArgumentExpUtils.pushTypeArgumentElements(
+                        annotationMetadata,
+                        thisType,
+                        ClassElement.of(introspectionName),
+                        types,
+                        loadClassValueExpressionFn
+                    )
+                )
+            )
+            .build();
     }
 
     private void addPrimitiveDispatchMethods(ClassDef.ClassDefBuilder classDefBuilder) {
@@ -965,6 +1313,126 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         throw new IllegalStateException("Property not found: " + propertyName + " " + beanClassElement.getName());
     }
 
+    /**
+     * Orders the visited declared constructors so that the constructor described by
+     * {@link BeanIntrospection#getConstructor()} comes first, per the contract of
+     * {@link BeanIntrospection#getConstructors()}.
+     */
+    private List<MethodElement> getOrderedDeclaredConstructors() {
+        if (declaredConstructors.isEmpty()) {
+            return List.of();
+        }
+        List<MethodElement> ordered = new ArrayList<>(declaredConstructors);
+        MethodElement instantiatingConstructor = constructor != null ? constructor : defaultConstructor;
+        if (instantiatingConstructor != null) {
+            MethodElement match = instantiatingConstructor instanceof ConstructorElement
+                ? ordered.stream().filter(candidate -> isSameConstructor(candidate, instantiatingConstructor)).findFirst().orElse(null)
+                : null;
+            if (match != null) {
+                ordered.remove(match);
+                ordered.add(0, match);
+            } else {
+                // a static creator, or a constructor that was not visited as a declared one
+                ordered.add(0, instantiatingConstructor);
+            }
+        }
+        return ordered.stream().map(BeanIntrospectionWriter::withEnclosingInstanceParameter).toList();
+    }
+
+    /**
+     * The constructor of a non-static inner class takes the enclosing instance as an implicit first
+     * parameter. {@link java.lang.reflect.Constructor#getParameterTypes()} reports it, the source level
+     * view of the element does not. Describe it, so that a described constructor lines up with its
+     * reflective counterpart and can be instantiated through
+     * {@link io.micronaut.core.beans.BeanConstructor#instantiate(Object...)}.
+     *
+     * @param constructor The declared constructor
+     * @return The constructor, with the enclosing instance parameter prepended if one is implied
+     */
+    private static MethodElement withEnclosingInstanceParameter(MethodElement constructor) {
+        if (!(constructor instanceof ConstructorElement)) {
+            // a static creator takes no enclosing instance
+            return constructor;
+        }
+        ClassElement declaringType = constructor.getDeclaringType();
+        if (!declaringType.isInner() || declaringType.isStatic()) {
+            return constructor;
+        }
+        ClassElement enclosingType = declaringType.getEnclosingType().orElse(null);
+        if (enclosingType == null) {
+            return constructor;
+        }
+        return constructor.withParameters(ArrayUtils.concat(
+            new ParameterElement[]{ParameterElement.of(enclosingType, ENCLOSING_INSTANCE_PARAMETER_NAME)},
+            constructor.getParameters()
+        ));
+    }
+
+    private static boolean isSameConstructor(MethodElement a, MethodElement b) {
+        if (a == b) {
+            return true;
+        }
+        ParameterElement[] parameters1 = a.getParameters();
+        ParameterElement[] parameters2 = b.getParameters();
+        if (parameters1.length != parameters2.length) {
+            return false;
+        }
+        for (int i = 0; i < parameters1.length; i++) {
+            if (!parameters1[i].getType().getName().equals(parameters2[i].getType().getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private ExpressionDef newBeanConstructorRef(MethodElement declaredConstructor,
+                                                int constructorIndex,
+                                                Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanConstructorRef.class)
+            .instantiate(
+                BEAN_CONSTRUCTOR_REF_CONSTRUCTOR,
+
+                // 1: annotation metadata
+                getAnnotationMetadataExpression(declaredConstructor.getAnnotationMetadata(), loadClassValueExpressionFn),
+                // 2: arguments
+                ArrayUtils.isEmpty(declaredConstructor.getParameters()) ? ExpressionDef.nullValue() : ArgumentExpUtils.pushBuildArgumentsForMethod(
+                    annotationMetadata,
+                    declaredConstructor.getOwningType(),
+                    introspectionTypeDef,
+                    Arrays.asList(declaredConstructor.getParameters()),
+                    loadClassValueExpressionFn
+                ),
+                // 3: instantiate dispatch index
+                ExpressionDef.constant(constructorIndex),
+                // 4: a constructor of the bean type, or a static creator method
+                ExpressionDef.constant(!declaredConstructor.isStatic())
+            );
+    }
+
+    private MethodDef getInstantiateConstructorMethod(List<MethodElement> orderedDeclaredConstructors) {
+        return MethodDef.override(INSTANTIATE_CONSTRUCTOR_INTERNAL_METHOD)
+            .build((aThis, methodParameters) -> {
+                Map<ExpressionDef.Constant, StatementDef> switchCases = new LinkedHashMap<>();
+                for (int i = 0; i < orderedDeclaredConstructors.size(); i++) {
+                    MethodElement declaredConstructor = orderedDeclaredConstructors.get(i);
+                    List<StatementDef> statements = new ArrayList<>();
+                    List<ExpressionDef> values = IntStream.range(0, declaredConstructor.getParameters().length)
+                        .<ExpressionDef>mapToObj(index -> methodParameters.get(1).arrayElement(index))
+                        .toList();
+                    statements.add(
+                        MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), declaredConstructor, true, values, statements)
+                            .returning()
+                    );
+                    switchCases.put(ExpressionDef.constant(i), StatementDef.multi(statements));
+                }
+                return methodParameters.get(0).asStatementSwitch(
+                    TypeDef.OBJECT,
+                    switchCases,
+                    aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX_METHOD, methodParameters.get(0)).doThrow()
+                );
+            });
+    }
+
     private MethodDef getInstantiateMethod(MethodElement constructor, Method method) {
         return MethodDef.override(method)
             .build((aThis, methodParameters) -> {
@@ -1007,12 +1475,44 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     }
 
     private static String computeShortIntrospectionName(String packageName, String className) {
-        final String shortName = NameUtils.getSimpleName(className);
-        return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
+        return computeIntrospectionName(packageName, NameUtils.getSimpleName(className), className);
     }
 
     private static String computeIntrospectionName(String packageName, String className) {
-        return packageName + ".$" + className.replace('.', '_') + INTROSPECTION_SUFFIX;
+        return computeIntrospectionName(packageName, className.replace('.', '_'), className);
+    }
+
+    /**
+     * Computes the name of the generated introspection, shortening it if it would be too long to
+     * be used as a file name.
+     *
+     * <p>The name is written to the file system twice: as {@code <name>.class} and, more
+     * importantly, as the file name of the
+     * {@code META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/<name>} service
+     * descriptor, where the whole name including the package is a single path segment. Most file
+     * systems reject a path segment longer than 255 bytes, which an introspection generated on
+     * behalf of another element exceeds as soon as the package is deeply nested, because such a
+     * name repeats the fully qualified class name after the package.</p>
+     *
+     * @param packageName The package the introspection is generated into
+     * @param simpleName  The name of the introspection within that package, without the marker or suffix
+     * @param className   The introspected type, used to keep a shortened name unique
+     * @return The introspection name
+     */
+    private static String computeIntrospectionName(String packageName, String simpleName, String className) {
+        String introspectionName = packageName + ".$" + simpleName + INTROSPECTION_SUFFIX;
+        if (introspectionName.length() <= MAX_INTROSPECTION_NAME_LENGTH) {
+            return introspectionName;
+        }
+        // Keep the tail of the name, which carries the simple name of the introspected type, and
+        // make it unique again with a stable hash of the type the introspection is generated for
+        String hash = "_" + Integer.toHexString(className.hashCode());
+        int available = MAX_INTROSPECTION_NAME_LENGTH - packageName.length() - 2 - hash.length() - INTROSPECTION_SUFFIX.length();
+        if (available < 1) {
+            // the package alone is already too long, nothing but the hash can be kept
+            return packageName + ".$" + hash.substring(1) + INTROSPECTION_SUFFIX;
+        }
+        return packageName + ".$" + simpleName.substring(simpleName.length() - available) + hash + INTROSPECTION_SUFFIX;
     }
 
     /**
@@ -1032,6 +1532,17 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      */
     void visitDefaultConstructor(MethodElement constructor) {
         this.defaultConstructor = constructor;
+        processConstructorEvaluatedMetadata(constructor);
+    }
+
+    /**
+     * Visit a declared constructor that should be described by the introspection and exposed via
+     * {@link BeanIntrospection#getConstructors()}.
+     *
+     * @param constructor The constructor
+     */
+    void visitDeclaredConstructor(MethodElement constructor) {
+        declaredConstructors.add(constructor);
         processConstructorEvaluatedMetadata(constructor);
     }
 
@@ -1346,6 +1857,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      * @param setDispatchIndex
      * @param withMethodDispatchIndex
      * @param isReadOnly
+     * @param members
      */
     private record BeanPropertyData(String name,
                                     ClassElement type,
@@ -1354,7 +1866,35 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                                     int getDispatchIndex,
                                     int setDispatchIndex,
                                     int withMethodDispatchIndex,
-                                    boolean isReadOnly) {
+                                    boolean isReadOnly,
+                                    List<BeanPropertyMemberData> members) {
+    }
+
+    /**
+     * A member of a property to be included in the introspection.
+     *
+     * @param member   The field, read method or write method, of the bean type or of a super type declaring it
+     * @param accessor The member of the bean type the value of the member is read through: the field, the
+     *                 read method the bean type declares or inherits, which overrides the read method of a
+     *                 super type, or the write method; {@code null} for a field hidden by the field of the
+     *                 property, which is read through the class declaring it
+     * @param type     The type of the member carrying the member's own annotation metadata
+     */
+    record PropertyMemberDef(MemberElement member, @Nullable MemberElement accessor, ClassElement type) {
+    }
+
+    /**
+     * @param elementType       The kind of the member
+     * @param declaringType     The type declaring the member
+     * @param name              The name of the member
+     * @param type              The type of the member carrying the member's own annotation metadata
+     * @param readDispatchIndex The dispatch index to read the member, or -1
+     */
+    private record BeanPropertyMemberData(ElementType elementType,
+                                          ClassElement declaringType,
+                                          String name,
+                                          ClassElement type,
+                                          int readDispatchIndex) {
     }
 
     /**

@@ -37,5 +37,5 @@ public record PythonAsyncioConfiguration(
     /**
      * Property used to enable or disable Python asyncio support.
      */
-    public static final String ENABLED = PREFIX + ".enabled";
+    public static final String ENABLED_PROPERTY = PREFIX + ".enabled";
 }

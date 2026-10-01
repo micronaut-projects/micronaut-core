@@ -19,6 +19,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 @MicronautTest
+@Property(name = "micronaut.server.error-response-include-message", value = "always")
 @Property(name = "micronaut.propagation", value = "scoped-value")
 class ScopedValueCoroutineFailureTest {
 

@@ -14,6 +14,7 @@ import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
+import io.micronaut.websocket.annotation.OnOpen
 import io.micronaut.websocket.annotation.ServerWebSocket
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultHttpHeaders
@@ -24,6 +25,8 @@ import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame
+import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory
 import io.netty.handler.codec.http.websocketx.WebSocketFrame
@@ -41,6 +44,53 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class WebSocketSpec extends Specification {
+    def 'oversized fragmented message closes connection without onClose handler'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'spec.name': 'WebSocketPayloadLimitSpec',
+        ])
+        def embeddedServer = (NettyHttpServer) ctx.getBean(EmbeddedServer)
+        def serverEmbeddedChannel = embeddedServer.buildEmbeddedChannel(false)
+        def clientEmbeddedChannel = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
+
+        def handshaker = WebSocketClientHandshakerFactory.newHandshaker(
+                URI.create('http://localhost/payload-limit'),
+                WebSocketVersion.V13,
+                null,
+                false,
+                new DefaultHttpHeaders()
+        )
+        clientEmbeddedChannel.pipeline()
+                .addLast(new HttpClientCodec())
+                .addLast(new HttpObjectAggregator(4096))
+
+        when:
+        handshaker.handshake(clientEmbeddedChannel)
+        EmbeddedTestUtil.advance(serverEmbeddedChannel, clientEmbeddedChannel)
+        def handshakeResponse = (FullHttpResponse) clientEmbeddedChannel.readInbound()
+        try {
+            handshaker.finishHandshake(clientEmbeddedChannel, handshakeResponse)
+        } finally {
+            handshakeResponse.release()
+        }
+        clientEmbeddedChannel.writeOutbound(new TextWebSocketFrame(false, 0, '123'))
+        clientEmbeddedChannel.writeOutbound(new ContinuationWebSocketFrame(true, 0, '456'))
+        EmbeddedTestUtil.advance(serverEmbeddedChannel, clientEmbeddedChannel)
+
+        then:
+        def closeFrame = (CloseWebSocketFrame) clientEmbeddedChannel.readInbound()
+        closeFrame.statusCode() == 1009
+        !ctx.getBean(PayloadLimitSocket).session.isOpen()
+        !serverEmbeddedChannel.isOpen()
+
+        cleanup:
+        closeFrame?.release()
+        clientEmbeddedChannel.finishAndReleaseAll()
+        serverEmbeddedChannel.finishAndReleaseAll()
+        ctx.close()
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7920')
     def 'race condition with channel close from http filter'() {
         given:
@@ -93,6 +143,21 @@ class WebSocketSpec extends Specification {
         @OnMessage
         def onMessage(String message, WebSocketSession session) {
             return session.send('reply: ' + message)
+        }
+    }
+
+    @ServerWebSocket('/payload-limit')
+    @Requires(property = 'spec.name', value = 'WebSocketPayloadLimitSpec')
+    static class PayloadLimitSocket {
+        WebSocketSession session
+
+        @OnOpen
+        void onOpen(WebSocketSession session) {
+            this.session = session
+        }
+
+        @OnMessage(maxPayloadLength = 4)
+        void onMessage(String message) {
         }
     }
 

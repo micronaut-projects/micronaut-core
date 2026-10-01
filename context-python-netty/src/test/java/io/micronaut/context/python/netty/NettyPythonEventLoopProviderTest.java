@@ -132,7 +132,7 @@ final class NettyPythonEventLoopProviderTest {
             }
         });
 
-        NettyServerCustomizer customizer = NettyPythonEventLoopServerCustomizer.binderCustomizer()
+        NettyServerCustomizer customizer = NettyPythonEventLoopServerCustomizer.binderCustomizer(provider)
             .specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         customizer.onStreamPipelineBuilt();
 

@@ -37,6 +37,16 @@ public interface ErrorContext {
     Optional<Throwable> getRootCause();
 
     /**
+     * Returns the exception message without adding it to the rendered errors.
+     *
+     * @return The optional exception message
+     * @since 5.1.11
+     */
+    default Optional<String> getExceptionMessage() {
+        return Optional.empty();
+    }
+
+    /**
      * @return The errors
      */
     List<Error> getErrors();
@@ -73,6 +83,17 @@ public interface ErrorContext {
          * @return This builder instance
          */
         ErrorContext.Builder cause(@Nullable Throwable cause);
+
+        /**
+         * Sets the exception message without adding it to the rendered errors.
+         *
+         * @param message The exception message
+         * @return This builder instance
+         * @since 5.1.11
+         */
+        default ErrorContext.Builder exceptionMessage(@Nullable String message) {
+            return this;
+        }
 
         /**
          * Adds an error to the context for the given message.

@@ -102,68 +102,7 @@ final class ConfigurationReaderBeanElementCreator<R> extends DeclaredBeanElement
                 throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
             }
         } else if (!propertyElement.isExcluded()) {
-
-            boolean claimed = false;
-            Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
-            if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.METHOD && writeMethod.isPresent()) {
-                MethodElement methodElement = writeMethod.get();
-                ParameterElement[] parameters = methodElement.getParameters();
-                if (parameters.length != 1) {
-                    throw new IllegalStateException("Setter method [" + methodElement.getName() + "] must have exactly one parameter");
-                }
-                ParameterElement parameter = methodElement.getParameters()[0];
-                AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
-                    propertyElement,
-                    parameter
-                ).merge();
-
-                // TODO: Avoid modifying the annotation metadata, simply generate the path and pass it to the create injection point method
-                annotationMetadata = calculatePath(propertyElement, methodElement, annotationMetadata);
-                AnnotationMetadata finalAnnotationMetadata = annotationMetadata;
-                methodElement = methodElement
-                    .withAnnotationMetadata(annotationMetadata)
-                    .withParameters(
-                        Arrays.stream(methodElement.getParameters())
-                            .map(p -> p == parameter ? parameter.withAnnotationMetadata(finalAnnotationMetadata) : p)
-                            .toArray(ParameterElement[]::new)
-                    );
-
-                boolean reflectionRequired = methodElement.isReflectionRequired(classElement);
-                BeanDefinitionInjectionPoint<ClassElement> injectionPoint = BeanInjectionUtils.createValueInjectionPoint(
-                    methodElement.getOwningType(),
-                    parameter.getGenericType(),
-                    annotationMetadata,
-                    reflectionRequired,
-                    parameter.getName(),
-                    visitorContext
-                );
-                try {
-                    beanDefinitionBuilder.addMethodInjection(
-                        new MethodDefinition<>(
-                            methodElement,
-                            annotationMetadata,
-                            List.of(injectionPoint),
-                            reflectionRequired,
-                            true,
-                            true,
-                            null)
-                    );
-                } catch (IllegalArgumentException e) {
-                    throw new ProcessingException(methodElement, e.getMessage(), e);
-                }
-                claimed = true;
-            } else if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.FIELD && field.isPresent()) {
-                FieldElement fieldElement = field.get();
-                AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(propertyElement.getAnnotationMetadata());
-                // TODO: Avoid modifying the annotation metadata, simply generate the path and pass it to the create injection point method
-                annotationMetadata = calculatePath(propertyElement, fieldElement, annotationMetadata);
-
-                fieldElement = fieldElement.withAnnotationMetadata(annotationMetadata);
-
-                beanDefinitionBuilder.addFieldPropertyInjection(fieldElement, annotationMetadata, fieldElement.isReflectionRequired(classElement), true, visitorContext);
-
-                claimed = true;
-            }
+            boolean claimed = visitPropertyValue(beanDefinitionBuilder, classElement, visitorContext, propertyElement);
             if (readMethod.isPresent()) {
                 MethodElement methodElement = readMethod.get();
                 if (methodElement.hasStereotype(Executable.class)) {
@@ -190,7 +129,52 @@ final class ConfigurationReaderBeanElementCreator<R> extends DeclaredBeanElement
         return super.visitField(beanDefinitionBuilder, fieldElement);
     }
 
-    private AnnotationMetadata calculatePath(PropertyElement propertyElement, MemberElement writeMember, AnnotationMetadata annotationMetadata) {
+    static <R> boolean visitPropertyValue(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder,
+                                          ClassElement classElement,
+                                          VisitorContext visitorContext,
+                                          PropertyElement propertyElement) {
+        Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
+        if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.METHOD && writeMethod.isPresent()) {
+            MethodElement methodElement = writeMethod.get();
+            ParameterElement[] parameters = methodElement.getParameters();
+            if (parameters.length != 1) {
+                throw new IllegalStateException("Setter method [" + methodElement.getName() + "] must have exactly one parameter");
+            }
+            ParameterElement parameter = parameters[0];
+            AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(propertyElement, parameter).merge();
+            annotationMetadata = calculatePath(propertyElement, methodElement, annotationMetadata, visitorContext);
+            AnnotationMetadata finalAnnotationMetadata = annotationMetadata;
+            methodElement = methodElement
+                .withAnnotationMetadata(annotationMetadata)
+                .withParameters(Arrays.stream(parameters)
+                    .map(p -> p == parameter ? parameter.withAnnotationMetadata(finalAnnotationMetadata) : p)
+                    .toArray(ParameterElement[]::new));
+            boolean reflectionRequired = methodElement.isReflectionRequired(classElement);
+            BeanDefinitionInjectionPoint<ClassElement> injectionPoint = BeanInjectionUtils.createValueInjectionPoint(
+                methodElement.getOwningType(), parameter.getGenericType(), annotationMetadata, reflectionRequired, parameter.getName(), visitorContext);
+            try {
+                beanDefinitionBuilder.addMethodInjection(new MethodDefinition<>(methodElement, annotationMetadata, List.of(injectionPoint), reflectionRequired, true, true, null));
+            } catch (IllegalArgumentException e) {
+                throw new ProcessingException(methodElement, e.getMessage(), e);
+            }
+            return true;
+        }
+        Optional<FieldElement> field = propertyElement.getField();
+        if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.FIELD && field.isPresent()) {
+            FieldElement fieldElement = field.get();
+            AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(propertyElement.getAnnotationMetadata());
+            annotationMetadata = calculatePath(propertyElement, fieldElement, annotationMetadata, visitorContext);
+            fieldElement = fieldElement.withAnnotationMetadata(annotationMetadata);
+            beanDefinitionBuilder.addFieldPropertyInjection(fieldElement, annotationMetadata, fieldElement.isReflectionRequired(classElement), true, visitorContext);
+            return true;
+        }
+        return false;
+    }
+
+    private static AnnotationMetadata calculatePath(PropertyElement propertyElement,
+                                                    MemberElement writeMember,
+                                                    AnnotationMetadata annotationMetadata,
+                                                    VisitorContext visitorContext) {
         String path = ConfigurationMetadataBuilder.calculatePath(
             writeMember.getOwningType(),
             writeMember.getDeclaringType(),

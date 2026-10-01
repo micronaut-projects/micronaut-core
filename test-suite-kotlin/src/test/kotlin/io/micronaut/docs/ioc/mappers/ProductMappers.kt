@@ -13,4 +13,4 @@ abstract class ProductMappers {
     fun getDistributor() : String = "Great Product Company"
 }
 
-// tag::class[]
+// end::class[]

@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.core.annotation.Retainable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -36,6 +37,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Repeatable(InterceptorBindingDefinitions.class)
+@Retainable
 public @interface InterceptorBinding {
 
     /**

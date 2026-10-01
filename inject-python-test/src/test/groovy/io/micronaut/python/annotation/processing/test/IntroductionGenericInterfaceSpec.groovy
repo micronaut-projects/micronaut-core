@@ -31,7 +31,7 @@ class ChatClient(ABC):
 '''
 
         expect:
-        def definition = buildBeanDefinition("python", "ChatClient\$RuntimeProxy", pythonCode)
+        def definition = buildBeanDefinition("python", "ChatClient\$Intercepted", pythonCode)
         definition != null
         definition.executableMethods*.methodName.contains("setWebSocketSession")
     }
@@ -210,7 +210,7 @@ class MyBean(MyInterface[SubPerson], ABC):
         def getPeople = definition.executableMethods.find { it.methodName == "get_people" }
         def save = definition.executableMethods.find { it.methodName == "save" }
         def saveAll = definition.executableMethods.find { it.methodName == "save_all" }
-        Value bean = getBean(context, "python.MyBean").asPolyglotValue()
+        def bean = getBean(context, "python.MyBean")
 
         then:
         !definition.isAbstract()
@@ -223,9 +223,9 @@ class MyBean(MyInterface[SubPerson], ABC):
         save.arguments[0].type.name == "python.SubPerson"
         saveAll.arguments[0].type == List
         saveAll.arguments[0].typeVariables["E"].type.name == "python.SubPerson"
-        bean.invokeMember("get_person").isNull()
-        bean.invokeMember("get_people").isNull()
-        bean.invokeMember("save", [null] as Object[]).isNull()
+        bean.get_person() == null
+        bean.get_people() == null
+        bean.save(null) == null
 
         cleanup:
         context?.close()
@@ -283,7 +283,7 @@ class MyBean(MyInterface, ABC):
         when:
         def context = buildContext(pythonCode)
         def definition = getBeanDefinition(context, "python.MyBean")
-        Value bean = getBean(context, "python.MyBean").asPolyglotValue()
+        def bean = getBean(context, "python.MyBean")
         def getPerson = definition.executableMethods.find { it.methodName == "get_person" }
         def getPeople = definition.executableMethods.find { it.methodName == "get_people" }
 
@@ -291,8 +291,8 @@ class MyBean(MyInterface, ABC):
         getPerson.returnType.type.name == "python.Person"
         getPeople.returnType.type == List
         getPeople.returnType.asArgument().typeVariables["E"].type.name == "python.Person"
-        bean.invokeMember("get_person").isNull()
-        bean.invokeMember("get_people").isNull()
+        bean.get_person() == null
+        bean.get_people() == null
 
         cleanup:
         context?.close()
@@ -608,11 +608,11 @@ class ProtocolCaller:
 
         when:
         def context = buildContext(pythonCode)
-        def repository = getBean(context, "python.MyPersonRepository").asPolyglotValue()
+        def repository = getBean(context, "python.MyPersonRepository")
         def caller = getBean(context, "python.ProtocolCaller").asPolyglotValue()
 
         then:
-        repository.invokeMember("findName", 1).asString() == "protocol-name"
+        repository.findName(1) == "protocol-name"
         caller.invokeMember("find_name").asString() == "protocol-name"
         caller.invokeMember("save_name").asString() == "Denis"
 
@@ -697,7 +697,7 @@ class GenreRepository(ReactorPageableRepository[Genre, int]):
 '''
 
         when:
-        def definition = buildBeanDefinition("python", "GenreRepository\$RuntimeProxy", pythonCode)
+        def definition = buildBeanDefinition("python", "GenreRepository\$Intercepted", pythonCode)
         def findAll = definition.executableMethods.findAll { it.methodName == "findAll" }
         def sortFindAll = findAll.find { it.arguments.length == 1 && it.arguments[0].type == Sort }
         def pageableFindAll = findAll.find { it.arguments.length == 1 && it.arguments[0].type == Pageable }

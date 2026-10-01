@@ -55,8 +55,12 @@ final class IntroductionInterfaceBeanElementCreator<R> extends AbstractBeanEleme
         List<MethodElement> nonAbstractMethods = methods.stream().filter(m -> !m.isAbstract()).toList();
         // Remove abstract methods overridden by non-abstract ones
         methods.removeIf(method -> method.isAbstract() && nonAbstractMethods.stream().anyMatch(nonAbstractMethod -> nonAbstractMethod.overrides(method)));
-        // Remove non-abstract methods without explicit around advice
-        methods.removeIf(method -> !method.isAbstract() && !InterceptedMethodUtil.hasDeclaredAroundAdvice(method.getAnnotationMetadata()));
+        // Remove non-abstract methods without around advice.
+        // The around advice can be declared by the method itself or, for the default methods, by the type
+        boolean typeDeclaresAroundAdvice = InterceptedMethodUtil.hasDeclaredAroundAdvice(classElement.getAnnotationMetadata());
+        methods.removeIf(method -> !method.isAbstract()
+            && !InterceptedMethodUtil.hasDeclaredAroundAdvice(method.getAnnotationMetadata())
+            && !(typeDeclaresAroundAdvice && isDefaultMethod(method)));
         Collections.reverse(methods); // reverse to process hierarchy starting from declared methods
         for (MethodElement methodElement : methods) {
             visitIntrospectedMethod(proxyBuilder, methodElement);
@@ -67,6 +71,18 @@ final class IntroductionInterfaceBeanElementCreator<R> extends AbstractBeanEleme
             handlePropertyMethod(proxyBuilder, methods, beanProperty.getWriteMethod().orElse(null));
         }
         return proxyBuilder.build();
+    }
+
+    /**
+     * Checks if the method is an interface default method.
+     * Only invoked for a non-abstract method of an interface, where a static and a private method
+     * are the only alternatives to a default method; an interface method can never be final.
+     *
+     * @param method The non-abstract method of the interface
+     * @return true if the method is a default method
+     */
+    private static boolean isDefaultMethod(MethodElement method) {
+        return !method.isStatic() && !method.isPrivate();
     }
 
     private void handlePropertyMethod(ElementProxyBuilder<R> proxyBuilder, List<MethodElement> methods, @Nullable MethodElement method) {

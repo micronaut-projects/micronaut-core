@@ -100,7 +100,14 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             @Override
             public boolean isUnique() {
                 try {
-                    return context.getBeanDefinitions(argument, finalQualifier).size() == 1;
+                    if (context instanceof DefaultBeanContext defaultBeanContext) {
+                        return defaultBeanContext.isUniqueBeanCandidate(argument, finalQualifier);
+                    }
+                    return context.getBeanDefinitions(argument, finalQualifier)
+                        .stream()
+                        .filter(candidate -> candidate.isCandidateBean(argument))
+                        .limit(2)
+                        .count() == 1;
                 } catch (NoSuchBeanException e) {
                     return false;
                 }

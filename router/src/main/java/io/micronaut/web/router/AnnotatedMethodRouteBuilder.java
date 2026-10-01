@@ -81,11 +81,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Set<String> uris = this.resolveUrisMapping(Get.class, method);
             for (String uri: uris) {
                 MediaType[] produces = resolveProduces(method);
-                UriRoute route = GET(resolveUri(bean, uri,
-                        method,
-                        uriNamingStrategy),
-                        bean,
-                        method).produces(produces);
+                String resolvedUri = resolveUri(bean, uri, method, uriNamingStrategy);
+                UriRoute route = GET(resolvedUri, bean, method).produces(produces);
 
                 if (definition.port > -1) {
                     route.exposedPort(definition.port);
@@ -94,11 +91,13 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                     LOG.debug("Created Route: {}", route);
                 }
                 if (method.booleanValue(Get.class, "headRoute").orElse(true)) {
-                    route = HEAD(resolveUri(bean, uri,
-                            method,
-                            uriNamingStrategy),
-                            bean,
-                            method).produces(produces);
+                    route = HEAD(resolvedUri, bean, method).produces(produces);
+                    // Flag the route as implicit so that, should it ever compete with a user-declared
+                    // @Head route for the same request, route resolution can prefer the explicit one
+                    // instead of failing with a DuplicateRouteException. See UriRouteInfo#isImplicitHead().
+                    if (route instanceof DefaultUriRoute defaultUriRoute) {
+                        defaultUriRoute.markImplicitHead();
+                    }
                     if (definition.port > -1) {
                         route.exposedPort(definition.port);
                     }

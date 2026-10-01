@@ -16,6 +16,8 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.python.netty.NettyPythonEventLoopProvider;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
@@ -24,7 +26,8 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.EventLoop;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -45,8 +48,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -90,14 +94,126 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoop.shutdownGracefully().syncUninterruptibly();
         }
     }
 
     @Test
+    void nettyBackedRuntimeRunsCoroutineStepsInThePropagatedContextOfTheCaller() throws Exception {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                async def run(reader):
+                    before = reader.element()
+                    loop = asyncio.get_running_loop()
+                    future = loop.create_future()
+                    loop.call_soon(future.set_result, None)
+                    await future
+                    after_callback = reader.element()
+                    await asyncio.sleep(0.001)
+                    after_sleep = reader.element()
+                    return before + "|" + after_callback + "|" + after_sleep
+                run
+                """).execute(new ElementReader());
+
+            CompletionStage stage = NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+                return PropagatedContext.getOrEmpty().plus(new TestElement("E1"))
+                    .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
+            });
+
+            assertEquals("E1|E1|E1", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    @Test
+    void nettyBackedRuntimeKeepsTheContextOfATaskResumedByAnotherTask() throws Exception {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            Value coroutines = context.eval(PYTHON, """
+                import asyncio
+                event = asyncio.Event()
+
+                async def waiter(reader):
+                    await event.wait()
+                    return "B=" + reader.element()
+
+                async def setter(reader):
+                    event.set()
+                    await asyncio.sleep(0)
+                    return "A=" + reader.element()
+
+                (waiter, setter)
+                """);
+            ElementReader reader = new ElementReader();
+
+            // B waits for the event under "B"; A sets it under "A": the callback resuming B is scheduled
+            // by A's step, and B must still run in its own context
+            CompletionStage<?> waiter = startUnder(eventLoop, "B", coroutines.getArrayElement(0).execute(reader));
+            CompletionStage<?> setter = startUnder(eventLoop, "A", coroutines.getArrayElement(1).execute(reader));
+
+            assertEquals("A=A", setter.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            assertEquals("B=B", waiter.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    @Test
+    void nettyBackedRuntimeKeepsTheContextOfACoroutineResumedByAnotherThread() throws Exception {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "reader", PythonCoercion.asyncMemberValue(target, new ElementReader()));
+            Value coroutine = context.eval(PYTHON, """
+                async def run(target):
+                    before = target.reader.element()
+                    delayed = await target.reader.delayed()
+                    after = target.reader.element()
+                    return before + "/" + delayed + "/" + after
+                run
+                """).execute(target);
+
+            // the awaited stage completes on a thread of its own, which has no context
+            CompletionStage<?> stage = startUnder(eventLoop, "E2", coroutine);
+
+            assertEquals("E2/d/E2", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    private static CompletionStage<?> startUnder(EventLoop eventLoop, String element, Value coroutine) {
+        return NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            return PropagatedContext.getOrEmpty().plus(new TestElement(element))
+                .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
+        });
+    }
+
+    @Test
     void nettyBackedRuntimeRunsCreateDatagramEndpoint() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
@@ -143,14 +259,16 @@ final class NettyPythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             executorService.shutdownNow();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
     @Test
     void nettyBackedRuntimeRunsCreateConnectionAndCreateServer() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
@@ -197,14 +315,247 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
+        }
+    }
+
+    @Test
+    void nettyBackedRuntimeConnectsOverIpv6() throws Exception {
+        assumeTrue(ipv6Loopback(), "IPv6 loopback is not available");
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        EventLoop eventLoop = eventLoopGroup.next();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import socket
+                class Echo(asyncio.Protocol):
+                    def connection_made(self, transport):
+                        self.transport = transport
+                    def data_received(self, data):
+                        self.transport.write(b"echo:" + data)
+                        self.transport.close()
+                class Client(asyncio.Protocol):
+                    def __init__(self, done):
+                        self.done = done
+                    def connection_made(self, transport):
+                        self.peer = transport.get_extra_info("peername")
+                        transport.write(b"ok")
+                    def data_received(self, data):
+                        self.done.set_result(data.decode() + " via " + self.peer[0])
+                    def connection_lost(self, exc):
+                        pass
+                async def run():
+                    loop = asyncio.get_running_loop()
+                    # family=AF_INET6 and an IPv6 literal used to fall off the Netty path onto polled sockets
+                    server = await loop.create_server(Echo, "::1", 0, family=socket.AF_INET6)
+                    host, port, *_ = server.sockets[0].getsockname()
+                    done = loop.create_future()
+                    transport, _ = await loop.create_connection(lambda: Client(done), host, port, family=socket.AF_INET6)
+                    assert transport.get_extra_info("micronaut.netty") is True
+                    try:
+                        return await done
+                    finally:
+                        transport.close()
+                        server.close()
+                        await server.wait_closed()
+                run()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            String result = (String) stage.toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertTrue(result.startsWith("echo:ok via "), result);
+            assertTrue(result.contains(":"), "expected an IPv6 peer address: " + result);
+            return null;
+            });
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    @Test
+    void nettyBackedRuntimeRunsDatagramsOverIpv6() throws Exception {
+        assumeTrue(ipv6Loopback(), "IPv6 loopback is not available");
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        EventLoop eventLoop = eventLoopGroup.next();
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        PythonAsyncioRuntime.setExecutorService(executorService);
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import socket
+                class Server(asyncio.DatagramProtocol):
+                    def connection_made(self, transport):
+                        self.transport = transport
+                    def datagram_received(self, data, addr):
+                        self.transport.sendto(b"echo:" + data, addr)
+                class Client(asyncio.DatagramProtocol):
+                    def __init__(self, done, peer):
+                        self.done = done
+                        self.peer = peer
+                    def connection_made(self, transport):
+                        # asyncio's four-element IPv6 tuple (host, port, flowinfo, scope_id) is accepted
+                        assert len(self.peer) == 4, self.peer
+                        transport.sendto(b"ok", tuple(self.peer))
+                    def datagram_received(self, data, addr):
+                        self.done.set_result(data.decode())
+                async def run():
+                    loop = asyncio.get_running_loop()
+                    server_transport, _ = await loop.create_datagram_endpoint(Server, local_addr=("::1", 0), family=socket.AF_INET6)
+                    sockname = server_transport.get_extra_info("sockname")
+                    host, port, *_ = sockname
+                    done = loop.create_future()
+                    client_transport, _ = await loop.create_datagram_endpoint(lambda: Client(done, sockname), remote_addr=(host, port), family=socket.AF_INET6)
+                    try:
+                        return await done
+                    finally:
+                        client_transport.close()
+                        server_transport.close()
+                run()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            assertEquals("echo:ok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
+        } finally {
+            PythonAsyncioRuntime.setExecutorService(null);
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            executorService.shutdownNow();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    @Test
+    void pythonSocketsCannotBeAdoptedByTheNettyLoop() throws Exception {
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        EventLoop eventLoop = eventLoopGroup.next();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import socket
+                async def run():
+                    loop = asyncio.get_running_loop()
+                    with socket.socket() as sock:
+                        try:
+                            await loop.connect_accepted_socket(asyncio.Protocol, sock)
+                        except NotImplementedError as exc:
+                            return str(exc)
+                run()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            String message = (String) stage.toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertTrue(message.contains("connect_accepted_socket with a Python socket"), message);
+            return null;
+            });
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    @Test
+    void aChannelAcceptedOnAnotherEventLoopCannotBeAdopted() throws Exception {
+        MultiThreadIoEventLoopGroup acceptingGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        MultiThreadIoEventLoopGroup otherGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        CompletableFuture<Channel> acceptedChannel = new CompletableFuture<>();
+        Channel[] channels = new Channel[2];
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            channels[0] = new ServerBootstrap()
+                .group(acceptingGroup.next())
+                .channel(NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel channel) {
+                        acceptedChannel.complete(channel);
+                    }
+                })
+                .bind("127.0.0.1", 0)
+                .syncUninterruptibly()
+                .channel();
+            channels[1] = new Bootstrap()
+                .group(acceptingGroup.next())
+                .channel(NioSocketChannel.class)
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel channel) {
+                        // no handlers: the channel only has to exist on the other event loop
+                    }
+                })
+                .connect((InetSocketAddress) channels[0].localAddress())
+                .syncUninterruptibly()
+                .channel();
+            Channel accepted = acceptedChannel.get(5, TimeUnit.SECONDS);
+            // adopted from a loop that did not accept it: refused, not re-piped from the wrong loop
+            String outcome = NettyPythonEventLoopProvider.bind(otherGroup.next(), () -> {
+                Value coroutine = context.eval(PYTHON, """
+                    import asyncio
+                    class Proto(asyncio.Protocol):
+                        pass
+                    async def run(channel):
+                        try:
+                            await asyncio.get_running_loop().connect_accepted_socket(Proto, channel)
+                            return "adopted"
+                        except Exception as e:
+                            return "refused" if "another event loop" in str(e) else repr(e)
+                    run
+                    """).execute(accepted);
+                return (String) PythonAsyncioRuntime.toCompletionStage(coroutine).toCompletableFuture().get(5, TimeUnit.SECONDS);
+            });
+            assertEquals("refused", outcome);
+            assertTrue(accepted.isOpen(), "the refused channel was closed by the wrong loop");
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            for (Channel channel : channels) {
+                if (channel != null) {
+                    channel.close();
+                }
+            }
+            acceptingGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            otherGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    private static boolean ipv6Loopback() {
+        try (java.net.ServerSocket probe = new java.net.ServerSocket()) {
+            probe.bind(new InetSocketAddress(InetAddress.getByName("::1"), 0));
+            return true;
+        } catch (java.io.IOException e) {
+            return false;
         }
     }
 
     @Test
     void rejectsPythonSslContextObjectsBeforeConnecting() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
@@ -226,20 +577,23 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
     @Test
     void gracefulShutdownClosesTrackedNettyServers() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         NettyPythonEventLoopProvider provider = new NettyPythonEventLoopProvider();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(provider));
         try {
-            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            // bound through the provider: its shutdown closes the channels opened under it
+            provider.call(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 class Hold(asyncio.Protocol):
@@ -262,14 +616,16 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
     @Test
     void nettyBackedRuntimeRunsConnectAcceptedSocket() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         CompletableFuture<Channel> acceptedChannel = new CompletableFuture<>();
@@ -297,6 +653,7 @@ final class NettyPythonAsyncioRuntimeTest {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel channel) {
+                        // no handlers: the channel only has to exist on the other event loop
                     }
                 })
                 .connect((InetSocketAddress) serverChannel[0].localAddress())
@@ -340,14 +697,16 @@ final class NettyPythonAsyncioRuntimeTest {
             close(clientChannel[0]);
             close(accepted[0]);
             close(serverChannel[0]);
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
     @Test
     void nettyBackedRuntimeRunsStreamServerAndClient() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
@@ -387,14 +746,16 @@ final class NettyPythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             executorService.shutdownNow();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
     @Test
     void nettyBackedRuntimeRunsTlsStreamServerAndClient() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
@@ -443,14 +804,16 @@ final class NettyPythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             executorService.shutdownNow();
             certificate.delete();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
     @Test
     void nettyBackedRuntimeRunsUnixServerAndClient() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         Path socketPath = Files.createTempDirectory("mn-python-netty").resolve("asyncio.sock");
@@ -497,8 +860,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
             Files.deleteIfExists(socketPath);
             Files.deleteIfExists(socketPath.getParent());
         }
@@ -507,6 +872,28 @@ final class NettyPythonAsyncioRuntimeTest {
     private static void close(Channel channel) {
         if (channel != null && channel.isOpen()) {
             channel.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+        }
+    }
+
+    /**
+     * A propagated context element the coroutine steps read.
+     *
+     * @param name The element name
+     */
+    public record TestElement(String name) implements PropagatedContextElement {
+    }
+
+    /**
+     * Reads the element of the propagated context of the calling thread.
+     */
+    public static final class ElementReader {
+
+        public String element() {
+            return PropagatedContext.getOrEmpty().find(TestElement.class).map(TestElement::name).orElse("none");
+        }
+
+        public CompletionStage<String> delayed() {
+            return CompletableFuture.supplyAsync(() -> "d", CompletableFuture.delayedExecutor(20, TimeUnit.MILLISECONDS));
         }
     }
 }

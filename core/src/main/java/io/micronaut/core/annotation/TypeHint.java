@@ -81,6 +81,10 @@ public @interface TypeHint {
         ALL_PUBLIC_FIELDS,
         /**
          * The type is a dynamic proxy.
+         *
+         * <p>For an annotation type this additionally registers the proxy that
+         * {@link AnnotationMetadata#synthesize(Class)} creates, which implements both the annotation
+         * type and {@link AnnotationValueProvider}.</p>
          */
         DYNAMIC_PROXY
     }

@@ -16,8 +16,10 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.junit.jupiter.api.Test;
@@ -26,10 +28,14 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GraalPyContextFactoryTest {
@@ -59,13 +65,208 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
-    void contextOptionsCanBeConfiguredFromMicronautProperties() {
-        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
-            "graalpy.context.options", Map.of("log.level", "FINE")
-        ))) {
-            GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
-            assertTrue(config.getOptions().containsKey("log.level"));
+    void inheritsVirtualEnvIntoGuestPython() throws IOException {
+        String virtualEnv = System.getenv("VIRTUAL_ENV");
+        assumeTrue(virtualEnv != null && !virtualEnv.isBlank());
+
+        PythonContextRuntime.setReuseContext(false);
+        PythonContextRuntime.resetContext();
+        try (Context context = GraalPyContextFactory.bootstrapReusableContext(getClass().getClassLoader())) {
+            assertEquals(virtualEnv, context.eval(PYTHON, "import os; os.environ.get('VIRTUAL_ENV')").asString());
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+            PythonContextRuntime.resetContext();
         }
+    }
+
+    @Test
+    void aReusableContextSharesItsEngineWithTheApplication() throws IOException {
+        PythonContextRuntime.setReuseContext(false);
+        PythonContextRuntime.resetContext();
+        try (Context context = GraalPyContextFactory.bootstrapReusableContext(getClass().getClassLoader())) {
+            try (ApplicationContext applicationContext = ApplicationContext.run(Map.of("micronaut.python.pool.enabled", true, "micronaut.python.pool.size", 1))) {
+                assertSame(context.getEngine(), applicationContext.getBean(Engine.class), "the pool must compile against the bootstrap engine");
+                assertSame(context, applicationContext.getBean(Context.class));
+                Integer pooledSum = applicationContext.getBean(PythonContextExecutor.class).withContext(pooled -> pooled.eval(PYTHON, "1 + 2").asInt());
+                assertEquals(3, pooledSum);
+            }
+            assertEquals(4, context.eval(PYTHON, "2 + 2").asInt(), "closing the application must not close the shared engine");
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+            PythonContextRuntime.resetContext();
+        }
+    }
+
+    @Test
+    void hostClassLookupIsUnrestrictedByDefault() {
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            Context context = applicationContext.getBean(Context.class);
+            assertTrue(applicationContext.getBean(GraalPyContextConfiguration.class).getHostClassLookup().isEmpty());
+            // a class outside the JDK, Jakarta and framework packages: visible without configuration
+            assertTrue(context.eval(PYTHON, "import java\njava.type('org.slf4j.LoggerFactory')").isMetaObject());
+            assertTrue(context.eval(PYTHON, "java.type('org.graalvm.polyglot.Value')").isMetaObject());
+        }
+    }
+
+    @Test
+    void hostClassLookupCanBeRestrictedToPackages() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "graalpy.context.host-class-lookup", List.of("com.example", "org.slf4j.Logger")
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            assertEquals(List.of("com.example", "org.slf4j.Logger"), applicationContext.getBean(GraalPyContextConfiguration.class).getHostClassLookup());
+            assertTrue(context.eval(PYTHON, "import java\njava.type('java.util.ArrayList')()").hasArrayElements());
+            assertEquals("a", context.eval(PYTHON, "java.type('io.micronaut.core.util.StringUtils').trimToNull(' a ')").asString());
+            assertTrue(context.eval(PYTHON, "java.type('org.slf4j.Logger')").isMetaObject(), "a class named exactly is visible");
+            PolyglotException blocked = assertThrows(PolyglotException.class,
+                () -> context.eval(PYTHON, "java.type('org.slf4j.LoggerFactory')"));
+            assertTrue(blocked.getMessage().contains("org.slf4j.LoggerFactory"), blocked.getMessage());
+        }
+    }
+
+    @Test
+    void javaObjectsAnswerToKeywordSafeMemberAliases() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1,
+            // the registration needs java.lang.Object even when host class lookup is narrowed
+            "graalpy.context.host-class-lookup", List.of("io.micronaut.context.python")
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            context.getBindings(PYTHON).putMember("factory", new KeywordFactory());
+            // a builder returned from Java, never seen by the compiler
+            assertEquals("from=x@y", context.eval(PYTHON, "factory.builder().from_('x@y').build()").asString());
+            assertEquals("a&b", context.eval(PYTHON, "factory.spec('a').and_(factory.spec('b')).is_()").asString());
+            assertEquals("from=null", context.eval(PYTHON, "factory.builder().build()").asString(), "regular members are untouched");
+            assertTrue(context.eval(PYTHON, "b = factory.builder(); hasattr(b, 'from_') and hasattr(b, 'from') and not hasattr(b, 'nope_')").asBoolean());
+            assertEquals("from=explicit", context.eval(PYTHON, "getattr(factory.builder(), 'from')('explicit').build()").asString(), "the explicit spelling keeps working");
+            assertEquals("really from_", context.eval(PYTHON, "factory.literal().from_").asString(), "a member really called from_ wins");
+            assertEquals("really from", context.eval(PYTHON, "getattr(factory.literal(), 'from')").asString());
+            PolyglotException missing = assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "factory.builder().missing_()"));
+            assertTrue(missing.getMessage().contains("foreign object has no attribute 'missing_'"), missing.getMessage());
+            PolyglotException missingKeyword = assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "factory.spec('a').while_()"));
+            assertTrue(missingKeyword.getMessage().contains("foreign object has no attribute 'while_'"), "the alias the caller used is reported: " + missingKeyword.getMessage());
+
+            // pooled contexts are bootstrapped the same way
+            String pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> {
+                pooledContext.getBindings(PYTHON).putMember("factory", new KeywordFactory());
+                return pooledContext.eval(PYTHON, "factory.spec('p').or_(factory.spec('q')).is_()").asString();
+            });
+            assertEquals("p|q", pooled);
+        }
+    }
+
+    public static final class KeywordFactory {
+        public KeywordBuilder builder() {
+            return new KeywordBuilder();
+        }
+
+        public KeywordSpec spec(String name) {
+            return new KeywordSpec(name);
+        }
+
+        public KeywordLiteral literal() {
+            return new KeywordLiteral();
+        }
+    }
+
+    public static final class KeywordLiteral {
+        public final String from = "really from";
+        // Deliberately keeps the keyword-suffixed name to verify that a real member wins over the alias.
+        @SuppressWarnings("java:S116")
+        public final String from_ = "really from_";
+    }
+
+    public static final class KeywordBuilder {
+        private String from;
+
+        public KeywordBuilder from(String from) {
+            this.from = from;
+            return this;
+        }
+
+        public String build() {
+            return "from=" + from;
+        }
+    }
+
+    public record KeywordSpec(String name) {
+        public KeywordSpec and(KeywordSpec other) {
+            return new KeywordSpec(name + "&" + other.name);
+        }
+
+        public KeywordSpec or(KeywordSpec other) {
+            return new KeywordSpec(name + "|" + other.name);
+        }
+
+        public String is() {
+            return name;
+        }
+    }
+
+    @Test
+    void bootstrapContextOptionsOverrideTheInferredLogLevel() {
+        PythonContextRuntime.setReuseContext(false);
+        PythonContextRuntime.resetContext();
+        try {
+            PolyglotException exception = assertThrows(PolyglotException.class, () ->
+                GraalPyContextFactory.bootstrapReusableContext(
+                    getClass().getClassLoader(),
+                    Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, "INVALID")
+                )
+            );
+            assertTrue(exception.getMessage().contains("INVALID"), exception.getMessage());
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+            PythonContextRuntime.resetContext();
+        }
+    }
+
+    @Test
+    void explicitLogLevelWinsRegardlessOfConfigurationOrder() {
+        GraalPyContextConfiguration rootFirst = new GraalPyContextConfiguration();
+        rootFirst.configureRootLogLevel("WARN");
+        rootFirst.setOptions(Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE, rootFirst.polyglotLogLevel());
+
+        GraalPyContextConfiguration optionsFirst = new GraalPyContextConfiguration();
+        optionsFirst.setOptions(Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE));
+        optionsFirst.configureRootLogLevel("WARN");
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE, optionsFirst.polyglotLogLevel());
+    }
+
+    @Test
+    void contextLogLevelInheritsMicronautRootLevel() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            GraalPyContextConfiguration.ROOT_LOG_LEVEL_PROPERTY, "WARN"
+        ))) {
+            try {
+                GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
+                assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_WARNING, config.polyglotLogLevel());
+            } finally {
+                refreshLogging(applicationContext);
+            }
+        }
+    }
+
+    @Test
+    void contextLogLevelOptionOverridesMicronautRootLevel() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            GraalPyContextConfiguration.ROOT_LOG_LEVEL_PROPERTY, "WARN",
+            GraalPyContextConfiguration.PREFIX + ".options",
+            Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE)
+        ))) {
+            try {
+                GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
+                assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE, config.polyglotLogLevel());
+            } finally {
+                refreshLogging(applicationContext);
+            }
+        }
+    }
+
+    private static void refreshLogging(ApplicationContext applicationContext) {
+        applicationContext.getBeansOfType(LoggingSystem.class).forEach(LoggingSystem::refresh);
     }
 
     @Test

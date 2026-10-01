@@ -125,6 +125,14 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
     }
 
     @Override
+    public boolean hasExplicitUpperBound() {
+        // An unbounded wildcard is given Object as its only upper bound; the resolved type
+        // may still be the bound of the type parameter the wildcard stands for
+        return lowerBounds.isEmpty()
+            && !(upperBounds.size() == 1 && upperBounds.get(0).getName().equals("java.lang.Object"));
+    }
+
+    @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
         if (arrayDimensions != 0) {
             throw new UnsupportedOperationException("Can't create array of wildcard");

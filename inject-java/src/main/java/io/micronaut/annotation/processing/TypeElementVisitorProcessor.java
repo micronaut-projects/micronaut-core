@@ -51,6 +51,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.OutputStream;
@@ -244,6 +245,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        javaVisitorContext.newRound();
         if (loadedVisitors != null && !loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
@@ -253,6 +255,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             var elements = new LinkedHashSet<TypeElement>();
 
             for (TypeElement annotation : annotations) {
+                if (annotation.getKind() != ElementKind.ANNOTATION_TYPE) {
+                    // an annotation the compiler could not resolve arrives here as a plain class; asking
+                    // the round for its annotated elements would throw and mask the real compile error
+                    continue;
+                }
                 modelUtils.resolveTypeElements(
                     roundEnv.getElementsAnnotatedWith(annotation)
                 ).filter(notGroovyObject).forEach(elements::add);
@@ -290,11 +297,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 List<JavaClassElement> javaClassElements = elements.stream()
                     .map(typeElement -> elementFactory.newSourceClassElement(typeElement, elementAnnotationMetadataFactory))
                     .collect(Collectors.toCollection(() -> new ArrayList<>(elements.size())));
-                List<ClassElement> extraClasses = new ArrayList<>();
+                // Imported elements can be discovered more than once: by several importing types, or by a
+                // type that is itself already part of this round. Visiting the same class twice would
+                // generate the same metadata twice, so only the newly discovered ones are added.
+                var visitedClassNames = javaClassElements.stream()
+                    .map(ClassElement::getName)
+                    .collect(Collectors.toCollection(HashSet::new));
                 for (JavaClassElement javaClassElement : new ArrayList<>(javaClassElements)) {
                     try {
-                        extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
-                        javaClassElements.addAll((Collection) extraClasses);
+                        for (ClassElement importedElement : VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext)) {
+                            if (importedElement instanceof JavaClassElement importedClassElement && visitedClassNames.add(importedElement.getName())) {
+                                javaClassElements.add(importedClassElement);
+                            }
+                        }
                     } catch (PostponeToNextRoundException e) {
                         javaClassElements.remove(javaClassElement);
                         postponeElement(javaClassElement, e.getNativeErrorElement(), e);

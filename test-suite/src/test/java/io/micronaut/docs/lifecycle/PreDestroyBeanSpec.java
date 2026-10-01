@@ -28,10 +28,12 @@ class PreDestroyBeanSpec {
         ApplicationContext ctx = ApplicationContext.run();
         PreDestroyBean preDestroyBean = ctx.getBean(PreDestroyBean.class);
         Connection connection = ctx.getBean(Connection.class);
+        Cache cache = ctx.getBean(Cache.class);
         ctx.stop();
         // end::start[]
 
         assertTrue(preDestroyBean.stopped.get());
         assertTrue(connection.stopped.get());
+        assertTrue(cache.flushed.get());
     }
 }

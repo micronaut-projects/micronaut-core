@@ -16,6 +16,7 @@
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.jspecify.annotations.Nullable;
 import java.util.Objects;
@@ -75,12 +76,14 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
      * @param name the class name
      * @param instantiated Whether at runtime an instance should be instantiated
      */
+    @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     @Internal
     public AnnotationClassValue(String name, boolean instantiated) {
         ArgumentUtils.requireNonNull("name", name);
         this.name = name;
-        this.theClass = null;
+        // primitive types can never be resolved by name from the classpath, but they are always present
+        this.theClass = (Class<T>) ClassUtils.getPrimitiveType(name).orElse(null);
         this.instance = null;
         this.instantiated = instantiated;
     }

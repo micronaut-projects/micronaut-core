@@ -37,7 +37,7 @@ class UploadControllerSpec: StringSpec() {
             ))
             val response = flowable.blockFirst()
 
-            response.status() shouldBe HttpStatus.OK
+            response!!.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
         }
 
@@ -54,7 +54,7 @@ class UploadControllerSpec: StringSpec() {
             ))
             val response = flowable.blockFirst()
 
-            response.status() shouldBe HttpStatus.OK
+            response!!.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
         }
 
@@ -71,7 +71,7 @@ class UploadControllerSpec: StringSpec() {
             ))
             val response = flowable.blockFirst()
 
-            response.status() shouldBe HttpStatus.OK
+            response!!.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
         }
 
@@ -88,7 +88,7 @@ class UploadControllerSpec: StringSpec() {
             ))
             val response = flowable.blockFirst()
 
-            response.status() shouldBe HttpStatus.OK
+            response!!.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
         }
 
@@ -165,7 +165,7 @@ class UploadControllerSpec: StringSpec() {
             ))
             val response = flowable.blockFirst()
 
-            response.status() shouldBe HttpStatus.OK
+            response!!.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
         }
     }

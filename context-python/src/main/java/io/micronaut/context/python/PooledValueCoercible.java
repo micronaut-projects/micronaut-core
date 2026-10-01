@@ -34,4 +34,15 @@ public interface PooledValueCoercible extends ValueCoercible {
      * @return The value
      */
     @NonNull Value asPolyglotValue(Context context);
+
+    /**
+     * Reconstructs the Python value after context-local identity handling has been established.
+     * Generated code calls this method through {@link #asPolyglotValue(Context)}.
+     *
+     * @param context The target context
+     * @return The reconstructed value
+     */
+    default @NonNull Value reconstructPolyglotValue(Context context) {
+        return asPolyglotValue(context);
+    }
 }

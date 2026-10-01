@@ -5,21 +5,27 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.test.IntrospectionMetadataShape
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.beans.UnsafeBeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
+import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
 import spock.lang.Issue
 import spock.util.environment.RestoreSystemProperties
 
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
+
+import java.lang.annotation.ElementType
 
 @RestoreSystemProperties
 class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
@@ -61,6 +67,130 @@ class CustomErrorResponse {
         errorDescription.stringValue(JsonProperty).get() == "error_description"
         errorUri.get(bean) == "https://example.com/errors/invalid"
         errorUri.stringValue(JsonProperty).get() == "error_uri"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(String title, int pages, boolean available) {}
+""")
+
+        when:
+        def book = introspection.instantiate("Groovy in Action", 912, true)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages", "available"]
+        introspection.getRequiredProperty("title", String).get(book) == "Groovy in Action"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.getRequiredProperty("available", boolean).get(book) == true
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source with an annotated component in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(@JsonProperty("book_title") String title, int pages) {}
+""")
+
+        when:
+        def book = introspection.instantiate("Groovy in Action", 912)
+        BeanProperty title = introspection.getRequiredProperty("title", String)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages"]
+        title.get(book) == "Groovy in Action"
+        title.stringValue(JsonProperty).get() == "book_title"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source with a compact constructor in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(String title, int pages) {
+    Book {
+        title = title.trim()
+    }
+}
+""")
+
+        when:
+        def book = introspection.instantiate(" Groovy in Action ", 912)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages"]
+        introspection.getRequiredProperty("title", String).get(book) == "Groovy in Action"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-serialization/issues/1422")
+    void "test introspection of a groovy record compiled from source with an accessor override in #mode mode"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Book', """
+package test
+
+import groovy.transform.RecordOptions
+import groovy.transform.RecordTypeMode
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@RecordOptions(mode = RecordTypeMode.${mode})
+record Book(String title, int pages) {
+    String title() {
+        title.toUpperCase()
+    }
+}
+""")
+
+        when:
+        def book = introspection.instantiate("Groovy in Action", 912)
+
+        then:
+        introspection.propertyNames as List == ["title", "pages"]
+        introspection.getRequiredProperty("title", String).get(book) == "GROOVY IN ACTION"
+        introspection.getRequiredProperty("pages", int).get(book) == 912
+        introspection.beanProperties.every { it.readOnly }
+
+        where:
+        mode << ["NATIVE", "EMULATE"]
     }
 
     void "test annotations"() {
@@ -2645,4 +2775,179 @@ class Test extends MySuperclass {
         and: 'the package private superclass property is introspected, as we are in the same package'
         introspection.getProperty("packagePrivateProperty").orElse(null)
     }
+
+    void "test property members"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Person', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
+
+@Introspected(members = true)
+class Person {
+
+    @NotNull
+    String name
+}
+''')
+        def members = introspection.getProperty("name").get().members
+
+        expect: "only the field is listed, the Groovy generated accessors are synthetic"
+        members*.name == ["name"]
+        members*.elementType == [ElementType.FIELD]
+        members[0].annotationMetadata.hasAnnotation(NotNull)
+        members[0].readable
+        members[0].read(introspection.instantiate()) == null
+    }
+
+    void "the members do not change the metadata the previous API answers"() {
+        given: "the same hierarchy, introspected with and without the members"
+        def source = { boolean members -> """
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+import jakarta.validation.constraints.*
+import java.lang.annotation.*
+
+@Introspected(accessKind = [Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD], visibility = Introspected.Visibility.ANY${members ? ", members = true" : ""})
+@Marker("type")
+class Child extends Parent implements Holder<String> {
+    @Marker("child-field") @Size(max = 3)
+    private String name = "shadow"
+    @Override @Marker("child-getter") @Positive String getName() { "child" }
+    @Override String getValue() { "value" }
+    @Override @Executable @Marker("child-describe") @Negative String describe(@Min(2L) int level) { "c" }
+    @Executable @NotNull String other() { "o" }
+}
+
+interface Named {
+    @Marker("interface-getter") @NotNull @Size(min = 1) String getName()
+    @Marker("interface-setter") void setName(@Email String name)
+    @Executable @NotNull String describe(@Min(1L) int level)
+}
+
+interface Holder<T> {
+    @NotNull T getValue()
+}
+
+class Parent implements Named {
+    @Marker("field") @NotBlank
+    protected String name = "parent"
+    @Override @Marker("parent-getter") @Size(max = 10) String getName() { name }
+    @Override @Marker("parent-setter") void setName(@Digits(integer = 1, fraction = 1) String name) { this.name = name }
+    @Override @Executable @Size(max = 5) String describe(@Max(9L) int level) { "p" }
+}
+
+@Retention(RetentionPolicy.RUNTIME) @Inherited
+@Target([ElementType.TYPE, ElementType.FIELD, ElementType.METHOD])
+@interface Marker {
+    String value()
+}
+""" }
+        def plain = buildBeanIntrospection('test.Child', source(false))
+        def withMembers = buildBeanIntrospection('test.Child', source(true))
+
+        expect: "the members are there in the one and not in the other"
+        withMembers.separatesDeclarations()
+        !plain.separatesDeclarations()
+        withMembers.getProperty("name").get().members*.declaringType*.simpleName == ["Child", "Parent", "Child", "Parent", "Named", "Parent", "Named"]
+        plain.getProperty("name").get().members.isEmpty()
+
+        and: "the metadata the previous API answers is the same in both"
+        withMembers.propertyNames == plain.propertyNames
+        withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
+        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
+    }
+
+    void "every declared constructor is described"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order {
+    String name
+    int quantity
+
+    Order() {}
+    Order(String name) { this.name = name }
+    Order(String name, int quantity) { this.name = name; this.quantity = quantity }
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 3
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+        introspection.getConstructors()*.arguments*.length.toSorted() == [0, 1, 2]
+    }
+
+    void "instantiating through a described constructor works"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order {
+    String name
+
+    Order() { this.name = "none" }
+    Order(String name) { this.name = name }
+}
+''')
+        def order = introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "an introspection that did not ask for constructors keeps describing one"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Order {
+    String name
+
+    Order() {}
+    Order(String name) { this.name = name }
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
+    // a non-static inner class is never introspected here: TypeElementVisitorTransform skips it
+    void "a described constructor of a static nested class does not describe an enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$Nested', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    static class Nested {
+        String name
+        Nested(String name) { this.name = name }
+    }
+}
+''')
+
+        then:
+        Argument.toClassArray(introspection.getConstructors()[0].arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+        introspection.getConstructors()[0].arguments.length == 1
+    }
+
 }

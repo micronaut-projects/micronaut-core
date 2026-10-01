@@ -37,7 +37,11 @@ public interface ObjectSerializer {
 
     /**
      * The default JDK serializer.
+     *
+     * @deprecated JDK serialization is insecure when deserializing data that can be influenced by an attacker.
+     * Use a safer serialization format instead.
      */
+    @Deprecated(since = "5.2", forRemoval = true)
     ObjectSerializer JDK = new JdkSerializer();
 
     /**

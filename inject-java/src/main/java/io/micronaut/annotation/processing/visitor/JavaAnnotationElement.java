@@ -15,9 +15,13 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.TypeElement;
 
 /**
  * Represents an annotation in the AST for Java.
@@ -37,5 +41,23 @@ final class JavaAnnotationElement extends JavaClassElement implements Annotation
                           ElementAnnotationMetadataFactory annotationMetadataFactory,
                           JavaVisitorContext visitorContext) {
         super(nativeElement, annotationMetadataFactory, visitorContext);
+    }
+
+    @Override
+    protected JavaClassElement copyThis() {
+        // an annotation type cannot be generic, so the type arguments can be ignored
+        return new JavaAnnotationElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext);
+    }
+
+    @Override
+    public boolean isInherited() {
+        TypeElement typeElement = getNativeType().element();
+        for (AnnotationMirror annotationMirror : typeElement.getAnnotationMirrors()) {
+            if (annotationMirror.getAnnotationType().asElement() instanceof TypeElement annotationType
+                && AnnotationUtil.ANN_INHERITED.contentEquals(annotationType.getQualifiedName())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

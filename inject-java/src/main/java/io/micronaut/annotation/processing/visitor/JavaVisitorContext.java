@@ -65,6 +65,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -101,6 +102,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private final JavaNativeElementsHelper nativeElementsHelper;
     private final Filer filer;
     private final Set<String> postponedTypes;
+    // cleared by newRound(): symbols do not survive the compiler's per-round symbol table
+    private final Map<String, TypeElement> resolvedTypeElements = new HashMap<>();
     private boolean visitUnresolvedInterfaces;
 
     /**
@@ -263,17 +266,51 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     @Override
     public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        TypeElement typeElement = getTypeElement(name);
+        return Optional.ofNullable(typeElement)
+            .map(typeElement1 -> elementFactory.newClassElement(typeElement1, annotationMetadataFactory));
+    }
+
+    /**
+     * Clears the state this context caches for the duration of a single annotation processing round.
+     *
+     * <p>The compiler builds a fresh symbol table for every round, so a type element resolved in an
+     * earlier round is stale once the next one begins. Every processor must call this at the start of
+     * its round.</p>
+     *
+     * @since 5.2.0
+     */
+    public void newRound() {
+        resolvedTypeElements.clear();
+    }
+
+    /**
+     * Resolves a type element by name, caching the resolved symbol for the current round. Only
+     * successful lookups are cached: a name that does not resolve yet may resolve in a later round.
+     *
+     * @param name The fully qualified name
+     * @return The type element or {@code null}
+     * @since 5.2.0
+     */
+    @Nullable
+    public TypeElement getTypeElement(String name) {
+        TypeElement cached = resolvedTypeElements.get(name);
+        if (cached != null) {
+            return cached;
+        }
         try {
             TypeElement typeElement = elements.getTypeElement(name);
             if (typeElement == null) {
                 // maybe inner class?
                 typeElement = elements.getTypeElement(name.replace('$', '.'));
             }
-            return Optional.ofNullable(typeElement)
-                .map(typeElement1 -> elementFactory.newClassElement(typeElement1, annotationMetadataFactory));
+            if (typeElement != null) {
+                resolvedTypeElements.put(name, typeElement);
+            }
+            return typeElement;
         } catch (RuntimeException e) {
             // can throw exception on Eclipse JDT which is brain dead
-            return Optional.empty();
+            return null;
         }
     }
 

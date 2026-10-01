@@ -1,1 +1,3 @@
-
+/META-INF/GRAALPY-VFS/micronaut-application/src/failing_main.py
+/META-INF/GRAALPY-VFS/micronaut-application/src/leased.py
+/META-INF/GRAALPY-VFS/micronaut-application/src/reentrant.py

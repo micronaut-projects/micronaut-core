@@ -29,4 +29,4 @@ class VehicleMockSpec {
         Assertions.assertEquals("Mock Started", result) // <3>
     }
 }
-// tag::class[]
+// end::class[]

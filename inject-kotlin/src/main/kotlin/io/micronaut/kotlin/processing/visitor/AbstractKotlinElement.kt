@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.isJavaPackagePrivate
 import com.google.devtools.ksp.isOpen
@@ -47,10 +46,7 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.getBinaryName
-import io.micronaut.kotlin.processing.getClassDeclaration
 import java.util.*
-import kotlin.collections.HashSet
 
 internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -216,8 +212,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             parent = parent.parent
         }
         return if (parent is KSClassDeclaration) {
-            val className = parent.getBinaryName(visitorContext.resolver, visitorContext)
-            if (owningType.name.equals(className)) {
+            val className = visitorContext.getBinaryName(parent)
+            if (owningType.name == className) {
                 owningType
             } else {
                 val parentTypeArguments = owningType.getTypeArguments(className)
@@ -489,8 +485,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             }
 
             else -> {
-                val objectType =
-                    visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
+                val objectType = visitorContext.classDeclarationByName(Object::class.java.name)!!
                 newKotlinClassElement(objectType, parentTypeArguments, visitedTypes)
             }
         }
@@ -535,7 +530,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ) = newClassElement(
         owner,
         type,
-        type.declaration.getClassDeclaration(visitorContext),
+        visitorContext.getClassDeclaration(type.declaration),
         parentTypeArguments,
         visitedTypes,
         false,
@@ -582,7 +577,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ) = newClassElement(
         owner,
         type,
-        type.declaration.getClassDeclaration(visitorContext),
+        visitorContext.getClassDeclaration(type.declaration),
         parentTypeArguments,
         HashSet(),
         allowPrimitive
@@ -597,7 +592,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ) = newClassElement(
         owner,
         type,
-        type.declaration.getClassDeclaration(visitorContext),
+        visitorContext.getClassDeclaration(type.declaration),
         parentTypeArguments,
         visitedTypes,
         false,

@@ -32,7 +32,9 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static io.micronaut.inject.configuration.ConfigurationUtils.buildPropertyPath;
 import static io.micronaut.inject.configuration.ConfigurationUtils.getRequiredTypePath;
@@ -59,6 +61,7 @@ public class ConfigurationMetadataBuilder {
 
     private final OriginatingElements originatingElements = OriginatingElements.of();
     private final List<PropertyMetadata> properties = new ArrayList<>();
+    private final Map<String, PropertyMetadata> propertyIndex = new HashMap<>();
     private final List<ConfigurationMetadata> configurations = new ArrayList<>();
 
     /**
@@ -73,6 +76,23 @@ public class ConfigurationMetadataBuilder {
      */
     public List<PropertyMetadata> getProperties() {
         return Collections.unmodifiableList(properties);
+    }
+
+    /**
+     * Finds a property already visited for the given declaring type and name.
+     *
+     * @param declaringType The declaring type name as recorded on the metadata
+     * @param name          The property name
+     * @return The property metadata, or {@code null} if none was visited
+     * @since 5.2.0
+     */
+    @Nullable
+    public PropertyMetadata findProperty(String declaringType, String name) {
+        return propertyIndex.get(propertyKey(declaringType, name));
+    }
+
+    private static String propertyKey(String declaringType, String name) {
+        return declaringType + '#' + name;
     }
 
     /**
@@ -206,6 +226,7 @@ public class ConfigurationMetadataBuilder {
         metadata.description = description;
         metadata.defaultValue = defaultValue;
         properties.add(metadata);
+        propertyIndex.putIfAbsent(propertyKey(metadata.declaringType, name), metadata);
         return metadata;
     }
 
@@ -304,6 +325,7 @@ public class ConfigurationMetadataBuilder {
     @Internal
     public static void reset() {
         INSTANCE.properties.clear();
+        INSTANCE.propertyIndex.clear();
         INSTANCE.configurations.clear();
     }
 }

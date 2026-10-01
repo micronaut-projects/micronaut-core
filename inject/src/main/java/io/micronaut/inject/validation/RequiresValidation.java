@@ -25,14 +25,14 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.CLASS;
 
 /**
- * Internal method marks a type, method or a field for validation.
+ * Internal marker that marks a type, method, constructor or field for validation.
  *
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Documented
 @Retention(CLASS)
-@Target({ElementType.METHOD, ElementType.TYPE, ElementType.FIELD})
+@Target({ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.TYPE, ElementType.FIELD})
 @Internal
 public @interface RequiresValidation {
 }

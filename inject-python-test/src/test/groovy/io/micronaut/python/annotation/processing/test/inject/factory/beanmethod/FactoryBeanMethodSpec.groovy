@@ -295,6 +295,31 @@ class ClientFactory:
         context.close()
     }
 
+    void "test factory can invoke a Java ResourceResolver method"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+from io.micronaut.core.io import ResourceResolver
+
+@Factory
+class ResourceFactory:
+
+    @Bean
+    def resource_status(self) -> str:
+        ResourceResolver().getResourceAsStream("classpath:missing-resource")
+        return "invoked"
+''')
+
+        when:
+        def status = getBean(context, "java.lang.String")
+
+        then:
+        status == "invoked"
+
+        cleanup:
+        context.close()
+    }
+
     void "test factory method context scope"() {
         given:
         def context = buildContext('''\

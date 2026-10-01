@@ -23,6 +23,7 @@ import io.micronaut.context.DefaultBeanDefinitionsProvider
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.context.python.PythonContextRuntime
+import io.micronaut.context.python.PythonContextExecutor
 import io.micronaut.core.io.IOUtils
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.beans.BeanIntrospection
@@ -35,13 +36,15 @@ import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement
+import io.micronaut.python.processing.element.AbstractPythonClassElement
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
 import javax.tools.JavaFileObject
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Base class to extend from to allow compilation of Python sources
@@ -210,12 +213,13 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
 
         // Process Python code and generate Java classes
         List<ClassElement> capturedElements = []
-        def compiler = PyronautCompiler.builder()
+        def compilerBuilder = PyronautCompiler.builder()
             .pythonCode(pythonCode)
             .classElementCallback { ClassElement classElement ->
                 capturedElements.add(classElement)
             }
-            .build()
+        configureCompiler(compilerBuilder)
+        def compiler = compilerBuilder.build()
 
         ClassLoader pythonClassLoader = compiler.buildClassLoader()
 
@@ -259,6 +263,35 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @param contextBuilder The context builder
      */
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
+    }
+
+    /**
+     * Allows configuring the compiler used by {@link #buildContext}, for example to add a Python
+     * source directory or resources to the class loader of the compiled application.
+     * @param compilerBuilder The compiler builder
+     */
+    protected void configureCompiler(PyronautCompiler.Builder compilerBuilder) {
+    }
+
+    protected static void warmPool(ApplicationContext context, def executor, int size) {
+        def contextExecutor = context.getBean(PythonContextExecutor)
+        def acquired = new CountDownLatch(size)
+        def release = new CountDownLatch(1)
+        def futures = (1..size).collect {
+            executor.submit {
+                contextExecutor.withContext {
+                    acquired.countDown()
+                    release.await()
+                    null
+                }
+            }
+        }
+        try {
+            assert acquired.await(30, TimeUnit.SECONDS)
+        } finally {
+            release.countDown()
+        }
+        futures.each { it.get(30, TimeUnit.SECONDS) }
     }
 
     /**

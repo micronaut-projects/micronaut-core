@@ -109,15 +109,27 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                     && response.status() == HttpStatus.OK // The Range header field is evaluated after evaluating the precondition header fields defined in Section 13.1, and only if the result in absence of the Range header field would be a 200 (OK) response.
                 ) {
                     IntRange range = parseRangeHeader(rangeHeader, fileLength);
-                    if (range != null // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
-                        && range.firstPos < range.lastPos // A server that supports range requests MAY ignore a Range header field when the selected representation has no content (i.e., the selected representation's data is of zero length).
-                        && range.firstPos < fileLength
-                        && range.lastPos < fileLength
-                    ) {
-                        position = range.firstPos;
-                        contentLength = range.lastPos + 1 - range.firstPos;
-                        response.status(HttpStatus.PARTIAL_CONTENT);
-                        response.header(CONTENT_RANGE, "%s %d-%d/%d".formatted(UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
+                    // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
+                    if (range != null) {
+                        if (fileLength > 0 && range.firstPos >= fileLength) {
+                            // The first position is at or past the end of the representation, so the range is unsatisfiable.
+                            // Section 15.5.17 requires a 416 with a Content-Range giving the complete length.
+                            // A representation of zero length is exempt: a server MAY ignore a Range header field when
+                            // the selected representation has no content.
+                            response.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+                            response.header(CONTENT_RANGE, "%s */%d".formatted(UNIT_BYTES, fileLength));
+                            response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);
+                            return ByteBodyHttpResponseWrapper.wrap(response, bodyFactory.createEmpty());
+                        }
+                        if (range.firstPos <= range.lastPos // an int-range is valid when first-pos <= last-pos (Section 14.1.2), so a single byte range such as "bytes=0-0" is satisfiable
+                            && range.firstPos < fileLength
+                            && range.lastPos < fileLength
+                        ) {
+                            position = range.firstPos;
+                            contentLength = range.lastPos + 1 - range.firstPos;
+                            response.status(HttpStatus.PARTIAL_CONTENT);
+                            response.header(CONTENT_RANGE, "%s %d-%d/%d".formatted(UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
+                        }
                     }
                 }
                 response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);
@@ -172,7 +184,21 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         String from = value.substring(equalsIdx + 1, minusIdx).trim();
         String to = value.substring(minusIdx + 1).trim();
         try {
-            long fromPosition = from.isEmpty() ? 0 : Long.parseLong(from);
+            if (from.isEmpty()) {
+                // suffix-range (Section 14.1.2): the last suffix-length bytes of the representation
+                if (to.isEmpty()) {
+                    return null; // Malformed range
+                }
+                long suffixLength = Long.parseLong(to);
+                if (suffixLength <= 0) {
+                    // a suffix-range with a length of zero is unsatisfiable (Section 14.1.2); report
+                    // it as a range starting past the end, which is answered with 416 above
+                    return new IntRange(contentLength, contentLength - 1);
+                }
+                // if the representation is shorter than the suffix length, the whole of it is used
+                return new IntRange(Math.max(0, contentLength - suffixLength), contentLength - 1);
+            }
+            long fromPosition = Long.parseLong(from);
             long toPosition = to.isEmpty() ? contentLength - 1 : Long.parseLong(to);
             return new IntRange(fromPosition, toPosition);
         } catch (NumberFormatException e) {

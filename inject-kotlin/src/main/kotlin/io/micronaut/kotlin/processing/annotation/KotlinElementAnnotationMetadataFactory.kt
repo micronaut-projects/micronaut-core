@@ -141,10 +141,12 @@ internal class KotlinElementAnnotationMetadataFactory(
 
     override fun lookupForParameter(parameterElement: ParameterElement): CachedAnnotationMetadata {
         val kotlinParameterElement = parameterElement as KotlinParameterElement
-        val owner = kotlinParameterElement.methodElement.owningType
+        // Keyed by the declaring type, not the owning type: a parameter of an inherited method is the same
+        // parameter whichever class it is read through, so a mutation must be visible through all of them
+        val declaringType = kotlinParameterElement.methodElement.declaringType as KotlinClassElement
         return metadataBuilder.lookupOrBuild(
             Key3(
-                getClassDefinitionCacheKey(owner),
+                getClassDefinitionCacheKey(declaringType),
                 kotlinParameterElement.methodElement.nativeType,
                 kotlinParameterElement.nativeType
             ),
@@ -152,22 +154,27 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun lookupForField(fieldElement: FieldElement): CachedAnnotationMetadata {
+    override fun lookupForField(fieldElement: FieldElement, propertyComponent: Boolean): CachedAnnotationMetadata {
         val kotlinFieldElement = fieldElement as AbstractKotlinElement<*>
-        val owner: KotlinClassElement
-        if (kotlinFieldElement is KotlinFieldElement) {
-            owner = kotlinFieldElement.owningType as KotlinClassElement
-        } else if (kotlinFieldElement is KotlinEnumConstantElement) {
-            owner = kotlinFieldElement.owningType as KotlinClassElement
-        } else {
+        // A mutation of the field is keyed by the declaring type, not the owning type: an inherited field is the
+        // same field whichever class it is read through, so a mutation must be visible through all of them.
+        // A mutation made through a bean property belongs to the owning type the property is resolved for
+        if (kotlinFieldElement !is KotlinFieldElement && kotlinFieldElement !is KotlinEnumConstantElement) {
             throw RuntimeException("Unknown field element type ${fieldElement.javaClass}")
         }
-        return metadataBuilder.lookupOrBuild(
+        val declaringType = fieldElement.declaringType as KotlinClassElement
+        val owningType = fieldElement.owningType as KotlinClassElement
+        return metadataBuilder.lookupOrBuildForOwner(
             Key2(
-                getClassDefinitionCacheKey(owner),
+                getClassDefinitionCacheKey(declaringType),
                 kotlinFieldElement.nativeType,
             ),
-            kotlinFieldElement.nativeType.element
+            OwnerKey2(
+                getClassDefinitionCacheKey(owningType),
+                kotlinFieldElement.nativeType,
+            ),
+            kotlinFieldElement.nativeType.element,
+            propertyComponent
         )
     }
 
@@ -190,6 +197,8 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
 
     data class Key2(private val v1: Any, private val v2: Any)
+
+    data class OwnerKey2(private val v1: Any, private val v2: Any)
 
     data class Key3(private val v1: Any, private val v2: Any, private val v3: Any)
 

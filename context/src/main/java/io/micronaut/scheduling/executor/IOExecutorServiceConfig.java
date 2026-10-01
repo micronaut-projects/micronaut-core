@@ -18,7 +18,6 @@ package io.micronaut.scheduling.executor;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.scheduling.LoomSupport;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -49,12 +48,8 @@ public final class IOExecutorServiceConfig {
      */
     @Singleton
     @Named(TaskExecutors.VIRTUAL)
-    @Requires(
-        missingProperty = ExecutorConfiguration.PREFIX + "." + TaskExecutors.VIRTUAL,
-        condition = LoomSupport.LoomCondition.class)
+    @Requires(missingProperty = ExecutorConfiguration.PREFIX + "." + TaskExecutors.VIRTUAL)
     ExecutorConfiguration virtual() {
-        // sanity check
-        LoomSupport.checkSupported();
         UserExecutorConfiguration cfg = UserExecutorConfiguration.of(TaskExecutors.VIRTUAL, ExecutorType.THREAD_PER_TASK);
         cfg.setVirtual(true);
         return cfg;

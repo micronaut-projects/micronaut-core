@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -237,10 +238,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public Stream<UriRouteInfo<?, ?>> uriRoutes() {
-        return Stream.concat(
-            allRoutesByMethod.values().stream().flatMap(Arrays::stream),
-            allRoutesByMethod.values().stream().flatMap(Arrays::stream)
-        );
+        return allRoutesByMethod.values().stream().flatMap(Arrays::stream);
     }
 
     @Override
@@ -270,6 +268,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         uriRoutes = resolveAmbiguity(request, uriRoutes);
         if (uriRoutes.size() > 1) {
+            uriRoutes = ImplicitHeadRoutes.preferExplicit(uriRoutes);
+        }
+        if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(path, (List) uriRoutes);
         } else if (uriRoutes.size() == 1) {
             return uriRoutes.get(0);
@@ -290,8 +291,19 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return resolveAmbiguity(request, uriRoutes);
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
-                                                              List<UriRouteMatch<T, R>> uriRoutes) {
+    /**
+     * Narrows the given route matches for a request down to the closest ones.
+     *
+     * @param request   The request
+     * @param uriRoutes The route matches of the request
+     * @param <T>       The target type
+     * @param <R>       The result type
+     * @return The closest matches
+     * @since 5.2.2
+     */
+    @Internal
+    public static <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
+                                                                    List<UriRouteMatch<T, R>> uriRoutes) {
         // if there are multiple routes, try to resolve the ambiguity
 
         final Collection<MediaType> acceptedProducedTypes = request.accept();

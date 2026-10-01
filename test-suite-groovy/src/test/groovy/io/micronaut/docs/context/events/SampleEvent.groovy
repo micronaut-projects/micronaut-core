@@ -18,4 +18,4 @@ package io.micronaut.docs.context.events
 class SampleEvent {
     String message = "Something happened"
 }
-// tag::class[]
+// end::class[]

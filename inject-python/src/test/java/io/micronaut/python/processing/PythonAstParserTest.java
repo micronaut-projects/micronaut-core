@@ -1,6 +1,13 @@
 package io.micronaut.python.processing;
 
 import java.io.IOException;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.inject.ast.ClassElement;
@@ -31,17 +39,18 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.python.processing.visitor.ArgumentDef;
-import io.micronaut.python.processing.visitor.ArgumentsDef;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.FunctionDef;
-import io.micronaut.python.processing.visitor.PythonClassElement;
-import io.micronaut.python.processing.visitor.PythonConstructorElement;
-import io.micronaut.python.processing.visitor.PythonEnumElement;
-import io.micronaut.python.processing.visitor.PythonFieldElement;
-import io.micronaut.python.processing.visitor.PythonMethodElement;
-import io.micronaut.python.processing.visitor.PythonParameterElement;
+import io.micronaut.python.processing.model.ArgumentDef;
+import io.micronaut.python.processing.model.ArgumentsDef;
+import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.FunctionDef;
+import io.micronaut.python.processing.element.PythonClassElement;
+import io.micronaut.python.processing.element.PythonConstructorElement;
+import io.micronaut.python.processing.element.PythonEnumElement;
+import io.micronaut.python.processing.element.PythonFieldElement;
+import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.element.PythonParameterElement;
+import io.micronaut.python.processing.model.ScriptDef;
 import io.micronaut.sourcegen.model.EnumDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -52,6 +61,14 @@ import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Source;
 
 public class PythonAstParserTest {
+
+    @Test
+    void recognizesWindowsSourceUriWithinWindowsSourceDirectory() {
+        assertTrue(PythonAstParser.isWithinSourceDir(
+            "C:\\builds\\project\\src\\main\\python",
+            "/C:/builds/project/src/main/python/example/micronaut/forecast_controller.py"
+        ));
+    }
 
     @Test
     void incrementalProcessorTransformsOnlyAffectedSourcesUnlessAggregationIsRequired(
@@ -139,6 +156,62 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void parsesModuleLevelAnnotationInvocationsIntoScriptMetadata() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            def micronaut_annotation(name):
+                return lambda func: func
+
+            @micronaut_annotation("ModuleMarker")
+            def ModuleMarker(value):
+                return lambda target: target
+
+            @micronaut_annotation("Get")
+            def Get(value):
+                return lambda target: target
+
+            ModuleMarker("/module")
+
+            @Get("/")
+            def root() -> str:
+                ModuleMarker("/inside-function")
+                return "ok"
+            """, "example")) {
+            ScriptDef script = environment.scripts().get("example.Unknown");
+            assertNotNull(script);
+            assertEquals(1, script.decorators().size());
+            assertEquals("example.ModuleMarker", script.decorators().getFirst().annotationName());
+            assertEquals("/module", script.decorators().getFirst().members().get("value"));
+            assertEquals(1, script.functions().size());
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement scriptElement = processingEnvironment.scripts().get("example.Unknown");
+                assertNotNull(scriptElement);
+                assertTrue(scriptElement.hasAnnotation("example.ModuleMarker"));
+                assertEquals("/module", scriptElement.stringValue("example.ModuleMarker", "value").orElseThrow());
+            }
+        }
+    }
+
+    @Test
+    void parsesImportedMicronautAnnotationsAtModuleLevel() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            from micronaut.test.extensions.junit5.annotation import MicronautTest
+
+            MicronautTest()
+
+            value: int = 1
+
+            def test_root(self) -> None:
+                pass
+            """, "example")) {
+            ScriptDef script = environment.scripts().get("example.Unknown");
+            assertNotNull(script);
+            assertEquals("io.micronaut.test.extensions.junit5.annotation.MicronautTest", script.decorators().getFirst().annotationName());
+            assertEquals("test_root", script.functions().getFirst().name());
+        }
+    }
+
+    @Test
     void testParseIgnoresLocalClassesDeclaredInsideFunctions() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         String sources = """
@@ -159,10 +232,11 @@ public class PythonAstParserTest {
         }
     }
 
-    @Test
-    void testRuntimeTransformAddsFutureAnnotationsBeforeGeneratedCode() {
-        PythonAstParser pythonProcessor = new PythonAstParser();
-        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+    /**
+     * A visitor context resolving the given Java class and nothing else.
+     */
+    private static VisitorContext visitorContextResolving(Class<?> resolvable) {
+        return (VisitorContext) Proxy.newProxyInstance(
             VisitorContext.class.getClassLoader(),
             new Class<?>[] { VisitorContext.class },
             (proxy, method, args) -> {
@@ -177,8 +251,8 @@ public class PythonAstParserTest {
                 if ("getClassElement".equals(method.getName())
                     && args != null
                     && args.length == 1
-                    && "java.security.Principal".equals(args[0])) {
-                    return Optional.of(ClassElement.of(java.security.Principal.class));
+                    && resolvable.getName().equals(args[0])) {
+                    return Optional.of(ClassElement.of(resolvable));
                 }
                 if ("getClassElements".equals(method.getName())) {
                     return ClassElement.ZERO_CLASS_ELEMENTS;
@@ -195,6 +269,76 @@ public class PythonAstParserTest {
                 return null;
             }
         );
+    }
+
+    @Test
+    void testRuntimeTransformKeepsJavaInterfaceBaseOfClassesDefinedInsideFunctions() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContextResolving(java.security.Principal.class), """
+            from dataclasses import dataclass
+            from java.security import Principal
+
+            class ModulePrincipal(Principal):
+                def getName(self) -> str:
+                    return "module"
+
+            def adapter():
+                class LocalPrincipal(Principal):
+                    def getName(self) -> str:
+                        return "local"
+                return LocalPrincipal()
+
+            def with_parameters(name):
+                class NamedPrincipal(Principal):
+                    def __init__(self, name):
+                        self.name = name
+
+                    def getName(self) -> str:
+                        return self.name
+                return NamedPrincipal(name)
+
+            class Outer:
+                def method(self):
+                    class MethodPrincipal(Principal):
+                        def getName(self) -> str:
+                            return "method"
+                    return MethodPrincipal()
+
+            def parameterized():
+                class TypedPrincipal(Principal[str]):
+                    def getName(self) -> str:
+                        return "typed"
+                return TypedPrincipal()
+
+            def decorated():
+                @dataclass
+                class DataPrincipal(Principal):
+                    name: str
+
+                    def getName(self) -> str:
+                        return self.name
+                return DataPrincipal("data")
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        // a module-level class is stripped of the interface: its generated Java class implements it
+        assertTrue(runtimeCode.contains("@_micronaut_java_interface_defaults('java.security.Principal')\nclass ModulePrincipal:"));
+        // a class defined inside a function keeps the interface: GraalPy's host adapter implements it
+        assertTrue(runtimeCode.contains("    class LocalPrincipal(Principal):"));
+        assertTrue(runtimeCode.contains("        class MethodPrincipal(Principal):"));
+        assertFalse(runtimeCode.contains("_micronaut_java_interface_defaults('java.security.Principal')\n    class LocalPrincipal"));
+        // a class with constructor parameters cannot be an adapter (the adapter constructor takes none): stripped
+        assertTrue(runtimeCode.contains("    @_micronaut_java_interface_defaults('java.security.Principal')\n    class NamedPrincipal:"));
+        // a type argument has no run time meaning: the raw interface is the base of the adapter
+        assertTrue(runtimeCode.contains("    class TypedPrincipal(Principal):"));
+        // a decorator may generate the constructor (@dataclass): stripped as before
+        assertTrue(runtimeCode.contains("    @_micronaut_java_interface_defaults('java.security.Principal')\n    @dataclass\n    class DataPrincipal:"));
+    }
+
+    @Test
+    void testRuntimeTransformAddsFutureAnnotationsBeforeGeneratedCode() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = visitorContextResolving(java.security.Principal.class);
         PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
             "module docs"
             from java.security import Principal
@@ -213,6 +357,217 @@ public class PythonAstParserTest {
         assertTrue(futureImport > docstring);
         assertTrue(javaImport > futureImport);
         assertTrue(javaTypeAssignment > javaImport);
+    }
+
+    @Test
+    void testTryBlockImportOfJavaClassKeepsTransformedCodeParseable() {
+        PythonAstParser parser = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.security.Principal".equals(args[0])) {
+                    return Optional.of(ClassElement.of(java.security.Principal.class));
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "jakarta.inject.Singleton".equals(args[0])) {
+                    return Optional.of(ClassElement.of(jakarta.inject.Singleton.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult result = parser.transform(visitorContext, """
+            try:
+                from java.security import Principal
+            except ImportError:
+                Principal = None
+
+            class Demo(Principal):
+                def getName(self) -> str:
+                    return "demo"
+            """);
+
+        // the import became a generated binding in its place, so the try/except guard is kept
+        assertTrue(result.code().contains("try:\n    Principal = java.type('java.security.Principal')\nexcept ImportError:\n    Principal = None\n"));
+        assertTrue(result.javaClassImports().containsKey("java.security"));
+        assertEquals("java.security.Principal", result.javaClassImports().get("java.security").get(0).get("class_name"));
+        // the runtime code strips the interface base
+        assertTrue(result.runtimeCode().contains("try:\n    Principal = java.type('java.security.Principal')\nexcept ImportError:"));
+        assertTrue(result.runtimeCode().contains("class Demo:"));
+        assertTrue(parser.requiresRuntimeBytecode(result));
+
+        PythonAstParser.TransformResult finallyResult = parser.transform(visitorContext, """
+            try:
+                from java.security import Principal
+            finally:
+                from jakarta.inject import Singleton
+            """);
+
+        // a class binding replaces the import in place; an annotation import becomes a hoisted decorator, and
+        // the final body it leaves empty is filled (a try needs a handler or a final body)
+        assertTrue(finallyResult.code().endsWith("try:\n    Principal = java.type('java.security.Principal')\nfinally:\n    pass"));
+        assertTrue(finallyResult.code().contains("def Singleton("));
+    }
+
+    @Test
+    void testRuntimeTransformStripsConcreteJavaThrowableBases() {
+        PythonAstParser parser = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.lang.RuntimeException".equals(args[0])) {
+                    return Optional.of(ClassElement.of(java.lang.RuntimeException.class));
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.lang.Exception".equals(args[0])) {
+                    return Optional.of(ClassElement.of(Exception.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult result = parser.transform(visitorContext, """
+            from java.lang import RuntimeException
+
+            class OutOfStockException(RuntimeException):
+                pass
+            """);
+
+        assertTrue(result.code().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(result.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
+        assertFalse(result.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(parser.requiresRuntimeBytecode(result));
+
+        PythonAstParser.TransformResult javaTypeResult = parser.transform(visitorContext, """
+            import java
+
+            RuntimeException = java.type("java.lang.RuntimeException")
+
+            class OutOfStockException(RuntimeException):
+                pass
+            """);
+
+        assertTrue(javaTypeResult.code().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(javaTypeResult.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
+        assertFalse(javaTypeResult.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(parser.requiresRuntimeBytecode(javaTypeResult));
+
+        PythonAstParser.TransformResult duplicateExceptionResult = parser.transform(visitorContext, """
+            from java.lang import RuntimeException
+
+            class OutOfStockException(Exception, RuntimeException):
+                pass
+            """);
+
+        assertTrue(duplicateExceptionResult.runtimeCode().contains("class OutOfStockException(Exception)"));
+        assertFalse(duplicateExceptionResult.runtimeCode().contains("class OutOfStockException(Exception, Exception)"));
+        assertTrue(parser.requiresRuntimeBytecode(duplicateExceptionResult));
+
+        PythonAstParser.TransformResult shadowedExceptionResult = parser.transform(visitorContext, """
+            from java.lang import Exception
+
+            class OutOfStockException(Exception):
+                pass
+            """);
+
+        assertTrue(shadowedExceptionResult.runtimeCode().contains("import builtins"));
+        assertTrue(shadowedExceptionResult.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
+        assertTrue(parser.requiresRuntimeBytecode(shadowedExceptionResult));
+    }
+
+    @Test
+    void testRuntimeTransformDiagnosesConcreteJavaClassInheritance() {
+        PythonAstParser parser = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1) {
+                    return switch ((String) args[0]) {
+                        case "java.lang.Thread" -> Optional.of(ClassElement.of(Thread.class));
+                        case "java.lang.Runnable" -> Optional.of(ClassElement.of(Runnable.class));
+                        default -> Optional.empty();
+                    };
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult result = parser.transform(visitorContext, """
+            from java.lang import Thread
+
+            class Worker(Thread):
+                pass
+            """);
+
+        assertTrue(result.code().contains("class Worker(Thread)"));
+        // the runtime class extends the Python base standing in for the Java class
+        assertTrue(result.runtimeCode().contains("class Worker(_micronaut_java_base('java.lang.Thread'))"));
+        assertTrue(result.runtimeCode().contains("def _micronaut_java_base(name):"));
+        assertTrue(result.runtimeCode().contains("PythonJavaBases').baseClass(java.type(name))"));
+        assertFalse(result.runtimeCode().contains("does not support Python class"));
+        assertTrue(parser.requiresRuntimeBytecode(result));
+
+        PythonAstParser.TransformResult interfaceResult = parser.transform(visitorContext, """
+            from java.lang import Runnable
+
+            class Worker(Runnable):
+                pass
+            """);
+
+        assertFalse(interfaceResult.runtimeCode().contains("__micronaut_java_base"));
+        assertTrue(interfaceResult.runtimeCode().contains("class Worker:"));
+        assertTrue(interfaceResult.runtimeCode().contains("def _micronaut_java_interface_defaults(*interface_names):"));
+        assertTrue(interfaceResult.runtimeCode().contains("@_micronaut_java_interface_defaults('java.lang.Runnable')\nclass Worker:"));
+        assertTrue(parser.requiresRuntimeBytecode(interfaceResult));
     }
 
     @Test
@@ -277,7 +632,7 @@ public class PythonAstParserTest {
         ClassElement annotationElement = fakeAnnotationElement(
             "example.BeanProperties",
             "BeanProperties",
-            new FakeNativeAnnotationType()
+            fakeNativeAnnotationType(fakeEnclosedType(ElementKind.ENUM, "AccessKind"))
         );
         ClassElement nestedEnumElement = fakeClassElement(
             "example.BeanProperties$AccessKind",
@@ -340,12 +695,12 @@ public class PythonAstParserTest {
         ClassElement parentAnnotation = fakeAnnotationElement(
             "example.Parent",
             "Parent",
-            new FakeNativeAnnotationTypeWithMethod("example.Nested")
+            fakeNativeAnnotationType(fakeMemberMethod("example.Nested"))
         );
         ClassElement nestedAnnotation = fakeAnnotationElement(
             "example.Nested",
             "Nested",
-            new FakeNativeAnnotationType()
+            fakeNativeAnnotationType()
         );
         VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
             VisitorContext.class.getClassLoader(),
@@ -409,13 +764,13 @@ public class PythonAstParserTest {
         ClassElement xmlProperty = fakeAnnotationElement(
             "example.XmlProperty",
             "XmlProperty",
-            new FakeNativeAnnotationType(),
+            fakeNativeAnnotationType(),
             annotationMetadata
         );
         ClassElement deprecated = fakeAnnotationElement(
             "java.lang.Deprecated",
             "Deprecated",
-            new FakeNativeAnnotationType()
+            fakeNativeAnnotationType()
         );
         VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
             VisitorContext.class.getClassLoader(),
@@ -519,92 +874,80 @@ public class PythonAstParserTest {
         );
     }
 
-    public static final class FakeNativeAnnotationType {
-        public FakeNativeAnnotationElement element() {
-            return new FakeNativeAnnotationElement();
-        }
+    /**
+     * A native annotation type backed by a {@link TypeElement} proxy, the shape the Java annotation
+     * processor hands the Python transformer.
+     */
+    private static JavaNativeElement.Class fakeNativeAnnotationType(Element... enclosed) {
+        return new JavaNativeElement.Class(fakeTypeElement(ElementKind.ANNOTATION_TYPE, "Fake", List.of(enclosed)), null, null);
     }
 
-    public static final class FakeNativeAnnotationTypeWithMethod {
-        private final String returnType;
-
-        FakeNativeAnnotationTypeWithMethod(String returnType) {
-            this.returnType = returnType;
-        }
-
-        public FakeNativeAnnotationElementWithMethod element() {
-            return new FakeNativeAnnotationElementWithMethod(returnType);
-        }
+    private static TypeElement fakeTypeElement(ElementKind kind, String simpleName, List<Element> enclosed) {
+        return (TypeElement) Proxy.newProxyInstance(
+            TypeElement.class.getClassLoader(),
+            new Class<?>[] { TypeElement.class },
+            (proxy, method, args) -> switch (method.getName()) {
+                case "getKind" -> kind;
+                case "getSimpleName" -> fakeName(simpleName);
+                case "getQualifiedName" -> fakeName("example." + simpleName);
+                case "getEnclosedElements" -> enclosed;
+                case "getAnnotationMirrors" -> List.of();
+                case "getAnnotation", "getAnnotationsByType" -> null;
+                case "toString" -> simpleName;
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
+                default -> null;
+            }
+        );
     }
 
-    public static final class FakeNativeAnnotationElement {
-        public FakeElementKind getKind() {
-            return new FakeElementKind("ANNOTATION_TYPE");
-        }
-
-        public List<FakeEnclosedElement> getEnclosedElements() {
-            return List.of(new FakeEnclosedElement("ENUM", "AccessKind"));
-        }
+    private static Element fakeEnclosedType(ElementKind kind, String simpleName) {
+        return fakeTypeElement(kind, simpleName, List.of());
     }
 
-    public static final class FakeNativeAnnotationElementWithMethod {
-        private final String returnType;
-
-        FakeNativeAnnotationElementWithMethod(String returnType) {
-            this.returnType = returnType;
-        }
-
-        public FakeElementKind getKind() {
-            return new FakeElementKind("ANNOTATION_TYPE");
-        }
-
-        public List<FakeEnclosedMethodElement> getEnclosedElements() {
-            return List.of(new FakeEnclosedMethodElement(returnType));
-        }
+    private static Element fakeMemberMethod(String returnTypeName) {
+        TypeMirror returnType = (TypeMirror) Proxy.newProxyInstance(
+            TypeMirror.class.getClassLoader(),
+            new Class<?>[] { TypeMirror.class },
+            (proxy, method, args) -> switch (method.getName()) {
+                case "toString" -> returnTypeName;
+                case "getKind" -> TypeKind.DECLARED;
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
+                default -> null;
+            }
+        );
+        return (ExecutableElement) Proxy.newProxyInstance(
+            ExecutableElement.class.getClassLoader(),
+            new Class<?>[] { ExecutableElement.class },
+            (proxy, method, args) -> switch (method.getName()) {
+                case "getKind" -> ElementKind.METHOD;
+                case "getReturnType" -> returnType;
+                case "getSimpleName" -> fakeName("member");
+                case "getEnclosedElements", "getAnnotationMirrors", "getParameters" -> List.of();
+                case "toString" -> "member()";
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
+                default -> null;
+            }
+        );
     }
 
-    public static final class FakeEnclosedMethodElement {
-        private final String returnType;
-
-        FakeEnclosedMethodElement(String returnType) {
-            this.returnType = returnType;
-        }
-
-        public FakeElementKind getKind() {
-            return new FakeElementKind("METHOD");
-        }
-
-        public FakeReturnType getReturnType() {
-            return new FakeReturnType(returnType);
-        }
-    }
-
-    public static final class FakeEnclosedElement {
-        private final String kind;
-        private final String simpleName;
-
-        FakeEnclosedElement(String kind, String simpleName) {
-            this.kind = kind;
-            this.simpleName = simpleName;
-        }
-
-        public FakeElementKind getKind() {
-            return new FakeElementKind(kind);
-        }
-
-        public String getSimpleName() {
-            return simpleName;
-        }
-    }
-
-    public record FakeElementKind(String name) {
-    }
-
-    public record FakeReturnType(String name) {
-        @Override
-        public String toString() {
-            return name;
-        }
+    private static Name fakeName(String value) {
+        return (Name) Proxy.newProxyInstance(
+            Name.class.getClassLoader(),
+            new Class<?>[] { Name.class },
+            (proxy, method, args) -> switch (method.getName()) {
+                case "toString" -> value;
+                case "contentEquals" -> value.contentEquals((CharSequence) args[0]);
+                case "length" -> value.length();
+                case "charAt" -> value.charAt((int) args[0]);
+                case "subSequence" -> value.subSequence((int) args[0], (int) args[1]);
+                case "hashCode" -> value.hashCode();
+                case "equals" -> proxy == args[0];
+                default -> null;
+            }
+        );
     }
 
     @Test
@@ -768,9 +1111,9 @@ class ProductMappers:
                 .findFirst()
                 .orElseThrow();
 
-            assertEquals("price", directMapping.members().get("to").asString());
-            assertEquals("#{product.price * 2}", directMapping.members().get("from").asString());
-            assertEquals("$#.00", directMapping.members().get("format").asString());
+            assertEquals("price", directMapping.members().get("to"));
+            assertEquals("#{product.price * 2}", directMapping.members().get("from"));
+            assertEquals("$#.00", directMapping.members().get("format"));
 
             FunctionDef manufacturerDto = productMappers.functions()
                 .stream()
@@ -783,14 +1126,14 @@ class ProductMappers:
                 .findFirst()
                 .orElseThrow();
 
-            org.graalvm.polyglot.Value value = mapper.members().get("value");
-            assertTrue(value.hasArrayElements());
-            Object nested = value.getArrayElement(0).asHostObject();
+            Object value = mapper.members().get("value");
+            assertInstanceOf(List.class, value);
+            Object nested = ((List<?>) value).getFirst();
             assertInstanceOf(DecoratorDef.class, nested);
             DecoratorDef nestedMapping = (DecoratorDef) nested;
             assertEquals("io.micronaut.context.annotation.Mapper$Mapping", nestedMapping.annotationName());
-            assertEquals("product.manufacturer", nestedMapping.members().get("from").asString());
-            assertEquals("distributor", nestedMapping.members().get("to").asString());
+            assertEquals("product.manufacturer", nestedMapping.members().get("from"));
+            assertEquals("distributor", nestedMapping.members().get("to"));
         }
     }
 
@@ -861,35 +1204,35 @@ class ProductMappers:
                 .filter(attr -> "simple_attr".equals(attr.name()))
                 .findFirst();
             assertTrue(simpleAttr.isPresent(), "simple_attr should be parsed");
-            assertEquals(42, simpleAttr.get().value().asInt(), "simple_attr should have value 42");
+            assertEquals(42, simpleAttr.get().value(), "simple_attr should have value 42");
             assertNull(simpleAttr.get().annotation(), "simple_attr should have no annotation");
 
             var nameAttr = testClass.attributes().stream()
                 .filter(attr -> "name".equals(attr.name()))
                 .findFirst();
             assertTrue(nameAttr.isPresent(), "name attribute should be parsed");
-            assertEquals("test", nameAttr.get().value().asString(), "name should have value 'test'");
+            assertEquals("test", nameAttr.get().value(), "name should have value 'test'");
 
             var annotatedAttr = testClass.attributes().stream()
                 .filter(attr -> "annotated_attr".equals(attr.name()))
                 .findFirst();
             assertTrue(annotatedAttr.isPresent(), "annotated_attr should be parsed");
             assertEquals("int", annotatedAttr.get().annotation(), "annotated_attr should have int annotation");
-            assertEquals(100, annotatedAttr.get().value().asInt(), "annotated_attr should have value 100");
+            assertEquals(100, annotatedAttr.get().value(), "annotated_attr should have value 100");
 
             var finalAttr = testClass.attributes().stream()
                 .filter(attr -> "final_attr".equals(attr.name()))
                 .findFirst();
             assertTrue(finalAttr.isPresent(), "final_attr should be parsed");
             assertTrue(finalAttr.get().annotation().contains("Final"), "final_attr should have Final annotation");
-            assertEquals(200, finalAttr.get().value().asInt(), "final_attr should have value 200");
+            assertEquals(200, finalAttr.get().value(), "final_attr should have value 200");
 
             var complexAttr = testClass.attributes().stream()
                 .filter(attr -> "complex_attr".equals(attr.name()))
                 .findFirst();
             assertTrue(complexAttr.isPresent(), "complex_attr should be parsed");
             assertTrue(complexAttr.get().annotation().contains("Annotated"), "complex_attr should have Annotated annotation");
-            assertEquals("value", complexAttr.get().value().asString(), "complex_attr should have value 'value'");
+            assertEquals("value", complexAttr.get().value(), "complex_attr should have value 'value'");
 
             // Should still parse the regular method (properties are ignored)
             assertEquals(1, testClass.functions().size());
@@ -1139,7 +1482,7 @@ class ProductMappers:
                 );
                 assertEquals(List.of("__PYTHON_CLASS_REFERENCE"), enumDef.getFields().stream().map(FieldDef::getName).toList());
                 assertEquals(1, enumDef.getSuperinterfaces().size());
-                assertEquals(List.of("asPolyglotValue", "fromPolyglotValue", "jsonValue", "toString"), enumDef.getMethods().stream().map(MethodDef::getName).toList());
+                assertEquals(List.of("asPolyglotValue", "asPolyglotValue", "reconstructPolyglotValue", "fromPolyglotValue", "jsonValue", "toString"), enumDef.getMethods().stream().map(MethodDef::getName).toList());
             }
         }
     }
@@ -1380,7 +1723,7 @@ class ProductMappers:
                 .filter(decorator -> "example.Marker".equals(decorator.annotationName()))
                 .findFirst()
                 .orElseThrow();
-            assertEquals("resolved-local", marker.members().get("value").asString());
+            assertEquals("resolved-local", marker.members().get("value"));
         }
     }
 
@@ -1427,7 +1770,7 @@ class ProductMappers:
                 .filter(decorator -> "example.Marker".equals(decorator.annotationName()))
                 .findFirst()
                 .orElseThrow();
-            assertEquals("resolved-import", marker.members().get("value").asString());
+            assertEquals("resolved-import", marker.members().get("value"));
         }
     }
 
@@ -1814,7 +2157,7 @@ class ProductMappers:
                 assertTrue(weightAttr.isPresent(), "weight attribute should be parsed");
                 assertEquals("Annotated[float, Gt(0)]", weightAttr.get().annotation(), "weight should have full annotation string");
                 assertEquals("float", weightAttr.get().typeName().name(), "weight should have full annotation as typeName for now");
-                assertEquals(1.5, weightAttr.get().value().asDouble(), 0.01, "weight should have value 1.5");
+                assertEquals(1.5, (Double) weightAttr.get().value(), 0.01, "weight should have value 1.5");
 
                 // Check that weight has Gt decorator
                 List<DecoratorDef> weightDecorators = weightAttr.get().decorators();
@@ -1824,8 +2167,7 @@ class ProductMappers:
                 assertEquals("Gt", gtDecorator.annotationName(), "annotation name should be Gt");
                 assertTrue(gtDecorator.members().containsKey("value"), "Gt should have value member");
                 var gtMemberValue = gtDecorator.members().get("value");
-                assertTrue(gtMemberValue instanceof org.graalvm.polyglot.Value, "Gt value should be a GraalVM Value");
-                assertEquals(0, gtMemberValue.asInt(), "Gt value should be 0");
+                assertEquals(0, gtMemberValue, "Gt value should be 0");
 
                 // Check count attribute - should have extracted int type and Min/Max decorators
                 var countAttr = fruitClass.attributes().stream()
@@ -1834,7 +2176,7 @@ class ProductMappers:
                 assertTrue(countAttr.isPresent(), "count attribute should be parsed");
                 assertEquals("Annotated[int, Min(1), Max(100)]", countAttr.get().annotation(), "count should have full annotation string");
                 assertEquals("int", countAttr.get().typeName().name(), "count should have full annotation as typeName for now");
-                assertEquals(10, countAttr.get().value().asInt(), "count should have value 10");
+                assertEquals(10, countAttr.get().value(), "count should have value 10");
 
                 // Check that count has Min and Max decorators
                 List<DecoratorDef> countDecorators = countAttr.get().decorators();
@@ -1845,13 +2187,13 @@ class ProductMappers:
                     .filter(d -> "Min".equals(d.name()))
                     .findFirst();
                 assertTrue(minDecorator.isPresent(), "count should have Min decorator");
-                assertEquals(1, minDecorator.get().members().get("value").asInt(), "Min value should be 1");
+                assertEquals(1, minDecorator.get().members().get("value"), "Min value should be 1");
 
                 var maxDecorator = countDecorators.stream()
                     .filter(d -> "Max".equals(d.name()))
                     .findFirst();
                 assertTrue(maxDecorator.isPresent(), "count should have Max decorator");
-                assertEquals(100, maxDecorator.get().members().get("value").asInt(), "Max value should be 100");
+                assertEquals(100, maxDecorator.get().members().get("value"), "Max value should be 100");
 
                 // Test that PythonFieldElement creates correct annotation metadata
                 ClassElement fruitElement = processingEnvironment.classes().get("Fruit");
@@ -1906,7 +2248,7 @@ class ProductMappers:
                 assertTrue(validatedNameAttr.isPresent(), "validated_name attribute should be parsed");
                 assertEquals("Annotated[str, NotBlank]", validatedNameAttr.get().annotation(), "validated_name should have full annotation string");
                 assertEquals("str", validatedNameAttr.get().typeName().name(), "validated_name should have full annotation as typeName");
-                assertEquals("apple", validatedNameAttr.get().value().asString(), "validated_name should have value 'apple'");
+                assertEquals("apple", validatedNameAttr.get().value(), "validated_name should have value 'apple'");
 
                 // Check that validated_name has NotBlank decorator
                 List<DecoratorDef> validatedNameDecorators = validatedNameAttr.get().decorators();
@@ -1997,8 +2339,7 @@ class ProductMappers:
                 assertEquals("Gt", gtDecorator.annotationName(), "annotation name should be Gt");
                 assertTrue(gtDecorator.members().containsKey("value"), "Gt should have value member");
                 var gtMemberValue = gtDecorator.members().get("value");
-                assertTrue(gtMemberValue instanceof org.graalvm.polyglot.Value, "Gt value should be a GraalVM Value");
-                assertEquals(0, ((org.graalvm.polyglot.Value) gtMemberValue).asInt(), "Gt value should be 0");
+                assertEquals(0, gtMemberValue, "Gt value should be 0");
 
                 // Check count argument - should have extracted int type and Min/Max decorators
                 ArgumentDef countArg = args.arguments().get(2);
@@ -2016,13 +2357,13 @@ class ProductMappers:
                     .filter(d -> "Min".equals(d.name()))
                     .findFirst();
                 assertTrue(minDecorator.isPresent(), "count should have Min decorator");
-                assertEquals(1, minDecorator.get().members().get("value").asInt(), "Min value should be 1");
+                assertEquals(1, minDecorator.get().members().get("value"), "Min value should be 1");
 
                 var maxDecorator = countDecorators.stream()
                     .filter(d -> "Max".equals(d.name()))
                     .findFirst();
                 assertTrue(maxDecorator.isPresent(), "count should have Max decorator");
-                assertEquals(100, maxDecorator.get().members().get("value").asInt(), "Max value should be 100");
+                assertEquals(100, maxDecorator.get().members().get("value"), "Max value should be 100");
 
                 // Test that PythonParameterElement creates correct annotation metadata
                 ClassElement fruitServiceElement = processingEnvironment.classes().get("FruitService");
@@ -2449,5 +2790,97 @@ class ProductMappers:
         List<PropertyElement> noStaticProperties = pythonClass.getBeanProperties(noStaticQuery);
         // All our test properties are non-static, so size should remain the same
         assertEquals(allProperties.size(), noStaticProperties.size(), "Should include all non-static properties");
+    }
+    /**
+     * The run time strips a leading "io." from every Java package
+     * (context-python/.../micronaut_java_imports.py), so io.swagger.v3.oas.annotations is imported from
+     * Python as swagger.v3.oas.annotations. The compiler restored the prefix only for micronaut.*, which
+     * left every other io. library unresolvable -- and unresolvable annotations are dropped silently.
+     *
+     * <p>The stand-in here is io.example.oas.SampleJavaType; the visitor context below deliberately
+     * resolves only the io.-prefixed spelling, which is the situation a real compile classpath presents.
+     */
+    @Test
+    void testImportOfAnIoPackageOtherThanMicronautResolvesToTheIoPrefixedName() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = ioPrefixedVisitorContext();
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example.oas import SampleJavaType
+
+            class Demo:
+                def index(self, sample: SampleJavaType | None = None) -> dict:
+                    return {}
+            """);
+
+        assertTrue(
+            transformResult.runtimeCode().contains("SampleJavaType = java.type('io.example.oas.SampleJavaType')"),
+            transformResult.runtimeCode()
+        );
+    }
+
+    /**
+     * The same asymmetry on the package lookup, which backs a wildcard import.
+     */
+    @Test
+    void testWildcardImportOfAnIoPackageOtherThanMicronautResolves() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = ioPrefixedVisitorContext();
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example.oas import *
+
+            class Demo:
+                def index(self, sample: SampleJavaType | None = None) -> dict:
+                    return {}
+            """);
+
+        assertTrue(
+            transformResult.runtimeCode().contains("java.type('io.example.oas.SampleJavaType')"),
+            transformResult.runtimeCode()
+        );
+    }
+
+    /**
+     * A visitor context that knows io.example.oas.SampleJavaType and nothing else -- in particular it
+     * does not answer to the "example.oas" spelling Python uses.
+     */
+    private static VisitorContext ioPrefixedVisitorContext() {
+        return (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName())
+                    && args != null
+                    && args.length >= 1
+                    && "io.example.oas.SampleJavaType".equals(args[0])) {
+                    return Optional.of(ClassElement.of(io.example.oas.SampleJavaType.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    if (args != null && args.length >= 1 && "io.example.oas".equals(args[0])) {
+                        return new ClassElement[] { ClassElement.of(io.example.oas.SampleJavaType.class) };
+                    }
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
     }
 }

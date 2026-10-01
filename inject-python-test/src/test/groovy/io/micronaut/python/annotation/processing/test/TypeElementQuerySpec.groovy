@@ -155,7 +155,7 @@ class QueryTarget:
     }
 
     private static boolean isPythonElement(Object element) {
-        element.class.name.startsWith("io.micronaut.python.processing.visitor.")
+        element.class.name.startsWith("io.micronaut.python.processing.element.")
     }
 
     static class TypeElementQueryVisitor implements TypeElementVisitor<Object, Object> {

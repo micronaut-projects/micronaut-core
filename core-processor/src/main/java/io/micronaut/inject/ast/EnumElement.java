@@ -15,8 +15,11 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Experimental;
+
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Models an enum type.
@@ -42,5 +45,21 @@ public interface EnumElement extends ClassElement {
      */
     default List<EnumConstantElement> elements() {
         return Collections.emptyList();
+    }
+
+    /**
+     * Returns the static method used to resolve an enum constant by name.
+     *
+     * <p>Java enums use the standard {@link Enum#valueOf(Class, String)}
+     * path and therefore return an empty optional. Language implementations
+     * can expose their compiler-modelled lookup method so generated
+     * introspections can resolve constants without reflection.</p>
+     *
+     * @return The enum constant lookup method, if one is available
+     * @since 5.2.0
+     */
+    @Experimental
+    default Optional<MethodElement> getEnumValueOfMethod() {
+        return Optional.empty();
     }
 }

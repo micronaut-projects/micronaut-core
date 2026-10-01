@@ -5,7 +5,7 @@ Micronaut Framework provides support for loading resources from files into memor
 * api:core.io.value.StringResourceLoader[]
 * api:core.io.value.Base64ResourceLoader[]
 
-A convenience class api:core.io.ResourceResolver[] is provided that leverages both of these  implementations. The following example illustrates using the API to read a text file from the classpath.
+A convenience class api:core.io.ResourceResolver[] is provided that leverages these implementations. The following example illustrates using the API to read a text file from the classpath.
 
 snippet::io.micronaut.docs.resources.MyResourceLoader[tags="class",indent=0,title="ResourceResolver Example"]
 
@@ -19,6 +19,6 @@ Areas of the framework that load resources using `ResourceResolver` include:
 * SSL key and trust stores
 * Dynamic configuration
 
-To use a fixed value for a resource instead of loading it from the file system or classpath, the `string:` and
+To use a fixed value for a resource instead of loading it from the file system or classpath, use the `string:` and
 `base64:` prefixes. While `string:` returns the value as is (decoded as UTF-8), `base64:` first decodes the value from
 Base64. This allows you to serve e.g. a small binary as a static HTTP file.

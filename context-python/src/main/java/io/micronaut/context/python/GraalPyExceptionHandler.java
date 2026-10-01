@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -52,7 +53,77 @@ final class GraalPyExceptionHandler {
         }
     }
 
+    /**
+     * Resolve the host throwable represented by a guest exception value.
+     * <p>
+     * Host exceptions that crossed into Python keep their identity, generated Python exception wrappers
+     * are instantiated, and any other Python exception is reported as the {@link PolyglotException}
+     * that {@link Value#throwException()} produces for it.
+     *
+     * @param exception The exception value
+     * @return The throwable to report to Java
+     */
+    static Throwable toHostThrowable(Value exception) {
+        if (exception.isHostObject() && exception.asHostObject() instanceof Throwable throwable) {
+            return throwable;
+        }
+        if (exception.hasMembers() && exception.hasMember("java_exception")) {
+            Value javaException = exception.getMember("java_exception");
+            if (javaException != null && javaException.isHostObject() && javaException.asHostObject() instanceof Throwable throwable) {
+                return throwable;
+            }
+        }
+        if (exception.isException()) {
+            try {
+                exception.throwException();
+            } catch (PolyglotException polyglotException) {
+                if (polyglotException.isHostException()) {
+                    return polyglotException.asHostException();
+                }
+                RuntimeException generated = toGeneratedRuntimeException(polyglotException);
+                return generated != null ? generated : polyglotException;
+            }
+        }
+        return new RuntimeException(exception.toString());
+    }
+
     private static @Nullable RuntimeException toGeneratedRuntimeException(PolyglotException exception) {
+        return toGeneratedException(exception, RuntimeException.class, Thread.currentThread().getContextClassLoader());
+    }
+
+    /**
+     * The exception a bridge method declaring checked exceptions rethrows for a Python exception:
+     * a host exception of one of the declared types, raised in Python as is or thrown by a Java
+     * call the Python code did not catch, or the generated Java exception of a Python exception
+     * class extending one of the declared types.
+     *
+     * @param exception The exception of the Python call
+     * @param classLoader The class loader of the generated classes (the context class loader of the thread
+     * is the loader of the polyglot context only while Python code runs)
+     * @param declaredTypes The checked exception types the bridge method declares
+     * @return The exception to rethrow, or {@code null} when the Python exception is none of them
+     */
+    static @Nullable Throwable toDeclaredException(PolyglotException exception, ClassLoader classLoader, Class<?>[] declaredTypes) {
+        if (exception.isHostException()) {
+            Throwable hostException = exception.asHostException();
+            for (Class<?> declaredType : declaredTypes) {
+                if (declaredType.isInstance(hostException)) {
+                    return hostException;
+                }
+            }
+        }
+        for (Class<?> declaredType : declaredTypes) {
+            if (Throwable.class.isAssignableFrom(declaredType)) {
+                Throwable generated = toGeneratedException(exception, declaredType.asSubclass(Throwable.class), classLoader);
+                if (generated != null) {
+                    return generated;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static <T extends Throwable> @Nullable T toGeneratedException(PolyglotException exception, Class<T> exceptionType, ClassLoader classLoader) {
         Value guestObject = null;
         try {
             guestObject = exception.getGuestObject();
@@ -65,12 +136,12 @@ final class GraalPyExceptionHandler {
         if (guestObject == null || guestObject.isNull()) {
             return null;
         }
-        RuntimeException mappedException = mappedRuntimeException(guestObject);
+        T mappedException = mappedException(guestObject, exceptionType);
         if (mappedException != null) {
             return mappedException;
         }
         for (String className : generatedWrapperCandidates(guestObject)) {
-            RuntimeException generatedException = instantiateGeneratedException(className, guestObject);
+            T generatedException = instantiateGeneratedException(className, guestObject, exceptionType, classLoader);
             if (generatedException != null) {
                 return generatedException;
             }
@@ -78,11 +149,11 @@ final class GraalPyExceptionHandler {
         return null;
     }
 
-    private static @Nullable RuntimeException mappedRuntimeException(Value guestObject) {
+    private static <T extends Throwable> @Nullable T mappedException(Value guestObject, Class<T> exceptionType) {
         try {
             Object mappedObject = guestObject.as(Object.class);
-            if (mappedObject instanceof RuntimeException runtimeException && mappedObject instanceof ValueCoercible) {
-                return runtimeException;
+            if (exceptionType.isInstance(mappedObject) && mappedObject instanceof ValueCoercible) {
+                return exceptionType.cast(mappedObject);
             }
         } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
             return null;
@@ -101,7 +172,7 @@ final class GraalPyExceptionHandler {
         Value pythonClass = guestObject.hasMember("__class__") ? guestObject.getMember("__class__") : null;
         String moduleName = stringMember(pythonClass, "__module__");
         if (simpleName != null && !simpleName.isBlank()) {
-            addCandidate(candidates, GraalPyRuntimeUtil.PYTHON + "." + simpleName);
+            addCandidate(candidates, PythonContextRuntime.PYTHON + "." + simpleName);
             if (moduleName != null && !moduleName.isBlank()) {
                 addCandidate(candidates, moduleName);
                 addCandidate(candidates, moduleName + "." + simpleName);
@@ -114,14 +185,19 @@ final class GraalPyExceptionHandler {
         return candidates;
     }
 
-    private static @Nullable RuntimeException instantiateGeneratedException(String className, Value guestObject) {
+    private static <T extends Throwable> @Nullable T instantiateGeneratedException(String className, Value guestObject, Class<T> exceptionType, ClassLoader classLoader) {
         try {
-            Class<?> exceptionClass = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
-            if (!RuntimeException.class.isAssignableFrom(exceptionClass) || !ValueCoercible.class.isAssignableFrom(exceptionClass)) {
+            Class<?> exceptionClass = Class.forName(className, false, classLoader);
+            if (!exceptionType.isAssignableFrom(exceptionClass) || !ValueCoercible.class.isAssignableFrom(exceptionClass)) {
                 return null;
             }
             Constructor<?> constructor = exceptionClass.getConstructor(Value.class);
-            return (RuntimeException) constructor.newInstance(guestObject);
+            return exceptionType.cast(constructor.newInstance(guestObject));
+        } catch (InvocationTargetException e) {
+            // the generated constructor failed to call the Java super constructor: a programming
+            // error of the Python class, not a Python exception to report as is
+            throw new IllegalStateException("Cannot create the Java exception [" + className + "] for the Python exception ["
+                + guestObject + "]: " + e.getCause(), e.getCause());
         } catch (ReflectiveOperationException | LinkageError e) {
             return null;
         }

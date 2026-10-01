@@ -12,6 +12,8 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
 <4> Use the `set` method to set the property value
 <5> Use the `get` method to retrieve the property value
 
+[.lang-java.lang-groovy]
+--
 It's possible to apply the introspection to all the classes in one package. Simply create `package-info` file and annotate the package with ann:core.annotation.Introspected[].
 
 snippet::io.micronaut.docs.ioc.introspection.pck.foobar.package-info[tags="usage", indent=0]
@@ -19,3 +21,9 @@ snippet::io.micronaut.docs.ioc.introspection.pck.foobar.package-info[tags="usage
 WARNING: The package should contain only classes that can be introspected.
 
 NOTE: Only classes located directly within the package are processed; subpackages are ignored.
+--
+
+[.lang-kotlin.lang-python]
+--
+NOTE: Package-level introspection requires a `package-info` declaration, which only Java and Groovy support. In Kotlin and Python, annotate each class with ann:core.annotation.Introspected[], or list the types with the `classes` member as shown in <<introspectedAnnotationOnAConfigurationClass, Use the @Introspected Annotation on a Configuration Class>>.
+--

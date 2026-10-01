@@ -50,6 +50,12 @@ internal class KotlinElementFactory(
                 visitorContext,
                 null
             )
+        } else if (declaration.classKind == ClassKind.ANNOTATION_CLASS) {
+            KotlinAnnotationElement(
+                KotlinClassNativeElement(declaration),
+                annotationMetadataFactory,
+                visitorContext
+            )
         } else {
             KotlinClassElement(
                 KotlinClassNativeElement(declaration),

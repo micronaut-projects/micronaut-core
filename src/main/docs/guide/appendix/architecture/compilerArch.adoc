@@ -1,7 +1,7 @@
 The Micronaut Compiler is a set of extensions to existing language compilers:
 
 * Java - the link:{jdkapi}/java.compiler/javax/annotation/processing/package-summary.html[Java Annotation Processing (APT) API] is used for Java  code.
-* Kotlin - <<kapt, KAPT>> or <<ksp, KSP>> is used for Kotlin code.
+* Kotlin - https://kotlinlang.org/docs/kapt.html[KAPT] or https://kotlinlang.org/docs/ksp-overview.html[KSP] is used for Kotlin code.
 * Groovy - Groovy https://docs.groovy-lang.org/latest/html/api/org/codehaus/groovy/transform/ASTTransformation.html[AST Transformations] are used to participate in the compilation of Groovy code.
 
 To keep this documentation simple, the remaining sections will describe the interaction with the Java compiler.

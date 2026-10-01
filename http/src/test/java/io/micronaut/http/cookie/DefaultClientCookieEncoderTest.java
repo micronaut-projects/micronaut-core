@@ -67,9 +67,28 @@ class DefaultClientCookieEncoderTest {
     }
 
     @Test
+    void encodeTreatsANullCookieValueAsEmpty() {
+        // Cookie::getValue is non-null by contract, so this cookie breaks it; the encoder still must not
+        // emit the four characters of "null"
+        ClientCookieEncoder cookieEncoder = new DefaultClientCookieEncoder();
+        assertEquals("SID=", cookieEncoder.encode(new NullValueCookie()));
+    }
+
+    @Test
     void encodeEmitsValidatedNameAndValue() {
         ClientCookieEncoder cookieEncoder = new DefaultClientCookieEncoder();
         assertEquals("SID=value", cookieEncoder.encode(new ChangingClientCookie()));
+    }
+
+    private static final class NullValueCookie extends SimpleCookie {
+        private NullValueCookie() {
+            super("SID", "value");
+        }
+
+        @Override
+        public String getValue() {
+            return null;
+        }
     }
 
     private static final class ChangingClientCookie extends SimpleCookie {
