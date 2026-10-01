@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.PropertyExpressionResolver;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.runtime.TrainingRunTest.ChildJvm;
@@ -65,8 +66,8 @@ class TrainingTestResourcesTest {
     static final String SPEC_NAME = "TrainingTestResourcesTest";
     private static final String CHILD_JVM = "child-jvm";
     private static final String CLIENT_ENABLED = "micronaut.test.resources.enabled";
-    private static final String DISABLED = "Training run (" + ApplicationConfiguration.TRAINING_ENABLED + "=true): Micronaut Test Resources is on the class path and disabled ("
-        + CLIENT_ENABLED + "=false while the configuration was read), so it supplies no property";
+    private static final String DISABLED = "Training run (" + ApplicationConfiguration.TRAINING_ENABLED + "=true): Micronaut Test Resources is on the class path, so this run set "
+        + CLIENT_ENABLED + "=false, the switch of its client, while the configuration was read";
 
     @TempDir
     Path temp;
@@ -231,6 +232,45 @@ class TrainingTestResourcesTest {
     }
 
     @Test
+    void aBuilderSourceThatAConfigurationFileOverridesIsNotReadBeforeTheStart() throws IOException {
+        // The configuration file (order -400) overrides the property source of the builder (order -1000), so this is
+        // not a training run, and Test Resources stays on
+        Path config = Files.createDirectories(temp.resolve("config"));
+        Files.writeString(config.resolve("application.properties"), ApplicationConfiguration.TRAINING_ENABLED + "=false\n");
+        try (ApplicationContext context = Micronaut.build(new String[0])
+            .classLoader(classLoaderWith(FakeTestResourcesClient.Loader.class))
+            .properties(Map.of("spec.name", SPEC_NAME))
+            .propertySources(PropertySource.of("low", Map.of(ApplicationConfiguration.TRAINING_ENABLED, "true"), -1000))
+            .overrideConfigLocations("file:" + config)
+            .start()) {
+
+            assertTrue(context.isRunning());
+            assertEquals("true", FakeTestResourcesClient.SWITCH.get());
+            assertEquals(FakeTestResourcesClient.VALUE, ReadsTheProperty.URL.get());
+            assertTrue(messages(Level.WARN).isEmpty(), () -> messages(Level.WARN).toString());
+        }
+    }
+
+    @Test
+    void aSwitchThatTheStartedConfigurationTurnsOffIsNotATrainingRunAndSaysThatTestResourcesWasDisabled() throws IOException {
+        // A source that the environment only reads when it starts, such as distributed configuration, overrides the builder
+        try (ApplicationContext context = Micronaut.build(new String[0])
+            .classLoader(classLoaderWith(FakeTestResourcesClient.Loader.class))
+            .properties(Map.of("spec.name", SPEC_NAME, ApplicationConfiguration.TRAINING_ENABLED, "true"))
+            .propertySourcesLocator(environment -> List.of(PropertySource.of("located", Map.of(ApplicationConfiguration.TRAINING_ENABLED, "false"), 100)))
+            .start()) {
+
+            assertTrue(context.isRunning());
+            assertEquals("false", FakeTestResourcesClient.SWITCH.get());
+            assertEquals("none", ReadsTheProperty.URL.get());
+            assertEquals(List.of(ApplicationConfiguration.TRAINING_ENABLED + " was true before the configuration was read, and the configuration turns it off, so this run is not a training run. "
+                + "Micronaut Test Resources was disabled all the same (" + CLIENT_ENABLED + "=false while the configuration was read). Set "
+                + ApplicationConfiguration.TRAINING_ENABLED + " in one place only"), messages(Level.WARN));
+            assertNull(System.getProperty(CLIENT_ENABLED));
+        }
+    }
+
+    @Test
     @Tag(CHILD_JVM)
     void aTrainingRunThatASystemPropertyOrAnEnvironmentVariableTurnsOnDisablesTestResources() throws IOException {
         String classPath = servicesFor(FakeTestResourcesClient.Loader.class) + File.pathSeparator + System.getProperty("java.class.path");
@@ -246,6 +286,14 @@ class TrainingTestResourcesTest {
             assertFalse(child.output().contains(FakeTestResourcesClient.RESOLVED_MESSAGE), child::output);
             assertTrue(child.output().contains(DISABLED), child::output);
         }
+
+        // An environment variable that the builder excludes is not read before the start either: not a training run
+        ChildJvm excluded = ChildJvm.run(MainWithoutTheVariable.class, classPath, Map.of("MICRONAUT_APPLICATION_TRAINING_ENABLED", "true"));
+        assertEquals(0, excluded.exitCode(), excluded::output);
+        assertTrue(excluded.output().contains(FakeTestResourcesClient.COMPUTED + "true, supplies [" + FakeTestResourcesClient.PROPERTY + "]"), excluded::output);
+        assertTrue(excluded.output().contains(FakeTestResourcesClient.RESOLVED_MESSAGE), excluded::output);
+        assertFalse(excluded.output().contains("Training run"), excluded::output);
+        assertFalse(excluded.output().contains("was true before the configuration was read"), excluded::output);
     }
 
     /**
@@ -299,6 +347,19 @@ class TrainingTestResourcesTest {
             Micronaut.build(args)
                 .properties(Map.<String, Object>of("spec.name", SPEC_NAME))
                 .start();
+        }
+    }
+
+    /**
+     * The application run by the child JVM, with the environment variable of the switch excluded.
+     */
+    static final class MainWithoutTheVariable {
+        public static void main(String[] args) {
+            Micronaut.build(args)
+                .properties(Map.<String, Object>of("spec.name", SPEC_NAME))
+                .environmentVariableExcludes("MICRONAUT_APPLICATION_TRAINING_ENABLED")
+                .start()
+                .close();
         }
     }
 }

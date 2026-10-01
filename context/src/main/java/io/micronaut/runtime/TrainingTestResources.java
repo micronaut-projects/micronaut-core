@@ -40,13 +40,35 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *     <li>If the switch is on before the environment starts, {@link Micronaut#start()} sets the system
  *     property {@value #CLIENT_ENABLED} to {@code false} while the environment starts. It is the switch
- *     that the factory of the Test Resources client reads: the client then neither contacts a server
- *     nor supplies a property. The previous value is restored once the environment has started, after
- *     the property source of the client has computed its properties.</li>
+ *     that the factory of the Test Resources client reads when it creates a client: the client then
+ *     neither contacts a server nor supplies a property. The system property gets its previous value
+ *     back once the environment has started, after the property source of the client has computed its
+ *     properties. The environment keeps the value {@code false}, which it read with the other system
+ *     properties; nothing in Test Resources reads it from there.</li>
  *     <li>Once the environment has started, {@link #checkDisabled(Environment, boolean)} fails the
  *     training run if Test Resources is on the class path and was not disabled: the switch was only
  *     set in the configuration of the application, which the environment reads together with the
  *     property source of Test Resources, or the module does not read {@value #CLIENT_ENABLED}.</li>
+ *     <li>If the switch was on before the environment started but the started environment turns it
+ *     off, the run is not a training run, and {@link #warnNotATrainingRun(Environment)} says that Test
+ *     Resources was disabled all the same.</li>
+ * </ul>
+ *
+ * <p>Two cases are not covered, and the check cannot see them. The started environment does not say
+ * whether Test Resources supplied a property: the loader of Test Resources returns a property source
+ * for the application and one for each active environment, all with the same name, and the
+ * environment keeps only the last one, which has nothing left to add once the first one has added the
+ * missing properties.</p>
+ *
+ * <ul>
+ *     <li>The factory of the client returns a client that it has already created in this JVM from
+ *     system properties before it reads {@value #CLIENT_ENABLED}. A training run that follows an
+ *     application context with Test Resources in the same JVM, in practice in a test, still uses that
+ *     client.</li>
+ *     <li>The resolver of the client resolves any {@code ${auto.test.resources.*}} expression, with a
+ *     client that it creates when it resolves the first one, after the system property has its
+ *     previous value back. The property source of the disabled client adds no such placeholder, so
+ *     only one written in the configuration of the application could reach a client.</li>
  * </ul>
  *
  * <p>Micronaut core has no dependency on Test Resources: it recognizes the property source loaders of
@@ -60,7 +82,7 @@ final class TrainingTestResources {
 
     /**
      * The switch of the Micronaut Test Resources client, a system property: {@code false} makes the
-     * client a no-op that contacts no server and supplies no property.
+     * client that the factory creates a no-op that contacts no server and supplies no property.
      */
     static final String CLIENT_ENABLED = "micronaut.test.resources.enabled";
 
@@ -85,9 +107,11 @@ final class TrainingTestResources {
     }
 
     /**
-     * Restores {@value #CLIENT_ENABLED} once the environment has started. The property source of the
-     * client has computed its properties by then, none, and the resolver of the client only resolves
-     * the placeholders of that property source.
+     * Gives the system property {@value #CLIENT_ENABLED} its previous value back once the environment
+     * has started, after the property source of the client has computed its properties: none. The
+     * started environment keeps the value {@code false}. The resolver of the client resolves any
+     * {@code ${auto.test.resources.*}} expression, with a client that it creates from then on; the
+     * property source added none, so only one written in the configuration could reach it.
      *
      * @param previous The value that {@link #disableClient()} returned
      */
@@ -127,8 +151,30 @@ final class TrainingTestResources {
             client = true;
         }
         if (client && LOG.isInfoEnabled()) {
-            LOG.info("Training run ({}=true): Micronaut Test Resources is on the class path and disabled ({}=false while the configuration was read), so it supplies no property",
+            // What the run did, not what the client did: a client that this JVM created before ignores the switch
+            LOG.info("Training run ({}=true): Micronaut Test Resources is on the class path, so this run set {}=false, the switch of its client, while the configuration was read",
                 ApplicationConfiguration.TRAINING_ENABLED, CLIENT_ENABLED);
+        }
+    }
+
+    /**
+     * Says that Test Resources was disabled for a run that is not a training run: the switch was on
+     * before the environment started, and a source that the environment only reads when it starts
+     * turned it off.
+     *
+     * @param environment The started environment of a run that is not a training run
+     */
+    static void warnNotATrainingRun(Environment environment) {
+        if (!LOG.isWarnEnabled()) {
+            return;
+        }
+        for (PropertySourceLoader loader : environment.getPropertySourceLoaders()) {
+            if (loader.getClass().getName().startsWith(PACKAGE)) {
+                LOG.warn("{} was true before the configuration was read, and the configuration turns it off, so this run is not a training run. "
+                        + "Micronaut Test Resources was disabled all the same ({}=false while the configuration was read). Set {} in one place only",
+                    ApplicationConfiguration.TRAINING_ENABLED, CLIENT_ENABLED, ApplicationConfiguration.TRAINING_ENABLED);
+                return;
+            }
         }
     }
 }

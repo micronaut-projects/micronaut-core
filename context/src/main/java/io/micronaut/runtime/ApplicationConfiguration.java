@@ -68,7 +68,8 @@ public class ApplicationConfiguration {
      * {@code MICRONAUT_APPLICATION_TRAINING_ENABLED} environment variable or as an argument of the
      * application, where it is read before the configuration: if Test Resources is on the class path
      * and the switch is only set in the configuration of the application, or Test Resources cannot
-     * be disabled, the training run fails.</p>
+     * be disabled, the training run fails. A Test Resources client that the same JVM has already
+     * created, in practice in a test, is not disabled.</p>
      *
      * <p>In the {@code test} environment {@link Micronaut#start()} does not exit the JVM: it
      * returns the {@link io.micronaut.context.ApplicationContext} it has already closed, so the

@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -93,6 +94,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     TrainingLoad.run(applicationContext);
                     return applicationContext;
                 }
+            } else if (trainingRunBeforeStart) {
+                // A source that the environment only reads when it starts turned the switch off again
+                TrainingTestResources.warnNotATrainingRun(environment);
             }
 
             applicationContext.start();
@@ -248,10 +252,18 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
     /**
      * Reads the training run switch before the environment starts, from the sources that the
-     * environment does not have to read: the system properties, the environment variables, and the
-     * properties and the arguments given to this builder. They take precedence over the configuration
-     * files, so when one of them sets the switch, the environment reads the same value once it has
-     * started. A switch that is only set in the configuration of the application is not seen here.
+     * environment does not have to read and that take precedence over the configuration files: the
+     * system properties, the environment variables (with the includes and the excludes of this
+     * builder, as the environment reads them), the properties and the arguments given to this
+     * builder, and the property sources given to this builder whose order is at least that of the
+     * environment variables. A switch that is only set in the configuration of the application, or
+     * in a property source of this builder with a lower order, which a configuration file can
+     * override, is not seen here.
+     *
+     * <p>A source that the environment only reads when it starts and that takes precedence over
+     * these, such as distributed configuration, can still turn the switch off. {@link #start()} then
+     * logs a warning, because Micronaut Test Resources was disabled for a run that is not a training
+     * run (see {@link TrainingTestResources}).</p>
      *
      * <p>Every application runs this on startup: two lookups and a look at the property sources that
      * this builder has added, usually none or one.</p>
@@ -265,20 +277,40 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         if (isEnableDefaultPropertySources()) {
             value = CachedEnvironment.getProperty(ApplicationConfiguration.TRAINING_ENABLED);
             order = SystemPropertiesPropertySource.POSITION;
-            if (value == null && isEnvironmentPropertySource()) {
+            if (value == null && readsTrainingVariable()) {
                 value = CachedEnvironment.getenv(TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
                 order = EnvironmentPropertySource.POSITION;
             }
         }
         // The source with the highest order wins, and the sources of the builder win a tie, as in the started environment
         for (PropertySource propertySource : environment.getPropertySources()) {
+            int sourceOrder = propertySource.getOrder();
+            // Below the environment variables, a configuration file, which is not read yet, could override it
+            if (sourceOrder < EnvironmentPropertySource.POSITION) {
+                continue;
+            }
             Object sourceValue = propertySource.get(ApplicationConfiguration.TRAINING_ENABLED);
-            if (sourceValue != null && (value == null || propertySource.getOrder() >= order)) {
+            if (sourceValue != null && (value == null || sourceOrder >= order)) {
                 value = sourceValue.toString();
-                order = propertySource.getOrder();
+                order = sourceOrder;
             }
         }
         return StringUtils.TRUE.equalsIgnoreCase(value);
+    }
+
+    /**
+     * @return Whether the started environment reads {@value #TRAINING_ENABLED_ENVIRONMENT_VARIABLE}:
+     * the environment variables are a property source, and the includes and the excludes of this
+     * builder let that variable through, as {@link EnvironmentPropertySource} applies them
+     */
+    private boolean readsTrainingVariable() {
+        if (!isEnvironmentPropertySource()) {
+            return false;
+        }
+        @Nullable List<String> includes = getEnvironmentVariableIncludes();
+        @Nullable List<String> excludes = getEnvironmentVariableExcludes();
+        return (includes == null || includes.contains(TRAINING_ENABLED_ENVIRONMENT_VARIABLE))
+            && (excludes == null || !excludes.contains(TRAINING_ENABLED_ENVIRONMENT_VARIABLE));
     }
 
     /**
