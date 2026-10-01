@@ -79,13 +79,10 @@ class TrainingRunSpec extends Specification {
         }
         reader.join(30_000)
 
-        then:
-        exited
-        process.exitValue() == 0
-        output.toString().contains('stopped: ' + MessagingApplication.name)
-
-        cleanup:
-        println output
+        then: 'the output of the child is only shown when a condition fails'
+        assert exited, output
+        assert process.exitValue() == 0, output
+        assert output.toString().contains('stopped: ' + MessagingApplication.name), output
     }
 
     /**
