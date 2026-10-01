@@ -384,6 +384,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The service type
      */
+    @Internal
     public interface ServiceCollector<S> {
         void collect(Collection<S> values);
 
