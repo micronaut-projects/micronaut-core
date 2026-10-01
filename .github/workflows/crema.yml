@@ -12,11 +12,14 @@ on:
       - main
       - '[0-9]+.[0-9]+.x'
     types: [opened, synchronize, reopened, ready_for_review]
-    # The module's tests depend on micronaut-core only: these are the sources they exercise.
+    # The module's tests depend on micronaut-core only. These are the sources they exercise, and the inject-java
+    # specs of the same package (SoftServiceLoaderSpec, ServiceLoaderFeatureSpec), so that a change to the service
+    # loading behaviour those specs pin down also runs the native tests.
     paths:
       - 'core/src/main/java/io/micronaut/core/io/service/**'
       - 'core/src/main/java/io/micronaut/core/util/NativeImageUtils.java'
       - 'core/src/main/resources/META-INF/native-image/**'
+      - 'inject-java/src/test/groovy/io/micronaut/core/io/service/**'
       - 'test-suite-crema-graalvm/**'
       - '.github/workflows/crema.yml'
   schedule:
@@ -24,9 +27,9 @@ on:
   workflow_dispatch:
     inputs:
       java-version:
-        description: "Oracle GraalVM to test with, as the java-version of graalvm/setup-graalvm (for example 25.0.3, or 25 for the latest release)"
+        description: "Oracle GraalVM to test with, as the java-version of graalvm/setup-graalvm (for example 25 for the latest release). Empty for the verified release, GRAALVM_JAVA_VERSION of the job."
         required: false
-        default: '25.0.3'
+        default: ''
         type: string
 # A new push to a pull request cancels its older run. Scheduled and manual runs get a group of their own.
 concurrency:
@@ -40,7 +43,8 @@ jobs:
     timeout-minutes: 60
     env:
       # The Oracle GraalVM release the Crema tests were last verified with, see test-suite-crema-graalvm/README.md.
-      # Change it together with the README when the tests are verified with another release.
+      # The only place this workflow names it: change it together with the README when the tests are verified with
+      # another release. A manual run with a java-version input tests another release instead.
       GRAALVM_JAVA_VERSION: ${{ inputs.java-version || '25.0.3' }}
       TESTCONTAINERS_RYUK_DISABLED: true
       # This workflow has no push trigger, so like the pull request builds of gradle.yml it only reads the
@@ -86,6 +90,8 @@ jobs:
           # build cache, with the writer key as the fallback until that secret exists.
           develocity-access-key: ${{ secrets.DEVELOCITY_PULL_REQUEST_ACCESS_KEY || secrets.GRADLE_ENTERPRISE_ACCESS_KEY || '' }}
 
+      # setup.sh skips its publishToMavenLocal for this workflow by its name, Crema CI: the build resolves
+      # micronaut-core as a project and never reads the local Maven repository.
       - name: "❓ Optional setup step"
         run: |
           [ -f ./setup.sh ] && ./setup.sh || [ ! -f ./setup.sh ]

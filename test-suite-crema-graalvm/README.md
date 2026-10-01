@@ -8,9 +8,9 @@ therefore opt-in. Without the `cremaTests` Gradle property this module has no `n
 GraalVM workflows, which run every `nativeTest` task of the build, do not run it.
 
 The Crema CI workflow, `.github/workflows/crema.yml`, runs them with the property on the Oracle GraalVM
-release named below: on pull requests that change `io.micronaut.core.io.service`, `NativeImageUtils`, the
-native-image configuration of `micronaut-core` or this module, every week, and on demand, where another
-GraalVM can be chosen. When the tests are verified with another release, change `GRAALVM_JAVA_VERSION` in
+release named below: on pull requests that change `io.micronaut.core.io.service` (or its specs in
+`inject-java`), `NativeImageUtils`, the native-image configuration of `micronaut-core` or this module, every
+week, and on demand, where another GraalVM can be chosen. When the tests are verified with another release, change `GRAALVM_JAVA_VERSION` in
 that workflow too.
 
 | Command | What it runs |
