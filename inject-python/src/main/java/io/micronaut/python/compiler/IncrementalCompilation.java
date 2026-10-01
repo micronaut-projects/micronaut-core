@@ -64,9 +64,6 @@ final class IncrementalCompilation {
     private static final String SOURCE_PREFIX = "source.";
     private static final String VFS_SOURCE_PREFIX = "META-INF/GRAALPY-VFS/micronaut-application/src/";
     private static final String VFS_ROOT = "META-INF/GRAALPY-VFS/micronaut-application";
-    // the name prefix of the provider of functional interfaces Python processing generates (see
-    // io.micronaut.python.processing.PythonFunctionalInterfaceProviderGenerator)
-    private static final String FUNCTIONAL_INTERFACE_PROVIDER_PREFIX = "$PythonFunctionalInterfaces$";
     private static final String PYTHON_INIT_MODULE_SUFFIX = ".__init__";
     private static final Pattern JAVA_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
     private static final Pattern JAVA_TYPE = Pattern.compile("\\b(?:class|interface|record|enum|@interface)\\s+([A-Za-z_$][\\w$]*)");
@@ -287,10 +284,6 @@ final class IncrementalCompilation {
             Set<String> pythonAggregatingOutputs = new LinkedHashSet<>(
                 compilationTrace.pythonProcessorOutputs()
             );
-            pythonAggregatingOutputs.addAll(functionalInterfaceProviderOutputs(
-                compilationTrace.pythonProcessorOutputs(),
-                outputFiles
-            ));
             pythonAggregatingOutputs.removeAll(assigned);
             if (!runsPythonProcessing(plan) && plan.previous() != null) {
                 pythonAggregatingOutputs.addAll(plan.previous().pythonAggregatingOutputs());
@@ -980,47 +973,10 @@ final class IncrementalCompilation {
         String generatedApplicationPath = packageName.replace('.', '/') + "/PyronautMain";
         return output.startsWith(VFS_ROOT + '/')
             || output.startsWith(generatedApplicationPath)
-            || isFunctionalInterfaceProviderOutput(output)
             || output.startsWith("META-INF/pyronaut/")
             || output.startsWith("META-INF/swagger/views/")
             || output.startsWith("META-INF/services/")
             || output.startsWith("META-INF/native-image/");
-    }
-
-    private static boolean isFunctionalInterfaceProviderOutput(String output) {
-        String fileName = output.substring(output.lastIndexOf('/') + 1);
-        return fileName.startsWith(FUNCTIONAL_INTERFACE_PROVIDER_PREFIX)
-            || fileName.contains('.' + FUNCTIONAL_INTERFACE_PROVIDER_PREFIX);
-    }
-
-    /**
-     * The outputs derived from the functional interface providers Python processing declared: the
-     * classes javac compiles from them, and the bean definitions and bean references their
-     * {@code @Singleton} produces. The provider has no origin among the sources (it is named by the
-     * hash of all of their entries), so these are Python aggregating outputs: replaced, and the
-     * ones of a provider no longer generated deleted, whenever Python processing writes the
-     * shared outputs again.
-     */
-    private static Set<String> functionalInterfaceProviderOutputs(Set<String> declaredPythonOutputs,
-                                                                  Set<String> outputFiles) {
-        Set<String> providerPaths = declaredPythonOutputs.stream()
-            .filter(output -> output.endsWith(".java") && isFunctionalInterfaceProviderOutput(output))
-            .map(output -> output.substring(0, output.length() - ".java".length()))
-            .collect(java.util.stream.Collectors.toSet());
-        if (providerPaths.isEmpty()) {
-            return Set.of();
-        }
-        return outputFiles.stream()
-            .filter(output -> providerPaths.stream().anyMatch(providerPath -> {
-                if (output.endsWith(".class")) {
-                    return output.equals(providerPath + ".class") || output.startsWith(providerPath + '$');
-                }
-                String providerName = providerPath.replace('/', '.');
-                String fileName = output.substring(output.lastIndexOf('/') + 1);
-                return output.startsWith("META-INF/micronaut/")
-                    && (fileName.equals(providerName) || fileName.startsWith(providerName + '$'));
-            }))
-            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static boolean isPythonBytecode(String output, String source) {
