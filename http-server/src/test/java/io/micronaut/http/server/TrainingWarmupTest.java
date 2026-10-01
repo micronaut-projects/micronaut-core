@@ -15,15 +15,23 @@
  */
 package io.micronaut.http.server;
 
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.runtime.EmbeddedApplication;
+import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.runtime.server.event.ServerStartupEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.lang.reflect.Proxy;
 import java.net.InetAddress;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -73,5 +81,24 @@ class TrainingWarmupTest {
         configuration.setRepeat(3);
 
         assertEquals(3, configuration.getRepeat());
+    }
+
+    @Test
+    void sendsNoRequestWithoutAnEmbeddedApplication() {
+        TrainingWarmupConfiguration configuration = new TrainingWarmupConfiguration();
+        configuration.setPaths(List.of("/training-warmup/ok"));
+        // Any call on the server, such as getScheme() or getPort(), means that the warm-up went ahead
+        EmbeddedServer server = (EmbeddedServer) Proxy.newProxyInstance(EmbeddedServer.class.getClassLoader(),
+            new Class<?>[]{EmbeddedServer.class}, (proxy, method, args) -> {
+                throw new AssertionError("The warm-up called EmbeddedServer." + method.getName());
+            });
+
+        // This module has no EmbeddedServer implementation, so the context has no EmbeddedApplication
+        try (ApplicationContext context = ApplicationContext.run()) {
+            assertFalse(context.containsBean(EmbeddedApplication.class));
+            TrainingWarmup warmup = new TrainingWarmup(context, new HttpServerConfiguration(), configuration);
+
+            assertDoesNotThrow(() -> warmup.onApplicationEvent(new ServerStartupEvent(server)));
+        }
     }
 }

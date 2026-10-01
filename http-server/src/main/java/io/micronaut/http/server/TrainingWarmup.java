@@ -101,8 +101,9 @@ final class TrainingWarmup implements ApplicationEventListener<ServerStartupEven
             return;
         }
         EmbeddedServer server = event.getSource();
-        if (beanContext.findBean(EmbeddedApplication.class).orElse(null) != server) {
-            // Another server, such as one built with a server factory: it serves other paths
+        EmbeddedApplication<?> application = beanContext.findBean(EmbeddedApplication.class).orElse(null);
+        if (application == null || application != server) {
+            // No application, or another server, such as one built with a server factory: it serves other paths
             return;
         }
         String scheme = server.getScheme();
