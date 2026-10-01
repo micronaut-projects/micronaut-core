@@ -1441,6 +1441,15 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void toPublisherPassesThroughAnExistingHostPublisher() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Publisher<String> original = Mono.just("result");
+
+            assertSame(original, PythonAsyncioRuntime.toPublisher(context.asValue(original)));
+        }
+    }
+
+    @Test
     void toPublisherSharesTheResultOfTheFirstSubscription() {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             AtomicInteger runs = new AtomicInteger();

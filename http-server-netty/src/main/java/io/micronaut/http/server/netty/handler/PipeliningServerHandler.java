@@ -15,16 +15,13 @@
  */
 package io.micronaut.http.server.netty.handler;
 
-import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -154,6 +151,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private boolean flushPending = false;
     /**
+     * Flushes requested outside a read are coalesced into one per event loop turn.
+     */
+    @Nullable
+    private FlushCoalescer flushCoalescer;
+    /**
      * {@code true} inside {@link #writeSome()} to avoid reentrancy.
      */
     private boolean writing = false;
@@ -180,11 +182,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
-        if (compressionStrategy.isEnabled()) {
-            this.compressor = new Compressor(compressionStrategy);
-        } else {
-            this.compressor = null;
-        }
+        setCompressor(Compressor.create(compressionStrategy));
+    }
+
+    /**
+     * Set the response compressor. The server shares one instance between its connections.
+     *
+     * @param compressor The compressor, or {@code null} to disable compression
+     */
+    public void setCompressor(@Nullable Compressor compressor) {
+        this.compressor = compressor;
     }
 
     public void setBodySizeLimits(BodySizeLimits bodySizeLimits) {
@@ -285,6 +292,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
         this.ctx = ctx;
+        this.flushCoalescer = new FlushCoalescer(ctx.executor(), this::flushNow);
         // we take control of reading now.
         ctx.channel().config().setAutoRead(false);
         refreshNeedMore();
@@ -319,10 +327,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         // only unset readCalled now. This ensures no read call is done before channelReadComplete
         readCalled = false;
         if (flushPending) {
+            // this flush also covers a flush that was scheduled before this read
+            requiredFlushCoalescer().cancel();
             ctx.flush();
             flushPending = false;
         }
         refreshNeedMore();
+    }
+
+    private FlushCoalescer requiredFlushCoalescer() {
+        return Objects.requireNonNull(flushCoalescer, "flushCoalescer");
+    }
+
+    /**
+     * Perform a flush that was scheduled by the {@link #flushCoalescer}.
+     */
+    private void flushNow() {
+        if (!removed) {
+            requiredCtx().flush();
+        }
     }
 
     @Override
@@ -362,8 +385,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Write a message.
      *
      * @param message The message to write
-     * @param flush   {@code true} iff we should flush after this message
-     * @param close   {@code true} iff the channel should be closed after this message
+     * @param flush   {@code true} iff we should flush after this message. The flush is delayed
+     *                until {@link #channelReadComplete} inside a read, and to the end of the
+     *                current event loop turn otherwise, so that the messages written in one turn
+     *                share a flush
+     * @param close   {@code true} iff the channel should be closed after this message. The
+     *                message is flushed immediately in that case
      */
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
         assert ctx != null;
@@ -407,18 +434,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             ChannelPromise promise = needsPromise ?
                 requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
                 requiredCtx().voidPromise();
+            ChannelFuture future = requiredCtx().write(message, promise);
             if (flush) {
-                // delay flush until readComplete if possible
                 if (reading) {
-                    requiredCtx().write(message, promise);
                     flushPending = true;
-                    return promise;
                 } else {
-                    return requiredCtx().writeAndFlush(message, promise);
+                    requiredFlushCoalescer().schedule();
                 }
-            } else {
-                return requiredCtx().write(message, promise);
             }
+            return future;
         }
     }
 
@@ -1273,7 +1297,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 prepareCompression(response, oh, expectedLength.orElse(-1));
                 StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
                 oh.body = streaming;
-                oh.upstream = streaming.primary(oh);
+                oh.writer.attach(streaming.primary(oh.writer));
                 write(oh);
             }
         }
@@ -1501,33 +1525,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Handler that writes a {@link StreamedHttpResponse}.
+     * Handler that writes a {@link StreamedHttpResponse}. The body signals are handled by a
+     * {@link StreamingResponseWriter}; this handler is its HTTP/1 {@link StreamingResponseWriter.Sink}:
+     * it queues behind the responses before it, writes the initial message and the content
+     * messages, and reports consumption while the channel is writable.
      */
-    private final class StreamingOutboundHandler extends OutboundHandler implements BufferConsumer {
-        private final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
+    private final class StreamingOutboundHandler extends OutboundHandler implements StreamingResponseWriter.Sink {
+        final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this);
         @Nullable
         private HttpResponse initialMessage;
-        private BufferConsumer. @Nullable Upstream upstream;
-        private boolean earlyComplete = false;
         /**
-         * Error that arrived before this handler became the current outbound handler. It is
-         * handled when this response is up for writing.
-         */
-        @Nullable
-        private Throwable earlyError = null;
-        /**
-         * Data that arrived before this handler became the current outbound handler. A body that
-         * already buffered some bytes (e.g. the response body of an HTTP client relayed by a
-         * route) hands them over as soon as it is subscribed to. They are written after the
-         * initial message.
-         */
-        @Nullable
-        private List<ReadBuffer> earlyData = null;
-        private boolean writtenLast = false;
-        private long incompleteWrittenBytes = 0;
-        /**
-         * The body, for its trailers. The body completes its trailers before it completes this
-         * consumer.
+         * The body, for its trailers. The body completes its trailers before it completes the
+         * writer.
          */
         @Nullable
         private StreamingNettyByteBody body;
@@ -1550,141 +1559,43 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
-            assert upstream != null;
-            if (earlyError != null) {
-                // the response failed before it was up for writing. Handle the error now that we
-                // are the current outbound handler.
-                Throwable t = earlyError;
-                earlyError = null;
-                error0(t);
-                return;
-            }
-            if (initialMessage != null) {
-                write(initialMessage, false, false, false);
-                initialMessage = null;
-                writeEarlyData();
-                Objects.requireNonNull(upstream).start();
-            }
-            if (earlyComplete) {
-                // onComplete has been called before the first writeSome. Trigger onComplete
-                // handling again.
-                complete();
-            } else {
-                long written = incompleteWrittenBytes;
-                if (written > 0) {
-                    incompleteWrittenBytes = 0;
-                    Objects.requireNonNull(upstream).onBytesConsumed(written);
-                }
-            }
+            // this handler is the current outbound handler now
+            writer.open();
+            writer.onWritable();
         }
 
         @Override
-        public void add(ReadBuffer buf) {
-            if (flow.executeNow(() -> add0(buf))) {
-                add0(buf);
-            }
-        }
-
-        private void add0(ReadBuffer buf) {
-            if (outboundHandler != this) {
-                if (removed || initialMessage == null) {
-                    buf.close();
-                    return;
-                }
-                // data the body had buffered before this response is up for writing
-                if (earlyData == null) {
-                    earlyData = new ArrayList<>(1);
-                }
-                earlyData.add(buf);
-                return;
-            }
-
-            if (writtenLast) {
-                throw new IllegalStateException("Already written a LastHttpContent");
-            }
-
-            if (!removed) {
-                writeContent(buf);
-                if (requiredCtx().channel().isWritable()) {
-                    writeSome();
-                }
-            } else {
-                buf.close();
-            }
-        }
-
-        private void writeContent(ReadBuffer buf) {
-            int n = buf.readable();
-            writeCompressing(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, false);
-            incompleteWrittenBytes += n;
-        }
-
-        private void writeEarlyData() {
-            List<ReadBuffer> data = earlyData;
-            if (data != null) {
-                earlyData = null;
-                for (ReadBuffer buf : data) {
-                    writeContent(buf);
-                }
-            }
-        }
-
-        private void releaseEarlyData() {
-            List<ReadBuffer> data = earlyData;
-            if (data != null) {
-                earlyData = null;
-                for (ReadBuffer buf : data) {
-                    buf.close();
-                }
-            }
+        public void open() {
+            PipeliningServerHandler.this.write(Objects.requireNonNull(initialMessage), false, false, false);
+            initialMessage = null;
         }
 
         @Override
-        public void addAndComplete(ReadBuffer buf) {
-            if (flow.executeNow(() -> addAndComplete0(buf))) {
-                addAndComplete0(buf);
-            }
-        }
-
-        private void addAndComplete0(ReadBuffer buf) {
-            if (outboundHandler != this || writtenLast || removed) {
-                // not the normal steady state (e.g. the response has not started yet, or the
-                // connection is already gone). those cases are handled by the separate paths.
-                add0(buf);
-                complete0();
+        public void write(ByteBuf data, boolean last) {
+            if (!last) {
+                writeCompressing(new DefaultHttpContent(data), true, false);
                 return;
             }
-
-            // the final bytes go out as the LastHttpContent that terminates the response, instead
-            // of a content message of their own followed by an empty terminator
+            LastHttpContent content;
+            if (data.isReadable()) {
+                content = lastContent(data);
+            } else {
+                data.release();
+                content = lastContent(null);
+            }
             outboundHandler = null;
-            writeCompressing(lastContent(NettyReadBufferFactory.toByteBuf(buf)), true, true);
-            writtenLast = true;
-            // idempotent, so that a later discard of this handler does not clean up the request
-            // a second time
-            markResponseWritten();
+            writeCompressing(content, true, true);
+            writer.markResponseWritten();
             PipeliningServerHandler.this.writeSome();
         }
 
         @Override
-        public void error(Throwable t) {
-            if (flow.executeNow(() -> error0(t))) {
-                error0(t);
-            }
+        public boolean isWritable() {
+            return requiredCtx().channel().isWritable();
         }
 
-        private void error0(Throwable t) {
-            assert ctx != null;
-            if (removed) {
-                return;
-            }
-            if (outboundHandler != this) {
-                // this response is still queued behind another one. Deal with the error when it is
-                // up for writing, so that we do not cut off the response that is currently being
-                // written.
-                earlyError = t;
-                return;
-            }
+        @Override
+        public void fail(Throwable t) {
             if (LOG.isWarnEnabled()) {
                 if (initialMessage == null) {
                     LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
@@ -1699,38 +1610,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // this releases the resources of the failed response (the compression session and the
             // remaining data of the body) and cleans up the request exactly once.
             discardOutbound();
+            // the data written so far still goes out before the connection is closed
+            requiredFlushCoalescer().flushNow();
             requiredCtx().close();
         }
 
         @Override
-        public void complete() {
-            if (flow.executeNow(this::complete0)) {
-                complete0();
-            }
-        }
-
-        private void complete0() {
-            if (outboundHandler != this) {
-                // onComplete can be called immediately after onSubscribe, before request.
-                earlyComplete = true;
-                return;
-            }
-
-            outboundHandler = null;
-            if (!removed) {
-                if (initialMessage != null) {
-                    writePotentialEnd(initialMessage, false, false);
-                    initialMessage = null;
-                    writeEarlyData();
-                }
-
-                if (!writtenLast) {
-                    writeCompressing(lastContent(null), true, true);
-                    writtenLast = true;
-                }
-                markResponseWritten();
-                PipeliningServerHandler.this.writeSome();
-            }
+        public void responseWritten() {
+            markResponseWritten();
         }
 
         /**
@@ -1753,13 +1640,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardOutbound() {
             super.discardOutbound();
             // this is safe because:
-            // - cancel() may trigger onComplete/onError, but by now this handler is either removed
-            //   or no longer the current outbound handler, so they do not write anything
-            // - markResponseWritten only forwards the first call, so a response that already
+            // - allowDiscard() may trigger onComplete/onError, but by now the writer is done, so
+            //   they do not write anything
+            // - the writer only forwards the first responseWritten, so a response that already
             //   reported an error is not cleaned up twice
-            markResponseWritten();
-            releaseEarlyData();
-            Objects.requireNonNull(upstream).allowDiscard();
+            writer.dispose();
+            writer.allowDiscard();
             outboundHandler = null;
         }
     }

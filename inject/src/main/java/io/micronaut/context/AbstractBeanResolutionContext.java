@@ -531,10 +531,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public void markDependentAsFactory() {
         if (dependentBeans != null) {
-            if (dependentBeans.isEmpty()) {
-                return;
+            // an interceptor created for the construction of the bean is resolved before its factory, and is not it
+            for (int i = 0; i < dependentBeans.size(); i++) {
+                if (!(dependentBeans.get(i) instanceof BeanDisposingRegistration<?> registration && registration.isCreatedAsInterceptor())) {
+                    dependentFactory = dependentBeans.remove(i);
+                    return;
+                }
             }
-            dependentFactory = dependentBeans.removeFirst();
         }
     }
 
@@ -682,6 +685,53 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return context.getProxyTargetBean(this, definition, beanType, qualifier);
     }
 
+    @Override
+    public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return context.getInterceptorRegistrations(this, interceptorType, binding);
+    }
+
+    /**
+     * Finds the interceptor of the given definition created for the bean this context resolves for, among its
+     * dependents.
+     *
+     * @param definition The definition of the interceptor
+     * @param <I>        The interceptor type
+     * @return The registration, or {@code null} when none was created for the bean
+     */
+    @Nullable
+    <I> BeanRegistration<I> findInterceptor(BeanDefinition<I> definition) {
+        return findInterceptor(getDependentBeans(), definition);
+    }
+
+    /**
+     * Finds the interceptor of the given definition among dependents, one created to intercept the bean they depend
+     * on rather than injected into it.
+     *
+     * @param dependents The dependents, or {@code null}
+     * @param definition The definition of the interceptor
+     * @param <I>        The interceptor type
+     * @return The registration, or {@code null}
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    static <I> BeanRegistration<I> findInterceptor(@Nullable List<BeanRegistration<?>> dependents, BeanDefinition<I> definition) {
+        if (dependents != null) {
+            for (BeanRegistration<?> dependent : dependents) {
+                if (dependent instanceof BeanDisposingRegistration<?> registration
+                    && registration.isCreatedAsInterceptor()
+                    && registration.beanDefinition.equals(definition)) {
+                    return (BeanRegistration<I>) registration;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getProxyTargetBeanRegistration(this, definition, beanType, qualifier);
+    }
+
     /**
      * Class that represents a default path.
      */
@@ -694,9 +744,39 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         DefaultPath() {
         }
 
+        /**
+         * A snapshot of the path, in its own order, for rendering a message.
+         *
+         * <p>Rendering reads the path several times -- iterating it, and asking for its
+         * size and for the index of an element -- so it must not read the live list. A
+         * segment's own {@code toString} can resolve something that pushes onto the path
+         * part way through, and iteration then fails with a
+         * {@link java.util.ConcurrentModificationException} thrown from inside the
+         * constructor of the exception being reported, which replaces a
+         * {@code Circular dependency detected} message and its path with an unrelated
+         * error naming neither. Reporting a failure must not be able to fail.
+         *
+         * <p>This addresses modification by the rendering thread, which is the case a
+         * resolution context has: the path belongs to one thread's resolution. It is not a
+         * guard against another thread mutating the path concurrently, and cannot be --
+         * {@link java.util.LinkedList#toArray()} walks its nodes without checking
+         * {@code modCount}, so the copy itself would be unsafe.
+         *
+         * <p>The order is the list's own, not the descending order the renderers walk in,
+         * so that an index into it means what it meant before: {@code lastIndexOf} is used
+         * to locate the start of the cycle and a reversed copy would mirror the answer.
+         *
+         * @return The segments, head first
+         */
+        private List<Segment<?, ?>> messageSnapshot() {
+            return new ArrayList<>(this);
+        }
+
         @Override
         public String toConsoleString(boolean ansiSupported) {
-            Iterator<Segment<?, ?>> i = descendingIterator();
+            List<Segment<?, ?>> segments = messageSnapshot();
+            Collections.reverse(segments);
+            Iterator<Segment<?, ?>> i = segments.iterator();
             String ls = CachedEnvironment.getProperty("line.separator");
             StringBuilder pathString = new StringBuilder().append(ls);
 
@@ -727,23 +807,34 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @SuppressWarnings("MagicNumber")
         @Override
         public String toConsoleCircularString(boolean ansiSupported) {
-            Iterator<Segment<?, ?>> i = descendingIterator();
-            StringBuilder pathString = new StringBuilder();
-            String ls = CachedEnvironment.getProperty("line.separator");
-
-            // Try finding an actual cycle, cycleI is index where the cycle starts
-            int cycleIndex = lastIndexOf(iterator().next());
+            // One snapshot for the whole render: the size, the cycle index and the
+            // iteration all have to agree with each other, and with the live path they
+            // need not.
+            List<Segment<?, ?>> segments = messageSnapshot();
+            if (segments.isEmpty()) {
+                return "";
+            }
+            int size = segments.size();
+            // `lastIndexOf` against the list's own order, as before; the head is what
+            // `iterator().next()` used to return.
+            int cycleIndex = segments.lastIndexOf(segments.get(0));
             if (cycleIndex > 0) {
-                cycleIndex = size() - cycleIndex;
+                cycleIndex = size - cycleIndex;
             } else {
                 cycleIndex = 0;
             }
+
+            List<Segment<?, ?>> descending = new ArrayList<>(segments);
+            Collections.reverse(descending);
+            Iterator<Segment<?, ?>> i = descending.iterator();
+            StringBuilder pathString = new StringBuilder();
+            String ls = CachedEnvironment.getProperty("line.separator");
 
             String spaces = "";
             int index = 0;
             // The last element ends the cycle and is repeated in the path, so we skip it
             // and point to an already present element instead
-            while (i.hasNext() && index < size() - 1) {
+            while (i.hasNext() && index < size - 1) {
                 String segmentString = i.next().toString();
                 if (index == cycleIndex) {
                     pathString.append(ls).append(spaces).append("^").append("  ")

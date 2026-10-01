@@ -26,6 +26,7 @@ import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -343,11 +344,11 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
             // Retained by the generated proxy.
             resolved = intercepted.$interceptorRegistrations();
         } else if (kind == InterceptorKind.PRE_DESTROY) {
-            // Destruction runs with a fresh resolution context, so a bean with lifecycle advice but no proxy has
-            // nothing handed to it. Reuse the interceptor instances the bean still owns.
+            // Destruction runs with a resolution context of its own. Reuse the interceptor instances the bean owns.
             resolved = resolveLifecycleInterceptors(resolutionContext, binding);
         } else {
-            resolved = resolutionContext.getBeanRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
+            // the bean's own: an instance created for an earlier interception point of the bean is used again
+            resolved = resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
         }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
@@ -376,11 +377,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Resolves the interceptor candidates for pre-destroy interception.
      *
-     * <p>Destruction runs with a fresh resolution context, so a bean with lifecycle advice but no retaining proxy has
-     * nothing handed to it. The interceptor instances it owns are still reachable through the registrations the
-     * container passes to the dispose call, and every interceptor bound to the bean's lifecycle was created while the
-     * bean was, so those registrations are the candidate set. When the bean owns none, candidates are resolved by
-     * binding as before.</p>
+     * <p>The interceptors the container hands over when the bean was constructed with some are the candidate set.
+     * Otherwise the interceptor instances among the dependents of the bean are, together with the singletons bound to
+     * the event, and when the bean has none the interceptors are resolved by binding as the bean's own.</p>
      *
      * @param resolutionContext The resolution context
      * @param binding           The binding of the interception point
@@ -396,13 +395,23 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         if (attribute instanceof List<?> existing) {
             return (List<BeanRegistration<Interceptor<?, ?>>>) existing;
         }
+        Qualifier<Interceptor<?, ?>> qualifier = Qualifiers.byInterceptorBindingValues(binding);
         List<BeanRegistration<Interceptor<?, ?>>> existing = findExistingInterceptors(resolutionContext);
-        return existing.isEmpty()
-            ? resolutionContext.getBeanRegistrations(
-                Interceptor.ARGUMENT,
-                Qualifiers.byInterceptorBindingValues(binding)
-            )
-            : existing;
+        if (existing.isEmpty()) {
+            // resolved as the bean's own, which finds those created for an earlier interception point of the bean
+            return resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, qualifier);
+        }
+        // The interceptor instances among the dependents of the bean, such as those a proxy retained and handed to
+        // the target it destroys, are the candidates, as before. A singleton bound to the event is no dependent of
+        // the bean, so it is added.
+        List<BeanRegistration<Interceptor<?, ?>>> candidates = new ArrayList<>(existing);
+        BeanContext beanContext = resolutionContext.getContext();
+        for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, qualifier)) {
+            if (definition.isSingleton()) {
+                candidates.add(beanContext.getBeanRegistration(definition));
+            }
+        }
+        return candidates;
     }
 
     /**

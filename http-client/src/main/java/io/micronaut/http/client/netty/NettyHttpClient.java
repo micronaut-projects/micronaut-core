@@ -86,6 +86,7 @@ import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
@@ -298,6 +299,11 @@ final class NettyHttpClient implements
     private final Charset defaultCharset;
     private final Logger log;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
+    /**
+     * {@code true} when the default resolver is used and no filter entry applies to this client,
+     * so per-request filter resolution and sorting can be skipped.
+     */
+    private final boolean noFilters;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     @Nullable
@@ -336,6 +342,7 @@ final class NettyHttpClient implements
                 new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
             );
         }
+        this.noFilters = clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
         this.webSocketRegistry = builder.webSocketBeanRegistry;
         this.conversionService = builder.conversionService;
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
@@ -858,19 +865,19 @@ final class NettyHttpClient implements
 
     private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
-        DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-            resp.nettyResponse.protocolVersion(),
-            resp.nettyResponse.status(),
-            buf,
-            resp.nettyResponse.headers(),
-            EmptyHttpHeaders.INSTANCE
-        );
-
+        FullHttpResponse fullHttpResponse;
         try {
             if (log.isTraceEnabled()) {
-                traceBody("Response", fullHttpResponse.content());
+                traceBody("Response", buf);
             }
+            // copy the pooled body exactly once; every response object created below (including
+            // the error paths) shares this copy, and the pooled buffer can be released right away
+            fullHttpResponse = FullNettyClientHttpResponse.detach(resp.nettyResponse, buf);
+        } finally {
+            buf.release();
+        }
 
+        try {
             boolean convertBodyWithBodyType = shouldConvertWithBodyType(fullHttpResponse, this.configuration, bodyType, errorType);
             FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
 
@@ -907,8 +914,6 @@ final class NettyHttpClient implements
                 }
             ));
             return ExecutionFlow.error(clientResponseError);
-        } finally {
-            fullHttpResponse.release();
         }
     }
 
@@ -1629,10 +1634,13 @@ final class NettyHttpClient implements
             ClientAttributes.setServiceId(request, informationalServiceId);
         }
 
-        List<GenericHttpFilter> filters =
-            filterResolver.resolveFilters(request, clientFilterEntries);
-
-        FilterRunner.sortReverse(filters);
+        List<GenericHttpFilter> filters;
+        if (noFilters) {
+            filters = List.of();
+        } else {
+            filters = filterResolver.resolveFilters(request, clientFilterEntries);
+            FilterRunner.sortReverse(filters);
+        }
 
         FilterRunner runner = new FilterRunner(filters) {
             @Override
