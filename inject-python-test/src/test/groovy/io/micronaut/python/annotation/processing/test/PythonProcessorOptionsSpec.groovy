@@ -21,7 +21,7 @@ class PythonProcessorOptionsSpec extends Specification {
             "micronaut.python.source.root",
             "micronaut.introspection.allowReflection",
             "micronaut.python.reflection.warnings",
-            "micronaut.python.pooled.ignoreDependencies"
+            "micronaut.python.pool.ignoreDependencies"
         ]
 
         when:
@@ -29,5 +29,10 @@ class PythonProcessorOptionsSpec extends Specification {
 
         then:
         expected.every { supported.contains(it) }
+
+        and: """the name the pooled dependency option was released under is still read but not
+                advertised: a tool would forward it, and configuration validation would flag it,
+                since PythonPoolConfiguration declares the current one"""
+        !supported.contains("micronaut.python.pooled.ignoreDependencies")
     }
 }
