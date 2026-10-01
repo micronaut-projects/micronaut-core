@@ -449,6 +449,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     /**
+     * @return The currently retained dependents, without resolving a target or transferring ownership
+     */
+    final List<BeanRegistration<?>> getCachedProxyTargetDependents() {
+        List<BeanRegistration<?>> dependents = cachedProxyTargetDependents;
+        return dependents == null ? List.of() : List.copyOf(dependents);
+    }
+
+    /**
      * @return The dependents of the cached target, which are forgotten, or {@code null}
      */
     @Nullable
