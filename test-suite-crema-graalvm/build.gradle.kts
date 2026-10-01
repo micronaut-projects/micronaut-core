@@ -10,7 +10,8 @@ description = "Test suite for service loading in a native image with runtime cla
 // Crema is experimental and what it supports changes between GraalVM releases, so the native tests of this module
 // are opt-in. The native plugin is only applied, and nativeTest only exists, with -PcremaTests=true (or with the
 // ORG_GRADLE_PROJECT_cremaTests=true environment variable). The GraalVM workflows run the nativeTest tasks they
-// find in the build, so they do not run this module by default. See README.md.
+// find in the build, so they do not run this module by default. The Crema CI workflow (.github/workflows/crema.yml)
+// runs this module's native tests with the property. See README.md.
 val cremaTests = providers.gradleProperty("cremaTests").map { it.toBoolean() }.getOrElse(false)
 
 // Classes that the tests load at run time from a class path that is not part of the image. In the
