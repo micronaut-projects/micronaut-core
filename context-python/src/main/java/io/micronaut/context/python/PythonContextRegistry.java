@@ -137,8 +137,12 @@ final class PythonContextRegistry {
         synchronized (LOCK) {
             ContextState contextState = CONTEXT_STATES.remove(context);
             if (contextState != null) {
-                listeners = List.copyOf(contextState.noContextListeners);
-                // executions still in flight leave the aggregate now; their exit finds no state
+                listeners = new ArrayList<>(contextState.noContextListeners);
+                // executions still in flight leave the aggregate now; their exit finds no state, so whatever waits
+                // for them to finish is released now, or never: a pool waiting for its contexts to be idle before
+                // closing them would wait for good, and keep the states it marked closing, and through them the
+                // engine, which closes once no state of its contexts remains
+                listeners.addAll(contextState.noActiveExecutionsListeners);
                 ACTIVE_EXECUTIONS.addAndGet(-contextState.activeExecutions);
                 fileSystem = contextState.fileSystem;
                 contextState.clear(context);
@@ -603,19 +607,40 @@ final class PythonContextRegistry {
     }
 
     private static void onNoActiveExecutions(Context context, Runnable listener, boolean closing) {
-        boolean runNow;
+        boolean runNow = true;
+        ContextState created = null;
         synchronized (LOCK) {
-            ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
-            if (closing) {
-                state.closing = true;
+            ContextState state = CONTEXT_STATES.get(context);
+            if (state == null && closing) {
+                // marked closing until the close ran, and dropped then
+                created = new ContextState();
+                CONTEXT_STATES.put(context, created);
+                state = created;
             }
-            runNow = state.activeExecutions == 0;
-            if (!runNow) {
-                state.noActiveExecutionsListeners.add(listener);
+            // a context without a state has no execution: nothing to wait for, and no state to create. A state created
+            // here for a context that is closed and unregistered already, as the primary context is when the application
+            // closes it before the pool waits for it, would be kept for good, and with it the engine, which closes once
+            // no state of its contexts remains
+            if (state != null) {
+                if (closing) {
+                    state.closing = true;
+                }
+                runNow = state.activeExecutions == 0;
+                if (!runNow) {
+                    state.noActiveExecutionsListeners.add(listener);
+                }
             }
         }
         if (runNow) {
-            listener.run();
+            if (created == null) {
+                listener.run();
+            } else {
+                try {
+                    listener.run();
+                } finally {
+                    forgetStates(Map.of(context, created));
+                }
+            }
         }
     }
 
