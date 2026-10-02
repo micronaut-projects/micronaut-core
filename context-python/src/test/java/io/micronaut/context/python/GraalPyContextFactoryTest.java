@@ -298,7 +298,7 @@ final class GraalPyContextFactoryTest {
         try (Context context = GraalPyResources.contextBuilder(vfs).allowAllAccess(true).build()) {
             String cachePath = context.eval(PYTHON, "import micronaut_asyncio; micronaut_asyncio.__cached__").asString();
 
-            assertTrue(cachePath.contains("/__pycache__/micronaut_asyncio."));
+            assertTrue(cachePath.replace('\\', '/').contains("/__pycache__/micronaut_asyncio."));
             assertTrue(cachePath.endsWith(".pyc"));
         }
     }
