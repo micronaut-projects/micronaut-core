@@ -34,16 +34,15 @@ final class BeanCreationState {
         this.proxyInterceptors = proxyInterceptors;
     }
 
-    @Nullable List<?> lifecycleInterceptors() {
-        List<?> interceptors = dependencies.interceptorRegistrations();
+    @Nullable List<BeanRegistration<?>> lifecycleInterceptors() {
+        List<BeanRegistration<?>> interceptors = dependencies.interceptorRegistrations();
         if (proxyInterceptors.isEmpty()) {
             return interceptors;
         }
-        ArrayList<Object> selected = new ArrayList<>(proxyInterceptors);
+        ArrayList<BeanRegistration<?>> selected = new ArrayList<>(proxyInterceptors);
         if (interceptors != null) {
-            for (Object value : interceptors) {
-                if (value instanceof BeanRegistration<?> candidate
-                    && proxyInterceptors.stream().noneMatch(existing -> existing.definition().equals(candidate.definition()))) {
+            for (BeanRegistration<?> candidate : interceptors) {
+                if (proxyInterceptors.stream().noneMatch(existing -> existing.definition().equals(candidate.definition()))) {
                     selected.add(candidate);
                 }
             }

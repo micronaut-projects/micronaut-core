@@ -70,11 +70,8 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
 
     @Override
     public void close() {
-        // idempotent, as AutoCloseable asks an implementation to be: destroying a bean runs its pre-destroy
-        // listeners, its @PreDestroy and its disposer, and a registration closed twice — by a
-        // try-with-resources and an explicit close, or by two owners that each believe they hold it — must
-        // not run them twice
-        if (markDestroyed()) {
+        // Closing and direct context destruction use the same claim before running callbacks.
+        if (beanContext instanceof DefaultBeanContext || beginDestruction()) {
             beanContext.destroyBean(this);
         }
     }
@@ -93,12 +90,12 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
-     * Marks the registration as destroyed, so that closing it afterwards does not destroy the bean again.
+     * Claims destruction before callbacks run, so that closing or destroying the registration again does nothing.
      *
      * @return {@code true} if the registration had not been closed or marked before
      */
-    boolean markDestroyed() {
-        return getDependencies().markDestroyed();
+    boolean beginDestruction() {
+        return getDependencies().beginDestruction();
     }
 
     /**
@@ -123,7 +120,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
      * @return The interceptor registrations selected while this bean was created, or {@code null}
      */
     @Nullable
-    List<?> getInterceptorRegistrations() {
+    List<BeanRegistration<?>> getInterceptorRegistrations() {
         return getDependencies().interceptorRegistrations();
     }
 

@@ -32,8 +32,9 @@ class SharedInterceptorCompatibilitySpec extends Specification {
         when: 'the legacy entry is removed'
         resolution.removeAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS)
 
-        then:
-        resolution.getBeanInterceptors(definition).is(current)
+        then: 'the current creation frame retains an immutable snapshot'
+        resolution.getBeanInterceptors(definition) == current
+        !resolution.getBeanInterceptors(definition).is(current)
 
         cleanup:
         resolution.close()

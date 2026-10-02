@@ -34,9 +34,8 @@ import java.util.function.Function;
 final class BeanDependencies implements DependentBeanProvider {
     private List<BeanRegistration<?>> owned = List.of();
     private List<BeanRegistration<?>> required = List.of();
-    private @Nullable List<?> interceptorRegistrations;
-    private boolean closing;
-    private boolean destroyed;
+    private InterceptorCandidates interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
+    private OwnershipState state = OwnershipState.OPEN;
     final @Nullable DefaultBeanResolutionContext destructionContext;
 
     BeanDependencies() {
@@ -47,12 +46,18 @@ final class BeanDependencies implements DependentBeanProvider {
         this.destructionContext = destructionContext;
     }
 
-    synchronized @Nullable List<?> interceptorRegistrations() {
-        return interceptorRegistrations;
+    synchronized InterceptorCandidates interceptorCandidates() {
+        return interceptorCandidates;
     }
 
+    // The nullable contract is retained at the resolution-context and registration compatibility boundaries.
+    synchronized @Nullable List<BeanRegistration<?>> interceptorRegistrations() {
+        return interceptorCandidates instanceof InterceptorCandidates.Resolved resolved ? resolved.registrations() : null;
+    }
+
+    @SuppressWarnings("unchecked") // Legacy callers supply registration lists through a List<?> API.
     synchronized void interceptorRegistrations(List<?> registrations) {
-        interceptorRegistrations = registrations;
+        interceptorCandidates = new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) registrations);
     }
 
     synchronized boolean remove(BeanRegistration<?> registration) {
@@ -97,29 +102,29 @@ final class BeanDependencies implements DependentBeanProvider {
     }
 
     synchronized boolean isClosing() {
-        return closing;
+        return state != OwnershipState.OPEN;
     }
 
     synchronized void stopResolving() {
-        closing = true;
+        if (state == OwnershipState.OPEN) {
+            state = OwnershipState.RESOLUTION_STOPPED;
+        }
     }
 
-    synchronized boolean markDestroyed() {
-        closing = true;
-        if (destroyed) {
+    synchronized boolean beginDestruction() {
+        if (state == OwnershipState.DESTRUCTION_CLAIMED || state == OwnershipState.OWNERSHIP_RELEASED) {
             return false;
         }
-        destroyed = true;
+        state = OwnershipState.DESTRUCTION_CLAIMED;
         return true;
     }
 
     synchronized List<BeanRegistration<?>> takeDependents() {
-        closing = true;
-        destroyed = true;
+        state = OwnershipState.OWNERSHIP_RELEASED;
         List<BeanRegistration<?>> taken = owned;
         owned = List.of();
         required = List.of();
-        interceptorRegistrations = null;
+        interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
         return taken;
     }
 
@@ -128,13 +133,14 @@ final class BeanDependencies implements DependentBeanProvider {
      */
     synchronized void initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
         if (resolved != null) {
-            interceptorRegistrations = resolved;
+            interceptorRegistrations(resolved);
         }
-        attach(created == null ? List.of() : created, resolved == null ? List.of() : resolved);
+        List<BeanRegistration<?>> retained = interceptorRegistrations();
+        attach(created == null ? List.of() : created, retained == null ? List.of() : retained);
     }
 
     @SuppressWarnings("ReferenceEquality") // A lifecycle belongs to an instance, even when two beans compare equal.
-    private void attach(List<BeanRegistration<?>> created, List<?> resolved) {
+    private void attach(List<BeanRegistration<?>> created, List<BeanRegistration<?>> resolved) {
         if (!created.isEmpty()) {
             List<BeanRegistration<?>> added = new ArrayList<>(owned);
             added.addAll(created);
@@ -144,9 +150,8 @@ final class BeanDependencies implements DependentBeanProvider {
             return;
         }
         List<BeanRegistration<?>> shared = new ArrayList<>(required);
-        for (Object value : resolved) {
-            if (value instanceof BeanRegistration<?> registration
-                && owned.stream().noneMatch(bean -> bean == registration)
+        for (BeanRegistration<?> registration : resolved) {
+            if (owned.stream().noneMatch(bean -> bean == registration)
                 && shared.stream().noneMatch(bean -> bean.getBean() == registration.getBean())) {
                 shared.add(registration);
             }
@@ -155,7 +160,7 @@ final class BeanDependencies implements DependentBeanProvider {
     }
 
     synchronized void checkOpen(DefaultBeanContext context) {
-        if (closing || destructionContext != null && !destructionContext.isDestructionInvocationActive()
+        if (isClosing() || destructionContext != null && !destructionContext.isDestructionInvocationActive()
             || destructionContext == null && context.isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot resolve a dependency after owner destruction or context shutdown has begun");
         }
@@ -181,5 +186,12 @@ final class BeanDependencies implements DependentBeanProvider {
                 throw failure;
             }
         }
+    }
+
+    private enum OwnershipState {
+        OPEN,
+        RESOLUTION_STOPPED,
+        DESTRUCTION_CLAIMED,
+        OWNERSHIP_RELEASED
     }
 }

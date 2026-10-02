@@ -20,6 +20,7 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -82,6 +83,27 @@ public interface InterceptorChainFactory {
         Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
         InterceptorKind kind,
         @Nullable Object... parameters);
+
+    /**
+     * Builds a method invocation from interceptors already selected for its target. Generated proxies retain the
+     * context's factory and their selected arrays; this operation does not resolve beans or repeat matching.
+     *
+     * @param bean The invocation target
+     * @param method The intercepted method
+     * @param interceptors The selected interceptors, in invocation order
+     * @param parameters The invocation arguments
+     * @param <T> The target type
+     * @param <R> The result type
+     * @return A fresh invocation with independent chain state
+     */
+    @UsedByGeneratedCode
+    default <T, R> MethodInterceptorChain<T, R> buildResolvedMethodChain(
+        T bean,
+        ExecutableMethod<T, R> method,
+        Interceptor<T, R>[] interceptors,
+        @Nullable Object... parameters) {
+        return new MethodInterceptorChain<>(interceptors, bean, method, parameters);
+    }
 
     /**
      * Builds a constructor chain. Null candidates permit discovery; an empty set does not.
