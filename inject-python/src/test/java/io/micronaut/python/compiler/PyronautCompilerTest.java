@@ -424,6 +424,31 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void theBytecodeOptionOfTheCompilerOptionsTurnsBytecodeOnAndOff() throws Exception {
+        // a compiler that compiles a project again in process passes the setting of the build that compiled it first
+        String on = filesList(PyronautCompiler.builder()
+            .pythonCode("answer = 42")
+            .options(java.util.List.of("-A" + io.micronaut.python.processing.PythonAnnotationProcessor.BYTECODE_OPTION + "=true"))
+            .build()
+            .buildClassLoader());
+        assertTrue(on.contains("__pycache__/__main__."), on);
+        String off = filesList(PyronautCompiler.builder()
+            .pythonCode("answer = 42")
+            .compilePythonBytecode(true)
+            .options(java.util.List.of("-A" + io.micronaut.python.processing.PythonAnnotationProcessor.BYTECODE_OPTION + "=false"))
+            .build()
+            .buildClassLoader());
+        assertFalse(off.contains(".pyc"), off);
+    }
+
+    private static String filesList(ClassLoader classLoader) throws Exception {
+        try (var input = classLoader.getResourceAsStream("META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt")) {
+            assertNotNull(input);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    @Test
     void leavesPythonBytecodeOutOfTheInMemoryVfsByDefault() throws Exception {
         ClassLoader classLoader = PyronautCompiler.builder()
             .pythonCode("answer = 42")

@@ -86,6 +86,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      * directories are resolved against. Without it they resolve against the working directory.
      */
     public static final String SOURCE_ROOT_OPTION = "micronaut.python.source.root";
+    /**
+     * The compiler option that sets whether every generated Python resource gets a GraalPy bytecode cache, {@code true} or
+     * {@code false}, as {@link #setCompilePythonBytecode(boolean)} does. A tool that compiles a project again in process,
+     * such as development mode, passes the setting of the build that compiled it first, so that both write the same
+     * resources and file list.
+     *
+     * @since 5.3.0
+     */
+    public static final String BYTECODE_OPTION = "micronaut.python.bytecode";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     /**
      * The prefix of the modules through which a compilation contributes members to a package (or, at
@@ -322,6 +331,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+        String bytecode = processingEnv.getOptions().get(BYTECODE_OPTION);
+        if (bytecode != null) {
+            compilePythonBytecode = Boolean.parseBoolean(bytecode.trim());
+        }
         if (classLoader == null) {
             classLoader = Thread.currentThread().getContextClassLoader();
             if (classLoader == null) {
