@@ -15,12 +15,14 @@
  */
 package io.micronaut.dev;
 
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.compile.ClassDependencyIndex;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
+import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.TestSettings;
 import io.micronaut.dev.test.Cancellation;
@@ -51,6 +53,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
@@ -67,6 +70,12 @@ import java.util.concurrent.TimeoutException;
  * run happens on a new generation of the reloadable loader, so the tests and the classes under test are the
  * ones just compiled, and its events go to the JUnit XML reports and to the report listeners registered as
  * services.</p>
+ *
+ * <p>Except when the runner can patch the change in: a change of the class output that holds no class and only
+ * changes resources the last run's generation holds, as a Python edit that changed only bodies, is offered to the
+ * runner's {@link TestRunner#inPlaceReloader in-place reloader} for that generation. When it takes the change, the
+ * generation's snapshot gets the new contents, the reloader applies them to what the runner keeps alive, and the
+ * tests the change owes run on the same generation. Anything else, before the next run, gets a new generation.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -101,6 +110,11 @@ final class TestSession {
     private boolean compileFailed;
     private volatile boolean watching = true;
     private volatile @Nullable Cancellation current;
+    // on the reload thread: the loader of the last run, whether every change since it was made is in it, patched in,
+    // and whether one was patched in, which makes the next run use it again
+    private @Nullable ClassLoader runLoader;
+    private boolean runLoaderCurrent;
+    private boolean patchedSinceRun;
 
     TestSession(DevRuntime runtime, DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
         this.runtime = runtime;
@@ -217,7 +231,11 @@ final class TestSession {
         // a test discovered from its source file, as a pytest function, has no class whose change can be followed
         boolean fileTestsChanged = allTestSources.entrySet().stream()
             .anyMatch(entry -> !isJvmKind(entry.getKey()) && (!entry.getValue().changed().isEmpty() || !entry.getValue().deleted().isEmpty()));
+        Set<String> resourcesBefore = runtime.outputResources();
         ChangeSet changes = runtime.takeOutputChanges();
+        if (!changes.isEmpty()) {
+            patchOrRetire(changes, resourcesBefore);
+        }
         Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
         changed.addAll(testRound.affectedClasses());
         for (String className : changes.classNames()) {
@@ -490,7 +508,17 @@ final class TestSession {
         synchronized (this) {
             runId = "run-" + (runs + 1);
         }
-        ClassLoader generation = runtime.newGeneration();
+        ClassLoader generation;
+        ClassLoader lastLoader = runLoader;
+        if (patchedSinceRun && runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration()) {
+            // every change since the last run was patched into its generation: the runner's state built over it lives on
+            generation = lastLoader;
+        } else {
+            generation = runtime.newGeneration();
+        }
+        runLoader = generation;
+        runLoaderCurrent = true;
+        patchedSinceRun = false;
         Cancellation cancellation = new Cancellation();
         current = cancellation;
         List<TestEventListener> listeners = new ArrayList<>();
@@ -515,9 +543,9 @@ final class TestSession {
             }
             notifyAll();
         }
-        LOG.info("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
+        LOG.info("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms on generation {}{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
             summary.isSuccess() ? "passed" : "failed", summary.passed(), summary.failed(), summary.errored(), summary.skipped(), summary.duration().toMillis(),
-            summary.cancelled() ? " (cancelled)" : "");
+            generation instanceof GenerationClassLoader g ? g.generation() : runtime.generation(), summary.cancelled() ? " (cancelled)" : "");
         if (!settings.once() && runtime.isGenerationBudgetSpent()) {
             // the run that spent the budget completed: the next one is the relaunched process's. Checked after a run,
             // not before, so that what a change owes is tested before the process goes
@@ -525,6 +553,40 @@ final class TestSession {
             return;
         }
         runtime.detectLeaks();
+    }
+
+    /**
+     * Patches a change of the class output into the last run's generation, when the runner keeps state built over it
+     * that can take the change, so that the next run uses that generation again; otherwise the next run gets a new one.
+     *
+     * @param changes The change
+     * @param before The resources the output held before it
+     */
+    private void patchOrRetire(ChangeSet changes, Set<String> before) {
+        ClassLoader lastLoader = runLoader;
+        InPlaceResourceReloader.Result result = null;
+        if (runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration() && runtime.isPatchable(changes, before)) {
+            long start = System.nanoTime();
+            Optional<InPlaceResourceReloader> reloader;
+            try {
+                reloader = runner.inPlaceReloader(lastLoader);
+            } catch (RuntimeException | LinkageError e) {
+                LOG.debug("The test runner {} failed to offer an in-place reloader", runner.id(), e);
+                reloader = Optional.empty();
+            }
+            if (reloader.isPresent()) {
+                result = runtime.patchGeneration(changes, List.of(reloader.get()), "the tests run on a new generation");
+            }
+            if (result != null) {
+                LOG.info("Patched {} {} in place in {} ms: the tests run on generation {} again", result.count(), result.unit(),
+                    Duration.ofNanos(System.nanoTime() - start).toMillis(), runtime.generation());
+            }
+        }
+        if (result == null) {
+            runLoaderCurrent = false;
+        } else {
+            patchedSinceRun = true;
+        }
     }
 
     private void compilationFailed(CompileFailure failure, Map<SourceKind, DevRuntime.SourceChanges> sources, Map<SourceKind, DevRuntime.SourceChanges> testSources) {

@@ -15,8 +15,11 @@
  */
 package io.micronaut.dev.test;
 
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.NullMarked;
+
+import java.util.Optional;
 
 /**
  * Runs tests, streaming what happens.
@@ -57,4 +60,26 @@ public interface TestRunner {
      * @return What the run did, as given to {@link TestEventListener#runFinished}
      */
     TestRunSummary run(TestRunRequest request, TestEventListener listener, Cancellation cancellation);
+
+    /**
+     * The reloader of what this runner keeps alive between runs on one class loader, such as an interpreter
+     * built over the generation, for test mode to patch a change into instead of starting a new generation.
+     *
+     * <p>Test mode asks after a change that holds no class and only changes resources the generation of the last
+     * run already held, as the Python modules of an edit that changed only bodies. When the runner answers with a
+     * reloader that {@link InPlaceResourceReloader#canReload can} take the change, test mode writes the new
+     * contents into that generation, has the reloader {@link InPlaceResourceReloader#reload apply} them, and runs
+     * the tests the change owes on the same loader: the next {@link TestRunRequest#classLoader()} is the one
+     * given here. Anything else, an empty answer, a refusal or a failure, starts a new generation as before, which
+     * discards a half-applied change; a runner rebuilds what it keeps when it is given a loader it has not seen.</p>
+     *
+     * <p>The default keeps nothing: every change starts a new generation.</p>
+     *
+     * @param classLoader The loader of the last run
+     * @return The reloader, or empty when this runner keeps nothing built over that loader
+     * @since 5.3.0
+     */
+    default Optional<InPlaceResourceReloader> inPlaceReloader(ClassLoader classLoader) {
+        return Optional.empty();
+    }
 }
