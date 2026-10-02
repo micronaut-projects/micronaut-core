@@ -15,7 +15,9 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -398,6 +400,114 @@ class TestModeTest {
         assertTrue(console.act('\n'));
         assertTrue(console.act('f'));
         assertEquals(2, runtime.testRuns());
+    }
+
+    @Test
+    void aChangeOfResourcesAloneIsPatchedIntoTheRunnersStateAndTheTestsRunOnTheSameGeneration() throws Exception {
+        PatchingTestRunner.reset();
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        // a resource the compiler of another language wrote beside the classes, as the Python compiler writes modules
+        // compiled as a build would, so that the output is up to date when the runtime starts
+        javac(project.resolve("build/classes"), greeter);
+        Path message = Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt");
+        Files.writeString(message, "one");
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.test.runner=patching\n"), new String[0]);
+        assertEquals(1, runtime.testRuns());
+        int generation = runtime.generation();
+        ClassLoader first = PatchingTestRunner.RUN_LOADERS.get(0);
+        assertEquals(List.of("one"), PatchingTestRunner.RUN_MESSAGES);
+
+        // the resource changes and the classes compile the same: the runner patches it, the tests run on the same loader
+        Files.writeString(message, "two");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(2, TIMEOUT);
+        assertEquals(List.of(Set.of(PatchingTestRunner.MESSAGE)), PatchingTestRunner.PATCHES);
+        assertSame(first, PatchingTestRunner.RUN_LOADERS.get(1));
+        assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
+        assertEquals(generation, runtime.generation(), "a patch takes no generation");
+        assertEquals(1, runtime.inPlacePatches());
+
+        // and again
+        Files.writeString(message, "three");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(3, TIMEOUT);
+        assertSame(first, PatchingTestRunner.RUN_LOADERS.get(2));
+        assertEquals("three", PatchingTestRunner.RUN_MESSAGES.get(2));
+        assertEquals(generation, runtime.generation());
+
+        // a run with no change since the last uses a new generation, as before
+        runtime.requestTests(TestRequest.ALL);
+        ClassLoader fresh = PatchingTestRunner.RUN_LOADERS.get(3);
+        assertNotSame(first, fresh);
+        assertEquals(generation + 1, runtime.generation());
+
+        // a change the runner refuses runs on a new generation, which reads it
+        PatchingTestRunner.refuse = true;
+        Files.writeString(message, "four");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(5, TIMEOUT);
+        assertNotSame(fresh, PatchingTestRunner.RUN_LOADERS.get(4));
+        assertEquals("four", PatchingTestRunner.RUN_MESSAGES.get(4));
+        assertEquals(generation + 2, runtime.generation());
+        PatchingTestRunner.refuse = false;
+
+        // so does one whose patch fails
+        PatchingTestRunner.fail = true;
+        ClassLoader beforeFailure = PatchingTestRunner.RUN_LOADERS.get(4);
+        Files.writeString(message, "five");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(6, TIMEOUT);
+        assertNotSame(beforeFailure, PatchingTestRunner.RUN_LOADERS.get(5));
+        assertEquals("five", PatchingTestRunner.RUN_MESSAGES.get(5));
+        assertEquals(generation + 3, runtime.generation());
+        PatchingTestRunner.fail = false;
+
+        // a class change in the same batch as a patchable resource is not patched
+        ClassLoader beforeClassChange = PatchingTestRunner.RUN_LOADERS.get(5);
+        int patches = PatchingTestRunner.PATCHES.size();
+        Files.writeString(message, "six");
+        Files.writeString(greeter, greeter("two"));
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(7, TIMEOUT);
+        assertEquals(patches, PatchingTestRunner.PATCHES.size());
+        assertNotSame(beforeClassChange, PatchingTestRunner.RUN_LOADERS.get(6));
+        assertEquals("six", PatchingTestRunner.RUN_MESSAGES.get(6));
+
+        // an added resource is not patched either
+        ClassLoader beforeAdded = PatchingTestRunner.RUN_LOADERS.get(6);
+        Files.writeString(message, "seven");
+        Files.writeString(message.resolveSibling("other.txt"), "added");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(8, TIMEOUT);
+        assertEquals(patches, PatchingTestRunner.PATCHES.size());
+        assertNotSame(beforeAdded, PatchingTestRunner.RUN_LOADERS.get(7));
+        assertEquals("seven", PatchingTestRunner.RUN_MESSAGES.get(7));
+    }
+
+    @Test
+    void patchingInPlaceCanBeTurnedOffInTestMode() throws Exception {
+        PatchingTestRunner.reset();
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        // compiled as a build would, so that the output is up to date when the runtime starts
+        javac(project.resolve("build/classes"), greeter);
+        Path message = Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt");
+        Files.writeString(message, "one");
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.test.runner=patching\nmicronaut.dev.patch-in-place=false\n"), new String[0]);
+        int generation = runtime.generation();
+
+        Files.writeString(message, "two");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(PatchingTestRunner.PATCHES.isEmpty());
+        assertNotSame(PatchingTestRunner.RUN_LOADERS.get(0), PatchingTestRunner.RUN_LOADERS.get(1));
+        assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
+        assertEquals(generation + 1, runtime.generation());
     }
 
     private DevManifest manifest(String extra) throws Exception {
