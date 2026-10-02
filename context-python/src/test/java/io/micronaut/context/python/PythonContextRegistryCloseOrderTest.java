@@ -50,18 +50,62 @@ final class PythonContextRegistryCloseOrderTest {
             PythonContextRegistry.closeWhenIdle(primary, () -> GraalPyContextFactory.closeContext(primary));
             assertNull(PythonContextRegistry.existingState(primary));
 
-            // then the pool closes its contexts once they and the primary one are idle, and the engine is
-            // destroyed meanwhile, waiting for the contexts of the engine
-            PythonContextRegistry.closeWhenIdle(List.of(primary, pooled), () -> {
+            // then the pool, told the primary context is destroyed, waits for it to be idle, as PythonPool.onDestroyed does,
+            // and closes its contexts once they and the primary one are idle; the engine is destroyed meanwhile, waiting
+            // for the contexts of the engine
+            PythonContextRegistry.onNoActiveExecutionsAfterCurrentFrame(primary, () -> PythonContextRegistry.closeWhenIdle(List.of(primary, pooled), () -> {
                 PythonContextRegistry.onNoContexts(engine, () -> {
                     engine.close();
                     engineClosed.set(true);
                 });
                 GraalPyContextFactory.closeContext(pooled);
-            });
+            }));
 
             assertNull(PythonContextRegistry.existingState(primary), "the pool's close kept a state for the closed primary context");
             assertNull(PythonContextRegistry.existingState(pooled), "the pooled context kept its state");
+            assertTrue(engineClosed.get(), "the engine waits for a context that is closed");
+        } finally {
+            PythonContextRegistry.unregisterContext(primary);
+            PythonContextRegistry.unregisterContext(pooled);
+            if (!engineClosed.get()) {
+                engine.close(true);
+            }
+        }
+    }
+
+    /**
+     * The order the native image showed: the pool closes after the primary context while a pooled context still
+     * counts an execution, and that context is closed and unregistered before the execution leaves, as a context
+     * handed back to a closed pool is. Its exit then finds no state, so the pool's close must run when it is
+     * unregistered, or it never does, and the state marked closing for the primary context, and the engine, stay.
+     */
+    @Test
+    void aPooledContextUnregisteredDuringAnExecutionReleasesThePoolsClose() {
+        Engine engine = Engine.create(PYTHON);
+        Context primary = Context.newBuilder(PYTHON).engine(engine).allowAllAccess(true).build();
+        Context pooled = Context.newBuilder(PYTHON).engine(engine).allowAllAccess(true).build();
+        AtomicBoolean poolClosed = new AtomicBoolean();
+        AtomicBoolean engineClosed = new AtomicBoolean();
+        try {
+            PythonContextRegistry.registerContext(primary);
+            PythonContextRegistry.enterExecution(pooled);
+
+            PythonContextRegistry.closeWhenIdle(primary, () -> GraalPyContextFactory.closeContext(primary));
+            PythonContextRegistry.closeWhenIdle(List.of(primary, pooled), () -> poolClosed.set(true));
+            PythonContextRegistry.onNoContexts(engine, () -> {
+                engine.close();
+                engineClosed.set(true);
+            });
+            // the pool waits for the pooled context's execution
+            assertNotNull(PythonContextRegistry.existingState(primary));
+
+            // handed back to the closing pool, the pooled context is closed before its execution leaves
+            GraalPyContextFactory.closeContext(pooled);
+            PythonContextRegistry.exitExecution(pooled);
+
+            assertTrue(poolClosed.get(), "the pool's close waits for an execution of an unregistered context");
+            assertNull(PythonContextRegistry.existingState(primary), "the pool's close kept a state for the closed primary context");
+            assertNull(PythonContextRegistry.existingState(pooled));
             assertTrue(engineClosed.get(), "the engine waits for a context that is closed");
         } finally {
             PythonContextRegistry.unregisterContext(primary);
