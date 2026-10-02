@@ -29,6 +29,7 @@ import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -68,6 +69,28 @@ class MicronautDevelopmentModeSpec extends Specification {
         conditions.eventually {
             assert !Thread.allStackTraces.keySet().any { it.name == "micronaut-shutdown-monitor-thread" && it.alive }
         }
+    }
+
+    void "the shutdown hook of an application that is not kept alive goes when its context is stopped"() {
+        given: "an application that start() returns from with its shutdown hook registered"
+        WeakReference<Application> stopped = startAndStopApplication()
+
+        expect: "nothing keeps the stopped application reachable, the hook least of all: a stopped context holds no singleton"
+        new PollingConditions(timeout: 20, delay: 0.2).eventually {
+            System.gc()
+            assert stopped.get() == null
+        }
+    }
+
+    private static WeakReference<Application> startAndStopApplication() {
+        ApplicationContext context = Micronaut.build()
+            .deduceEnvironment(false)
+            .properties('spec.name': 'MicronautDevelopmentModeSpec', 'spec.application': true)
+            .start()
+        Application application = context.getBean(Application)
+        assert application.running
+        context.stop()
+        return new WeakReference<>(application)
     }
 
     void "a startup failure in development mode is reported instead of exiting the JVM"() {
@@ -212,6 +235,41 @@ class MicronautDevelopmentModeSpec extends Specification {
         @Override
         void onApplicationEvent(StartupEvent event) {
             throw new ApplicationStartupException("listener failed")
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'MicronautDevelopmentModeSpec')
+    @Requires(property = 'spec.application', value = 'true')
+    static class Application implements EmbeddedApplication<Application> {
+        private final ApplicationContext applicationContext
+        private final ApplicationConfiguration applicationConfiguration
+        private final AtomicBoolean running = new AtomicBoolean()
+
+        Application(ApplicationContext applicationContext, ApplicationConfiguration applicationConfiguration) {
+            this.applicationContext = applicationContext
+            this.applicationConfiguration = applicationConfiguration
+        }
+
+        @Override
+        ApplicationContext getApplicationContext() { applicationContext }
+
+        @Override
+        ApplicationConfiguration getApplicationConfiguration() { applicationConfiguration }
+
+        @Override
+        boolean isRunning() { running.get() }
+
+        @Override
+        Application start() {
+            running.set(true)
+            return this
+        }
+
+        @Override
+        Application stop() {
+            running.set(false)
+            return this
         }
     }
 
