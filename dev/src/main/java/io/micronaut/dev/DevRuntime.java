@@ -1585,7 +1585,7 @@ public final class DevRuntime implements Closeable {
                     break;
                 }
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             LOG.debug("An in-place reloader failed to answer: {}", otherwise, e);
             return null;
         }
