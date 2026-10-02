@@ -56,7 +56,6 @@ import java.util.Set;
  */
 @ConfigurationProperties("netty")
 @Replaces(HttpServerConfiguration.class)
-@SuppressWarnings("FileLength")
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
