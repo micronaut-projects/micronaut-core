@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2025 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -993,7 +993,7 @@ def debug_failure():
         def applicationFrame = error.polyglotStackTrace.find { it.rootName == 'debug_failure' }
         applicationFrame != null
         applicationFrame.sourceLocation.startLine == 12
-        applicationFrame.sourceLocation.source.name == '/graalpy_vfs/src/__main__.py'
+        applicationFrame.sourceLocation.source.name == pythonContext.eval("python", "__file__").asString()
         pythonContext.eval("python", "'getattr' in debug_failure.__code__.co_names and 'from_' not in debug_failure.__code__.co_names").asBoolean()
         new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}").text == pythonCode
         def cacheFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}__pycache__")
@@ -1055,13 +1055,16 @@ def debug_failure():
         def applicationFrame = error.polyglotStackTrace.find { it.rootName == 'debug_failure' }
         applicationFrame != null
         applicationFrame.sourceLocation.startLine == 13
-        applicationFrame.sourceLocation.source.name == '/graalpy_vfs/src/example/debug_service.py'
+        applicationFrame.sourceLocation.source.name == pythonContext.eval(
+            "python",
+            "__import__('example.debug_service', fromlist=['']).__file__"
+        ).asString()
         pythonContext.eval("python", "'getattr' in debug_failure.__code__.co_names and 'from_' not in debug_failure.__code__.co_names").asBoolean()
         def moduleCache = pythonContext.eval(
             "python",
             "__import__('example.debug_service', fromlist=['']).__cached__"
         ).asString()
-        moduleCache.contains('/example/__pycache__/debug_service.')
+        moduleCache.replace('\\', '/').contains('/example/__pycache__/debug_service.')
         moduleCache.endsWith('.pyc')
         new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}example/debug_service.py").text == pythonCode
 
@@ -1504,7 +1507,7 @@ class UserController:
         !filesList.contains("/src/jakarta/")
         context.getBean(classLoader.loadClass('example.UserController'))
         context.getBean(classLoader.loadClass('example.HelloController'))
-        cachedModule.contains("/__pycache__/HelloController.")
+        cachedModule.replace('\\', '/').contains("/__pycache__/HelloController.")
         cachedModule.endsWith(".pyc")
 
         cleanup:

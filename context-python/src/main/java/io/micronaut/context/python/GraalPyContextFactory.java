@@ -85,6 +85,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 module = __micronaut_types.ModuleType('__main__')
                 __micronaut_sys.modules['__main__'] = module
             spec = __micronaut_importlib_util.spec_from_file_location('__main__', module_path)
+            module.__file__ = spec.origin
             spec.loader.exec_module(module)
         """, "micronaut-load-vfs-module.py").cached(true).buildLiteral();
     /**
@@ -325,10 +326,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         long now = System.currentTimeMillis();
 
 
+        VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
+            .resourceDirectory(APPLICATION_PATH)
+            .resourceClassLoader(classLoader).build();
         Context.Builder builder = contextConfiguration.getBuilder()
-            .apply(GraalPyResources.forVirtualFileSystem(VirtualFileSystem.newBuilder()
-                .resourceDirectory(APPLICATION_PATH)
-                .resourceClassLoader(classLoader).build()))
+            .apply(GraalPyResources.forVirtualFileSystem(vfs))
             .logHandler(new GraalPySlf4jLogHandler())
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
@@ -383,8 +385,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             LOG.debug("GraalPy Java import finder installed in {}ms", System.currentTimeMillis() - now);
             // Try to load the generated pyronaut_application.py from META-INF
             now = System.currentTimeMillis();
-            evaluateMain(classLoader, INTERNAL_MAIN, context);
-            evaluateMain(classLoader, applicationMain, context);
+            evaluateMain(classLoader, INTERNAL_MAIN, context, vfs);
+            evaluateMain(classLoader, applicationMain, context, vfs);
             LOG.debug("GraalPy main.py evaluated in {}ms", System.currentTimeMillis() - now);
             bootstrapped = true;
             return context;
@@ -415,14 +417,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         return Optional.empty();
     }
 
-    private static void evaluateMain(ClassLoader classLoader, String mainPy, Context context) throws IOException {
+    static void evaluateMain(ClassLoader classLoader, String mainPy, Context context, VirtualFileSystem vfs) throws IOException {
         String mainPyPath = APPLICATION_SRC_PATH + mainPy;
         try (InputStream inputStream = classLoader
             .getResourceAsStream(mainPyPath)) {
 
             if (inputStream != null) {
                 LOG.debug("Evaluating main.py {}", mainPyPath);
-                String modulePath = "/graalpy_vfs/src/" + mainPy;
+                String modulePath = Path.of(vfs.getMountPoint(), "src", mainPy).toString();
                 Value loader = PythonContextRuntime.helper(context, "__micronaut_load_vfs_module", LOAD_VFS_MODULE_SOURCE);
                 loader.executeVoid(modulePath);
             }
