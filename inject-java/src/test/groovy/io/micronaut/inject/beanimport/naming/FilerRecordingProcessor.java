@@ -74,7 +74,7 @@ public final class FilerRecordingProcessor implements Processor {
         return delegate.getCompletions(element, annotation, member, userText);
     }
 
-    private void record(String path, Element... originatingElements) {
+    private void recordOriginatingTypes(String path, Element... originatingElements) {
         List<String> types = new ArrayList<>();
         if (originatingElements != null) {
             for (Element originatingElement : originatingElements) {
@@ -103,20 +103,20 @@ public final class FilerRecordingProcessor implements Processor {
 
         @Override
         public JavaFileObject createSourceFile(CharSequence name, Element... originatingElements) throws IOException {
-            record(name.toString().replace('.', '/') + ".java", originatingElements);
+            recordOriginatingTypes(name.toString().replace('.', '/') + ".java", originatingElements);
             return filer.createSourceFile(name, originatingElements);
         }
 
         @Override
         public JavaFileObject createClassFile(CharSequence name, Element... originatingElements) throws IOException {
-            record(name.toString().replace('.', '/') + ".class", originatingElements);
+            recordOriginatingTypes(name.toString().replace('.', '/') + ".class", originatingElements);
             return filer.createClassFile(name, originatingElements);
         }
 
         @Override
         public FileObject createResource(JavaFileManager.Location location, CharSequence moduleAndPkg, CharSequence relativeName, Element... originatingElements) throws IOException {
             String pkg = moduleAndPkg.toString().replace('.', '/');
-            record(pkg.isEmpty() ? relativeName.toString() : pkg + "/" + relativeName, originatingElements);
+            recordOriginatingTypes(pkg.isEmpty() ? relativeName.toString() : pkg + "/" + relativeName, originatingElements);
             return filer.createResource(location, moduleAndPkg, relativeName, originatingElements);
         }
 
