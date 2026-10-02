@@ -75,7 +75,8 @@ import java.util.concurrent.TimeoutException;
  * changes resources the last run's generation holds, as a Python edit that changed only bodies, is offered to the
  * runner's {@link TestRunner#inPlaceReloader in-place reloader} for that generation. When it takes the change, the
  * generation's snapshot gets the new contents, the reloader applies them to what the runner keeps alive, and the
- * tests the change owes run on the same generation. Anything else, before the next run, gets a new generation.</p>
+ * tests the change owes run on the same generation; so does a run that no change preceded, while the runner keeps state
+ * built over the generation. Anything else, before the next run, gets a new generation.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -510,8 +511,9 @@ final class TestSession {
         }
         ClassLoader generation;
         ClassLoader lastLoader = runLoader;
-        if (patchedSinceRun && runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration()) {
-            // every change since the last run was patched into its generation: the runner's state built over it lives on
+        if (runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration() && (patchedSinceRun || keepsState(lastLoader))) {
+            // every change since the last run was patched into its generation, or nothing changed and the runner keeps
+            // state built over it: that state lives on
             generation = lastLoader;
         } else {
             generation = runtime.newGeneration();
@@ -553,6 +555,18 @@ final class TestSession {
             return;
         }
         runtime.detectLeaks();
+    }
+
+    /**
+     * Whether the runner keeps state built over a loader, which it would patch a change into.
+     */
+    private boolean keepsState(ClassLoader loader) {
+        try {
+            return runner.inPlaceReloader(loader).isPresent();
+        } catch (RuntimeException | LinkageError e) {
+            LOG.debug("The test runner {} failed to offer an in-place reloader", runner.id(), e);
+            return false;
+        }
     }
 
     /**

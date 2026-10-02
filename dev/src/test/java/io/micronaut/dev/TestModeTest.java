@@ -438,20 +438,20 @@ class TestModeTest {
         assertEquals("three", PatchingTestRunner.RUN_MESSAGES.get(2));
         assertEquals(generation, runtime.generation());
 
-        // a run with no change since the last uses a new generation, as before
+        // a run that no change preceded keeps the generation too, while the runner keeps state built over it
         runtime.requestTests(TestRequest.ALL);
-        ClassLoader fresh = PatchingTestRunner.RUN_LOADERS.get(3);
-        assertNotSame(first, fresh);
-        assertEquals(generation + 1, runtime.generation());
+        assertSame(first, PatchingTestRunner.RUN_LOADERS.get(3));
+        assertEquals(generation, runtime.generation());
 
         // a change the runner refuses runs on a new generation, which reads it
         PatchingTestRunner.refuse = true;
         Files.writeString(message, "four");
         runtime.changed(List.of(greeter), List.of());
         runtime.awaitTestRun(5, TIMEOUT);
-        assertNotSame(fresh, PatchingTestRunner.RUN_LOADERS.get(4));
+        ClassLoader fresh = PatchingTestRunner.RUN_LOADERS.get(4);
+        assertNotSame(first, fresh);
         assertEquals("four", PatchingTestRunner.RUN_MESSAGES.get(4));
-        assertEquals(generation + 2, runtime.generation());
+        assertEquals(generation + 1, runtime.generation());
         PatchingTestRunner.refuse = false;
 
         // so does one whose patch fails
@@ -462,7 +462,7 @@ class TestModeTest {
         runtime.awaitTestRun(6, TIMEOUT);
         assertNotSame(beforeFailure, PatchingTestRunner.RUN_LOADERS.get(5));
         assertEquals("five", PatchingTestRunner.RUN_MESSAGES.get(5));
-        assertEquals(generation + 3, runtime.generation());
+        assertEquals(generation + 2, runtime.generation());
         PatchingTestRunner.fail = false;
 
         // a class change in the same batch as a patchable resource is not patched
