@@ -101,10 +101,12 @@ public final class DevManifest {
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
      * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
      * the interpreter's data for them on the heap, for the life of the process.
-     * Measured on a Pyronaut application whose generations each hold a GraalPy context: every generation the process
-     * retains costs about 110 MB of resident memory, so ten keep a development process under 2 GB before it relaunches.
+     * Measured on a Pyronaut application whose generations each hold a GraalPy context, adding a route per generation:
+     * once a retired generation is released, what stays is its classes and their data, about 1.3 MB of heap a
+     * generation, and the resident memory of 61 generations stayed under 1 GB, with the metaspace not exhausted. Fifty
+     * bounds that growth with room to spare.
      */
-    public static final int NATIVE_MAX_GENERATIONS = 10;
+    public static final int NATIVE_MAX_GENERATIONS = 50;
 
     private static final String TEST = "test.";
 
