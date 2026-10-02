@@ -109,6 +109,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
      * @return The dependents, or {@code null} when none are retained
      * @deprecated Use {@link #dependentBeans()}, which returns an empty list when there are no dependents.
      */
+    @SuppressWarnings("java:S1133") // Retained for source and binary compatibility with the legacy dependent accessor.
     @Deprecated(since = "5.3.0", forRemoval = false)
     @Nullable
     public List<BeanRegistration<?>> getDependents() {

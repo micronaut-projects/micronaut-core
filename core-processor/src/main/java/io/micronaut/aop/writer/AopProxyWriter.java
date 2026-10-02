@@ -1339,7 +1339,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class)
                     .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
                     .build();
-            } else if (hotswap || cacheLazyTarget) {
+            } else {
                 // written with the target: when it is cached, cleared or swapped
                 targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class)
                     .addModifiers(Modifier.PRIVATE, Modifier.VOLATILE)
