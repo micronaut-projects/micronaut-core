@@ -424,7 +424,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
         private final MethodReference methodReference;
+        // the generated metadata: each configuration wraps this, never the metadata a previous context configured,
+        // which would nest one layer per context, each holding its environment, for as long as the definition lives
+        private final AnnotationMetadata sourceAnnotationMetadata;
         private AnnotationMetadata annotationMetadata;
+        @Nullable
+        private Environment environment;
+        @Nullable
+        private BeanContext beanContext;
         @Nullable
         private ReturnType<R> returnType;
         private final Argument<?>[] arguments;
@@ -440,6 +447,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.dispatcher = dispatcher;
             this.index = index;
             this.methodReference = methodReference;
+            this.sourceAnnotationMetadata = annotationMetadata;
             this.annotationMetadata = annotationMetadata;
             MethodArguments methodArguments = methodArguments(methodReference);
             this.arguments = methodArguments.arguments;
@@ -448,17 +456,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public void configure(Environment environment) {
-            if (annotationMetadata.hasPropertyExpressions()) {
-                annotationMetadata = new MethodAnnotationMetadata(annotationMetadata, environment);
-            }
+            this.environment = environment;
+            configureAnnotationMetadata();
         }
 
         @Override
         public void configure(BeanContext beanContext) {
-            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
-            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
-                eam.configure(beanContext);
-            }
+            this.beanContext = beanContext;
+            configureAnnotationMetadata();
             if (argumentsAnnotationsWithExpressions) {
                 for (Argument<?> argument : arguments) {
                     AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
@@ -466,6 +471,30 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                         eam.configure(beanContext);
                     }
                 }
+            }
+        }
+
+        /**
+         * Wraps the generated metadata for the environment and the bean context last configured: placeholders
+         * resolve against the environment, and expressions are evaluated in the context.
+         */
+        private void configureAnnotationMetadata() {
+            AnnotationMetadata metadata = sourceAnnotationMetadata;
+            Environment env = environment;
+            if (env != null && metadata.hasPropertyExpressions()) {
+                metadata = new MethodAnnotationMetadata(metadata, env);
+            }
+            BeanContext context = beanContext;
+            if (context != null) {
+                metadata = EvaluatedAnnotationMetadata.wrapIfNecessary(metadata);
+                if (metadata instanceof EvaluatedAnnotationMetadata eam) {
+                    eam.configure(context);
+                }
+            }
+            if (metadata != annotationMetadata) {
+                annotationMetadata = metadata;
+                // the return type carries the method's metadata
+                returnType = null;
             }
         }
 
