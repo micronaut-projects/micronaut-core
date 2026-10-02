@@ -18,6 +18,7 @@ package io.micronaut.inject.writer
 import groovy.transform.PackageScope
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultBeanDefinitionsProvider
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.conditions.MatchesAbsenceOfClassesCondition
 import io.micronaut.context.conditions.MatchesConfigurationCondition
@@ -124,6 +125,35 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         return [String[], int[], AnnotationValue[]]
     }
 
+    /**
+     * @return The name of the bean type of the factory method that returns an array
+     */
+    protected String getArrayBeanType() {
+        return 'test.Product[]'
+    }
+
+    /**
+     * @return The names of the types the bean of the factory method that returns an array is exposed as
+     */
+    protected List<String> getArrayExposedTypes() {
+        return ['test.Product', 'test.Product[]']
+    }
+
+    /**
+     * @return The flags of the definition of the bean with around advice
+     */
+    protected List<Integer> getAdvisedFlags() {
+        return [FLAG_PROXIED_BEAN, FLAG_SINGLETON]
+    }
+
+    /**
+     * @return The definition of the proxy of the bean with around advice, as {@link #descriptor} takes it, and the
+     * name of the bean type it has
+     */
+    protected List<String> getAdviceProxy() {
+        return ['Advised$Definition$Intercepted', 'test.$Advised$Definition$Intercepted']
+    }
+
     void setupSpec() {
         output = compile()
         classLoader = new URLClassLoader(output, getClass().classLoader)
@@ -140,19 +170,23 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
 
     void "the descriptor of every compiled definition agrees with the loaded reference"() {
         when:
-        def comparison = BeanDefinitionDescriptors.compareAll(new URLClassLoader(output, getClass().classLoader) {
-            @Override
-            Enumeration<URL> getResources(String name) {
-                // only what was compiled here
-                return findResources(name)
-            }
-        })
+        // only what was compiled here
+        def comparison = BeanDefinitionDescriptors.compareAll(onlyFrom(output))
 
         then:
         comparison.differences.isEmpty()
         comparison.notLoaded.isEmpty()
         comparison.withoutDescriptor as Set == undescribed as Set
         comparison.compared.size() == definitions().size() - undescribed.size()
+    }
+
+    void "every entry reads back to the bytes it was written with"() {
+        given:
+        Set<String> described = definitions().findAll { content(it).length > 0 }
+
+        expect:
+        described.size() == definitions().size() - undescribed.size()
+        described.every { BeanDefinitionDescriptor.read(content(it))?.toByteArray() == content(it) }
     }
 
     void "the flags are the answers of the reference"() {
@@ -165,7 +199,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         flags('Settings') == [FLAG_SINGLETON, FLAG_CONFIGURATION_PROPERTIES]
         flags('Startup') == [FLAG_SINGLETON, FLAG_REQUIRES_METHOD_PROCESSING]
         flags('Conditional') == [FLAG_SINGLETON, FLAG_POST_LOAD_CONDITIONS]
-        flags(describedAs('test.Product[]')) == [FLAG_SINGLETON, FLAG_CONTAINER_TYPE]
+        flags(describedAs(arrayBeanType)) == [FLAG_SINGLETON, FLAG_CONTAINER_TYPE]
     }
 
     void "the bean type, the exposed types and the indexes are described by name"() {
@@ -180,7 +214,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         descriptor('Typed').indexes() == ['test.Other']
 
         and:
-        describedAs('test.Product[]').exposedTypes() == ['test.Product', 'test.Product[]']
+        describedAs(arrayBeanType).exposedTypes() == arrayExposedTypes
 
         and: "a bean of a factory declares no index and is indexed as its factory is"
         descriptor('Products').indexes() == ['test.Other']
@@ -302,13 +336,14 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
 
     void "a bean with around advice has a descriptor for its definition and for the one of its proxy"() {
         given:
-        def proxy = descriptor('Advised$Definition$Intercepted')
+        def (String proxyDefinition, String proxyType) = adviceProxy
+        def proxy = descriptor(proxyDefinition)
 
         expect:
-        flags('Advised') == [FLAG_PROXIED_BEAN, FLAG_SINGLETON]
-        flags('Advised$Definition$Intercepted') == [FLAG_SINGLETON]
-        proxy.beanType() == 'test.$Advised$Definition$Intercepted'
-        proxy.exposedTypes().containsAll(['test.Advised', 'test.$Advised$Definition$Intercepted'])
+        flags('Advised') == advisedFlags
+        flags(proxyDefinition) == [FLAG_SINGLETON]
+        proxy.beanType() == proxyType
+        proxy.exposedTypes().containsAll(['test.Advised', proxyType])
         proxy.has('test.Traced', MEMBERSHIP_DECLARED_ANNOTATION)
     }
 
@@ -357,6 +392,28 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         copies?.toFile()?.deleteDir()
     }
 
+    // The loader a context uses by default. Nothing it calls opens an entry, so the content cannot change what it finds:
+    // this holds that for the provider, as the feature above does for the utility it is built on.
+    void "the default provider finds the same definitions from entries with content as from empty ones"() {
+        given: "what was compiled and a copy of it with the entries emptied, each with nothing else to find"
+        Path copies = Files.createTempDirectory("descriptors")
+        URLClassLoader compiled = onlyFrom(output)
+        URLClassLoader emptied = onlyFrom(emptiedCopy(copies.resolve("emptied")))
+
+        when:
+        List<String> found = new DefaultBeanDefinitionsProvider().provide(compiled)*.beanDefinitionName.sort()
+        List<String> foundEmptied = new DefaultBeanDefinitionsProvider().provide(emptied)*.beanDefinitionName.sort()
+
+        then:
+        found == definitions().sort()
+        found == foundEmptied
+
+        cleanup:
+        compiled?.close()
+        emptied?.close()
+        copies?.toFile()?.deleteDir()
+    }
+
     // A smoke test of the beans the other features describe. Nothing in the context reads the content of an entry,
     // so this cannot fail because of what a descriptor says.
     void "a context starts from the definitions that were compiled"() {
@@ -367,7 +424,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
             .environments("test")
             .beanDefinitionsProvider { ClassLoader loader ->
                 List<BeanDefinitionReference<?>> references = names.collect { (BeanDefinitionReference<?>) classLoader.loadClass(it).getDeclaredConstructor().newInstance() }
-                return references + [new InterceptorRegistryBean(), new BeanProviderDefinition(), new JakartaProviderBeanDefinition(), new ApplicationEventPublisherFactory<>()]
+                return references + runtimeReferences(loader)
             }
             .start()
 
@@ -382,6 +439,15 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    /**
+     * @param classLoader The class loader of the context
+     * @return The references the context needs besides the compiled ones: the ones that have no entry
+     */
+    @PackageScope
+    List<BeanDefinitionReference<?>> runtimeReferences(ClassLoader classLoader) {
+        return [new InterceptorRegistryBean(), new BeanProviderDefinition(), new JakartaProviderBeanDefinition(), new ApplicationEventPublisherFactory<>()]
     }
 
     /**
@@ -431,6 +497,19 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
      */
     private static boolean emptyArrayOf(Object value, Class<?> componentType) {
         value != null && value.getClass().isArray() && value.getClass().componentType == componentType && java.lang.reflect.Array.getLength(value) == 0
+    }
+
+    /**
+     * @return A class loader that finds the resources of the given directories only, and loads the other classes from
+     * the class path of the spec
+     */
+    private URLClassLoader onlyFrom(URL[] directories) {
+        new URLClassLoader(directories, getClass().classLoader) {
+            @Override
+            Enumeration<URL> getResources(String name) {
+                return findResources(name)
+            }
+        }
     }
 
     private Set<String> definitions() {

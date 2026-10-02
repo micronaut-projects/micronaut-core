@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -271,6 +272,14 @@ public final class PythonVisitorContext implements VisitorContext {
     public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
         if (javaVisitorContext != null) {
             javaVisitorContext.visitServiceDescriptor(type, classname, originatingElement);
+        }
+    }
+
+    @Override
+    @Internal
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement, byte @Nullable [] content) {
+        if (javaVisitorContext != null) {
+            javaVisitorContext.visitServiceDescriptor(type, classname, originatingElement, content);
         }
     }
 
