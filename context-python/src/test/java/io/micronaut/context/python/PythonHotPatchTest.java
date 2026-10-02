@@ -1,5 +1,6 @@
 package io.micronaut.context.python;
 
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterEach;
@@ -7,9 +8,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -83,6 +86,39 @@ final class PythonHotPatchTest {
 
     private void run(String python) {
         context.eval(PYTHON, python);
+    }
+
+    @Test
+    void theReloaderOfTheInstalledRuntimePatchesItsContexts() throws Exception {
+        run("""
+            m = define('hot.reused', '''
+            def answer():
+                return 1
+            ''')
+            captured = m.answer
+            """);
+        run("""
+            edit('hot.reused', '''
+            def answer():
+                return 2
+            ''')
+            """);
+        InPlaceResourceReloader reloader = PythonContextRuntime.inPlaceReloader();
+        String module = GraalPyContextFactory.APPLICATION_SRC_PATH + "hot/reused.py";
+        assertTrue(reloader.canReload(Set.of(module), Set.of()));
+        assertFalse(reloader.canReload(Set.of(GraalPyContextFactory.APPLICATION_SRC_PATH + "hot/__init__.py"), Set.of()));
+        assertFalse(reloader.canReload(Set.of(module), Set.of(GraalPyContextFactory.APPLICATION_SRC_PATH + "hot/gone.py")));
+        // the runtime installed when it reloads, as a test runner's reused context
+        PythonApplicationRuntime runtime = PythonContextRuntime.setContext(context, getClass().getClassLoader());
+        try {
+            assertEquals(1, reloader.reload(Set.of(module)).count());
+        } finally {
+            PythonApplicationRuntime.uninstall(runtime);
+        }
+        run("""
+            assert m.answer is captured
+            assert captured() == 2, captured()
+            """);
     }
 
     @Test
