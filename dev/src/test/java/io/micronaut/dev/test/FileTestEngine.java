@@ -26,6 +26,8 @@ import java.util.stream.Stream;
 public final class FileTestEngine implements TestEngine {
 
     static final String ID = "file-tests";
+    // names each test's class by its file's absolute path, as pytest's engine does
+    static final String ABSOLUTE = "file-tests.absolute";
 
     @Override
     public String getId() {
@@ -35,17 +37,18 @@ public final class FileTestEngine implements TestEngine {
     @Override
     public TestDescriptor discover(EngineDiscoveryRequest request, UniqueId uniqueId) {
         EngineDescriptor engine = new EngineDescriptor(uniqueId, "File tests");
+        boolean absolute = request.getConfigurationParameters().getBoolean(ABSOLUTE).orElse(false);
         for (DirectorySelector directory : request.getSelectorsByType(DirectorySelector.class)) {
             try (Stream<Path> files = Files.list(directory.getPath())) {
                 files.filter(file -> file.toString().endsWith(".py")).sorted()
-                    .forEach(file -> engine.addChild(new FileTest(uniqueId, directory.getPath().getParent(), file)));
+                    .forEach(file -> engine.addChild(new FileTest(uniqueId, directory.getPath().getParent(), file, absolute)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
         }
         for (FileSelector file : request.getSelectorsByType(FileSelector.class)) {
             Path path = file.getPath();
-            engine.addChild(new FileTest(uniqueId, path.getParent().getParent(), path));
+            engine.addChild(new FileTest(uniqueId, path.getParent().getParent(), path, absolute));
         }
         return engine;
     }
@@ -72,10 +75,10 @@ public final class FileTestEngine implements TestEngine {
     private static final class FileTest extends AbstractTestDescriptor {
         private final Path file;
 
-        FileTest(UniqueId engine, Path base, Path file) {
-            // named as pytest names a function's source: the file's path relative to the directory holding the tests
+        FileTest(UniqueId engine, Path base, Path file, boolean absolute) {
+            // named by the file's path relative to the directory holding the tests, or by its absolute path
             super(engine.append("file", file.toString()), file.getFileName().toString(),
-                MethodSource.from(base.relativize(file).toString().replace('\\', '/'), "test"));
+                MethodSource.from(absolute ? file.toAbsolutePath().toString() : base.relativize(file).toString().replace('\\', '/'), "test"));
             this.file = file;
         }
 

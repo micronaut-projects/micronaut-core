@@ -37,6 +37,7 @@ import org.junit.platform.launcher.TestPlan;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -277,10 +278,10 @@ final class JUnitPlatformExecution {
             if (source.isPresent()) {
                 TestSource testSource = source.get();
                 if (testSource instanceof MethodSource method) {
-                    return method.getClassName();
+                    return fileOrClass(method.getClassName());
                 }
                 if (testSource instanceof ClassSource type) {
-                    return type.getClassName();
+                    return fileOrClass(type.getClassName());
                 }
                 if (testSource instanceof FileSource file) {
                     return relativeFile(file.getFile().toPath());
@@ -298,6 +299,23 @@ final class JUnitPlatformExecution {
     }
 
     /**
+     * A class name as it is, or, when an engine names a test's class by its file's absolute path, as pytest's does, that
+     * file relative to its test source root, as a test declared in a file is named.
+     */
+    private String fileOrClass(String className) {
+        // a binary name is never an absolute path, on any platform
+        try {
+            Path file = Path.of(className);
+            if (file.isAbsolute()) {
+                return relativeFile(file);
+            }
+        } catch (InvalidPathException e) {
+            // not a path: a class name
+        }
+        return className;
+    }
+
+    /**
      * A test file's path relative to the test source root that holds it, so reports read the same on every machine.
      */
     private String relativeFile(Path file) {
@@ -308,7 +326,23 @@ final class JUnitPlatformExecution {
                 return rootPath.relativize(absolute).toString().replace('\\', '/');
             }
         }
+        // an engine may name the file by its real path, through the links the root's path goes through, as /var on macOS
+        Path real = realPath(absolute);
+        for (var root : request.testSources()) {
+            Path rootPath = realPath(root.path().toAbsolutePath().normalize());
+            if (real.startsWith(rootPath)) {
+                return rootPath.relativize(real).toString().replace('\\', '/');
+            }
+        }
         return absolute.toString();
+    }
+
+    private static Path realPath(Path path) {
+        try {
+            return path.toRealPath();
+        } catch (IOException e) {
+            return path;
+        }
     }
 
     private static TestOutcome outcome(TestExecutionResult result, Duration duration) {
