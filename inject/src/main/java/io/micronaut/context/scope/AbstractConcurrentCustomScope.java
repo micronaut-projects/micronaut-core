@@ -341,7 +341,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             if (scopeMap == null) {
                 return Optional.empty();
             }
-            for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
+            for (CreatedBean<?> createdBean : scopeMap.values()) {
                 if (createdBean.bean() == bean) {
                     return Optional.of(toBeanRegistration(createdBean));
                 }
@@ -617,7 +617,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             return null;
         }
         final Class<?> targetDefinitionType = getTargetDefinitionType(beanDefinition);
-        for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
+        for (CreatedBean<?> createdBean : scopeMap.values()) {
             final BeanDefinition<?> held = createdBean.definition();
             if (held.equals(beanDefinition) || (targetDefinitionType != null && targetDefinitionType == unwrap(held).getClass())) {
                 return createdBean;
