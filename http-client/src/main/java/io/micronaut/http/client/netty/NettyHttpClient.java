@@ -26,6 +26,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -178,6 +179,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
@@ -201,6 +203,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -208,6 +211,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -497,8 +501,12 @@ final class NettyHttpClient implements
                         disable this check if you are certain a blocking operation is fine \
                         here.""");
                 }
+                if (Schedulers.isInNonBlockingThread()) {
+                    // same check (and message) as reactor's block(), which this client used before
+                    throw new IllegalStateException("block()/blockFirst()/blockLast() are blocking, which is not supported in thread " + Thread.currentThread().getName());
+                }
                 BlockHint blockHint = BlockHint.willBlockThisThread();
-                return Objects.requireNonNull(NettyHttpClient.this.exchange(request, bodyType, errorType, blockHint).block(),
+                return Objects.requireNonNull(awaitFlow(exchangeFlow(request, bodyType, errorType, blockHint)),
                     "The blocking HTTP client returned a null response");
                 // We don't have to release client response buffer
             }
@@ -676,6 +684,46 @@ final class NettyHttpClient implements
             }), FluxSink.OverflowStrategy.BUFFER);
     }
 
+    /**
+     * Wait for the given flow to complete on the calling thread. Errors are reported the same way
+     * as reactor's {@code Mono.block()}: checked exceptions are wrapped using
+     * {@link Exceptions#propagate(Throwable)}, and a suppressed exception carrying the stack trace
+     * of the calling thread is added. If the thread is interrupted, the flow is cancelled.
+     *
+     * @param flow The flow to wait for
+     * @param <T>  The value type
+     * @return The flow value
+     */
+    @Nullable
+    private static <T> T awaitFlow(ExecutionFlow<T> flow) {
+        T value;
+        Throwable error;
+        ImperativeExecutionFlow<T> complete = flow.tryComplete();
+        if (complete != null) {
+            value = complete.getValue();
+            error = complete.getError();
+        } else {
+            BlockingFlowListener<T> listener = new BlockingFlowListener<>();
+            flow.onComplete(listener);
+            try {
+                listener.await();
+            } catch (InterruptedException e) {
+                flow.cancel();
+                Thread.currentThread().interrupt();
+                throw Exceptions.propagate(e);
+            }
+            value = listener.value;
+            error = listener.error;
+        }
+        if (error != null) {
+            RuntimeException re = Exceptions.propagate(error);
+            // the error usually comes from the event loop, keep the stack trace of the caller
+            re.addSuppressed(new Exception("#block terminated with an error"));
+            throw re;
+        }
+        return value;
+    }
+
     private static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
         return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
     }
@@ -779,7 +827,7 @@ final class NettyHttpClient implements
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
-        return Flux.defer(() -> exchange(request, bodyType, errorType, null).flux())
+        return Flux.defer(() -> toMono(exchangeFlow(request, bodyType, errorType, null), PropagatedContext.getOrEmpty()).flux())
             // some tests expect flux...
             ;
     }
@@ -799,11 +847,6 @@ final class NettyHttpClient implements
                                                                  @Nullable Argument<O> bodyType,
                                                                  Argument<E> errorType) {
         return exchangeFlow(request, bodyType, errorType, null);
-    }
-
-    private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
-        ExecutionFlow<HttpResponse<O>> flow = exchangeFlow(request, bodyType, errorType, blockHint);
-        return toMono(flow, PropagatedContext.getOrEmpty());
     }
 
     private <I, O, E> ExecutionFlow<HttpResponse<O>> exchangeFlow(io.micronaut.http.HttpRequest<I> request,
@@ -3284,6 +3327,30 @@ final class NettyHttpClient implements
          * @param client The client
          */
         void onStop(NettyHttpClient client);
+    }
+
+    /**
+     * Completion listener that a blocking caller waits on, see {@link #awaitFlow(ExecutionFlow)}.
+     *
+     * @param <T> The value type
+     */
+    private static final class BlockingFlowListener<T> extends CountDownLatch implements BiConsumer<T, @Nullable Throwable> {
+        @Nullable
+        T value;
+        @Nullable
+        Throwable error;
+
+        BlockingFlowListener() {
+            super(1);
+        }
+
+        @Override
+        public void accept(T value, @Nullable Throwable error) {
+            // the count down publishes these fields to the waiting thread
+            this.value = value;
+            this.error = error;
+            countDown();
+        }
     }
 
     /**
