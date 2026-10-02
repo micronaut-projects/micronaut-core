@@ -329,6 +329,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     @Override
+    public Set<String> getSupportedOptions() {
+        Set<String> options = new HashSet<>(super.getSupportedOptions());
+        options.add(BYTECODE_OPTION);
+        options.add(SOURCE_ROOT_OPTION);
+        return options;
+    }
+
+    @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         String bytecode = processingEnv.getOptions().get(BYTECODE_OPTION);

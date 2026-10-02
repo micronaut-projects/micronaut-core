@@ -439,6 +439,9 @@ final class PyronautCompilerTest {
             .build()
             .buildClassLoader());
         assertFalse(off.contains(".pyc"), off);
+        // declared, so that javac does not report it as an option no processor recognised
+        assertTrue(new io.micronaut.python.processing.PythonAnnotationProcessor().getSupportedOptions()
+            .contains(io.micronaut.python.processing.PythonAnnotationProcessor.BYTECODE_OPTION));
     }
 
     private static String filesList(ClassLoader classLoader) throws Exception {
