@@ -43,6 +43,26 @@ final class GraalPyContextFactoryTest {
     Path temporaryDirectory;
 
     @Test
+    void loadsMainFromTheConfiguredVfsMountPoint() throws IOException {
+        ClassLoader classLoader = getClass().getClassLoader();
+        System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
+        System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
+        try (VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
+            .resourceDirectory(GraalPyContextFactory.APPLICATION_PATH)
+            .resourceClassLoader(classLoader)
+            .unixMountPoint("/micronaut_test_vfs")
+            .windowsMountPoint("Y:\\micronaut_test_vfs")
+            .build();
+             Context context = GraalPyResources.contextBuilder(vfs).build()) {
+            PolyglotException exception = assertThrows(PolyglotException.class, () ->
+                GraalPyContextFactory.evaluateMain(classLoader, "failing_main.py", context, vfs));
+            assertTrue(exception.getMessage().contains("failing_main.py refuses to load"), exception.getMessage());
+            assertEquals(Path.of(vfs.getMountPoint(), "src", "failing_main.py").toString(),
+                context.eval(PYTHON, "import sys; sys.modules['__main__'].__file__").asString());
+        }
+    }
+
+    @Test
     void resolvesActiveVirtualEnvExecutableWithoutPyenvVersion() throws IOException {
         Path executable = temporaryDirectory.resolve(".venv/bin/python");
         Files.createDirectories(executable.getParent());

@@ -54,8 +54,10 @@ class PythonBootstrapStackTest {
     private static final String RERUN_LAUNCHER_WITH_DEPTH_RECORDER = """
         def __micronaut_rerun_launcher():
             import importlib.util
+            import os
             import sys
 
+            source_directory = os.path.dirname(sys.modules['__main__'].__file__)
             deepest = [0, None]
 
             class DepthRecorder:
@@ -74,12 +76,12 @@ class PythonBootstrapStackTest {
             for name, module in list(sys.modules.items()):
                 file = getattr(module, '__file__', None) or ''
                 origin = getattr(getattr(module, '__spec__', None), 'origin', None) or ''
-                if file.startswith('/graalpy_vfs/src/') or origin.startswith('java:'):
+                if file.startswith(source_directory + os.sep) or origin.startswith('java:'):
                     del sys.modules[name]
             recorder = DepthRecorder()
             sys.meta_path.insert(0, recorder)
             try:
-                spec = importlib.util.spec_from_file_location('__micronaut_launcher_rerun', '/graalpy_vfs/src/__main__.py')
+                spec = importlib.util.spec_from_file_location('__micronaut_launcher_rerun', os.path.join(source_directory, '__main__.py'))
                 spec.loader.exec_module(importlib.util.module_from_spec(spec))
             finally:
                 sys.meta_path.remove(recorder)
