@@ -16,11 +16,13 @@
 package io.micronaut.inject.utils;
 
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanInjectionProvider;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.ResolveWith;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.BeanInjectionPoint;
@@ -309,6 +311,16 @@ public class BeanInjectionUtils {
                 if (result != null) {
                     return result;
                 }
+            }
+            if (annotationMetadata.hasStereotype(ResolveWith.class)) {
+                String providerName = annotationMetadata.stringValue(ResolveWith.class).orElseThrow(() ->
+                    new IllegalArgumentException("ResolveWith requires a BeanInjectionProvider type"));
+                ClassElement provider = visitorContext.getClassElement(providerName).orElseThrow(() ->
+                    new IllegalArgumentException("The injection provider " + providerName + " is not on the classpath"));
+                if (!provider.isAssignable(BeanInjectionProvider.class)) {
+                    throw new IllegalArgumentException("The injection provider " + providerName + " must implement BeanInjectionProvider");
+                }
+                return new BeanInjectionPoint<>(genericType, annotationMetadata);
             }
             isArray = genericType.isArray();
             if (genericType.isAssignable(Collection.class) || isArray) {
