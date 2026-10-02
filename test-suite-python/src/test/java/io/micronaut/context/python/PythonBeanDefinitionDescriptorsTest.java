@@ -55,7 +55,7 @@ class PythonBeanDefinitionDescriptorsTest {
     );
 
     /**
-     * Of micronaut-session 5.1.0, from Maven Central.
+     * Of micronaut-session, from Maven Central at the version of the catalog, which was built before micronaut-core 5.3.
      */
     private static final List<String> RELEASED = List.of(
         "io.micronaut.session.$InMemorySessionStore$Definition",
@@ -82,7 +82,9 @@ class PythonBeanDefinitionDescriptorsTest {
 
     @Test
     void aDefinitionOfAModuleReleasedBeforeDescriptorsHasAnEmptyEntry() {
-        assertTrue(comparison.getWithoutDescriptor().containsAll(RELEASED), comparison::toString);
+        assertTrue(comparison.getWithoutDescriptor().containsAll(RELEASED),
+            () -> "micronaut-session now ships descriptors: pin a release built before micronaut-core 5.3 as the fixture. "
+                + comparison);
     }
 
     /**

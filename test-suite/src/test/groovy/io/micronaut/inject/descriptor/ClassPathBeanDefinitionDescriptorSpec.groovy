@@ -34,11 +34,12 @@ class ClassPathBeanDefinitionDescriptorSpec extends Specification {
         'io.micronaut.docs.ioc.validation.pojo.$PersonService$Definition$Intercepted$Definition'
     ]
 
-    // of micronaut-session 5.1.0 and micronaut-validation 5.1.0, from Maven Central
+    // of micronaut-session and micronaut-validation, from Maven Central at the versions of the catalog, which were
+    // built before micronaut-core 5.3; by artifact and not by version, so that only a release with descriptors fails
     private static final Map<String, String> RELEASED = [
-        'io.micronaut.session.$InMemorySessionStore$Definition'                  : 'micronaut-session-5.1.0.jar',
-        'io.micronaut.validation.validator.$DefaultValidator$Definition'         : 'micronaut-validation-5.1.0.jar',
-        'io.micronaut.validation.$ValidatingInterceptor$Definition'              : 'micronaut-validation-5.1.0.jar'
+        'io.micronaut.session.$InMemorySessionStore$Definition'                  : 'micronaut-session',
+        'io.micronaut.validation.validator.$DefaultValidator$Definition'         : 'micronaut-validation',
+        'io.micronaut.validation.$ValidatingInterceptor$Definition'              : 'micronaut-validation'
     ]
 
     @Shared
@@ -58,9 +59,13 @@ class ClassPathBeanDefinitionDescriptorSpec extends Specification {
 
     void "a definition of a module released before descriptors has an empty entry"() {
         expect:
-        comparison.withoutDescriptor.containsAll(RELEASED.keySet())
-        RELEASED.every { definition, jar -> entry(definition).toString().contains("/$jar!/") && entry(definition).bytes.length == 0 }
-        RELEASED.keySet().every { !comparison.notLoaded.contains(it) }
+        RELEASED.each { definition, artifact ->
+            URL entry = entry(definition)
+            assert entry.toString() =~ "/${artifact}-[0-9][^/]*\\.jar!/"
+            assert entry.bytes.length == 0 && comparison.withoutDescriptor.contains(definition),
+                "$artifact now ships descriptors: pin a release built before micronaut-core 5.3 as the fixture"
+            assert !comparison.notLoaded.contains(definition)
+        }
     }
 
     // Nothing reads the content of an entry yet, so this cannot fail because of it: it is what a context that reads
@@ -72,7 +77,7 @@ class ClassPathBeanDefinitionDescriptorSpec extends Specification {
 
         expect: "the bean of a released module"
         context.getBean(SessionStore) instanceof InMemorySessionStore
-        InMemorySessionStore.protectionDomain.codeSource.location.path.endsWith('/micronaut-session-5.1.0.jar')
+        InMemorySessionStore.protectionDomain.codeSource.location.path ==~ /.*\/micronaut-session-[0-9][^\/]*\.jar/
         context.getBean(Validator) != null
 
         and: "the interceptor of a released module around a bean of this build"
