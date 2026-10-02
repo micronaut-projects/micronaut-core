@@ -55,6 +55,7 @@ final class BeanDependencies implements DependentBeanProvider {
         return removed;
     }
 
+    @SuppressWarnings("java:S1181") // Release every dependent before rethrowing the first failure, including Errors.
     void close(DefaultBeanContext context) {
         Throwable failure = null;
         List<BeanRegistration<?>> taken = takeDependents();
