@@ -15,7 +15,7 @@ micronaut.dev.retain=javax.sql.DataSource
 micronaut.dev.patch-in-place=true
 ----
 
-On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do: the launcher then watches through the native file system events instead of the JDK's polling service, and a save is noticed at once rather than seconds later.
+On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do: the launcher then watches through the native file system events, and a save is noticed at once. Without it, and in a native image, the launcher compares the watched directories every 250 milliseconds, rather than use the JDK's service, which polls every two seconds at best.
 
 Relative paths resolve against the manifest's directory, `@file` reads a list from an argument file, and a system property of the same name overrides an entry. The launcher snapshots the reloadable tier for each generation into `build/micronaut-dev/generations` under the project, or the directory `micronaut.dev.generations` names, such as a Maven build's `target/micronaut-dev/generations`; it empties that directory when it starts, and refuses to when it holds files it did not write. The launcher is started with the runtime classpath, which holds the framework, the libraries and `micronaut-dev` itself, but not the project's own class directories: those belong to the reloadable tier.
 
