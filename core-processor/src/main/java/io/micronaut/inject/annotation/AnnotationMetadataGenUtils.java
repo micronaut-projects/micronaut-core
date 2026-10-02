@@ -468,6 +468,20 @@ public final class AnnotationMetadataGenUtils {
                 value -> asValueExpression(value, loadClassValueExpressionFn)));
     }
 
+    /**
+     * Creates the expression of a map of the given annotation values, in the form the annotation metadata
+     * records them.
+     *
+     * @param values                   The values by member name
+     * @param loadClassValueExpressionFn The function creating the expression loading a class value
+     * @return The expression of an immutable map
+     * @since 5.3.0
+     */
+    public static ExpressionDef valuesMapExpression(Map<CharSequence, Object> values,
+                                                    Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return stringMapOf(values, loadClassValueExpressionFn);
+    }
+
     private static ExpressionDef asValueExpression(Object value,
                                                    Function<String, ExpressionDef> loadClassValueExpressionFn) {
         if (value == null) {
