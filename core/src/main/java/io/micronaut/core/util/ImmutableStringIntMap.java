@@ -16,9 +16,11 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * An immutable map from {@link String} keys to {@code int} values, built for fast lookups.
@@ -29,8 +31,8 @@ import java.util.function.Function;
  * Do not add mutators or non-final fields to this class, as that would break the guarantee.</p>
  *
  * <p>Up to {@link #LINEAR_SCAN_THRESHOLD} keys are stored densely and looked up by a linear scan
- * with {@link String#equals}. Larger maps use open addressing with linear probing and a load
- * factor of at most 50%.</p>
+ * with {@link String#equals}. Larger maps use open addressing with linear probing over the
+ * spread hash code and a load factor of at most 50%.</p>
  *
  * @author Jochen Seeber
  * @since 5.3.0
@@ -43,42 +45,51 @@ public final class ImmutableStringIntMap {
      */
     static final int LINEAR_SCAN_THRESHOLD = 4;
 
-    private static final int LINEAR_SCAN = -1;
-
-    private static final ImmutableStringIntMap EMPTY = new ImmutableStringIntMap(new String[0], new int[0], LINEAR_SCAN);
+    private static final ImmutableStringIntMap EMPTY = new ImmutableStringIntMap(new String[0], null);
 
     /**
-     * {@link #LINEAR_SCAN} for the dense layout, otherwise the hash table mask.
+     * The keys in order in the dense layout, with {@code null} for a skipped duplicate, otherwise
+     * the hash table, whose size is a power of two.
      */
-    private final int mask;
     private final String[] keys;
-    private final int[] values;
+    /**
+     * The value of each hash table slot, or {@code null} for the dense layout, where a key's value
+     * is its position.
+     */
+    private final int @Nullable [] values;
 
-    private ImmutableStringIntMap(String[] keys, int[] values, int mask) {
+    private ImmutableStringIntMap(String[] keys, int @Nullable [] values) {
         this.keys = keys;
         this.values = values;
-        this.mask = mask;
     }
 
-    private <T> ImmutableStringIntMap(T[] items, Function<? super T, String> key) {
+    private <T> ImmutableStringIntMap(T[] items, Function<? super T, String> key, boolean skipDuplicates, @Nullable Supplier<String> owner) {
         // Build into locals first, so each final field is assigned exactly once
         int n = items.length;
         if (n <= LINEAR_SCAN_THRESHOLD) {
             String[] denseKeys = new String[n];
-            int[] denseValues = new int[n];
             for (int i = 0; i < n; i++) {
                 String name = Objects.requireNonNull(key.apply(items[i]), "key");
+                // Checking each key against all earlier ones is quadratic, but this layout holds at
+                // most LINEAR_SCAN_THRESHOLD keys, so it costs a handful of equals calls, once per map.
+                // With skipDuplicates a later duplicate is not added: its slot stays empty, so every
+                // other key keeps its position as its value.
+                boolean duplicate = false;
                 for (int j = 0; j < i; j++) {
-                    if (denseKeys[j].equals(name)) {
-                        throw new IllegalArgumentException("Duplicate key");
+                    if (name.equals(denseKeys[j])) {
+                        if (!skipDuplicates) {
+                            throw duplicateKey(name, owner);
+                        }
+                        duplicate = true;
+                        break;
                     }
                 }
-                denseKeys[i] = name;
-                denseValues[i] = i;
+                if (!duplicate) {
+                    denseKeys[i] = name;
+                }
             }
             this.keys = denseKeys;
-            this.values = denseValues;
-            this.mask = LINEAR_SCAN;
+            this.values = null;
         } else {
             int tableSize = Integer.highestOneBit(n * 2 + 1) * 2;
             int tableMask = tableSize - 1;
@@ -86,7 +97,7 @@ public final class ImmutableStringIntMap {
             int[] tableValues = new int[tableSize];
             for (int i = 0; i < n; i++) {
                 String name = Objects.requireNonNull(key.apply(items[i]), "key");
-                int slot = name.hashCode() & tableMask;
+                int slot = slot(name, tableMask);
                 while (true) {
                     String candidate = tableKeys[slot];
                     if (candidate == null) {
@@ -94,15 +105,37 @@ public final class ImmutableStringIntMap {
                         tableValues[slot] = i;
                         break;
                     } else if (candidate.equals(name)) {
-                        throw new IllegalArgumentException("Duplicate key");
+                        if (skipDuplicates) {
+                            break;
+                        }
+                        throw duplicateKey(name, owner);
                     }
                     slot = (slot + 1) & tableMask;
                 }
             }
             this.keys = tableKeys;
             this.values = tableValues;
-            this.mask = tableMask;
         }
+    }
+
+    /**
+     * The first slot to probe for a key. The high half of the hash code is folded into the low
+     * half, as {@link java.util.HashMap} does, because the table mask only keeps the low bits:
+     * names that differ only in a trailing digit, such as {@code field1}..{@code field24}, would
+     * otherwise land in a few neighbouring slots and form long probe chains.
+     *
+     * @param key  The key
+     * @param mask The table mask
+     * @return The slot
+     */
+    private static int slot(String key, int mask) {
+        int h = key.hashCode();
+        return (h ^ (h >>> 16)) & mask;
+    }
+
+    private static IllegalArgumentException duplicateKey(String key, @Nullable Supplier<String> owner) {
+        String message = "Duplicate key [" + key + "]";
+        return new IllegalArgumentException(owner == null ? message : message + " in " + owner.get());
     }
 
     /**
@@ -115,30 +148,54 @@ public final class ImmutableStringIntMap {
      * @throws IllegalArgumentException if two items have the same key
      */
     public static <T> ImmutableStringIntMap of(T[] items, Function<? super T, String> key) {
+        return of(items, key, false, null);
+    }
+
+    /**
+     * Creates a map from each item's key to the item's index in {@code items}.
+     *
+     * @param items          The items
+     * @param key            Extracts the non-null key of an item
+     * @param skipDuplicates Whether only the first item with a key is mapped and later items with
+     *                       the same key are ignored, instead of rejecting a duplicate key
+     * @param owner          Describes what is indexed, for the message of a duplicate key, such as
+     *                       {@code "the properties of com.example.Book"}; only called for a
+     *                       duplicate, and unused if {@code skipDuplicates} is set
+     * @param <T>            The item type
+     * @return The map
+     * @throws IllegalArgumentException if two items have the same key and {@code skipDuplicates}
+     *                                  is not set
+     */
+    public static <T> ImmutableStringIntMap of(T[] items, Function<? super T, String> key, boolean skipDuplicates, @Nullable Supplier<String> owner) {
         if (items.length == 0) {
             return EMPTY;
         }
-        return new ImmutableStringIntMap(items, key);
+        return new ImmutableStringIntMap(items, key, skipDuplicates, owner);
     }
 
     /**
      * Looks up the value of a key.
      *
-     * @param key The key, must not be null
+     * @param key The key
      * @param def The value to return when the key is absent
      * @return The value, or {@code def}
+     * @throws NullPointerException if {@code key} is null, whatever the size of the map
      */
     public int get(String key, int def) {
+        Objects.requireNonNull(key, "key");
         String[] keys = this.keys;
-        if (mask == LINEAR_SCAN) {
+        int[] values = this.values;
+        if (values == null) {
             for (int i = 0; i < keys.length; i++) {
-                if (keys[i].equals(key)) {
-                    return values[i];
+                // an empty slot of a skipped duplicate is null, which equals no key
+                if (key.equals(keys[i])) {
+                    return i;
                 }
             }
             return def;
         }
-        int slot = key.hashCode() & mask;
+        int mask = keys.length - 1;
+        int slot = slot(key, mask);
         while (true) {
             String candidate = keys[slot];
             if (candidate == null) {
@@ -154,6 +211,6 @@ public final class ImmutableStringIntMap {
      * @return Whether this map uses the dense linear-scan layout
      */
     boolean isLinearScan() {
-        return mask == LINEAR_SCAN;
+        return values == null;
     }
 }

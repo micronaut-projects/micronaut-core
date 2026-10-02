@@ -46,15 +46,18 @@ class AbstractBeanMethodArgumentIndexSpec extends Specification {
         thrown(NullPointerException)
     }
 
-    def "argumentIndexOf rejects duplicate argument names"() {
-        given:
-        def method = new TestMethod(Argument.of(String, "dup"), Argument.of(String, "dup"))
+    def "argumentIndexOf returns the first of #count arguments sharing a name"() {
+        given: 'a Kotlin suspend method parameter can share its name with the synthetic continuation'
+        Argument<?>[] arguments = (args(count - 1).toList() + [Argument.of(String, "arg0")]) as Argument<?>[]
+        def method = new TestMethod(arguments)
 
-        when:
-        method.argumentIndexOf("dup")
+        expect:
+        method.argumentIndexOf("arg0") == 0
+        method.getArgument("arg0").get().is(arguments[0])
+        (1..<count - 1).every { method.argumentIndexOf("arg$it".toString()) == it }
 
-        then:
-        thrown(IllegalArgumentException)
+        where:
+        count << [2, 4, 5, 9]
     }
 
     def "concurrent first calls all see correct indexes"() {

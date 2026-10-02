@@ -3,6 +3,7 @@ package io.micronaut.core.util
 import spock.lang.Specification
 
 import java.util.function.Function
+import java.util.function.Supplier
 
 class ImmutableStringIntMapSpec extends Specification {
 
@@ -27,8 +28,8 @@ class ImmutableStringIntMapSpec extends Specification {
     private static List<List> duplicateKeyCases() {
         int t = ImmutableStringIntMap.LINEAR_SCAN_THRESHOLD
         [
-            ["scan", ["a", "a"] as String[]],
-            ["hash", (names(t + 2).toList() + ["name0"]) as String[]]
+            ["scan", ["a", "a"] as String[], "a"],
+            ["hash", (names(t + 2).toList() + ["name0"]) as String[], "name0"]
         ]
     }
 
@@ -80,16 +81,79 @@ class ImmutableStringIntMapSpec extends Specification {
         size << equalNotIdenticalSizes()
     }
 
-    def "duplicate keys are rejected in the #layout layout"() {
+    def "duplicate keys are rejected in the #layout layout, naming the key"() {
         when:
         ImmutableStringIntMap.of(keys, ID)
 
         then:
         def e = thrown(IllegalArgumentException)
-        e.message == "Duplicate key"
+        e.message == "Duplicate key [$duplicate]".toString()
 
         where:
-        [layout, keys] << duplicateKeyCases()
+        [layout, keys, duplicate] << duplicateKeyCases()
+    }
+
+    def "a duplicate key message names what is indexed in the #layout layout"() {
+        when:
+        ImmutableStringIntMap.of(keys, ID, false, { "the test items" } as Supplier<String>)
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "Duplicate key [$duplicate] in the test items".toString()
+
+        where:
+        [layout, keys, duplicate] << duplicateKeyCases()
+    }
+
+    def "skipDuplicates keeps only the first mapping of a key in the #layout layout"() {
+        when:
+        def map = ImmutableStringIntMap.of(keys, ID, true, null)
+
+        then:
+        map.isLinearScan() == (layout == "scan")
+        (0..<keys.length).every { map.get(keys[it], -1) == keys.findIndexOf { k -> k == keys[it] } }
+        map.get("missing", -1) == -1
+
+        where:
+        layout | keys
+        "scan" | ["a", "b", "a", "c"] as String[]
+        "hash" | (names(ImmutableStringIntMap.LINEAR_SCAN_THRESHOLD + 2).toList() + ["name0", "name3"]) as String[]
+    }
+
+    def "the description of what is indexed is only built for a duplicate"() {
+        when:
+        def map = ImmutableStringIntMap.of(names(size), ID, false, { throw new AssertionError("described") } as Supplier<String>)
+
+        then:
+        map.get("name0", -1) == 0
+
+        where:
+        size << [1, ImmutableStringIntMap.LINEAR_SCAN_THRESHOLD + 1]
+    }
+
+    def "numbered names, whose hash codes differ only in their low bits, are all found"() {
+        given: 'without spreading the hash, field1..field24 pile into a few slots of a 64-slot table'
+        String[] keys = (1..24).collect { "field$it".toString() } as String[]
+
+        when:
+        def map = ImmutableStringIntMap.of(keys, ID)
+
+        then:
+        !map.isLinearScan()
+        (0..<keys.length).every { map.get(new String(keys[it].toCharArray()), -1) == it }
+        map.get("field25", -1) == -1
+        map.get("field0", -1) == -1
+    }
+
+    def "a null key is rejected by a map of #size keys"() {
+        when:
+        ImmutableStringIntMap.of(names(size), ID).get(null, -1)
+
+        then:
+        thrown(NullPointerException)
+
+        where:
+        size << [0, 1, ImmutableStringIntMap.LINEAR_SCAN_THRESHOLD, ImmutableStringIntMap.LINEAR_SCAN_THRESHOLD + 1]
     }
 
     def "colliding hash codes are all found in the hash layout"() {

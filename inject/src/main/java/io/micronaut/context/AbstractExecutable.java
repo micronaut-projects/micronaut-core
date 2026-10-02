@@ -106,7 +106,7 @@ abstract class AbstractExecutable<T, R> implements Executable<T, R> {
         ArgumentUtils.requireNonNull("name", name);
         ImmutableStringIntMap index = argumentIndex;
         if (index == null) {
-            index = ImmutableStringIntMap.of(getArguments(), Argument::getName);
+            index = ImmutableStringIntMap.of(getArguments(), Argument::getName, true, null);
             argumentIndex = index;
         }
         return index.get(name, -1);

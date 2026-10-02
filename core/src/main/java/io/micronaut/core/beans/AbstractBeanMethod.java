@@ -119,7 +119,7 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
         ArgumentUtils.requireNonNull("name", name);
         ImmutableStringIntMap index = argumentIndex;
         if (index == null) {
-            index = ImmutableStringIntMap.of(arguments, Argument::getName);
+            index = ImmutableStringIntMap.of(arguments, Argument::getName, true, null);
             argumentIndex = index;
         }
         return index.get(name, -1);

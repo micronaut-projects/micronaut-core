@@ -94,4 +94,20 @@ class MyBean {
         (0..<10).every { method.argumentIndexOf("a$it".toString()) == it }
         method.argumentIndexOf('missing') == -1
     }
+
+    @SuppressWarnings('GrDeprecatedAPIUsage')
+    void 'the first of arguments sharing a name is found'() {
+        given:
+        Argument<?>[] methodArguments = [Argument.of(String, 'a'), Argument.of(String, 'a')] as Argument<?>[]
+        def method = new AbstractExecutableMethod<Object, Object>(Object, 'm',
+                Argument.OBJECT_ARGUMENT,
+                methodArguments) {
+            @Override
+            protected Object invokeInternal(Object instance, Object[] arguments) { null }
+        }
+
+        expect:
+        method.argumentIndexOf('a') == 0
+        method.getArgument('a').get().is(methodArguments[0])
+    }
 }

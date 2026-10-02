@@ -219,6 +219,9 @@ public class ImmutableStringIntMapBenchmark {
             keys = new String[size];
             System.arraycopy(NAMES, 0, keys, 0, size);
             immutable = ImmutableStringIntMap.of(keys, Function.identity());
+            // The table baseline at every size. Unlike ImmutableStringIntMap's hash layout it does not
+            // spread the hash code; that costs the table one shift and xor per lookup, so leaving it
+            // out can only favour the table and the measured threshold stays valid.
             table = new StringIntMap(size);
             for (int i = 0; i < size; i++) {
                 table.put(keys[i], i);

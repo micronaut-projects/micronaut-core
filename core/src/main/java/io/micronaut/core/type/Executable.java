@@ -50,8 +50,9 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      *
      * @param name The argument name
      * @return The index into {@link #getArguments()}, or {@code -1} if there is no such argument.
-     * Argument names are expected to be unique; if they are not, implementations may throw
-     * {@link IllegalArgumentException}. This default returns the first match.
+     * If several arguments share the name, the first one's index is returned; for example the
+     * synthetic {@code continuation} argument of a Kotlin {@code suspend} method can share its name
+     * with a declared parameter.
      * @throws NullPointerException if {@code name} is null
      * @since 5.3.0
      */
