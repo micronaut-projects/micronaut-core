@@ -28,6 +28,7 @@ import io.micronaut.inject.BeanType;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * <p>A bean registration is an association between a {@link BeanDefinition} and a created bean, typically a
@@ -151,6 +152,36 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     @Internal
     public List<BeanRegistration<?>> dependentBeans() {
         return dependencies == null ? List.of() : dependencies.dependentBeans();
+    }
+
+    /**
+     * Returns the interceptor selection retained for this registration without resolving dependencies.
+     * The key is compared by identity. Registrations without container ownership retain no selection.
+     *
+     * @param key The selection key
+     * @param <S> The selection type
+     * @return The retained selection, or null when none exists
+     * @since 5.3.0
+     */
+    @Internal
+    public <S> @Nullable S getInterceptorSelection(Object key) {
+        return null;
+    }
+
+    /**
+     * Returns a retained interceptor selection or computes it through this bean's dependency owner.
+     * Unscoped interceptors become dependents of this registration; shared registrations remain scope-owned.
+     * Selection is serialized with destruction and cached by key identity.
+     *
+     * @param key The selection key
+     * @param selector Computes the selection using this bean's resolution context
+     * @param <S> The selection type
+     * @return The selection, or null when this registration cannot acquire interceptors
+     * @since 5.3.0
+     */
+    @Internal
+    public <S> @Nullable S selectInterceptors(Object key, Function<BeanResolutionContext, S> selector) {
+        return null;
     }
 
     @Override

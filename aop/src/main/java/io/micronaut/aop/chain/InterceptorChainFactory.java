@@ -35,7 +35,9 @@ import java.util.Collection;
 /**
  * Context-local strategy for building and executing method and constructor interceptor chains.
  * Implementations can customize chain construction while retaining the default lifecycle and constructor
- * execution contracts. Each build returns an independent invocation; chain state is never shared.
+ * execution contracts. Implementations supply {@link #buildResolvedInvocation}, the common method/lifecycle
+ * construction hook used by generated proxies. Candidate-based conveniences live on
+ * {@link DefaultInterceptorChainFactory}. Each build returns independent invocation state.
  *
  * @since 5.3.0
  */
@@ -68,25 +70,6 @@ public interface InterceptorChainFactory {
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> candidates);
 
     /**
-     * Builds a method chain from acquired candidates. Introduction chains also include around advice.
-     *
-     * @param bean The target
-     * @param method The intercepted method
-     * @param candidates The interceptor candidates, including an authoritative empty set
-     * @param kind The interception kind
-     * @param parameters The invocation arguments
-     * @param <T> The bean type
-     * @param <R> The result type
-     * @return A new method chain
-     */
-    <T, R> MethodInvocationContext<T, R> buildMethodChain(
-        T bean,
-        ExecutableMethod<T, R> method,
-        Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
-        InterceptorKind kind,
-        @Nullable Object... parameters);
-
-    /**
      * Builds a method invocation from interceptors already selected for its target. Generated proxies retain the
      * context's factory and their selected arrays; this operation does not resolve beans or repeat matching.
      *
@@ -110,7 +93,9 @@ public interface InterceptorChainFactory {
 
     /**
      * Builds an invocation after selection. The default factory routes method and lifecycle construction through
-     * this hook, preserving the interception kind without repeating matching. Each call returns independent state.
+     * this required hook, preserving the interception kind without repeating matching. Implementations must
+     * supply it explicitly so generated calls cannot silently bypass their construction strategy.
+     * Each call returns independent state.
      *
      * @param bean The target
      * @param method The intercepted method
@@ -121,11 +106,9 @@ public interface InterceptorChainFactory {
      * @param <R> The result type
      * @return A fresh method or lifecycle invocation
      */
-    default <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(
+    <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(
         T bean, ExecutableMethod<T, R> method, Interceptor<T, R>[] interceptors,
-        InterceptorKind kind, @Nullable Object... parameters) {
-        return new MethodInterceptorChain<>(interceptors, bean, method, kind, parameters);
-    }
+        InterceptorKind kind, @Nullable Object... parameters);
 
     /**
      * Builds a constructor chain. Null candidates permit discovery; an empty set does not.

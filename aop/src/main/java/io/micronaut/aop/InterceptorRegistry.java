@@ -19,6 +19,7 @@ import io.micronaut.aop.chain.InterceptorCandidateResolver;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
@@ -85,6 +86,68 @@ public interface InterceptorRegistry {
             return selected;
         }
         return ArrayUtils.concat(resolveInterceptors(method, candidates, InterceptorKind.AROUND), selected);
+    }
+
+    /**
+     * Acquires the candidates shared by a bean's construction and lifecycle phases.
+     * @param resolutionContext The creation context
+     * @param constructor The constructor with combined bean and constructor metadata
+     * @param <T> The bean type
+     * @return The candidates, or null when the bean declares no binding
+     * @since 5.3.0
+     */
+    @Internal
+    default <T> @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveBeanCandidates(
+        BeanResolutionContext resolutionContext, AnnotationMetadataProvider constructor) {
+        return new InterceptorCandidateResolver(this).resolveBeanCandidates(resolutionContext, constructor);
+    }
+
+    /**
+     * Retains lifecycle candidates before injection and initialization, reusing construction or proxy candidates.
+     * @param resolutionContext The creation context
+     * @param definition The bean definition
+     * @param bean The constructed instance
+     * @param initialization Whether post-construct interception needs its own candidates
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default void captureLifecycleCandidates(BeanResolutionContext resolutionContext, BeanDefinition<?> definition,
+                                            @Nullable Object bean, boolean initialization) {
+        new InterceptorCandidateResolver(this).captureLifecycleCandidates(resolutionContext, definition, bean, initialization);
+    }
+
+    /**
+     * Acquires candidates for construction when the caller supplies no explicit set.
+     * @param resolutionContext The resolution context
+     * @param definition The bean definition
+     * @param constructor The intercepted constructor
+     * @param <T> The bean type
+     * @return The candidates
+     * @since 5.3.0
+     */
+    @Internal
+    default <T> Collection<BeanRegistration<Interceptor<T, T>>> resolveConstructorCandidates(
+        BeanResolutionContext resolutionContext, BeanDefinition<T> definition, BeanConstructor<T> constructor) {
+        return new InterceptorCandidateResolver(this).resolveConstructorCandidates(resolutionContext, definition, constructor);
+    }
+
+    /**
+     * Returns retained lifecycle candidates, using legacy discovery only when none were recorded.
+     * An explicitly retained empty set prevents discovery.
+     * @param resolutionContext The resolution context
+     * @param definition The lifecycle owner
+     * @param method The lifecycle method
+     * @param bean The bean instance
+     * @param kind The lifecycle kind
+     * @return The candidates
+     * @since 5.3.0
+     */
+    @Internal
+    default Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleCandidates(
+        BeanResolutionContext resolutionContext, BeanDefinition<?> definition,
+        ExecutableMethod<?, ?> method, Object bean, InterceptorKind kind) {
+        return new InterceptorCandidateResolver(this).resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind);
     }
 
     /**

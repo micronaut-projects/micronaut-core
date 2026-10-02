@@ -30,6 +30,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
@@ -67,6 +68,31 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
 
     public DefaultInterceptorRegistry(BeanContext beanContext) {
         this.beanContext = beanContext;
+    }
+
+    @Override
+    public <T> @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveBeanCandidates(
+        BeanResolutionContext resolutionContext, AnnotationMetadataProvider constructor) {
+        return candidateResolver.resolveBeanCandidates(resolutionContext, constructor);
+    }
+
+    @Override
+    public void captureLifecycleCandidates(BeanResolutionContext resolutionContext, BeanDefinition<?> definition,
+                                           @Nullable Object bean, boolean initialization) {
+        candidateResolver.captureLifecycleCandidates(resolutionContext, definition, bean, initialization);
+    }
+
+    @Override
+    public <T> Collection<BeanRegistration<Interceptor<T, T>>> resolveConstructorCandidates(
+        BeanResolutionContext resolutionContext, BeanDefinition<T> definition, BeanConstructor<T> constructor) {
+        return candidateResolver.resolveConstructorCandidates(resolutionContext, definition, constructor);
+    }
+
+    @Override
+    public Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleCandidates(
+        BeanResolutionContext resolutionContext, BeanDefinition<?> definition,
+        ExecutableMethod<?, ?> method, Object bean, InterceptorKind kind) {
+        return candidateResolver.resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind);
     }
 
     @Override

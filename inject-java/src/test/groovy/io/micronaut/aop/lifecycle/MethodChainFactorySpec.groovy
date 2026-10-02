@@ -50,10 +50,10 @@ class CustomFactory implements InterceptorChainFactory {
     final List<MethodInvocationContext<?, ?>> invocations = new ArrayList<>();
     final InterceptorChainFactory delegate;
     CustomFactory(InterceptorRegistry registry) { delegate = new DefaultInterceptorChainFactory(registry); }
-    public <T, R> MethodInvocationContext<T, R> buildResolvedMethodChain(T bean, ExecutableMethod<T, R> method,
-            Interceptor<T, R>[] interceptors, Object... arguments) {
-        MethodInvocationContext<T, R> chain = new RecordingInvocation<>(
-            delegate.buildResolvedMethodChain(bean, method, interceptors, arguments));
+    public <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(T bean, ExecutableMethod<T, R> method,
+            Interceptor<T, R>[] interceptors, InterceptorKind kind, Object... arguments) {
+        LifecycleInvocation<T, R> chain = new RecordingInvocation<>(
+            delegate.buildResolvedInvocation(bean, method, interceptors, kind, arguments));
         invocations.add(chain);
         return chain;
     }
@@ -62,20 +62,17 @@ class CustomFactory implements InterceptorChainFactory {
             Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
         return delegate.buildLifecycleChain(resolution, definition, method, bean, kind, candidates);
     }
-    public <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
-            Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind, Object... arguments) {
-        return delegate.buildMethodChain(bean, method, candidates, kind, arguments);
-    }
     public <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
             BeanDefinition<T> definition, BeanConstructor<T> constructor,
             Collection<BeanRegistration<Interceptor<T, T>>> candidates, int additionalArguments, Object... arguments) {
         return delegate.buildConstructorChain(resolution, definition, constructor, candidates, additionalArguments, arguments);
     }
 }
-class RecordingInvocation<T, R> implements MethodInvocationContext<T, R> {
-    final MethodInvocationContext<T, R> delegate;
+class RecordingInvocation<T, R> implements LifecycleInvocation<T, R> {
+    final LifecycleInvocation<T, R> delegate;
     int executions;
-    RecordingInvocation(MethodInvocationContext<T, R> delegate) { this.delegate = delegate; }
+    RecordingInvocation(LifecycleInvocation<T, R> delegate) { this.delegate = delegate; }
+    public R proceedLifecycle(BeanDefinition<T> definition) { executions++; return delegate.proceedLifecycle(definition); }
     public R proceed() { executions++; return delegate.proceed(); }
     public R proceed(Interceptor from) { return delegate.proceed(from); }
     public R invoke(T bean, Object... arguments) { return delegate.invoke(bean, arguments); }

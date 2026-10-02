@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * The disposing bean registration.
@@ -36,7 +37,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Nullable
     @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
     private volatile AbstractBeanResolutionContext proxyTargetContext;
-    // the interceptors a proxy fronting the bean selected for it, see RegisteredBeanInterceptors
+    // the interceptors a proxy fronting the bean selected for it, see BeanRegistration#selectInterceptors
     @SuppressWarnings("java:S3077") // a KeptSelection is immutable, set under the lock of this registration
     @Nullable
     private volatile KeptSelection keptSelection;
@@ -162,27 +163,30 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
+     * Returns the selection retained by this registration without acquiring dependencies.
      * @param key The key
+     * @param <S> The selection type
      * @return The selection kept for the key, or {@code null}
      */
-    @Nullable
-    Object keptSelection(Object key) {
+    @Override
+    @SuppressWarnings("unchecked")
+    public <S> @Nullable S getInterceptorSelection(Object key) {
         KeptSelection kept = keptSelection;
-        return kept != null && kept.key == key ? kept.value : null;
+        return kept != null && kept.key == key ? (S) kept.value : null;
     }
 
     /**
      * Returns the selection kept for the given key, or computes it through a resolution context of this bean and
-     * keeps it, see {@link RegisteredBeanInterceptors#select(BeanRegistration, Object, java.util.function.Function)}.
+     * keeps it, see {@link BeanRegistration#selectInterceptors(Object, Function)}.
      *
      * @param key      The key
      * @param selector Computes the selection
      * @param <S>      The selection type
      * @return The selection, or {@code null} when this bean is destroyed
      */
+    @Override
     @SuppressWarnings("unchecked")
-    @Nullable
-    <S> S select(Object key, java.util.function.Function<BeanResolutionContext, S> selector) {
+    public <S> @Nullable S selectInterceptors(Object key, Function<BeanResolutionContext, S> selector) {
         KeptSelection kept = keptSelection;
         if (kept != null && kept.key == key) {
             return (S) kept.value;

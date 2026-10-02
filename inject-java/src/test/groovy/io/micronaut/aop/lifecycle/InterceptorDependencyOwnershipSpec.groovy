@@ -168,7 +168,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def interceptor = ctx.classLoader.loadClass('test.SlowInterceptor')
         def events = ctx.classLoader.loadClass('test.Events')
         def call = CompletableFuture.supplyAsync {
-            RegisteredBeanInterceptors.select(target, new Object()) { resolution ->
+            target.selectInterceptors(new Object()) { resolution ->
                 resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
             }
         }
@@ -219,11 +219,13 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         interceptor.created == 0
 
         when:
-        def selected = RegisteredBeanInterceptors.select(target, key) { resolution ->
+        def selected = target.selectInterceptors(key) { resolution ->
             selections++
             resolution.getInterceptorRegistrations(Argument.of(interceptor), null).first().bean
         }
         def reused = RegisteredBeanInterceptors.select(target, key) { throw new AssertionError('selection was not cached') }
+        assert target.getInterceptorSelection(key).is(selected)
+        assert RegisteredBeanInterceptors.kept(target, key).is(selected)
         ctx.close()
 
         then:
@@ -245,7 +247,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def entered = new java.util.concurrent.CountDownLatch(1)
         def release = new java.util.concurrent.CountDownLatch(1)
         def selection = CompletableFuture.supplyAsync {
-            RegisteredBeanInterceptors.selectUnowned(ctx, new Object(), Argument.of(interceptor), null) { registrations ->
+            ctx.selectUnownedInterceptors(new Object(), Argument.of(interceptor), null) { registrations ->
                 entered.countDown()
                 assert release.await(10, TimeUnit.SECONDS)
                 registrations

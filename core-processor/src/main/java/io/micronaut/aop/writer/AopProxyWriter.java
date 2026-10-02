@@ -23,7 +23,6 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.Introduced;
-import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
@@ -245,9 +244,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         Object.class
     );
     private static final Method METHOD_FIND_PROXY_TARGET_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorChain.class,
-        "findProxyTargetRegistration",
         BeanLocator.class,
+        "findProxyTargetRegistration",
         Object.class
     );
     private static final String FIELD_TARGET_REGISTRATION = "$targetRegistration";
@@ -1145,11 +1143,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 swap.add(aThis.field(targetField).assign(methodParameters.get(0)));
                 if (targetRegistrationField != null) {
                     // the registration of the new target, which carries the interceptors it owns, when the context holds one
-                    swap.add(aThis.field(targetRegistrationField).assign(ClassTypeDef.of(InterceptorChain.class).invokeStatic(
-                        METHOD_FIND_PROXY_TARGET_REGISTRATION,
-                        aThis.field(Objects.requireNonNull(beanLocatorField)),
-                        methodParameters.get(0)
-                    )));
+                    swap.add(aThis.field(targetRegistrationField).assign(
+                        aThis.field(Objects.requireNonNull(beanLocatorField))
+                            .invoke(METHOD_FIND_PROXY_TARGET_REGISTRATION, methodParameters.get(0))));
                 }
                 return StatementDef.multi(
                     lock.invoke(LOCK_METHOD),

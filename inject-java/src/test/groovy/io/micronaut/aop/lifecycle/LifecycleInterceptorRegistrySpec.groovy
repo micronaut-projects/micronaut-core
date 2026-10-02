@@ -31,9 +31,9 @@ class CustomFactory implements InterceptorChainFactory {
         seen.add(kind);
         return delegate.buildLifecycleChain(resolution, definition, method, bean, kind, candidates);
     }
-    public <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
-            Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind, Object... arguments) {
-        return delegate.buildMethodChain(bean, method, candidates, kind, arguments);
+    public <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(T bean, ExecutableMethod<T, R> method,
+            Interceptor<T, R>[] interceptors, InterceptorKind kind, Object... arguments) {
+        return delegate.buildResolvedInvocation(bean, method, interceptors, kind, arguments);
     }
     public <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
             BeanDefinition<T> definition, BeanConstructor<T> constructor,
@@ -87,6 +87,8 @@ import io.micronaut.aop.chain.DefaultInterceptorRegistry;
 import io.micronaut.context.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.inject.*;
 import io.micronaut.core.type.Executable;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
@@ -95,8 +97,25 @@ import java.util.*;
 @Singleton @Bean(typed = InterceptorRegistry.class) @Replaces(InterceptorRegistry.class)
 class CustomRegistry implements InterceptorRegistry {
     final List<InterceptorKind> seen = new ArrayList<>();
+    final List<String> acquisitions = new ArrayList<>();
     final InterceptorRegistry delegate;
     CustomRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
+    public <T> List<BeanRegistration<Interceptor<T, T>>> resolveBeanCandidates(
+            BeanResolutionContext resolution, AnnotationMetadataProvider constructor) {
+        acquisitions.add("bean");
+        return InterceptorRegistry.super.resolveBeanCandidates(resolution, constructor);
+    }
+    public void captureLifecycleCandidates(BeanResolutionContext resolution, BeanDefinition<?> definition,
+            Object bean, boolean initialization) {
+        acquisitions.add("capture");
+        InterceptorRegistry.super.captureLifecycleCandidates(resolution, definition, bean, initialization);
+    }
+    public Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleCandidates(
+            BeanResolutionContext resolution, BeanDefinition<?> definition,
+            ExecutableMethod<?, ?> method, Object bean, InterceptorKind kind) {
+        acquisitions.add("lifecycle");
+        return InterceptorRegistry.super.resolveLifecycleCandidates(resolution, definition, method, bean, kind);
+    }
     public <T> Interceptor<T, ?>[] resolveInterceptors(Executable<T, ?> method,
             Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
         seen.add(kind);
@@ -134,6 +153,8 @@ class Advice implements Interceptor<Object, Object> {
         !firstRegistry.is(secondRegistry)
         firstRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT']
         secondRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT']
+        firstRegistry.acquisitions == ['bean', 'capture', 'lifecycle']
+        secondRegistry.acquisitions == firstRegistry.acquisitions
 
         when:
         first.destroyBean(firstBean)
@@ -141,12 +162,16 @@ class Advice implements Interceptor<Object, Object> {
         then:
         firstRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'PRE_DESTROY']
         secondRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT']
+        firstRegistry.acquisitions == ['bean', 'capture', 'lifecycle', 'lifecycle']
+        secondRegistry.acquisitions == ['bean', 'capture', 'lifecycle']
 
         when:
         second.destroyBean(secondBean)
 
         then:
         secondRegistry.seen*.name() == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'PRE_DESTROY']
+        firstRegistry.acquisitions == ['bean', 'capture', 'lifecycle', 'lifecycle']
+        secondRegistry.acquisitions == firstRegistry.acquisitions
 
         cleanup:
         first.close()

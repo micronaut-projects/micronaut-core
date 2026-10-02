@@ -4102,18 +4102,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
+     * Returns a context-owned selection without acquiring any new dependencies.
      * @param key The key
-     * @return The selection this context keeps for targets it holds no registration for, or {@code null}
+     * @param <S> The selection type
+     * @return The retained selection, or {@code null}
      */
-    @Nullable
-    Object keptUnownedInterceptors(Object key) {
+    @Override
+    @Internal
+    @SuppressWarnings("unchecked")
+    public <S> @Nullable S getUnownedInterceptorSelection(Object key) {
         UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
-        return kept == null ? null : kept.selection;
+        return kept == null ? null : (S) kept.selection;
     }
 
     /**
      * Returns the interceptors this context keeps for targets it holds no registration for, see
-     * {@link RegisteredBeanInterceptors#selectUnowned(BeanLocator, Object, Argument, Qualifier, Function)}.
+     * {@link BeanLocator#selectUnownedInterceptors(Object, Argument, Qualifier, Function)}.
      *
      * <p>The interceptors no scope holds that a selection is computed from are created for it, and this context is
      * their only owner: they are destroyed when it stops, or at once when the selection fails or another thread kept
@@ -4127,8 +4131,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <S>             The selection type
      * @return The selection
      */
+    @Override
+    @Internal
     @SuppressWarnings("unchecked")
-    <I, S> S selectUnownedInterceptors(Object key,
+    public <I, S> S selectUnownedInterceptors(Object key,
                                        Argument<I> interceptorType,
                                        @Nullable Qualifier<I> binding,
                                        Function<Collection<BeanRegistration<I>>, S> selector) {

@@ -18,6 +18,7 @@ package io.micronaut.aop.chain;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
@@ -32,8 +33,8 @@ import java.util.Collection;
 
 /**
  * Default chain factory using the interceptor registry selected by its bean context.
- * Subclasses can override {@link #buildResolvedInvocation} to customize method and lifecycle invocations
- * after selection, without repeating candidate acquisition or matching.
+ * Subclasses can override {@link #buildResolvedInvocation} and {@link #buildResolvedConstructorInvocation}
+ * to customize invocation construction after selection, without repeating acquisition or matching.
  *
  * @since 5.3.0
  */
@@ -41,14 +42,12 @@ import java.util.Collection;
 @NullMarked
 public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
     private final InterceptorRegistry registry;
-    private final InterceptorCandidateResolver candidateResolver;
 
     /**
      * @param registry The context's interceptor registry
      */
     public DefaultInterceptorChainFactory(InterceptorRegistry registry) {
         this.registry = registry;
-        this.candidateResolver = new InterceptorCandidateResolver(registry);
     }
 
     @Override
@@ -62,18 +61,27 @@ public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
         Collection<BeanRegistration<Interceptor<?, ?>>> resolved = candidates;
         if (resolved == null) {
-            resolved = (Collection) resolutionContext.getBeanInterceptors(definition);
-        }
-        if (resolved == null) {
-            resolved = candidateResolver.resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind);
+            resolved = registry.resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind);
         }
         Interceptor<T, R>[] interceptors = (Interceptor[]) registry.resolveMethodInterceptors(method, (Collection) resolved, kind);
         return buildResolvedInvocation(bean, method, interceptors, kind, ArrayUtils.EMPTY_OBJECT_ARRAY);
     }
 
-    @Override
+    /**
+     * Builds a method chain from acquired candidates. Introduction chains also include around advice.
+     *
+     * @param bean The target
+     * @param method The intercepted method
+     * @param candidates The interceptor candidates, including an authoritative empty set
+     * @param kind The interception kind
+     * @param parameters The invocation arguments
+     * @param <T> The bean type
+     * @param <R> The result type
+     * @return A new method chain
+     * @since 5.3.0
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public <T, R> LifecycleInvocation<T, R> buildMethodChain(
+    public <T, R> MethodInvocationContext<T, R> buildMethodChain(
         T bean,
         ExecutableMethod<T, R> method,
         Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
@@ -84,7 +92,14 @@ public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
     }
 
     @Override
-    public <T> ConstructorInterceptorChain<T> buildConstructorChain(
+    public <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(
+        T bean, ExecutableMethod<T, R> method, Interceptor<T, R>[] interceptors,
+        InterceptorKind kind, @Nullable Object... parameters) {
+        return new MethodInterceptorChain<>(interceptors, bean, method, kind, parameters);
+    }
+
+    @Override
+    public <T> ConstructorInvocation<T> buildConstructorChain(
         BeanResolutionContext resolutionContext,
         BeanDefinition<T> definition,
         BeanConstructor<T> constructor,
@@ -93,9 +108,28 @@ public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
         @Nullable Object... parameters) {
         Collection<BeanRegistration<Interceptor<T, T>>> resolved = candidates;
         if (resolved == null) {
-            resolved = candidateResolver.resolveConstructorCandidates(resolutionContext, definition, constructor);
+            resolved = registry.resolveConstructorCandidates(resolutionContext, definition, constructor);
         }
-        return new ConstructorInterceptorChain<>(definition, constructor, registry.resolveConstructorInterceptors(constructor, resolved),
+        return buildResolvedConstructorInvocation(definition, constructor, registry.resolveConstructorInterceptors(constructor, resolved),
+            additionalProxyConstructorParametersCount, parameters);
+    }
+
+    /**
+     * Builds an independent constructor invocation from selected interceptors. Subclasses may return a
+     * different implementation or decorate the default invocation while retaining its execution contract.
+     * @param definition The bean definition
+     * @param constructor The intercepted constructor
+     * @param interceptors The selected interceptors, in invocation order
+     * @param additionalProxyConstructorParametersCount The internal proxy constructor argument count
+     * @param parameters The complete constructor arguments
+     * @param <T> The bean type
+     * @return A fresh constructor invocation
+     * @since 5.3.0
+     */
+    protected <T> ConstructorInvocation<T> buildResolvedConstructorInvocation(
+        BeanDefinition<T> definition, BeanConstructor<T> constructor, Interceptor<T, T>[] interceptors,
+        int additionalProxyConstructorParametersCount, @Nullable Object... parameters) {
+        return new ConstructorInterceptorChain<>(definition, constructor, interceptors,
             additionalProxyConstructorParametersCount, parameters);
     }
 }

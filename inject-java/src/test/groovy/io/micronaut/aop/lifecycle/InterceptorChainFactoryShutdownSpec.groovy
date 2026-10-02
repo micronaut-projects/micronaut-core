@@ -35,7 +35,7 @@ class AAAFactory extends DefaultInterceptorChainFactory {
         }
         return super.buildResolvedInvocation(bean, method, interceptors, kind, arguments);
     }
-    public <T> ConstructorInterceptorChain<T> buildConstructorChain(BeanResolutionContext resolution,
+    public <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
             BeanDefinition<T> definition, BeanConstructor<T> constructor,
             Collection<BeanRegistration<Interceptor<T, T>>> candidates, int additionalArguments, Object... arguments) {
         seen.add(InterceptorKind.AROUND_CONSTRUCT);

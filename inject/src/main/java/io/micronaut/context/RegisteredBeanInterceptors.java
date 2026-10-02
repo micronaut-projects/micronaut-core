@@ -20,7 +20,6 @@ import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -29,7 +28,10 @@ import java.util.function.Function;
  *
  * @author Denis Stepanov
  * @since 5.3.0
+ * @deprecated Use the instance operations on {@link BeanRegistration} and {@link BeanLocator}.
+ * Retained as an adapter for existing callers.
  */
+@Deprecated(since = "5.3.0", forRemoval = false)
 @Internal
 public final class RegisteredBeanInterceptors {
 
@@ -54,10 +56,7 @@ public final class RegisteredBeanInterceptors {
      * registration, or the bean is destroyed
      */
     public static <S> @Nullable S select(BeanRegistration<?> bean, Object key, Function<BeanResolutionContext, S> selector) {
-        if (bean instanceof BeanDisposingRegistration<?> registration) {
-            return registration.select(key, selector);
-        }
-        return null;
+        return bean.selectInterceptors(key, selector);
     }
 
     /**
@@ -69,9 +68,8 @@ public final class RegisteredBeanInterceptors {
      * @param <S>  The selection type
      * @return The selection, or {@code null} when none is kept
      */
-    @SuppressWarnings("unchecked")
     public static <S> @Nullable S kept(BeanRegistration<?> bean, Object key) {
-        return bean instanceof BeanDisposingRegistration<?> registration ? (S) registration.keptSelection(key) : null;
+        return bean.getInterceptorSelection(key);
     }
 
     /**
@@ -82,9 +80,8 @@ public final class RegisteredBeanInterceptors {
      * @param <S>         The selection type
      * @return The selection, or {@code null} when none is kept
      */
-    @SuppressWarnings("unchecked")
     public static <S> @Nullable S keptUnowned(BeanLocator beanLocator, Object key) {
-        return beanLocator instanceof DefaultBeanContext beanContext ? (S) beanContext.keptUnownedInterceptors(key) : null;
+        return beanLocator.getUnownedInterceptorSelection(key);
     }
 
     /**
@@ -109,11 +106,6 @@ public final class RegisteredBeanInterceptors {
                                          Argument<I> interceptorType,
                                          @Nullable Qualifier<I> binding,
                                          Function<Collection<BeanRegistration<I>>, S> selector) {
-        if (beanLocator instanceof DefaultBeanContext beanContext) {
-            return beanContext.selectUnownedInterceptors(key, interceptorType, binding, selector);
-        }
-        return selector.apply(beanLocator instanceof BeanDefinitionRegistry registry
-            ? registry.getBeanRegistrations(interceptorType, binding)
-            : List.of());
+        return beanLocator.selectUnownedInterceptors(key, interceptorType, binding, selector);
     }
 }

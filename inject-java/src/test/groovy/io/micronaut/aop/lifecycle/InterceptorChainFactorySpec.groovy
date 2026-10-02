@@ -291,8 +291,8 @@ class InterceptorChainFactorySpec extends Specification {
         }
 
         @Override
-        <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
-                Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind, Object... arguments) {
+        <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(T bean, ExecutableMethod<T, R> method,
+                Interceptor<T, R>[] interceptors, InterceptorKind kind, Object... arguments) {
             throw new UnsupportedOperationException()
         }
 

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.beandefinition.DisposableIntercepted;
 import io.micronaut.aop.beandefinition.InitializableIntercepted;
@@ -246,7 +246,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method RESOLVE_BEAN_DEPENDENCY = ReflectionUtils.getRequiredInternalMethod(
         BeanResolutionContext.class, "getBeanDependency", Argument.class);
     private static final Method CAPTURE_LIFECYCLE_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
-        BeanResolutionContext.class, "captureBeanInterceptors", BeanDefinition.class, Object.class, Argument.class, boolean.class);
+        InterceptorRegistry.class, "captureLifecycleCandidates", BeanResolutionContext.class, BeanDefinition.class, Object.class, boolean.class);
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method INJECT_BEAN_METHOD =
@@ -1951,11 +1951,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             if (needsInterceptorCandidates) {
                 statements.add(methodParameters.get(0).invoke(RESOLVE_BEAN_DEPENDENCY,
                     ClassTypeDef.of(InterceptorChainFactory.class).getStaticField("ARGUMENT", TypeDef.of(Argument.class))));
-                statements.add(methodParameters.get(0).invoke(
-                    CAPTURE_LIFECYCLE_INTERCEPTORS, aThis, instanceVar,
-                    ClassTypeDef.of(Interceptor.class).getStaticField("ARGUMENT", TypeDef.of(Argument.class)),
-                    ExpressionDef.constant(isPostConstructIntercepted())
-                ));
+                statements.add(methodParameters.get(0).invoke(RESOLVE_BEAN_DEPENDENCY,
+                    ClassTypeDef.of(InterceptorRegistry.class).getStaticField("ARGUMENT", TypeDef.of(Argument.class)))
+                    .cast(InterceptorRegistry.class).invoke(CAPTURE_LIFECYCLE_INTERCEPTORS,
+                        methodParameters.get(0), aThis, instanceVar, ExpressionDef.constant(isPostConstructIntercepted())));
             }
             if (needsInjectMethod) {
                 statements.add(
