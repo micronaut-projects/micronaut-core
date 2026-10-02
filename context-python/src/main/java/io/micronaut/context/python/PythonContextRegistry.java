@@ -105,8 +105,20 @@ final class PythonContextRegistry {
      * @param context The GraalPy context being tracked
      */
     static void registerContext(Context context) {
+        registerContext(context, null);
+    }
+
+    /**
+     * Register a context for execution and shared-engine shutdown tracking, with the file system it
+     * was built over, which {@link #unregisterContext(Context)} closes: the context does not close it.
+     *
+     * @param context The GraalPy context being tracked
+     * @param fileSystem The file system the context owns, if any
+     */
+    static void registerContext(Context context, @Nullable AutoCloseable fileSystem) {
         ContextState state = state(context);
         state.enterable.set(context);
+        state.fileSystem = fileSystem;
         state.registered = true;
     }
 
@@ -115,23 +127,44 @@ final class PythonContextRegistry {
      * <p>
      * This is part of shutdown coordination; it clears cached helper/member state before the
      * context can be closed and releases shared-engine shutdown gates that include this context.
+     * The file system the context was registered with is closed, so it is unregistered once closed.
      *
      * @param context The GraalPy context being removed
      */
     static void unregisterContext(Context context) {
         List<Runnable> listeners;
+        AutoCloseable fileSystem = null;
         synchronized (LOCK) {
             ContextState contextState = CONTEXT_STATES.remove(context);
             if (contextState != null) {
                 listeners = List.copyOf(contextState.noContextListeners);
                 // executions still in flight leave the aggregate now; their exit finds no state
                 ACTIVE_EXECUTIONS.addAndGet(-contextState.activeExecutions);
+                fileSystem = contextState.fileSystem;
                 contextState.clear(context);
             } else {
                 listeners = List.of();
             }
         }
+        closeFileSystem(fileSystem);
         runNoActiveExecutionsListeners(listeners);
+    }
+
+    /**
+     * Close the file system of a context that is gone. GraalPy's virtual file system deletes the files it
+     * extracted to a temporary directory; without the close they stay until the JVM exits.
+     *
+     * @param fileSystem The file system, if any
+     */
+    private static void closeFileSystem(@Nullable AutoCloseable fileSystem) {
+        if (fileSystem == null) {
+            return;
+        }
+        try {
+            fileSystem.close();
+        } catch (Exception e) {
+            LOG.debug("Failed to close the file system of a closed Python context", e);
+        }
     }
 
     /**
@@ -790,6 +823,8 @@ final class PythonContextRegistry {
         final AtomicReference<@Nullable Context> enterable = new AtomicReference<>();
         /** Whether the runtime created the context and unregisters it when closing it. */
         volatile boolean registered;
+        /** The file system the runtime built the context over, closed when the context is unregistered. */
+        volatile @Nullable AutoCloseable fileSystem;
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
         /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
@@ -865,6 +900,7 @@ final class PythonContextRegistry {
             viewedValues.clear();
             runtimeModule.set(null);
             registered = false;
+            fileSystem = null;
             noActiveExecutionsListeners.clear();
             noContextListeners.clear();
             activeExecutions = 0;

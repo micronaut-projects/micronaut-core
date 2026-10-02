@@ -86,6 +86,7 @@ public final class PythonAstParser {
      * name as well, for any library and not only {@code io.micronaut}.
      */
     private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
+    private final VirtualFileSystem fileSystem;
     private final Context context;
     private final Value runtimeAstCompiler;
     private final IdentityHashMap<TransformResult, RuntimeArtifact> runtimeArtifacts = new IdentityHashMap<>();
@@ -103,7 +104,13 @@ public final class PythonAstParser {
         // across compilations, but an engine pins every context created on it until that context is
         // closed, and the optimizing runtime keeps compiled code per engine: the compile-time test
         // suite, which creates hundreds of parsers in one JVM, ran out of heap on GraalVM CE.
-        this.context = buildTolerantly(classLoader, incremental);
+        this.fileSystem = buildFileSystem();
+        try {
+            this.context = buildWithParserLoader(classLoader, fileSystem, incremental);
+        } catch (RuntimeException e) {
+            closeFileSystem(fileSystem);
+            throw e;
+        }
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
@@ -118,11 +125,60 @@ public final class PythonAstParser {
         return context;
     }
 
-    private static Context.Builder newContextBuilder(ClassLoader classLoader) {
-        return GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+    /**
+     * Builds the file system of the parser with no context class loader on the calling thread. A file system that
+     * extracts files registers a JVM shutdown hook to delete them, a thread created here that would otherwise
+     * inherit the caller's context class loader, which during a compilation is the annotation processor loader,
+     * and keep it, every processor class and their static caches reachable until the JVM exits;
+     * {@link VirtualFileSystem#close()} deletes the files but leaves the hook.
+     *
+     * @return The file system
+     */
+    private static VirtualFileSystem buildFileSystem() {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(null);
+        try {
+            return VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
-                .build())
+                .build();
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
+    }
+
+    /**
+     * Builds the context with the parser's own loader as the context class loader. The first context of the JVM
+     * initializes the polyglot runtime, which registers JVM-wide shutdown hooks on this thread, and during a
+     * compilation the context class loader is the annotation processor loader of that compilation alone.
+     *
+     * @param classLoader The host class loader
+     * @param fileSystem The file system of the parser
+     * @param incremental Whether to tune the context for incremental processing
+     * @return The context
+     */
+    private static Context buildWithParserLoader(ClassLoader classLoader, VirtualFileSystem fileSystem, boolean incremental) {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(PythonAstParser.class.getClassLoader());
+        try {
+            return buildTolerantly(classLoader, fileSystem, incremental);
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
+    }
+
+    private static void closeFileSystem(VirtualFileSystem fileSystem) {
+        try {
+            fileSystem.close();
+        } catch (IOException e) {
+            // only the extracted files are left behind, and the shutdown hook deletes them
+        }
+    }
+
+    private static Context.Builder newContextBuilder(ClassLoader classLoader, VirtualFileSystem fileSystem) {
+        return GraalPyResources.contextBuilder(fileSystem)
             // Future hardening should constrain host access to the required Micronaut API surface.
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
@@ -136,10 +192,11 @@ public final class PythonAstParser {
      * @param contextBuilder The builder, already carrying the tuning options when incremental
      * @param incremental    Whether the tuning options were applied
      * @param classLoader    The host class loader, needed to rebuild from scratch
+     * @param fileSystem     The file system of the parser
      * @return The context
      */
-    private static Context buildTolerantly(ClassLoader classLoader, boolean incremental) {
-        Context.Builder contextBuilder = newContextBuilder(classLoader);
+    private static Context buildTolerantly(ClassLoader classLoader, VirtualFileSystem fileSystem, boolean incremental) {
+        Context.Builder contextBuilder = newContextBuilder(classLoader, fileSystem);
         if (incremental) {
             // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
             // and avoid paying for a core-count-based compiler thread pool.
@@ -157,7 +214,7 @@ public final class PythonAstParser {
             if (!incremental) {
                 throw e;
             }
-            return newContextBuilder(classLoader).build();
+            return newContextBuilder(classLoader, fileSystem).build();
         }
     }
 
@@ -677,7 +734,11 @@ public final class PythonAstParser {
 
     public void close() {
         runtimeArtifacts.clear();
-        this.context.close();
+        try {
+            this.context.close();
+        } finally {
+            closeFileSystem(fileSystem);
+        }
     }
 
     private record RuntimeArtifact(Value tree, boolean required) {
