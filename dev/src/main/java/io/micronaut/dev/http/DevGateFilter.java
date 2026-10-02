@@ -22,6 +22,7 @@ import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.dev.management.DevEndpoint;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -32,14 +33,18 @@ import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
- * Holds requests while a reload is in progress, and answers them with the diagnostics while the last
+ * Holds requests while a reload is in progress, up to {@link io.micronaut.dev.manifest.DevManifest#requestHoldTimeout()}
+ * and then answers them with a 503 and a {@code Retry-After}; answers them with the diagnostics while the last
  * compilation failed: a page for a browser, a structured 503 for anything else. The stale generation
  * keeps serving what compiles. The development endpoint is never answered with the failure: reloading through it is
  * how to recover when the watcher missed the corrected edit.
@@ -66,6 +71,11 @@ public final class DevGateFilter {
     static final String KEY_LINE = "line";
     static final String KEY_COLUMN = "column";
 
+    /**
+     * What a request held longer than the hold is told: the reload finishes in a moment.
+     */
+    static final String RETRY_AFTER_SECONDS = "1";
+
     private final DevRuntime runtime;
     @Nullable
     private final DevErrorPage errorPage;
@@ -83,7 +93,30 @@ public final class DevGateFilter {
      */
     @RequestFilter
     public CompletableFuture<@Nullable HttpResponse<?>> gate(HttpRequest<?> request) {
-        return runtime.whenReady().thenApply(ignored -> answer(request, runtime.lastFailure().orElse(null), errorPage));
+        return hold(runtime.whenAdmitted(), runtime.manifest().requestHoldTimeout(),
+            () -> answer(request, runtime.lastFailure().orElse(null), errorPage));
+    }
+
+    /**
+     * Holds a request until it is admitted, then answers it with what the supplier gives, null to proceed; a request
+     * held longer than the hold is answered with a 503 the client can retry, never left hanging.
+     */
+    static CompletableFuture<@Nullable HttpResponse<?>> hold(CompletableFuture<Void> admitted, Duration hold, Supplier<@Nullable HttpResponse<?>> then) {
+        if (admitted.isDone()) {
+            return CompletableFuture.completedFuture(then.get());
+        }
+        // held until the batch is done, or until a restart drains this generation, which serves it before it stops
+        CompletableFuture<@Nullable HttpResponse<?>> response = new CompletableFuture<>();
+        admitted.whenComplete((ignored, error) -> response.complete(then.get()));
+        response.completeOnTimeout(unavailable(hold), hold.toMillis(), TimeUnit.MILLISECONDS);
+        return response;
+    }
+
+    private static HttpResponse<?> unavailable(Duration hold) {
+        return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
+            .contentType(MediaType.TEXT_PLAIN_TYPE)
+            .body("The application is reloading and did not finish within " + hold.toMillis() + " ms; retry shortly.");
     }
 
     /**

@@ -630,6 +630,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return new ServerBootstrap();
     }
 
+    /**
+     * The provider of sockets that outlive this server, when there is one and the listener's transport is NIO, the
+     * only one whose server channel can be built over a socket it does not own.
+     */
+    @Nullable
+    private RetainedServerSockets retainedServerSockets(ServerBootstrap bootstrap) {
+        if (!(bootstrap.config().group() instanceof IoEventLoopGroup group) || !group.isIoType(NioIoHandler.class)) {
+            return null;
+        }
+        return applicationContext.findBean(RetainedServerSockets.class).orElse(null);
+    }
+
     private Listener bind(Supplier<ServerBootstrap> serverBootstrap, Supplier<Bootstrap> udpBootstrap, Supplier<Bootstrap> acceptedBootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, @Nullable EventLoopGroupConfiguration workerConfig) {
         logBind(cfg);
 
@@ -679,18 +691,26 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         .childHandler(listener);
                     switch (cfg.getFamily()) {
                         case TCP:
+                            int port = cfg.getPort();
+                            if (port == -1) {
+                                port = 0;
+                            }
+                            RetainedServerSockets retainedSockets = fd == null && cfg.isBind() ? retainedServerSockets(listenerBootstrap) : null;
+                            java.nio.channels.ServerSocketChannel retained = retainedSockets == null ? null : retainedSockets.serverSocket(cfg.getHost(), port);
                             listenerBootstrap.channelFactory(() -> {
-                                if (fd != null) {
+                                if (retained != null) {
+                                    // a socket that outlives this server: accept on it, and leave it bound when this server stops
+                                    return new RetainedNioServerSocketChannel(retained);
+                                } else if (fd != null) {
                                     return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig, null, fd);
                                 } else {
                                     return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
                                 }
                             });
-                            int port = cfg.getPort();
-                            if (port == -1) {
-                                port = 0;
-                            }
-                            if (cfg.isBind()) {
+                            if (retained != null) {
+                                future = listenerBootstrap.register().syncUninterruptibly();
+                                Objects.requireNonNull(retainedSockets).accepting(retained, future.channel());
+                            } else if (cfg.isBind()) {
                                 if (cfg.getHost() == null) {
                                     future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap, CHECK_LOOPBACK_PORT_SHADOWING ? NettyHttpServer::isLoopbackPortTaken : p -> false) : listenerBootstrap.bind(port);
                                 } else {

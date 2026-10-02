@@ -30,6 +30,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -71,6 +72,9 @@ import java.util.Properties;
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
  * micronaut.dev.max-generations=10
+ * micronaut.dev.requests.hold-timeout=30s
+ * micronaut.dev.requests.drain-timeout=10s
+ * micronaut.dev.requests.retain-sockets=true
  * </pre>
  *
  * @author graemerocher
@@ -94,6 +98,30 @@ public final class DevManifest {
      * relaunch it.
      */
     public static final String MAX_GENERATIONS = PREFIX + "max-generations";
+
+    /**
+     * The key of how long a request that arrives while a batch is processed waits for it, before it is answered with a
+     * 503 and a {@code Retry-After}. A duration, such as {@code 30s} or {@code 500ms}; a bare number is seconds.
+     */
+    public static final String REQUESTS_HOLD_TIMEOUT = PREFIX + "requests.hold-timeout";
+
+    /**
+     * The key of how long a restart waits for the requests in flight on the stopping generation to finish before it
+     * stops it anyway.
+     */
+    public static final String REQUESTS_DRAIN_TIMEOUT = PREFIX + "requests.drain-timeout";
+
+    /**
+     * The key of whether the HTTP servers' listening sockets are kept bound across generations, so that a connection
+     * made during a restart waits for the next generation instead of being refused. On by default.
+     */
+    public static final String REQUESTS_RETAIN_SOCKETS = PREFIX + "requests.retain-sockets";
+
+    private static final Duration DEFAULT_HOLD_TIMEOUT = Duration.ofSeconds(30);
+    /**
+     * Shorter than the hold: a connection that never finishes, a websocket or an event stream, holds every restart this long.
+     */
+    private static final Duration DEFAULT_DRAIN_TIMEOUT = Duration.ofSeconds(10);
 
     /**
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
@@ -139,6 +167,9 @@ public final class DevManifest {
     private final List<ResourceRoot> testResourceRoots;
     private final TestSettings testSettings;
     private final int maxGenerations;
+    private final Duration requestHoldTimeout;
+    private final Duration requestDrainTimeout;
+    private final boolean retainServerSockets;
 
     private DevManifest(Path directory, Properties properties) {
         this.directory = directory;
@@ -169,6 +200,9 @@ public final class DevManifest {
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
         this.retainAnnotated = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-annotated", "true").trim());
         this.maxGenerations = maxGenerations(properties.getProperty(MAX_GENERATIONS));
+        this.requestHoldTimeout = duration(REQUESTS_HOLD_TIMEOUT, properties.getProperty(REQUESTS_HOLD_TIMEOUT), DEFAULT_HOLD_TIMEOUT);
+        this.requestDrainTimeout = duration(REQUESTS_DRAIN_TIMEOUT, properties.getProperty(REQUESTS_DRAIN_TIMEOUT), DEFAULT_DRAIN_TIMEOUT);
+        this.retainServerSockets = Boolean.parseBoolean(properties.getProperty(REQUESTS_RETAIN_SOCKETS, "true").trim());
         String generationsDir = properties.getProperty(PREFIX + "generations");
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
@@ -477,6 +511,37 @@ public final class DevManifest {
     }
 
     /**
+     * How long a request that arrives while a batch is processed is held, {@value #REQUESTS_HOLD_TIMEOUT}: it is
+     * served once the batch is done, by the generation that runs then, or answered with a 503 and a {@code Retry-After}
+     * when the batch takes longer. 30 seconds by default.
+     *
+     * @return The timeout
+     */
+    public Duration requestHoldTimeout() {
+        return requestHoldTimeout;
+    }
+
+    /**
+     * How long a restart waits for the requests in flight on the stopping generation, {@value #REQUESTS_DRAIN_TIMEOUT}:
+     * they finish on the generation they started on. 10 seconds by default: a connection that never finishes, such as a
+     * websocket or an event stream, holds each restart this long.
+     *
+     * @return The timeout
+     */
+    public Duration requestDrainTimeout() {
+        return requestDrainTimeout;
+    }
+
+    /**
+     * Whether the HTTP servers' listening sockets are kept bound across generations, {@value #REQUESTS_RETAIN_SOCKETS}.
+     *
+     * @return True unless turned off
+     */
+    public boolean retainServerSockets() {
+        return retainServerSockets;
+    }
+
+    /**
      * @return The LiveReload settings
      */
     public LiveReload liveReload() {
@@ -681,6 +746,31 @@ public final class DevManifest {
             }
         }
         return Collections.unmodifiableList(entries);
+    }
+
+    static Duration duration(String key, @Nullable String value, Duration defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        String trimmed = value.trim().toLowerCase(Locale.ROOT);
+        try {
+            Duration duration;
+            if (trimmed.endsWith("ms")) {
+                duration = Duration.ofMillis(Long.parseLong(trimmed.substring(0, trimmed.length() - 2).trim()));
+            } else if (trimmed.endsWith("s")) {
+                duration = Duration.ofSeconds(Long.parseLong(trimmed.substring(0, trimmed.length() - 1).trim()));
+            } else if (trimmed.endsWith("m")) {
+                duration = Duration.ofMinutes(Long.parseLong(trimmed.substring(0, trimmed.length() - 1).trim()));
+            } else {
+                duration = Duration.ofSeconds(Long.parseLong(trimmed));
+            }
+            if (duration.isNegative()) {
+                throw new IllegalArgumentException("Invalid " + key + ": " + value.trim() + ", a duration such as 30s or 500ms");
+            }
+            return duration;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid " + key + ": " + value.trim() + ", a duration such as 30s or 500ms", e);
+        }
     }
 
     static int maxGenerations(@Nullable String value) {
