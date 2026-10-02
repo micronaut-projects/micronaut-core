@@ -488,6 +488,28 @@ class TestModeTest {
     }
 
     @Test
+    void aChangeOfAResourceReadLiveRunsOnANewGenerationEvenWhenTheRunnerKeepsState() throws Exception {
+        PatchingTestRunner.reset();
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        javac(project.resolve("build/classes"), greeter);
+        Files.writeString(Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt"), "one");
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.test.runner=patching\n"), new String[0]);
+        int generation = runtime.generation();
+
+        // the runner keeps state built over the generation, which a configuration file it read may have shaped
+        Path config = Files.createDirectories(project.resolve("src/test/resources")).resolve("application-test.properties");
+        Files.writeString(config, "a=b\n");
+        runtime.changed(List.of(config), List.of());
+        runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(PatchingTestRunner.PATCHES.isEmpty());
+        assertNotSame(PatchingTestRunner.RUN_LOADERS.get(0), PatchingTestRunner.RUN_LOADERS.get(1));
+        assertEquals(generation + 1, runtime.generation());
+    }
+
+    @Test
     void patchingInPlaceCanBeTurnedOffInTestMode() throws Exception {
         PatchingTestRunner.reset();
         Path main = Files.createDirectories(project.resolve("src/main/java/app"));

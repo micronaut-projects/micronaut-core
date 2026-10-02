@@ -237,6 +237,10 @@ final class TestSession {
         if (!changes.isEmpty()) {
             patchOrRetire(changes, resourcesBefore);
         }
+        if (resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())) {
+            // a configuration or other resource file read live changed: what the runner built from it is out of date
+            runLoaderCurrent = false;
+        }
         Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
         changed.addAll(testRound.affectedClasses());
         for (String className : changes.classNames()) {
