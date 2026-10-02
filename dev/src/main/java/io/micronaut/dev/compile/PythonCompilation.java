@@ -48,7 +48,8 @@ import java.util.stream.Stream;
  * that a file another tool wrote into the class output is never removed, and its classes stay
  * resolvable by the sources through {@code <output>-python-foreign}. A failed compilation leaves
  * the class output as it was, and the Pyronaut compiler invalidates its own state, so the next one
- * compiles in full.</p>
+ * compiles in full. So does the first compilation of each class output in a session, which then
+ * changes in the class output only what the build that wrote it compiled differently.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -69,6 +70,8 @@ final class PythonCompilation implements AutoCloseable {
     private static final String APPLICATION_PACKAGE = "pyronaut_application/";
 
     private final PythonProcessingSession session = new PythonProcessingSession();
+    // the class outputs compiled in this session: the first compilation of each starts over
+    private final Set<Path> compiledOutputs = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     CompilationResult compile(CompilationRequest request) {
         long start = System.nanoTime();
@@ -84,7 +87,13 @@ final class PythonCompilation implements AutoCloseable {
         }
         Set<Path> compiled = new LinkedHashSet<>();
         try {
-            if (request.isFull()) {
+            // the first compilation of an output in a session is full: the work directory holds what the last session
+            // compiled, while another tool may have rebuilt the class output since, as pyronaut process does when a
+            // session starts. An incremental compilation would leave the files it does not recompile as the last session
+            // wrote them, which may differ from the class output, as when the tool runs other versions of the processors,
+            // and copying them would change classes no edit changed
+            boolean first = compiledOutputs.add(classOutput.toAbsolutePath().normalize());
+            if (request.isFull() || first) {
                 OutputTransaction.deleteRecursively(work);
                 OutputTransaction.deleteRecursively(cache);
             }
