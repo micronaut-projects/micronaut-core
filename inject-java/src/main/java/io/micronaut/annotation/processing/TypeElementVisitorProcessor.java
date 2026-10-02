@@ -356,6 +356,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
 
         final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = javaVisitorContext.getBeanElementBuilders();
+        if (!roundEnv.processingOver() && !postponedTypes.isEmpty()) {
+            removeBeansOfPostponedTypes(beanDefinitionBuilders);
+        }
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
             DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(javaVisitorContext);
             try {
@@ -396,6 +399,22 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
             error(javaElement, "Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * Drops the associated beans added while visiting a type that was then postponed. The type is visited again in
+     * the next round and adds its beans again there, so building them in this round as well would give each of them
+     * two definitions, or the same name twice.
+     *
+     * @param beanDefinitionBuilders The associated beans added in this round
+     */
+    private void removeBeansOfPostponedTypes(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders) {
+        beanDefinitionBuilders.removeIf(beanDefinitionBuilder -> {
+            io.micronaut.inject.ast.Element originatingElement = beanDefinitionBuilder.getOriginatingElement();
+            // an associated bean is added to a visited class or to one of its methods
+            ClassElement visitedType = originatingElement instanceof MemberElement memberElement ? memberElement.getOwningType() : (ClassElement) originatingElement;
+            return postponedTypes.containsKey(visitedType.getCanonicalName());
+        });
     }
 
     private <T extends Throwable> void postponeElement(JavaClassElement javaClassElement, Element originalElement, T e) throws T {

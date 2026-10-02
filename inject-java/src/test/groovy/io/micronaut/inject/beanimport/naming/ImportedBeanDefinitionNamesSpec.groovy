@@ -7,9 +7,12 @@ import io.micronaut.annotation.processing.PackageElementVisitorProcessor
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.visitor.BeanImportVisitor
+import io.micronaut.context.visitor.InternalApiTypeElementVisitor
 import io.micronaut.inject.beanbuilder.ApplyAopToTypeVisitor
 import io.micronaut.inject.beanimport.naming.first.Library
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.visitors.WitherVisitor
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -168,6 +171,38 @@ public class Twice {
 
         then:
         definitions(output) == ['example.$Twice$Library0$Definition'] as Set
+        beanCount(output, Library) == 1
+    }
+
+    void "an importer postponed to the next round gets one definition"() {
+        given:
+        Path output = tempDir.resolve('classes')
+
+        when: 'a visitor postpones the importer because the return type of its method is generated in the first round'
+        compileWithLoadedProcessors(output, [
+            'test/Walrus.java': '''
+package test;
+
+@io.micronaut.visitors.Wither
+public record Walrus(String name, int age, byte[] chipInfo) {
+}
+''',
+            'example/Postponed.java': '''
+package example;
+
+import io.micronaut.context.annotation.Import;
+import io.micronaut.inject.beanimport.naming.first.Library;
+
+@Import(classes = Library.class)
+public class Postponed {
+    public test.WalrusWither wither() {
+        return null;
+    }
+}
+'''], [new BeanImportVisitor(), new WitherVisitor(), new InternalApiTypeElementVisitor()])
+
+        then:
+        definitions(output) == ['example.$Postponed$Library0$Definition'] as Set
         beanCount(output, Library) == 1
     }
 
