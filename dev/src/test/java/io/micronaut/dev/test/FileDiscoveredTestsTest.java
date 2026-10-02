@@ -59,6 +59,19 @@ class FileDiscoveredTestsTest {
                 TestSelection.ofClasses(Set.of("tests/test_b.py"), "failed"), onlyFiles), gone, new Cancellation());
             assertEquals(0, none.total());
             assertTrue(none.complete());
+
+            // an engine that names a test's class by its file's absolute path, as pytest's does, is reported by the file
+            // relative to its test source root, and that name runs the file again
+            Files.writeString(tests.resolve("test_b.py"), "fails");
+            Map<String, String> absolute = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.ABSOLUTE, "true");
+            RecordingListener named = new RecordingListener();
+            runner.run(new TestRunRequest("run-4", loader, List.of(classes), sources, TestSelection.all(), absolute), named, new Cancellation());
+            assertEquals(Set.of("test_a.py.test_a.py", "test_b.py.test_b.py"), named.outcomes.keySet());
+            RecordingListener byRelativeName = new RecordingListener();
+            TestRunSummary relativeRerun = runner.run(new TestRunRequest("run-5", loader, List.of(classes), sources,
+                TestSelection.ofClasses(Set.of("test_b.py"), "failed"), absolute), byRelativeName, new Cancellation());
+            assertEquals(1, relativeRerun.total());
+            assertEquals(TestStatus.FAILED, byRelativeName.status("test_b.py.test_b.py"));
         }
     }
 }
