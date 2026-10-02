@@ -16,12 +16,21 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
 /** The retained selection is unresolved or an immutable, authoritative set, including an empty one. */
 @Internal
 sealed interface InterceptorCandidates {
+    /** Adapts typed state to the nullable-list contract used by existing resolution contexts and registrations. */
+    default @Nullable List<BeanRegistration<?>> legacyRegistrations() {
+        return switch (this) {
+            case Unresolved ignored -> null;
+            case Resolved resolved -> resolved.registrations();
+        };
+    }
+
     @Internal
     enum Unresolved implements InterceptorCandidates {
         INSTANCE

@@ -21,6 +21,7 @@ import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.InterceptorChainFactory;
@@ -72,6 +73,7 @@ import javax.lang.model.element.Modifier;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -182,9 +184,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_READ_LOCK = "$target_rl";
     private static final String FIELD_WRITE_LOCK = "$target_wl";
 
-    private static final Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
-
-    private static final Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
+    private static final Method RESOLVE_METHOD_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
+        InterceptorRegistry.class, "resolveMethodInterceptors", ExecutableMethod.class, Collection.class, InterceptorKind.class);
     private static final Method BUILD_RESOLVED_METHOD_CHAIN = ReflectionUtils.getRequiredInternalMethod(
         InterceptorChainFactory.class, "buildResolvedMethodChain", Object.class, ExecutableMethod.class,
         Interceptor[].class, Object[].class);
@@ -197,7 +198,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String QUALIFIER_PARAMETER = "$qualifier";
     private static final String INTERCEPTOR_REGISTRY_PARAMETER = "$interceptorRegistry";
 
-    private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
+    private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(MethodInvocationContext.class, "proceed");
 
     private static final Method GET_PROXY_DEPENDENCIES_METHOD = ReflectionUtils.getRequiredInternalMethod(
         InterceptedBeanProxy.class, "interceptedBeanDependencies");
@@ -993,15 +994,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     methods.stream().map(methodElement -> {
                             boolean introduction = isIntroduction && (methodElement.isAbstract() || (methodElement.getDeclaringType().isInterface() && !methodElement.isDefault()));
 
-                            return ClassTypeDef.of(InterceptorChain.class).invokeStatic(
-                                (introduction ? RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD : RESOLVE_AROUND_INTERCEPTORS_METHOD),
-
-                                // First argument. The interceptor registry
-                                parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
-                                // Second argument i.e. proxyMethods[0]
+                            return parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)).invoke(
+                                RESOLVE_METHOD_INTERCEPTORS,
+                                // The executable method
                                 aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
-                                // Third argument i.e. interceptors
-                                parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
+                                // The acquired candidates
+                                parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER)),
+                                ExpressionDef.constant(introduction ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND)
                             );
                         }
                     ).toList()
@@ -1057,15 +1056,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             aThis.field(interceptorsField).assign(
                 ClassTypeDef.of(Interceptor.class).array(2).instantiate(
                     methods.stream().map(methodElement ->
-                        ClassTypeDef.of(InterceptorChain.class).invokeStatic(
-                            (isIntroduction ? RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD : RESOLVE_AROUND_INTERCEPTORS_METHOD),
-
-                            // First argument. The interceptor registry
-                            parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
-                            // Second argument i.e. proxyMethods[0]
+                        parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)).invoke(
+                            RESOLVE_METHOD_INTERCEPTORS,
+                            // The executable method
                             aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
-                            // Third argument i.e. interceptors
-                            parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
+                            // The acquired candidates
+                            parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER)),
+                            ExpressionDef.constant(isIntroduction ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND)
                         )
                     ).toList()
                 )

@@ -52,12 +52,11 @@ final class BeanDependencies implements DependentBeanProvider {
 
     // The nullable contract is retained at the resolution-context and registration compatibility boundaries.
     synchronized @Nullable List<BeanRegistration<?>> interceptorRegistrations() {
-        return interceptorCandidates instanceof InterceptorCandidates.Resolved resolved ? resolved.registrations() : null;
+        return interceptorCandidates.legacyRegistrations();
     }
 
-    @SuppressWarnings("unchecked") // Legacy callers supply registration lists through a List<?> API.
-    synchronized void interceptorRegistrations(List<?> registrations) {
-        interceptorCandidates = new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) registrations);
+    synchronized void retainInterceptorCandidates(List<BeanRegistration<?>> registrations) {
+        interceptorCandidates = new InterceptorCandidates.Resolved(registrations);
     }
 
     synchronized boolean remove(BeanRegistration<?> registration) {
@@ -131,12 +130,16 @@ final class BeanDependencies implements DependentBeanProvider {
     /**
      * Attaches construction dependents and records interceptor registrations already selected at construction.
      */
+    @SuppressWarnings("unchecked") // Registration compatibility entry points still accept List<?>.
     synchronized void initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
         if (resolved != null) {
-            interceptorRegistrations(resolved);
+            retainInterceptorCandidates((List<BeanRegistration<?>>) resolved);
         }
-        List<BeanRegistration<?>> retained = interceptorRegistrations();
-        attach(created == null ? List.of() : created, retained == null ? List.of() : retained);
+        List<BeanRegistration<?>> retained = switch (interceptorCandidates) {
+            case InterceptorCandidates.Unresolved ignored -> List.of();
+            case InterceptorCandidates.Resolved selected -> selected.registrations();
+        };
+        attach(created == null ? List.of() : created, retained);
     }
 
     @SuppressWarnings("ReferenceEquality") // A lifecycle belongs to an instance, even when two beans compare equal.

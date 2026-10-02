@@ -29,7 +29,7 @@ class BeanDependenciesStateSpec extends Specification {
         dependencies.interceptorRegistrations() == null
 
         when:
-        dependencies.interceptorRegistrations([])
+        dependencies.retainInterceptorCandidates([])
 
         then:
         dependencies.interceptorCandidates() instanceof InterceptorCandidates.Resolved
@@ -44,7 +44,7 @@ class BeanDependenciesStateSpec extends Specification {
         def dependencies = new BeanDependencies()
 
         when:
-        dependencies.interceptorRegistrations(supplied)
+        dependencies.retainInterceptorCandidates(supplied)
         supplied.clear()
 
         then:
@@ -55,6 +55,39 @@ class BeanDependenciesStateSpec extends Specification {
 
         then:
         thrown(UnsupportedOperationException)
+    }
+
+    void 'creation carries unresolved and resolved-empty candidates without rediscovery'() {
+        given:
+        def definition = RuntimeBeanDefinition.builder(Object, { new Object() } as Supplier<Object>).build()
+        def creation = new BeanCreationState(definition, [])
+
+        expect:
+        creation.lifecycleInterceptorCandidates() == InterceptorCandidates.Unresolved.INSTANCE
+
+        when:
+        creation.dependencies.retainInterceptorCandidates([])
+
+        then:
+        def candidates = creation.lifecycleInterceptorCandidates()
+        candidates instanceof InterceptorCandidates.Resolved
+        candidates.registrations().empty
+        candidates.is(creation.dependencies.interceptorCandidates())
+    }
+
+    void 'destruction candidates prefer proxy advice while initialization retains target advice'() {
+        given:
+        def definition = RuntimeBeanDefinition.builder(Object, { new Object() } as Supplier<Object>).build()
+        def otherDefinition = RuntimeBeanDefinition.builder(String, { 'other' } as Supplier<String>).build()
+        def proxyAdvice = new BeanRegistration(BeanIdentifier.of('proxy'), definition, new Object())
+        def targetAdvice = new BeanRegistration(BeanIdentifier.of('target'), definition, new Object())
+        def otherAdvice = new BeanRegistration(BeanIdentifier.of('other'), otherDefinition, 'other')
+        def creation = new BeanCreationState(definition, [proxyAdvice])
+        creation.dependencies.retainInterceptorCandidates([targetAdvice, otherAdvice])
+
+        expect:
+        creation.lifecycleInterceptorCandidates().registrations() == [proxyAdvice, otherAdvice]
+        creation.dependencies.interceptorCandidates().registrations() == [targetAdvice, otherAdvice]
     }
 
     void 'freezing resolution still permits one destruction claim and one ownership transfer'() {

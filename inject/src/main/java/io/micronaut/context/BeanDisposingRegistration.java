@@ -117,11 +117,10 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
-     * @return The interceptor registrations selected while this bean was created, or {@code null}
+     * @return The interceptor candidate state retained while this bean was created
      */
-    @Nullable
-    List<BeanRegistration<?>> getInterceptorRegistrations() {
-        return getDependencies().interceptorRegistrations();
+    InterceptorCandidates getInterceptorCandidates() {
+        return getDependencies().interceptorCandidates();
     }
 
     /**

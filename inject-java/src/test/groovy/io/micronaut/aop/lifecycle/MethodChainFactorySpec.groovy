@@ -12,7 +12,13 @@ import io.micronaut.aop.chain.*;
 import io.micronaut.context.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.core.type.MutableArgumentValue;
+import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import java.lang.reflect.Method;
 import io.micronaut.inject.*;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
@@ -21,8 +27,14 @@ import java.util.*;
 @Singleton @Bean(typed = InterceptorRegistry.class) @Replaces(InterceptorRegistry.class)
 class CountingRegistry implements InterceptorRegistry {
     int selections;
+    int methodSelections;
     final InterceptorRegistry delegate;
     CountingRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
+    public <T> Interceptor<T, ?>[] resolveMethodInterceptors(ExecutableMethod<T, ?> method,
+            Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
+        methodSelections++;
+        return InterceptorRegistry.super.resolveMethodInterceptors(method, candidates, kind);
+    }
     public <T> Interceptor<T, ?>[] resolveInterceptors(Executable<T, ?> method,
             Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
         selections++;
@@ -35,29 +47,49 @@ class CountingRegistry implements InterceptorRegistry {
 }
 @Singleton @Bean(typed = InterceptorChainFactory.class) @Replaces(InterceptorChainFactory.class)
 class CustomFactory implements InterceptorChainFactory {
-    final List<MethodInterceptorChain<?, ?>> invocations = new ArrayList<>();
+    final List<MethodInvocationContext<?, ?>> invocations = new ArrayList<>();
     final InterceptorChainFactory delegate;
     CustomFactory(InterceptorRegistry registry) { delegate = new DefaultInterceptorChainFactory(registry); }
-    public <T, R> MethodInterceptorChain<T, R> buildResolvedMethodChain(T bean, ExecutableMethod<T, R> method,
+    public <T, R> MethodInvocationContext<T, R> buildResolvedMethodChain(T bean, ExecutableMethod<T, R> method,
             Interceptor<T, R>[] interceptors, Object... arguments) {
-        MethodInterceptorChain<T, R> chain = delegate.buildResolvedMethodChain(bean, method, interceptors, arguments);
+        MethodInvocationContext<T, R> chain = new RecordingInvocation<>(
+            delegate.buildResolvedMethodChain(bean, method, interceptors, arguments));
         invocations.add(chain);
         return chain;
     }
-    public <T, R> MethodInterceptorChain<T, R> buildLifecycleChain(BeanResolutionContext resolution,
+    public <T, R> LifecycleInvocation<T, R> buildLifecycleChain(BeanResolutionContext resolution,
             BeanDefinition<T> definition, ExecutableMethod<T, R> method, T bean, InterceptorKind kind,
             Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
         return delegate.buildLifecycleChain(resolution, definition, method, bean, kind, candidates);
     }
-    public <T, R> MethodInterceptorChain<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
+    public <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
             Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind, Object... arguments) {
         return delegate.buildMethodChain(bean, method, candidates, kind, arguments);
     }
-    public <T> ConstructorInterceptorChain<T> buildConstructorChain(BeanResolutionContext resolution,
+    public <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
             BeanDefinition<T> definition, BeanConstructor<T> constructor,
             Collection<BeanRegistration<Interceptor<T, T>>> candidates, int additionalArguments, Object... arguments) {
         return delegate.buildConstructorChain(resolution, definition, constructor, candidates, additionalArguments, arguments);
     }
+}
+class RecordingInvocation<T, R> implements MethodInvocationContext<T, R> {
+    final MethodInvocationContext<T, R> delegate;
+    int executions;
+    RecordingInvocation(MethodInvocationContext<T, R> delegate) { this.delegate = delegate; }
+    public R proceed() { executions++; return delegate.proceed(); }
+    public R proceed(Interceptor from) { return delegate.proceed(from); }
+    public R invoke(T bean, Object... arguments) { return delegate.invoke(bean, arguments); }
+    public T getTarget() { return delegate.getTarget(); }
+    public InterceptorKind getKind() { return delegate.getKind(); }
+    public ExecutableMethod<T, R> getExecutableMethod() { return delegate.getExecutableMethod(); }
+    public String getMethodName() { return delegate.getMethodName(); }
+    public Method getTargetMethod() { return delegate.getTargetMethod(); }
+    public ReturnType<R> getReturnType() { return delegate.getReturnType(); }
+    public Argument<?>[] getArguments() { return delegate.getArguments(); }
+    public Object[] getParameterValues() { return delegate.getParameterValues(); }
+    public Map<String, MutableArgumentValue<?>> getParameters() { return delegate.getParameters(); }
+    public AnnotationMetadata getAnnotationMetadata() { return delegate.getAnnotationMetadata(); }
+    public MutableConvertibleValues<Object> getAttributes() { return delegate.getAttributes(); }
 }
 '''
 
@@ -84,6 +116,7 @@ class Advice implements MethodInterceptor<Object, Object> {
         when:
         def first = bean.echo('first')
         def selections = registry.selections
+        def methodSelections = registry.methodSelections
         def second = bean.echo('second')
         def answer = bean.answer()
 
@@ -95,6 +128,9 @@ class Advice implements MethodInterceptor<Object, Object> {
         !factory.invocations[0].is(factory.invocations[1])
         factory.invocations*.methodName == ['echo', 'echo', 'answer']
         registry.selections == selections
+        methodSelections > 0
+        registry.methodSelections == methodSelections
+        factory.invocations*.executions == [1, 1, 1]
 
         cleanup:
         context.close()
@@ -138,6 +174,7 @@ class IntroductionAdvice implements MethodInterceptor<Object, Object> {
         bean.echo('value') == 'around:introduced:value'
         factory.invocations.size() == 1
         factory.invocations[0].kind.name() == 'INTRODUCTION'
+        factory.invocations[0].executions == 1
 
         cleanup:
         context.close()

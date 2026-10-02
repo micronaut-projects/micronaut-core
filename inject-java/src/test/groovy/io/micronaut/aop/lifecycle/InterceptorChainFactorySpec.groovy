@@ -3,10 +3,16 @@ package io.micronaut.aop.lifecycle
 import io.micronaut.aop.Interceptor
 import io.micronaut.aop.InterceptorKind
 import io.micronaut.aop.InterceptorRegistry
+import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.chain.ConstructorInvocation
+import io.micronaut.aop.chain.LifecycleInvocation
+import io.micronaut.aop.chain.InterceptorChainFactory
+import io.micronaut.aop.chain.InterceptorChain
 import io.micronaut.aop.chain.DefaultInterceptorChainFactory
 import io.micronaut.aop.chain.MethodInterceptorChain
 import io.micronaut.aop.InvocationContext
+import io.micronaut.context.BeanRegistration
 import io.micronaut.context.BeanResolutionContext
 import io.micronaut.context.exceptions.ConstructorAdviceException
 import io.micronaut.core.beans.BeanConstructor
@@ -36,8 +42,7 @@ class InterceptorChainFactorySpec extends Specification {
         def second = factory.buildMethodChain(target, method, [], InterceptorKind.INTRODUCTION, 'second')
 
         then:
-        2 * registry.resolveInterceptors(method, [], InterceptorKind.INTRODUCTION) >> ([introduction] as Interceptor[])
-        2 * registry.resolveInterceptors(method, [], InterceptorKind.AROUND) >> ([around] as Interceptor[])
+        2 * registry.resolveMethodInterceptors(method, [], InterceptorKind.INTRODUCTION) >> ([around, introduction] as Interceptor[])
         first instanceof MethodInterceptorChain
         !first.is(second)
         first.kind == InterceptorKind.INTRODUCTION
@@ -65,7 +70,7 @@ class InterceptorChainFactorySpec extends Specification {
         def chain = factory.buildMethodChain(target, method, [], InterceptorKind.AROUND, 'argument')
 
         then:
-        1 * registry.resolveInterceptors(method, [], InterceptorKind.AROUND) >> ([] as Interceptor[])
+        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.AROUND) >> ([] as Interceptor[])
         chain instanceof MethodInterceptorChain
         0 * method.invoke(_, _)
 
@@ -97,7 +102,7 @@ class InterceptorChainFactorySpec extends Specification {
         }
 
         then:
-        1 * registry.resolveInterceptors(method, [], kind) >> ([advice] as Interceptor[])
+        1 * registry.resolveMethodInterceptors(method, [], kind) >> ([advice] as Interceptor[])
         def failure = thrown(NullPointerException)
         failure.message.contains(kind.name())
         0 * method.invoke(_, _)
@@ -120,7 +125,7 @@ class InterceptorChainFactorySpec extends Specification {
         def result = factory."$operation"(resolution, definition, method, bean, [])
 
         then:
-        1 * registry.resolveInterceptors(method, [], kind) >> ([] as Interceptor[])
+        1 * registry.resolveMethodInterceptors(method, [], kind) >> ([] as Interceptor[])
         1 * method.invoke(bean, [] as Object[]) >> null
         result == null
         0 * resolution._
@@ -188,4 +193,72 @@ class InterceptorChainFactorySpec extends Specification {
         where:
         entry << ['factory', 'chain']
     }
+    void 'factory execution accepts independent lifecycle and constructor implementations'() {
+        given:
+        def lifecycle = Mock(LifecycleInvocation)
+        def construction = Mock(ConstructorInvocation)
+        def factory = new CustomInvocations(lifecycle: lifecycle, construction: construction)
+        def resolution = Mock(BeanResolutionContext)
+        def definition = Mock(BeanDefinition)
+        def method = Mock(ExecutableMethod)
+        def constructor = Mock(BeanConstructor)
+        def bean = new Object()
+
+        when:
+        def initialized = factory.initialize(resolution, definition, method, bean, [])
+        def disposed = factory.dispose(resolution, definition, method, bean, [])
+        def instantiated = factory.instantiate(resolution, definition, constructor, [], 0)
+
+        then:
+        2 * lifecycle.proceedLifecycle(definition) >> bean
+        1 * construction.instantiate() >> bean
+        0 * lifecycle.proceed()
+        0 * construction.proceed()
+        initialized.is(bean)
+        disposed.is(bean)
+        instantiated.is(bean)
+    }
+
+    void 'static selection entry points delegate to the registry instance operation'() {
+        given:
+        def registry = Mock(InterceptorRegistry)
+        def method = Mock(ExecutableMethod)
+        def selected = [] as Interceptor[]
+
+        when:
+        def around = InterceptorChain.resolveAroundInterceptors(registry, method, [])
+        def introduction = InterceptorChain.resolveIntroductionInterceptors(registry, method, [])
+
+        then:
+        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.AROUND) >> selected
+        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.INTRODUCTION) >> selected
+        around.is(selected)
+        introduction.is(selected)
+    }
+
+    private static class CustomInvocations implements InterceptorChainFactory {
+        LifecycleInvocation lifecycle
+        ConstructorInvocation construction
+
+        @Override
+        <T, R> LifecycleInvocation<T, R> buildLifecycleChain(BeanResolutionContext resolution,
+                BeanDefinition<T> definition, ExecutableMethod<T, R> method, T bean, InterceptorKind kind,
+                Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
+            return lifecycle
+        }
+
+        @Override
+        <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
+                Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind, Object... arguments) {
+            throw new UnsupportedOperationException()
+        }
+
+        @Override
+        <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
+                BeanDefinition<T> definition, BeanConstructor<T> constructor,
+                Collection<BeanRegistration<Interceptor<T, T>>> candidates, int additionalArguments, Object... arguments) {
+            return construction
+        }
+    }
+
 }

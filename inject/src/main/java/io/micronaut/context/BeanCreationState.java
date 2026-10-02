@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,19 +33,19 @@ final class BeanCreationState {
         this.proxyInterceptors = proxyInterceptors;
     }
 
-    @Nullable List<BeanRegistration<?>> lifecycleInterceptors() {
-        List<BeanRegistration<?>> interceptors = dependencies.interceptorRegistrations();
+    InterceptorCandidates lifecycleInterceptorCandidates() {
+        InterceptorCandidates candidates = dependencies.interceptorCandidates();
         if (proxyInterceptors.isEmpty()) {
-            return interceptors;
+            return candidates;
         }
         ArrayList<BeanRegistration<?>> selected = new ArrayList<>(proxyInterceptors);
-        if (interceptors != null) {
-            for (BeanRegistration<?> candidate : interceptors) {
+        if (candidates instanceof InterceptorCandidates.Resolved resolved) {
+            for (BeanRegistration<?> candidate : resolved.registrations()) {
                 if (proxyInterceptors.stream().noneMatch(existing -> existing.definition().equals(candidate.definition()))) {
                     selected.add(candidate);
                 }
             }
         }
-        return List.copyOf(selected);
+        return new InterceptorCandidates.Resolved(selected);
     }
 }

@@ -19,7 +19,6 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
-import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -48,7 +47,7 @@ import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
  */
 @Internal
 @UsedByGeneratedCode
-public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
+public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements LifecycleInvocation<T, R> {
 
     private final @Nullable InterceptorKind kind;
 
@@ -164,6 +163,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @return The invocation result
      * @since 5.3.0
      */
+    @Override
     @Nullable
     public R proceedLifecycle(BeanDefinition<T> definition) {
         if (interceptorCount == 0) {

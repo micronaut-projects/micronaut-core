@@ -25,17 +25,17 @@ class CustomFactory implements InterceptorChainFactory {
     final List<InterceptorKind> seen = new ArrayList<>();
     final InterceptorChainFactory delegate;
     CustomFactory(InterceptorRegistry registry) { delegate = new DefaultInterceptorChainFactory(registry); }
-    public <T, R> MethodInterceptorChain<T, R> buildLifecycleChain(BeanResolutionContext resolution,
+    public <T, R> LifecycleInvocation<T, R> buildLifecycleChain(BeanResolutionContext resolution,
             BeanDefinition<T> definition, ExecutableMethod<T, R> method, T bean, InterceptorKind kind,
             Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
         seen.add(kind);
         return delegate.buildLifecycleChain(resolution, definition, method, bean, kind, candidates);
     }
-    public <T, R> MethodInterceptorChain<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
+    public <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
             Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind, Object... arguments) {
         return delegate.buildMethodChain(bean, method, candidates, kind, arguments);
     }
-    public <T> ConstructorInterceptorChain<T> buildConstructorChain(BeanResolutionContext resolution,
+    public <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
             BeanDefinition<T> definition, BeanConstructor<T> constructor,
             Collection<BeanRegistration<Interceptor<T, T>>> candidates, int additionalArguments, Object... arguments) {
         seen.add(InterceptorKind.AROUND_CONSTRUCT);

@@ -39,7 +39,7 @@ import java.util.Collection;
 @NullMarked
 public final class DefaultInterceptorChainFactory implements InterceptorChainFactory {
     private final InterceptorRegistry registry;
-    private final LegacyInterceptorCandidateResolver legacyCandidates = new LegacyInterceptorCandidateResolver();
+    private final InterceptorCandidateResolver candidateResolver = new InterceptorCandidateResolver();
 
     /**
      * @param registry The context's interceptor registry
@@ -62,7 +62,7 @@ public final class DefaultInterceptorChainFactory implements InterceptorChainFac
             resolved = (Collection) resolutionContext.getBeanInterceptors(definition);
         }
         if (resolved == null) {
-            resolved = legacyCandidates.resolveLifecycleCandidates(resolutionContext, method, bean, kind);
+            resolved = candidateResolver.resolveLifecycleCandidates(resolutionContext, method, bean, kind);
         }
         return buildMethodChain(bean, method, (Collection) resolved, kind, ArrayUtils.EMPTY_OBJECT_ARRAY);
     }
@@ -75,10 +75,7 @@ public final class DefaultInterceptorChainFactory implements InterceptorChainFac
         Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
         InterceptorKind kind,
         @Nullable Object... parameters) {
-        Interceptor<T, ?>[] interceptors = registry.resolveInterceptors(method, candidates, kind);
-        if (kind == InterceptorKind.INTRODUCTION) {
-            interceptors = ArrayUtils.concat(registry.resolveInterceptors(method, candidates, InterceptorKind.AROUND), interceptors);
-        }
+        Interceptor<T, ?>[] interceptors = registry.resolveMethodInterceptors(method, candidates, kind);
         return new MethodInterceptorChain((Interceptor[]) interceptors, bean, method, kind, parameters);
     }
 
@@ -92,7 +89,7 @@ public final class DefaultInterceptorChainFactory implements InterceptorChainFac
         @Nullable Object... parameters) {
         Collection<BeanRegistration<Interceptor<T, T>>> resolved = candidates;
         if (resolved == null) {
-            resolved = legacyCandidates.resolveConstructorCandidates(resolutionContext, definition, constructor);
+            resolved = candidateResolver.resolveConstructorCandidates(resolutionContext, definition, constructor);
         }
         return new ConstructorInterceptorChain<>(definition, constructor, registry.resolveConstructorInterceptors(constructor, resolved),
             additionalProxyConstructorParametersCount, parameters);

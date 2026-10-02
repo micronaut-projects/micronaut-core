@@ -16,9 +16,13 @@
 package io.micronaut.aop;
 
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.Collection;
@@ -50,6 +54,31 @@ public interface InterceptorRegistry {
         Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
         InterceptorKind interceptorKind
     );
+
+    /**
+     * Selects the interceptors for a method invocation. Introduction invocations execute around advice
+     * before introduction advice. Selection can be retained and reused by independent invocations.
+     *
+     * @param method The intercepted method
+     * @param candidates The acquired interceptor registrations
+     * @param kind The interception kind
+     * @param <T> The bean type
+     * @return The selected interceptors in invocation order
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default <T> Interceptor<T, ?>[] resolveMethodInterceptors(
+        ExecutableMethod<T, ?> method,
+        Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
+        InterceptorKind kind
+    ) {
+        Interceptor<T, ?>[] selected = resolveInterceptors(method, candidates, kind);
+        if (kind != InterceptorKind.INTRODUCTION) {
+            return selected;
+        }
+        return ArrayUtils.concat(resolveInterceptors(method, candidates, InterceptorKind.AROUND), selected);
+    }
 
     /**
      * Resolves interceptors for the given constructor.

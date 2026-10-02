@@ -36,10 +36,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-/** Candidate discovery for callers without a candidate set retained during bean creation. */
+/** Candidate discovery, including compatibility fallbacks for lifecycle calls without retained candidates. */
 @Internal
 @NullMarked
-final class LegacyInterceptorCandidateResolver {
+final class InterceptorCandidateResolver {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     <T> Collection<BeanRegistration<Interceptor<T, T>>> resolveConstructorCandidates(

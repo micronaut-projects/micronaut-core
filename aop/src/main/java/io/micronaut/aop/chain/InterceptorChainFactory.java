@@ -17,6 +17,7 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
@@ -55,9 +56,9 @@ public interface InterceptorChainFactory {
      * @param candidates Explicit candidates, or null to use retained candidates or discovery
      * @param <T> The bean type
      * @param <R> The result type
-     * @return A new lifecycle chain; execute with {@link MethodInterceptorChain#proceedLifecycle(BeanDefinition)}
+     * @return A new lifecycle chain; execute with {@link LifecycleInvocation#proceedLifecycle(BeanDefinition)}
      */
-    <T, R> MethodInterceptorChain<T, R> buildLifecycleChain(
+    <T, R> LifecycleInvocation<T, R> buildLifecycleChain(
         BeanResolutionContext resolutionContext,
         BeanDefinition<T> definition,
         ExecutableMethod<T, R> method,
@@ -77,7 +78,7 @@ public interface InterceptorChainFactory {
      * @param <R> The result type
      * @return A new method chain
      */
-    <T, R> MethodInterceptorChain<T, R> buildMethodChain(
+    <T, R> MethodInvocationContext<T, R> buildMethodChain(
         T bean,
         ExecutableMethod<T, R> method,
         Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
@@ -97,7 +98,7 @@ public interface InterceptorChainFactory {
      * @return A fresh invocation with independent chain state
      */
     @UsedByGeneratedCode
-    default <T, R> MethodInterceptorChain<T, R> buildResolvedMethodChain(
+    default <T, R> MethodInvocationContext<T, R> buildResolvedMethodChain(
         T bean,
         ExecutableMethod<T, R> method,
         Interceptor<T, R>[] interceptors,
@@ -115,9 +116,9 @@ public interface InterceptorChainFactory {
      * @param additionalProxyConstructorParametersCount The internal proxy constructor argument count
      * @param parameters The complete constructor arguments
      * @param <T> The bean type
-     * @return A new constructor chain; execute with {@link ConstructorInterceptorChain#instantiate()}
+     * @return A new constructor chain; execute with {@link ConstructorInvocation#instantiate()}
      */
-    <T> ConstructorInterceptorChain<T> buildConstructorChain(
+    <T> ConstructorInvocation<T> buildConstructorChain(
         BeanResolutionContext resolutionContext,
         BeanDefinition<T> definition,
         BeanConstructor<T> constructor,

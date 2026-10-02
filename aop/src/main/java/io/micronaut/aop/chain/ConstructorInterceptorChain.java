@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.ConstructorInvocationContext;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InvocationContext;
@@ -48,7 +47,7 @@ import java.util.Objects;
  */
 @Internal
 @UsedByGeneratedCode
-public final class ConstructorInterceptorChain<T> extends AbstractInterceptorChain<T, T> implements ConstructorInvocationContext<T> {
+public final class ConstructorInterceptorChain<T> extends AbstractInterceptorChain<T, T> implements ConstructorInvocation<T> {
 
     /**
      * The constructor that is actually invoked. For a proxied bean this is the generated proxy constructor, which
@@ -204,6 +203,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @return The constructed bean
      * @since 5.3.0
      */
+    @Override
     public T instantiate() {
         T bean;
         try {

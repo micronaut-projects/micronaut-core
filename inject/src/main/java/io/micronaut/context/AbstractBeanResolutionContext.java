@@ -92,9 +92,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    @SuppressWarnings("unchecked") // Adapt the existing resolution-context contract at its boundary.
     public void setBeanInterceptors(BeanDefinition<?> definition, List<?> registrations) {
         if (creationState != null && creationState.definition.equals(definition)) {
-            creationState.dependencies.interceptorRegistrations(registrations);
+            creationState.dependencies.retainInterceptorCandidates((List<BeanRegistration<?>>) registrations);
         } else {
             BeanResolutionContext.super.setBeanInterceptors(definition, registrations);
         }
@@ -113,7 +114,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
         return creationState != null && creationState.definition.equals(definition)
-            ? creationState.lifecycleInterceptors() : getBeanInterceptors(definition);
+            ? creationState.lifecycleInterceptorCandidates().legacyRegistrations() : getBeanInterceptors(definition);
     }
 
     @Override

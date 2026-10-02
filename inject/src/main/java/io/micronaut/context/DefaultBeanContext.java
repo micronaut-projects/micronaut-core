@@ -1389,21 +1389,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                  BeanRegistration<T> registration,
                                  T beanToDestroy) {
         List<BeanRegistration<?>> dependents = registration.dependentBeans();
-        List<?> interceptorRegistrations = registration instanceof BeanDisposingRegistration<?> disposingRegistration
-            ? disposingRegistration.getInterceptorRegistrations()
-            : null;
+        InterceptorCandidates candidates = registration instanceof BeanDisposingRegistration<?> disposingRegistration
+            ? disposingRegistration.getInterceptorCandidates()
+            : InterceptorCandidates.Unresolved.INSTANCE;
         if (!dependents.isEmpty()) {
             resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
         }
-        if (interceptorRegistrations != null) {
-            // The same authoritative candidates serve initialization and destruction, including an empty set.
-            resolutionContext.setBeanInterceptors(definition, interceptorRegistrations);
-        }
-        if (interceptorRegistrations != null && !interceptorRegistrations.isEmpty()) {
-            resolutionContext.setAttribute(
-                BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS,
-                interceptorRegistrations
-            );
+        if (candidates instanceof InterceptorCandidates.Resolved resolved) {
+            // An explicitly resolved empty set must also prevent discovery during destruction.
+            resolutionContext.setBeanInterceptors(definition, resolved.registrations());
+            if (!resolved.registrations().isEmpty()) {
+                resolutionContext.setAttribute(
+                    BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS,
+                    resolved.registrations()
+                );
+            }
         }
         definition.dispose(resolutionContext, this, beanToDestroy);
     }
@@ -1577,7 +1577,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 return false;
             }
             targetDependents = trackedRegistration.dependentBeans();
-            targetInterceptorRegistrations = trackedRegistration.getInterceptorRegistrations();
+            targetInterceptorRegistrations = trackedRegistration.getInterceptorCandidates().legacyRegistrations();
         } else {
             return false;
         }
@@ -3718,11 +3718,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         } else {
                             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                         }
-                        List<?> interceptorRegistrations = creation.lifecycleInterceptors();
+                        InterceptorCandidates interceptorCandidates = creation.lifecycleInterceptorCandidates();
                         if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
                             Object value = registrations.remove(definition);
                             if (value instanceof List<?> list) {
-                                interceptorRegistrations = list;
+                                interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
                             }
                         }
                         bean = postBeanCreated(context, definition, beanType, qualifier, bean);
@@ -3741,7 +3741,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                         beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorRegistrations, creation.dependencies);
+                            dependentBeans, interceptorCandidates.legacyRegistrations(), creation.dependencies);
                     } catch (RuntimeException | Error e) {
                         destroyDependentsOfFailedBean(context, e);
                         destroyCreatedBeans(creation.dependencies.takeDependents(), e);
