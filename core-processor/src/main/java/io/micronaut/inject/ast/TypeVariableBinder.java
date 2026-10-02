@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 
-import java.util.Collection;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 
@@ -103,11 +102,11 @@ public final class TypeVariableBinder {
      * @return The bound type, or the use when it annotates the variable
      */
     private static ClassElement readThroughUse(ClassElement bound, GenericPlaceholderElement use) {
-        Collection<String> useAnnotations = use.getGenericTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames();
-        if (useAnnotations.isEmpty()
-            || bound.getTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames().containsAll(useAnnotations)) {
+        if (use.getGenericTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames().isEmpty()) {
             return bound;
         }
+        // Matching annotation names on the binding do not make the occurrence redundant: its member
+        // values may differ, and must still take precedence over the binding's values.
         return use;
     }
 

@@ -600,13 +600,15 @@ public final class ArgumentExpUtils {
                 ? placeholder.getVariableName() : null;
         }
 
+        // Persist only type annotations added to the type argument
+        // A placeholder combines annotations on its binding and on this occurrence. Snapshot that
+        // metadata before resolving it, without adding occurrence annotations to the shared bound type.
+        MutableAnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Persist resolved placeholder for backward compatibility
             argumentType = placeholderElement.getResolved().orElse(argumentType);
         }
 
-        // Persist only type annotations added to the type argument
-        MutableAnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
         boolean isWildcard = argumentType instanceof WildcardElement;
 

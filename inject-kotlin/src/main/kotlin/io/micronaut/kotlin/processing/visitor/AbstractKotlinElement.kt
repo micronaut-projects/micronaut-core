@@ -558,7 +558,12 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             visitedTypes,
             stripTypeArguments2
         )
-        if (resolved !is KotlinClassElement || resolved.isGenericPlaceholder) {
+        if (resolved is KotlinGenericPlaceholderElement) {
+            // Keep the occurrence separate from the declaration and the type it resolves to.
+            resolved.typeArgument = typeArgument
+            return resolved
+        }
+        if (resolved !is KotlinClassElement) {
             return resolved
         }
 
