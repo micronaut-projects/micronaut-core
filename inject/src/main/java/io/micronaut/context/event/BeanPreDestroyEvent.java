@@ -35,7 +35,7 @@ import java.util.function.Function;
  * @since 3.0.0
  */
 public class BeanPreDestroyEvent<T> extends BeanEvent<T> {
-    private final @Nullable BeanResolutionContext resolutionContext;
+    private final transient @Nullable BeanResolutionContext resolutionContext;
 
     /**
      * @param beanContext    The bean context
@@ -64,7 +64,7 @@ public class BeanPreDestroyEvent<T> extends BeanEvent<T> {
      * Returns the context for resolving temporary destruction dependencies through
      * {@link BeanResolutionContext#withDependencies(java.util.function.Function)}. Its destruction permission
      * is confined to the synchronous container invocation. Events constructed with the original constructor
-     * do not carry a resolution context.
+     * do not carry a resolution context. The context is transient and is not retained by serialized events.
      * @return The resolution context, or {@code null} if none was supplied
      * @since 5.3.0
      */
