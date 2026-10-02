@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.beandefinition.DisposableIntercepted;
 import io.micronaut.aop.beandefinition.InitializableIntercepted;
 import io.micronaut.aop.beandefinition.ParameterizedInterceptedBeanDefinition;
@@ -242,6 +243,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final String BUILDER_VARIABLE_PREFIX = "builder";
     private static final String ARGUMENT_MEMBER = "argument";
 
+    private static final Method RESOLVE_BEAN_DEPENDENCY = ReflectionUtils.getRequiredInternalMethod(
+        BeanResolutionContext.class, "getBeanDependency", Argument.class);
     private static final Method CAPTURE_LIFECYCLE_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
         BeanResolutionContext.class, "captureBeanInterceptors", BeanDefinition.class, Object.class, Argument.class, boolean.class);
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
@@ -1946,6 +1949,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return beanInstance.newLocal("instance", instanceVar -> {
             List<StatementDef> statements = new ArrayList<>();
             if (needsInterceptorCandidates) {
+                statements.add(methodParameters.get(0).invoke(RESOLVE_BEAN_DEPENDENCY,
+                    ClassTypeDef.of(InterceptorChainFactory.class).getStaticField("ARGUMENT", TypeDef.of(Argument.class))));
                 statements.add(methodParameters.get(0).invoke(
                     CAPTURE_LIFECYCLE_INTERCEPTORS, aThis, instanceVar,
                     ClassTypeDef.of(Interceptor.class).getStaticField("ARGUMENT", TypeDef.of(Argument.class)),

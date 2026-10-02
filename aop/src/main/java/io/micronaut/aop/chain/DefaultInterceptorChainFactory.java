@@ -32,25 +32,28 @@ import java.util.Collection;
 
 /**
  * Default chain factory using the interceptor registry selected by its bean context.
+ * Subclasses can override {@link #buildResolvedInvocation} to customize method and lifecycle invocations
+ * after selection, without repeating candidate acquisition or matching.
  *
  * @since 5.3.0
  */
 @Internal
 @NullMarked
-public final class DefaultInterceptorChainFactory implements InterceptorChainFactory {
+public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
     private final InterceptorRegistry registry;
-    private final InterceptorCandidateResolver candidateResolver = new InterceptorCandidateResolver();
+    private final InterceptorCandidateResolver candidateResolver;
 
     /**
      * @param registry The context's interceptor registry
      */
     public DefaultInterceptorChainFactory(InterceptorRegistry registry) {
         this.registry = registry;
+        this.candidateResolver = new InterceptorCandidateResolver(registry);
     }
 
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public <T, R> MethodInterceptorChain<T, R> buildLifecycleChain(
+    public <T, R> LifecycleInvocation<T, R> buildLifecycleChain(
         BeanResolutionContext resolutionContext,
         BeanDefinition<T> definition,
         ExecutableMethod<T, R> method,
@@ -62,21 +65,22 @@ public final class DefaultInterceptorChainFactory implements InterceptorChainFac
             resolved = (Collection) resolutionContext.getBeanInterceptors(definition);
         }
         if (resolved == null) {
-            resolved = candidateResolver.resolveLifecycleCandidates(resolutionContext, method, bean, kind);
+            resolved = candidateResolver.resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind);
         }
-        return buildMethodChain(bean, method, (Collection) resolved, kind, ArrayUtils.EMPTY_OBJECT_ARRAY);
+        Interceptor<T, R>[] interceptors = (Interceptor[]) registry.resolveMethodInterceptors(method, (Collection) resolved, kind);
+        return buildResolvedInvocation(bean, method, interceptors, kind, ArrayUtils.EMPTY_OBJECT_ARRAY);
     }
 
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public <T, R> MethodInterceptorChain<T, R> buildMethodChain(
+    public <T, R> LifecycleInvocation<T, R> buildMethodChain(
         T bean,
         ExecutableMethod<T, R> method,
         Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
         InterceptorKind kind,
         @Nullable Object... parameters) {
         Interceptor<T, ?>[] interceptors = registry.resolveMethodInterceptors(method, candidates, kind);
-        return new MethodInterceptorChain((Interceptor[]) interceptors, bean, method, kind, parameters);
+        return buildResolvedInvocation(bean, method, (Interceptor[]) interceptors, kind, parameters);
     }
 
     @Override

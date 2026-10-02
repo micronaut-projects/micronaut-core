@@ -96,7 +96,7 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         if (interceptors != null) {
             resolutionContext.setBeanInterceptors(this, interceptors);
         }
-        return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
+        return resolutionContext.getBeanDependency(InterceptorChainFactory.ARGUMENT).instantiate(
             resolutionContext,
             this,
             constructor,

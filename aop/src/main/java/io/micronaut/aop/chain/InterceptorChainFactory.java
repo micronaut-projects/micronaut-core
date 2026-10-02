@@ -16,6 +16,7 @@
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.Introduced;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanRegistration;
@@ -103,7 +104,27 @@ public interface InterceptorChainFactory {
         ExecutableMethod<T, R> method,
         Interceptor<T, R>[] interceptors,
         @Nullable Object... parameters) {
-        return new MethodInterceptorChain<>(interceptors, bean, method, parameters);
+        return buildResolvedInvocation(bean, method, interceptors,
+            bean instanceof Introduced ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND, parameters);
+    }
+
+    /**
+     * Builds an invocation after selection. The default factory routes method and lifecycle construction through
+     * this hook, preserving the interception kind without repeating matching. Each call returns independent state.
+     *
+     * @param bean The target
+     * @param method The intercepted method
+     * @param interceptors The selected interceptors
+     * @param kind The interception kind
+     * @param parameters The invocation arguments
+     * @param <T> The target type
+     * @param <R> The result type
+     * @return A fresh method or lifecycle invocation
+     */
+    default <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(
+        T bean, ExecutableMethod<T, R> method, Interceptor<T, R>[] interceptors,
+        InterceptorKind kind, @Nullable Object... parameters) {
+        return new MethodInterceptorChain<>(interceptors, bean, method, kind, parameters);
     }
 
     /**

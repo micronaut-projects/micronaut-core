@@ -101,13 +101,13 @@ public interface ParameterizedInterceptedBeanDefinition<T>
         if (declared != null) {
             // An explicitly supplied set is bound for construction only, so it is used here but not shared with the
             // post-construct interception of this bean, which may bind interceptors this set does not contain.
-            return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(resolutionContext, this, constructor, declared, 0, values);
+            return resolutionContext.getBeanDependency(InterceptorChainFactory.ARGUMENT).instantiate(resolutionContext, this, constructor, declared, 0, values);
         }
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveLifecycleInterceptors(resolutionContext, constructor);
         if (interceptors != null) {
             resolutionContext.setBeanInterceptors(this, interceptors);
         }
-        return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
+        return resolutionContext.getBeanDependency(InterceptorChainFactory.ARGUMENT).instantiate(
             resolutionContext,
             this,
             constructor,

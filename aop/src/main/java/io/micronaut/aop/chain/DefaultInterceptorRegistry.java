@@ -24,7 +24,9 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanContextConfigurable;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -35,10 +37,12 @@ import io.micronaut.core.naming.Described;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
-import org.jspecify.annotations.NullMarked;
 
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,9 +63,24 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
     private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
     private final BeanContext beanContext;
+    private final InterceptorCandidateResolver candidateResolver = new InterceptorCandidateResolver(this);
 
     public DefaultInterceptorRegistry(BeanContext beanContext) {
         this.beanContext = beanContext;
+    }
+
+    @Override
+    public <T> List<BeanRegistration<Interceptor<T, ?>>> resolveCandidates(
+        BeanResolutionContext resolutionContext, BeanDefinition<T> definition,
+        Collection<ExecutableMethod<T, ?>> methods) {
+        return candidateResolver.resolveCandidates(resolutionContext, definition, methods);
+    }
+
+    @Override
+    public Interceptor<?, ?>[][] resolveTargetInterceptors(BeanLocator beanLocator,
+        BeanDefinition<?> targetDefinition, ExecutableMethod<?, ?>[] methods, boolean introduction,
+        @Nullable BeanRegistration<?> target, @Nullable Object bean) {
+        return candidateResolver.resolveTargetInterceptors(beanLocator, targetDefinition, methods, introduction, target, bean);
     }
 
     @Override

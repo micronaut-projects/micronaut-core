@@ -29,8 +29,6 @@ import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
-import io.micronaut.context.Qualifier;
-import io.micronaut.context.RegisteredBeanInterceptors;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -42,12 +40,9 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -239,32 +234,8 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
                                                                   boolean introduction,
                                                                   @Nullable BeanRegistration<?> target,
                                                                   @Nullable Object bean) {
-        if (target != null && target.getBean() == bean) {
-            // read before a selector is created for it, on every call
-            Interceptor<?, ?>[][] kept = RegisteredBeanInterceptors.kept(target, targetDefinition);
-            if (kept != null) {
-                return kept;
-            }
-            Interceptor<?, ?>[][] selection = RegisteredBeanInterceptors.select(target, targetDefinition, resolutionContext -> selectForMethods(
-                resolutionContext.getContext().getBean(InterceptorRegistry.ARGUMENT),
-                methods,
-                introduction,
-                resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
-            ));
-            if (selection != null) {
-                return selection;
-            }
-        }
-        Interceptor<?, ?>[][] unowned = RegisteredBeanInterceptors.keptUnowned(beanLocator, targetDefinition);
-        if (unowned != null) {
-            return unowned;
-        }
-        return RegisteredBeanInterceptors.selectUnowned(beanLocator, targetDefinition, Interceptor.ARGUMENT, bindingOf(methods), registrations -> selectForMethods(
-            beanLocator.getBean(InterceptorRegistry.ARGUMENT),
-            methods,
-            introduction,
-            registrations
-        ));
+        return beanLocator.getBean(InterceptorRegistry.ARGUMENT)
+            .resolveTargetInterceptors(beanLocator, targetDefinition, methods, introduction, target, bean);
     }
 
     /**
@@ -285,29 +256,6 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         return registry.findBeanRegistration(bean).orElse(null);
     }
 
-    private static Qualifier<Interceptor<?, ?>> bindingOf(ExecutableMethod<?, ?>[] methods) {
-        // each method keeps its own occurrences of a binding annotation that binds members
-        AnnotationMetadata[] interceptionPoints = new AnnotationMetadata[methods.length];
-        for (int i = 0; i < methods.length; i++) {
-            interceptionPoints[i] = methods[i].getAnnotationMetadata();
-        }
-        return InterceptorBindingQualifier.ofInterceptionPoints(interceptionPoints);
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Interceptor<?, ?>[][] selectForMethods(InterceptorRegistry registry,
-                                                          ExecutableMethod<?, ?>[] methods,
-                                                          boolean introduction,
-                                                          Collection<? extends BeanRegistration<?>> registrations) {
-        List list = new ArrayList<>(registrations);
-        Interceptor<?, ?>[][] selection = new Interceptor[methods.length][];
-        for (int i = 0; i < methods.length; i++) {
-            ExecutableMethod method = methods[i];
-            selection[i] = registry.resolveMethodInterceptors(method, list,
-                introduction ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND);
-        }
-        return selection;
-    }
 
     /**
      * Resolves the {@link Around} interceptors for a method.

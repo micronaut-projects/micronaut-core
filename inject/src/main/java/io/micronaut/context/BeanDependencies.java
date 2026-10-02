@@ -59,6 +59,10 @@ final class BeanDependencies implements DependentBeanProvider {
         interceptorCandidates = new InterceptorCandidates.Resolved(registrations);
     }
 
+    synchronized void require(BeanRegistration<?> registration) {
+        attach(List.of(), List.of(registration));
+    }
+
     synchronized boolean remove(BeanRegistration<?> registration) {
         List<BeanRegistration<?>> remaining = new ArrayList<>(owned);
         boolean removed = remaining.removeIf(candidate -> candidate == registration);
@@ -130,10 +134,9 @@ final class BeanDependencies implements DependentBeanProvider {
     /**
      * Attaches construction dependents and records interceptor registrations already selected at construction.
      */
-    @SuppressWarnings("unchecked") // Registration compatibility entry points still accept List<?>.
-    synchronized void initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
-        if (resolved != null) {
-            retainInterceptorCandidates((List<BeanRegistration<?>>) resolved);
+    synchronized void initialize(@Nullable List<BeanRegistration<?>> created, InterceptorCandidates candidates) {
+        if (candidates instanceof InterceptorCandidates.Resolved) {
+            interceptorCandidates = candidates;
         }
         List<BeanRegistration<?>> retained = switch (interceptorCandidates) {
             case InterceptorCandidates.Unresolved ignored -> List.of();

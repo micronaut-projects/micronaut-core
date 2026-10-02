@@ -87,6 +87,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public <T> T getBeanDependency(Argument<T> type) {
+        BeanRegistration<T> registration = context.getBeanRegistration(this, type, null);
+        if (creationState != null) {
+            creationState.dependencies.require(registration);
+        }
+        return registration.getBean();
+    }
+
+    @Override
     public @Nullable BeanDependencyGroup getBeanDependencyGroup() {
         return creationState == null ? null : new DefaultBeanDependencyResolver(context, creationState.dependencies);
     }
@@ -114,7 +123,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
         return creationState != null && creationState.definition.equals(definition)
-            ? creationState.lifecycleInterceptorCandidates().legacyRegistrations() : getBeanInterceptors(definition);
+            ? creationState.lifecycleInterceptorCandidates().legacyRegistrations() : BeanResolutionContext.super.getBeanDestructionInterceptors(definition);
     }
 
     @Override

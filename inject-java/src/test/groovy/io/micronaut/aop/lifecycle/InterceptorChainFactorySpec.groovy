@@ -236,6 +236,49 @@ class InterceptorChainFactorySpec extends Specification {
         introduction.is(selected)
     }
 
+    void 'one construction hook handles resolved methods candidate methods and lifecycle kinds'() {
+        given:
+        def registry = Mock(InterceptorRegistry)
+        def factory = new RecordingFactory(registry)
+        def method = Mock(ExecutableMethod)
+        def definition = Mock(BeanDefinition)
+        def resolution = Mock(BeanResolutionContext)
+        def bean = new Object()
+        def selected = [] as Interceptor[]
+
+        when:
+        def resolved = factory.buildResolvedMethodChain(bean, method, selected, 'argument')
+        def matched = factory.buildMethodChain(bean, method, [], InterceptorKind.INTRODUCTION, 'argument')
+        def initialized = factory.buildLifecycleChain(resolution, definition, method, bean, InterceptorKind.POST_CONSTRUCT, [])
+        def disposed = factory.buildLifecycleChain(resolution, definition, method, bean, InterceptorKind.PRE_DESTROY, [])
+
+        then:
+        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.INTRODUCTION) >> selected
+        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.POST_CONSTRUCT) >> selected
+        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.PRE_DESTROY) >> selected
+        0 * registry._
+        factory.kinds == [InterceptorKind.AROUND, InterceptorKind.INTRODUCTION, InterceptorKind.POST_CONSTRUCT, InterceptorKind.PRE_DESTROY]
+        [resolved, matched, initialized, disposed]*.kind == factory.kinds
+        !resolved.is(matched)
+        resolved.parameterValues == ['argument']
+        matched.parameterValues == ['argument']
+    }
+
+    private static class RecordingFactory extends DefaultInterceptorChainFactory {
+        final List<InterceptorKind> kinds = []
+
+        RecordingFactory(InterceptorRegistry registry) {
+            super(registry)
+        }
+
+        @Override
+        <T, R> LifecycleInvocation<T, R> buildResolvedInvocation(T bean, ExecutableMethod<T, R> method,
+                Interceptor<T, R>[] interceptors, InterceptorKind kind, Object... parameters) {
+            kinds.add(kind)
+            return super.buildResolvedInvocation(bean, method, interceptors, kind, parameters)
+        }
+    }
+
     private static class CustomInvocations implements InterceptorChainFactory {
         LifecycleInvocation lifecycle
         ConstructorInvocation construction

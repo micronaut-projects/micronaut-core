@@ -86,7 +86,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Attribute that exposes the interceptor registrations selected while creating the bean being disposed.
      *
      * <p>The value is a read-only {@code List<BeanRegistration<?>>}. It is set only while a bean is being disposed and
-     * is intended for lifecycle interception.</p>
+     * is read only for compatibility. Current callers use {@link #setBeanInterceptors(BeanDefinition, List)}.</p>
      *
      * @since 5.2.0
      */
@@ -147,6 +147,19 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     default <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
         return getBeanRegistrations(interceptorType, binding);
+    }
+
+    /**
+     * Resolves infrastructure used by the current bean and records its registration for destruction ordering.
+     * Shared beans remain owned by their scopes. Legacy contexts retain ordinary lookup behavior.
+     *
+     * @param type The dependency type
+     * @param <T> The dependency type
+     * @return The dependency
+     * @since 5.3.0
+     */
+    default <T> T getBeanDependency(Argument<T> type) {
+        return getBean(type);
     }
 
     /**
@@ -237,7 +250,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 5.3.0
      */
     default @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
-        return getBeanInterceptors(definition);
+        List<?> retained = getBeanInterceptors(definition);
+        if (retained != null) {
+            return retained;
+        }
+        // Compatibility with callers that supplied destruction candidates through the old context attribute.
+        return getAttribute(EXISTING_INTERCEPTOR_REGISTRATIONS) instanceof List<?> legacy ? legacy : null;
     }
 
     /**

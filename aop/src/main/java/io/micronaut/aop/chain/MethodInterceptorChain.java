@@ -37,7 +37,7 @@ import java.util.Objects;
 import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
 
 /**
- * An internal representation of the {@link Interceptor} chain. This class implements {@link MethodInvocationContext} and is
+ * An internal representation of the {@link Interceptor} chain. This class implements {@link LifecycleInvocation} and is
  * consumed by the framework itself and should not be used directly in application code.
  *
  * @param <T> type

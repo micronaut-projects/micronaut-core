@@ -15,17 +15,24 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.aop.chain.InterceptorCandidateResolver;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Strategy interface for looking up interceptors from the bean context.
@@ -78,6 +85,42 @@ public interface InterceptorRegistry {
             return selected;
         }
         return ArrayUtils.concat(resolveInterceptors(method, candidates, InterceptorKind.AROUND), selected);
+    }
+
+    /**
+     * Acquires and retains candidates for a runtime proxy, including constructor and lifecycle bindings.
+     * @param resolutionContext The creation context
+     * @param definition The proxy definition
+     * @param methods The intercepted methods
+     * @param <T> The bean type
+     * @return The acquired registrations
+     * @since 5.3.0
+     */
+    @Internal
+    default <T> List<BeanRegistration<Interceptor<T, ?>>> resolveCandidates(
+        BeanResolutionContext resolutionContext, BeanDefinition<T> definition,
+        Collection<ExecutableMethod<T, ?>> methods) {
+        return new InterceptorCandidateResolver(this).resolveCandidates(resolutionContext, definition, methods);
+    }
+
+    /**
+     * Reuses or acquires the selection owned by one proxy target. Shared registrations keep their scope ownership.
+     * @param beanLocator The context used for unmanaged targets
+     * @param targetDefinition The target definition
+     * @param methods The intercepted methods
+     * @param introduction Whether introduction advice is required
+     * @param target The target registration, if known
+     * @param bean The invocation target
+     * @return The interceptors selected for each method
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default Interceptor<?, ?>[][] resolveTargetInterceptors(BeanLocator beanLocator,
+        BeanDefinition<?> targetDefinition, ExecutableMethod<?, ?>[] methods, boolean introduction,
+        @Nullable BeanRegistration<?> target, @Nullable Object bean) {
+        return new InterceptorCandidateResolver(this)
+            .resolveTargetInterceptors(beanLocator, targetDefinition, methods, introduction, target, bean);
     }
 
     /**

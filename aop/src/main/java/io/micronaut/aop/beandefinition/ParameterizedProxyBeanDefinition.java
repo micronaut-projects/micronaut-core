@@ -51,7 +51,7 @@ public interface ParameterizedProxyBeanDefinition<T>
             "Resolved instantiation values cannot be null"
         );
         List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
-        return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
+        return resolutionContext.getBeanDependency(InterceptorChainFactory.ARGUMENT).instantiate(
             resolutionContext,
             this,
             new InterceptedParametrizedConstructor<>(this, resolutionContext, context),

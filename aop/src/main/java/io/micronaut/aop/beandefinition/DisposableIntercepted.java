@@ -40,7 +40,7 @@ public interface DisposableIntercepted<T> extends DisposableBeanDefinition<T> {
         // @PreDestroy callback of the bean, superclass callbacks first, in the same order as post-construct. An
         // interceptor that does not proceed keeps all of them from running. The callbacks themselves are listed by
         // getPreDestroyExecutableMethods().
-        return Objects.requireNonNull(context.getBean(InterceptorChainFactory.ARGUMENT).dispose(
+        return Objects.requireNonNull(resolutionContext.getBeanDependency(InterceptorChainFactory.ARGUMENT).dispose(
             resolutionContext,
             this,
             new InterceptedDisposeMethod<>(this, resolutionContext, context, bean),

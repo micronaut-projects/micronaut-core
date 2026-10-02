@@ -1398,12 +1398,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (candidates instanceof InterceptorCandidates.Resolved resolved) {
             // An explicitly resolved empty set must also prevent discovery during destruction.
             resolutionContext.setBeanInterceptors(definition, resolved.registrations());
-            if (!resolved.registrations().isEmpty()) {
-                resolutionContext.setAttribute(
-                    BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS,
-                    resolved.registrations()
-                );
-            }
         }
         definition.dispose(resolutionContext, this, beanToDestroy);
     }
@@ -3741,7 +3735,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                         beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorCandidates.legacyRegistrations(), creation.dependencies);
+                            dependentBeans, interceptorCandidates, creation.dependencies);
                     } catch (RuntimeException | Error e) {
                         destroyDependentsOfFailedBean(context, e);
                         destroyCreatedBeans(creation.dependencies.takeDependents(), e);

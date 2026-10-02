@@ -20,6 +20,29 @@ class BeanDependenciesStateSpec extends Specification {
         1 * context.destroyBean(registration)
     }
 
+    void 'destruction candidates adapt legacy attributes only when no typed selection exists'() {
+        given:
+        def context = new DefaultBeanContext()
+        def definition = RuntimeBeanDefinition.builder(Object, { new Object() } as Supplier<Object>).build()
+        def registration = new BeanRegistration(BeanIdentifier.of('legacy'), definition, new Object())
+        def resolution = new DefaultBeanResolutionContext(context, definition)
+        resolution.setAttribute(BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS, [registration])
+
+        expect:
+        resolution.getBeanDestructionInterceptors(definition) == [registration]
+
+        when:
+        resolution.setBeanInterceptors(definition, [])
+
+        then:
+        resolution.getBeanDestructionInterceptors(definition).empty
+        resolution.getBeanInterceptors(definition).empty
+
+        cleanup:
+        resolution.close()
+        context.close()
+    }
+
     void 'retained candidates distinguish unresolved from an authoritative empty selection'() {
         given:
         def dependencies = new BeanDependencies()
@@ -95,7 +118,7 @@ class BeanDependenciesStateSpec extends Specification {
         def definition = RuntimeBeanDefinition.builder(Object, { new Object() } as Supplier<Object>).build()
         def registration = new BeanRegistration(BeanIdentifier.of('dependent'), definition, new Object())
         def dependencies = new BeanDependencies()
-        dependencies.initialize([registration], [])
+        dependencies.initialize([registration], new InterceptorCandidates.Resolved([]))
 
         when:
         dependencies.stopResolving()

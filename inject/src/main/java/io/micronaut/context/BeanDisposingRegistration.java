@@ -43,13 +43,16 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     // whether this bean was created as an interceptor of the bean it is a dependent of
     private volatile boolean createdAsInterceptor;
 
+    @SuppressWarnings("unchecked") // Adapt the registration compatibility boundary once.
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
                               @Nullable List<?> interceptorRegistrations) {
-        this(beanContext, identifier, beanDefinition, createdBean, dependents, interceptorRegistrations, new BeanDependencies());
+        this(beanContext, identifier, beanDefinition, createdBean, dependents,
+            interceptorRegistrations == null ? InterceptorCandidates.Unresolved.INSTANCE
+                : new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) interceptorRegistrations), new BeanDependencies());
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -57,14 +60,14 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
-                              @Nullable List<?> interceptorRegistrations,
+                              InterceptorCandidates interceptorCandidates,
                               BeanDependencies dependencies) {
         super(identifier, beanDefinition, createdBean, dependencies);
         this.beanContext = beanContext;
         // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
         // duplicate registrations or add them back to an owner that was already destroyed.
         if (getDependencies() == dependencies || createdBean instanceof DefaultBeanDependencyResolver) {
-            getDependencies().initialize(dependents, interceptorRegistrations);
+            getDependencies().initialize(dependents, interceptorCandidates);
         }
     }
 

@@ -190,7 +190,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         InterceptorChainFactory.class, "buildResolvedMethodChain", Object.class, ExecutableMethod.class,
         Interceptor[].class, Object[].class);
     private static final Method RESOLVE_CHAIN_FACTORY = ReflectionUtils.getRequiredInternalMethod(
-        BeanResolutionContext.class, "getBean", Argument.class);
+        BeanResolutionContext.class, "getBeanDependency", Argument.class);
+    private static final FieldDef FIELD_INTERCEPTOR_REGISTRY = FieldDef.builder("$interceptorRegistry", TypeDef.of(InterceptorRegistry.class))
+        .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
     private static final String FIELD_CHAIN_FACTORY = "$interceptorChainFactory";
     private static final String INTERCEPTORS_PARAMETER = "$interceptors";
     private static final String BEAN_RESOLUTION_CONTEXT_PARAMETER = "$beanResolutionContext";
@@ -233,7 +235,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         "interceptedTargetRegistration"
     );
     private static final Method METHOD_RESOLVE_TARGET_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorChain.class,
+        InterceptorRegistry.class,
         "resolveTargetInterceptors",
         BeanLocator.class,
         BeanDefinition.class,
@@ -596,7 +598,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                                    FieldDef proxyMethodsField,
                                                    ExpressionDef targetRegistration,
                                                    ExpressionDef target) {
-        return ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+        return aThis.field(FIELD_INTERCEPTOR_REGISTRY).invoke(
             METHOD_RESOLVE_TARGET_INTERCEPTORS,
             aThis.field(Objects.requireNonNull(fields.beanLocator())),
             aThis.field(fields.proxyBeanDefinition()),
@@ -615,6 +617,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         }
 
         ClassDef.ClassDefBuilder proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
+        if (interceptorsPerTarget) {
+            proxyBuilder.addField(FIELD_INTERCEPTOR_REGISTRY);
+        }
         proxyBuilder.addField(FieldDef.builder(FIELD_CHAIN_FACTORY, TYPE_CHAIN_FACTORY)
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build());
 
@@ -766,6 +771,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         FieldDef proxyMethodsField = proxyFields.proxyMethods();
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
+        if (interceptorsPerTarget) {
+            bodyBuilders.add((aThis, parameters) -> aThis.field(FIELD_INTERCEPTOR_REGISTRY)
+                .assign(parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER))));
+        }
         bodyBuilders.add((aThis, parameters) -> aThis.field(FIELD_CHAIN_FACTORY, TYPE_CHAIN_FACTORY).assign(
             parameters.get(constructor.findParameterIndex(BEAN_RESOLUTION_CONTEXT_PARAMETER)).invoke(
                 RESOLVE_CHAIN_FACTORY, TYPE_CHAIN_FACTORY.getStaticField("ARGUMENT", ClassTypeDef.of(Argument.class)))));
@@ -1040,7 +1049,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             // the target is fixed: the interceptors are those of the target, selected from its registration
             return StatementDef.multi(
                 proxyMethods,
-                aThis.field(interceptorsField).assign(ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+                aThis.field(interceptorsField).assign(parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)).invoke(
                     METHOD_RESOLVE_TARGET_INTERCEPTORS,
                     parameters.get(constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER)),
                     aThis.field(proxyBeanDefinitionField),
