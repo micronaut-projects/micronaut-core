@@ -244,8 +244,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         Object.class
     );
     private static final Method METHOD_FIND_PROXY_TARGET_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(
-        BeanLocator.class,
+        InterceptorRegistry.class,
         "findProxyTargetRegistration",
+        BeanLocator.class,
         Object.class
     );
     private static final String FIELD_TARGET_REGISTRATION = "$targetRegistration";
@@ -615,7 +616,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         }
 
         ClassDef.ClassDefBuilder proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
-        if (interceptorsPerTarget) {
+        if (interceptorsPerTarget || hotswap) {
             proxyBuilder.addField(FIELD_INTERCEPTOR_REGISTRY);
         }
         proxyBuilder.addField(FieldDef.builder(FIELD_CHAIN_FACTORY, TYPE_CHAIN_FACTORY)
@@ -769,7 +770,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         FieldDef proxyMethodsField = proxyFields.proxyMethods();
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
-        if (interceptorsPerTarget) {
+        if (interceptorsPerTarget || hotswap) {
             bodyBuilders.add((aThis, parameters) -> aThis.field(FIELD_INTERCEPTOR_REGISTRY)
                 .assign(parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER))));
         }
@@ -1144,8 +1145,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 if (targetRegistrationField != null) {
                     // the registration of the new target, which carries the interceptors it owns, when the context holds one
                     swap.add(aThis.field(targetRegistrationField).assign(
-                        aThis.field(Objects.requireNonNull(beanLocatorField))
-                            .invoke(METHOD_FIND_PROXY_TARGET_REGISTRATION, methodParameters.get(0))));
+                        aThis.field(FIELD_INTERCEPTOR_REGISTRY).invoke(METHOD_FIND_PROXY_TARGET_REGISTRATION,
+                            aThis.field(Objects.requireNonNull(beanLocatorField)), methodParameters.get(0))));
                 }
                 return StatementDef.multi(
                     lock.invoke(LOCK_METHOD),

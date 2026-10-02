@@ -4106,8 +4106,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param key The key
      * @param <S> The selection type
      * @return The retained selection, or {@code null}
+     * @since 5.3.0
      */
-    @Override
     @Internal
     @SuppressWarnings("unchecked")
     public <S> @Nullable S getUnownedInterceptorSelection(Object key) {
@@ -4116,8 +4116,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
-     * Returns the interceptors this context keeps for targets it holds no registration for, see
-     * {@link BeanLocator#selectUnownedInterceptors(Object, Argument, Qualifier, Function)}.
+     * Returns the interceptor selection this context keeps for targets it holds no registration for,
+     * computing it once for each target definition.
      *
      * <p>The interceptors no scope holds that a selection is computed from are created for it, and this context is
      * their only owner: they are destroyed when it stops, or at once when the selection fails or another thread kept
@@ -4130,8 +4130,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <I>             The interceptor type
      * @param <S>             The selection type
      * @return The selection
+     * @since 5.3.0
      */
-    @Override
     @Internal
     @SuppressWarnings("unchecked")
     public <I, S> S selectUnownedInterceptors(Object key,

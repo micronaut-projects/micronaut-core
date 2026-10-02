@@ -2,7 +2,9 @@ package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.InterceptorRegistry
+import io.micronaut.aop.HotSwappableInterceptedProxy
 import io.micronaut.aop.chain.InterceptorChainFactory
+import io.micronaut.inject.qualifiers.Qualifiers
 
 class MethodChainFactorySpec extends AbstractTypeElementSpec {
     private final String infrastructure = '''
@@ -28,8 +30,16 @@ import java.util.*;
 class CountingRegistry implements InterceptorRegistry {
     int selections;
     int methodSelections;
+    final List<Object> targetLookups = new ArrayList<>();
+    final List<BeanRegistration<?>> targetRegistrations = new ArrayList<>();
     final InterceptorRegistry delegate;
     CountingRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
+    public BeanRegistration<?> findProxyTargetRegistration(BeanLocator locator, Object bean) {
+        targetLookups.add(bean);
+        BeanRegistration<?> registration = InterceptorRegistry.super.findProxyTargetRegistration(locator, bean);
+        targetRegistrations.add(registration);
+        return registration;
+    }
     public <T> Interceptor<T, ?>[] resolveMethodInterceptors(ExecutableMethod<T, ?> method,
             Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
         methodSelections++;
@@ -143,6 +153,47 @@ class Advice implements MethodInterceptor<Object, Object> {
         'per-target lazy'       | true        | true  | false  | false   | true
         'per-target cached'     | true        | true  | true   | false   | true
         'per-target hot swap'   | true        | false | false  | true    | true
+    }
+
+    void 'hot swapping uses the context registry for managed and unmanaged targets (perTarget=#perTarget)'() {
+        given:
+        def context = buildContext(infrastructure + """
+@Singleton @Around(proxyTarget = true, hotswap = true, lazyInterceptorsPerTarget = $perTarget)
+class Subject {
+    public String echo(String value) { return value + "!"; }
+    public static Subject unmanaged() { return new Subject(); }
+}
+""")
+        def type = context.classLoader.loadClass('method.factory.Subject')
+        def proxy = (HotSwappableInterceptedProxy) context.getBean(type)
+        def original = proxy.interceptedTarget()
+        def replacement = type.unmanaged()
+        def managed = type.unmanaged()
+        context.registerSingleton(type, managed, Qualifiers.byName('managed'), false)
+        def registry = context.getBean(InterceptorRegistry)
+
+        when:
+        def swapped = proxy.swap(replacement)
+
+        then:
+        swapped.is(original)
+        registry.targetLookups == [replacement]
+        registry.targetRegistrations == [null]
+        proxy.echo('unmanaged') == 'unmanaged!'
+
+        when:
+        proxy.swap(managed)
+
+        then:
+        registry.targetLookups == [replacement, managed]
+        proxy.echo('managed') == 'managed!'
+        registry.targetRegistrations[1].bean.is(managed)
+
+        cleanup:
+        context.close()
+
+        where:
+        perTarget << [false, true]
     }
 
     void 'replacement factory preserves introduction and around ordering'() {

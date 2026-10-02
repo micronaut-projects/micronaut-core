@@ -25,6 +25,7 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
@@ -249,7 +250,10 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     @Internal
     @UsedByGeneratedCode
     public static @Nullable BeanRegistration<?> findProxyTargetRegistration(BeanLocator beanLocator, @Nullable Object bean) {
-        return beanLocator.findProxyTargetRegistration(bean);
+        if (bean == null || !(beanLocator instanceof BeanDefinitionRegistry definitions)) {
+            return null;
+        }
+        return definitions.findBeanRegistration(bean).orElse(null);
     }
 
 

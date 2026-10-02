@@ -18,9 +18,11 @@ package io.micronaut.aop.chain;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -153,15 +155,18 @@ public final class InterceptorCandidateResolver {
                 return selection;
             }
         }
-        Interceptor<?, ?>[][] unowned = beanLocator.getUnownedInterceptorSelection(targetDefinition);
-        if (unowned != null) {
-            return unowned;
+        if (beanLocator instanceof DefaultBeanContext beanContext) {
+            Interceptor<?, ?>[][] unowned = beanContext.getUnownedInterceptorSelection(targetDefinition);
+            if (unowned != null) {
+                return unowned;
+            }
+            return beanContext.selectUnownedInterceptors(targetDefinition, Interceptor.ARGUMENT, bindingOf(methods),
+                registrations -> selectForMethods(methods, introduction, registrations));
         }
-        return beanLocator.selectUnownedInterceptors(targetDefinition, Interceptor.ARGUMENT, bindingOf(methods), registrations -> selectForMethods(
-            methods,
-            introduction,
-            registrations
-        ));
+        // Other locators retain their registration lookup semantics without context-owned caching.
+        return selectForMethods(methods, introduction, beanLocator instanceof BeanDefinitionRegistry definitions
+            ? definitions.getBeanRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
+            : List.of());
     }
 
     private Qualifier<Interceptor<?, ?>> bindingOf(ExecutableMethod<?, ?>[] methods) {

@@ -1,7 +1,6 @@
 package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.RegisteredBeanInterceptors
 import io.micronaut.core.type.Argument
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.context.scope.refresh.RefreshScope
@@ -223,9 +222,8 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
             selections++
             resolution.getInterceptorRegistrations(Argument.of(interceptor), null).first().bean
         }
-        def reused = RegisteredBeanInterceptors.select(target, key) { throw new AssertionError('selection was not cached') }
+        def reused = target.selectInterceptors(key) { throw new AssertionError('selection was not cached') }
         assert target.getInterceptorSelection(key).is(selected)
-        assert RegisteredBeanInterceptors.kept(target, key).is(selected)
         ctx.close()
 
         then:

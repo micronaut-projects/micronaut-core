@@ -16,6 +16,7 @@
 package io.micronaut.aop;
 
 import io.micronaut.aop.chain.InterceptorCandidateResolver;
+import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -164,6 +165,23 @@ public interface InterceptorRegistry {
         BeanResolutionContext resolutionContext, BeanDefinition<T> definition,
         Collection<ExecutableMethod<T, ?>> methods) {
         return new InterceptorCandidateResolver(this).resolveCandidates(resolutionContext, definition, methods);
+    }
+
+    /**
+     * Finds an existing registration for a target supplied to a proxy, including a swapped-in target.
+     * This lookup neither creates a bean nor takes ownership of it.
+     * @param beanLocator The context used by the proxy
+     * @param bean The target, or null
+     * @return The existing registration, or null when the locator does not hold it
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default @Nullable BeanRegistration<?> findProxyTargetRegistration(BeanLocator beanLocator, @Nullable Object bean) {
+        if (bean == null || !(beanLocator instanceof BeanDefinitionRegistry definitions)) {
+            return null;
+        }
+        return definitions.findBeanRegistration(bean).orElse(null);
     }
 
     /**

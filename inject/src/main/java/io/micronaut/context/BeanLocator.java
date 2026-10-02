@@ -15,8 +15,6 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.InstantiationUtils;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
@@ -25,11 +23,9 @@ import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -39,59 +35,6 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface BeanLocator {
-
-    /**
-     * Finds the existing registration of a target supplied to a proxy, including a swapped-in target.
-     * This lookup neither creates a bean nor takes ownership of it.
-     * @param bean The target, or null
-     * @return The existing registration, or null when the locator does not hold it
-     * @since 5.3.0
-     */
-    @Internal
-    @UsedByGeneratedCode
-    default @Nullable BeanRegistration<?> findProxyTargetRegistration(@Nullable Object bean) {
-        if (bean == null || !(this instanceof BeanDefinitionRegistry registry)) {
-            return null;
-        }
-        return registry.findBeanRegistration(bean).orElse(null);
-    }
-
-    /**
-     * Returns a context-owned interceptor selection for a target without a registration.
-     * Locators that do not retain selections return null.
-     *
-     * @param key The selection key
-     * @param <S> The selection type
-     * @return The retained selection, or null when none exists
-     * @since 5.3.0
-     */
-    @Internal
-    default <S> @Nullable S getUnownedInterceptorSelection(Object key) {
-        return null;
-    }
-
-    /**
-     * Selects interceptors for a target without a registration. A bean context retains the selection and
-     * owns its unscoped dependencies until shutdown; failed or losing concurrent selections are released.
-     * Other locators use their registration lookup, when available, without retaining a selection.
-     *
-     * @param key The selection key
-     * @param interceptorType The interceptor type
-     * @param binding The interceptor binding qualifier
-     * @param selector Computes the selection from acquired registrations
-     * @param <I> The interceptor type
-     * @param <S> The selection type
-     * @return The selection
-     * @since 5.3.0
-     */
-    @Internal
-    default <I, S> S selectUnownedInterceptors(Object key, Argument<I> interceptorType,
-                                              @Nullable Qualifier<I> binding,
-                                              Function<Collection<BeanRegistration<I>>, S> selector) {
-        return selector.apply(this instanceof BeanDefinitionRegistry registry
-            ? registry.getBeanRegistrations(interceptorType, binding)
-            : List.of());
-    }
 
     /**
      * Obtains a Bean for the given bean definition.
