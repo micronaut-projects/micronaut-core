@@ -20,6 +20,82 @@ import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Unroll
 
 class ExactContainerResolverSpec extends AbstractTypeElementSpec {
+    void 'non-required field and method injection accept missing provider values without nullable arguments'() {
+        given:
+        def context = buildContext('test.provideroptional.Consumer', '''
+            package test.provideroptional;
+            import jakarta.inject.Singleton;
+            import io.micronaut.context.*;
+            import io.micronaut.context.annotation.*;
+            import io.micronaut.inject.autowired.Autowired;
+            import io.micronaut.core.type.Argument;
+            @Singleton class Consumer {
+                @Autowired(required = false) @ResolveWith(AbsentProvider.class) String field;
+                boolean called;
+                @Autowired(required = false)
+                void init(@ResolveWith(AbsentProvider.class) String value) { called = true; }
+            }
+            @Singleton class AbsentProvider implements BeanInjectionProvider {
+                static int calls;
+                public <T> T get(BeanResolutionContext context, Argument<T> argument,
+                    io.micronaut.context.Qualifier<T> qualifier) {
+                    if (argument.isNullable()) throw new AssertionError("Expected non-nullable argument");
+                    calls++;
+                    return null;
+                }
+            }
+        ''')
+
+        when:
+        def bean = getBean(context, 'test.provideroptional.Consumer')
+
+        then:
+        bean.field == null
+        !bean.called
+        context.classLoader.loadClass('test.provideroptional.AbsentProvider').calls == 2
+
+        cleanup:
+        context.close()
+    }
+
+    void 'provider receives each-bean qualifier that is absent from argument metadata'() {
+        given:
+        def context = buildContext('test.providerqualifier.Consumer', '''
+            package test.providerqualifier;
+            import jakarta.inject.*;
+            import io.micronaut.context.*;
+            import io.micronaut.context.annotation.*;
+            import io.micronaut.core.type.Argument;
+            import io.micronaut.inject.qualifiers.Qualifiers;
+            @Factory class Values {
+                @Singleton @Named("one") String one() { return "one"; }
+                @Singleton @Named("two") String two() { return "two"; }
+            }
+            @EachBean(String.class) class Consumer {
+                final String value;
+                Consumer(@Parameter @ResolveWith(QualifiedProvider.class) String value) { this.value = value; }
+            }
+            @Singleton class QualifiedProvider implements BeanInjectionProvider {
+                public <T> T get(BeanResolutionContext context, Argument<T> argument,
+                    io.micronaut.context.Qualifier<T> qualifier) {
+                    if (Qualifiers.forArgument(argument) != null) throw new AssertionError("Unexpected annotation qualifier");
+                    if (qualifier == null) throw new AssertionError("Missing context qualifier");
+                    return context.findBean(argument, qualifier).orElse(null);
+                }
+            }
+        ''')
+
+        when:
+        def type = context.classLoader.loadClass('test.providerqualifier.Consumer')
+        def beans = context.getBeansOfType(type)
+
+        then:
+        beans.collect { it.value }.toSet() == ['one', 'two'] as Set
+
+        cleanup:
+        context.close()
+    }
+
     void 'annotation selects a context managed provider for fields constructors and methods'() {
         given:
         def context = buildContext('test.exactcontainers.Consumer', '''
@@ -34,9 +110,9 @@ class ExactContainerResolverSpec extends AbstractTypeElementSpec {
             @ResolveWith(ExactProvider.class)
             @interface Exact {}
             @Singleton class ExactProvider implements BeanInjectionProvider {
-                public <T> T get(BeanResolutionContext context, Argument<T> argument, io.micronaut.context.Qualifier<T> qualifier, boolean nullable) {
+                public <T> T get(BeanResolutionContext context, Argument<T> argument, io.micronaut.context.Qualifier<T> qualifier) {
                     if (context.getPath().peek() == null) throw new AssertionError("No requesting path");
-                    return nullable ? context.findBean(argument, qualifier).orElse(null) : context.getBean(argument, qualifier);
+                    return context.findBean(argument, qualifier).orElse(null);
                 }
             }
             @Singleton
@@ -118,7 +194,7 @@ class ExactContainerResolverSpec extends AbstractTypeElementSpec {
             }
             @Singleton class BadProvider implements BeanInjectionProvider {
                 public <T> T get(BeanResolutionContext context, Argument<T> argument,
-                    io.micronaut.context.Qualifier<T> qualifier, boolean nullable) {
+                    io.micronaut.context.Qualifier<T> qualifier) {
                     return (T) RESULT;
                 }
             }
@@ -155,7 +231,7 @@ class ExactContainerResolverSpec extends AbstractTypeElementSpec {
             }
             class MissingProvider implements BeanInjectionProvider {
                 public <T> T get(BeanResolutionContext context, Argument<T> argument,
-                    io.micronaut.context.Qualifier<T> qualifier, boolean nullable) { return null; }
+                    io.micronaut.context.Qualifier<T> qualifier) { return null; }
             }
             @Factory class Elements { @Singleton String element() { return "element"; } }
         ''')
@@ -189,15 +265,15 @@ class ExactContainerResolverSpec extends AbstractTypeElementSpec {
             @Prototype class OwnedProvider implements BeanInjectionProvider {
                 static int destroyed;
                 public <T> T get(BeanResolutionContext context, Argument<T> argument,
-                    io.micronaut.context.Qualifier<T> qualifier, boolean nullable) {
+                    io.micronaut.context.Qualifier<T> qualifier) {
                     return context.getBean(argument, qualifier);
                 }
                 @PreDestroy void close() { destroyed++; }
             }
             @Singleton class NullProvider implements BeanInjectionProvider {
                 public <T> T get(BeanResolutionContext context, Argument<T> argument,
-                    io.micronaut.context.Qualifier<T> qualifier, boolean nullable) {
-                    if (!nullable) throw new AssertionError("Expected nullable request");
+                    io.micronaut.context.Qualifier<T> qualifier) {
+                    if (!argument.isNullable()) throw new AssertionError("Expected nullable argument");
                     return null;
                 }
             }

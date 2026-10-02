@@ -2550,7 +2550,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             try {
                 BeanInjectionProvider provider = resolutionContext.getBean(Argument.of(providerType), null);
                 boolean nullable = argument.isDeclaredNullable() || isOptional;
-                K value = provider.get(resolutionContext, argument, qualifier, nullable);
+                K value = provider.get(resolutionContext, argument, qualifier);
                 if (value == null && !nullable) {
                     throw new DependencyInjectionException(resolutionContext,
                         "The injection provider " + providerType.getName() + " returned null for required " + argument);

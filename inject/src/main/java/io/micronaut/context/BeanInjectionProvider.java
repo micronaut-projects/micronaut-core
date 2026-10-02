@@ -41,10 +41,10 @@ public interface BeanInjectionProvider {
      * @param resolutionContext The active resolution context, with the requesting path already established
      * @param argument The declared injection argument
      * @param qualifier The resolved qualifier, or {@code null} for an unqualified request
-     * @param nullable Whether this injection point permits a {@code null} result
      * @param <T> The requested type
-     * @return The injection value; {@code null} only when nullable is true
+     * @return The injection value, or {@code null} when no value can be supplied. The container accepts
+     *         {@code null} only for a nullable or non-required injection point
      */
     <T> @Nullable T get(BeanResolutionContext resolutionContext, Argument<T> argument,
-                        @Nullable Qualifier<T> qualifier, boolean nullable);
+                        @Nullable Qualifier<T> qualifier);
 }
