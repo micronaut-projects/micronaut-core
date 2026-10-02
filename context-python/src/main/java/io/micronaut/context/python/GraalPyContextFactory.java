@@ -52,6 +52,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 
@@ -298,6 +299,48 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
     }
 
+    private static void closeQuietly(VirtualFileSystem fileSystem) {
+        try {
+            fileSystem.close();
+        } catch (IOException | RuntimeException e) {
+            LOG.debug("Failed to close the file system of a context that was not built", e);
+        }
+    }
+
+    /**
+     * Builds a virtual file system with no context class loader on the calling thread. A file system that
+     * extracts files registers a JVM shutdown hook to delete them, a thread created here that would otherwise
+     * inherit the caller's context class loader, the application's, and keep it and every class it defined
+     * reachable until the JVM exits; {@link VirtualFileSystem#close()} deletes the files but leaves the hook.
+     *
+     * @param builder The configured builder
+     * @return The file system
+     */
+    static VirtualFileSystem buildVirtualFileSystem(VirtualFileSystem.Builder builder) {
+        return withContextClassLoader(null, builder::build);
+    }
+
+    /**
+     * Runs an action with the given context class loader on the calling thread. GraalVM and GraalPy create
+     * threads that live as long as the JVM, such as shutdown hooks, on the thread that first needs them, and
+     * a thread inherits the context class loader of the thread that created it.
+     *
+     * @param classLoader The context class loader for the action
+     * @param action The action
+     * @param <T> The result type
+     * @return The result of the action
+     */
+    static <T> T withContextClassLoader(@Nullable ClassLoader classLoader, Supplier<T> action) {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(classLoader);
+        try {
+            return action.get();
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     static HostAccess bootstrapHostAccess(ClassLoader classLoader) {
         List<TargetTypeMapping<?>> mappings = (List) SoftServiceLoader.load(TargetTypeMapping.class, classLoader).collectAll();
@@ -325,10 +368,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         long now = System.currentTimeMillis();
 
 
+        VirtualFileSystem fileSystem = buildVirtualFileSystem(VirtualFileSystem.newBuilder()
+            .resourceDirectory(APPLICATION_PATH)
+            .resourceClassLoader(classLoader));
         Context.Builder builder = contextConfiguration.getBuilder()
-            .apply(GraalPyResources.forVirtualFileSystem(VirtualFileSystem.newBuilder()
-                .resourceDirectory(APPLICATION_PATH)
-                .resourceClassLoader(classLoader).build()))
+            .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
             .logHandler(new GraalPySlf4jLogHandler())
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
@@ -356,8 +400,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
         now = System.currentTimeMillis();
-        var context = builder.build();
-        PythonContextRegistry.registerContext(context);
+        Context context;
+        try {
+            context = builder.build();
+        } catch (RuntimeException e) {
+            closeQuietly(fileSystem);
+            throw e;
+        }
+        PythonContextRegistry.registerContext(context, fileSystem);
         LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
         boolean bootstrapped = false;
         try {
@@ -390,10 +440,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             return context;
         } finally {
             if (!bootstrapped) {
-                // a context that failed to bootstrap has no bean to destroy it: unregister and close it
-                // here; the bootstrap failure propagates whatever the close does
-                PythonContextRegistry.unregisterContext(context);
+                // a context that failed to bootstrap has no bean to destroy it: close and unregister it
+                // here, which closes its file system too; the bootstrap failure propagates whatever the close does
                 closeQuietly(context);
+                PythonContextRegistry.unregisterContext(context);
             }
         }
     }
