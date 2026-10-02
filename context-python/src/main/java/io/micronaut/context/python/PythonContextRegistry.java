@@ -682,13 +682,35 @@ final class PythonContextRegistry {
         onNoActiveExecutions(contexts, close, true);
     }
 
-    private static void onNoActiveExecutions(Collection<Context> contexts, Runnable listener, boolean closing) {
+    private static void onNoActiveExecutions(Collection<Context> contexts, Runnable close, boolean closing) {
         List<Context> activeContexts;
+        Runnable listener = close;
         synchronized (LOCK) {
             HashSet<Context> seen = new HashSet<>();
             if (closing) {
+                Map<Context, ContextState> created = new HashMap<>();
                 for (Context context : contexts) {
-                    CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState()).closing = true;
+                    ContextState state = CONTEXT_STATES.get(context);
+                    if (state == null) {
+                        state = new ContextState();
+                        CONTEXT_STATES.put(context, state);
+                        created.put(context, state);
+                    }
+                    state.closing = true;
+                }
+                if (!created.isEmpty()) {
+                    // a context without a state was never used, or was closed and unregistered already, as the
+                    // primary context of an application is when the application closes it before its pool: the
+                    // state marked closing here is dropped again once the close ran, or it would be kept for good,
+                    // and with it the context, its engine, which waits for the context to be unregistered before it
+                    // closes, and everything the engine holds
+                    listener = () -> {
+                        try {
+                            close.run();
+                        } finally {
+                            forgetStates(created);
+                        }
+                    };
                 }
             }
             activeContexts = contexts.stream()
@@ -702,9 +724,10 @@ final class PythonContextRegistry {
                 activeContexts = List.of();
             } else {
                 AtomicInteger remaining = new AtomicInteger(activeContexts.size());
+                Runnable last = listener;
                 Runnable gate = () -> {
                     if (remaining.decrementAndGet() == 0) {
-                        listener.run();
+                        last.run();
                     }
                 };
                 for (Context activeContext : activeContexts) {
@@ -715,6 +738,26 @@ final class PythonContextRegistry {
         if (activeContexts.isEmpty()) {
             listener.run();
         }
+    }
+
+    /**
+     * Drop the states {@link #closeWhenIdle(Collection, Runnable)} created, unless the context was registered or
+     * used since, and release what waits for their removal, as {@link #unregisterContext(Context)} does.
+     *
+     * @param created The states by context
+     */
+    private static void forgetStates(Map<Context, ContextState> created) {
+        List<Runnable> listeners = new ArrayList<>();
+        synchronized (LOCK) {
+            created.forEach((context, state) -> {
+                if (CONTEXT_STATES.get(context) == state && !state.registered && state.activeExecutions == 0) {
+                    CONTEXT_STATES.remove(context);
+                    listeners.addAll(state.noContextListeners);
+                    state.clear(context);
+                }
+            });
+        }
+        runNoActiveExecutionsListeners(listeners);
     }
 
     /**
