@@ -24,6 +24,9 @@ import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.event.ShutdownEvent;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
@@ -120,7 +123,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     Thread shutdownHook = null;
                     if (embeddedApplication.isShutdownHookNeeded()) {
                         try {
-                            shutdownHook = new Thread(() -> {
+                            Thread hook = new Thread(() -> {
                                 if (LOG.isInfoEnabled()) {
                                     LOG.info("Embedded Application shutting down");
                                 }
@@ -134,7 +137,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                     }
                                 }
                             });
-                            Runtime.getRuntime().addShutdownHook(shutdownHook);
+                            Runtime.getRuntime().addShutdownHook(hook);
+                            shutdownHook = hook;
                         } catch (IllegalStateException e) {
                             try (applicationContext) {
                                 embeddedApplication.stop();
@@ -142,6 +146,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                 LOG.error("Embedded Application shutting down", stopError);
                             }
                             LOG.warn("Failed to register shutdown hook", e);
+                        }
+                        if (shutdownHook != null) {
+                            removeShutdownHookOnStop(applicationContext, shutdownHook);
                         }
                     }
 
@@ -399,6 +406,27 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     protected boolean isExitAllowed(Environment environment) {
         return !environment.getActiveNames().contains(Environment.TEST) && !DevelopmentMode.isEnabled(environment);
+    }
+
+    /**
+     * Removes the shutdown hook when the context stops, however it is stopped. An application that is not kept
+     * alive, such as the Netty server, returns from {@link #start()} with the hook registered, and a context
+     * stopped by its embedder (a test, or a development launcher that starts the next generation in the same
+     * JVM) would otherwise stay reachable from the hook, with the hook's context class loader, until the JVM
+     * exits. When the hook itself stops the context, the JVM is already shutting down and the hook stays.
+     *
+     * @param applicationContext The context
+     * @param shutdownHook The hook registered for it
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void removeShutdownHookOnStop(ApplicationContext applicationContext, Thread shutdownHook) {
+        ApplicationEventListener<ShutdownEvent> listener = event -> removeShutdownHook(shutdownHook);
+        applicationContext.registerBeanDefinition(
+            RuntimeBeanDefinition.builder((Class) ApplicationEventListener.class, () -> listener)
+                .singleton(true)
+                .typeArguments(Argument.of(ShutdownEvent.class))
+                .build()
+        );
     }
 
     private static void removeShutdownHook(@Nullable Thread shutdownHook) {
