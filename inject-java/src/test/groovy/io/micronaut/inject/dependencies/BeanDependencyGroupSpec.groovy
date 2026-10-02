@@ -234,6 +234,63 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         where:
         failureType << ['IllegalStateException', 'AssertionError']
     }
+    void "registration cleanup preserves destruction failures and releases siblings - owner failure #ownerFails cleanup #failureType"() {
+        given:
+        def ctx = buildContext(HEADER + """
+@Prototype class Owner {
+    Owner(Resource first, Resource second) { }
+}
+@Singleton class OwnerListener implements io.micronaut.context.event.BeanPreDestroyEventListener<Owner> {
+    public Owner onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Owner> event) {
+        Log.events.add("owner");
+        if (${ownerFails}) { throw new AssertionError("owner failure"); }
+        return event.getBean();
+    }
+}
+@Singleton class ResourceListener implements io.micronaut.context.event.BeanPreDestroyEventListener<Resource> {
+    public Resource onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Resource> event) {
+        Log.events.add("resource");
+        throw new ${failureType}("cleanup");
+    }
+}
+""")
+        def type = ctx.classLoader.loadClass('test.Owner')
+        def log = ctx.classLoader.loadClass('test.Log')
+        def registration = ctx.createBeanRegistration(ctx.getBeanDefinition(type))
+
+        when:
+        registration.close()
+
+        then:
+        def failure = thrown(Throwable)
+        log.events == ['owner', 'resource', 'resource']
+        if (ownerFails) {
+            assert failure instanceof AssertionError
+            assert failure.message == 'owner failure'
+            assert failure.suppressed.length == 1
+        }
+        def cleanup = ownerFails ? failure.suppressed[0] : failure
+        cleanup.message.contains('cleanup')
+        cleanup.suppressed.length == 1
+        cleanup.suppressed[0].message.contains('cleanup')
+
+        when:
+        registration.close()
+
+        then:
+        log.events == ['owner', 'resource', 'resource']
+
+        cleanup:
+        ctx.close()
+
+        where:
+        ownerFails | failureType
+        false      | 'IllegalStateException'
+        false      | 'AssertionError'
+        true       | 'IllegalStateException'
+        true       | 'AssertionError'
+    }
+
     void "fresh registrations created through a group are released with that group"() {
         given:
         def ctx = buildContext(HEADER + """
