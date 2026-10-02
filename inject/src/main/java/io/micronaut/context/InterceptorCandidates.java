@@ -15,14 +15,19 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.util.List;
 
 /** The retained selection is unresolved or an immutable, authoritative set, including an empty one. */
+@Internal
 sealed interface InterceptorCandidates {
+    @Internal
     enum Unresolved implements InterceptorCandidates {
         INSTANCE
     }
 
+    @Internal
     record Resolved(List<BeanRegistration<?>> registrations) implements InterceptorCandidates {
         public Resolved {
             registrations = List.copyOf(registrations);

@@ -23,6 +23,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -36,6 +37,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** Candidate discovery for callers without a candidate set retained during bean creation. */
+@Internal
 @NullMarked
 final class LegacyInterceptorCandidateResolver {
 

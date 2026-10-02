@@ -188,10 +188,31 @@ final class BeanDependencies implements DependentBeanProvider {
         }
     }
 
+    /**
+     * Controls dependency publication and the single destruction claim. Destruction may start directly from
+     * {@link #OPEN}; failed creation may release ownership without claiming destruction of the owner bean.
+     */
+    @Internal
     private enum OwnershipState {
+        /** New dependencies may be resolved and attached to the owner. */
         OPEN,
+
+        /**
+         * New dependency resolution and publication are blocked. Existing dependencies are retained, and
+         * a caller may still claim destruction.
+         */
         RESOLUTION_STOPPED,
+
+        /**
+         * One caller has claimed destruction. Further claims are rejected, while existing dependencies
+         * remain owned until they are transferred for cleanup.
+         */
         DESTRUCTION_CLAIMED,
+
+        /**
+         * Owned dependencies have been transferred for cleanup and retained references have been cleared.
+         * Resolution and destruction claims remain blocked; cleanup may still be running or may have failed.
+         */
         OWNERSHIP_RELEASED
     }
 }
