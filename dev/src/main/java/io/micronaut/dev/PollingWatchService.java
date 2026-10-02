@@ -44,9 +44,9 @@ import java.util.stream.Stream;
 
 /**
  * A watch service that compares each registered directory's entries with their previous state at a fixed interval.
- * The development runtime watches with it in a native image on macOS, where the JDK's own service polls every two
- * seconds at its highest sensitivity and the native FSEvents service of {@code micronaut-runtime-osx}, which uses JNA,
- * cannot be loaded at runtime.
+ * The development runtime watches with it on macOS when the native FSEvents service of {@code micronaut-runtime-osx} is
+ * not there, or cannot be, as in a native image, which cannot load that service's JNA at runtime: the JDK's own service
+ * polls every two seconds at its highest sensitivity.
  *
  * <p>Like the JDK's services it watches one directory per key, without its subdirectories, and reports names
  * relative to it: a created, deleted, or modified entry, by its modification time and size.</p>
