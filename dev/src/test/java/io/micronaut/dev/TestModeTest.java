@@ -495,17 +495,21 @@ class TestModeTest {
         Path greeter = main.resolve("Greeter.java");
         Files.writeString(greeter, greeter("one"));
         javac(project.resolve("build/classes"), greeter);
-        Files.writeString(Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt"), "one");
+        Path message = Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt");
+        Files.writeString(message, "one");
         runtime = new MicronautDevMain().launch(manifest("micronaut.dev.test.runner=patching\n"), new String[0]);
         int generation = runtime.generation();
 
-        // the runner keeps state built over the generation, which a configuration file it read may have shaped
+        // the runner keeps state built over the generation, which a configuration file it read may have shaped: in a
+        // batch that changes one, a change the runner could take is not patched into state about to be discarded
         Path config = Files.createDirectories(project.resolve("src/test/resources")).resolve("application-test.properties");
         Files.writeString(config, "a=b\n");
+        Files.writeString(message, "two");
         runtime.changed(List.of(config), List.of());
         runtime.awaitTestRun(2, TIMEOUT);
         assertTrue(PatchingTestRunner.PATCHES.isEmpty());
         assertNotSame(PatchingTestRunner.RUN_LOADERS.get(0), PatchingTestRunner.RUN_LOADERS.get(1));
+        assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
         assertEquals(generation + 1, runtime.generation());
     }
 
