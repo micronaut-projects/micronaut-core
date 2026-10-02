@@ -20,7 +20,6 @@ import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -99,7 +98,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
     @Override
     protected AnnotationMetadata getTypeAnnotationMetadata() {
-        return getReturnType().getTypeAnnotationMetadata();
+        return getTypeNullabilityAnnotationMetadata(getReturnType());
     }
 
     @Override
@@ -355,7 +354,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
         String docComment = visitorContext.getElements().getDocComment(executableElement);
         ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo, findReturnDoc(docComment));
         if (returnClassElement instanceof AbstractJavaElement && canBeMarkedWithNonNull(returnClassElement)) {
-            returnClassElement.getTypeAnnotationMetadata().annotate(NonNull.class);
+            markTypeAsNonNull(returnClassElement);
         }
         return returnClassElement;
     }
