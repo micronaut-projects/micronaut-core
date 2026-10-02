@@ -75,6 +75,9 @@ public final class JUnitXmlReportWriter implements TestReportListener {
     private static final Logger LOG = LoggerFactory.getLogger(JUnitXmlReportWriter.class);
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final String REPORT_PREFIX = "TEST-";
+    // a file name holds at most 255 bytes, with TEST-, .xml and the .tmp of a report being written around the name
+    private static final int MAX_ESCAPED_LENGTH = 200;
+    private static final int HASH_LENGTH = 16;
     private static final String REPORT_SUFFIX = ".xml";
 
     private final Path directory;
@@ -165,26 +168,39 @@ public final class JUnitXmlReportWriter implements TestReportListener {
      * name that is not a Java binary name, such as a test file's path, is escaped so that two names never share a
      * file: every character but an ASCII letter, a digit, {@code .}, {@code _} and {@code $} becomes {@code -} and
      * the two hex digits of each of its UTF-8 bytes. A binary name never holds a {@code -}, and an escaped name
-     * always does, so the two kinds cannot meet.
+     * always does, so the two kinds cannot meet. An escaped name too long for a file name, as the absolute path of a
+     * deep test file can be, keeps its end, the most telling part, after a hash of the whole name.
      *
      * @param className The class, or the file of tests without one
      * @return The file
      */
     public Path reportOf(String className) {
-        StringBuilder name = new StringBuilder(REPORT_PREFIX);
         if (isBinaryName(className)) {
-            name.append(className);
-        } else {
-            for (byte b : className.getBytes(StandardCharsets.UTF_8)) {
-                char c = (char) (b & 0xFF);
-                if (c < 0x80 && (Character.isLetterOrDigit(c) || c == '.' || c == '_' || c == '$')) {
-                    name.append(c);
-                } else {
-                    name.append('-').append(String.format(Locale.ROOT, "%02X", b & 0xFF));
-                }
+            return directory.resolve(REPORT_PREFIX + className + REPORT_SUFFIX);
+        }
+        StringBuilder escaped = new StringBuilder();
+        for (byte b : className.getBytes(StandardCharsets.UTF_8)) {
+            char c = (char) (b & 0xFF);
+            if (c < 0x80 && (Character.isLetterOrDigit(c) || c == '.' || c == '_' || c == '$')) {
+                escaped.append(c);
+            } else {
+                escaped.append('-').append(String.format(Locale.ROOT, "%02X", b & 0xFF));
             }
         }
-        return directory.resolve(name.append(REPORT_SUFFIX).toString());
+        String name = escaped.toString();
+        if (name.length() > MAX_ESCAPED_LENGTH) {
+            // the hash keeps two long names apart; the - it is followed by keeps the name escaped
+            name = sha256(className).substring(0, HASH_LENGTH) + "-" + name.substring(name.length() - (MAX_ESCAPED_LENGTH - HASH_LENGTH - 1));
+        }
+        return directory.resolve(REPORT_PREFIX + name + REPORT_SUFFIX);
+    }
+
+    private static String sha256(String value) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static boolean isBinaryName(String name) {
