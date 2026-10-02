@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.handler
 
 import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.body.ConcatenatingSubscriber
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
@@ -13,6 +14,7 @@ import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpResponse
@@ -87,6 +89,16 @@ class Http2ServerHandlerSpec extends Specification {
             } else {
                 ctx.fireChannelRead(msg)
             }
+        }
+    }
+
+    private static class FlushCounter extends ChannelOutboundHandlerAdapter {
+        int count = 0
+
+        @Override
+        void flush(ChannelHandlerContext ctx) throws Exception {
+            count++
+            super.flush(ctx)
         }
     }
 
@@ -287,6 +299,145 @@ class Http2ServerHandlerSpec extends Specification {
         client.readInbound() instanceof Http2SettingsAckFrame
         client.readInbound() instanceof Http2HeadersFrame
         duplexHandler.dataFrames == [['[1', false], [',2]', true]]
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "response pieces written in one event loop turn share one flush and one consumption signal"() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def streamingBody = null
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        def flushes = new FlushCounter()
+        // between the connection handler and the test transport, which swallows flushes
+        server.pipeline().addBefore(server.pipeline().context(Http2ServerHandler.ConnectionHandler).name(), "flushes", flushes)
+        def pieces = (0..<50).collect { "piece $it," }
+        def readBuffers = new NettyByteBodyFactory(server).readBufferFactory()
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        def flushesBefore = flushes.count
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        client.readInbound() instanceof Http2HeadersFrame
+        upstream.starts == 1
+        upstream.consumptions == 0
+
+        when: 'the body arrives as many small pieces in one event loop turn, outside a read'
+        // EmbeddedChannel runs pending tasks after every write made from outside the loop, so
+        // the pieces are added from a task to form one turn
+        int flushesInTurn = -1
+        int consumptionsInTurn = -1
+        server.eventLoop().execute {
+            for (String piece : pieces) {
+                streamingBody.sharedBuffer().add(readBuffers.adapt(Unpooled.copiedBuffer(piece, StandardCharsets.UTF_8)))
+            }
+            flushesInTurn = flushes.count
+            consumptionsInTurn = upstream.consumptions
+        }
+        EmbeddedTestUtil.advance(server, client)
+        then: 'nothing is flushed or acknowledged before the turn ends'
+        flushesInTurn == flushesBefore
+        consumptionsInTurn == 0
+
+        and: 'one flush covers all pieces, and they arrive unchanged'
+        flushes.count == flushesBefore + 1
+        duplexHandler.received.toString(StandardCharsets.UTF_8) == pieces.join('')
+        duplexHandler.dataFrames.every { !it[1] }
+
+        and: 'the upstream is told once that the whole batch was consumed'
+        upstream.consumptions == 1
+        upstream.consumed == pieces.sum { it.length() }
+
+        when: 'more pieces arrive in a later turn, the last of them with the completion'
+        server.eventLoop().execute {
+            streamingBody.sharedBuffer().add(readBuffers.adapt(Unpooled.copiedBuffer("more", StandardCharsets.UTF_8)))
+            streamingBody.sharedBuffer().addAndComplete(readBuffers.adapt(Unpooled.copiedBuffer("end", StandardCharsets.UTF_8)))
+        }
+        EmbeddedTestUtil.advance(server, client)
+        then: 'the final piece goes out with the frame that ends the stream'
+        flushes.count == flushesBefore + 2
+        duplexHandler.received.toString(StandardCharsets.UTF_8) == pieces.join('') + "moreend"
+        duplexHandler.dataFrames.last() == ["moreend", true]
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "a piece held back for the end of the turn is released when the response fails"() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def streamingBody = null
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        def readBuffers = new NettyByteBodyFactory(server).readBufferFactory()
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        client.readInbound() instanceof Http2HeadersFrame
+
+        when: 'a piece is written, and the body fails before the turn ends'
+        def piece = Unpooled.copiedBuffer("piece", StandardCharsets.UTF_8)
+        server.eventLoop().execute {
+            streamingBody.sharedBuffer().add(readBuffers.adapt(piece))
+            streamingBody.sharedBuffer().error(new RuntimeException("body failed"))
+        }
+        EmbeddedTestUtil.advance(server, client)
+        then: 'the piece is released without being sent, and the stream is reset'
+        piece.refCnt() == 0
+        !duplexHandler.received.isReadable()
+        Http2ResetFrame rst = client.readInbound()
+        rst.errorCode() == Http2Error.INTERNAL_ERROR.code()
 
         cleanup:
         client.checkException()

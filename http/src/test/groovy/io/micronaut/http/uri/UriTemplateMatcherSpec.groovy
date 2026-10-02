@@ -210,4 +210,31 @@ class UriTemplateMatcherSpec extends Specification {
         "/{+someId}"    | '/username%2B1@company.com'   | true      | [someId: 'username%2B1@company.com']
         "/{+someId}"    | '/username+1@company.com'     | true      | [someId: 'username+1@company.com']
     }
+
+    @Unroll
+    void "test match variables for #template and #uri"() {
+        given:
+        UriMatchInfo info = new UriTemplateMatcher(template).tryMatch(uri)
+
+        expect:
+        (info == null ? null : info.variableValues.entrySet().collect { [it.key, it.value] }) == expected
+
+        where:
+        template                          | uri                          | expected
+        "/books/{id}/authors/{name}"      | '/books/1/authors/fred'      | [['id', '1'], ['name', 'fred']]
+        "/books/{id}/authors/{name}"      | '/books/1/authors/fred/'     | [['id', '1'], ['name', 'fred']]
+        "/books/{id}/authors/{name}"      | '/books/1/authors/fred?x=1'  | [['id', '1'], ['name', 'fred']]
+        "/books/{id}/authors/{name}"      | '/books/1/writers/fred'      | null
+        "/books/{id}/authors/{name}"      | '/books/1/authors'           | null
+        "/books/{id}/authors"             | '/books/1/authors/x'         | null
+        "/books/{id}/authors"             | '/books//authors'            | null
+        "/books/{id:[0-9]+}/{name}"       | '/books/12/fred'             | [['id', '12'], ['name', 'fred']]
+        "/books/{id:[0-9]+}/{name}"       | '/books/ab/fred'             | null
+        "/books/{a}/{id:[0-9]+}"          | '/books/x/12'                | [['a', 'x'], ['id', '12']]
+        "/books/{a}/{id:[0-9]+}"          | '/books/x/ab'                | null
+        "/books/{a}{/id}"                 | '/books/x/5'                 | [['a', 'x'], ['id', '5']]
+        "/books/{a}{/id}"                 | '/books/x'                   | [['a', 'x'], ['id', null]]
+        "/books{/path:.*}"                | '/books/a/b'                 | [['path', 'a/b']]
+        "/books/{a}{?q}"                  | '/books/x?q=1'               | [['a', 'x']]
+    }
 }

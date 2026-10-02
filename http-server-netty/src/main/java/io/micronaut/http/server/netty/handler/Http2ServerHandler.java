@@ -82,6 +82,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
      */
     private boolean exposeResponseRequest = false;
     /**
+     * Flushes requested outside a read are coalesced into one per event loop turn.
+     */
+    @Nullable
+    private FlushCoalescer flushCoalescer;
+    /**
      * Streams whose request headers were read since the last read complete, without the end of
      * the stream. These are the only streams that can still need {@link MultiplexedStream#devolveToStreaming()}
      * at the next read complete: that call accepts every such stream, so none survive it.
@@ -134,8 +139,16 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         // while reading, hold back flushes for efficiency.
         // Http2ConnectionHandler.readComplete does a flush.
         if (!reading) {
-            requiredConnectionHandler().flush(requiredCtx());
+            Objects.requireNonNull(flushCoalescer, "flushCoalescer").schedule();
         }
+    }
+
+    /**
+     * Perform a flush that was scheduled by the {@link #flushCoalescer}.
+     */
+    private void flushNow() {
+        endTurn();
+        requiredConnectionHandler().flush(requiredCtx());
     }
 
     @Override
@@ -277,6 +290,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
             handler.ctx = ctx;
+            handler.flushCoalescer = new FlushCoalescer(ctx.executor(), handler::flushNow);
             super.handlerAdded(ctx);
             // the preface has been sent if the channel is active, the WINDOW_UPDATE must come after it
             raiseConnectionWindow(ctx);
@@ -304,7 +318,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
             handler.devolvePendingStreams();
+            handler.endTurn();
             handler.reading = false;
+            // the superclass flushes now, which also covers a flush scheduled before this read
+            Objects.requireNonNull(handler.flushCoalescer, "flushCoalescer").cancel();
             super.channelReadComplete(ctx);
         }
 
@@ -406,9 +423,17 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
-            if (compressionStrategy.isEnabled()) {
-                frameListener.compressor(new Compressor(compressionStrategy));
-            }
+            return compressor(Compressor.create(compressionStrategy));
+        }
+
+        /**
+         * Set the response compressor. The server shares one instance between its connections.
+         *
+         * @param compressor The compressor, or {@code null} to disable compression
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder compressor(@Nullable Compressor compressor) {
+            frameListener.compressor(compressor);
             return this;
         }
 

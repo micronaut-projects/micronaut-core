@@ -301,11 +301,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * no processor recognized - a warning, and with {@code -Werror} a compilation error, for a user who
      * passes one of them.
      *
-     * @return The names of the {@code -A} options of the reflection gate
+     * <p>Declaring an option here is also what makes it settable from an application's configuration
+     * under Pyronaut, which passes every supported option it finds in {@code application.toml} through
+     * as {@code -A}. An option the visitor reads but does not declare can only be set by hand.
+     *
+     * @return The names of the {@code -A} options this visitor reads
      */
     @Override
     public Set<String> getSupportedOptions() {
-        return Set.of(PythonReflectionGate.OPTION, PythonReflectionGate.WARNINGS_OPTION);
+        return Set.of(
+            PythonReflectionGate.OPTION,
+            PythonReflectionGate.WARNINGS_OPTION,
+            PythonPooledStubGenerator.IGNORE_OPTION
+        );
     }
 
     @Override

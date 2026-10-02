@@ -26,6 +26,7 @@ import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
@@ -63,11 +64,8 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -286,18 +284,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected abstract NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
 
     /**
-     * Subclasses can override to customize publishers returned from message handlers.
-     *
-     * @param ctx    The context
-     * @param result The result
-     * @return The flowable
-     */
-    protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, @Nullable Object result) {
-        Publisher<?> actual = Publishers.convertToPublisher(conversionService, result);
-        return Flux.from(actual).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
-    }
-
-    /**
      * Invokes the given executable.
      *
      * @param boundExecutable The bound executable
@@ -312,7 +298,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             return ExecutionFlow.error(e);
         }
         if (Publishers.isConvertibleToPublisher(result)) {
-            return ReactiveExecutionFlow.fromPublisher(Publishers.convertToPublisher(conversionService, result));
+            return ReactiveExecutionFlow.fromPublisherEager(Publishers.convertToPublisher(conversionService, result), PropagatedContext.getOrEmpty());
         } else {
             return ExecutionFlow.just(result);
         }

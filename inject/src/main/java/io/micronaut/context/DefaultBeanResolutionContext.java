@@ -16,10 +16,14 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,6 +35,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public final class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
+    @Nullable
+    private final BeanDependencies owner;
+    @Nullable
+    private List<BeanRegistration<?>> required;
     private final Map<BeanIdentifier, BeanRegistration<?>> beansInCreation = new ConcurrentHashMap<>(5);
 
     /**
@@ -38,7 +46,43 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
      * @param rootDefinition The bean root definition
      */
     public DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition) {
+        this(context, rootDefinition, null);
+    }
+
+    DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition, @Nullable BeanDependencies owner) {
         super((DefaultBeanContext) context, rootDefinition);
+        this.owner = owner;
+    }
+
+    void require(BeanRegistration<?> registration) {
+        if (required == null) {
+            required = new ArrayList<>(2);
+        }
+        required.add(registration);
+    }
+
+    List<BeanRegistration<?>> requiredBeans() {
+        return required == null ? List.of() : required;
+    }
+
+    @Override
+    public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        Collection<BeanRegistration<I>> registrations = super.getInterceptorRegistrations(interceptorType, binding);
+        if (owner != null && getPath().isEmpty()) {
+            registrations.forEach(this::require);
+        }
+        return registrations;
+    }
+
+    @Override
+    @Nullable
+    <I> BeanRegistration<I> findInterceptor(BeanDefinition<I> definition) {
+        BeanRegistration<I> created = super.findInterceptor(definition);
+        if (created != null || owner == null || !getPath().isEmpty()) {
+            // A nested bean owns its own interceptors, even when resolved during another bean's selection.
+            return created;
+        }
+        return findInterceptor(owner.dependentBeans(), definition);
     }
 
     @Override
