@@ -98,6 +98,11 @@ import java.util.TreeSet;
  * as the header says. A later addition appends to the payload and keeps the version: the fields are read in order
  * and the bytes after the last one known are ignored. A change to what is already there takes a new version.</p>
  *
+ * <p>{@link #read(byte[])} gives {@code null} for an empty entry and for every entry it does not know, and a reader
+ * that gets {@code null} loads the definition as a runtime without descriptors does. So does a reader that finds no
+ * entry for a reference at all, as for the references a custom {@code BeanDefinitionsProvider} or the static
+ * service loaders of Micronaut AOT give.</p>
+ *
  * @param flags                The answers of the reference, a combination of the {@code FLAG_} constants
  * @param beanType             The name of the bean type, with {@code []} appended for each dimension of an array
  * @param exposedTypes         The names of the types the bean is exposed as
