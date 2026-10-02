@@ -6,6 +6,7 @@ import io.micronaut.dev.MicronautDevMain;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,12 +27,37 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class PythonGenerationMemoryTest {
 
     private static final Duration COLLECTION_TIMEOUT = Duration.ofSeconds(60);
+    private static final String POOL_ENABLED = "micronaut.python.pool.enabled";
 
     @TempDir
     Path project;
 
     @Test
     void aRetiredGenerationItsContextAndItsGraalPyContextAreCollected() throws Exception {
+        assertRetiredGenerationCollected();
+    }
+
+    /**
+     * With the pool of Python contexts, as an application has by default: the pool closes its contexts after the
+     * application context closed the primary one, and must not leave a state behind for it in the registry, which
+     * would keep its engine open and every retired generation reachable.
+     */
+    @Test
+    void aRetiredGenerationIsCollectedWithThePoolOfPythonContexts() throws Exception {
+        String pool = System.getProperty(POOL_ENABLED);
+        System.setProperty(POOL_ENABLED, "true");
+        try {
+            assertRetiredGenerationCollected();
+        } finally {
+            if (pool == null) {
+                System.clearProperty(POOL_ENABLED);
+            } else {
+                System.setProperty(POOL_ENABLED, pool);
+            }
+        }
+    }
+
+    private void assertRetiredGenerationCollected() throws Exception {
         PythonFixture fixture = PythonFixture.create(project);
         List<String> classpath = PythonFixture.testClasspath().stream().map(Path::toString).toList();
         Files.write(project.resolve("cp.argfile"), classpath);
@@ -68,6 +94,7 @@ class PythonGenerationMemoryTest {
             awaitCollected(second.loader, "the class loader of generation 2");
             awaitCollected(second.applicationContext, "the application context of generation 2");
             awaitCollected(second.pythonContext, "the GraalPy context of generation 2");
+            awaitCollected(second.engine, "the GraalPy engine of generation 2");
         } finally {
             runtime.close();
         }
@@ -80,10 +107,12 @@ class PythonGenerationMemoryTest {
     private static Retired retire(DevRuntime runtime) {
         ApplicationContext context = runtime.context().orElseThrow();
         Context pythonContext = context.getBean(Context.class, Qualifiers.byName("python"));
+        Engine engine = context.getBean(Engine.class, Qualifiers.byName("python"));
         return new Retired(
             new WeakReference<>(context.getClassLoader()),
             new WeakReference<>(context),
-            new WeakReference<>(pythonContext)
+            new WeakReference<>(pythonContext),
+            new WeakReference<>(engine)
         );
     }
 
@@ -103,6 +132,7 @@ class PythonGenerationMemoryTest {
 
     private record Retired(WeakReference<ClassLoader> loader,
                            WeakReference<ApplicationContext> applicationContext,
-                           WeakReference<Context> pythonContext) {
+                           WeakReference<Context> pythonContext,
+                           WeakReference<Engine> engine) {
     }
 }
