@@ -234,12 +234,12 @@ final class TestSession {
             .anyMatch(entry -> !isJvmKind(entry.getKey()) && (!entry.getValue().changed().isEmpty() || !entry.getValue().deleted().isEmpty()));
         Set<String> resourcesBefore = runtime.outputResources();
         ChangeSet changes = runtime.takeOutputChanges();
-        if (!changes.isEmpty()) {
-            patchOrRetire(changes, resourcesBefore);
-        }
         if (resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())) {
-            // a configuration or other resource file read live changed: what the runner built from it is out of date
+            // a configuration or other resource file read live changed: what the runner built from it is out of date,
+            // and nothing is patched into it
             runLoaderCurrent = false;
+        } else if (!changes.isEmpty()) {
+            patchOrRetire(changes, resourcesBefore);
         }
         Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
         changed.addAll(testRound.affectedClasses());
