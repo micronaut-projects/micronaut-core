@@ -73,7 +73,10 @@ public interface TestRunner {
      * given here. Anything else, an empty answer, a refusal or a failure, starts a new generation as before, which
      * discards a half-applied change; a runner rebuilds what it keeps when it is given a loader it has not seen.</p>
      *
-     * <p>The default keeps nothing: every change starts a new generation.</p>
+     * <p>A run that no change preceded, as one asked for from the console, also uses the last run's loader while
+     * this answers with a reloader for it: what the runner keeps is still current.</p>
+     *
+     * <p>The default keeps nothing: every change starts a new generation, and so does every run.</p>
      *
      * @param classLoader The loader of the last run
      * @return The reloader, or empty when this runner keeps nothing built over that loader
