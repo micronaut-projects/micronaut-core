@@ -18,7 +18,7 @@ package io.micronaut.core.annotation;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.util.SupplierUtil;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * The registry of the {@link AnnotationBuilder}s the service loader supplies, which the annotation processor
@@ -51,7 +52,7 @@ public final class AnnotationBuilderRegistry {
     private static final AnnotationBuilderRegistry SHARED = new AnnotationBuilderRegistry(AnnotationBuilderRegistry.class.getClassLoader());
 
     private final ClassLoader classLoader;
-    private volatile @Nullable Map<String, List<ServiceDefinition<AnnotationBuilder>>> definitions;
+    private final Supplier<Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>>> definitions = SupplierUtil.memoized(this::scan);
     private final Map<String, Optional<AnnotationBuilder<?>>> builders = new ConcurrentHashMap<>();
 
     private AnnotationBuilderRegistry(ClassLoader classLoader) {
@@ -204,9 +205,9 @@ public final class AnnotationBuilderRegistry {
     }
 
     private Optional<AnnotationBuilder<?>> load(String annotationName) {
-        List<ServiceDefinition<AnnotationBuilder>> candidates = definitions().get(mangle(annotationName));
+        List<ServiceDefinition<AnnotationBuilder<?>>> candidates = definitions.get().get(mangle(annotationName));
         if (candidates != null) {
-            for (ServiceDefinition<AnnotationBuilder> candidate : candidates) {
+            for (ServiceDefinition<AnnotationBuilder<?>> candidate : candidates) {
                 if (candidate.isPresent()) {
                     AnnotationBuilder<?> builder = candidate.load();
                     if (builder.annotationType().getName().equals(annotationName)) {
@@ -218,19 +219,17 @@ public final class AnnotationBuilderRegistry {
         return Optional.empty();
     }
 
-    private Map<String, List<ServiceDefinition<AnnotationBuilder>>> definitions() {
-        Map<String, List<ServiceDefinition<AnnotationBuilder>>> result = definitions;
-        if (result == null) {
-            result = new HashMap<>();
-            for (ServiceDefinition<AnnotationBuilder> definition : SoftServiceLoader.load(AnnotationBuilder.class, classLoader)) {
-                String name = definition.getName();
-                if (name.endsWith(BUILDER_SUFFIX)) {
-                    String withoutSuffix = name.substring(0, name.length() - BUILDER_SUFFIX.length());
-                    int start = withoutSuffix.lastIndexOf('$') + 1;
-                    result.computeIfAbsent(withoutSuffix.substring(start), key -> new ArrayList<>()).add(definition);
-                }
+    private Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>> scan() {
+        Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>> result = new HashMap<>();
+        @SuppressWarnings("unchecked")
+        Class<AnnotationBuilder<?>> serviceType = (Class<AnnotationBuilder<?>>) (Class<?>) AnnotationBuilder.class;
+        for (ServiceDefinition<AnnotationBuilder<?>> definition : SoftServiceLoader.load(serviceType, classLoader)) {
+            String name = definition.getName();
+            if (name.endsWith(BUILDER_SUFFIX)) {
+                String withoutSuffix = name.substring(0, name.length() - BUILDER_SUFFIX.length());
+                int start = withoutSuffix.lastIndexOf('$') + 1;
+                result.computeIfAbsent(withoutSuffix.substring(start), key -> new ArrayList<>()).add(definition);
             }
-            definitions = result;
         }
         return result;
     }

@@ -80,6 +80,11 @@ final class AnnotationBuilderWriter {
     private static final ClassTypeDef ANNOTATION_VALUE_TYPE = ClassTypeDef.of(AnnotationValue.class);
     private static final ClassTypeDef ARRAYS = ClassTypeDef.of(Arrays.class);
     private static final ClassTypeDef OBJECTS = ClassTypeDef.of(Objects.class);
+    private static final String CONVERSION_SERVICE_PARAMETER = "conversionService";
+    private static final String TO_STRING = "toString";
+    private static final String ANNOTATION_VALUE_METHOD = "annotationValue";
+    private static final String HASH_CODE = "hashCode";
+    private static final String EQUALS = "equals";
     private static final String ANNOTATION_VALUE_FIELD = "$annotationValue";
     private static final TypeDef OBJECT_ARRAY = TypeDef.OBJECT.array();
 
@@ -108,7 +113,7 @@ final class AnnotationBuilderWriter {
         // its accessors have to be interface calls: a type made from the definition of an interface knows it
         ClassTypeDef annotationTypeDef = ClassTypeDef.of(InterfaceDef.builder(annotationName).build());
         write(implementation(implementationName, annotationTypeDef, members), implementationName, origin, context);
-        write(builder(builderName, implementationName, annotationType, annotationTypeDef, members, context), builderName, origin, context);
+        write(builder(builderName, implementationName, annotationType, annotationTypeDef, context), builderName, origin, context);
         context.visitServiceDescriptor(AnnotationBuilder.class, builderName, origin);
     }
 
@@ -187,7 +192,7 @@ final class AnnotationBuilderWriter {
             .addModifiers(Modifier.PUBLIC)
             .addParameter("values", MAP_TYPE)
             .addParameter("defaults", MAP_TYPE)
-            .addParameter("conversionService", CONVERSION_SERVICE_TYPE)
+            .addParameter(CONVERSION_SERVICE_PARAMETER, CONVERSION_SERVICE_TYPE)
             .build((aThis, parameters) -> {
                 List<StatementDef> statements = new ArrayList<>();
                 statements.add(aThis.superRef().invokeConstructor());
@@ -215,11 +220,11 @@ final class AnnotationBuilderWriter {
         builder.addMethod(hashCodeMethod(members));
         builder.addMethod(equalsMethod(annotationTypeDef, members));
 
-        builder.addMethod(MethodDef.builder("toString")
+        builder.addMethod(MethodDef.builder(TO_STRING)
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeDef.STRING)
-            .build((aThis, parameters) -> aThis.invoke("annotationValue", ANNOTATION_VALUE_TYPE)
-                .invoke("toString", TypeDef.STRING)
+            .build((aThis, parameters) -> aThis.invoke(ANNOTATION_VALUE_METHOD, ANNOTATION_VALUE_TYPE)
+                .invoke(TO_STRING, TypeDef.STRING)
                 .returning()));
 
         annotationMethods.values().forEach(builder::addMethod);
@@ -250,7 +255,7 @@ final class AnnotationBuilderWriter {
             return implementationType.invokeStatic(Objects.requireNonNull(methods.get(member.component().getName())), raw, conversionService);
         }
         if (!member.isArray() && String.class.getName().equals(member.component().getName())) {
-            return CONVERSION_UTILS.invokeStatic("toString", TypeDef.STRING, raw, conversionService);
+            return CONVERSION_UTILS.invokeStatic(TO_STRING, TypeDef.STRING, raw, conversionService);
         }
         if (member.isArray()) {
             String component = member.component().getName();
@@ -282,7 +287,7 @@ final class AnnotationBuilderWriter {
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(type)
             .addParameter("value", TypeDef.OBJECT)
-            .addParameter("conversionService", CONVERSION_SERVICE_TYPE)
+            .addParameter(CONVERSION_SERVICE_PARAMETER, CONVERSION_SERVICE_TYPE)
             .buildStatic(parameters -> CONVERSION_UTILS.invokeStatic("toAnnotation",
                     List.of(TypeDef.OBJECT, TypeDef.CLASS, ANNOTATION_BUILDER_TYPE, CONVERSION_SERVICE_TYPE), ClassTypeDef.of(Annotation.class),
                     List.of(parameters.get(0), ExpressionDef.constant(type), implementationType.getStaticField(builderField), parameters.get(1)))
@@ -300,7 +305,7 @@ final class AnnotationBuilderWriter {
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(arrayType)
             .addParameter("value", TypeDef.OBJECT)
-            .addParameter("conversionService", CONVERSION_SERVICE_TYPE)
+            .addParameter(CONVERSION_SERVICE_PARAMETER, CONVERSION_SERVICE_TYPE)
             .buildStatic(parameters -> CONVERSION_UTILS.invokeStatic("toAnnotations",
                     List.of(TypeDef.OBJECT, TypeDef.CLASS, ANNOTATION_BUILDER_TYPE, CONVERSION_SERVICE_TYPE), ClassTypeDef.of(List.class),
                     List.of(parameters.get(0), ExpressionDef.constant(type), implementationType.getStaticField(builderField), parameters.get(1)))
@@ -314,7 +319,7 @@ final class AnnotationBuilderWriter {
      * kept.
      */
     private static MethodDef annotationValueMethod() {
-        return MethodDef.builder("annotationValue")
+        return MethodDef.builder(ANNOTATION_VALUE_METHOD)
             .addModifiers(Modifier.PUBLIC)
             .returns(ANNOTATION_VALUE_TYPE)
             .build((aThis, parameters) -> {
@@ -373,7 +378,7 @@ final class AnnotationBuilderWriter {
             // a nested annotation is one a builder created, which provides its annotation value
             return member.isArray()
                 ? CONVERSION_UTILS.invokeStatic("toAnnotationValues", List.of(ClassTypeDef.of(Annotation.class).array()), ANNOTATION_VALUE_TYPE.array(), List.of(field))
-                : field.cast(ClassTypeDef.of(AnnotationValueProvider.class)).invoke("annotationValue", ANNOTATION_VALUE_TYPE);
+                : field.cast(ClassTypeDef.of(AnnotationValueProvider.class)).invoke(ANNOTATION_VALUE_METHOD, ANNOTATION_VALUE_TYPE);
         }
         // an enum is recorded by the name of its constant
         return member.isArray()
@@ -386,7 +391,7 @@ final class AnnotationBuilderWriter {
      * member name, exclusive-ored with the hash of the member value. The hashes of the names are computed here.
      */
     private static MethodDef hashCodeMethod(List<Member> members) {
-        return MethodDef.builder("hashCode")
+        return MethodDef.builder(HASH_CODE)
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeDef.Primitive.INT)
             .build((aThis, parameters) -> {
@@ -404,13 +409,13 @@ final class AnnotationBuilderWriter {
     private static ExpressionDef memberHash(Member member, ExpressionDef field) {
         TypeDef type = member.typeDef();
         if (member.isPrimitive()) {
-            return ((TypeDef.Primitive) type).wrapperType().invokeStatic("hashCode", TypeDef.Primitive.INT, field);
+            return ((TypeDef.Primitive) type).wrapperType().invokeStatic(HASH_CODE, TypeDef.Primitive.INT, field);
         }
         if (member.isArray()) {
             boolean primitive = ((TypeDef.Array) type).componentType().isPrimitive();
-            return ARRAYS.invokeStatic("hashCode", List.of(primitive ? type : OBJECT_ARRAY), TypeDef.Primitive.INT, List.of(field));
+            return ARRAYS.invokeStatic(HASH_CODE, List.of(primitive ? type : OBJECT_ARRAY), TypeDef.Primitive.INT, List.of(field));
         }
-        return OBJECTS.invokeStatic("hashCode", List.of(TypeDef.OBJECT), TypeDef.Primitive.INT, List.of(field));
+        return OBJECTS.invokeStatic(HASH_CODE, List.of(TypeDef.OBJECT), TypeDef.Primitive.INT, List.of(field));
     }
 
     /**
@@ -419,7 +424,7 @@ final class AnnotationBuilderWriter {
      * proxy of the annotation metadata or an annotation of the JVM as well as a generated one.
      */
     private static MethodDef equalsMethod(ClassTypeDef annotationTypeDef, List<Member> members) {
-        return MethodDef.builder("equals")
+        return MethodDef.builder(EQUALS)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("other", TypeDef.OBJECT)
             .returns(TypeDef.Primitive.BOOLEAN)
@@ -457,9 +462,9 @@ final class AnnotationBuilderWriter {
         if (member.isArray()) {
             boolean primitive = ((TypeDef.Array) type).componentType().isPrimitive();
             TypeDef parameter = primitive ? type : OBJECT_ARRAY;
-            return ARRAYS.invokeStatic("equals", List.of(parameter, parameter), TypeDef.Primitive.BOOLEAN, List.of(field, answer));
+            return ARRAYS.invokeStatic(EQUALS, List.of(parameter, parameter), TypeDef.Primitive.BOOLEAN, List.of(field, answer));
         }
-        return OBJECTS.invokeStatic("equals", List.of(TypeDef.OBJECT, TypeDef.OBJECT), TypeDef.Primitive.BOOLEAN, List.of(field, answer));
+        return OBJECTS.invokeStatic(EQUALS, List.of(TypeDef.OBJECT, TypeDef.OBJECT), TypeDef.Primitive.BOOLEAN, List.of(field, answer));
     }
 
     private static String methodSuffix(ClassElement annotation, int index) {
@@ -476,7 +481,7 @@ final class AnnotationBuilderWriter {
                 ExpressionDef field = aThis.field(member.name(), type);
                 if (member.isArray()) {
                     // the arrays are copied, so that the caller cannot change the annotation
-                    // return array == null ? null : array.clone();
+                    // a null array stays null, any other is cloned
                     return StatementDef.multi(
                         field.ifNull(ExpressionDef.nullValue().returning()),
                         field.invoke("clone", TypeDef.OBJECT).cast(type).returning());
@@ -489,7 +494,6 @@ final class AnnotationBuilderWriter {
                                     String implementationName,
                                     ClassElement annotationType,
                                     ClassTypeDef annotationTypeDef,
-                                    List<Member> members,
                                     VisitorContext context) {
         Map<CharSequence, Object> defaults = new LinkedHashMap<>(context.getAnnotationDefaultValues(annotationType.getName()));
         ClassTypeDef builderTypeDef = ClassTypeDef.of(name);
@@ -512,7 +516,7 @@ final class AnnotationBuilderWriter {
                 .overrides()
                 .addParameter("values", MAP_TYPE)
                 .addParameter("defaults", MAP_TYPE)
-                .addParameter("conversionService", CONVERSION_SERVICE_TYPE)
+                .addParameter(CONVERSION_SERVICE_PARAMETER, CONVERSION_SERVICE_TYPE)
                 .returns(ClassTypeDef.of(Annotation.class))
                 .build((aThis, parameters) -> ClassTypeDef.of(implementationName)
                     .instantiate(List.of(MAP_TYPE, MAP_TYPE, CONVERSION_SERVICE_TYPE),
