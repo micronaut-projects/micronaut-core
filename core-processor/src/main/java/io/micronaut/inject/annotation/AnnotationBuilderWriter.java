@@ -128,59 +128,6 @@ final class AnnotationBuilderWriter {
         return members;
     }
 
-    /**
-     * A member of an annotation type.
-     *
-     * @param name The name, which is the name of the accessor
-     * @param type The declared type
-     */
-    private record Member(String name, ClassElement type) {
-
-        /**
-         * @return The type of the accessor: a Kotlin class reference is a {@link Class} on the JVM
-         */
-        TypeDef typeDef() {
-            if (isClassReference(type.isArray() ? type.fromArray() : type)) {
-                return type.isArray() ? TypeDef.CLASS.array() : TypeDef.CLASS;
-            }
-            return TypeDef.erasure(type);
-        }
-
-        /**
-         * @return The element type of an array member, the type otherwise
-         */
-        ClassElement component() {
-            return type.isArray() ? type.fromArray() : type;
-        }
-
-        boolean isArray() {
-            return type.isArray();
-        }
-
-        /**
-         * A member that is neither a basic type, a class, an enum nor an array of those is an annotation: those
-         * are the types an annotation member can have.
-         */
-        boolean isAnnotation() {
-            TypeDef def = typeDef();
-            ClassElement component = component();
-            return !(def.isPrimitive() || (def instanceof TypeDef.Array array && array.componentType().isPrimitive())
-                || isClassReference(component) || component.isEnum() || String.class.getName().equals(component.getName()));
-        }
-
-        boolean isClass() {
-            return isClassReference(component());
-        }
-
-        boolean isPrimitive() {
-            return !isArray() && typeDef().isPrimitive();
-        }
-
-        private static boolean isClassReference(ClassElement element) {
-            return Class.class.getName().equals(element.getName()) || "kotlin.reflect.KClass".equals(element.getName());
-        }
-    }
-
     private static void write(ClassDef classDef, String name, Element origin, VisitorContext context) throws IOException {
         try (OutputStream outputStream = context.visitClass(name, origin)) {
             outputStream.write(ByteCodeWriterUtils.writeByteCode(classDef, context));
@@ -573,5 +520,58 @@ final class AnnotationBuilderWriter {
                     .returning()));
         loadTypeMethods.values().forEach(builder::addMethod);
         return builder.build();
+    }
+
+    /**
+     * A member of an annotation type.
+     *
+     * @param name The name, which is the name of the accessor
+     * @param type The declared type
+     */
+    private record Member(String name, ClassElement type) {
+
+        /**
+         * @return The type of the accessor: a Kotlin class reference is a {@link Class} on the JVM
+         */
+        TypeDef typeDef() {
+            if (isClassReference(type.isArray() ? type.fromArray() : type)) {
+                return type.isArray() ? TypeDef.CLASS.array() : TypeDef.CLASS;
+            }
+            return TypeDef.erasure(type);
+        }
+
+        /**
+         * @return The element type of an array member, the type otherwise
+         */
+        ClassElement component() {
+            return type.isArray() ? type.fromArray() : type;
+        }
+
+        boolean isArray() {
+            return type.isArray();
+        }
+
+        /**
+         * A member that is neither a basic type, a class, an enum nor an array of those is an annotation: those
+         * are the types an annotation member can have.
+         */
+        boolean isAnnotation() {
+            TypeDef def = typeDef();
+            ClassElement component = component();
+            return !(def.isPrimitive() || (def instanceof TypeDef.Array array && array.componentType().isPrimitive())
+                || isClassReference(component) || component.isEnum() || String.class.getName().equals(component.getName()));
+        }
+
+        boolean isClass() {
+            return isClassReference(component());
+        }
+
+        boolean isPrimitive() {
+            return !isArray() && typeDef().isPrimitive();
+        }
+
+        private static boolean isClassReference(ClassElement element) {
+            return Class.class.getName().equals(element.getName()) || "kotlin.reflect.KClass".equals(element.getName());
+        }
     }
 }
