@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.python.annotation.PythonClass;
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -248,6 +249,21 @@ public final class PythonContextRuntime {
      */
     public static void setReuseContext(boolean reuse) {
         PythonApplicationRuntime.setReuseContext(reuse);
+    }
+
+    /**
+     * A reloader that patches Python modules edited in place into the contexts of the application runtime installed
+     * when it reloads, as development mode's reloader does for a running application: the primary context, and the
+     * pooled and event-loop ones. For tools that keep a runtime alive outside an application context, such as a test
+     * runner that keeps a {@linkplain #setReuseContext reused} context between runs; the resources it takes and refuses
+     * are those of {@link InPlaceResourceReloader#canReload}, as the application's reloader answers.
+     *
+     * @return The reloader
+     * @since 5.3.0
+     */
+    @Experimental
+    public static InPlaceResourceReloader inPlaceReloader() {
+        return PythonInPlaceReloader.ofInstalledRuntime();
     }
 
     /**

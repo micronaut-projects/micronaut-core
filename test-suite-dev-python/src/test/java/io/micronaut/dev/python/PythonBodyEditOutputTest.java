@@ -105,6 +105,56 @@ class PythonBodyEditOutputTest {
         assertEquals(List.of(), unexpected);
     }
 
+    @Test
+    void theFirstCompilationOfASessionChangesOnlyWhatTheEditChangedWhateverTheLastSessionLeft() throws Exception {
+        PythonFixture fixture = PythonFixture.create(project);
+        Path hello = fixture.writePython("app/hello.py", """
+            from micronaut.http.annotation import Controller, Get
+
+
+            @Controller("/hello")
+            class HelloController:
+                @Get
+                def index(self) -> str:
+                    return "alpha"
+            """);
+        fixture.writePython("app/other.py", """
+            from jakarta.inject import Singleton
+
+
+            @Singleton
+            class Other:
+                def value(self) -> str:
+                    return "other"
+            """);
+        PythonSourceCompiler last = new PythonSourceCompiler();
+        try {
+            assertTrue(last.compile(fixture.request(Set.of(), Set.of()).asFull()).isSuccess());
+        } finally {
+            last.close();
+        }
+        // what the last session compiled differs from the class output another build wrote since, as pyronaut process
+        // rewrites it with other versions of the processors when a session starts
+        Path work = fixture.classOutput().resolveSibling(fixture.classOutput().getFileName() + "-python");
+        // a class of a module the edit does not touch, which an incremental compilation would not write again
+        Path stale = work.resolve("app/$Other$Definition.class");
+        assertTrue(Files.isRegularFile(stale), stale.toString());
+        Files.write(stale, new byte[] {(byte) 0xCA, (byte) 0xFE});
+
+        PythonSourceCompiler session = new PythonSourceCompiler();
+        try {
+            OutputSnapshot before = OutputSnapshot.of(List.of(fixture.classOutput()));
+            Files.writeString(hello, Files.readString(hello).replace("return \"alpha\"", "return \"beta\""));
+            CompilationResult result = session.compile(fixture.request(Set.of(hello), Set.of()));
+            assertTrue(result.isSuccess(), result.diagnostics().toString());
+            ChangeSet changes = before.diff(OutputSnapshot.of(List.of(fixture.classOutput())));
+            assertTrue(changes.classes().isEmpty(), changes.toString());
+            assertTrue(changes.changedResources().stream().allMatch(resource -> resource.startsWith(SRC + "app/") && resource.contains("hello.")), changes.toString());
+        } finally {
+            session.close();
+        }
+    }
+
     private static Edit body(String description, String file, String from, String to) {
         return new Edit(description, file, from, to, true);
     }
