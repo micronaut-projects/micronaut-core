@@ -81,17 +81,22 @@ class ReleasedLoaderSpec extends Specification {
      * Copies a jar with the entries of the definitions emptied, as a processor without descriptors writes them.
      */
     private static Path emptiedCopy(Path jar, Path target) {
-        new ZipFile(jar.toFile()).withCloseable { zip ->
-            new ZipOutputStream(Files.newOutputStream(target)).withCloseable { out ->
-                for (ZipEntry entry : zip.entries().toList()) {
-                    out.putNextEntry(new ZipEntry(entry.name))
-                    if (!entry.directory && !entry.name.startsWith(ENTRIES)) {
-                        zip.getInputStream(entry).withCloseable { out << it }
-                    }
-                    out.closeEntry()
-                }
-            }
+        ZipFile zip = new ZipFile(jar.toFile())
+        ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(target))
+        try {
+            zip.entries().toList().each { ZipEntry entry -> copy(zip, entry, out) }
+        } finally {
+            out.close()
+            zip.close()
         }
         return target
+    }
+
+    private static void copy(ZipFile zip, ZipEntry entry, ZipOutputStream out) {
+        out.putNextEntry(new ZipEntry(entry.name))
+        if (!entry.directory && !entry.name.startsWith(ENTRIES)) {
+            zip.getInputStream(entry).withCloseable { out << it }
+        }
+        out.closeEntry()
     }
 }
