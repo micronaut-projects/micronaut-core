@@ -241,7 +241,9 @@ public final class JUnitXmlReportWriter implements TestReportListener {
             }
         }
         try (OutputStream out = Files.newOutputStream(temporary)) {
-            XMLStreamWriter xml = XMLOutputFactory.newFactory().createXMLStreamWriter(out, "UTF-8");
+            // the JDK's writer, created directly: a factory looked up by name is created reflectively, which a native image
+            // holding this class does not prepare for
+            XMLStreamWriter xml = XMLOutputFactory.newDefaultFactory().createXMLStreamWriter(out, "UTF-8");
             xml.writeStartDocument("UTF-8", "1.0");
             xml.writeCharacters("\n");
             xml.writeStartElement("testsuite");
