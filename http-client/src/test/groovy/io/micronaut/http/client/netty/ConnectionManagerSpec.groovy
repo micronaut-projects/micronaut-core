@@ -921,6 +921,49 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 request handlers added by a customizer registered after the connection was created are removed'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-concurrent-http1-connections': 1,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+        // no customizers yet, so the request pipeline snapshot is skipped
+        assert CompositeNettyClientCustomizer.isEmpty(client.connectionManager().clientCustomizer)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+        def handlerName = 'late-request-handler'
+        int added = 0
+
+        when:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        def namesBeforeRegistration = conn.clientChannel.pipeline().names()
+        // does not specialize, so the existing pooled connection sees it on its next request
+        ctx.getBean(NettyClientCustomizer.Registry).register(new NettyClientCustomizer() {
+            @Override
+            void onRequestPipelineBuilt() {
+                conn.clientChannel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, handlerName, new ChannelInboundHandlerAdapter())
+                added++
+            }
+        })
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        def namesAfterSecond = conn.clientChannel.pipeline().names()
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        then:
+        !namesBeforeRegistration.contains(handlerName)
+        added == 2
+        // the handler belongs to the request and is removed again, so the third request could re-add it
+        !namesAfterSecond.contains(handlerName)
+        !conn.clientChannel.pipeline().names().contains(handlerName)
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http2 customization'(boolean secure) {
         given:
         def ctx = ApplicationContext.run([

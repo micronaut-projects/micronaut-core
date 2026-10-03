@@ -1729,6 +1729,10 @@ public class ConnectionManager {
 
                     @Override
                     public void notifyRequestPipelineBuilt() {
+                        if (CompositeNettyClientCustomizer.isEmpty(connectionCustomizer)) {
+                            // common case: no customizers registered, skip the pipeline snapshot
+                            return;
+                        }
                         ChannelPipeline pipeline = channel.pipeline();
                         Set<String> before = new HashSet<>(pipeline.names());
                         connectionCustomizer.onRequestPipelineBuilt();

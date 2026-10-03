@@ -38,6 +38,17 @@ final class CompositeNettyClientCustomizer
         super();
     }
 
+    /**
+     * Check whether the given customizer is known to do nothing, i.e. it is a composite without
+     * any members. Must be checked at call time, since customizers can be registered later.
+     *
+     * @param customizer The customizer
+     * @return {@code true} if the customizer is an empty composite
+     */
+    static boolean isEmpty(NettyClientCustomizer customizer) {
+        return customizer instanceof CompositeNettyClientCustomizer composite && composite.isEmpty();
+    }
+
     @Override
     protected NettyClientCustomizer specializeForChannel(NettyClientCustomizer member, Channel channel, ChannelRole role) {
         return member.specializeForChannel(channel, role);

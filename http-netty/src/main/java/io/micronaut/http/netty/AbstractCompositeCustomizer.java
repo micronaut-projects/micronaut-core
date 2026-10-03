@@ -113,6 +113,16 @@ public abstract class AbstractCompositeCustomizer<C, R> {
         }
     }
 
+    /**
+     * Whether this composite currently has no members. Members may still be added later to a
+     * root customizer, so callers must check this each time instead of caching the result.
+     *
+     * @return {@code true} if there are no member customizers
+     */
+    public final boolean isEmpty() {
+        return members.isEmpty();
+    }
+
     protected final void forEach(Consumer<C> consumer) {
         for (C member : members) {
             try {
