@@ -18,6 +18,7 @@ package io.micronaut.runtime;
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.NativeImageUtils;
@@ -27,8 +28,13 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
@@ -39,11 +45,12 @@ import java.util.concurrent.RecursiveAction;
  * the common pool while the main thread creates the builder, and {@link Micronaut#start()} hands
  * its result to the context it builds.
  *
- * <p>The task never loads or initializes a bean definition reference itself. It calls the
- * provider that the context would have called, and the first {@link #provide(ClassLoader)} with
- * the task's class loader returns what that call returned or rethrows, unchanged, what it threw.
- * Which failures of a reference Micronaut skips and which ones stop the application is therefore
- * decided by Micronaut, on the thread that met the failure first.</p>
+ * <p>The task never initializes a bean definition reference itself. It calls the provider that
+ * the context would have called, and the first {@link #provide(ClassLoader)} with the task's class
+ * loader returns what that call returned or rethrows, unchanged, what it threw. Which failures of
+ * a reference Micronaut skips and which ones stop the application is therefore decided by
+ * Micronaut, on the thread that met the failure first. Before the task starts, the prefetch only
+ * loads and links the reference classes, which runs none of their code.</p>
  *
  * <p>This class must not use {@link Micronaut}: it is created inside the static initializer of
  * {@link Micronaut}, and a pool thread that needed that class would wait for the main thread.</p>
@@ -93,27 +100,39 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     }
 
     /**
-     * Starts the prefetch, unless the application runs in a native image or the common pool has
-     * fewer than {@value #MINIMUM_PARALLELISM} threads. The static initializer of
-     * {@link Micronaut} calls this once {@value #PROPERTY} is {@code true}, after it has created
-     * its logger, which usually configures logging.
-     *
-     * <p>Before it submits the task, this initializes {@link ClassUtils} on the calling thread, as
-     * Micronaut does without the prefetch, so that {@link ClassUtils#REFLECTION_LOGGER} is the
-     * logger it would be without it: a bean definition reference that a pool thread initializes can
-     * otherwise be the first to use {@link ClassUtils}.</p>
+     * Creates the prefetch, unless the application runs in a native image or the common pool has
+     * fewer than {@value #MINIMUM_PARALLELISM} threads, and starts loading the bean definition
+     * reference classes on the common pool. The static initializer of {@link Micronaut} calls
+     * this once {@value #PROPERTY} is {@code true}, before it creates its logger, which usually
+     * configures logging, and calls {@link #submit()} after. In between, the pool only loads and
+     * links classes, which runs none of their code, so no pool thread creates a logger while
+     * logging is being configured.
      *
      * @param classLoader The class loader of the builder, which the context reads the references with
-     * @return The running task, or {@code null} when the prefetch stands down
+     * @return The task, not submitted yet, or {@code null} when the prefetch stands down
      */
     static @Nullable BeanDefinitionPrefetch start(ClassLoader classLoader) {
         if (NativeImageUtils.inImageCode() || ForkJoinPool.getCommonPoolParallelism() < MINIMUM_PARALLELISM) {
             return null;
         }
-        // DefaultBeanContext sets it too, later. ClassUtils reads it once, when it is initialized just below
+        ForkJoinPool.commonPool().execute(new Preload(classLoader, null));
+        return new BeanDefinitionPrefetch(Thread.currentThread().getContextClassLoader(), classLoader);
+    }
+
+    /**
+     * Submits the task to the common pool and returns without waiting for it. {@link Micronaut}
+     * calls this once it has created its logger.
+     *
+     * <p>Before, this sets {@link ClassUtils#PROPERTY_MICRONAUT_CLASSLOADER_LOGGING}, as the
+     * context does when it is created, and initializes {@link ClassUtils} on the calling thread.
+     * {@link ClassUtils#REFLECTION_LOGGER} is then created there, with logging configured, rather
+     * than on the first pool thread that initializes a bean definition reference that uses
+     * {@link ClassUtils}, which can be before the context is created.</p>
+     */
+    void submit() {
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, StringUtils.TRUE);
         Logger _ = ClassUtils.REFLECTION_LOGGER;
-        return launch(Thread.currentThread().getContextClassLoader(), classLoader);
+        ForkJoinPool.commonPool().execute(this);
     }
 
     /**
@@ -268,6 +287,49 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
             result = null;
             failure = null;
             return thrown;
+        }
+    }
+
+    /**
+     * Loads and links the bean definition reference classes without initializing them, which runs
+     * none of their code, so that the provider finds them loaded. What fails here is left for the
+     * provider to meet again, on its own thread and in its own order.
+     */
+    private static final class Preload extends RecursiveAction {
+
+        private final ClassLoader classLoader;
+        // A reference class to load, or null to list them and load each
+        @Nullable
+        private final String className;
+
+        Preload(ClassLoader classLoader, @Nullable String className) {
+            this.classLoader = classLoader;
+            this.className = className;
+        }
+
+        @Override
+        @SuppressWarnings("NoReflection") // Loads the classes as MicronautMetaServiceLoaderUtils does, without initializing them
+        protected void compute() {
+            if (className == null) {
+                Set<String> classNames;
+                try {
+                    classNames = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, BeanDefinitionReference.class.getName());
+                } catch (IOException | RuntimeException e) {
+                    return;
+                }
+                List<Preload> tasks = new ArrayList<>(classNames.size());
+                for (String name : classNames) {
+                    tasks.add(new Preload(classLoader, name));
+                }
+                invokeAll(tasks);
+                return;
+            }
+            try {
+                // Links the class, as the provider does before it initializes it
+                MethodHandles.publicLookup().findConstructor(Class.forName(className, false, classLoader), MethodType.methodType(void.class));
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
+                // The provider meets it again
+            }
         }
     }
 }

@@ -15,6 +15,9 @@
  */
 package io.micronaut.runtime;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.Configurator;
+import ch.qos.logback.core.spi.ContextAwareBase;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextConfigurer;
@@ -32,6 +35,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,6 +79,7 @@ class BeanDefinitionPrefetchStartupTest {
     private static final String PARALLELISM = "-Djava.util.concurrent.ForkJoinPool.common.parallelism=";
     private static final String THREE_THREADS = PARALLELISM + "3";
     private static final String TASK = BeanDefinitionPrefetch.class.getName();
+    private static final String WORKER_PREFIX = "ForkJoinPool.commonPool-worker-";
 
     @TempDir
     Path temp;
@@ -204,29 +210,57 @@ class BeanDefinitionPrefetchStartupTest {
         assertEquals("main", on.value("OPTIMIZATIONS_THREAD"), on.output());
         assertEquals(off.value("OPTIMIZATIONS_THREAD"), on.value("OPTIMIZATIONS_THREAD"), off.output());
         assertEquals(off.value("REFERENCES"), on.value("REFERENCES"));
-        assertTrue(on.value("REGISTRAR_THREAD").startsWith("ForkJoinPool.commonPool-worker-"), on.output());
+        assertTrue(on.value("REGISTRAR_THREAD").startsWith(WORKER_PREFIX), on.output());
         assertEquals("true", on.value("REGISTRAR_CONTEXT_CLASS_LOADER"), on.output());
         assertEquals("true", off.value("REGISTRAR_CONTEXT_CLASS_LOADER"), off.output());
     }
 
     /**
-     * The main thread configures logging, as it creates the logger of {@link Micronaut}, and
-     * initializes {@link ClassUtils} before it starts the task, so no pool thread creates a logger
-     * while logging is being configured: SLF4J hands out no substitute logger, and the application
-     * logs as it does without the prefetch.
+     * The main thread configures logging, as it creates the logger of {@link Micronaut}, and only
+     * then submits the task, so no pool thread creates a logger while logging is being configured:
+     * SLF4J hands out no substitute logger, and the application logs as it does without the
+     * prefetch. {@link PoolFirstConfigurator} holds the configuration back until the pool has done
+     * what it was given before, and {@link LoggingRegistrar}, which creates a logger and logs, runs
+     * on a pool thread with the prefetch, when the task builds the shared conversion service.
      */
     @Test
     void logsAsItDoesWithoutThePrefetch() throws IOException {
-        ChildJvm on = run(List.of(), ON, THREE_THREADS, "-verbose:class");
-        ChildJvm off = run(List.of(), THREE_THREADS, "-verbose:class");
+        List<Path> classPath = List.of(services(Map.of(TypeConverterRegistrar.class, LoggingRegistrar.class, Configurator.class, PoolFirstConfigurator.class)));
+        ChildJvm on = run(classPath, ON, THREE_THREADS, "-verbose:class");
+        ChildJvm off = run(classPath, THREE_THREADS, "-verbose:class");
 
         assertEquals(TASK, on.value("PROVIDER"), on.output());
         for (String substitute : List.of("org.slf4j.helpers.SubstituteLogger", "org.slf4j.event.EventRecordingLogger")) {
             assertFalse(on.output().contains(substitute + " source:"), substitute + " was loaded:\n" + on.output());
         }
         assertEquals(off.value("REFLECTION_LOGGER"), on.value("REFLECTION_LOGGER"), on.output());
-        assertFalse(off.logged().isEmpty(), off.output());
+        assertEquals("ch.qos.logback.classic.Logger", off.value("REGISTRAR_LOGGER"), off.output());
+        assertEquals(off.value("REGISTRAR_LOGGER"), on.value("REGISTRAR_LOGGER"), on.output());
+        assertTrue(on.output().lines().anyMatch(line -> line.contains("[" + WORKER_PREFIX) && line.contains(LoggingRegistrar.MESSAGE)), on.output());
+        assertTrue(off.logged().stream().anyMatch(line -> line.endsWith(LoggingRegistrar.MESSAGE)), off.output());
         assertEquals(off.logged(), on.logged(), on.output());
+    }
+
+    /**
+     * Before {@link Micronaut} creates its logger, the prefetch loads the reference classes on the
+     * pool without initializing them. {@link PoolFirstConfigurator} holds the configuration of
+     * logging back until the pool is done, and the class loading log shows the fixture loaded
+     * before that point and initialized after it.
+     */
+    @Test
+    void loadsTheReferenceClassesWithoutInitializingThemWhileLoggingIsConfigured() throws IOException {
+        List<Path> classPath = List.of(entries(FIRST), services(Map.of(Configurator.class, PoolFirstConfigurator.class)));
+        String classLog = "-Xlog:class+load=info,class+init=info";
+        ChildJvm on = run(classPath, ON, THREE_THREADS, classLog);
+        ChildJvm off = run(classPath, THREE_THREADS, classLog);
+
+        assertEquals(TASK, on.value("PROVIDER"), on.output());
+        assertTrue(on.value("REFERENCES").contains(FIRST), on.output());
+        int configuring = on.line(ConfiguringLogging.class.getName() + " source:");
+        assertTrue(on.line(FIRST + " source:") < configuring, on.output());
+        assertTrue(on.line("Initializing '" + FIRST.replace('.', '/') + "'") > configuring, on.output());
+        // Without the prefetch, the context loads it
+        assertTrue(off.line(FIRST + " source:") > off.line(ConfiguringLogging.class.getName() + " source:"), off.output());
     }
 
     /**
@@ -274,8 +308,9 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     record ChildJvm(int exitCode, String output) {
-        // The time that the pattern of the test logback.xml, or a Logback status line, starts with
-        private static final Pattern LOGGED_AT = Pattern.compile("\\d{2}:\\d{2}:\\d{2}[.,]\\d{3} (.*)");
+        // The time that the pattern of the test logback.xml, or a Logback status line, starts with, and the thread
+        // of the pattern
+        private static final Pattern LOGGED_AT = Pattern.compile("\\d{2}:\\d{2}:\\d{2}[.,]\\d{3} (?:\\[[^\\]]*\\] )?(.*)");
 
         String value(String key) {
             String prefix = key + "=";
@@ -287,8 +322,21 @@ class BeanDefinitionPrefetchStartupTest {
         }
 
         /**
-         * What logging wrote, without the time: the lines of Logback and its status lines, and
-         * the reports of SLF4J itself.
+         * The index of the first line of the output that contains the text.
+         */
+        int line(String text) {
+            List<String> lines = output.lines().toList();
+            for (int i = 0; i < lines.size(); i++) {
+                if (lines.get(i).contains(text)) {
+                    return i;
+                }
+            }
+            throw new AssertionError("No line with " + text + " in the output of the child JVM:\n" + output);
+        }
+
+        /**
+         * What logging wrote, without the time and the thread: the lines of Logback and its
+         * status lines, and the reports of SLF4J itself.
          */
         List<String> logged() {
             List<String> logged = new ArrayList<>();
@@ -401,6 +449,20 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     /**
+     * Creates a logger and logs with it whenever it registers its converters.
+     */
+    public static final class LoggingRegistrar implements TypeConverterRegistrar {
+        static final String MESSAGE = "Registering the converters of the test";
+        private static final Logger LOG = LoggerFactory.getLogger(LoggingRegistrar.class);
+
+        @Override
+        public void register(MutableConversionService conversionService) {
+            Main.registrarLogger = LOG.getClass().getName();
+            LOG.info(MESSAGE);
+        }
+    }
+
+    /**
      * Fails to register its converters.
      */
     public static final class FailingRegistrar implements TypeConverterRegistrar {
@@ -413,11 +475,46 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     /**
+     * Holds the configuration of logging back until the common pool has done what it was given,
+     * so that whatever the prefetch starts before {@link Micronaut} creates its logger runs while
+     * logging is being configured. It then loads {@link ConfiguringLogging}, which marks that point
+     * in the class loading log, and leaves the rest to Logback, which reads logback.xml.
+     */
+    public static final class PoolFirstConfigurator extends ContextAwareBase implements Configurator {
+        @Override
+        public ExecutionStatus configure(LoggerContext context) {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            // Only watches the pool: a quiescence wait could run the pool's tasks on this thread
+            while (!ForkJoinPool.commonPool().isQuiescent() && System.nanoTime() < deadline) {
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            ConfiguringLogging.mark();
+            return ExecutionStatus.INVOKE_NEXT_IF_ANY;
+        }
+    }
+
+    /**
+     * Loaded by {@link PoolFirstConfigurator} once the pool is done, before Logback reads
+     * logback.xml.
+     */
+    static final class ConfiguringLogging {
+        static void mark() {
+            // Loading the class is the mark
+        }
+    }
+
+    /**
      * The application of the child JVM. It does not use {@link Micronaut} before it has set the
      * context class loader that a test asks for.
      */
     static final class Main {
         static volatile ClassLoader contextClassLoader;
+        static volatile String registrarLogger;
 
         public static void main(String[] args) throws Exception {
             String path = System.getProperty("prefetch-test.ccl");
@@ -448,6 +545,7 @@ class BeanDefinitionPrefetchStartupTest {
                 System.out.println("OPTIMIZATIONS_THREAD=" + StaticServices.thread);
                 System.out.println("REGISTRAR_THREAD=" + ContextClassLoaderRegistrar.thread);
                 System.out.println("REGISTRAR_CONTEXT_CLASS_LOADER=" + ContextClassLoaderRegistrar.contextClassLoader);
+                System.out.println("REGISTRAR_LOGGER=" + registrarLogger);
             }
         }
     }

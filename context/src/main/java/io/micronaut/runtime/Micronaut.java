@@ -59,18 +59,26 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
     private static final String BANNER_NAME = "micronaut-banner.txt";
-    private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     /**
      * The experimental bean definition prefetch, or {@code null} when it is off or stood down.
-     * Started after {@link #LOG}, whose creation usually configures logging, so that no pool
-     * thread creates a logger while logging is being configured. With the property unset, the
-     * class of the task is not even loaded.
+     * Created before {@link #LOG}, whose creation usually configures logging: in the meantime the
+     * pool only loads the bean definition reference classes, which runs none of their code. The
+     * task itself is submitted once {@link #LOG} exists, so that no pool thread creates a logger
+     * while logging is being configured. With the property unset, the class of the task is not
+     * even loaded.
      */
     @Nullable
     private static final BeanDefinitionPrefetch BEAN_DEFINITION_PREFETCH = Boolean.getBoolean(BeanDefinitionPrefetch.PROPERTY)
         ? BeanDefinitionPrefetch.start(Micronaut.class.getClassLoader())
         : null;
+    private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
+
+    static {
+        if (BEAN_DEFINITION_PREFETCH != null) {
+            BEAN_DEFINITION_PREFETCH.submit();
+        }
+    }
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
 
