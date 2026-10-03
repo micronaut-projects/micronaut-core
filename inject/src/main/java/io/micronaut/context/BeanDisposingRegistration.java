@@ -65,8 +65,12 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         this.beanContext = beanContext;
         // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
         // duplicate registrations or add them back to an owner that was already destroyed.
-        if (getDependencies() == dependencies || createdBean instanceof DefaultBeanDependencyResolver) {
-            getDependencies().initialize(dependents, interceptorRegistrations);
+        if ((getDependencies() == dependencies || createdBean instanceof DefaultBeanDependencyResolver)
+            && !getDependencies().initialize(dependents, interceptorRegistrations)
+            && beanContext instanceof DefaultBeanContext context) {
+            // The owner was destroyed before its creation completed and released what it held then. Dependents
+            // created with the bean would be attached to an owner that no longer destroys anything.
+            context.destroyCreatedBeans(dependents, null);
         }
         this.interceptorRegistrations = interceptorRegistrations;
     }

@@ -291,6 +291,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @throws BeanDestructionException If destroying the bean fails
      * @since 5.2.0
      */
+    @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<T> remove(BeanDefinition<T> beanDefinition) {
         if (lockPerBean) {

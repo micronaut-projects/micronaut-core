@@ -117,7 +117,7 @@ Destruction integrations use `resolutionContext.withDependencies(group -> ...)` 
 `DisposableBeanDefinition.dispose(...)` or `BeanPreDestroyEvent.getResolutionContext()`. Core closes that context
 when destruction returns. Its temporary groups may resolve during shutdown, only on the destruction thread and
 within that invocation. Child groups inherit the same lifetime restriction. Ordinary contexts, independent groups,
-and retained injected resolvers receive no shutdown exception. A context created manually grants no destruction permission.
+and retained injected resolvers receive no shutdown exemption. A context created manually grants no destruction permission.
 Do not return an owned dependency from such an invocation, since it has already been destroyed.
 
 ==== Proxy target ownership
