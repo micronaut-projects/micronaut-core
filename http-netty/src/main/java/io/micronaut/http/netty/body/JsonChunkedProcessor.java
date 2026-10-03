@@ -18,14 +18,17 @@ package io.micronaut.http.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
 import java.io.IOException;
-import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Adapted from JsonContentProcessor. This class takes input data and splits it up according to the
@@ -37,10 +40,71 @@ import java.util.Objects;
 @Internal
 final class JsonChunkedProcessor {
     final JsonCounter counter = new JsonCounter();
+    /**
+     * The maximum number of bytes of a JSON value that is buffered to be emitted.
+     */
+    private final long maxElementSize;
+    // guarded by this: the subscriber may cancel, which releases them, on another thread than
+    // the one that processes the input
     @Nullable
     private ByteBuf singleBuffer;
     @Nullable
     private CompositeByteBuf compositeBuffer;
+    // the buffers were released: what the processing still buffers is released at once
+    private boolean released;
+
+    JsonChunkedProcessor() {
+        this(Long.MAX_VALUE);
+    }
+
+    /**
+     * @param maxElementSize The maximum number of bytes of a JSON value: a larger one fails the
+     *                       processing with a {@link ContentLengthExceededException}, once that
+     *                       many bytes of it were buffered
+     */
+    JsonChunkedProcessor(long maxElementSize) {
+        this.maxElementSize = maxElementSize;
+    }
+
+    /**
+     * The Netty buffer of a buffer of the input. A buffer that is not backed by one, e.g. a
+     * buffer of a server that is not a Netty server, is copied into a new Netty buffer and
+     * released.
+     *
+     * @param buffer The buffer, which the returned buffer takes the ownership of
+     * @return The Netty buffer
+     */
+    static ByteBuf nettyBuffer(ByteBuffer<?> buffer) {
+        if (buffer.asNativeBuffer() instanceof ByteBuf buf) {
+            return buf;
+        }
+        try {
+            // the readable bytes, from the reader index: one copy
+            return Unpooled.copiedBuffer(buffer.asNioBuffer());
+        } finally {
+            if (buffer instanceof ReferenceCounted counted) {
+                counted.release();
+            }
+        }
+    }
+
+    /**
+     * Read a JSON value that was processed, and release its buffer if reading it fails: the
+     * reader releases it only once it read it.
+     *
+     * @param value  The buffer of the value
+     * @param reader The reader
+     * @param <T>    The type of the value
+     * @return The value
+     */
+    static <T> T readReleasing(ByteBuffer<?> value, Function<ByteBuffer<?>, T> reader) {
+        try {
+            return reader.apply(value);
+        } catch (Throwable e) {
+            release(value);
+            throw e;
+        }
+    }
 
     public Flux<ByteBuffer<?>> process(Flux<ByteBuf> input) {
         return Flux.concat(input
@@ -48,7 +112,7 @@ final class JsonChunkedProcessor {
                     try {
                         countLoop(s, b);
                         s.complete();
-                    } catch (IOException e) {
+                    } catch (IOException | ContentLengthExceededException e) {
                         s.error(e);
                     } finally {
                         b.release();
@@ -61,10 +125,25 @@ final class JsonChunkedProcessor {
                     s.error(e);
                 }
             }))
-            .doOnTerminate(this::releaseBuffers);
+            // also when the subscriber cancels, e.g. a reader that stops before the last element:
+            // the partial element and the elements and input not delivered yet are released
+            .doFinally(signal -> releaseBuffers())
+            .doOnDiscard(ByteBuffer.class, JsonChunkedProcessor::release)
+            .doOnDiscard(ByteBuf.class, ByteBuf::release);
     }
 
-    private void releaseBuffers() {
+    private static void release(ByteBuffer<?> buffer) {
+        if (buffer.asNativeBuffer() instanceof ByteBuf buf) {
+            buf.release();
+        } else if (buffer instanceof ReferenceCounted counted) {
+            // a buffer of the input that is not a Netty buffer, discarded before it was copied,
+            // e.g. one the input still had when the subscriber cancelled
+            counted.release();
+        }
+    }
+
+    private synchronized void releaseBuffers() {
+        released = true;
         if (this.singleBuffer != null) {
             this.singleBuffer.release();
             this.singleBuffer = null;
@@ -82,6 +161,7 @@ final class JsonChunkedProcessor {
             counter.feed(content);
             JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
             if (bufferRegion != null) {
+                checkSize(bufferRegion.end() - bufferRegion.start());
                 long start = Math.max(initialPosition, bufferRegion.start());
                 buffer(content.retainedSlice(
                     Math.toIntExact(start - bias),
@@ -91,13 +171,26 @@ final class JsonChunkedProcessor {
             }
         }
         if (counter.isBuffering()) {
+            // what is buffered of a value that is not complete yet: a value that is too large
+            // fails before it is buffered whole
+            checkSize(counter.position() - counter.bufferStart());
             int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
             content.readerIndex(currentBufferStart);
             buffer(content.retain());
         }
     }
 
-    private void buffer(ByteBuf buffer) {
+    private void checkSize(long size) {
+        if (size > maxElementSize) {
+            throw new ContentLengthExceededException("The size of a JSON value [" + size + "] exceeds the maximum allowed content length [" + maxElementSize + "]");
+        }
+    }
+
+    private synchronized void buffer(ByteBuf buffer) {
+        if (released) {
+            buffer.release();
+            return;
+        }
         if (this.singleBuffer == null && this.compositeBuffer == null) {
             this.singleBuffer = buffer;
         } else {
@@ -111,17 +204,26 @@ final class JsonChunkedProcessor {
     }
 
     private void flush(FluxSink<? super ByteBuffer<?>> out) {
+        ByteBuf completedNode = take();
+        if (completedNode != null) {
+            // emitted without the lock: the subscriber may cancel meanwhile
+            out.next(NettyByteBufferFactory.DEFAULT.wrap(completedNode));
+        }
+    }
+
+    /**
+     * @return The buffered element, taken from this, or {@code null} if nothing is buffered, or
+     * the buffers were released
+     */
+    private synchronized @Nullable ByteBuf take() {
         ByteBuf completedNode = compositeBuffer == null ? singleBuffer : compositeBuffer;
-        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(Objects.requireNonNull(completedNode));
-        out.next(wrapped);
         compositeBuffer = null;
         singleBuffer = null;
+        return completedNode;
     }
 
     private void complete(FluxSink<? super ByteBuffer<?>> out) throws IOException {
         counter.noMoreInput();
-        if (this.singleBuffer != null || this.compositeBuffer != null) {
-            flush(out);
-        }
+        flush(out);
     }
 }

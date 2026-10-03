@@ -855,6 +855,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.outboundAccess = outboundAccess;
             this.sendContinue = sendContinue;
             this.dest = byteBodyFactory().createStreamingBuffer(bodySizeLimits, this);
+            // what arrives before the route reads the body is bounded by requested, not by the
+            // buffer limit, for a reader that streams the body without holding it
+            this.dest.setKeepInitialBytes();
         }
 
         @Override

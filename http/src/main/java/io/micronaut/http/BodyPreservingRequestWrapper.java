@@ -23,11 +23,11 @@ import io.micronaut.core.annotation.Internal;
  * a view that hides a body decoded before so that it is read again from the bytes.
  *
  * <p>{@link HttpRequestWrapper#replacesBody(HttpRequest)} does not call {@code getBody()} on
- * such a wrapper. Without the marker, the body of a wrapper whose class is not
- * {@link HttpRequestWrapper} itself is compared by identity with the body of the request it
- * wraps, which decodes that body: on a server whose requests decode the body on each call, or
- * whose decoding consumes the bytes, that makes a wrapper that kept the body look like one that
- * replaced it.</p>
+ * such a wrapper. Without the marker, the body of a wrapper whose class overrides
+ * {@code getBody()} is compared by identity with the body of the request it wraps, which decodes
+ * that body. Decoding may consume the bytes of the request, e.g. the input stream of a servlet
+ * request, so that they cannot be read again, or produce a new object on each call, so that a
+ * wrapper that kept the body looks like one that replaced it.</p>
  *
  * @since 5.3.0
  */

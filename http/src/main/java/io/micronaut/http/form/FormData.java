@@ -1,0 +1,230 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.http.form;
+
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionError;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.NamedValues;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletionStage;
+
+/**
+ * The submitted form of a request, {@code application/x-www-form-urlencoded} or
+ * {@code multipart/form-data}. It is a parameter of a controller method or of a request filter
+ * method:
+ *
+ * <pre>{@code
+ * @Post(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA)
+ * String profile(FormData form) {
+ *     String name = form.getString("name");
+ *     int age = form.getInt("age");
+ *     Optional<FileUpload> avatar = form.findFile("avatar");
+ *     ...
+ * }
+ * }</pre>
+ *
+ * <p>The whole form is read once for the request, before the method runs; the {@link FileUpload}
+ * and text field ({@code @Part} or bound by name) arguments of the method are taken from it, and a
+ * filter that reads it leaves it readable for the route. A form a filter set as the body of the
+ * request replaces the bytes of the request, and a body a filter cleared is a form without fields.
+ * Text fields convert with the accessors, including default values for missing fields, e.g.
+ * {@code getInt("quantity", 1)}: a missing required field or a value that does not convert is
+ * answered with 400. Uploaded files are {@link FileUpload}s, stored in memory or on disk
+ * depending on the {@code micronaut.server.multipart} configuration, with the limits of that
+ * configuration. The files are owned by the request: what was not consumed is released when the
+ * request completes, and an operation on a file must complete before the response:</p>
+ * <pre>{@code
+ * @Post(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA)
+ * CompletionStage<String> profile(FormData form) {
+ *     return form.getFile("avatar").transferTo(destination)
+ *         .thenApply(done -> form.getString("displayName"));
+ * }
+ * }</pre>
+ *
+ * <p>{@link #close()} releases the files early. The text fields stay readable after closing.</p>
+ *
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Experimental
+public interface FormData extends NamedValues, AutoCloseable {
+
+    /**
+     * @return The names of the text fields that have a value
+     */
+    Set<String> names();
+
+    /**
+     * @param name The name of the field
+     * @return Whether a text field of that name has a value
+     */
+    boolean contains(String name);
+
+    /**
+     * All the values of a text field, e.g. of checkboxes or a multiple select.
+     *
+     * @param name The name of the field
+     * @return The values, in the order they were submitted, or an empty list
+     */
+    List<String> getValues(String name);
+
+    /**
+     * A required text field converted to a type. If the field was submitted several times, the
+     * first value is used.
+     *
+     * @param name The name of the field
+     * @param type The type
+     * @param <T>  The type
+     * @return The value
+     * @throws FormFieldException if the field has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    @Override
+    <T> T get(String name, Class<T> type);
+
+    /**
+     * An optional text field converted to a type.
+     *
+     * @param name The name of the field
+     * @param type The type
+     * @param <T>  The type
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    @Override
+    <T> Optional<T> find(String name, Class<T> type);
+
+    /**
+     * A required text field converted to a type, with its type arguments: a collection or an
+     * array type, e.g. {@code Argument.listOf(Integer.class)}, or an {@code Optional} of one, gets
+     * every value of the field, in the submitted order; any other type gets the first value, like
+     * {@link #get(String, Class)}.
+     *
+     * @param name The name of the field
+     * @param type The type
+     * @param <T>  The type
+     * @return The value
+     * @throws FormFieldException if the field has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     * @since 5.3.0
+     */
+    default <T> T get(String name, Argument<T> type) {
+        return find(name, type).orElseThrow(() -> FormFieldException.missingField(name));
+    }
+
+    /**
+     * An optional text field converted to a type, with its type arguments, see
+     * {@link #get(String, Argument)}.
+     *
+     * @param name The name of the field
+     * @param type The type
+     * @param <T>  The type
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     * @since 5.3.0
+     */
+    default <T> Optional<T> find(String name, Argument<T> type) {
+        List<String> values = getValues(name);
+        if (values.isEmpty()) {
+            return Optional.empty();
+        }
+        Class<T> rawType = type.getType();
+        // the type of the value of an Optional decides
+        Class<?> valueType = rawType == Optional.class ? type.getFirstTypeVariable().<Class<?>>map(Argument::getType).orElse(rawType) : rawType;
+        boolean all = Iterable.class.isAssignableFrom(valueType) || valueType.isArray();
+        if (!all && type.getTypeParameters().length == 0) {
+            return find(name, rawType);
+        }
+        if (all && rawType == Optional.class) {
+            // converted to the collection: the conversion to an Optional does not report the
+            // values of the collection that were rejected
+            Argument<?> value = type.getFirstTypeVariable().orElseThrow();
+            return Optional.of(rawType.cast(Optional.of(
+                convertField(name, Argument.of(value.getType(), name, value.getAnnotationMetadata(), value.getTypeParameters()), values))));
+        }
+        Argument<T> named = name.equals(type.getName()) ? type : Argument.of(rawType, name, type.getAnnotationMetadata(), type.getTypeParameters());
+        return Optional.of(convertField(name, named, all ? values : values.get(0)));
+    }
+
+    private static <T> T convertField(String name, Argument<T> named, Object value) {
+        ArgumentConversionContext<T> context = ConversionContext.of(named);
+        Optional<T> result = ConversionService.SHARED.convert(value, context);
+        // checked first: a collection is converted from the values that convert, and the
+        // others are rejected, which is not the value that was asked for
+        Optional<ConversionError> error = context.getLastError();
+        if (error.isPresent()) {
+            throw new ConversionErrorException(named, error.get());
+        }
+        if (result.isPresent()) {
+            return result.get();
+        }
+        throw new FormFieldException(name, "Form field [" + name + "] cannot be converted to " + named.getTypeName());
+    }
+
+    /**
+     * All the files uploaded in a field. Every call returns the same handles.
+     *
+     * @param name The name of the field
+     * @return The files, in the order they were submitted, or an empty list; immutable
+     */
+    List<FileUpload> getFiles(String name);
+
+    /**
+     * An optional file.
+     *
+     * @param name The name of the field
+     * @return The first file uploaded in the field, if any
+     */
+    default Optional<FileUpload> findFile(String name) {
+        List<FileUpload> files = getFiles(name);
+        return files.isEmpty() ? Optional.empty() : Optional.of(files.get(0));
+    }
+
+    /**
+     * A required file.
+     *
+     * @param name The name of the field
+     * @return The first file uploaded in the field
+     * @throws FormFieldException if no file was uploaded in the field, answered with 400
+     */
+    default FileUpload getFile(String name) {
+        return findFile(name).orElseThrow(() -> FormFieldException.missingFile(name));
+    }
+
+    /**
+     * Release the files that were not consumed yet, and abort the operations on them that are
+     * still running. Closing is idempotent, and the same stage is returned on every call. The text
+     * fields stay readable.
+     *
+     * @return Completes when the resources of the files were released, or exceptionally when
+     * releasing them failed
+     */
+    CompletionStage<Void> closeAsync();
+
+    /**
+     * Start releasing the files like {@link #closeAsync()}, without waiting for it.
+     */
+    @Override
+    void close();
+}
