@@ -448,7 +448,12 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         // using that.compareTo because more raw length should have higher precedence
         int rawCompare = Integer.compare(thatEvaluator.rawLength, thisEvaluator.rawLength);
         if (rawCompare == 0) {
-            return Integer.compare(thisEvaluator.variableCount, thatEvaluator.variableCount);
+            int variableCompare = Integer.compare(thisEvaluator.variableCount, thatEvaluator.variableCount);
+            if (variableCompare == 0) {
+                // fewer variables constrained by a regular expression is more specific
+                return Integer.compare(thisEvaluator.patternVariableCount, thatEvaluator.patternVariableCount);
+            }
+            return variableCompare;
         }
         return rawCompare;
     }
@@ -462,6 +467,106 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         for (UriTemplateParser.Part part : parts) {
             part.visit(visitor);
         }
+    }
+
+    /**
+     * A literal that every URI this template matches starts with, once the URI is normalised with
+     * {@link #normalizeForMatching(String)}. Routers use it to skip templates that cannot match.
+     *
+     * @return The prefix, or an empty string if there is none
+     * @since 5.3.0
+     */
+    public String getRequiredPrefix() {
+        if (isRoot) {
+            return "";
+        }
+        if (variables.isEmpty()) {
+            // matched by equality
+            return templateString;
+        }
+        if (segments.length > 0 && segments[0].type == SegmentType.LITERAL) {
+            return segments[0].value;
+        }
+        return "";
+    }
+
+    /**
+     * @return The length of the literal parts, the first key of the order of templates, see
+     * {@link #compareTo(UriTemplateMatcher)}
+     * @since 5.3.0
+     */
+    public int getRawLength() {
+        PathEvaluator evaluator = new PathEvaluator();
+        visitParts(parts, evaluator);
+        return evaluator.rawLength;
+    }
+
+    /**
+     * @return The number of path variables, the second key of the order of templates, see
+     * {@link #compareTo(UriTemplateMatcher)}
+     * @since 5.3.0
+     */
+    public int getPathVariableCount() {
+        PathEvaluator evaluator = new PathEvaluator();
+        visitParts(parts, evaluator);
+        return evaluator.variableCount;
+    }
+
+    /**
+     * The number of path variables constrained by a regular expression, e.g. {@code {id:.+}}: the
+     * third key of the order of templates, see {@link #compareTo(UriTemplateMatcher)}. Among
+     * templates with the same literal length and number of variables, the one with fewer such
+     * variables is more specific, so {@code /t/{id}} is selected over {@code /t/{id:.+}}. A
+     * numeric modifier, e.g. {@code {id:3}}, limits the length of the value and is not a
+     * regular expression: it is not counted.
+     *
+     * @return The number of path variables with a regular expression
+     * @since 5.3.0
+     */
+    public int getPatternVariableCount() {
+        PathEvaluator evaluator = new PathEvaluator();
+        visitParts(parts, evaluator);
+        return evaluator.patternVariableCount;
+    }
+
+    /**
+     * Whether the modifier of a variable is a regular expression, rather than a numeric length
+     * limit, see {@link #getPatternVariableCount()}.
+     *
+     * @param modifier The modifier
+     * @return Whether it is a regular expression
+     */
+    private static boolean isPatternModifier(@Nullable String modifier) {
+        if (StringUtils.isEmpty(modifier)) {
+            return false;
+        }
+        // the same interpretation as the matcher: a modifier that parses as a number is a limit
+        try {
+            Integer.parseInt(modifier);
+            return false;
+        } catch (NumberFormatException e) {
+            return true;
+        }
+    }
+
+    /**
+     * Normalise a URI the way {@link #tryMatch(String)} does before it matches the segments: the
+     * query and a trailing slash are removed.
+     *
+     * @param uri The URI
+     * @return The normalised URI
+     * @since 5.3.0
+     */
+    public static String normalizeForMatching(String uri) {
+        int parameterIndex = uri.indexOf('?');
+        if (parameterIndex > -1) {
+            uri = uri.substring(0, parameterIndex);
+        }
+        int length = uri.length();
+        if (length > 1 && uri.charAt(length - 1) == '/') {
+            uri = uri.substring(0, length - 1);
+        }
+        return uri;
     }
 
     private boolean isRoot(String uri) {
@@ -483,6 +588,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     private static final class PathEvaluator implements UriTemplateParser.PartVisitor {
 
         int variableCount = 0;
+        int patternVariableCount = 0;
         int rawLength = 0;
 
         @Override
@@ -494,6 +600,11 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         public void visitExpression(UriTemplateParser.ExpressionType type, List<UriTemplateParser.Variable> variables) {
             if (!type.isQueryPart()) {
                 variableCount += variables.size();
+                for (UriTemplateParser.Variable variable : variables) {
+                    if (isPatternModifier(variable.modifier())) {
+                        patternVariableCount++;
+                    }
+                }
             }
         }
     }

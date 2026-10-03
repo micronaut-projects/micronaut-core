@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -34,6 +35,8 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -337,4 +340,48 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @since 4.0.0
      */
     boolean needsRequestBody();
+
+    /**
+     * The attributes of the route: metadata a route declares for the code that handles its
+     * requests, e.g. a filter that reads a required role, see
+     * {@link io.micronaut.web.router.builder.HttpRouteSpec#attribute(String, Object)}. They are
+     * attributes of the route, the same for every request, not the attributes of a request.
+     *
+     * @return The attributes of the route, empty if it has none
+     * @since 5.3.0
+     */
+    @Experimental
+    default Map<String, Object> getAttributes() {
+        return Map.of();
+    }
+
+    /**
+     * An attribute of the route, see {@link #getAttributes()}.
+     *
+     * @param name The name of the attribute
+     * @return The value of the attribute, if the route has it
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<Object> getAttribute(String name) {
+        Objects.requireNonNull(name, "name");
+        return Optional.ofNullable(getAttributes().get(name));
+    }
+
+    /**
+     * An attribute of the route of a type, see {@link #getAttributes()}.
+     *
+     * @param name The name of the attribute
+     * @param type The type of the attribute
+     * @param <T>  The type of the attribute
+     * @return The value of the attribute, if the route has it and it is of the type
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> Optional<T> getAttribute(String name, Class<T> type) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(type, "type");
+        Object value = getAttributes().get(name);
+        return type.isInstance(value) ? Optional.of(type.cast(value)) : Optional.empty();
+    }
 }
