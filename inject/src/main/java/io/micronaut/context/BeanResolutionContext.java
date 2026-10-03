@@ -87,7 +87,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Attribute that exposes the interceptor registrations selected while creating the bean being disposed.
      *
      * <p>The value is a read-only {@code List<BeanRegistration<?>>}. It is set only while a bean is being disposed and
-     * is intended for lifecycle interception.</p>
+     * is read only for compatibility. Current callers use {@link #setBeanInterceptors(BeanDefinition, List)}.</p>
      *
      * @since 5.2.0
      */
@@ -196,6 +196,22 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     default @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
         return getAttribute(INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> stored
             && stored.get(definition) instanceof List<?> registrations ? registrations : null;
+    }
+
+    /**
+     * Returns retained destruction candidates, including advice borrowed from an owning proxy.
+     * This does not resolve new beans and does not change the candidates used for initialization.
+     * @param definition The bean being created
+     * @return Its destruction candidates, or {@code null} if none have been recorded
+     * @since 5.3.0
+     */
+    default @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
+        List<?> retained = getBeanInterceptors(definition);
+        if (retained != null) {
+            return retained;
+        }
+        // Compatibility with callers that supplied destruction candidates through the old context attribute.
+        return getAttribute(EXISTING_INTERCEPTOR_REGISTRATIONS) instanceof List<?> legacy ? legacy : null;
     }
 
     /**
