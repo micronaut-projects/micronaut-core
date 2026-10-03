@@ -218,7 +218,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             status = nmhr.getNettyHttpStatus();
         } else {
             version = HttpVersion.HTTP_1_1;
-            status = new HttpResponseStatus(response.code(), response.reason());
+            status = HttpResponseStatus.valueOf(response.code(), response.reason());
         }
         io.micronaut.http.HttpHeaders mnHeaders = response.getHeaders();
         HttpHeaders nettyHeaders;
@@ -408,7 +408,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         if (message == null) {
             message = HttpStatus.getDefaultReason(status);
         }
-        httpResponseStatus = new HttpResponseStatus(status, message.toString());
+        httpResponseStatus = HttpResponseStatus.valueOf(status, message.toString());
         return this;
     }
 

@@ -166,6 +166,50 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.advance(client, server)
     }
 
+    def "a #code status that is not the netty constant has no content-length"() {
+        given:
+        // an equal status that is a different instance, as built from a code and a reason phrase
+        def status = new HttpResponseStatus(code, HttpResponseStatus.valueOf(code).reasonPhrase())
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, status), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def response = (Http2HeadersFrame) client.readInbound()
+        String.valueOf(code).contentEquals(response.headers().status())
+        !response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+
+        where:
+        code << [204, 304]
+    }
+
     def "upload backpressure"() {
         given:
         Subscription serverSubscription = null

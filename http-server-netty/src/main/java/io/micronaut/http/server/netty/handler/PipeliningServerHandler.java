@@ -235,10 +235,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public static boolean canHaveBody(HttpResponseStatus status) {
         // All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
-        // responses do not include a message body
-        return !(status == HttpResponseStatus.CONTINUE || status == HttpResponseStatus.SWITCHING_PROTOCOLS ||
-            status == HttpResponseStatus.PROCESSING || status == HttpResponseStatus.NO_CONTENT ||
-            status == HttpResponseStatus.NOT_MODIFIED);
+        // responses do not include a message body. Compare the code: a status built from a code
+        // and a custom reason phrase is not the netty constant
+        int code = status.code();
+        return !(code < 200 || code == 204 || code == 304);
     }
 
     /**
