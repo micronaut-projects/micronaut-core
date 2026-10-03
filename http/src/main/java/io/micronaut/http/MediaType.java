@@ -853,6 +853,19 @@ public class MediaType implements CharSequence {
      */
     private static final AtomicReferenceArray<@Nullable CachedMediaTypes> ORDERED_CACHE = new AtomicReferenceArray<>(MAX_CACHED_HEADERS);
 
+    /**
+     * Per class result of {@link #fromType(Class)}, which is called for every response body. The
+     * {@link Produces} annotation of a class does not change, so the reflective lookup and the
+     * parsing of its value are done once per class. {@link ClassValue} does not keep the class
+     * or its class loader alive.
+     */
+    private static final ClassValue<Optional<MediaType>> FROM_TYPE_CACHE = new ClassValue<>() {
+        @Override
+        protected Optional<MediaType> computeValue(Class<?> type) {
+            return computeFromType(type);
+        }
+    };
+
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     // Sonar java:S3077: the table is an immutable map, a Map.copyOf of the parsed table or an empty map
@@ -1592,6 +1605,10 @@ public class MediaType implements CharSequence {
      * @return An {@link Optional} {@link MediaType}
      */
     public static Optional<MediaType> fromType(Class<?> type) {
+        return FROM_TYPE_CACHE.get(type);
+    }
+
+    private static Optional<MediaType> computeFromType(Class<?> type) {
         Produces producesAnn = type.getAnnotation(Produces.class);
         if (producesAnn != null) {
             String[] value = producesAnn.value();

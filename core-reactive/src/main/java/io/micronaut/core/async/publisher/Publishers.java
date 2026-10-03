@@ -60,6 +60,12 @@ public class Publishers {
     private static final List<Class<?>> SINGLE_TYPES;
     private static final List<Class<?>> COMPLETABLE_TYPES;
     private static final Logger LOG = LoggerFactory.getLogger(Publishers.class);
+    /**
+     * Per class result of {@link #isConvertibleToPublisher(Class)}. The result depends on the registered reactive
+     * types, so a new cache replaces this one whenever a type is registered. {@link ClassValue} does not keep the
+     * class or its class loader alive.
+     */
+    private static volatile ClassValue<Boolean> convertibleToPublisherCache = newConvertibleToPublisherCache();
 
     static {
         List<Class<?>> reactiveTypes;
@@ -175,6 +181,8 @@ public class Publishers {
     public static void registerReactiveType(Class<?> type) {
         if (type != null) {
             REACTIVE_TYPES.add(type);
+            // replace the cache after the type is added, so that lookups through the new cache see it
+            convertibleToPublisherCache = newConvertibleToPublisherCache();
         }
     }
 
@@ -459,6 +467,19 @@ public class Publishers {
         if (type == Publisher.class) {
             return true;
         }
+        return convertibleToPublisherCache.get(type);
+    }
+
+    private static ClassValue<Boolean> newConvertibleToPublisherCache() {
+        return new ClassValue<>() {
+            @Override
+            protected Boolean computeValue(Class<?> type) {
+                return computeConvertibleToPublisher(type);
+            }
+        };
+    }
+
+    private static boolean computeConvertibleToPublisher(Class<?> type) {
         if (type.isPrimitive() || type.getName().startsWith("java.") || type.isArray()) {
             return false;
         }
