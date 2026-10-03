@@ -1455,6 +1455,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return bean;
     }
 
+    @SuppressWarnings("java:S1181") // Remove the scoped target even when a dependent fails with an Error, then rethrow it.
     private <T> void destroyProxyTargetBean(BeanRegistration<T> registration, boolean dependent) {
         BeanDefinition<T> proxyTargetBeanDefinition = findProxyTargetBeanDefinition(registration.beanDefinition)
             .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
@@ -1463,14 +1464,32 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             && proxy.interceptedBeanDependencies() != null) {
             // The proxy retains the original owner even if the caller only retained the bean instance.
             // Its prototype target and advice are ordinary dependents; scoped and swapped-in targets are borrowed.
+            Throwable failure = null;
             try {
                 proxy.interceptedBeanDependencies().close();
+            } catch (RuntimeException | Error e) {
+                failure = e;
             } finally {
                 proxy.clearCachedInterceptedTarget();
             }
             if (!dependent && declaredScope.isPresent()) {
-                CustomScope<?> scope = declaredScope.get();
-                scope.findBeanRegistration(proxyTargetBeanDefinition).ifPresent(target -> scope.remove(target.identifier));
+                // Runs even when a dependent failed to be destroyed, or the scope would keep the target alive.
+                // Removal by definition waits for a creation in flight, so a target about to be published is not missed.
+                try {
+                    declaredScope.get().remove(proxyTargetBeanDefinition);
+                } catch (RuntimeException | Error e) {
+                    if (failure == null) {
+                        failure = e;
+                    } else {
+                        failure.addSuppressed(e);
+                    }
+                }
+            }
+            if (failure instanceof RuntimeException exception) {
+                throw exception;
+            }
+            if (failure instanceof Error error) {
+                throw error;
             }
             return;
         }

@@ -151,9 +151,16 @@ final class BeanDependencies implements DependentBeanProvider {
 
     /**
      * Attaches construction dependents and records interceptor registrations already selected at construction.
+     *
+     * @return {@code false} when the owner was destroyed while its bean was being created, such as a proxy a
+     * creation listener destroyed: nothing is attached, and the caller releases what was created
      */
-    synchronized void initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
+    synchronized boolean initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
+        if (destroyed) {
+            return false;
+        }
         attach(created == null ? List.of() : created, resolved == null ? List.of() : resolved);
+        return true;
     }
 
     @SuppressWarnings("ReferenceEquality") // A lifecycle belongs to an instance, even when two beans compare equal.
