@@ -111,7 +111,9 @@ closed automatically with it. Independent groups must be closed by their callers
 
 For temporary method arguments, `BeanContext.withDependencies(group -> ...)` releases owned dependencies
 when the synchronous invocation ends, including when it fails. Cleanup attempts every dependent and suppresses
-cleanup failures on the invocation's exception. When invoked from a container destruction callback, it may
-resolve temporary dependencies during shutdown. This permission is confined to the destruction thread and the
-invocation: normal groups and retained injected resolvers still reject new lookups after shutdown starts.
-Do not return an owned dependency from such an invocation, since it has already been destroyed.
+cleanup failures on the invocation's exception. It rejects new groups once shutdown begins.
+
+A `BeanPreDestroyEventListener` that needs temporary dependencies while a bean is being destroyed calls
+`event.withDependencies(group -> ...)`. These lookups are allowed during shutdown, only on the destruction
+thread and until the listener returns; injected resolvers and independent groups still reject new lookups
+once shutdown starts. Do not return an owned dependency from either invocation, since it has already been destroyed.
