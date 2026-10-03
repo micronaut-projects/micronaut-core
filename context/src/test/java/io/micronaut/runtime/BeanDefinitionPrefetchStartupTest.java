@@ -132,6 +132,9 @@ class BeanDefinitionPrefetchStartupTest {
             assertEquals(off.exitCode(), on.exitCode(), on.output());
             assertTrue(off.causes().stream().anyMatch(cause -> cause.contains(failing)), off.output());
             assertEquals(off.causes(), on.causes(), on.output());
+            // The failure comes from the task with the prefetch on, and from the context's own read without it
+            assertTrue(on.output().contains("at " + TASK + ".compute("), on.output());
+            assertFalse(off.output().contains("at " + TASK + ".compute("), off.output());
         }
     }
 

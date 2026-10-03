@@ -19,7 +19,7 @@ The prefetch moves work off the main thread; it does not remove any. It pays onl
 
 * It needs four or more processors. It stands down when the common pool has fewer than three threads, because Micronaut also uses the pool to load the bean definitions, and the main thread, which would otherwise help, then only waits. The pool size follows the processor count, which `-XX:ActiveProcessorCount` and container CPU limits change, and `-Djava.util.concurrent.ForkJoinPool.common.parallelism` sets it directly.
 * It stands down in a native image.
-* The gain grows with the number of processors. It is larger without a JDK AOT cache than with one, which already makes loading the bean definitions cheaper. Measure the startup of your application with and without the property before you keep it.
+* It is larger without a JDK AOT cache than with one, which already makes loading the bean definitions cheaper. Measure the startup of your application with and without the property before you keep it.
 
 === Caveats
 
