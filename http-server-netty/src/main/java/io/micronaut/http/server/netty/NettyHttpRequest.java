@@ -340,6 +340,19 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
+    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        String key = name.toString();
+        if (attributes == null && !RouteMetadataAttributes.isMetadataKey(key)) {
+            // nothing set: answer without creating the attribute map
+            return Optional.empty();
+        }
+        return getAttributes().get(key, type);
+    }
+
+    @Override
     public @Nullable Object getRouteMatchMetadata() {
         return routeMatch;
     }
