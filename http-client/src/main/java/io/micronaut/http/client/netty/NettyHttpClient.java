@@ -26,6 +26,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -86,6 +87,7 @@ import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
@@ -177,6 +179,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
@@ -193,6 +196,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -200,6 +204,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -207,6 +212,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -298,6 +304,11 @@ final class NettyHttpClient implements
     private final Charset defaultCharset;
     private final Logger log;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
+    /**
+     * {@code true} when the default resolver is used and no filter entry applies to this client,
+     * so per-request filter resolution and sorting can be skipped.
+     */
+    private final boolean noFilters;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     @Nullable
@@ -336,6 +347,7 @@ final class NettyHttpClient implements
                 new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
             );
         }
+        this.noFilters = clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
         this.webSocketRegistry = builder.webSocketBeanRegistry;
         this.conversionService = builder.conversionService;
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
@@ -490,10 +502,21 @@ final class NettyHttpClient implements
                         disable this check if you are certain a blocking operation is fine \
                         here.""");
                 }
+                if (Schedulers.isInNonBlockingThread()) {
+                    // same check (and message) as reactor's block(), which this client used before
+                    throw new IllegalStateException("block()/blockFirst()/blockLast() are blocking, which is not supported in thread " + Thread.currentThread().getName());
+                }
                 BlockHint blockHint = BlockHint.willBlockThisThread();
-                return Objects.requireNonNull(NettyHttpClient.this.exchange(request, bodyType, errorType, blockHint).block(),
-                    "The blocking HTTP client returned a null response");
-                // We don't have to release client response buffer
+                try {
+                    return Objects.requireNonNull(awaitFlow(exchangeFlow(request, bodyType, errorType, blockHint)),
+                        "The blocking HTTP client returned a null response");
+                    // We don't have to release client response buffer
+                } catch (HttpClientException e) {
+                    if (configuration.isBlockingCallerStackTrace()) {
+                        throw customizeBlockingException(e);
+                    }
+                    throw e;
+                }
             }
 
             @Override
@@ -669,6 +692,46 @@ final class NettyHttpClient implements
             }), FluxSink.OverflowStrategy.BUFFER);
     }
 
+    /**
+     * Wait for the given flow to complete on the calling thread. Errors are reported the same way
+     * as reactor's {@code Mono.block()}: checked exceptions are wrapped using
+     * {@link Exceptions#propagate(Throwable)}, and a suppressed exception carrying the stack trace
+     * of the calling thread is added. If the thread is interrupted, the flow is cancelled.
+     *
+     * @param flow The flow to wait for
+     * @param <T>  The value type
+     * @return The flow value
+     */
+    @Nullable
+    private static <T> T awaitFlow(ExecutionFlow<T> flow) {
+        T value;
+        Throwable error;
+        ImperativeExecutionFlow<T> complete = flow.tryComplete();
+        if (complete != null) {
+            value = complete.getValue();
+            error = complete.getError();
+        } else {
+            BlockingFlowListener<T> listener = new BlockingFlowListener<>();
+            flow.onComplete(listener);
+            try {
+                listener.await();
+            } catch (InterruptedException e) {
+                flow.cancel();
+                Thread.currentThread().interrupt();
+                throw Exceptions.propagate(e);
+            }
+            value = listener.value;
+            error = listener.error;
+        }
+        if (error != null) {
+            RuntimeException re = Exceptions.propagate(error);
+            // the error usually comes from the event loop, keep the stack trace of the caller
+            re.addSuppressed(new Exception("#block terminated with an error"));
+            throw re;
+        }
+        return value;
+    }
+
     private static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
         return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
     }
@@ -772,7 +835,7 @@ final class NettyHttpClient implements
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
-        return Flux.defer(() -> exchange(request, bodyType, errorType, null).flux())
+        return Flux.defer(() -> toMono(exchangeFlow(request, bodyType, errorType, null), PropagatedContext.getOrEmpty()).flux())
             // some tests expect flux...
             ;
     }
@@ -792,11 +855,6 @@ final class NettyHttpClient implements
                                                                  @Nullable Argument<O> bodyType,
                                                                  Argument<E> errorType) {
         return exchangeFlow(request, bodyType, errorType, null);
-    }
-
-    private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
-        ExecutionFlow<HttpResponse<O>> flow = exchangeFlow(request, bodyType, errorType, blockHint);
-        return toMono(flow, PropagatedContext.getOrEmpty());
     }
 
     private <I, O, E> ExecutionFlow<HttpResponse<O>> exchangeFlow(io.micronaut.http.HttpRequest<I> request,
@@ -847,7 +905,7 @@ final class NettyHttpClient implements
                 flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
-                            return ExecutionFlow.error(headersReceived.get() ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            return ExecutionFlow.error(decorate(new ReadTimeoutException(headersReceived.get())));
                         }
                         return ExecutionFlow.error(throwable);
                     });
@@ -858,19 +916,19 @@ final class NettyHttpClient implements
 
     private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
-        DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-            resp.nettyResponse.protocolVersion(),
-            resp.nettyResponse.status(),
-            buf,
-            resp.nettyResponse.headers(),
-            EmptyHttpHeaders.INSTANCE
-        );
-
+        FullHttpResponse fullHttpResponse;
         try {
             if (log.isTraceEnabled()) {
-                traceBody("Response", fullHttpResponse.content());
+                traceBody("Response", buf);
             }
+            // copy the pooled body exactly once; every response object created below (including
+            // the error paths) shares this copy, and the pooled buffer can be released right away
+            fullHttpResponse = FullNettyClientHttpResponse.detach(resp.nettyResponse, buf);
+        } finally {
+            buf.release();
+        }
 
+        try {
             boolean convertBodyWithBodyType = shouldConvertWithBodyType(fullHttpResponse, this.configuration, bodyType, errorType);
             FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
 
@@ -907,8 +965,6 @@ final class NettyHttpClient implements
                 }
             ));
             return ExecutionFlow.error(clientResponseError);
-        } finally {
-            fullHttpResponse.release();
         }
     }
 
@@ -1629,10 +1685,13 @@ final class NettyHttpClient implements
             ClientAttributes.setServiceId(request, informationalServiceId);
         }
 
-        List<GenericHttpFilter> filters =
-            filterResolver.resolveFilters(request, clientFilterEntries);
-
-        FilterRunner.sortReverse(filters);
+        List<GenericHttpFilter> filters;
+        if (noFilters) {
+            filters = List.of();
+        } else {
+            filters = filterResolver.resolveFilters(request, clientFilterEntries);
+            FilterRunner.sortReverse(filters);
+        }
 
         FilterRunner runner = new FilterRunner(filters) {
             @Override
@@ -2836,6 +2895,38 @@ final class NettyHttpClient implements
     }
 
     /**
+     * Rewrite the stack trace of an exception thrown from a blocking client call so that it points
+     * to the code that made the call rather than to the Netty event loop (or the request-timeout
+     * scheduler) where the exception was actually constructed. Without this, exceptions such as
+     * {@link ReadTimeoutException} carry a stack trace that does not mention the caller at all.
+     *
+     * <p>This method is only ever called on the thread that performed the blocking call, right
+     * after the blocking await (see {@link #awaitFlow(ExecutionFlow)}) has unwound, so the current
+     * thread's stack trace is exactly the caller chain. The original execution stack trace is
+     * preserved as a suppressed exception for debugging.
+     *
+     * @param exception the exception thrown from the blocking call
+     * @param <E>        the exception type
+     * @return the same exception, with its stack trace pointing at the caller
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/12655">gh-12655</a>
+     */
+    private static <E extends HttpClientException> E customizeBlockingException(E exception) {
+        StackTraceElement[] origin = exception.getStackTrace();
+        if (origin.length > 0) {
+            BlockingClientExecutionTrace originTrace = new BlockingClientExecutionTrace();
+            originTrace.setStackTrace(origin);
+            exception.addSuppressed(originTrace);
+        }
+        // We are back on the thread that made the blocking call; its stack points to the caller.
+        // Drop Thread.getStackTrace() (index 0) and this method's frame (index 1).
+        StackTraceElement[] caller = Thread.currentThread().getStackTrace();
+        if (caller.length > 2) {
+            exception.setStackTrace(Arrays.copyOfRange(caller, 2, caller.length));
+        }
+        return exception;
+    }
+
+    /**
      * Map a failure of a response, before or after its headers, to a client exception. The
      * outcome for the load balancer is not reported here: the response listener of the exchange
      * reports it, see {@link #failureOutcome}.
@@ -2861,9 +2952,10 @@ final class NettyHttpClient implements
         } else if (cause instanceof BufferLengthExceededException blee) {
             result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-            result = ReadTimeoutException.TIMEOUT_EXCEPTION;
+            // a Netty read timeout fires before the response headers arrive
+            result = decorate(new ReadTimeoutException(false));
         } else if (cause instanceof ReadTimeoutException rte) {
-            // a shared instance takes no service id; a timeout of the body is already mapped
+            // already mapped (e.g. a body timeout from the request-timeout path), keep it as-is
             result = rte;
         } else if (cause instanceof HttpClientException hce) {
             result = decorate(hce);
@@ -3279,6 +3371,30 @@ final class NettyHttpClient implements
     }
 
     /**
+     * Completion listener that a blocking caller waits on, see {@link #awaitFlow(ExecutionFlow)}.
+     *
+     * @param <T> The value type
+     */
+    private static final class BlockingFlowListener<T> extends CountDownLatch implements BiConsumer<T, @Nullable Throwable> {
+        @Nullable
+        T value;
+        @Nullable
+        Throwable error;
+
+        BlockingFlowListener() {
+            super(1);
+        }
+
+        @Override
+        public void accept(T value, @Nullable Throwable error) {
+            // the count down publishes these fields to the waiting thread
+            this.value = value;
+            this.error = error;
+            countDown();
+        }
+    }
+
+    /**
      * Internal signal that a request failed because the reused connection it was written to had
      * already been closed, before any part of the response was received. The request is sent
      * again on another connection, and this exception never reaches the caller.
@@ -3290,6 +3406,17 @@ final class NettyHttpClient implements
         StaleConnectionException(@Nullable CloseableAvailableByteBody replayBody) {
             super("Reused connection was closed before the response was received", null, false, false);
             this.replayBody = replayBody;
+        }
+    }
+
+    /**
+     * Marker carrying the original execution stack trace of a blocking client failure (the point
+     * on the event loop where the exception was constructed), attached as a suppressed exception
+     * by {@link #customizeBlockingException(HttpClientException)}.
+     */
+    private static final class BlockingClientExecutionTrace extends Throwable {
+        BlockingClientExecutionTrace() {
+            super("Client request execution failed on a background thread; stack trace of the failure follows", null, false, true);
         }
     }
 }

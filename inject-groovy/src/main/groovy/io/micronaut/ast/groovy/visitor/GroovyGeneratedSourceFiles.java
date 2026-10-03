@@ -56,13 +56,21 @@ import java.util.Set;
  * <p>The rewind only skips the sources whose phase is marked complete, and the compiler marks a phase complete
  * after it has checked the queue. A source queued from the middle of a phase would therefore make the whole
  * phase run a second time for every source already in it, transforms included. So the generated sources are
- * not queued where they are written. Instead a phase operation is registered for a later phase, instruction
- * selection at the earliest, after the operations that visit the types and write the bean definitions; the
- * compiler appends it after every other operation of that phase, and when it runs it marks the phase complete
- * for the sources in the unit exactly as the compiler would, and only then queues the generated sources. The
- * rewind then processes the generated sources alone up to that phase, after which all sources continue
- * together. Micronaut's transforms, and every other global transform, see the generated class exactly once,
- * as they would a class the compilation started with, and its classes reach the same output as the others.</p>
+ * not queued where they are written. Instead they are queued by a phase operation that runs after every
+ * other operation of its phase: when it runs it marks the phase complete for the sources in the unit exactly
+ * as the compiler would, and only then queues the generated sources. The rewind then processes the generated
+ * sources alone up to that phase, after which all sources continue together. Micronaut's transforms, and every
+ * other global transform, see the generated class exactly once, as they would a class the compilation started
+ * with, and its classes reach the same output as the others.</p>
+ *
+ * <p>The sources the visitors write are queued at the end of canonicalization, by the operation
+ * {@link #registerCanonicalizationQueue(CompilationUnit)} registers after the operations that visit the types and
+ * write the bean definitions, so that the generated classes exist before instruction selection, where
+ * {@code @CompileStatic} and {@code @TypeChecked} code is checked. The hand-written sources were resolved in
+ * semantic analysis, before the generated classes existed: a reference to a generated class that Groovy left as
+ * a dynamic variable or property is replaced with the class by {@link GroovyGeneratedClassReferences}, first thing
+ * in instruction selection. A source written later, while instruction selection runs, is queued by an operation
+ * of the following phase, and is compiled but cannot be referenced from the other sources.</p>
  *
  * <p>The generated source reports the URI of the source it originates from: tooling that attributes the classes
  * of the compilation to source files (Gradle's incremental Groovy compilation does, at class generation) then
@@ -72,7 +80,7 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Internal
-final class GroovyGeneratedSourceFiles {
+public final class GroovyGeneratedSourceFiles {
 
     private static final String EXTENSION = ".groovy";
 
@@ -80,6 +88,7 @@ final class GroovyGeneratedSourceFiles {
     private final Map<String, GroovyGeneratedSourceFile> files = CollectionUtils.newLinkedHashMap(8);
     private final List<GroovyGeneratedSourceFile> pending = new ArrayList<>(4);
     private final Set<Integer> queuePhases = CollectionUtils.newHashSet(4);
+    private final GroovyGeneratedClassReferences references = new GroovyGeneratedClassReferences();
 
     private GroovyGeneratedSourceFiles(CompilationUnit compilationUnit) {
         this.compilationUnit = compilationUnit;
@@ -93,6 +102,20 @@ final class GroovyGeneratedSourceFiles {
      */
     static GroovyGeneratedSourceFiles of(CompilationUnit compilationUnit) {
         return compilationUnit.getAST().getNodeMetaData(GroovyGeneratedSourceFiles.class, key -> new GroovyGeneratedSourceFiles(compilationUnit));
+    }
+
+    /**
+     * Registers the operation that queues the sources generated up to the end of canonicalization. It must be
+     * registered before canonicalization, after the operations that visit the types and write the bean definitions,
+     * so that it runs after them and before the compiler checks the queue at the end of the phase.
+     *
+     * @param compilationUnit The compilation unit
+     */
+    public static void registerCanonicalizationQueue(CompilationUnit compilationUnit) {
+        GroovyGeneratedSourceFiles files = of(compilationUnit);
+        if (compilationUnit.getPhase() < Phases.CANONICALIZATION && files.queuePhases.add(Phases.CANONICALIZATION)) {
+            compilationUnit.addNewPhaseOperation(files::queuePending, Phases.CANONICALIZATION);
+        }
     }
 
     /**
@@ -137,10 +160,15 @@ final class GroovyGeneratedSourceFiles {
                     return originating == null ? super.getURI() : originating.getURI();
                 }
             };
-            compilationUnit.addSource(new SourceUnit(file.getName(), readerSource, compilationUnit.getConfiguration(), compilationUnit.getClassLoader(), compilationUnit.getErrorCollector()));
+            SourceUnit generatedSource = new SourceUnit(file.getName(), readerSource, compilationUnit.getConfiguration(), compilationUnit.getClassLoader(), compilationUnit.getErrorCollector());
+            compilationUnit.addSource(generatedSource);
+            references.add(generatedSource);
             file.queued = true;
         }
         pending.clear();
+        if (phase < Phases.INSTRUCTION_SELECTION) {
+            references.register(compilationUnit);
+        }
     }
 
     /**
@@ -217,8 +245,9 @@ final class GroovyGeneratedSourceFiles {
             if (!pending.contains(this)) {
                 pending.add(this);
             }
-            // the type element visitors and the bean definitions run at the end of CANONICALIZATION (deferred phase
-            // operations); the generated sources are queued after them, so they do not skip the sources they mark complete
+            // a source written up to the end of CANONICALIZATION is queued by the operation registered for that phase,
+            // after the type element visitors and the bean definitions; this one queues what is written after it and
+            // does nothing when that operation has already queued the source
             int queuePhase = Math.max(phase + 1, Phases.INSTRUCTION_SELECTION);
             if (queuePhases.add(queuePhase)) {
                 compilationUnit.addNewPhaseOperation(GroovyGeneratedSourceFiles.this::queuePending, queuePhase);

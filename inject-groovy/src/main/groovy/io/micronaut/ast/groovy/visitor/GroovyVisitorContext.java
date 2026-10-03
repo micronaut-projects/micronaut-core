@@ -297,6 +297,11 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement, byte @Nullable [] content) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement, content);
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
         return outputVisitor.visitMetaInfFile(path, originatingElements);
     }

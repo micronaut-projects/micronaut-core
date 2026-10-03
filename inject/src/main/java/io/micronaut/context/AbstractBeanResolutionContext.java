@@ -449,6 +449,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     /**
+     * @return The currently retained dependents, without resolving a target or transferring ownership
+     */
+    final List<BeanRegistration<?>> getCachedProxyTargetDependents() {
+        List<BeanRegistration<?>> dependents = cachedProxyTargetDependents;
+        return dependents == null ? List.of() : List.copyOf(dependents);
+    }
+
+    /**
      * @return The dependents of the cached target, which are forgotten, or {@code null}
      */
     @Nullable
@@ -744,9 +752,39 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         DefaultPath() {
         }
 
+        /**
+         * A snapshot of the path, in its own order, for rendering a message.
+         *
+         * <p>Rendering reads the path several times -- iterating it, and asking for its
+         * size and for the index of an element -- so it must not read the live list. A
+         * segment's own {@code toString} can resolve something that pushes onto the path
+         * part way through, and iteration then fails with a
+         * {@link java.util.ConcurrentModificationException} thrown from inside the
+         * constructor of the exception being reported, which replaces a
+         * {@code Circular dependency detected} message and its path with an unrelated
+         * error naming neither. Reporting a failure must not be able to fail.
+         *
+         * <p>This addresses modification by the rendering thread, which is the case a
+         * resolution context has: the path belongs to one thread's resolution. It is not a
+         * guard against another thread mutating the path concurrently, and cannot be --
+         * {@link java.util.LinkedList#toArray()} walks its nodes without checking
+         * {@code modCount}, so the copy itself would be unsafe.
+         *
+         * <p>The order is the list's own, not the descending order the renderers walk in,
+         * so that an index into it means what it meant before: {@code lastIndexOf} is used
+         * to locate the start of the cycle and a reversed copy would mirror the answer.
+         *
+         * @return The segments, head first
+         */
+        private List<Segment<?, ?>> messageSnapshot() {
+            return new ArrayList<>(this);
+        }
+
         @Override
         public String toConsoleString(boolean ansiSupported) {
-            Iterator<Segment<?, ?>> i = descendingIterator();
+            List<Segment<?, ?>> segments = messageSnapshot();
+            Collections.reverse(segments);
+            Iterator<Segment<?, ?>> i = segments.iterator();
             String ls = CachedEnvironment.getProperty("line.separator");
             StringBuilder pathString = new StringBuilder().append(ls);
 
@@ -777,23 +815,34 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @SuppressWarnings("MagicNumber")
         @Override
         public String toConsoleCircularString(boolean ansiSupported) {
-            Iterator<Segment<?, ?>> i = descendingIterator();
-            StringBuilder pathString = new StringBuilder();
-            String ls = CachedEnvironment.getProperty("line.separator");
-
-            // Try finding an actual cycle, cycleI is index where the cycle starts
-            int cycleIndex = lastIndexOf(iterator().next());
+            // One snapshot for the whole render: the size, the cycle index and the
+            // iteration all have to agree with each other, and with the live path they
+            // need not.
+            List<Segment<?, ?>> segments = messageSnapshot();
+            if (segments.isEmpty()) {
+                return "";
+            }
+            int size = segments.size();
+            // `lastIndexOf` against the list's own order, as before; the head is what
+            // `iterator().next()` used to return.
+            int cycleIndex = segments.lastIndexOf(segments.get(0));
             if (cycleIndex > 0) {
-                cycleIndex = size() - cycleIndex;
+                cycleIndex = size - cycleIndex;
             } else {
                 cycleIndex = 0;
             }
+
+            List<Segment<?, ?>> descending = new ArrayList<>(segments);
+            Collections.reverse(descending);
+            Iterator<Segment<?, ?>> i = descending.iterator();
+            StringBuilder pathString = new StringBuilder();
+            String ls = CachedEnvironment.getProperty("line.separator");
 
             String spaces = "";
             int index = 0;
             // The last element ends the cycle and is repeated in the path, so we skip it
             // and point to an already present element instead
-            while (i.hasNext() && index < size() - 1) {
+            while (i.hasNext() && index < size - 1) {
                 String segmentString = i.next().toString();
                 if (index == cycleIndex) {
                     pathString.append(ls).append(spaces).append("^").append("  ")

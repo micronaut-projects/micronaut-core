@@ -142,7 +142,9 @@ class JdkClaimedRequestBodyUpstreamFailureSpec extends Specification {
         }
 
         then:
-        buffers.every { it.refCnt() == 0 }
+        new PollingConditions(timeout: 10).eventually {
+            assert buffers.every { it.refCnt() == 0 }
+        }
 
         where:
         options << [null, RawRequestOptions.getDefault(), RawRequestOptions.proxy()]

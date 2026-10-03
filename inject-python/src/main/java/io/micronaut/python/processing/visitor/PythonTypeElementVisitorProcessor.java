@@ -440,7 +440,7 @@ public final class PythonTypeElementVisitorProcessor {
         Class<?> serviceClass = outputObjectDef.serviceClass();
         OriginatingElements originatingElements = outputObjectDef.originatingElements();
         if (serviceClass != null) {
-            pythonVisitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+            pythonVisitorContext.visitServiceDescriptor(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements()[0], outputObjectDef.serviceContent());
         }
         try (OutputStream outputStream = pythonVisitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
             outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, pythonVisitorContext));

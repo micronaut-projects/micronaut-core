@@ -43,6 +43,50 @@ class TestExpressionsInjectionSpec extends AbstractEvaluatedExpressionsSpec {
         ctx.close()
     }
 
+    void "test expression Optional method and constructor parameter injection"() {
+        given:
+        def ctx = buildContext("""
+            package test;
+
+            import jakarta.inject.Inject;
+            import jakarta.inject.Singleton;
+            import io.micronaut.context.annotation.Value;
+            import java.util.Optional;
+
+            @Singleton
+            class Expr {
+                Optional<String> ctorPresent;
+                Optional<String> ctorAbsent;
+                Optional<String> methodPresent;
+                Optional<String> methodAbsent;
+
+                Expr(@Value("#{ 'ctor' }") Optional<String> present,
+                     @Value("#{ null }") Optional<String> absent) {
+                    this.ctorPresent = present;
+                    this.ctorAbsent = absent;
+                }
+
+                @Inject
+                void init(@Value("#{ 'method' }") Optional<String> present,
+                          @Value("#{ null }") Optional<String> absent) {
+                    this.methodPresent = present;
+                    this.methodAbsent = absent;
+                }
+            }
+        """)
+
+        def bean = ctx.getBean(ctx.classLoader.loadClass('test.Expr'))
+
+        expect:
+        bean.ctorPresent == Optional.of('ctor')
+        bean.ctorAbsent == Optional.empty()
+        bean.methodPresent == Optional.of('method')
+        bean.methodAbsent == Optional.empty()
+
+        cleanup:
+        ctx.close()
+    }
+
     void "test expression constructor injection"() {
         given:
         def ctx = buildContext("""

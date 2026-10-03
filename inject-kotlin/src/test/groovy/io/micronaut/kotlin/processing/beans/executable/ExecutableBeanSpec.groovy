@@ -609,8 +609,7 @@ class MyBean {
             assert am.hasStereotype(Executable)
     }
 
-    @PendingFeature
-    void "test how the type annotations from the type are preserved - pending 1"() {
+    void "test type annotations on a generic occurrence are preserved"() {
         given:
             BeanDefinition bd = buildBeanDefinition('test.MyBean', '''\
 package test

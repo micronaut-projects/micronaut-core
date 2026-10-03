@@ -156,6 +156,19 @@ registration. Two targets never share an instance, and each instance is destroye
 as a scoped proxy, intercepts each target it resolves with that target's instances. The proxy itself is injected with no
 interceptors and creates none.
 
+Core records shared singleton interceptors as dependencies of the target, including interceptors selected after the
+target was created. During context shutdown, a singleton target or a singleton owning a prototype target is destroyed
+before those shared interceptors. Failed selections clean up newly created dependents, and a selection racing target
+destruction cannot attach new interceptors to the destroyed target. Custom-scoped interceptors remain owned by their
+scope.
+New selections are rejected once context shutdown begins; selections already cached on a target remain available
+to destruction callbacks until that target is destroyed.
+
+An interceptor that resolves additional beans dynamically can inject api:context.BeanDependencyResolver[] to give
+those dependencies its lifetime. It uses the same ownership and failure-cleanup infrastructure as native interceptor
+selection. Ordinary prototype lookups still create separate instances; native interceptor selection separately retains
+the instance associated with each target.
+
 For example, this interceptor numbers the calls it intercepts:
 
 snippet::io.micronaut.docs.aop.lifecycle.pertarget.AuditInterceptor[tags="imports,interceptor", indent=0, title="A per-target interceptor"]

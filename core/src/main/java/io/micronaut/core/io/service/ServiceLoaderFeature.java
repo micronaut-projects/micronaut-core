@@ -29,6 +29,7 @@ import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeProxyCreation;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
+import org.graalvm.nativeimage.hosted.RuntimeResourceAccess;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -55,11 +56,15 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 @SuppressWarnings("unused")
 class ServiceLoaderFeature implements Feature {
 
+    private static final String BEAN_DEFINITION_REFERENCE = "io.micronaut.inject.BeanDefinitionReference";
+    private static final String BEAN_DEFINITION_ENTRIES = "META-INF/micronaut/" + BEAN_DEFINITION_REFERENCE + "/";
+    private static final byte[] NO_CONTENT = new byte[0];
+
     private final List<String> INTERNAL_SERVICE = List.of(
         "io.micronaut.core.convert.TypeConverterRegistrar",
         "io.micronaut.context.env.PropertySourceLoader",
         "io.micronaut.core.beans.BeanIntrospectionReference",
-        "io.micronaut.inject.BeanDefinitionReference",
+        BEAN_DEFINITION_REFERENCE,
         "io.micronaut.context.env.PropertyExpressionResolver",
         "io.micronaut.context.ApplicationContextConfigurer"
     );
@@ -206,6 +211,8 @@ class ServiceLoaderFeature implements Feature {
     protected ExclusiveStaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         try {
             Map<String, Set<String>> services = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader());
+            // the entries only: the names of META-INF/services are added to the same set below
+            registerBeanDefinitionEntries(services.getOrDefault(BEAN_DEFINITION_REFERENCE, Set.of()));
             for (String internalService : INTERNAL_SERVICE) {
                 Set<String> entries = services.computeIfAbsent(internalService, x -> new LinkedHashSet<>());
                 collectDynamicServices(entries, internalService);
@@ -216,6 +223,37 @@ class ServiceLoaderFeature implements Feature {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * Registers the {@code META-INF/micronaut} entries of the bean definitions as resources without content.
+     *
+     * <p>The processors write a descriptor of each definition into its entry. Nothing in an image reads it: the
+     * definitions are found by the names of the static service definitions. The resource configuration of
+     * {@code micronaut-inject} leaves these entries out, and they are registered here empty, as they were before
+     * the entries had content, so that what lists or opens them in an image finds what it found then.</p>
+     *
+     * <p>That exclusion has to stay in the {@code excludes} of the legacy {@code resource-config.json} of
+     * {@code micronaut-inject}: the resources of {@code reachability-metadata.json} are globs, and that format has no
+     * exclusion, so moving the configuration there would put the descriptors back into images.
+     * {@code BeanDefinitionEntriesTest} of {@code test-suite-netty-ssl-graalvm} checks that an image has the entries
+     * without content.</p>
+     *
+     * @param names The names of the entries
+     */
+    private void registerBeanDefinitionEntries(Collection<String> names) {
+        for (String name : names) {
+            addResource(BEAN_DEFINITION_ENTRIES + name, NO_CONTENT);
+        }
+    }
+
+    /**
+     * Add a resource of the class path to the image.
+     * @param path The path of the resource
+     * @param content The content
+     */
+    void addResource(String path, byte[] content) {
+        RuntimeResourceAccess.addResource(getClass().getClassLoader().getUnnamedModule(), path, content);
     }
 
     private void collectDynamicServices(Collection<String> values, String name) {

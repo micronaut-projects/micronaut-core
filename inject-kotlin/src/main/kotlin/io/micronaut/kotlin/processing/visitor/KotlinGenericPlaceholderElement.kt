@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.symbol.KSTypeArgument
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ClassElement
@@ -44,6 +45,8 @@ internal class KotlinGenericPlaceholderElement(
     arrayDimensions,
     true
 ), GenericPlaceholderElement {
+
+    internal var typeArgument: KSTypeArgument? = null
 
     constructor(
         genericNativeType: KotlinTypeParameterNativeElement,
@@ -89,7 +92,7 @@ internal class KotlinGenericPlaceholderElement(
         elementAnnotationMetadataFactory,
         visitorContext,
         arrayDimensions
-    )
+    ).also { it.typeArgument = typeArgument }
 
     override fun isGenericPlaceholder() = true
 
@@ -115,7 +118,7 @@ internal class KotlinGenericPlaceholderElement(
         elementAnnotationMetadataFactory,
         visitorContext,
         arrayDimensions
-    )
+    ).also { it.typeArgument = typeArgument }
 
     override fun getBounds() = bounds
 

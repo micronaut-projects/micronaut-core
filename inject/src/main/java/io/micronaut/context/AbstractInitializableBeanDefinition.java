@@ -2770,7 +2770,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Optional<?> expressionValue =
             argument.getAnnotationMetadata()
                 .getValue(Value.class, t);
-        return expressionValue.orElse(null);
+        Object value = expressionValue.orElse(null);
+        return argument.isOptional() ? Optional.ofNullable(value) : value;
     }
 
     @Internal

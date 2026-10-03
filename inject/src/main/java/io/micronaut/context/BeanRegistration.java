@@ -19,7 +19,6 @@ import io.micronaut.context.scope.CreatedBean;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -119,9 +118,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                       K bean,
                                       @Nullable List<BeanRegistration<?>> dependents,
                                       @Nullable List<?> interceptorRegistrations) {
-        return CollectionUtils.isNotEmpty(dependents) ?
-            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents), interceptorRegistrations) :
-            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, interceptorRegistrations);
+        return new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents, interceptorRegistrations);
     }
 
     @Override
