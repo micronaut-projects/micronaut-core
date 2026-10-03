@@ -451,7 +451,7 @@ public class CrossOriginTest {
             .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
 
         if (allowPrivateNetwork) {
-            request.header(HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, method);
+            request.header(HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, StringUtils.TRUE);
         }
 
         return request;
