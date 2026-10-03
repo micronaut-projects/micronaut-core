@@ -21,6 +21,7 @@ import io.micronaut.inject.BeanIdentifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * The disposing bean registration.
@@ -32,7 +33,6 @@ import java.util.List;
 @Internal
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
     private final BeanContext beanContext;
-    private final BeanDependencies dependencies;
     @Nullable
     @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
     private volatile AbstractBeanResolutionContext proxyTargetContext;
@@ -51,13 +51,27 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
                               @Nullable List<?> interceptorRegistrations) {
-        super(identifier, beanDefinition, createdBean);
+        this(beanContext, identifier, beanDefinition, createdBean, dependents, interceptorRegistrations, new BeanDependencies());
+    }
+
+    BeanDisposingRegistration(BeanContext beanContext,
+                              BeanIdentifier identifier,
+                              BeanDefinition<BT> beanDefinition,
+                              BT createdBean,
+                              @Nullable List<BeanRegistration<?>> dependents,
+                              @Nullable List<?> interceptorRegistrations,
+                              BeanDependencies dependencies) {
+        super(identifier, beanDefinition, createdBean, dependencies);
         this.beanContext = beanContext;
-        // The resolver is a dependent bean itself. Its registration holds the same ownership state, so normal
-        // destruction and shutdown graph traversal need no resolver-specific path.
-        this.dependencies = createdBean instanceof DefaultBeanDependencyResolver resolver
-            ? resolver.dependencies : new BeanDependencies();
-        this.dependencies.initialize(dependents, interceptorRegistrations);
+        // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
+        // duplicate registrations or add them back to an owner that was already destroyed.
+        if ((getDependencies() == dependencies || createdBean instanceof DefaultBeanDependencyResolver)
+            && !getDependencies().initialize(dependents, interceptorRegistrations)
+            && beanContext instanceof DefaultBeanContext context) {
+            // The owner was destroyed before its creation completed and released what it held then. Dependents
+            // created with the bean would be attached to an owner that no longer destroys anything.
+            context.destroyCreatedBeans(dependents, null);
+        }
         this.interceptorRegistrations = interceptorRegistrations;
     }
 
@@ -91,16 +105,17 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
      * @return {@code true} if the registration had not been closed or marked before
      */
     boolean markDestroyed() {
-        return dependencies.markDestroyed();
-    }
-
-    BeanDependencies getDependencies() {
-        return dependencies;
+        return getDependencies().markDestroyed();
     }
 
     @Override
     public List<BeanRegistration<?>> dependentBeans() {
-        return dependencies.dependentBeans();
+        return super.dependentBeans();
+    }
+
+    @Override
+    BeanDependencies getDependencies() {
+        return Objects.requireNonNull(super.getDependencies());
     }
 
     /**
@@ -128,17 +143,10 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
-     * Stops resolution and transfers the dependents to the destruction caller exactly once.
-     *
-     * @return The dependents
+     * Clears the interceptor selection retained for this registration.
      */
     synchronized void takeSelection() {
         keptSelection = null;
-    }
-
-    synchronized List<BeanRegistration<?>> takeDependents() {
-        takeSelection();
-        return dependencies.takeDependents();
     }
 
     /**
@@ -172,11 +180,11 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
             if (kept != null && kept.key == key) {
                 return (S) kept.value;
             }
-            if (dependencies.isClosing()) {
+            if (getDependencies().isClosing()) {
                 // closed, or being destroyed: nothing becomes the bean's any more
                 return null;
             }
-            S selection = dependencies.resolve((DefaultBeanContext) beanContext, getBeanDefinition(), selector::apply);
+            S selection = getDependencies().resolve((DefaultBeanContext) beanContext, getBeanDefinition(), selector);
             keptSelection = new KeptSelection(key, selection);
             return selection;
         }

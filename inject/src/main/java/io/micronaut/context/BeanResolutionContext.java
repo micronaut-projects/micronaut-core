@@ -33,6 +33,7 @@ import io.micronaut.inject.MethodInjectionPoint;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -147,6 +148,54 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     default <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
         return getBeanRegistrations(interceptorType, binding);
+    }
+
+    /**
+     * Returns a view of the current bean's ownership, for generated proxies to retain even when no scope
+     * holds their registration. The view shares the lifecycle of the registration created for this bean.
+     * @return The dependency group, or {@code null} for a legacy creation path
+     * @since 5.3.0
+     */
+    default @Nullable BeanDependencyGroup getBeanDependencyGroup() {
+        return null;
+    }
+
+    /**
+     * Associates a proxy's selected advice with the next creation of its unscoped target. Target construction
+     * keeps its own interceptor semantics; the proxy's advice takes precedence for target destruction.
+     * @param definition The target definition
+     * @param registrations The proxy's selected interceptor registrations
+     * @since 5.3.0
+     */
+    default void prepareProxyTarget(BeanDefinition<?> definition, List<?> registrations) {
+    }
+
+    /**
+     * Records the interceptor candidates for one bean's construction and lifecycle.
+     * @param definition The bean being created
+     * @param registrations Its interceptor registrations
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    default void setBeanInterceptors(BeanDefinition<?> definition, List<?> registrations) {
+        Map<BeanDefinition<?>, List<?>> stored =
+            (Map<BeanDefinition<?>, List<?>>) getAttribute(INTERCEPTOR_REGISTRATIONS);
+        if (stored == null) {
+            stored = new IdentityHashMap<>();
+            setAttribute(INTERCEPTOR_REGISTRATIONS, stored);
+        }
+        stored.put(definition, registrations);
+    }
+
+    /**
+     * Returns the candidates retained for one bean's lifecycle, without resolving any new beans.
+     * @param definition The bean being created
+     * @return Its interceptor registrations, or {@code null}
+     * @since 5.3.0
+     */
+    default @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
+        return getAttribute(INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> stored
+            && stored.get(definition) instanceof List<?> registrations ? registrations : null;
     }
 
     /**
