@@ -49,7 +49,8 @@ import java.lang.reflect.Modifier
  */
 @CompileStatic
 // IMPORTANT NOTE: This transform runs in phase CANONICALIZATION; the bean definitions are written at the end of
-// that phase, after Groovy's own local transforms and after the deferred TypeElementVisitorTransform (see visit)
+// that phase, after Groovy's own local transforms and after the deferred TypeElementVisitorTransform (see visit),
+// by the operation TypeElementVisitorTransform registers
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
@@ -59,9 +60,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
      * Groovy runs the global transforms of a phase before the local ones, so the bean definitions written here would
      * miss the constructors of a record or of a {@code @TupleConstructor} class, which
      * {@code TupleConstructorASTTransformation} adds in this phase. The work is therefore deferred to a phase
-     * operation registered from within CANONICALIZATION: the compiler runs it after every operation of the phase,
-     * including the operation {@link TypeElementVisitorTransform} registered from an earlier phase. It is registered
-     * once per compilation unit and processes every source unit of the compilation, the ones queued later included.
+     * operation for CANONICALIZATION, which {@link TypeElementVisitorTransform} registers from SEMANTIC_ANALYSIS
+     * after its own (see {@link #registerInjection(CompilationUnit)}): the compiler runs it after every operation of
+     * the phase, the local transforms included.
      */
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -69,10 +70,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             inject(source)
             return
         }
+        registerInjection(unit)
+    }
+
+    /**
+     * Registers the phase operation writing the bean definitions at the end of CANONICALIZATION. It is registered
+     * once per compilation unit and processes every source unit of the compilation, the ones queued later included.
+     *
+     * @param unit The compilation unit
+     */
+    static void registerInjection(CompilationUnit unit) {
         CompileUnit ast = unit.getAST()
         if (ast.getNodeMetaData(InjectTransform) == null) {
             ast.putNodeMetaData(InjectTransform, Boolean.TRUE)
-            unit.addNewPhaseOperation({ SourceUnit sourceUnit -> inject(sourceUnit) } as CompilationUnit.ISourceUnitOperation, Phases.CANONICALIZATION)
+            InjectTransform transform = new InjectTransform(unit: unit)
+            unit.addNewPhaseOperation({ SourceUnit sourceUnit -> transform.inject(sourceUnit) } as CompilationUnit.ISourceUnitOperation, Phases.CANONICALIZATION)
         }
     }
 
