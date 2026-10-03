@@ -289,7 +289,7 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
     static BeanDependencyGroup escaped;
     public Owner onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Owner> event) {
         try {
-            event.getResolutionContext().withDependencies(group -> {
+            event.withDependencies(group -> {
                 escaped = group;
                 group.getBean(Resource.class);
                 group.getBean(Resource.class);
