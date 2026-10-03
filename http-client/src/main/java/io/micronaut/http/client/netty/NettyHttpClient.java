@@ -512,7 +512,10 @@ final class NettyHttpClient implements
                         "The blocking HTTP client returned a null response");
                     // We don't have to release client response buffer
                 } catch (HttpClientException e) {
-                    throw customizeBlockingException(e);
+                    if (configuration.isBlockingCallerStackTrace()) {
+                        throw customizeBlockingException(e);
+                    }
+                    throw e;
                 }
             }
 
@@ -2924,17 +2927,6 @@ final class NettyHttpClient implements
     }
 
     /**
-     * Marker carrying the original execution stack trace of a blocking client failure (the point
-     * on the event loop where the exception was constructed), attached as a suppressed exception
-     * by {@link #customizeBlockingException(HttpClientException)}.
-     */
-    private static final class BlockingClientExecutionTrace extends Throwable {
-        BlockingClientExecutionTrace() {
-            super("Client request execution failed on a background thread; stack trace of the failure follows", null, false, true);
-        }
-    }
-
-    /**
      * Map a failure of a response, before or after its headers, to a client exception. The
      * outcome for the load balancer is not reported here: the response listener of the exchange
      * reports it, see {@link #failureOutcome}.
@@ -3414,6 +3406,17 @@ final class NettyHttpClient implements
         StaleConnectionException(@Nullable CloseableAvailableByteBody replayBody) {
             super("Reused connection was closed before the response was received", null, false, false);
             this.replayBody = replayBody;
+        }
+    }
+
+    /**
+     * Marker carrying the original execution stack trace of a blocking client failure (the point
+     * on the event loop where the exception was constructed), attached as a suppressed exception
+     * by {@link #customizeBlockingException(HttpClientException)}.
+     */
+    private static final class BlockingClientExecutionTrace extends Throwable {
+        BlockingClientExecutionTrace() {
+            super("Client request execution failed on a background thread; stack trace of the failure follows", null, false, true);
         }
     }
 }

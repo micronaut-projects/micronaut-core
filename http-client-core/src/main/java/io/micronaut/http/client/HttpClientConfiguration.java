@@ -148,6 +148,14 @@ public abstract class HttpClientConfiguration {
     public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
 
     /**
+     * The default value for {@link #isBlockingCallerStackTrace()}.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_BLOCKING_CALLER_STACK_TRACE = false;
+
+    /**
      * The default value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -263,6 +271,8 @@ public abstract class HttpClientConfiguration {
 
     private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
 
+    private boolean blockingCallerStackTrace = DEFAULT_BLOCKING_CALLER_STACK_TRACE;
+
     private DnsResolutionMode dnsResolutionMode = DEFAULT_DNS_RESOLUTION_MODE;
 
     @Nullable
@@ -337,6 +347,7 @@ public abstract class HttpClientConfiguration {
                 this.alpnModes = new ArrayList<>(copy.alpnModes);
             }
             this.allowBlockEventLoop = copy.allowBlockEventLoop;
+            this.blockingCallerStackTrace = copy.blockingCallerStackTrace;
             if (copy.dnsResolutionMode != null) {
                 this.dnsResolutionMode = copy.dnsResolutionMode;
             }
@@ -1129,6 +1140,36 @@ public abstract class HttpClientConfiguration {
      */
     public void setAllowBlockEventLoop(boolean allowBlockEventLoop) {
         this.allowBlockEventLoop = allowBlockEventLoop;
+    }
+
+    /**
+     * Whether exceptions thrown from a {@link BlockingHttpClient} call (including declarative
+     * clients with a synchronous return type) should have their stack trace replaced with the
+     * stack trace of the calling thread. Such exceptions are usually constructed on an event
+     * loop, so by default their stack trace does not mention the code that made the call. When
+     * enabled, the original stack trace is kept as a suppressed exception.
+     *
+     * @return {@code true} if the stack trace of the caller should be used
+     * @since 5.3.0
+     */
+    public boolean isBlockingCallerStackTrace() {
+        return blockingCallerStackTrace;
+    }
+
+    /**
+     * Whether exceptions thrown from a {@link BlockingHttpClient} call (including declarative
+     * clients with a synchronous return type) should have their stack trace replaced with the
+     * stack trace of the calling thread. Such exceptions are usually constructed on an event
+     * loop, so by default their stack trace does not mention the code that made the call. When
+     * enabled, the original stack trace is kept as a suppressed exception.
+     * <br>
+     * Default value: {@value DEFAULT_BLOCKING_CALLER_STACK_TRACE}
+     *
+     * @param blockingCallerStackTrace {@code true} if the stack trace of the caller should be used
+     * @since 5.3.0
+     */
+    public void setBlockingCallerStackTrace(boolean blockingCallerStackTrace) {
+        this.blockingCallerStackTrace = blockingCallerStackTrace;
     }
 
     /**
