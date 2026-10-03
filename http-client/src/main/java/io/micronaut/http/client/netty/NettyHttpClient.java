@@ -196,6 +196,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -506,9 +507,16 @@ final class NettyHttpClient implements
                     throw new IllegalStateException("block()/blockFirst()/blockLast() are blocking, which is not supported in thread " + Thread.currentThread().getName());
                 }
                 BlockHint blockHint = BlockHint.willBlockThisThread();
-                return Objects.requireNonNull(awaitFlow(exchangeFlow(request, bodyType, errorType, blockHint)),
-                    "The blocking HTTP client returned a null response");
-                // We don't have to release client response buffer
+                try {
+                    return Objects.requireNonNull(awaitFlow(exchangeFlow(request, bodyType, errorType, blockHint)),
+                        "The blocking HTTP client returned a null response");
+                    // We don't have to release client response buffer
+                } catch (HttpClientException e) {
+                    if (configuration.isBlockingCallerStackTrace()) {
+                        throw customizeBlockingException(e);
+                    }
+                    throw e;
+                }
             }
 
             @Override
@@ -897,7 +905,7 @@ final class NettyHttpClient implements
                 flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
-                            return ExecutionFlow.error(headersReceived.get() ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            return ExecutionFlow.error(decorate(new ReadTimeoutException(headersReceived.get())));
                         }
                         return ExecutionFlow.error(throwable);
                     });
@@ -2887,6 +2895,38 @@ final class NettyHttpClient implements
     }
 
     /**
+     * Rewrite the stack trace of an exception thrown from a blocking client call so that it points
+     * to the code that made the call rather than to the Netty event loop (or the request-timeout
+     * scheduler) where the exception was actually constructed. Without this, exceptions such as
+     * {@link ReadTimeoutException} carry a stack trace that does not mention the caller at all.
+     *
+     * <p>This method is only ever called on the thread that performed the blocking call, right
+     * after the blocking await (see {@link #awaitFlow(ExecutionFlow)}) has unwound, so the current
+     * thread's stack trace is exactly the caller chain. The original execution stack trace is
+     * preserved as a suppressed exception for debugging.
+     *
+     * @param exception the exception thrown from the blocking call
+     * @param <E>        the exception type
+     * @return the same exception, with its stack trace pointing at the caller
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/12655">gh-12655</a>
+     */
+    private static <E extends HttpClientException> E customizeBlockingException(E exception) {
+        StackTraceElement[] origin = exception.getStackTrace();
+        if (origin.length > 0) {
+            BlockingClientExecutionTrace originTrace = new BlockingClientExecutionTrace();
+            originTrace.setStackTrace(origin);
+            exception.addSuppressed(originTrace);
+        }
+        // We are back on the thread that made the blocking call; its stack points to the caller.
+        // Drop Thread.getStackTrace() (index 0) and this method's frame (index 1).
+        StackTraceElement[] caller = Thread.currentThread().getStackTrace();
+        if (caller.length > 2) {
+            exception.setStackTrace(Arrays.copyOfRange(caller, 2, caller.length));
+        }
+        return exception;
+    }
+
+    /**
      * Map a failure of a response, before or after its headers, to a client exception. The
      * outcome for the load balancer is not reported here: the response listener of the exchange
      * reports it, see {@link #failureOutcome}.
@@ -2912,9 +2952,10 @@ final class NettyHttpClient implements
         } else if (cause instanceof BufferLengthExceededException blee) {
             result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-            result = ReadTimeoutException.TIMEOUT_EXCEPTION;
+            // a Netty read timeout fires before the response headers arrive
+            result = decorate(new ReadTimeoutException(false));
         } else if (cause instanceof ReadTimeoutException rte) {
-            // a shared instance takes no service id; a timeout of the body is already mapped
+            // already mapped (e.g. a body timeout from the request-timeout path), keep it as-is
             result = rte;
         } else if (cause instanceof HttpClientException hce) {
             result = decorate(hce);
@@ -3365,6 +3406,17 @@ final class NettyHttpClient implements
         StaleConnectionException(@Nullable CloseableAvailableByteBody replayBody) {
             super("Reused connection was closed before the response was received", null, false, false);
             this.replayBody = replayBody;
+        }
+    }
+
+    /**
+     * Marker carrying the original execution stack trace of a blocking client failure (the point
+     * on the event loop where the exception was constructed), attached as a suppressed exception
+     * by {@link #customizeBlockingException(HttpClientException)}.
+     */
+    private static final class BlockingClientExecutionTrace extends Throwable {
+        BlockingClientExecutionTrace() {
+            super("Client request execution failed on a background thread; stack trace of the failure follows", null, false, true);
         }
     }
 }
