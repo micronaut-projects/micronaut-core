@@ -33,6 +33,7 @@ import io.micronaut.inject.MethodInjectionPoint;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -101,15 +102,15 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Resolves dependencies for a synchronous invocation and closes the temporary group afterwards.
      * A context supplied by the container for destruction permits temporary lookups during shutdown,
      * only on the destruction thread and until that invocation returns. Other contexts follow the ordinary
-     * shutdown restrictions of {@link BeanContext#withDependencies(java.util.function.Function)}.
+     * shutdown restrictions of {@link BeanContext#withDependencies(Function)}.
      * Cleanup failures are suppressed on an invocation failure. Do not retain an owned dependency in the result.
      * @param action The invocation
      * @param <R> The result type
      * @return The result
      * @since 5.3.0
      */
-    @io.micronaut.core.annotation.Experimental
-    default <R> R withDependencies(java.util.function.Function<BeanDependencyGroup, R> action) {
+    @Experimental
+    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
         return getContext().withDependencies(action);
     }
 
@@ -177,10 +178,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     @SuppressWarnings("unchecked")
     default void setBeanInterceptors(BeanDefinition<?> definition, List<?> registrations) {
-        java.util.Map<BeanDefinition<?>, List<?>> stored =
-            (java.util.Map<BeanDefinition<?>, List<?>>) getAttribute(INTERCEPTOR_REGISTRATIONS);
+        Map<BeanDefinition<?>, List<?>> stored =
+            (Map<BeanDefinition<?>, List<?>>) getAttribute(INTERCEPTOR_REGISTRATIONS);
         if (stored == null) {
-            stored = new java.util.IdentityHashMap<>();
+            stored = new IdentityHashMap<>();
             setAttribute(INTERCEPTOR_REGISTRATIONS, stored);
         }
         stored.put(definition, registrations);
@@ -193,7 +194,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 5.3.0
      */
     default @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
-        return getAttribute(INTERCEPTOR_REGISTRATIONS) instanceof java.util.Map<?, ?> stored
+        return getAttribute(INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> stored
             && stored.get(definition) instanceof List<?> registrations ? registrations : null;
     }
 
