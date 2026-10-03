@@ -376,15 +376,18 @@ public abstract class ResponseLifecycle {
             isJson = () -> isJsonRoute;
             MediaType finalMediaType = mediaType;
             pieces = new PieceStream(request, response, isJson);
+            MessageBodyWriter<Object> routeWriter = routeInfo.getMessageBodyWriter();
+            @SuppressWarnings("unchecked")
+            Argument<Object> routeBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
+            // whether the route's writer can write its body type in this media type does not change
+            // between the elements of one response, so it is checked once instead of for every element
+            MessageBodyWriter<Object> usableRouteWriter = routeWriter != null && routeWriter.isWriteable(routeBodyType, finalMediaType) ? routeWriter : null;
             httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
-                MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
-                @SuppressWarnings("unchecked")
-                Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
-
-                if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
-                    responseBodyType = Argument.ofInstance(message);
-                    messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
+                if (usableRouteWriter != null && routeBodyType.isInstance(message)) {
+                    return pieces.write(usableRouteWriter, routeBodyType, finalMediaType, message);
                 }
+                Argument<Object> responseBodyType = Argument.ofInstance(message);
+                MessageBodyWriter<Object> messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 return pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
             });
         } else {
