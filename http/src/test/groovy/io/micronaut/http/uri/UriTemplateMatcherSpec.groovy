@@ -46,6 +46,31 @@ class UriTemplateMatcherSpec extends Specification {
     }
 
     @Unroll
+    void "fewer variables with a regular expression is more specific: #left and #right"() {
+        given:
+        UriTemplateMatcher leftTemplate = new UriTemplateMatcher(left)
+        UriTemplateMatcher rightTemplate = new UriTemplateMatcher(right)
+
+        expect:
+        leftTemplate.compareTo(rightTemplate) == result
+        leftTemplate.patternVariableCount == leftPatterns
+
+        where:
+        left                   | right                | result | leftPatterns
+        "/t/{id}"              | "/t/{id:.+}"         | -1     | 0
+        "/t/{id:.+}"           | "/t/{id}"            | 1      | 1
+        "/t/{id:.+}"           | "/t/{x:[0-9]+}"      | 0      | 1
+        "/t/{a}/{b:.+}"        | "/t/{a:.+}/{b:.+}"   | -1     | 1
+        // a numeric modifier limits the length, it is not a regular expression
+        "/t/{id:3}"            | "/t/{id}"            | 0      | 0
+        "/t/{id:3}"            | "/t/{id:.+}"         | -1     | 0
+        // the first two keys still decide first
+        "/t/x/{id:.+}"         | "/t/{id}"            | -1     | 1
+        "/t/{id:.+}"           | "/t/{a}{b}"          | -1     | 1
+        "/t/{id:.+}{?q}"       | "/t/{id:.+}"         | 0      | 1
+    }
+
+    @Unroll
     void "Test URI template #template matches #uri when nested with #nested"() {
         given:
         UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)

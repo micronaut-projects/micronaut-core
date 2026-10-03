@@ -1,0 +1,17 @@
+WARNING: A route specification, group or builder kept after `HttpRoutes.routes(...)` returned has no effect: the router reads the routes, their configuration and their filters when it is created. The routes cannot change while the application runs.
+
+Functional routes are experimental and have these known limitations:
+
+* Tools that read the annotations of controllers, such as Micronaut OpenAPI, do not see handler routes.
+* There is no API to stream a response other than a `Publisher` body.
+* There is no Kotlin DSL and no support for `suspend` handler functions.
+
+NOTE: A handler route has no annotations unless it is given some, see <<functionalRoutesAnnotations, Annotations on Handler Routes>>, so the body and the path variables of a handler route are not validated. To validate them, let the handler call a method of a bean whose parameters carry the constraints, e.g. `@Valid Item item` or `@NotBlank String name`: the method is validated like any other bean method, and a violation is answered with `400`, as for a controller.
+
+snippet::io.micronaut.docs.server.functional.ValidatedRoutes[tags="service", indent=0, title="A bean method that validates its parameters"]
+
+<1> The method is validated when it is called: an invalid product throws a `ConstraintViolationException`, answered with `400`.
+
+snippet::io.micronaut.docs.server.functional.ValidatedRoutes[tags="route", indent=0, title="A handler route that validates its body through the bean"]
+
+<2> The handler passes the body to the validated method.
