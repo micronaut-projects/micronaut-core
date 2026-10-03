@@ -134,6 +134,26 @@ public class CrossOriginTest {
     }
 
     @Test
+    void preflightIsNotApprovedByACrossOriginOfARouteWithAnotherHttpMethod() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/permethod").path("resource"), "https://foo.com", HttpMethod.POST),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
+                .build()));
+    }
+
+    @Test
+    void preflightIsApprovedByTheCrossOriginOfTheRouteServingTheRequestedMethod() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/permethod").path("resource"), "https://bar.com", HttpMethod.POST),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> assertCorsHeaders(response, "https://bar.com", HttpMethod.POST, false))
+                .build()));
+    }
+
+    @Test
     void allowedOriginsRegexHappyPath() throws IOException {
         URI uri = UriBuilder.of("/allowedoriginsregex").path("foo").build();
         String origin = "https://foo.com";
@@ -472,6 +492,25 @@ public class CrossOriginTest {
         @Get("/all")
         String defaults() {
             return "bar";
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/permethod")
+    static class PerMethod {
+
+        @CrossOrigin("https://foo.com")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/resource")
+        String read() {
+            return "read";
+        }
+
+        @CrossOrigin("https://bar.com")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Post("/resource")
+        String write() {
+            return "write";
         }
     }
 
