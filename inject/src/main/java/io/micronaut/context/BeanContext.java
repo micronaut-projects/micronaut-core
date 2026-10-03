@@ -31,6 +31,7 @@ import io.micronaut.inject.validation.BeanDefinitionValidator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -76,7 +77,7 @@ public interface BeanContext extends
 
     /**
      * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
-     * New lookups are rejected during shutdown. Use {@link #withDependencies(java.util.function.Function)}
+     * New lookups are rejected during shutdown. Use {@link #withDependencies(Function)}
      * for temporary dependencies required by a destruction callback.
      * @return The group
      * @since 5.3.0
@@ -96,7 +97,7 @@ public interface BeanContext extends
      * @since 5.3.0
      */
     @Experimental
-    default <R> R withDependencies(java.util.function.Function<BeanDependencyGroup, R> action) {
+    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
         try (BeanDependencyGroup group = createDependencyGroup()) {
             return action.apply(group);
         }
