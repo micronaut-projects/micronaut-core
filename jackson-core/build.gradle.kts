@@ -16,6 +16,7 @@ dependencies {
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(projects.micronautInjectGroovy)
+    testImplementation(libs.managed.netty.common)
 }
 
 noReflection {

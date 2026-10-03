@@ -78,7 +78,7 @@ from micronaut.http.annotation import Get
 async def message() -> str:
     return "ok"
 ''', '''
-return (CompletionStage<String>) PythonContextRuntime.invokePooledScriptAsync(
+return (CompletionStage<String>) PythonPooledRuntime.invokePooledScriptAsync(
 ''')
     }
 
@@ -162,7 +162,7 @@ from micronaut.http.annotation import Get
 async def numbers() -> AsyncIterator[str]:
     yield "one"
 ''', '''
-PythonContextRuntime.invokePooledScriptPublisher(
+PythonPooledRuntime.invokePooledScriptPublisher(
 ''')
     }
 

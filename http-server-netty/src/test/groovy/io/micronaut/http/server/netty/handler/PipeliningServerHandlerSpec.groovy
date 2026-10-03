@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.handler
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.body.AvailableByteBody
 import io.micronaut.http.body.ByteBody
@@ -11,11 +12,13 @@ import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.netty.buffer.AbstractByteBufAllocator
 import io.netty.buffer.ByteBuf
+import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.buffer.UnpooledByteBufAllocator
 import io.netty.channel.ChannelHandler
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
 import io.netty.channel.embedded.EmbeddedChannel
@@ -96,7 +99,7 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.checkException()
     }
 
-    def 'streaming responses flush after every item'() {
+    def 'streaming responses flush at the end of the event loop turn of every item'() {
         given:
         def mon = new MonitorHandler()
         def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
@@ -129,8 +132,14 @@ class PipeliningServerHandlerSpec extends Specification {
         when:
         def c1 = Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))
         sink.tryEmitNext(c1)
-        then:
+        then: 'the item is written outside a read, so the flush waits for the end of the turn'
         mon.read == 2
+        mon.flush == 0
+        ch.readOutbound() == null
+
+        when:
+        ch.runPendingTasks()
+        then:
         mon.flush == 1
         ch.readOutbound() instanceof HttpResponse
         ch.readOutbound() == new DefaultHttpContent(c1)
@@ -139,12 +148,137 @@ class PipeliningServerHandlerSpec extends Specification {
         when:
         def c2 = Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))
         sink.tryEmitNext(c2)
+        ch.runPendingTasks()
         then:
         mon.read == 2
         mon.flush == 2
         ch.readOutbound() == new DefaultHttpContent(c2)
         ch.readOutbound() == null
         ch.checkException()
+    }
+
+    def 'streaming response pieces written outside a read in one turn share one flush'() {
+        given:
+        def mon = new MonitorHandler()
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def upstream = new RecordingUpstream()
+        def streamingBody = null
+        def ch = new EmbeddedChannel(mon, new TaskRunner(), new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(resp, streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+        def pieces = (0..<50).collect { "piece $it," }
+        def readBuffers = new NettyByteBodyFactory(ch).readBufferFactory()
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        def flushesBefore = mon.flush
+        then:
+        upstream.starts == 1
+
+        when: 'the body arrives as many small pieces in one event loop turn, outside a read'
+        int flushesInTurn = -1
+        long consumedInTurn = -1
+        // EmbeddedChannel runs pending tasks after every write made from outside one of its own
+        // operations, so the pieces are added from inside one, see TaskRunner
+        ch.writeOneInbound({
+            for (String piece : pieces) {
+                streamingBody.sharedBuffer().add(readBuffers.adapt(Unpooled.copiedBuffer(piece, StandardCharsets.UTF_8)))
+            }
+            flushesInTurn = mon.flush
+            consumedInTurn = upstream.consumed
+        } as Runnable)
+        ch.runPendingTasks()
+        def outbound = []
+        Object msg
+        while ((msg = ch.readOutbound()) != null) {
+            outbound << msg
+        }
+        then: 'the flush waits for the end of the turn, and one flush covers all of them'
+        ch.checkException()
+        flushesInTurn == flushesBefore
+        mon.flush == flushesBefore + 1
+
+        and: 'the upstream was told right away that the bytes were consumed, since the channel is writable'
+        consumedInTurn == pieces.sum { it.length() }
+
+        and: 'the messages are unchanged: the response and one content message per piece'
+        outbound[0] == resp
+        outbound.size() == pieces.size() + 1
+        outbound.drop(1).every { it instanceof HttpContent && !(it instanceof LastHttpContent) }
+        outbound.drop(1).collect { ((HttpContent) it).content().toString(StandardCharsets.UTF_8) } == pieces
+
+        when: 'the body completes in a later turn'
+        streamingBody.sharedBuffer().complete()
+        ch.runPendingTasks()
+        then:
+        mon.flush == flushesBefore + 2
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        ch.readOutbound() == null
+
+        cleanup:
+        outbound.each { if (it instanceof HttpContent) it.release() }
+        ch.finishAndReleaseAll()
+    }
+
+    def 'the final piece of a streaming response is the terminating message'() {
+        given:
+        def mon = new MonitorHandler()
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def upstream = new RecordingUpstream()
+        def streamingBody = null
+        def cleaned = 0
+        def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(resp, streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                cleaned++
+            }
+        }))
+        def readBuffers = new NettyByteBodyFactory(ch).readBufferFactory()
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        streamingBody.sharedBuffer().add(readBuffers.adapt(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        streamingBody.sharedBuffer().addAndComplete(readBuffers.adapt(Unpooled.copiedBuffer("bar", StandardCharsets.UTF_8)))
+        ch.runPendingTasks()
+        then:
+        ch.checkException()
+        cleaned == 1
+        ch.readOutbound() == resp
+        HttpContent first = ch.readOutbound()
+        !(first instanceof LastHttpContent)
+        first.content().toString(StandardCharsets.UTF_8) == "foo"
+        LastHttpContent last = ch.readOutbound()
+        last.content().toString(StandardCharsets.UTF_8) == "bar"
+        ch.readOutbound() == null
+
+        cleanup:
+        first?.release()
+        last?.release()
+        ch.finishAndReleaseAll()
     }
 
     def 'writability handling is protocol-specific'() {
@@ -370,6 +504,7 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.flushInbound()
         def c1 = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
         sink.emitNext(c1, Sinks.EmitFailureHandler.FAIL_FAST)
+        ch.runPendingTasks()
         then:
         ch.checkException()
         ch.readOutbound() == resp
@@ -985,6 +1120,7 @@ class PipeliningServerHandlerSpec extends Specification {
 
         when:
         sink.tryEmitComplete()
+        ch.runPendingTasks()
         then:
         ch.readOutbound() == resp
         ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
@@ -1095,6 +1231,7 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER))
         def c1 = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
         sink.emitNext(c1, Sinks.EmitFailureHandler.FAIL_FAST)
+        ch.runPendingTasks()
         then:
         ch.checkException()
         ch.readOutbound() == resp
@@ -1342,6 +1479,65 @@ class PipeliningServerHandlerSpec extends Specification {
         errors.size() == errorsOnClose
     }
 
+    def 'responseWritten is called once when the final bytes arrive with the completion'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def upstream = new RecordingUpstream()
+        def streamingBody = null
+        PipeliningServerHandler.OutboundAccessImpl access = null
+        def cleaned = 0
+        def errors = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                access = outboundAccess
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(resp, streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                cleaned++
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER))
+        then:
+        upstream.starts == 1
+        cleaned == 0
+
+        when:
+        // the last bytes of the body and its completion arrive as a single signal
+        streamingBody.sharedBuffer().addAndComplete(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        ch.runPendingTasks()
+        then:
+        ch.checkException()
+        ch.readOutbound() == resp
+        LastHttpContent last = ch.readOutbound()
+        last.content().toString(StandardCharsets.UTF_8) == "foo"
+        last.release()
+        ch.readOutbound() == null
+        cleaned == 1
+
+        when:
+        // the response is reported as done again, as a discard of the handler would do, and then
+        // the connection goes away
+        access.handler.markResponseWritten()
+        ch.finishAndReleaseAll()
+        then:
+        // the request is cleaned up only once
+        cleaned == 1
+        errors.empty
+    }
+
     def 'graceful shutdown sets connection close on a queued streaming response'() {
         given:
         def firstResp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
@@ -1493,6 +1689,10 @@ class PipeliningServerHandlerSpec extends Specification {
         int starts = 0
         int discards = 0
         long consumed = 0
+        /**
+         * Number of {@link #onBytesConsumed} calls.
+         */
+        int consumptions = 0
 
         @Override
         void start() {
@@ -1502,11 +1702,28 @@ class PipeliningServerHandlerSpec extends Specification {
         @Override
         void onBytesConsumed(long bytesConsumed) {
             consumed += bytesConsumed
+            consumptions++
         }
 
         @Override
         void allowDiscard() {
             discards++
+        }
+    }
+
+    /**
+     * Runs a {@link Runnable} written as an inbound message. {@link EmbeddedChannel#writeOneInbound}
+     * does not run pending tasks until it returns, so the task forms one event loop turn, and it
+     * does not fire read complete, so the handler behind this one is not inside a read.
+     */
+    static class TaskRunner extends ChannelInboundHandlerAdapter {
+        @Override
+        void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof Runnable) {
+                msg.run()
+            } else {
+                super.channelRead(ctx, msg)
+            }
         }
     }
 

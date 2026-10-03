@@ -61,27 +61,37 @@ final class ServiceScanner<S> {
     @Nullable
     private final ServiceIndex index;
 
-    public ServiceScanner(ClassLoader classLoader, String serviceName, Predicate<String> lineCondition, Function<String, S> transformer) {
+    /**
+     * @param classLoader   The class loader
+     * @param serviceName   The name of the service type
+     * @param lineCondition The condition tested on the name of each service entry, or null to accept every entry
+     * @param transformer   The transformer of the entry names
+     */
+    ServiceScanner(ClassLoader classLoader, String serviceName, @Nullable Predicate<String> lineCondition, Function<String, S> transformer) {
         this(classLoader, serviceName, lineCondition, transformer, findServiceIndex(classLoader));
     }
 
     /**
      * @param classLoader   The class loader
      * @param serviceName   The name of the service type
-     * @param lineCondition The condition tested on the service names
-     * @param transformer   The transformer of the service names
+     * @param lineCondition The condition tested on the name of each service entry, or null to accept every entry
+     * @param transformer   The transformer of the entry names
      * @param index         The service index that applies to the class loader, or null to scan the class path
      */
-    ServiceScanner(ClassLoader classLoader, String serviceName, Predicate<String> lineCondition, Function<String, S> transformer, @Nullable ServiceIndex index) {
+    ServiceScanner(ClassLoader classLoader, String serviceName, @Nullable Predicate<String> lineCondition, Function<String, S> transformer, @Nullable ServiceIndex index) {
         this.classLoader = classLoader;
         this.serviceName = serviceName;
-        this.lineCondition = lineCondition;
+        this.lineCondition = lineCondition == null ? name -> true : lineCondition;
         this.transformer = transformer;
         this.index = index;
     }
 
     static ServiceScanner.@Nullable ExclusiveStaticServiceDefinitions findStaticServiceDefinitions() {
-        if (NativeImageUtils.hasImageSingletons()) {
+        // Image singletons only hold values in image code. On the JVM, where the GraalVM SDK is usually absent,
+        // looking up the ImageSingletons class would throw and catch a NoClassDefFoundError on every scan.
+        // A native image with runtime class loading (Crema) is image code too, for the classes it loads at run
+        // time as well, so it still gets the table unless micronaut.graalvm.imagesingletons.enabled is false.
+        if (NativeImageUtils.inImageCode() && NativeImageUtils.hasImageSingletons()) {
             return ImageSingletons.contains(ExclusiveStaticServiceDefinitions.class) ? ImageSingletons.lookup(ExclusiveStaticServiceDefinitions.class) : null;
         } else {
             return null;
@@ -218,15 +228,7 @@ final class ServiceScanner<S> {
         protected void compute() {
             try {
                 if (serviceEntries != null) {
-                    for (String serviceEntry : serviceEntries) {
-                        final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
-                        tasks.add(task);
-                        if (fork) {
-                            task.fork();
-                        } else {
-                            task.compute();
-                        }
-                    }
+                    loadEntries(serviceEntries);
                     return;
                 }
                 if (index != null) {
@@ -235,16 +237,7 @@ final class ServiceScanner<S> {
                 }
                 scanStandardServiceConfigs();
                 // no index applied when the lookup started, and a task does not ask for it again
-                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, null);
-                for (String serviceEntry : serviceEntries) {
-                    final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
-                    tasks.add(task);
-                    if (fork) {
-                        task.fork();
-                    } else {
-                        task.compute();
-                    }
-                }
+                loadEntries(MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, null));
             } catch (IOException e) {
                 throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
             }
@@ -263,21 +256,22 @@ final class ServiceScanner<S> {
             if (standardNames == null) {
                 scanStandardServiceConfigs();
             } else {
-                loadIndexedEntries(standardNames);
+                loadEntries(standardNames);
             }
-            loadIndexedEntries(index.micronautServices().getOrDefault(serviceName, Set.of()));
+            loadEntries(index.micronautServices().getOrDefault(serviceName, Set.of()));
         }
 
-        private void loadIndexedEntries(Collection<String> names) {
-            for (String name : names) {
-                if (lineCondition.test(name)) {
-                    ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(name, transformer);
-                    tasks.add(task);
-                    if (fork) {
-                        task.fork();
-                    } else {
-                        task.compute();
-                    }
+        private void loadEntries(Collection<String> entries) {
+            for (String serviceEntry : entries) {
+                if (!lineCondition.test(serviceEntry)) {
+                    continue;
+                }
+                final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
+                tasks.add(task);
+                if (fork) {
+                    task.fork();
+                } else {
+                    task.compute();
                 }
             }
         }
@@ -365,15 +359,15 @@ final class ServiceScanner<S> {
                         if (line == null) {
                             break;
                         }
-                        if (line.isEmpty() || line.charAt(0) == '#') {
-                            continue;
-                        }
-                        if (!lineCondition.test(line)) {
-                            continue;
-                        }
+                        // Like java.util.ServiceLoader: drop the comment, then the whitespace around the name.
+                        // ServiceLoader calls trim() where this calls strip(): the same for spaces and tabs.
                         int i = line.indexOf('#');
                         if (i > -1) {
                             line = line.substring(0, i);
+                        }
+                        line = line.strip();
+                        if (line.isEmpty() || !lineCondition.test(line)) {
+                            continue;
                         }
                         typeNames.add(line);
                     }

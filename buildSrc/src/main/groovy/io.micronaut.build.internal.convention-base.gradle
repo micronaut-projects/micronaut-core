@@ -29,11 +29,29 @@ def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBui
 def micronautCore = micronautBuild.extensions.create(MicronautCoreExtension, "core", DefaultMicronautCoreExtension, extensions.findByType(VersionCatalogsExtension))
 micronautCore.documented.convention(true)
 
+// CI runs on Oracle GraalVM, whose default top tier JIT is the Graal compiler. C2 compiles the
+// test JVMs and the forked compilers with less CPU; on other JDKs the arguments change nothing.
+def C2_JVM_ARGS = ["-XX:+UnlockExperimentalVMOptions", "-XX:-UseJVMCICompiler"]
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     jvmArgs '-Xmx2048m'
     systemProperty "micronaut.cloud.platform", "OTHER"
     jvmArgs "--enable-preview"
+    if (!project.path.contains("python")) {
+        // GraalPy needs the Graal compiler for Python code
+        jvmArgs C2_JVM_ARGS
+    }
+}
+
+pluginManager.withPlugin("jacoco") {
+    tasks.withType(Test).configureEach {
+        // The agent instruments every class a test loads by default, including the Java, Groovy and
+        // Kotlin compilers the annotation processing tests run, while coverage only reports our classes
+        jacoco {
+            includes = ["io.micronaut.*"]
+        }
+    }
 }
 
 java {
@@ -47,6 +65,7 @@ tasks.withType(JavaCompile).configureEach {
     options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
     options.compilerArgs.add("-Amicronaut.processing.omit.confprop.injectpoints=true")
     options.forkOptions.memoryMaximumSize = "2g"
+    options.forkOptions.jvmArgs.addAll(C2_JVM_ARGS)
 }
 
 tasks.withType(GroovyCompile).configureEach {
@@ -54,6 +73,7 @@ tasks.withType(GroovyCompile).configureEach {
     options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
     options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
     groovyOptions.forkOptions.memoryMaximumSize = "2g"
+    groovyOptions.forkOptions.jvmArgs.addAll(C2_JVM_ARGS)
 }
 
 tasks.withType(JapicmpTask).configureEach {

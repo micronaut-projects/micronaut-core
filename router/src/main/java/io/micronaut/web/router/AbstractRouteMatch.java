@@ -432,6 +432,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         } else {
             return false;
         }
+        if (value != null && bindingResult.isConvertedToArgumentType() && argument.getType().isInstance(value)) {
+            // The binder already produced the value for the complete argument, including its type arguments
+            argumentValues[index] = value;
+            fulfilledArguments[index] = true;
+            return true;
+        }
         setValue(index, argument, value);
         return true;
     }

@@ -24,6 +24,7 @@ import io.micronaut.core.io.service.ServiceScanner.ExclusiveStaticServiceDefinit
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URI;
@@ -124,8 +125,8 @@ public final class MicronautMetaServiceLoaderUtils {
             return index.micronautServices().getOrDefault(serviceName, Set.of());
         }
         CacheEntry ce = cacheEntry;
-        if (ce == null || ce.classLoader != classLoader) {
-            ce = new CacheEntry(classLoader, findAllMicronautMetaServices(classLoader));
+        if (ce == null || ce.classLoader.get() != classLoader) {
+            ce = new CacheEntry(new WeakReference<>(classLoader), findAllMicronautMetaServices(classLoader));
             cacheEntry = ce;
         }
         return ce.services.getOrDefault(serviceName, Set.of());
@@ -504,7 +505,9 @@ public final class MicronautMetaServiceLoaderUtils {
 
     }
 
-    private record CacheEntry(ClassLoader classLoader, Map<String, Set<String>> services) {
+    // Only service names are retained with the weak loader identity; no classes or instances that could
+    // indirectly keep the loader alive belong in this cache.
+    private record CacheEntry(WeakReference<ClassLoader> classLoader, Map<String, Set<String>> services) {
     }
 
 }

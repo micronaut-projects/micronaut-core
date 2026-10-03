@@ -31,6 +31,9 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.http.client.loadbalance.LoadBalancerKey;
+import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -39,6 +42,9 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -62,6 +68,7 @@ import reactor.core.publisher.Mono;
 import javax.net.ssl.SSLParameters;
 import java.io.IOException;
 import java.net.Authenticator;
+import java.net.ConnectException;
 import java.net.CookieManager;
 import java.net.HttpCookie;
 import java.net.InetSocketAddress;
@@ -71,11 +78,14 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
+import java.net.http.HttpTimeoutException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
@@ -118,10 +128,16 @@ abstract class AbstractJdkHttpClient {
     @Nullable
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     /**
-     * The client for raw exchanges: it keeps no cookies, because the exchanges a raw client
-     * relays belong to different users. Built on first use.
+     * The client for raw exchanges and for proxying: it follows redirects as configured, and
+     * keeps no cookies, because the exchanges a raw client relays belong to different users.
+     * Built on first use.
      */
     final Supplier<HttpClient> rawClient;
+    /**
+     * Like {@link #rawClient}, but never follows redirects, see
+     * {@link io.micronaut.http.client.RawRequestOptions#isFollowRedirects()}.
+     */
+    final Supplier<HttpClient> rawNoRedirectClient;
 
     protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
         this.loadBalancer = prototype.loadBalancer;
@@ -130,6 +146,7 @@ abstract class AbstractJdkHttpClient {
         this.contextPath = prototype.contextPath;
         this.client = prototype.client;
         this.rawClient = prototype.rawClient;
+        this.rawNoRedirectClient = prototype.rawNoRedirectClient;
         this.cookieManager = prototype.cookieManager;
         this.requestBinderRegistry = prototype.requestBinderRegistry;
         this.clientId = prototype.clientId;
@@ -206,11 +223,14 @@ abstract class AbstractJdkHttpClient {
             this.contextPath = null;
         }
 
-        this.client = buildClient(true);
-        this.rawClient = SupplierUtil.memoized(() -> buildClient(false));
+        HttpClient.Redirect redirect = configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER;
+        this.client = buildClient(redirect, true);
+        Supplier<HttpClient> rawNoRedirect = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));
+        this.rawClient = configuration.isFollowRedirects() ? SupplierUtil.memoized(() -> buildClient(redirect, false)) : rawNoRedirect;
+        this.rawNoRedirectClient = rawNoRedirect;
     }
 
-    private HttpClient buildClient(boolean cookies) {
+    private HttpClient buildClient(HttpClient.Redirect redirect, boolean cookies) {
         HttpClient.Builder builder = HttpClient.newBuilder();
         configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
 
@@ -239,7 +259,7 @@ abstract class AbstractJdkHttpClient {
             builder.version(HttpClient.Version.HTTP_1_1);
         }
 
-        builder.followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER);
+        builder.followRedirects(redirect);
         if (cookies) {
             builder.cookieHandler(cookieManager);
         }
@@ -361,21 +381,41 @@ abstract class AbstractJdkHttpClient {
      * @return A JDK request object
      */
     protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
-        return resolveRequestUri(request)
-            .map(uri -> {
-                cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
-                    HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
-                    cookieManager.getCookieStore().add(uri, newCookie);
-                }));
+        return resolveRequestUri(request).map(uri -> toJdkRequest(uri, request, bodyType));
+    }
 
-                return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
-            });
+    /**
+     * Convert the Micronaut request to a JDK request for the given absolute URI.
+     *
+     * @param uri      The absolute URI to send the request to
+     * @param request  The Micronaut request object
+     * @param bodyType The body type
+     * @return A JDK request object
+     */
+    HttpRequest toJdkRequest(URI uri, io.micronaut.http.HttpRequest<?> request, @Nullable Argument<?> bodyType) {
+        cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
+            HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
+            cookieManager.getCookieStore().add(uri, newCookie);
+        }));
+
+        return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
     }
 
     protected Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
+        return resolveTarget(request).map(ResolvedTarget::releasedUri);
+    }
+
+    /**
+     * Resolve the absolute URI of a request, and the service instance the load balancer selected
+     * for it if the request was load balanced.
+     *
+     * @param request The request
+     * @return The resolved target
+     */
+    Mono<ResolvedTarget> resolveTarget(io.micronaut.http.HttpRequest<?> request) {
         if (request.getUri().getScheme() != null) {
             // Full request URI, so use that
-            return Mono.just(request.getUri());
+            return Mono.just(new ResolvedTarget(request.getUri(), null));
         }
 
         // Otherwise, go and look it up via the LoadBalancer
@@ -383,32 +423,187 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
+     * The target of a request once the client filters ran, since a filter may have changed its
+     * URI: the request stays with the instance the load balancer selected as long as it goes to
+     * the same scheme, host and port, and the load balancer is not asked again.
+     *
+     * @param target  The target resolved before the filters ran
+     * @param request The request the filters passed on
+     * @return The target the request is sent to
+     */
+    Mono<ResolvedTarget> afterFilters(ResolvedTarget target, io.micronaut.http.HttpRequest<?> request) {
+        URI filtered = request.getUri();
+        if (filtered.equals(target.uri())) {
+            return Mono.just(target);
+        }
+        LoadBalancerSelection selection = target.selection();
+        if (filtered.getScheme() != null) {
+            return Mono.just(new ResolvedTarget(filtered, sameServer(filtered, target.uri()) ? selection : null));
+        }
+        if (selection == null) {
+            return resolveTarget(request);
+        }
+        return Mono.fromCallable(() -> new ResolvedTarget(resolveAgainst(selection.instance(), filtered), selection));
+    }
+
+    /**
+     * @return Whether both URIs name the same server: scheme and host ignoring case, and port,
+     * the default port of the scheme when there is none
+     */
+    static boolean sameServer(URI a, URI b) {
+        return a.getScheme().equalsIgnoreCase(b.getScheme())
+            && a.getHost() != null && a.getHost().equalsIgnoreCase(b.getHost())
+            && effectivePort(a) == effectivePort(b);
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+    }
+
+    /**
+     * @param instance   The service instance
+     * @param requestUri The relative request URI
+     * @return The request URI resolved against the instance, with the context path of the client
+     */
+    private URI resolveAgainst(ServiceInstance instance, URI requestUri) {
+        try {
+            return instance.resolve(ContextPathUtils.prepend(requestUri, contextPath));
+        } catch (URISyntaxException e) {
+            throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
+        }
+    }
+
+    /**
      * @param request The request object
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
      */
     protected Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
-        return request;
+        return LoadBalancerKey.discriminator(request, configuration);
     }
 
-    private <I> Mono<URI> resolveURI(io.micronaut.http.HttpRequest<I> request) {
+    private <I> Mono<ResolvedTarget> resolveURI(io.micronaut.http.HttpRequest<I> request) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
             return Mono.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
         }
 
+        LoadBalancer balancer = loadBalancer;
         return Mono.from(loadBalancer.select(getLoadBalancerDiscriminator(request))).map(server -> {
+                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
                     mutableRequest.getHeaders().auth(authInfo.get());
                 }
 
                 try {
-                    return server.resolve(ContextPathUtils.prepend(requestURI, contextPath));
-                } catch (URISyntaxException e) {
-                    throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
+                    return new ResolvedTarget(resolveAgainst(server, requestURI), selection);
+                } catch (RuntimeException e) {
+                    selection.release();
+                    throw e;
                 }
             }
         );
+    }
+
+    /**
+     * Map an I/O failure of {@link HttpClient#sendAsync}: a request that was not sent, because the
+     * connection could not be opened, is an {@link UnprocessedRequestException}, so that the caller
+     * can send it again; a connection closed before the response arrived is a
+     * {@link ResponseClosedException}.
+     *
+     * @param selection The selection of the load balancer, or {@code null}
+     * @param uri       The URI the request was sent to
+     * @param e         The failure
+     * @return The client exception
+     */
+    HttpClientException sendError(@Nullable LoadBalancerSelection selection, URI uri, IOException e) {
+        return sendError(selection, uri, e, false);
+    }
+
+    /**
+     * @param selection       The selection of the load balancer, or {@code null}
+     * @param uri             The request URI
+     * @param e               The failure of {@link HttpClient#sendAsync}
+     * @param headersReceived Whether the response headers had arrived, i.e. the failure is one of
+     *                        a body read by the JDK client
+     * @return The client exception
+     */
+    HttpClientException sendError(@Nullable LoadBalancerSelection selection, URI uri, IOException e, boolean headersReceived) {
+        HttpClientException result;
+        if (e instanceof HttpConnectTimeoutException) {
+            result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + e.getMessage(), e);
+            report(selection, LoadBalancer.Outcome.CONNECT_FAILURE);
+        } else if (e instanceof ConnectException) {
+            result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Connect Error: " + e.getMessage(), e);
+            report(selection, LoadBalancer.Outcome.CONNECT_FAILURE);
+        } else if (e.getMessage() != null && e.getMessage().contains("header parser received no bytes")) {
+            // the JDK client reports a connection closed before the response headers with this message
+            result = new ResponseClosedException("Connection closed before response was received", false);
+            report(selection, LoadBalancer.Outcome.RESET);
+        } else if (e instanceof HttpTimeoutException) {
+            // the request timeout of the JDK client is set from the read timeout; up to JDK 25 it
+            // only runs until the response headers arrive, a later JDK may extend it to the body
+            result = headersReceived ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : ReadTimeoutException.TIMEOUT_EXCEPTION;
+            report(selection, LoadBalancer.Outcome.TIMEOUT);
+        } else {
+            if (ByteBodySubscriber.isTruncatedBody(e)) {
+                // a buffered response whose body was cut off
+                report(selection, LoadBalancer.Outcome.RESET);
+            }
+            result = new HttpClientException("Error sending request: " + e.getMessage(), e);
+        }
+        if (result instanceof UnprocessedRequestException unprocessed) {
+            unprocessed.setTarget(uri, selection == null ? null : selection.instance());
+        }
+        return result;
+    }
+
+    /**
+     * Report the outcome of an exchange to the load balancer that selected its instance, if any.
+     *
+     * @param selection The selection of the load balancer, or {@code null}
+     * @param outcome   The outcome
+     */
+    static void report(@Nullable LoadBalancerSelection selection, LoadBalancer.Outcome outcome) {
+        if (selection != null) {
+            selection.report(outcome);
+        }
+    }
+
+    /**
+     * End an exchange without an outcome, unless one was reported already or the response
+     * handling claimed the selection.
+     *
+     * @param selection The selection of the load balancer, or {@code null}
+     */
+    static void releaseUnclaimed(@Nullable LoadBalancerSelection selection) {
+        if (selection != null) {
+            selection.releaseUnclaimed();
+        }
+    }
+
+    /**
+     * Report the outcome of an exchange whose response body ended: the status when the body is
+     * complete, or the failure that cut it off.
+     *
+     * @param selection  The selection of the load balancer, or {@code null}
+     * @param statusCode The response status
+     * @param failure    The failure of the body, or {@code null} if it is complete
+     */
+    void reportBodyEnd(@Nullable LoadBalancerSelection selection, int statusCode, @Nullable Throwable failure) {
+        if (failure == null) {
+            report(selection, statusCode >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
+        } else if (failure instanceof ResponseClosedException) {
+            report(selection, LoadBalancer.Outcome.RESET);
+        } else if (failure instanceof HttpTimeoutException) {
+            report(selection, LoadBalancer.Outcome.TIMEOUT);
+        } else if (selection != null) {
+            // any other failure of the body says nothing about the instance, and is not a success either
+            selection.release();
+        }
     }
 
     /**
@@ -424,9 +619,10 @@ abstract class AbstractJdkHttpClient {
     }
 
     protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
-        var defaultPublisher = responsePublisher(request, bodyType);
-        return resolveRequestUri(request)
-            .flatMapMany(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));
+        return resolveTarget(request)
+            .flatMapMany(target -> Flux.from(applyFilterToResponsePublisher(request, target.uri(), responsePublisher(request, target, bodyType)))
+                // the selection ends with the exchange, also when a filter answered without it
+                .doFinally(signal -> releaseUnclaimed(target.selection())));
     }
 
     protected <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
@@ -461,22 +657,53 @@ abstract class AbstractJdkHttpClient {
         io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
+        return Flux.defer(() -> resolveTarget(request).flatMapMany(target -> Flux.from(responsePublisher(request, target, bodyType))
+            .doFinally(signal -> releaseUnclaimed(target.selection()))));
+    }
+
+    /**
+     * Send the request to the resolved target and publish the response. The target is resolved
+     * once, so that the instance a failure names is the instance the request was sent to.
+     *
+     * @param request  The request
+     * @param target   The absolute URI to send the request to, and the service instance the load
+     *                 balancer selected for it, if any
+     * @param bodyType The body type
+     * @param <O>      The body type
+     * @return The response publisher
+     */
+    <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
+        io.micronaut.http.HttpRequest<?> request,
+        ResolvedTarget target,
+        @Nullable Argument<O> bodyType
+    ) {
         if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
             ClientAttributes.setServiceId(request, clientId);
         }
 
-        return Flux.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
-            .map(httpRequest -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
-                }
-                HttpHeadersUtil.trace(log,
-                    () -> httpRequest.headers().map().keySet(),
-                    headerName -> httpRequest.headers().allValues(headerName));
-                return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+        // built on subscription, so that any client filter changes are used
+        return Flux.defer(() -> afterFilters(target, request))
+            .flatMap(sent -> {
+                // whether the headers arrived, so that a failure of the body is told from one before
+                AtomicBoolean headersReceived = new AtomicBoolean();
+                return Mono.fromCallable(() -> toJdkRequest(sent.uri(), request, bodyType))
+                    .map(httpRequest -> {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+                        }
+                        HttpHeadersUtil.trace(log,
+                            () -> httpRequest.headers().map().keySet(),
+                            headerName -> httpRequest.headers().allValues(headerName));
+                        return client.sendAsync(httpRequest, responseInfo -> {
+                            headersReceived.set(true);
+                            return java.net.http.HttpResponse.BodySubscribers.ofByteArray();
+                        });
+                    })
+                    .flatMap(Mono::fromCompletionStage)
+                    .onErrorMap(IOException.class, e -> sendError(sent.selection(), sent.uri(), e, headersReceived.get()))
+                    .doOnNext(netResponse -> report(sent.selection(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS))
+                    .doFinally(signal -> releaseUnclaimed(sent.selection()));
             })
-            .flatMap(Mono::fromCompletionStage)
-            .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {
                 if (log.isDebugEnabled()) {
@@ -493,5 +720,33 @@ abstract class AbstractJdkHttpClient {
                     sink.next(response(netResponse, bodyType));
                 }
             });
+    }
+
+    /**
+     * The absolute URI a request is sent to, and the service instance the load balancer selected
+     * for it, if the request was load balanced.
+     *
+     * @param uri      The absolute request URI
+     * @param selection The selection of the load balancer, or {@code null} if the request URI
+     *                  was absolute
+     */
+    record ResolvedTarget(URI uri, @Nullable LoadBalancerSelection selection) {
+
+        /**
+         * @return The selected instance, or {@code null} if the request URI was absolute
+         */
+        @Nullable ServiceInstance instance() {
+            return selection == null ? null : selection.instance();
+        }
+
+        /**
+         * @return The URI, for a caller that sends no exchange: the selection is released
+         */
+        URI releasedUri() {
+            if (selection != null) {
+                selection.release();
+            }
+            return uri;
+        }
     }
 }

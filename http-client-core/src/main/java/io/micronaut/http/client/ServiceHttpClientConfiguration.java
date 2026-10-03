@@ -18,11 +18,13 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 
@@ -71,12 +73,17 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
     private final ServiceHttp2ClientConfiguration http2Configuration;
+    private final ServiceOutlierDetectionConfiguration outlierDetection;
     private List<URI> urls = Collections.emptyList();
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
     private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
     @Nullable
     private String path;
+    @Nullable
+    private String loadBalancerStrategy;
+    @Nullable
+    private String loadBalancerKeyHeader;
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -103,6 +110,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         }
         this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
         this.http2Configuration = new ServiceHttp2ClientConfiguration();
+        this.outlierDetection = new ServiceOutlierDetectionConfiguration();
     }
 
     /**
@@ -153,7 +161,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
      */
-    @Inject
+    @Deprecated(since = "5.3.0")
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
@@ -161,7 +169,32 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             ServiceHttpClientConfiguration.@Nullable ServiceHttp2ClientConfiguration http2Configuration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             HttpClientConfiguration defaultHttpClientConfiguration) {
+        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, http2Configuration, sslConfiguration, null, defaultHttpClientConfiguration);
+    }
+
+    /**
+     * Creates a new client configuration for the given service ID.
+     *
+     * @param serviceId                         The service id
+     * @param connectionPoolConfiguration       The connection pool configuration
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration
+     * @param http2Configuration                The HTTP/2 configuration
+     * @param sslConfiguration                  The SSL configuration
+     * @param outlierDetection                  The outlier detection configuration
+     * @param defaultHttpClientConfiguration    The default HTTP client configuration
+     * @since 5.3.0
+     */
+    @Inject
+    public ServiceHttpClientConfiguration(
+            @Parameter String serviceId,
+            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+            ServiceHttpClientConfiguration.@Nullable ServiceHttp2ClientConfiguration http2Configuration,
+            @Nullable ServiceSslClientConfiguration sslConfiguration,
+            @Nullable ServiceOutlierDetectionConfiguration outlierDetection,
+            HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);
+        this.outlierDetection = outlierDetection != null ? outlierDetection : new ServiceOutlierDetectionConfiguration();
         this.serviceId = serviceId;
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);
@@ -306,10 +339,74 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     /**
+     * The outlier detection of the service: whether an instance that keeps failing stops being
+     * selected for a while.
+     *
+     * @return The outlier detection configuration
+     * @since 5.3.0
+     */
+    public OutlierDetectionConfiguration getOutlierDetection() {
+        return outlierDetection;
+    }
+
+    /**
+     * How the load balancer of the service picks among its available instances: a built-in
+     * {@link io.micronaut.http.client.loadbalance.LoadBalancerStrategy strategy}
+     * ({@code round-robin}, {@code random}, {@code p2c}, {@code weighted}, {@code sticky}) or the
+     * name of a strategy bean. Defaults to {@code null}, round robin.
+     *
+     * @return The name of the strategy, or {@code null}
+     * @since 5.3.0
+     */
+    public @Nullable String getLoadBalancerStrategy() {
+        return loadBalancerStrategy;
+    }
+
+    /**
+     * @param loadBalancerStrategy See {@link #getLoadBalancerStrategy()}
+     * @since 5.3.0
+     */
+    public void setLoadBalancerStrategy(@Nullable String loadBalancerStrategy) {
+        this.loadBalancerStrategy = loadBalancerStrategy;
+    }
+
+    /**
+     * The request header that holds the
+     * {@link io.micronaut.http.client.loadbalance.LoadBalancerKey key} of a request for the
+     * load balancer, e.g. a session id for the {@code sticky} strategy, when the request has no
+     * key attribute. Defaults to {@code null}, none.
+     *
+     * @return The name of the header, or {@code null}
+     * @since 5.3.0
+     */
+    @Experimental
+    public @Nullable String getLoadBalancerKeyHeader() {
+        return loadBalancerKeyHeader;
+    }
+
+    /**
+     * @param loadBalancerKeyHeader See {@link #getLoadBalancerKeyHeader()}
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setLoadBalancerKeyHeader(@Nullable String loadBalancerKeyHeader) {
+        this.loadBalancerKeyHeader = loadBalancerKeyHeader;
+    }
+
+    /**
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     public static class ServiceConnectionPoolConfiguration extends ConnectionPoolConfiguration {
+    }
+
+    /**
+     * The outlier detection configuration of the service.
+     *
+     * @since 5.3.0
+     */
+    @ConfigurationProperties(OutlierDetectionConfiguration.PREFIX)
+    public static class ServiceOutlierDetectionConfiguration extends OutlierDetectionConfiguration {
     }
 
     /**

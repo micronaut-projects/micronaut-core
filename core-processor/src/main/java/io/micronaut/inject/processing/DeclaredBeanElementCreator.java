@@ -83,12 +83,14 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
 
     /**
-     * The stereotypes that mark an annotation as interceptor advice.
+     * The stereotypes that mark an annotation as interceptor advice. An annotation declared with more than one
+     * {@code @InterceptorBinding} carries them under their repeatable container rather than as the binding itself.
      */
     private static final List<String> ADVICE_STEREOTYPES = List.of(
         Around.class.getName(),
         Introduction.class.getName(),
-        AnnotationUtil.ANN_INTERCEPTOR_BINDING
+        AnnotationUtil.ANN_INTERCEPTOR_BINDING,
+        AnnotationUtil.ANN_INTERCEPTOR_BINDINGS
     );
 
     protected final boolean isAopProxy;
@@ -735,6 +737,10 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
             proxyAnnotationMetadata,
             interfaceToAdapt
         );
+        // The proxy name is synthetic and the adapted interface usually comes from a library, so neither ties the
+        // adapter to a source file. Incremental processors drop outputs that originate from no source file.
+        aopProxyWriter.addOriginatingElement(classElement);
+        aopProxyWriter.addOriginatingElement(sourceMethod.getDeclaringType());
         additionalBuilders.add(aopProxyWriter);
 
         aopProxyWriter.implementInterface(interfaceToAdapt);

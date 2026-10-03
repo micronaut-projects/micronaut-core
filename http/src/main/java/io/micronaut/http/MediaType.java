@@ -1509,7 +1509,8 @@ public class MediaType implements CharSequence {
             }
         }
         mediaTypes.sort(MediaType::naturalSort);
-        return Collections.unmodifiableList(mediaTypes);
+        // an immutable list lets callers safely cache per-list results by identity
+        return List.copyOf(mediaTypes);
     }
 
     /**

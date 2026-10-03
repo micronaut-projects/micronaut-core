@@ -73,6 +73,7 @@ import org.graalvm.polyglot.Value;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
@@ -89,6 +90,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.element.PythonParameterElement;
 import io.micronaut.python.processing.element.PythonPropertyElement;
 import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.python.processing.model.ScriptDef;
@@ -299,11 +301,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * no processor recognized - a warning, and with {@code -Werror} a compilation error, for a user who
      * passes one of them.
      *
-     * @return The names of the {@code -A} options of the reflection gate
+     * <p>Declaring an option here is also what makes it settable from an application's configuration
+     * under Pyronaut, which passes every supported option it finds in {@code application.toml} through
+     * as {@code -A}. An option the visitor reads but does not declare can only be set by hand.
+     *
+     * @return The names of the {@code -A} options this visitor reads
      */
     @Override
     public Set<String> getSupportedOptions() {
-        return Set.of(PythonReflectionGate.OPTION, PythonReflectionGate.WARNINGS_OPTION);
+        return Set.of(
+            PythonReflectionGate.OPTION,
+            PythonReflectionGate.WARNINGS_OPTION,
+            PythonPooledStubGenerator.IGNORE_OPTION
+        );
     }
 
     @Override
@@ -4003,7 +4013,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (className != null) {
                 ClassElement type = context.getClassElement(className).orElse(null);
                 if (type != null) {
-                    return ClassTypeDef.of(type).getStaticField(CLASS_FIELD, TypeDef.of(Class.class));
+                    // a class literal names the raw type: FindAllInterceptor.class, not FindAllInterceptor<Object, Object>.class
+                    return javaClassType(type).getStaticField(CLASS_FIELD, TypeDef.of(Class.class));
                 }
             }
             throw unrepresentable(annotationName, memberName, value, memberType);
@@ -4135,6 +4146,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return false;
     }
 
+    /**
+     * Whether an annotation type is annotated with {@link Internal}: it is served by the annotation
+     * metadata and never copied onto the generated source.
+     *
+     * @param annotationName The annotation
+     * @param visitorContext The visitor context
+     * @return Whether the annotation type is internal
+     */
+    private static boolean isInternalAnnotation(String annotationName, VisitorContext visitorContext) {
+        return visitorContext.getClassElement(annotationName)
+            .map(annotationType -> annotationType.hasDeclaredAnnotation(Internal.class))
+            .orElse(false);
+    }
+
     private PythonReflectionGate.Copy runtimeAnnotationCopy(String annotationName, ElementType declaration, VisitorContext visitorContext) {
         if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX)) {
             // The ones a test framework reads reflectively on the test class are always copied:
@@ -4150,6 +4175,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // (@TestResourcesProperties of micronaut-test-resources), so it is reflection data of the
             // generated type and falls through to the gate like a third-party annotation
             if (isMicronautProcessedAnnotation(annotationName, visitorContext)) {
+                return PythonReflectionGate.Copy.NEVER;
+            }
+            // An @Internal annotation is framework metadata, often added by a visitor rather than declared
+            // in the Python source (@DataMethod of micronaut-data): no module reads it from the class
+            if (isInternalAnnotation(annotationName, visitorContext)) {
                 return PythonReflectionGate.Copy.NEVER;
             }
         }
@@ -4430,6 +4460,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassElement declaredReturnType = signatureMethod == methodElement || returnTypeOverride != null
             ? null
             : resolvedSignatureMethod.getGenericReturnType();
+        ClassElement asyncDeclaredReturnType = declaredReturnType == null ? returnTypeOverride : declaredReturnType;
         TypeDef methodSourceReturnType = genericToArray
             ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
             : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
@@ -4552,7 +4583,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         );
                     } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
-                            coroutineResult(pythonCoroutine, methodSourceReturnType, declaredReturnType).returning()
+                            coroutineResult(pythonCoroutine, methodSourceReturnType, asyncDeclaredReturnType).returning()
                         );
                     } else {
                         boolean bridgeSignature = signatureMethod != methodElement
@@ -5256,7 +5287,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return false;
         }
         for (int i = 0; i < parameters.length; i++) {
-            if (!hasCompatibleBridgeParameter(parameters[i], interfaceParameters[i])) {
+            if (!hasCompatibleBridgeParameter(parameters[i], interfaceParameters[i])
+                && !(isAsyncPythonMethod(method)
+                && parameters[i] instanceof PythonParameterElement pythonParameter
+                && pythonParameter.getNativeType().typeAnnotation() == null)) {
                 return false;
             }
         }

@@ -101,9 +101,27 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
             ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
         }
 
-        if (System.getProperty("io.netty.allocator.maxOrder") == null) {
+        // maxOrder=3 (64 KiB chunks) keeps the footprint of the pooled allocator small. It only
+        // applies to PooledByteBufAllocator, which is no longer Netty's default allocator (Netty 4.2
+        // uses the adaptive allocator unless io.netty.allocator.type says otherwise), so only set it
+        // when the pooled allocator is selected. Like all io.netty.allocator.* properties, it only
+        // takes effect if PooledByteBufAllocator has not been initialized yet.
+        if (System.getProperty("io.netty.allocator.maxOrder") == null && isPooledAllocatorSelected()) {
             System.setProperty("io.netty.allocator.maxOrder", "3");
         }
+    }
+
+    /**
+     * Whether {@code io.netty.allocator.type} selects the pooled allocator as the default allocator.
+     * This mirrors the selection in Netty's {@code ByteBufUtil}: {@code unpooled} and
+     * {@code adaptive} (the default when unset) select other allocators, any other value falls back
+     * to the pooled allocator.
+     *
+     * @return {@code true} if the pooled allocator is the default allocator
+     */
+    private static boolean isPooledAllocatorSelected() {
+        String allocatorType = System.getProperty("io.netty.allocator.type");
+        return allocatorType != null && !allocatorType.equals("adaptive") && !allocatorType.equals("unpooled");
     }
 
     private EventLoopGroupFactory nativeFactory() {

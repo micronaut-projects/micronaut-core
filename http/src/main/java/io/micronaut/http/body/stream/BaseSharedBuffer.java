@@ -20,6 +20,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.ByteBody;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,6 +33,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -59,6 +63,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Nullable
     private Throwable error;
+    /**
+     * Whether {@link #error} is set, for {@link #isFailed()} from any thread.
+     */
+    private volatile boolean failed;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -97,6 +105,22 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private List<ReadBuffer> buffer;
     @Nullable
     private Exception bufferSizeExceeded = null;
+    /**
+     * Whether {@link #bufferSizeExceeded} is set, for {@link #isBufferLimitExceeded()} from any
+     * thread.
+     */
+    private volatile boolean bufferLimitExceeded;
+    /**
+     * The trailers of the body, see {@link ByteBody#trailers()}. Completed before the
+     * subscribers are, so that a subscriber finds them in its {@link BufferConsumer#complete()}.
+     */
+    private final CompletableFuture<HttpHeaders> trailers = new CompletableFuture<>();
+    /**
+     * If not negative, each {@link AsFlux} reader is charged for the bytes it has not delivered
+     * yet against its own limit of this size, instead of against the buffered size of this
+     * buffer, see {@link #setReaderBufferLimit(long)}.
+     */
+    private long readerBufferLimit = -1;
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
         this.readBufferFactory = readBufferFactory;
@@ -133,6 +157,47 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
     public final BufferConsumer.Upstream getRootUpstream() {
         return rootUpstream;
+    }
+
+    /**
+     * Get the trailers of the body, see {@link ByteBody#trailers()}.
+     *
+     * @return The trailers
+     */
+    public final CompletionStage<HttpHeaders> getTrailers() {
+        return trailers;
+    }
+
+    /**
+     * @return Whether more bytes than the buffer limit arrived while bytes were kept for a
+     * reserved reader, so that the kept bytes were dropped
+     * @since 5.3.0
+     */
+    public final boolean isBufferLimitExceeded() {
+        return bufferLimitExceeded;
+    }
+
+    /**
+     * @return Whether the body failed
+     * @since 5.3.0
+     */
+    public final boolean isFailed() {
+        return failed;
+    }
+
+    /**
+     * Charge each {@link AsFlux} reader for the bytes it has not delivered yet against a limit
+     * of its own, so that the buffered size of this buffer only counts the bytes it keeps for
+     * the reserved readers. Must be called before the first reader subscribes.
+     *
+     * @param limit The maximum number of bytes a reader holds
+     * @since 5.3.0
+     */
+    public final void setReaderBufferLimit(long limit) {
+        if (limit < 0) {
+            throw new IllegalArgumentException("The reader buffer limit is negative");
+        }
+        this.readerBufferLimit = limit;
     }
 
     public final void setExpectedLengthFrom(@Nullable String contentLength) {
@@ -468,6 +533,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 if (bufferSizeExceeded == null) {
                     bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
                     if (bufferSizeExceeded != null) {
+                        bufferLimitExceeded = true;
                         discardBuffer();
                         // new subscribers will recognize that the limit has been exceeded. Streaming
                         // subscribers can proceed normally. Need to notify buffering subscribers
@@ -500,10 +566,56 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         complete0(true);
     }
 
+    /**
+     * Complete this buffer with the given trailers, see {@link ByteBody#trailers()}.<br>
+     * Not thread safe, caller must handle concurrency.
+     *
+     * @param trailers The trailers
+     */
+    public void complete(HttpHeaders trailers) {
+        this.trailers.complete(trailers);
+        complete0(true);
+    }
+
+    /**
+     * Complete this buffer with the trailers the given stage completes with: immediately if the
+     * stage is already complete, else once it completes. A stage that fails, fails this buffer.
+     * <br>Not thread safe, caller must handle concurrency.
+     *
+     * @param trailers The trailers
+     */
+    public final void complete(CompletionStage<? extends HttpHeaders> trailers) {
+        CompletableFuture<? extends HttpHeaders> future = trailers.toCompletableFuture();
+        if (future.isDone() && !future.isCompletedExceptionally()) {
+            complete(future.join());
+            return;
+        }
+        future.whenComplete((headers, failure) -> submitDeferred(() -> {
+            if (error != null) {
+                return;
+            }
+            if (failure == null) {
+                complete(headers == null ? NoTrailers.HEADERS : headers);
+            } else {
+                error(failure instanceof CompletionException ce && ce.getCause() != null ? ce.getCause() : failure);
+            }
+        }));
+    }
+
+    /**
+     * Run the given task non-concurrently with the other operations on this buffer, like the
+     * subclass runs the {@link BufferConsumer} methods.
+     *
+     * @param task The task
+     */
+    protected abstract void submitDeferred(Runnable task);
+
     private void complete0(boolean notifySubscribers) {
         if (expectedLength > lengthSoFar) {
             throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
         }
+        // no-op if the trailers are known
+        trailers.complete(NoTrailers.HEADERS);
         complete = true;
         expectedLength = lengthSoFar;
         if (notifySubscribers && subscribers != null) {
@@ -537,6 +649,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         error = e;
+        failed = true;
+        trailers.completeExceptionally(e);
         discardBuffer();
         if (subscribers != null) {
             for (BufferConsumer subscriber : subscribers) {
@@ -559,14 +673,35 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     public static final class AsFlux implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
+        /**
+         * The tracker of this reader alone, see {@link #setReaderBufferLimit(long)}, or
+         * {@code null} to charge the buffered size of the shared buffer.
+         */
+        @Nullable
+        private final SizeLimitTracker ownTracker;
         private boolean first = true;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
+            long readerBufferLimit = sharedBuffer.readerBufferLimit;
+            this.ownTracker = readerBufferLimit < 0 ? null : NotThreadSafe.create(readerBufferLimit, true).makeAtomic();
         }
 
         @Override
         public void add(ReadBuffer buf) {
+            SizeLimitTracker readerTracker = ownTracker;
+            if (readerTracker != null) {
+                int size = buf.readable();
+                Exception bufferExceededExc = readerTracker.add(size);
+                if (bufferExceededExc != null) {
+                    sink.tryEmitError(bufferExceededExc);
+                    buf.close();
+                } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                    readerTracker.subtract(size);
+                    buf.close();
+                }
+                return;
+            }
             if (first) {
                 // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
                 sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
@@ -594,6 +729,24 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         public Flux<ReadBuffer> asFlux(Upstream upstream) {
+            SizeLimitTracker readerTracker = ownTracker;
+            if (readerTracker != null) {
+                return sink.asFlux()
+                    .doOnSubscribe(s -> upstream.start())
+                    .doOnNext(bb -> {
+                        int size = bb.readable();
+                        readerTracker.subtract(size);
+                        upstream.onBytesConsumed(size);
+                    })
+                    .doOnCancel(() -> {
+                        upstream.allowDiscard();
+                        upstream.disregardBackpressure();
+                    })
+                    .doOnDiscard(ReadBuffer.class, rb -> {
+                        readerTracker.subtract(rb.readable());
+                        rb.close();
+                    });
+            }
             return sink.asFlux()
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {

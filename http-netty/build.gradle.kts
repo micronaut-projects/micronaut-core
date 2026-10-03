@@ -48,8 +48,26 @@ spotless {
 }
 
 tasks {
+    // DefaultAllocatorSpec sets the io.netty.allocator system properties and needs a JVM in which
+    // Netty's default allocator is not created yet, so it runs in a test JVM of its own
+    val allocatorTest by registering(Test::class) {
+        description = "Runs the specs configuring Netty's default allocator."
+        group = LifecycleBasePlugin.VERIFICATION_GROUP
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        filter {
+            includeTestsMatching("io.micronaut.http.netty.allocator.DefaultAllocatorSpec")
+        }
+    }
     test {
         forkEvery = 1
+        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
+        filter {
+            excludeTestsMatching("io.micronaut.http.netty.allocator.DefaultAllocatorSpec")
+        }
+    }
+    check {
+        dependsOn(allocatorTest)
     }
 }
 

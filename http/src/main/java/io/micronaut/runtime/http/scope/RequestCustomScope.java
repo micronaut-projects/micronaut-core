@@ -62,6 +62,18 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
         return ServerRequestContext.currentRequest().isPresent();
     }
 
+    /**
+     * Only requests that hold request scoped beans need the event, the HTTP server uses this to
+     * skip publishing the event when nothing else listens for it.
+     *
+     * @param event The event
+     * @return Whether the request of the event holds request scoped beans
+     */
+    @Override
+    public boolean supports(HttpRequestTerminatedEvent event) {
+        return getRequestAttributeMap(event.getSource(), false) != null;
+    }
+
     @Override
     public void onApplicationEvent(HttpRequestTerminatedEvent event) {
         destroyBeans(event.getSource());
