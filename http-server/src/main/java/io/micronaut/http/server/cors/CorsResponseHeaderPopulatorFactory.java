@@ -16,6 +16,7 @@
 package io.micronaut.http.server.cors;
 
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaderEntry;
@@ -43,6 +44,7 @@ final class CorsResponseHeaderPopulatorFactory {
      * @throws DisabledBeanException If no cross-origin policy is configured
      */
     @Singleton
+    @Requires(condition = CrossOriginPoliciesCondition.class)
     ResponseHeaderPopulator crossOriginPolicies(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
         if (corsConfiguration.getCrossOriginResourcePolicy() == null
             && corsConfiguration.getCrossOriginEmbedderPolicy() == null) {
