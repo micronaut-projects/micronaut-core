@@ -45,6 +45,19 @@ Changes to the query parameters or the body of the copy are still only kept when
 
 If an earlier filter continued with a request that cannot be copied this way, for example an `HttpRequestWrapper`, the parameter is now a mutable wrapper of that request. Previously the method failed with an `UnsupportedOperationException`.
 
+=== The name condition of `SoftServiceLoader.load` is tested on every service entry (5.3)
+
+The `Predicate<String>` given to the three-argument `load(Class, ClassLoader, Predicate)` of api:core.io.service.SoftServiceLoader[] is documented to be passed the class name of each service. Previously it was only tested on the lines of `META-INF/services` files, comment included. Since Micronaut 5.3 it is tested on the name of every entry, so a caller that passes a condition can get different results:
+
+* Entries under `META-INF/micronaut`, and the entries of the service table of a native image, are no longer returned when the condition rejects them. Previously the condition was not tested on them.
+* With a static service loader registered for the service type (the internal `SoftServiceLoader.StaticServiceLoader`, which nothing in Micronaut 5 registers), `collectAll()` only returns the entries that the condition accepts. Previously it ignored the condition.
+* With such a loader, `iterator()`, and `first()`, `firstAvailable()` and `firstOr(..)`, which use it, now return the entries that the condition accepts. Previously the condition was tested on `java.lang.String` instead of the name of each entry, so for most conditions the iterator was empty.
+* For a `META-INF/services` line with a trailing comment, such as `com.example.Foo # comment`, the condition is tested on `com.example.Foo`. Previously it was tested on the whole line.
+
+The name of a `META-INF/services` entry is now read without the whitespace around it, as `java.util.ServiceLoader` reads an entry that is padded with spaces or tabs. This also applies without a condition. Previously an indented entry, or one followed by whitespace, was not loaded: `collectAll()` left it out, and `iterator()`, `first()` and `firstOr(..)` returned it as a definition that is not present, under the name with its whitespace. For a line that has only whitespace, or only whitespace before a comment, they returned a definition that is not present, with a blank name. Now such an entry is returned under its class name, and such a line is skipped.
+
+Callers of the `load` methods without a condition are otherwise not affected.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.
