@@ -123,6 +123,10 @@ public final class Compressor {
             return null;
         }
         // check the request accepts a compression we can do before inspecting the content type
+        if (!request.headers().contains(HttpHeaderNames.ACCEPT_ENCODING)) {
+            // without the header there is nothing to iterate
+            return null;
+        }
         Algorithm encoding = determineEncoding(request.headers().valueStringIterator(HttpHeaderNames.ACCEPT_ENCODING));
         if (encoding == null) {
             return null;
