@@ -91,6 +91,10 @@ public final class BeanDestructionOrder {
      */
     public static <T extends CreatedBean<?>> List<T> sort(Collection<T> beans) {
         final int size = beans.size();
+        if (size < 2) {
+            // nothing to order: a scope closed on a hot path, such as the request scope, usually holds one bean
+            return new ArrayList<>(beans);
+        }
         // Node indexes provide a stable tie-breaker for the destruction sequence.
         final List<T> nodes = new ArrayList<>(beans);
         // Keep destruction listeners alive as long as possible, but respect their own dependencies too.
