@@ -31,11 +31,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup {
     final BeanDependencies dependencies;
 
     DefaultBeanDependencyResolver(DefaultBeanContext context) {
-        this(context, false);
-    }
-
-    DefaultBeanDependencyResolver(DefaultBeanContext context, boolean destructionInvocation) {
-        this(context, new BeanDependencies(destructionInvocation));
+        this(context, new BeanDependencies());
     }
 
     DefaultBeanDependencyResolver(DefaultBeanContext context, BeanDependencies dependencies) {
@@ -60,7 +56,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup {
     @Override
     public BeanDependencyGroup createGroup() {
         return dependencies.resolve(context, null, resolution -> {
-            BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration();
+            BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies.destructionContext);
             resolution.addDependentBean(child);
             return (BeanDependencyGroup) child.bean();
         });
