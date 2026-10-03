@@ -4485,7 +4485,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <R> R withDependencies(java.util.function.Function<BeanDependencyGroup, R> action) {
+    public <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
         try (BeanDependencyGroup group = isDestructionInvocationActive()
             ? new DefaultBeanDependencyResolver(this, true) : createDependencyGroup()) {
             return action.apply(group);
