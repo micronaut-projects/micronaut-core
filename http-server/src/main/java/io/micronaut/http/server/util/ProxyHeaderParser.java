@@ -204,7 +204,10 @@ public class ProxyHeaderParser {
     }
 
     private String trimQuotes(String value) {
-        if (value != null && value.startsWith("\"")) {
+        // Only unwrap a balanced quoted-string (RFC 7239 section 4). A value that merely opens with
+        // a quote is left untouched: stripping the last character of "abc would drop a real char, and
+        // a lone " would make substring(1, 0) throw out of the constructor on the Forwarded header.
+        if (value != null && value.length() >= 2 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
             return value.substring(1, value.length() - 1);
         } else {
             return value;
