@@ -1,11 +1,21 @@
 package io.micronaut.core.io.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.management.ManagementFactory;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -14,13 +24,16 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.Test;
@@ -28,8 +41,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 class MicronautMetaServiceLoaderUtilsTest {
 
+    private static final String SERVICES = "META-INF/micronaut/";
     private static final String BEANS = "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/";
     private static final String INTROSPECTIONS = "META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/";
+    private static final byte[] SERVICES_PREFIX = SERVICES.getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] ALL_NAMES = new byte[0];
 
     @TempDir
     Path tempDir;
@@ -66,11 +82,244 @@ class MicronautMetaServiceLoaderUtilsTest {
         )));
     }
 
+    @Test
+    void listsTheServicesOfAJarWhoseCentralDirectoryIsLargerThanTheScanBuffer() throws IOException {
+        // long names, extra fields and comments spread the central directory over many reads of the buffer, so that
+        // headers and names of matching entries also cross the end of what one read holds
+        String padding = "p".repeat(150);
+        Path jar = zip("large directory.jar", zip -> {
+            put(zip, "META-INF/");
+            put(zip, SERVICES);
+            for (int i = 0; i < 6_000; i++) {
+                if (i % 97 == 0) {
+                    ZipEntry entry = new ZipEntry(BEANS + "com.example." + padding + ".$Bean" + i + "$Definition");
+                    entry.setComment("c".repeat(i % 7));
+                    zip.putNextEntry(entry);
+                    zip.closeEntry();
+                } else {
+                    ZipEntry entry = new ZipEntry("com/example/" + padding + "/Generated" + i + ".class");
+                    entry.setExtra(extraField(i % 13));
+                    entry.setComment("comment".repeat(i % 3));
+                    zip.putNextEntry(entry);
+                    zip.closeEntry();
+                }
+            }
+            put(zip, INTROSPECTIONS + "z.$Z$Introspection");
+        });
+        assertTrue(Files.size(jar) > 4 * 65_536);
+        assertScanMatchesZipFile(jar);
+        assertSameAsZipFileSystem(jar);
+    }
+
+    @Test
+    void listsTheServicesWithNamesThatAreNotAscii() throws IOException {
+        Path jar = jar("unicode.jar", List.of(
+            SERVICES,
+            BEANS + "café.$Crème$Definition",
+            BEANS + "日本.$名前$Definition",
+            "ü/Ü.class",
+            INTROSPECTIONS + "emoji.$😀$Introspection"
+        ));
+        assertScanMatchesZipFile(jar);
+        assertSameAsZipFileSystem(jar);
+    }
+
+    @Test
+    void matchesOnlyTheExactPrefixOfTheServices() throws IOException {
+        Path jar = jar("near misses.jar", List.of(
+            "META-INF/micronaut",
+            "META-INF/micronautx/a/b",
+            "meta-inf/micronaut/a/b",
+            "META-INF/MICRONAUT/a/b",
+            "META-INF/micronau",
+            "META-INF/micronaut/a/b",
+            "META-INF/micronaut//c",
+            "x/META-INF/micronaut/a/b"
+        ));
+        assertEquals(List.of("META-INF/micronaut/a/b", "META-INF/micronaut//c"), scan(jar, SERVICES_PREFIX));
+        assertScanMatchesZipFile(jar);
+    }
+
+    @Test
+    void readsTheJarsOfTheClassPathAsZipFileDoes() throws IOException {
+        int read = 0;
+        for (String entry : System.getProperty("java.class.path").split(File.pathSeparator, -1)) {
+            Path path = Path.of(entry);
+            if (entry.endsWith(".jar") && Files.isRegularFile(path)) {
+                assertScanMatchesZipFile(path);
+                read++;
+            }
+        }
+        assertTrue(read >= 5, "Only " + read + " jars on the class path");
+    }
+
+    @Test
+    void readsAJarWithDataBeforeItsFirstEntry() throws IOException {
+        Path jar = jar("plain.jar", serviceEntries());
+        Path prepended = tempDir.resolve("a dir").resolve("launcher.jar");
+        byte[] script = "#!/bin/sh\nexec java -jar \"$0\" \"$@\"\n".getBytes(StandardCharsets.US_ASCII);
+        Files.write(prepended, concat(script, Files.readAllBytes(jar)));
+        assertNotNull(scan(prepended, ALL_NAMES));
+        assertScanMatchesZipFile(prepended);
+        assertSameServices(jar, prepended);
+    }
+
+    @Test
+    void readsAJarWithAComment() throws IOException {
+        for (String comment : List.of("a comment", "c".repeat(65_535))) {
+            Path jar = zip("commented " + comment.length() + ".jar", zip -> {
+                zip.setComment(comment);
+                for (String name : serviceEntries()) {
+                    put(zip, name);
+                }
+            });
+            assertNotNull(scan(jar, ALL_NAMES), "comment of " + comment.length());
+            assertScanMatchesZipFile(jar);
+            assertSameAsZipFileSystem(jar);
+        }
+    }
+
+    @Test
+    void leavesAJarWithAnEndSignatureInItsCommentToZipFile() throws IOException {
+        Path jar = zip("signature in comment.jar", zip -> {
+            zip.setComment("PK\u0005\u0006 looks like an end record");
+            for (String name : serviceEntries()) {
+                put(zip, name);
+            }
+        });
+        assertNull(scan(jar, ALL_NAMES));
+        assertSameAsZipFileSystem(jar);
+    }
+
+    @Test
+    void leavesAZip64JarToZipFile() throws IOException {
+        // more than 65,534 entries make ZipOutputStream write the ZIP64 end records
+        Path jar = zip("zip64.jar", zip -> {
+            for (String name : serviceEntries()) {
+                put(zip, name);
+            }
+            for (int i = 0; i < 65_600; i++) {
+                put(zip, "c/" + i);
+            }
+        });
+        byte[] bytes = Files.readAllBytes(jar);
+        assertEquals(0x07064b50, littleEndian(bytes).getInt(bytes.length - 22 - 20), "no ZIP64 locator");
+        assertNull(scan(jar, ALL_NAMES));
+        assertSameAsZipFileSystem(jar);
+    }
+
+    @Test
+    void leavesADamagedJarToZipFile() throws IOException {
+        Path jar = jar("intact.jar", serviceEntries());
+        byte[] intact = Files.readAllBytes(jar);
+        ByteBuffer view = littleEndian(intact);
+        int end = intact.length - 22;
+        int cenStart = end - view.getInt(end + 12);
+        int secondHeader = cenStart + 46 + Short.toUnsignedInt(view.getShort(cenStart + 28));
+        int lastHeader = lastCentralHeader(intact, cenStart, end);
+
+        // damage that ZipFile also rejects
+        assertNull(scan(damaged("cen signature.jar", intact, b -> b.put(secondHeader, (byte) 0)), ALL_NAMES));
+        assertNull(scan(damaged("name past the directory.jar", intact, b -> b.putShort(lastHeader + 28, (short) 0x7FFF)), ALL_NAMES));
+        assertNull(scan(damaged("directory before the file.jar", intact, b -> b.putInt(end + 12, 0x7FFFFFFF)), ALL_NAMES));
+        assertNull(scan(damaged("offset past the directory.jar", intact, b -> b.putInt(end + 16, 0x7FFFFFFF)), ALL_NAMES));
+        assertNull(scan(write("truncated.jar", Arrays.copyOf(intact, intact.length - 1)), ALL_NAMES));
+        assertNull(scan(write("too short.jar", Arrays.copyOf(intact, 21)), ALL_NAMES));
+        assertNull(scan(write("empty.jar", new byte[0]), ALL_NAMES));
+        assertNull(scan(write("text.jar", "not a zip file".repeat(10).getBytes(StandardCharsets.US_ASCII)), ALL_NAMES));
+        assertNull(scan(tempDir.resolve("missing.jar"), ALL_NAMES));
+
+        // damage that ZipFile accepts: the services are then the same as before, listed by ZipFile
+        Path wrongCount = damaged("wrong count.jar", intact, b -> b.putShort(end + 10, (short) (b.getShort(end + 10) - 1)));
+        Path padded = write("padded.jar", concat(intact, new byte[16]));
+        Path commented = zip("commented.jar", zip -> {
+            zip.setComment("0123456789");
+            for (String name : serviceEntries()) {
+                put(zip, name);
+            }
+        });
+        byte[] commentedBytes = Files.readAllBytes(commented);
+        int commentedEnd = commentedBytes.length - 22 - 10;
+        Path shorterComment = damaged("comment length.jar", commentedBytes, b -> b.putShort(commentedEnd + 20, (short) 5));
+        for (Path readable : List.of(wrongCount, padded, shorterComment)) {
+            assertNull(scan(readable, ALL_NAMES), readable.toString());
+            try (ZipFile zipFile = new ZipFile(readable.toFile())) {
+                assertEquals(serviceEntries().size(), zipFile.size(), readable.toString());
+            }
+            assertSameServices(jar, readable);
+        }
+    }
+
+    @Test
+    void createsNoNameForTheOtherEntriesOfAJar() throws IOException {
+        assumeTrue(ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean);
+        com.sun.management.ThreadMXBean threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+        assumeTrue(threads.isThreadAllocatedMemorySupported() && threads.isThreadAllocatedMemoryEnabled());
+        int others = 50_000;
+        Path jar = zip("many classes.jar", zip -> {
+            put(zip, SERVICES);
+            put(zip, BEANS + "a.$A$Definition");
+            for (int i = 0; i < others; i++) {
+                put(zip, "com/example/generated/Host$$Lambda" + i + ".class");
+            }
+            put(zip, BEANS + "b.$B$Definition");
+        });
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, null)) {
+            // the first calls open the jar in the class loader and load the classes the scan uses
+            for (int i = 0; i < 3; i++) {
+                MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
+            }
+            long before = threads.getCurrentThreadAllocatedBytes();
+            Map<String, Set<String>> services = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
+            long allocated = threads.getCurrentThreadAllocatedBytes() - before;
+
+            assertEquals(Map.of("io.micronaut.inject.BeanDefinitionReference", List.of("b.$B$Definition", "a.$A$Definition")), asLists(services));
+            // a name alone (a String and its bytes) takes 40 bytes or more, and listing a ZipFile also creates a ZipEntry
+            assertTrue(allocated < others * 16L, allocated + " bytes allocated to list " + others + " other entries");
+        }
+    }
+
+    private static List<String> serviceEntries() {
+        return List.of(
+            "META-INF/",
+            SERVICES,
+            BEANS,
+            BEANS + "a.$A$Definition",
+            "a/A.class",
+            BEANS + "b.$B$Definition",
+            INTROSPECTIONS + "a.$A$Introspection",
+            "b/B.class"
+        );
+    }
+
+    private static List<String> scan(Path zip, byte[] prefix) {
+        return MicronautMetaServiceLoaderUtils.scanCentralDirectory(zip.toFile(), prefix, new byte[65_581]);
+    }
+
+    private static void assertScanMatchesZipFile(Path zip) throws IOException {
+        List<String> all = new ArrayList<>();
+        try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                all.add(entries.nextElement().getName());
+            }
+        }
+        assertEquals(all, scan(zip, ALL_NAMES), zip.toString());
+        assertEquals(all.stream().filter(n -> n.startsWith(SERVICES)).toList(), scan(zip, SERVICES_PREFIX), zip.toString());
+    }
+
     private void assertSameAsZipFileSystem(Path jar) throws IOException {
         Map<String, Set<String>> expected = walkZipFileSystem(jar);
+        assertEquals(asLists(expected), asLists(findAll(jar)));
+    }
+
+    private static void assertSameServices(Path expectedJar, Path jar) throws IOException {
+        assertEquals(asLists(walkZipFileSystem(expectedJar)), asLists(findAll(jar)), jar.toString());
+    }
+
+    private static Map<String, Set<String>> findAll(Path jar) throws IOException {
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, null)) {
-            Map<String, Set<String>> actual = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
-            assertEquals(asLists(expected), asLists(actual));
+            return MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
         }
     }
 
@@ -108,14 +357,79 @@ class MicronautMetaServiceLoaderUtilsTest {
     }
 
     private Path jar(String name, List<String> entries) throws IOException {
+        return zip(name, zip -> {
+            for (String entry : entries) {
+                put(zip, entry);
+            }
+        });
+    }
+
+    private Path zip(String name, ZipContent content) throws IOException {
         Path dir = Files.createDirectories(tempDir.resolve("a dir"));
         Path jar = dir.resolve(name);
-        try (OutputStream out = Files.newOutputStream(jar); ZipOutputStream zip = new ZipOutputStream(out)) {
-            for (String entry : entries) {
-                zip.putNextEntry(new ZipEntry(entry));
-                zip.closeEntry();
-            }
+        try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(jar)); ZipOutputStream zip = new ZipOutputStream(out)) {
+            content.write(zip);
         }
         return jar;
+    }
+
+    private static void put(ZipOutputStream zip, String name) throws IOException {
+        // stored, as an empty entry needs no compression, and writing a deflated one takes several times longer
+        ZipEntry entry = new ZipEntry(name);
+        entry.setMethod(ZipEntry.STORED);
+        entry.setSize(0);
+        entry.setCrc(0);
+        zip.putNextEntry(entry);
+        zip.closeEntry();
+    }
+
+    private Path write(String name, byte[] bytes) throws IOException {
+        Path dir = Files.createDirectories(tempDir.resolve("a dir"));
+        return Files.write(dir.resolve(name), bytes);
+    }
+
+    private Path damaged(String name, byte[] intact, Damage damage) throws IOException {
+        byte[] bytes = intact.clone();
+        damage.apply(littleEndian(bytes));
+        return write(name, bytes);
+    }
+
+    private static int lastCentralHeader(byte[] zip, int cenStart, int cenEnd) {
+        ByteBuffer view = littleEndian(zip);
+        int position = cenStart;
+        int last = cenStart;
+        while (position < cenEnd) {
+            last = position;
+            position += 46 + Short.toUnsignedInt(view.getShort(position + 28)) + Short.toUnsignedInt(view.getShort(position + 30))
+                + Short.toUnsignedInt(view.getShort(position + 32));
+        }
+        return last;
+    }
+
+    private static byte[] extraField(int dataLength) {
+        // an unknown header ID, which ZipEntry keeps as it is
+        byte[] extra = new byte[4 + dataLength];
+        littleEndian(extra).putShort(0, (short) 0x6D6E).putShort(2, (short) dataLength);
+        return extra;
+    }
+
+    private static ByteBuffer littleEndian(byte[] bytes) {
+        return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+    }
+
+    private static byte[] concat(byte[] first, byte[] second) {
+        byte[] bytes = Arrays.copyOf(first, first.length + second.length);
+        System.arraycopy(second, 0, bytes, first.length, second.length);
+        return bytes;
+    }
+
+    @FunctionalInterface
+    private interface ZipContent {
+        void write(ZipOutputStream zip) throws IOException;
+    }
+
+    @FunctionalInterface
+    private interface Damage {
+        void apply(ByteBuffer zip);
     }
 }
