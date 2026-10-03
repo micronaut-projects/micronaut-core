@@ -77,8 +77,8 @@ public interface BeanContext extends
 
     /**
      * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
-     * New lookups are rejected during shutdown. Use {@link #withDependencies(Function)}
-     * for temporary dependencies required by a destruction callback.
+     * New lookups are rejected during shutdown. For temporary destruction dependencies, use
+     * {@link BeanResolutionContext#withDependencies(Function)} on the context supplied by the container.
      * @return The group
      * @since 5.3.0
      */
@@ -89,8 +89,9 @@ public interface BeanContext extends
 
     /**
      * Resolves dependencies for a synchronous invocation and always releases them afterwards. Cleanup failures
-     * are suppressed on an invocation failure. During a container destruction callback, this operation may create
-     * temporary dependents until the callback returns; it cannot be used after shutdown completes.
+     * are suppressed on an invocation failure. New groups and lookups are rejected once shutdown begins.
+     * Destruction integrations can use {@link BeanResolutionContext#withDependencies(Function)}
+     * on their container-supplied resolution context.
      * @param action The invocation
      * @param <R> The result type
      * @return The result (which must not retain an owned dependency)

@@ -36,14 +36,14 @@ final class BeanDependencies implements DependentBeanProvider {
     private List<BeanRegistration<?>> required = List.of();
     private boolean closing;
     private boolean destroyed;
-    private final boolean destructionInvocation;
+    final @Nullable DefaultBeanResolutionContext destructionContext;
 
     BeanDependencies() {
-        this(false);
+        this(null);
     }
 
-    BeanDependencies(boolean destructionInvocation) {
-        this.destructionInvocation = destructionInvocation;
+    BeanDependencies(@Nullable DefaultBeanResolutionContext destructionContext) {
+        this.destructionContext = destructionContext;
     }
 
     synchronized boolean remove(BeanRegistration<?> registration) {
@@ -142,13 +142,14 @@ final class BeanDependencies implements DependentBeanProvider {
     }
 
     synchronized void checkOpen(DefaultBeanContext context) {
-        if (closing || context.isDependencyResolutionClosed() && !(destructionInvocation && context.isDestructionInvocationActive())) {
+        if (closing || destructionContext != null && !destructionContext.isDestructionInvocationActive()
+            || destructionContext == null && context.isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot resolve a dependency after owner destruction or context shutdown has begun");
         }
     }
 
     <T> T resolve(DefaultBeanContext context, @Nullable BeanDefinition<?> definition,
-                  Function<DefaultBeanResolutionContext, T> operation) {
+                  Function<? super DefaultBeanResolutionContext, T> operation) {
         checkOpen(context);
         // User factories run outside the owner lock. Publication is atomic with closing.
         List<BeanRegistration<?>> created = List.of();
