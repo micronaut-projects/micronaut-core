@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.ConfigurationPath;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -35,6 +36,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Represents the resolution context for a current resolve of a given bean.
@@ -93,6 +95,22 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     @Override
     default void close() {
         // no-op
+    }
+
+    /**
+     * Resolves dependencies for a synchronous invocation and closes the temporary group afterwards.
+     * A context supplied by the container for destruction permits temporary lookups during shutdown,
+     * only on the destruction thread and until that invocation returns. Other contexts follow the ordinary
+     * shutdown restrictions of {@link BeanContext#withDependencies(Function)}.
+     * Cleanup failures are suppressed on an invocation failure. Do not retain an owned dependency in the result.
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result
+     * @since 5.3.0
+     */
+    @Experimental
+    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+        return getContext().withDependencies(action);
     }
 
     /**
