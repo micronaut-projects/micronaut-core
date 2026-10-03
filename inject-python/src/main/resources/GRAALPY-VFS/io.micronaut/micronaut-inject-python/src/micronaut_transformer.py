@@ -31,6 +31,17 @@ def normalize_python_keyword_alias(name: str) -> str:
     return name
 
 
+def mark_generated(nodes) -> None:
+    """
+    Mark statements the transformer generated, and everything inside them, so the processor knows
+    they have no position in the original source: their line numbers are those of the generated
+    snippet they were parsed from.
+    """
+    for statement in nodes:
+        for node in ast.walk(statement):
+            node._mn_generated = True
+
+
 def ensure_non_empty_bodies(tree: ast.AST) -> None:
     """
     Insert ``pass`` into every block a transformer emptied, such as an ``if TYPE_CHECKING:`` whose
@@ -474,10 +485,9 @@ class MicronautTransformer(ast.NodeTransformer):
             and any(alias.name == 'builtins' and alias.asname is None for alias in statement.names)
             for statement in node.body
         ):
-            node.body.insert(
-                self._generated_code_insert_index(node),
-                ast.Import(names=[ast.alias(name='builtins', asname=None)])
-            )
+            builtins_import = ast.Import(names=[ast.alias(name='builtins', asname=None)])
+            mark_generated([builtins_import])
+            node.body.insert(self._generated_code_insert_index(node), builtins_import)
 
         # Add generated code at the beginning
         if (self.transformed_code or self.has_java_import
@@ -537,6 +547,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     raise RuntimeError(f"Error parsing generated decorator (generated code is not valid Python): {e}") from e
                     continue
 
+            mark_generated(generated_nodes)
             insert_at = self._generated_code_insert_index(node)
             node.body = node.body[:insert_at] + generated_nodes + node.body[insert_at:]
 
@@ -573,6 +584,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             level=0
         )
         ast.fix_missing_locations(future_import)
+        mark_generated([future_import])
 
         insert_at = 0
         if node.body and self._is_module_docstring(node.body[0]):
