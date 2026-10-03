@@ -201,7 +201,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
 
     private static final Method GET_PROXY_DEPENDENCIES_METHOD = ReflectionUtils.getRequiredInternalMethod(
-        InterceptedBeanProxy.class, "interceptedBeanDependencies");
+        InterceptedBeanProxy.class, "$beanDependencies");
     private static final Method DEPENDENCIES_CLOSED_METHOD = ReflectionUtils.getRequiredInternalMethod(
         BeanDependencyGroup.class, "isClosed");
 
@@ -800,7 +800,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             bodyBuilders.add((aThis, parameters) -> aThis.field(dependenciesField).assign(
                 parameters.get(beanResolutionContextArgumentIndex).invoke(
                     ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "getBeanDependencyGroup"))));
-            proxyBuilder.addMethod(MethodDef.builder("interceptedBeanDependencies")
+            proxyBuilder.addMethod(MethodDef.builder("$beanDependencies")
                 .addModifiers(Modifier.PUBLIC).returns(BeanDependencyGroup.class)
                 .build((aThis, parameters) -> aThis.field(dependenciesField).returning()));
 

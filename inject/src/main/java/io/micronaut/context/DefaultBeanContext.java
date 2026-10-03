@@ -1461,12 +1461,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
         Optional<CustomScope<?>> declaredScope = customScopeRegistry.findDeclaredScope(proxyTargetBeanDefinition);
         if (registration.bean instanceof InterceptedBeanProxy<?> proxy
-            && proxy.interceptedBeanDependencies() != null) {
+            && proxy.$beanDependencies() != null) {
             // The proxy retains the original owner even if the caller only retained the bean instance.
             // Its prototype target and advice are ordinary dependents; scoped and swapped-in targets are borrowed.
             Throwable failure = null;
             try {
-                proxy.interceptedBeanDependencies().close();
+                proxy.$beanDependencies().close();
             } catch (RuntimeException | Error e) {
                 failure = e;
             } finally {

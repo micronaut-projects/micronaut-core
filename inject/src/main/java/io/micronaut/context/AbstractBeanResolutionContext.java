@@ -69,12 +69,33 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
-    @Nullable BeanCreationState creationState;
-    @Nullable BeanDependencies lazyProxyDependencies;
+    /** The ownership of the bean this context is creating at the moment, or null outside a creation. */
+    @Nullable
+    BeanCreationState creationState;
+    /** The owner of the proxy whose lazy target this context creates, so that the target is released with the proxy. */
+    @Nullable
+    BeanDependencies lazyProxyDependencies;
+    /** The attribute a {@link ProxyInterceptors} waits under between {@link #prepareProxyTarget} and the creation of the target. */
     private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
 
-    record ProxyInterceptors(BeanDefinition<?> definition, List<BeanRegistration<?>> registrations) { }
+    /**
+     * The interceptors a proxy selected, handed to the creation of its unscoped target so that the target is
+     * destroyed with the advice of the proxy.
+     *
+     * @param definition The target definition the registrations are meant for
+     * @param registrations The interceptor registrations of the proxy
+     */
+    record ProxyInterceptors(BeanDefinition<?> definition, List<BeanRegistration<?>> registrations) {
+    }
 
+    /**
+     * Starts the creation of a bean. The state it returns owns what is resolved for the bean before its instance
+     * exists and becomes the owner held by the registration. Interceptors a proxy prepared for this definition
+     * are taken over. The caller restores the previous state when the creation ends.
+     *
+     * @param definition The definition being created
+     * @return The creation state, which is also current on this context
+     */
     BeanCreationState beginCreation(BeanDefinition<?> definition) {
         List<BeanRegistration<?>> borrowed = getAttribute(PROXY_INTERCEPTORS) instanceof ProxyInterceptors shared
             && shared.definition().equals(definition) ? shared.registrations() : List.of();

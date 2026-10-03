@@ -61,11 +61,14 @@ public class BeanPreDestroyEvent<T> extends BeanEvent<T> {
     }
 
     /**
-     * Returns the context for resolving temporary destruction dependencies through
-     * {@link BeanResolutionContext#withDependencies(java.util.function.Function)}. Its destruction permission
-     * is confined to the synchronous container invocation. Events constructed with the original constructor
-     * do not carry a resolution context. The context is transient and is not retained by serialized events.
-     * @return The resolution context, or {@code null} if none was supplied
+     * Resolves dependencies the listener needs while the bean is being destroyed and releases them when the
+     * action returns, including when it fails. The lookups are allowed during context shutdown, only on the
+     * thread delivering this event and until the listener returns. The result must not retain an owned
+     * dependency, since it has already been destroyed.
+     *
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result
      * @since 5.3.0
      */
     @Experimental

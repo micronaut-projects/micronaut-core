@@ -113,21 +113,7 @@ For temporary method arguments, `BeanContext.withDependencies(group -> ...)` rel
 when the synchronous invocation ends, including when it fails. Cleanup attempts every dependent and suppresses
 cleanup failures on the invocation's exception. It rejects new groups once shutdown begins.
 
-Destruction integrations use `resolutionContext.withDependencies(group -> ...)` on the context supplied to
-`DisposableBeanDefinition.dispose(...)` or `BeanPreDestroyEvent.getResolutionContext()`. Core closes that context
-when destruction returns. Its temporary groups may resolve during shutdown, only on the destruction thread and
-within that invocation. Child groups inherit the same lifetime restriction. Ordinary contexts, independent groups,
-and retained injected resolvers receive no shutdown exemption. A context created manually grants no destruction permission.
-Do not return an owned dependency from such an invocation, since it has already been destroyed.
-
-==== Proxy target ownership
-
-Generated target proxies retain the dependency ownership established before their construction. Eager and
-cached lazy prototype targets keep their original registrations, including constructor dependencies and
-lifecycle interceptors. Destruction closes these registrations before releasing the proxy's interceptor
-instances, even when the caller destroys a raw proxy instance instead of its registration.
-
-A cached lazy target cannot be created after proxy destruction. If creation races with destruction, Core
-releases the unpublished target and its dependents. Scoped targets remain owned by their scopes, and
-externally supplied hot-swap targets are borrowed. Existing proxy-owned and per-target interceptor selection
-rules still determine which interceptor instances handle each lifecycle phase.
+A `BeanPreDestroyEventListener` that needs temporary dependencies while a bean is being destroyed calls
+`event.withDependencies(group -> ...)`. These lookups are allowed during shutdown, only on the destruction
+thread and until the listener returns; injected resolvers and independent groups still reject new lookups
+once shutdown starts. Do not return an owned dependency from either invocation, since it has already been destroyed.
