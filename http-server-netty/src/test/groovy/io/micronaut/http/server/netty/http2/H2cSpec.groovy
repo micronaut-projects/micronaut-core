@@ -67,9 +67,10 @@ class H2cSpec extends Specification {
 
     private CompletableFuture requestUpgrade(DefaultFullHttpRequest initialRequest) {
         def responseFuture = new CompletableFuture()
+        def group = new NioEventLoopGroup()
         def bootstrap = new Bootstrap()
                 .remoteAddress(embeddedServer.host, embeddedServer.port)
-                .group(new NioEventLoopGroup())
+                .group(group)
                 .channel(NioSocketChannel.class)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
@@ -119,6 +120,10 @@ class H2cSpec extends Specification {
 
         channel.writeAndFlush(initialRequest)
         channel.read()
+        responseFuture.whenComplete { response, error ->
+            channel.close()
+            group.shutdownGracefully()
+        }
 
         return responseFuture
     }
@@ -127,8 +132,14 @@ class H2cSpec extends Specification {
         given:
         def responseFuture = requestUpgrade(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
 
-        expect:
-        responseFuture.get(10, TimeUnit.SECONDS) != null
+        when:
+        def response = responseFuture.get(10, TimeUnit.SECONDS)
+
+        then:
+        response != null
+
+        cleanup:
+        response.release()
     }
 
     void 'test using micronaut http client: retrieve'() {
