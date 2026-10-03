@@ -49,7 +49,17 @@ final class NettyReadBuffer extends ReadBuffer {
     ByteBuf buf;
 
     NettyReadBuffer(ByteBuf buf) {
-        checkAccessible(buf);
+        this(checkAccessible(buf), true);
+    }
+
+    /**
+     * Constructor for a buffer that is known to be accessible: derived from, or moved out of, a
+     * buffer that {@link #getBuf()} has just checked.
+     *
+     * @param buf     The buffer, which this instance takes ownership of
+     * @param checked Distinguishes this constructor, always {@code true}
+     */
+    private NettyReadBuffer(ByteBuf buf, boolean checked) {
         if (STRICT_REFCNT) {
             ByteBuf copy = buf.copy();
             buf.release();
@@ -59,10 +69,11 @@ final class NettyReadBuffer extends ReadBuffer {
         }
     }
 
-    private static void checkAccessible(ByteBuf buf) {
+    private static ByteBuf checkAccessible(ByteBuf buf) {
         if (buf.refCnt() <= 0) {
             throw new IllegalReferenceCountException(buf.refCnt());
         }
+        return buf;
     }
 
     private ByteBuf getBuf() {
@@ -81,19 +92,20 @@ final class NettyReadBuffer extends ReadBuffer {
 
     @Override
     public ReadBuffer duplicate() {
-        return new NettyReadBuffer(getBuf().retainedDuplicate());
+        // a retained duplicate shares the reference count getBuf() has just checked
+        return new NettyReadBuffer(getBuf().retainedDuplicate(), true);
     }
 
     @Override
     public ReadBuffer split(int splitPosition) {
-        return new NettyReadBuffer(getBuf().readRetainedSlice(splitPosition));
+        return new NettyReadBuffer(getBuf().readRetainedSlice(splitPosition), true);
     }
 
     @Override
     public ReadBuffer move() {
         ByteBuf b = getBuf();
         this.buf = null;
-        return new NettyReadBuffer(b);
+        return new NettyReadBuffer(b, true);
     }
 
     @Override

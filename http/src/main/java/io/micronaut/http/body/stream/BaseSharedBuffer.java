@@ -493,8 +493,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         try (rb) {
             assert !working;
 
+            int readable = rb.readable();
             // calculate the new total length
-            long newLength = lengthSoFar + rb.readable();
+            long newLength = lengthSoFar + readable;
             long expectedLength = this.expectedLength;
             if (expectedLength != -1 && newLength > expectedLength) {
                 throw new IncorrectContentLengthException("Received more bytes than specified by Content-Length");
@@ -506,7 +507,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 return null;
             }
             if (expectedLength == -1) {
-                Exception totalSizeException = sizeLimitTrackers.totalSize().add(rb.readable());
+                Exception totalSizeException = sizeLimitTrackers.totalSize().add(readable);
                 if (totalSizeException != null) {
                     // for maxBodySize, all subscribers get the error
                     error(totalSizeException);
@@ -516,7 +517,19 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             } // else, already checked the Content-Length
 
             working = true;
-            if (subscribers != null) {
+            if (subscribers != null && subscribers.size() == 1 && reserved == 0 && fullSubscribers == null) {
+                // The common streaming case: a single subscriber and nothing else that will ever
+                // read these bytes (no reservation is left, so no subscriber can join later, and
+                // nothing is buffered). The buffer is handed over as it is instead of as a
+                // retained duplicate that would only be released right after.
+                ReadBuffer only = rb.move();
+                if (completeAfter) {
+                    deferred = new ArrayList<>(1);
+                    deferred.add(only);
+                } else {
+                    subscribers.get(0).add(only);
+                }
+            } else if (subscribers != null) {
                 if (completeAfter) {
                     // delivered by addAndComplete once the state below is final
                     deferred = new ArrayList<>(subscribers.size());
@@ -531,7 +544,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             }
             if (reserved > 0 || fullSubscribers != null) {
                 if (bufferSizeExceeded == null) {
-                    bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
+                    bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(readable);
                     if (bufferSizeExceeded != null) {
                         bufferLimitExceeded = true;
                         discardBuffer();
