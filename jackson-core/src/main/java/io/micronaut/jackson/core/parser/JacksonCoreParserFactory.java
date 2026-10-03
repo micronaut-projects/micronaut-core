@@ -41,6 +41,12 @@ import java.util.function.Function;
 @Internal
 @Deprecated(since = "5.0.0")
 public final class JacksonCoreParserFactory {
+    /**
+     * Buffers without a backing array (direct or composite) of up to this size are copied to the
+     * heap: the copy is cheaper than parsing through an {@link InputStream}, which is Jackson's
+     * slowest input. Larger inputs are streamed, so that they are not held twice.
+     */
+    private static final int COPY_LIMIT = 16 * 1024;
 
     private static final boolean HAS_NETTY_BUFFER;
 
@@ -75,6 +81,8 @@ public final class JacksonCoreParserFactory {
 
         if (byteBuf.hasArray()) {
             return factory.createParser(byteBuf.array(), byteBuf.readerIndex() + byteBuf.arrayOffset(), byteBuf.readableBytes());
+        } else if (byteBuf.readableBytes() <= COPY_LIMIT) {
+            return factory.createParser(copy(byteBuf));
         } else {
             return factory.createParser((InputStream) new ByteBufInputStream(byteBuf));
         }
@@ -96,8 +104,16 @@ public final class JacksonCoreParserFactory {
 
         if (byteBuf.hasArray()) {
             return factory.createParser(readContext, byteBuf.array(), byteBuf.readerIndex() + byteBuf.arrayOffset(), byteBuf.readableBytes());
+        } else if (byteBuf.readableBytes() <= COPY_LIMIT) {
+            return factory.createParser(readContext, copy(byteBuf));
         } else {
             return factory.createParser(readContext, (InputStream) new ByteBufInputStream(byteBuf));
         }
+    }
+
+    private static byte[] copy(ByteBuf byteBuf) {
+        byte[] bytes = new byte[byteBuf.readableBytes()];
+        byteBuf.getBytes(byteBuf.readerIndex(), bytes);
+        return bytes;
     }
 }
