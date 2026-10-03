@@ -17,19 +17,25 @@ package io.micronaut.ast.groovy.annotation;
 
 import io.micronaut.ast.groovy.visitor.AbstractGroovyElement;
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 
+import java.lang.annotation.ElementType;
 import java.util.List;
 
 /**
@@ -57,26 +63,51 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
         var clazz = (GroovyNativeElement) classElement.getNativeType();
-        return metadataBuilder.lookupOrBuild(clazz, getTypeAnnotationsOnly((ClassNode) clazz.annotatedNode()));
+        return metadataBuilder.lookupOrBuild(clazz, getTypeAnnotationsOnly((ClassNode) clazz.annotatedNode(),
+            clazz instanceof GroovyNativeElement.ClassWithOwner classWithOwner ? classWithOwner.owner() : null));
+    }
+
+    /**
+     * Builds type metadata for a primitive use, which has no Groovy class element of its own.
+     *
+     * @param nativeElement The type use and its owner
+     * @return The type annotation metadata, using this factory's read-only semantics
+     */
+    @Internal
+    public @NonNull ElementAnnotationMetadata buildTypeAnnotations(GroovyNativeElement.ClassWithOwner nativeElement) {
+        return buildTypeAnnotations(metadataBuilder.lookupOrBuild(nativeElement,
+            getTypeAnnotationsOnly(nativeElement.annotatedNode(), nativeElement.owner())), nativeElement);
     }
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForGenericPlaceholder(GenericPlaceholderElement placeholderElement) {
         var placeholder = (GroovyNativeElement.Placeholder) placeholderElement.getGenericNativeType();
-        return metadataBuilder.lookupOrBuild(placeholder, getTypeAnnotationsOnly(placeholder.annotatedNode()));
+        return metadataBuilder.lookupOrBuild(placeholder, getTypeAnnotationsOnly(placeholder.annotatedNode(), placeholder.owner()));
     }
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
         var wildcard = (GroovyNativeElement) wildcardElement.getGenericNativeType();
-        return metadataBuilder.lookupOrBuild(wildcard, getTypeAnnotationsOnly((ClassNode) wildcard.annotatedNode()));
+        return metadataBuilder.lookupOrBuild(wildcard, getTypeAnnotationsOnly((ClassNode) wildcard.annotatedNode(), null));
     }
 
-    private AnnotatedNode getTypeAnnotationsOnly(ClassNode classNode) {
+    private AnnotatedNode getTypeAnnotationsOnly(ClassNode classNode, @Nullable GroovyNativeElement owner) {
         var annotatedNode = new AnnotatedNode();
         List<AnnotationNode> typeAnnotations = classNode.getTypeAnnotations();
         if (CollectionUtils.isNotEmpty(typeAnnotations)) {
             annotatedNode.addAnnotations(typeAnnotations);
+        }
+        if (owner instanceof GroovyNativeElement.MethodReturn methodReturn && !ClassHelper.VOID_TYPE.equals(classNode)) {
+            // Groovy files an annotation before the return type on the method, even when it targets TYPE_USE too.
+            var visitorContext = ((GroovyAnnotationMetadataBuilder) metadataBuilder).visitorContext;
+            for (AnnotationNode annotation : methodReturn.annotatedNode().getAnnotations()) {
+                ClassElement annotationType = visitorContext.getElementFactory().newClassElement(annotation.getClassNode(), this);
+                if (annotationType instanceof AnnotationElement annotationElement
+                    && annotationElement.getTargets().contains(ElementType.TYPE_USE)
+                    && !annotatedNode.getAnnotations().contains(annotation)) {
+                    annotatedNode.addAnnotation(annotation);
+                }
+            }
         }
         return annotatedNode;
     }

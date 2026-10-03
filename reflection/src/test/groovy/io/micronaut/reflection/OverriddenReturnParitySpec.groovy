@@ -4,7 +4,6 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
-import spock.lang.PendingFeature
 
 /**
  * The annotations of a method that overrides a declaration, of its return value and of its parameters, described
@@ -21,7 +20,7 @@ import spock.lang.PendingFeature
  * <p>Each case states what the processors answer today before comparing the two, so that a description built
  * reflectively is held to what a generated one actually says rather than to what it is assumed to say, and so
  * that a change on the generated side is seen here rather than silently followed. The Java processor is the
- * reference; the one gap is on the Groovy side, and it is written down as pending.</p>
+ * reference.</p>
  */
 class OverriddenReturnParitySpec extends AbstractTypeElementSpec {
 
@@ -68,7 +67,6 @@ class OverriddenReturnParitySpec extends AbstractTypeElementSpec {
         method << ["place", "describe"]
     }
 
-    @PendingFeature(reason = "the Groovy processor reads the type annotations of a return type from its ClassNode alone, where the Groovy parser files an annotation written before the return type under the method, so the return value it generates misses an annotation that targets TYPE_USE too, one groovyc writes into the class file and javac's processor records")
     void "the return value of #method carries the annotation of the method too, its target including TYPE_USE, described either way"() {
         expect: "what the Java processor answers, and the class file groovyc writes: an annotation written before"
         and: "the return type with a target that includes TYPE_USE is on the method and on the value it returns"
@@ -100,6 +98,23 @@ class OverriddenReturnParitySpec extends AbstractTypeElementSpec {
 
         and: "and a reflective description answers the same, not the annotation twice over"
         tags(parameterOf(reflective, "take")) == tags(parameterOf(generated, "take"))
+    }
+
+    void "a void return stays empty when the method targets TYPE_USE, compiled by either processor"() {
+        given:
+        BeanIntrospection<?> javaGenerated = javac()
+        def javaReturn = javaGenerated.getBeanMethods().find { it.name == 'noValue' }.getReturnType().asArgument()
+        def groovyReturn = generated.getBeanMethods().find { it.name == 'noValue' }.getReturnType().asArgument()
+
+        expect:
+        tags(methodOf(javaGenerated, 'noValue')) == ['from-void']
+        javaReturn.type == Void.TYPE
+        javaReturn.getAnnotationMetadata().isEmpty()
+
+        and:
+        tags(methodOf(generated, 'noValue')) == ['from-void']
+        groovyReturn.type == Void.TYPE
+        groovyReturn.getAnnotationMetadata().isEmpty()
     }
 
     // --- the Java processor, over the same declarations compiled in memory
@@ -168,6 +183,11 @@ class OverriddenReturn extends AbstractReturnDeclarer implements ReturnDeclarer 
 
     @Executable
     public void takeNested(List<@Tag("nested") String> value) {
+    }
+
+    @Executable
+    @Tag("from-void")
+    public void noValue() {
     }
 }
 
