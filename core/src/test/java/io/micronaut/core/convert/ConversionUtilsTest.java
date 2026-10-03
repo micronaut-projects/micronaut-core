@@ -28,6 +28,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,7 +40,7 @@ class ConversionUtilsTest {
     private final ConversionService cs = ConversionService.SHARED;
 
     @Test
-    void basicTypesAreReturnedAsTheyAreConvertedFromNumbersOrDelegated() {
+    void stringsAndIntegersAreReturnedAsTheyAreConvertedFromNumbersOrDelegated() {
         assertEquals("a", ConversionUtils.toString("a", cs));
         assertEquals("a.B", ConversionUtils.toString(new AnnotationClassValue<>("a.B"), cs));
         assertEquals("sb", ConversionUtils.toString(new StringBuilder("sb"), cs));
@@ -52,6 +54,10 @@ class ConversionUtilsTest {
         assertNull(ConversionUtils.toInteger(null, cs));
         assertEquals(Integer.valueOf(4), ConversionUtils.toInteger(4, cs));
 
+    }
+
+    @Test
+    void integralTypesAreConverted() {
         assertEquals(3L, ConversionUtils.toLong(3, cs));
         assertEquals(3L, ConversionUtils.toLong("3", cs));
         assertEquals(0L, ConversionUtils.toLong(null, cs));
@@ -68,6 +74,10 @@ class ConversionUtilsTest {
         assertEquals((byte) 0, ConversionUtils.toByte(null, cs));
         assertEquals(Byte.valueOf((byte) 3), ConversionUtils.toByteObject((byte) 3, cs));
 
+    }
+
+    @Test
+    void floatingPointBooleanAndCharacterTypesAreConverted() {
         assertEquals(1.5f, ConversionUtils.toFloat(1.5, cs));
         assertEquals(1.5f, ConversionUtils.toFloat("1.5", cs));
         assertEquals(0f, ConversionUtils.toFloat(null, cs));
@@ -94,7 +104,8 @@ class ConversionUtilsTest {
     @Test
     void aValueThatCannotBeConvertedFails() {
         assertThrows(IllegalArgumentException.class, () -> ConversionUtils.toInt("not a number", cs));
-        assertThrows(IllegalArgumentException.class, () -> ConversionUtils.toBoolean(new Object(), cs));
+        Object notABoolean = new Object();
+        assertThrows(IllegalArgumentException.class, () -> ConversionUtils.toBoolean(notABoolean, cs));
     }
 
     @Test
@@ -114,6 +125,10 @@ class ConversionUtilsTest {
         assertArrayEquals(new int[] {1}, ConversionUtils.toIntArray(1, cs));
         assertNull(ConversionUtils.toIntArray(null, cs));
 
+    }
+
+    @Test
+    void arraysOfTheOtherPrimitiveTypesAreConvertedElementByElement() {
         assertArrayEquals(new long[] {1, 2}, ConversionUtils.toLongArray(List.of("1", 2), cs));
         assertArrayEquals(new short[] {1, 2}, ConversionUtils.toShortArray(List.of("1", 2), cs));
         assertArrayEquals(new byte[] {1, 2}, ConversionUtils.toByteArray(List.of("1", 2), cs));
@@ -166,7 +181,7 @@ class ConversionUtilsTest {
     @Test
     void nestedAnnotationsAreBuiltByTheBuilderFromWhateverTheyAreGiven() {
         var builder = ConversionUtils.annotationBuilder(TestFlag.class);
-        assertTrue(builder != null);
+        assertNotNull(builder);
         assertNull(ConversionUtils.annotationBuilder(Deprecated.class));
 
         TestFlag fromMap = ConversionUtils.toAnnotation(Map.of("value", "m"), TestFlag.class, builder, cs);
@@ -179,7 +194,7 @@ class ConversionUtilsTest {
         TestFlag jvm = Annotated.class.getAnnotation(TestFlag.class);
         TestFlag rebuilt = ConversionUtils.toAnnotation(jvm, TestFlag.class, builder, cs);
         assertEquals(jvm, rebuilt);
-        assertFalse(jvm == rebuilt);
+        assertNotSame(jvm, rebuilt);
         assertNull(ConversionUtils.toAnnotation(null, TestFlag.class, builder, cs));
         // without a builder an instance is kept
         assertSame(jvm, ConversionUtils.toAnnotation(jvm, TestFlag.class, null, cs));

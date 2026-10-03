@@ -80,7 +80,8 @@ class AnnotationBuilderRegistryTest {
     void failsWhenThereIsNoBuilderOrTheValueIsWrong() {
         assertThrows(IllegalArgumentException.class, () -> registry.build(Deprecated.class, Map.of()));
         assertThrows(IllegalArgumentException.class, () -> registry.build("not.An.Annotation", Map.of(), ConversionService.SHARED));
-        assertThrows(IllegalArgumentException.class, () -> registry.build(TestFlag.class, Map.of("value", "v", "level", "not a number")));
+        Map<String, Object> wrong = Map.of("value", "v", "level", "not a number");
+        assertThrows(IllegalArgumentException.class, () -> registry.build(TestFlag.class, wrong));
     }
 
     @Test
