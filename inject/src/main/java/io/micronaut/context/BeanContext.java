@@ -16,11 +16,14 @@
 package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
@@ -28,6 +31,7 @@ import io.micronaut.inject.validation.BeanDefinitionValidator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -56,6 +60,48 @@ public interface BeanContext extends
      * @since 3.0.0
      */
     BeanContextConfiguration getContextConfiguration();
+
+    /**
+     * Creates a fresh instance of the exact definition, bypassing its scope, and retains its complete
+     * dependency tree in the returned registration. Dependencies still obey their own scope rules.
+     * For a contextual target behind a proxy, supply the target definition. The caller owns the result.
+     * @param definition The definition to instantiate
+     * @param <T> The bean type
+     * @return The created instance and its lifecycle
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
+        throw new UnsupportedOperationException("Fresh registrations are not supported by this context");
+    }
+
+    /**
+     * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
+     * New lookups are rejected during shutdown. A destruction listener that needs temporary dependencies uses
+     * {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     * @return The group
+     * @since 5.3.0
+     */
+    @Experimental
+    default BeanDependencyGroup createDependencyGroup() {
+        throw new UnsupportedOperationException("Dependency groups are not supported by this context");
+    }
+
+    /**
+     * Resolves dependencies for a synchronous invocation and always releases them afterwards. Cleanup failures
+     * are suppressed on an invocation failure. New groups and lookups are rejected once shutdown begins;
+     * a destruction listener uses {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result (which must not retain an owned dependency)
+     * @since 5.3.0
+     */
+    @Experimental
+    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+        try (BeanDependencyGroup group = createDependencyGroup()) {
+            return action.apply(group);
+        }
+    }
 
     /**
      * The predicate the context was built with, as passed to

@@ -132,8 +132,12 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
      *
      * @return The dependents
      */
-    synchronized List<BeanRegistration<?>> takeDependents() {
+    synchronized void takeSelection() {
         keptSelection = null;
+    }
+
+    synchronized List<BeanRegistration<?>> takeDependents() {
+        takeSelection();
         return dependencies.takeDependents();
     }
 
