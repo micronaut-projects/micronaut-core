@@ -16,7 +16,7 @@
 package io.micronaut.inject.annotationbuilders
 
 import io.micronaut.core.annotation.AnnotationBuilderRegistry
-import io.micronaut.core.annotation.AnnotationBuilders
+import io.micronaut.core.annotation.RegisterAnnotations
 import spock.lang.Specification
 
 import java.lang.annotation.Retention
@@ -52,7 +52,7 @@ enum GroovyShade { LIGHT, DARK }
     GroovyTag[] tags() default [@GroovyTag("one")]
 }
 
-@AnnotationBuilders([GroovySample, GroovyTag])
+@RegisterAnnotations([GroovySample, GroovyTag])
 class GroovySampleBuilders {
 }
 

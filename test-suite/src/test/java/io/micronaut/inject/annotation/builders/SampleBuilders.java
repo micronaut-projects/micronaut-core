@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.annotation.builders;
 
-import io.micronaut.core.annotation.AnnotationBuilders;
+import io.micronaut.core.annotation.RegisterAnnotations;
 
-@AnnotationBuilders({Sample.class, Tag.class})
+@RegisterAnnotations({Sample.class, Tag.class})
 public final class SampleBuilders {
 }

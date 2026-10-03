@@ -26,11 +26,11 @@ class AnnotationBuildersSpec extends AbstractTypeElementSpec {
     private static final String SOURCE = '''
 package test;
 
-import io.micronaut.core.annotation.AnnotationBuilders;
+import io.micronaut.core.annotation.RegisterAnnotations;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-@AnnotationBuilders({Holder.Sample.class, Holder.Tag.class})
+@RegisterAnnotations({Holder.Sample.class, Holder.Tag.class})
 public class Holder {
 
     public enum Shade { LIGHT, DARK }

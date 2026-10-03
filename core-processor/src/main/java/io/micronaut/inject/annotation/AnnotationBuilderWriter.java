@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.convert.ConversionUtils;
+import io.micronaut.core.annotation.AnnotationConversionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
@@ -61,8 +61,8 @@ import java.util.Objects;
  * Writes the {@link AnnotationBuilder} of an annotation type and the implementation of the annotation it creates.
  *
  * <p>The implementation has a field for each member, which its constructor reads from the given values, or the
- * defaults, and converts to the type of the member: with the methods of {@link ConversionUtils} for the basic types,
- * with {@link ConversionUtils} for classes, and with a generated {@code toAnnotation_<Type>} method for each
+ * defaults, and converts to the type of the member: with the methods of {@link AnnotationConversionUtils} for the basic types,
+ * with {@link AnnotationConversionUtils} for classes, and with a generated {@code toAnnotation_<Type>} method for each
  * nested annotation type. {@code hashCode} and {@code equals} are generated
  * over the members, as {@link Annotation} defines them; the annotation value is created when first asked for and kept. The builder extends {@link AbstractAnnotationBuilder} and adds the description of the
  * annotation type: the members and the defaults.</p>
@@ -75,7 +75,7 @@ final class AnnotationBuilderWriter {
 
     private static final ClassTypeDef CONVERSION_SERVICE_TYPE = ClassTypeDef.of(ConversionService.class);
     private static final ClassTypeDef MAP_TYPE = ClassTypeDef.of(Map.class);
-    private static final ClassTypeDef CONVERSION_UTILS = ClassTypeDef.of(ConversionUtils.class);
+    private static final ClassTypeDef CONVERSION_UTILS = ClassTypeDef.of(AnnotationConversionUtils.class);
     private static final ClassTypeDef ANNOTATION_BUILDER_TYPE = ClassTypeDef.of(AnnotationBuilder.class);
     private static final ClassTypeDef ANNOTATION_VALUE_TYPE = ClassTypeDef.of(AnnotationValue.class);
     private static final ClassTypeDef ARRAYS = ClassTypeDef.of(Arrays.class);

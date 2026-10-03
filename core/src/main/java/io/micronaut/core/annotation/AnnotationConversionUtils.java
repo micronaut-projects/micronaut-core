@@ -13,15 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.convert;
+package io.micronaut.core.annotation;
 
-import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.AnnotationValueProvider;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationBuilderRegistry;
-import io.micronaut.core.annotation.AnnotationBuilder;
-import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.convert.ConversionService;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -41,11 +35,11 @@ import java.util.Map;
  * @author Denis Stepanov
  * @since 5.3.0
  */
-@Experimental
+@Internal
 @UsedByGeneratedCode
-public final class ConversionUtils {
+public final class AnnotationConversionUtils {
 
-    private ConversionUtils() {
+    private AnnotationConversionUtils() {
     }
 
     /**

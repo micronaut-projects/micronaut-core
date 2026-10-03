@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.annotation;
 
-import io.micronaut.core.annotation.AnnotationBuilders;
+import io.micronaut.core.annotation.RegisterAnnotations;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -34,13 +34,13 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Generates the annotation builders requested by {@link AnnotationBuilders}, on a type or on a package.
+ * Generates the annotation builders requested by {@link RegisterAnnotations}, on a type or on a package.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public final class AnnotationBuildersVisitor implements TypeElementVisitor<AnnotationBuilders, Object> {
+public final class RegisterAnnotationsVisitor implements TypeElementVisitor<RegisterAnnotations, Object> {
 
     @Override
     public TypeElementQuery query() {
@@ -58,7 +58,7 @@ public final class AnnotationBuildersVisitor implements TypeElementVisitor<Annot
     }
 
     static void generate(Element element, String holderName, VisitorContext context) {
-        AnnotationValue<AnnotationBuilders> annotation = element.getAnnotation(AnnotationBuilders.class);
+        AnnotationValue<RegisterAnnotations> annotation = element.getAnnotation(RegisterAnnotations.class);
         if (annotation == null) {
             return;
         }
@@ -81,10 +81,10 @@ public final class AnnotationBuildersVisitor implements TypeElementVisitor<Annot
     }
 
     /**
-     * The {@link AnnotationBuilders} on a package.
+     * The {@link RegisterAnnotations} on a package.
      */
     @Internal
-    public static final class OnPackage implements PackageElementVisitor<AnnotationBuilders> {
+    public static final class OnPackage implements PackageElementVisitor<RegisterAnnotations> {
 
         @Override
         public void visitPackage(PackageElement element, VisitorContext context) throws ProcessingException {

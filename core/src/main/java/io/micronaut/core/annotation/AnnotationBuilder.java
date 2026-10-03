@@ -20,13 +20,14 @@ import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Creates the instances of one annotation type.
  *
  * <p>A builder is stateless and thread safe, and is meant to be looked up once, with
- * {@link AnnotationBuilderRegistry#find(Class)}, and then reused. The implementations are generated at compile
- * time for the types listed in {@link AnnotationBuilders}.</p>
+ * {@link #find(Class)}, and then reused. The implementations are generated at compile
+ * time for the types listed in {@link RegisterAnnotations}.</p>
  *
  * <p>A member that is an annotation is read from an {@link AnnotationValue}, from a {@link Map} of its members or
  * from an instance, and an array of annotations from an array or a collection of those. A member that is a class
@@ -39,6 +40,53 @@ import java.util.Map;
  * @since 5.3.0
  */
 public interface AnnotationBuilder<A extends Annotation> {
+
+    /**
+     * Finds the builder of an annotation type. The builder can be kept and reused, to build many annotations
+     * without a search.
+     *
+     * @param annotationType The annotation type
+     * @param <A>            The annotation type
+     * @return The builder, empty when none is registered for this very type
+     */
+    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType) {
+        return AnnotationBuilderRegistry.shared().find(annotationType);
+    }
+
+    /**
+     * Finds the builder of an annotation type, among the builders visible to a class loader. Every call looks the
+     * builders of the class loader up, so keep the builder.
+     *
+     * @param annotationType The annotation type
+     * @param classLoader    The class loader
+     * @param <A>            The annotation type
+     * @return The builder, empty when none is registered for this very type
+     */
+    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, ClassLoader classLoader) {
+        return AnnotationBuilderRegistry.of(classLoader).find(annotationType);
+    }
+
+    /**
+     * Finds the builder of an annotation type by name.
+     *
+     * @param annotationName The name of the annotation type
+     * @return The builder, empty when none is registered
+     */
+    static Optional<AnnotationBuilder<?>> find(String annotationName) {
+        return AnnotationBuilderRegistry.shared().find(annotationName);
+    }
+
+    /**
+     * Finds the builder of an annotation type by name, among the builders visible to a class loader. Every call
+     * looks the builders of the class loader up, so keep the builder.
+     *
+     * @param annotationName The name of the annotation type
+     * @param classLoader    The class loader
+     * @return The builder, empty when none is registered
+     */
+    static Optional<AnnotationBuilder<?>> find(String annotationName, ClassLoader classLoader) {
+        return AnnotationBuilderRegistry.of(classLoader).find(annotationName);
+    }
 
     /**
      * @return The annotation type this builder creates

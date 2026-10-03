@@ -47,6 +47,18 @@ class AnnotationBuilderRegistryTest {
     }
 
     @Test
+    void theStaticMethodsOfTheBuilderFindTheBuilders() {
+        AnnotationBuilder<TestFlag> builder = AnnotationBuilder.find(TestFlag.class).orElseThrow();
+        assertSame(builder, AnnotationBuilder.find(TestFlag.class.getName()).orElseThrow());
+        ClassLoader classLoader = getClass().getClassLoader();
+        assertEquals(TestFlag.class, AnnotationBuilder.find(TestFlag.class, classLoader).orElseThrow().annotationType());
+        assertEquals(TestFlag.class, AnnotationBuilder.find(TestFlag.class.getName(), classLoader).orElseThrow().annotationType());
+        assertTrue(AnnotationBuilder.find(Deprecated.class).isEmpty());
+        assertTrue(AnnotationBuilder.find("not.An.Annotation").isEmpty());
+        assertEquals("v", builder.build(Map.of("value", "v")).value());
+    }
+
+    @Test
     void aRegistryOfALoaderFindsTheBuilders() {
         AnnotationBuilderRegistry own = AnnotationBuilderRegistry.of(getClass().getClassLoader());
         assertTrue(own.find(TestFlag.class).isPresent());

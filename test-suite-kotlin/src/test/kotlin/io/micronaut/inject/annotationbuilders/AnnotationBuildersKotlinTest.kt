@@ -16,7 +16,7 @@
 package io.micronaut.inject.annotationbuilders
 
 import io.micronaut.core.annotation.AnnotationBuilderRegistry
-import io.micronaut.core.annotation.AnnotationBuilders
+import io.micronaut.core.annotation.RegisterAnnotations
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -39,7 +39,7 @@ annotation class KtSample(
     val tags: Array<KtTag> = [KtTag("one")]
 )
 
-@AnnotationBuilders(KtSample::class, KtTag::class)
+@RegisterAnnotations(KtSample::class, KtTag::class)
 class KtSampleBuilders
 
 // KSP reads the defaults of an annotation type from a usage of it, so each type is used at least once

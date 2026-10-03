@@ -25,7 +25,7 @@ import java.lang.annotation.Target;
 /**
  * Requests the compile time generation of an {@link AnnotationBuilder} for each of the given annotation types.
  *
- * <p>The builders are supplied through the service loader and found with the {@link AnnotationBuilderRegistry}.
+ * <p>The builders are supplied through the service loader and found with {@link AnnotationBuilder#find(Class)}.
  * A builder creates instances of the annotation type from an {@link AnnotationValue} or from a map of the member
  * values, converting the values to the types of the members, without a {@link java.lang.reflect.Proxy} and without
  * reading the defaults of the annotation type reflectively. The instances are equal to, and hash like, the ones
@@ -43,7 +43,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target({ElementType.TYPE, ElementType.PACKAGE})
-public @interface AnnotationBuilders {
+public @interface RegisterAnnotations {
 
     /**
      * @return The annotation types to generate the builders for

@@ -31,15 +31,17 @@ import java.util.function.Supplier;
 
 /**
  * The registry of the {@link AnnotationBuilder}s the service loader supplies, which the annotation processor
- * generates for the types listed in {@link AnnotationBuilders}.
+ * generates for the types listed in {@link RegisterAnnotations}.
  *
  * <p>A builder is loaded when it is first asked for, not when the registry is created: the service entries carry
  * the name of the annotation type, so the registry loads the classes of the annotations that are looked up only.
- * Look a builder up once with {@link #find(Class)} and reuse it to build many annotations without a search.</p>
+ * Look a builder up once with {@link AnnotationBuilder#find(Class)} and reuse it to build many annotations without
+ * a search; the registry is the implementation of that method.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
+@Internal
 public final class AnnotationBuilderRegistry {
 
     /**

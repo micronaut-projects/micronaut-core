@@ -15,10 +15,10 @@
  */
 package io.micronaut.core.annotation.builder;
 
+import io.micronaut.core.annotation.AnnotationConversionUtils;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueProvider;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.ConversionUtils;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Map;
@@ -33,8 +33,8 @@ final class TestFlagImpl implements TestFlag, AnnotationValueProvider<TestFlag> 
     private final int level;
 
     TestFlagImpl(Map<? extends CharSequence, ?> values, Map<CharSequence, Object> defaults, ConversionService conversionService) {
-        this.value = ConversionUtils.toString(ConversionUtils.member(values, defaults, "value"), conversionService);
-        this.level = ConversionUtils.toInt(ConversionUtils.member(values, defaults, "level"), conversionService);
+        this.value = AnnotationConversionUtils.toString(AnnotationConversionUtils.member(values, defaults, "value"), conversionService);
+        this.level = AnnotationConversionUtils.toInt(AnnotationConversionUtils.member(values, defaults, "level"), conversionService);
     }
 
     @Override
