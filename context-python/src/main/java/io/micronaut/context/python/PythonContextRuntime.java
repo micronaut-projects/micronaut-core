@@ -227,13 +227,15 @@ public final class PythonContextRuntime {
      * of the primary context. An application shutting down uninstalls its own runtime through
      * {@link GraalPyContextFactory}; this method serves tests and tooling that reset the JVM-wide
      * state between applications.
+     * <p>
+     * The reset returns the JVM to the state it was in before any application ran: a context
+     * bootstrapped for an entry point outside an application that no application adopted is closed
+     * with the engine created for it, and an entry point reached afterwards may bootstrap a context
+     * again, as it may in a JVM where no application has run yet.
      */
     public static void resetContext() {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
-        if (runtime == null) {
-            return;
-        }
-        if (isReuseContext()) {
+        if (runtime != null && isReuseContext()) {
             runtime.context().eval(RELOAD_MODULES_SOURCE);
             return;
         }
