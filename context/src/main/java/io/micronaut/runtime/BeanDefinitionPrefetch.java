@@ -25,6 +25,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.List;
 import java.util.Objects;
@@ -34,8 +35,8 @@ import java.util.concurrent.RecursiveAction;
 /**
  * The experimental bean definition prefetch, switched on with the system property
  * {@value #PROPERTY}{@code =true}: Micronaut's own {@link DefaultBeanDefinitionsProvider} runs on
- * the common pool while the main thread configures logging and creates the builder, and
- * {@link Micronaut#start()} hands its result to the context it builds.
+ * the common pool while the main thread creates the builder, and {@link Micronaut#start()} hands
+ * its result to the context it builds.
  *
  * <p>The task never loads or initializes a bean definition reference itself. It calls the
  * provider that the context would have called, and the first {@link #provide(ClassLoader)} with
@@ -88,8 +89,13 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     /**
      * Starts the prefetch, unless the application runs in a native image or the common pool has
      * fewer than {@value #MINIMUM_PARALLELISM} threads. The static initializer of
-     * {@link Micronaut} calls this once {@value #PROPERTY} is {@code true}, before it creates its
-     * logger.
+     * {@link Micronaut} calls this once {@value #PROPERTY} is {@code true}, after it has created
+     * its logger, which usually configures logging.
+     *
+     * <p>Before it submits the task, this initializes {@link ClassUtils} on the calling thread, as
+     * Micronaut does without the prefetch, so that {@link ClassUtils#REFLECTION_LOGGER} is the
+     * logger it would be without it: a bean definition reference that a pool thread initializes can
+     * otherwise be the first to use {@link ClassUtils}.</p>
      *
      * @param classLoader The class loader of the builder, which the context reads the references with
      * @return The running task, or {@code null} when the prefetch stands down
@@ -98,8 +104,9 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
         if (NativeImageUtils.inImageCode() || ForkJoinPool.getCommonPoolParallelism() < MINIMUM_PARALLELISM) {
             return null;
         }
-        // DefaultBeanContext sets it too. ClassUtils reads it once, and a pool thread can now be the first to initialize ClassUtils
+        // DefaultBeanContext sets it too, later. ClassUtils reads it once, when it is initialized just below
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, StringUtils.TRUE);
+        Logger _ = ClassUtils.REFLECTION_LOGGER;
         return launch(Thread.currentThread().getContextClassLoader(), classLoader);
     }
 
@@ -119,8 +126,9 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     /**
      * Builds {@link ConversionService#SHARED}, which the context needs before the references, and
      * then runs Micronaut's provider. Both run with the context class loader of the thread that
-     * started the prefetch: {@code StaticOptimizations} and {@code SoftServiceLoader} look their
-     * services up there, and a common pool thread carries the system class loader.
+     * started the prefetch, which code that names no class loader uses, such as
+     * {@link ClassUtils#forName(String, ClassLoader)} with {@code null}: a common pool thread
+     * carries the system class loader.
      */
     @Override
     @SuppressWarnings("java:S1181") // Whatever the provider throws is rethrown, unchanged, on the thread that builds the context

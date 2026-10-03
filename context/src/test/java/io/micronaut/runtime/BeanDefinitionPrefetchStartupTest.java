@@ -20,6 +20,8 @@ import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
+import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.optim.StaticOptimizations;
@@ -44,6 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.micronaut.runtime.BeanDefinitionPrefetchTest.FAILS_AT_RUNTIME;
 import static io.micronaut.runtime.BeanDefinitionPrefetchTest.FAILS_TO_LINK;
@@ -152,25 +156,54 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     /**
-     * The task runs with the context class loader of the main thread, the only one here that sees
-     * a {@link StaticOptimizations.Loader} of a static service table, as Micronaut AOT registers
-     * one. The main thread waits for the task, so the pool thread initializes
-     * {@link StaticOptimizations}.
+     * Only the context class loader of the main thread sees a {@link StaticOptimizations.Loader}
+     * of a static service table here, as Micronaut AOT registers one, and the task reads the
+     * references that table lists. {@link ClassUtils}, which the main thread initializes before it
+     * starts the task, reads {@link StaticOptimizations}, so the loader runs on the main thread, as
+     * it does without the prefetch. The task builds the shared conversion service on its own
+     * thread, with the context class loader of the main thread.
      */
     @Test
     void theTaskSeesTheStaticOptimizationsOfTheContextClassLoader() throws IOException {
         Path services = Files.createDirectories(temp.resolve("optimizations/META-INF/services"));
         Files.writeString(services.resolve(StaticOptimizations.Loader.class.getName()), StaticServices.class.getName());
+        Path registrar = Files.createDirectories(temp.resolve("registrar/META-INF/services"));
+        Files.writeString(registrar.resolve(TypeConverterRegistrar.class.getName()), ContextClassLoaderRegistrar.class.getName());
+        List<Path> classPath = List.of(temp.resolve("registrar"));
         String contextClassLoader = "-Dprefetch-test.ccl=" + temp.resolve("optimizations");
 
-        ChildJvm on = run(List.of(), ON, THREE_THREADS, contextClassLoader, "-Dprefetch-test.await=true");
-        ChildJvm off = run(List.of(), THREE_THREADS, contextClassLoader);
+        ChildJvm on = run(classPath, ON, THREE_THREADS, contextClassLoader, "-Dprefetch-test.await=true");
+        ChildJvm off = run(classPath, THREE_THREADS, contextClassLoader);
 
         assertEquals(TASK, on.value("PROVIDER"), on.output());
         // Only the static service table lists the two fixtures
         assertTrue(List.of(on.value("REFERENCES").split(",")).containsAll(List.of(FIRST, SECOND)), on.output());
-        assertTrue(on.value("OPTIMIZATIONS_THREAD").startsWith("ForkJoinPool.commonPool-worker-"), on.output());
+        assertEquals("main", on.value("OPTIMIZATIONS_THREAD"), on.output());
+        assertEquals(off.value("OPTIMIZATIONS_THREAD"), on.value("OPTIMIZATIONS_THREAD"), off.output());
         assertEquals(off.value("REFERENCES"), on.value("REFERENCES"));
+        assertTrue(on.value("REGISTRAR_THREAD").startsWith("ForkJoinPool.commonPool-worker-"), on.output());
+        assertEquals("true", on.value("REGISTRAR_CONTEXT_CLASS_LOADER"), on.output());
+        assertEquals("true", off.value("REGISTRAR_CONTEXT_CLASS_LOADER"), off.output());
+    }
+
+    /**
+     * The main thread configures logging, as it creates the logger of {@link Micronaut}, and
+     * initializes {@link ClassUtils} before it starts the task, so no pool thread creates a logger
+     * while logging is being configured: SLF4J hands out no substitute logger, and the application
+     * logs as it does without the prefetch.
+     */
+    @Test
+    void logsAsItDoesWithoutThePrefetch() throws IOException {
+        ChildJvm on = run(List.of(), ON, THREE_THREADS, "-verbose:class");
+        ChildJvm off = run(List.of(), THREE_THREADS, "-verbose:class");
+
+        assertEquals(TASK, on.value("PROVIDER"), on.output());
+        for (String substitute : List.of("org.slf4j.helpers.SubstituteLogger", "org.slf4j.event.EventRecordingLogger")) {
+            assertFalse(on.output().contains(substitute + " source:"), substitute + " was loaded:\n" + on.output());
+        }
+        assertEquals(off.value("REFLECTION_LOGGER"), on.value("REFLECTION_LOGGER"), on.output());
+        assertFalse(off.logged().isEmpty(), off.output());
+        assertEquals(off.logged(), on.logged(), on.output());
     }
 
     /**
@@ -206,6 +239,9 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     record ChildJvm(int exitCode, String output) {
+        // The time that the pattern of the test logback.xml, or a Logback status line, starts with
+        private static final Pattern LOGGED_AT = Pattern.compile("\\d{2}:\\d{2}:\\d{2}[.,]\\d{3} (.*)");
+
         String value(String key) {
             String prefix = key + "=";
             return output.lines()
@@ -213,6 +249,23 @@ class BeanDefinitionPrefetchStartupTest {
                 .map(line -> line.substring(prefix.length()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No " + key + " in the output of the child JVM:\n" + output));
+        }
+
+        /**
+         * What logging wrote, without the time: the lines of Logback and its status lines, and
+         * the reports of SLF4J itself.
+         */
+        List<String> logged() {
+            List<String> logged = new ArrayList<>();
+            for (String line : output.lines().toList()) {
+                Matcher matcher = LOGGED_AT.matcher(line);
+                if (matcher.matches()) {
+                    logged.add(matcher.group(1));
+                } else if (line.startsWith("SLF4J")) {
+                    logged.add(line);
+                }
+            }
+            return logged;
         }
 
         List<String> causes() {
@@ -292,15 +345,38 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     /**
+     * Records the thread that registers its converters first, for the shared conversion service,
+     * and whether that thread carries the context class loader that {@link Main} set. The
+     * conversion service of the context registers them again later, on the main thread.
+     */
+    public static final class ContextClassLoaderRegistrar implements TypeConverterRegistrar {
+        static volatile String thread;
+        static volatile boolean contextClassLoader;
+
+        @Override
+        public void register(MutableConversionService conversionService) {
+            synchronized (ContextClassLoaderRegistrar.class) {
+                if (thread == null) {
+                    Thread current = Thread.currentThread();
+                    contextClassLoader = current.getContextClassLoader() == Main.contextClassLoader;
+                    thread = current.getName();
+                }
+            }
+        }
+    }
+
+    /**
      * The application of the child JVM. It does not use {@link Micronaut} before it has set the
      * context class loader that a test asks for.
      */
     static final class Main {
+        static volatile ClassLoader contextClassLoader;
+
         public static void main(String[] args) throws Exception {
-            String contextClassLoader = System.getProperty("prefetch-test.ccl");
-            if (contextClassLoader != null) {
-                Thread.currentThread().setContextClassLoader(new URLClassLoader(
-                    new URL[] {Path.of(contextClassLoader).toUri().toURL()}, Main.class.getClassLoader()));
+            String path = System.getProperty("prefetch-test.ccl");
+            if (path != null) {
+                contextClassLoader = new URLClassLoader(new URL[] {Path.of(path).toUri().toURL()}, Main.class.getClassLoader());
+                Thread.currentThread().setContextClassLoader(contextClassLoader);
             }
             Class.forName(Micronaut.class.getName(), true, Main.class.getClassLoader());
             if ("init".equals(System.getProperty("prefetch-test.mode"))) {
@@ -323,6 +399,8 @@ class BeanDefinitionPrefetchStartupTest {
                 System.out.println("REFERENCES=" + String.join(",", names(context.getBeanDefinitionReferences())));
                 System.out.println("REFLECTION_LOGGER=" + ClassUtils.REFLECTION_LOGGER.getClass().getName());
                 System.out.println("OPTIMIZATIONS_THREAD=" + StaticServices.thread);
+                System.out.println("REGISTRAR_THREAD=" + ContextClassLoaderRegistrar.thread);
+                System.out.println("REGISTRAR_CONTEXT_CLASS_LOADER=" + ContextClassLoaderRegistrar.contextClassLoader);
             }
         }
     }
