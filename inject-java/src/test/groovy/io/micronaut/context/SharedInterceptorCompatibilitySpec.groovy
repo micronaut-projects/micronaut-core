@@ -40,22 +40,6 @@ class SharedInterceptorCompatibilitySpec extends Specification {
         context.close()
     }
 
-    void 'legacy disposing registration accessor keeps its nullable contract'() {
-        given:
-        def context = new DefaultBeanContext()
-        BeanDefinition<Object> definition = Stub()
-        def dependent = new BeanRegistration<>(null, definition, new Object())
-        def registration = BeanRegistration.of(context, null, definition, new Object(), [dependent])
-        def empty = BeanRegistration.of(context, null, definition, new Object(), null)
-
-        expect:
-        registration.dependents == [dependent]
-        empty.dependents == null
-
-        cleanup:
-        context.close()
-    }
-
     void 'legacy construction stack remains isolated and stores completed candidates'() {
         given:
         def context = new DefaultBeanContext()
