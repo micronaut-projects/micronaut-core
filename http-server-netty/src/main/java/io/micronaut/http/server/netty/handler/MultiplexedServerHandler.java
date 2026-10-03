@@ -735,7 +735,7 @@ abstract class MultiplexedServerHandler {
             final HttpResponse response;
             final StreamingNettyByteBody body;
             final long contentLength;
-            final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this);
+            final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this, requiredCtx().alloc());
             /**
              * The last piece written in the current turn. Written by {@link #endBatch()}, or as
              * the final frame of the stream by the last {@link #write}.
