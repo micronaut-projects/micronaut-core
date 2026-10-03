@@ -36,7 +36,7 @@ open class RequestScopeClass (
                 .sort()
 
         then:
-        methods == ["\$interceptorRegistrations", "\$withBeanQualifier", "getList", "getText", "interceptedBeanDependencies", "interceptedTarget", "setText"] as List
+        methods == ["\$beanDependencies", "\$interceptorRegistrations", "\$withBeanQualifier", "getList", "getText", "interceptedTarget", "setText"] as List
 
         cleanup:
         applicationContext.close()

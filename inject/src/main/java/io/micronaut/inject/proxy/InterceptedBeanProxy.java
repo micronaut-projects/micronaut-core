@@ -69,11 +69,17 @@ public interface InterceptedBeanProxy<T> extends InterceptedBean, Qualified<T> {
     }
 
     /**
-     * Returns the ownership retained by a generated proxy, without initializing its target.
+     * Returns the ownership a generated proxy retains from its creation, without initializing its target.
+     *
+     * <p>The group owns the original registration of an eager or cached lazy prototype target, with its
+     * constructor dependencies and lifecycle interceptors, and the interceptor instances of the proxy. Closing it
+     * destroys the target before the advice, also when the caller holds only the proxy instance. A scoped target
+     * stays owned by its scope and a swapped-in target is borrowed.</p>
+     *
      * @return The dependency group, or {@code null} for previously generated proxies
      * @since 5.3.0
      */
-    default @Nullable BeanDependencyGroup interceptedBeanDependencies() {
+    default @Nullable BeanDependencyGroup $beanDependencies() {
         return null;
     }
 

@@ -22,7 +22,14 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Ownership exists before the bean instance, and survives successful creation in its registration. */
+/**
+ * The ownership of a bean while it is being created.
+ *
+ * <p>A bean can resolve dependencies and select interceptors before its instance exists, so the owner is created
+ * first and kept on the resolution context for the duration of the creation. On success the same
+ * {@link BeanDependencies} becomes the owner held by the registration of the bean; on failure it releases what
+ * was created. Each creation has its own state, so a nested creation does not attach to its parent.</p>
+ */
 @Internal
 final class BeanCreationState {
     final BeanDefinition<?> definition;
