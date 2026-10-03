@@ -2408,6 +2408,29 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             boolean isNotInnerConfiguration = !precalculatedInfo.isConfigurationProperties || !isInnerConfiguration(argument);
             ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
+                if (argument.getAnnotationMetadata().hasStereotype(io.micronaut.context.annotation.ResolveWith.class)) {
+                    Class<?> providerType = argument.getAnnotationMetadata()
+                        .classValue(io.micronaut.context.annotation.ResolveWith.class)
+                        .orElseThrow(() -> new DependencyInjectionException(resolutionContext,
+                            "The injection provider type is not on the classpath"));
+                    if (!BeanInjectionProvider.class.isAssignableFrom(providerType)) {
+                        throw new DependencyInjectionException(resolutionContext,
+                            "The injection provider " + providerType.getName() + " must implement BeanInjectionProvider");
+                    }
+                    BeanInjectionProvider provider = (BeanInjectionProvider) resolutionContext.getBean(Argument.of(providerType), null);
+                    boolean nullable = argument.isDeclaredNullable() || isOptional;
+                    K value = provider.get(resolutionContext, argument, qualifier, nullable);
+                    if (value == null && !nullable) {
+                        throw new DependencyInjectionException(resolutionContext,
+                            "The injection provider " + providerType.getName() + " returned null for required " + argument);
+                    }
+                    if (value != null && !argument.getWrapperType().isInstance(value)) {
+                        throw new DependencyInjectionException(resolutionContext,
+                            "The injection provider " + providerType.getName() + " returned " + value.getClass().getName()
+                                + " for " + argument);
+                    }
+                    return value;
+                }
                 if (argument.isDeclaredNullable() || isOptional) {
                     K k = resolutionContext.findBean(argument, qualifier).orElse(null);
                     return k;
