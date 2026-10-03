@@ -2,8 +2,12 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.RouteMetadataHolder;
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Field;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -80,5 +84,37 @@ class NettyMutableHttpResponseAttributesTest {
         assertEquals("value", response.getAttributes().getValue("other"));
         assertEquals("/foo", response.getAttributes().getValue(HttpAttributes.URI_TEMPLATE.toString()));
         assertEquals("/foo", response.getUriTemplateMetadata());
+    }
+
+    @Test
+    void readingAttributesDoesNotCreateTheMap() throws ReflectiveOperationException {
+        NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(ConversionService.SHARED);
+        HttpResponse<?> wrapper = new HttpResponseWrapper<>(new HttpResponseWrapper<>(response));
+
+        assertTrue(response.getAttribute("skip", Boolean.class).isEmpty());
+        assertTrue(wrapper.getAttribute("skip", Boolean.class).isEmpty());
+        assertTrue(wrapper.getAttribute("skip").isEmpty());
+        assertTrue(wrapper.getAttribute(HttpAttributes.ROUTE_MATCH, Object.class).isEmpty());
+        assertNull(attributeMap(response));
+
+        Object routeMatch = new Object();
+        response.setRouteMatchMetadata(routeMatch);
+        response.setUriTemplateMetadata("/foo");
+        assertSame(routeMatch, wrapper.getAttribute(HttpAttributes.ROUTE_MATCH, Object.class).orElseThrow());
+        assertSame(routeMatch, wrapper.getAttribute(HttpAttributes.ROUTE_MATCH).orElseThrow());
+        assertEquals("/foo", wrapper.getAttribute(HttpAttributes.URI_TEMPLATE, String.class).orElseThrow());
+        assertNull(attributeMap(response));
+
+        // other attributes create the map, and the typed lookup converts their value
+        response.setAttribute("skip", "true");
+        assertEquals(Boolean.TRUE, wrapper.getAttribute("skip", Boolean.class).orElseThrow());
+        assertEquals("true", wrapper.getAttribute("skip").orElseThrow());
+        assertSame(routeMatch, wrapper.getAttribute(HttpAttributes.ROUTE_MATCH, Object.class).orElseThrow());
+    }
+
+    private static Object attributeMap(NettyMutableHttpResponse<?> response) throws ReflectiveOperationException {
+        Field field = NettyMutableHttpResponse.class.getDeclaredField("attributes");
+        field.setAccessible(true);
+        return field.get(response);
     }
 }

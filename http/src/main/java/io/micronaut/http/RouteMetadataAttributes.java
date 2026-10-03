@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import org.jspecify.annotations.Nullable;
@@ -38,6 +39,9 @@ import java.util.function.BiConsumer;
  * that could be older than the holder's fields, and creating the map does not have to move the
  * metadata into it. The other attributes are kept in a plain map, which, like the attribute map
  * of any message, is not safe for concurrent modification.
+ * <p>
+ * If the holder is also a {@link RouteWaitsForHolder}, the route-waits-for attribute of
+ * {@link BasicHttpAttributes} is handled the same way and stored only by the holder.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -49,6 +53,7 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
     private static final String ROUTE_MATCH_KEY = HttpAttributes.ROUTE_MATCH.toString();
     private static final String ROUTE_INFO_KEY = HttpAttributes.ROUTE_INFO.toString();
     private static final String URI_TEMPLATE_KEY = HttpAttributes.URI_TEMPLATE.toString();
+    private static final String ROUTE_WAITS_FOR_KEY = BasicHttpAttributes.ROUTE_WAITS_FOR;
 
     private final RouteMetadataHolder holder;
     private final Map<String, Object> others;
@@ -79,6 +84,9 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
         if (key.equals(URI_TEMPLATE_KEY)) {
             return holder.getUriTemplateMetadata();
         }
+        if (holder instanceof RouteWaitsForHolder waitsForHolder && key.equals(ROUTE_WAITS_FOR_KEY)) {
+            return waitsForHolder.getRouteWaitsForMetadata();
+        }
         return null;
     }
 
@@ -92,10 +100,32 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
      * @return The value
      */
     public static Optional<Object> getAttribute(RouteMetadataHolder holder, @Nullable ConvertibleValues<Object> attributes, String key) {
-        if (isMetadataKey(key)) {
+        if (isMetadataKey(holder, key)) {
             return Optional.ofNullable(getMetadata(holder, key));
         }
         return attributes == null ? Optional.empty() : Optional.ofNullable(attributes.getValue(key));
+    }
+
+    /**
+     * Read an attribute of a message that stores the route metadata in the holder and convert it
+     * to the given type, without creating the attribute map of the message.
+     *
+     * @param holder     The holder
+     * @param attributes The attribute map of the message, or {@code null} if not created yet
+     * @param key        The attribute name
+     * @param type       The required type
+     * @param <T>        The required type
+     * @return The converted value
+     */
+    public static <T> Optional<T> getAttribute(RouteMetadataHolder holder, @Nullable ConvertibleValues<Object> attributes, String key, Class<T> type) {
+        if (attributes != null) {
+            return attributes.get(key, type);
+        }
+        Object value = isMetadataKey(holder, key) ? getMetadata(holder, key) : null;
+        if (value == null) {
+            return Optional.empty();
+        }
+        return ConversionService.SHARED.convert(value, type);
     }
 
     /**
@@ -119,6 +149,10 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
             holder.setUriTemplateMetadata(value == null ? null : value.toString());
             return true;
         }
+        if (holder instanceof RouteWaitsForHolder waitsForHolder && key.equals(ROUTE_WAITS_FOR_KEY)) {
+            waitsForHolder.setRouteWaitsForMetadata(value);
+            return true;
+        }
         return false;
     }
 
@@ -130,13 +164,17 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
         return key.equals(ROUTE_MATCH_KEY) || key.equals(ROUTE_INFO_KEY) || key.equals(URI_TEMPLATE_KEY);
     }
 
+    private static boolean isMetadataKey(RouteMetadataHolder holder, String key) {
+        return isMetadataKey(key) || (holder instanceof RouteWaitsForHolder && key.equals(ROUTE_WAITS_FOR_KEY));
+    }
+
     @Override
     public @Nullable Object getValue(@Nullable CharSequence name) {
         if (name == null) {
             return null;
         }
         String key = name.toString();
-        if (isMetadataKey(key)) {
+        if (isMetadataKey(holder, key)) {
             return getMetadata(holder, key);
         }
         return others.get(key);
@@ -175,7 +213,8 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
         return others.isEmpty()
             && holder.getRouteMatchMetadata() == null
             && holder.getRouteInfoMetadata() == null
-            && holder.getUriTemplateMetadata() == null;
+            && holder.getUriTemplateMetadata() == null
+            && (!(holder instanceof RouteWaitsForHolder waitsForHolder) || waitsForHolder.getRouteWaitsForMetadata() == null);
     }
 
     @Override
@@ -196,6 +235,12 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
         String uriTemplate = holder.getUriTemplateMetadata();
         if (uriTemplate != null) {
             action.accept(URI_TEMPLATE_KEY, uriTemplate);
+        }
+        if (holder instanceof RouteWaitsForHolder waitsForHolder) {
+            Object routeWaitsFor = waitsForHolder.getRouteWaitsForMetadata();
+            if (routeWaitsFor != null) {
+                action.accept(ROUTE_WAITS_FOR_KEY, routeWaitsFor);
+            }
         }
     }
 
@@ -226,6 +271,9 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
         holder.setRouteMatchMetadata(null);
         holder.setRouteInfoMetadata(null);
         holder.setUriTemplateMetadata(null);
+        if (holder instanceof RouteWaitsForHolder waitsForHolder) {
+            waitsForHolder.setRouteWaitsForMetadata(null);
+        }
         others.clear();
         return this;
     }

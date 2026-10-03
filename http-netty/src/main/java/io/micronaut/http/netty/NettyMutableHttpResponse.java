@@ -305,6 +305,14 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     }
 
     @Override
+    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        return RouteMetadataAttributes.getAttribute(this, attributes, name.toString(), type);
+    }
+
+    @Override
     public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, @Nullable Object value) {
         // This is the copy from the super method to avoid the type pollution
         if (StringUtils.isNotEmpty(name)) {

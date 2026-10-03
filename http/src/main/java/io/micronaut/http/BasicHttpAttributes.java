@@ -29,7 +29,10 @@ import java.util.Optional;
  */
 @SuppressWarnings("removal")
 public final class BasicHttpAttributes {
-    private static final String ROUTE_WAITS_FOR = BasicHttpAttributes.class.getName() + ".ROUTE_WAITS_FOR";
+    /**
+     * The name of the route-waits-for attribute, stored in a field by a {@link RouteWaitsForHolder}.
+     */
+    static final String ROUTE_WAITS_FOR = BasicHttpAttributes.class.getName() + ".ROUTE_WAITS_FOR";
 
     private BasicHttpAttributes() {
     }
@@ -93,6 +96,9 @@ public final class BasicHttpAttributes {
      */
     @Experimental
     public static ExecutionFlow<?> getRouteWaitsFor(HttpRequest<?> request) {
+        if (request instanceof RouteWaitsForHolder holder) {
+            return holder.getRouteWaitsForMetadata() instanceof ExecutionFlow<?> flow ? flow : ExecutionFlow.empty();
+        }
         // getAttribute(name) without a type: the typed lookup allocates a conversion context even
         // when the attribute is absent, which it is for nearly every request
         if (request.getAttribute(ROUTE_WAITS_FOR).orElse(null) instanceof ExecutionFlow<?> flow) {
@@ -110,6 +116,12 @@ public final class BasicHttpAttributes {
      */
     @Experimental
     public static void addRouteWaitsFor(HttpRequest<?> request, ExecutionFlow<?> flowToAdd) {
+        if (request instanceof RouteWaitsForHolder holder) {
+            // stored in a field, so that binding a body does not create the attribute map
+            holder.setRouteWaitsForMetadata(holder.getRouteWaitsForMetadata() instanceof ExecutionFlow<?> existing
+                ? existing.then(() -> flowToAdd) : flowToAdd);
+            return;
+        }
         if (request.getAttribute(ROUTE_WAITS_FOR).orElse(null) instanceof ExecutionFlow<?> existing) {
             request.setAttribute(ROUTE_WAITS_FOR, existing.then(() -> flowToAdd));
         } else {

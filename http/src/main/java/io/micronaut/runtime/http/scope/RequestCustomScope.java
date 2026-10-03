@@ -19,7 +19,6 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
@@ -116,14 +115,15 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
     }
 
     private <T> @Nullable ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> getRequestAttributeMap(HttpRequest<T> httpRequest, boolean create) {
-        MutableConvertibleValues<Object> attrs = httpRequest.getAttributes();
-        Object o = attrs.getValue(SCOPED_BEANS_ATTRIBUTE);
+        // getAttribute(name) rather than getAttributes(): a request may create its attribute map
+        // lazily, and most requests hold no request scoped beans
+        Object o = httpRequest.getAttribute(SCOPED_BEANS_ATTRIBUTE).orElse(null);
         if (o instanceof ConcurrentHashMap) {
             return (ConcurrentHashMap<BeanIdentifier, CreatedBean<?>>) o;
         }
         if (create) {
             ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> scopedBeans = new ConcurrentHashMap<>(5);
-            attrs.put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
+            httpRequest.getAttributes().put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
             return scopedBeans;
         }
         return null;

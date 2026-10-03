@@ -18,6 +18,7 @@ package io.micronaut.http;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 
 import java.util.Optional;
 
@@ -54,6 +55,24 @@ public class HttpMessageWrapper<B> implements HttpMessage<B> {
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
         return delegate.getAttributes();
+    }
+
+    @Override
+    public Optional<Object> getAttribute(CharSequence name) {
+        // delegate, so that a message that can read an attribute without creating its attribute
+        // map is not forced to create it through getAttributes()
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        return delegate.getAttribute(name);
+    }
+
+    @Override
+    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        return delegate.getAttribute(name, type);
     }
 
     @Override

@@ -39,6 +39,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.RouteMetadataAttributes;
 import io.micronaut.http.RouteMetadataHolder;
+import io.micronaut.http.RouteWaitsForHolder;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -125,7 +126,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, RouteWaitsForHolder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -184,8 +185,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private final HttpServerConfiguration serverConfiguration;
     /**
      * The attribute map. It is created lazily, by {@link #getAttributes()} only, so that a plain
-     * request never allocates it. It does not store the route metadata: the fields below are the
-     * only store for it, read and written by the typed accessors and, through
+     * request never allocates it. It does not store the route metadata nor the condition the route
+     * waits for: the fields below are the only store for them, read and written by the typed accessors and, through
      * {@link RouteMetadataAttributes}, by the attribute map and the attribute accessors. So a
      * reader on another thread sees a metadata write as soon as the setter has returned, whether
      * or not the map exists, and neither the setters nor the readers take a lock.
@@ -206,6 +207,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private volatile Object routeInfo;
     @Nullable
     private volatile String uriTemplate;
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile Object routeWaitsFor;
     @Nullable
     private NettyCookies nettyCookies;
     private final CloseableByteBody body;
@@ -340,6 +344,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
+    public <A> Optional<A> getAttribute(CharSequence name, Class<A> type) {
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        return RouteMetadataAttributes.getAttribute(this, attributes, name.toString(), type);
+    }
+
+    @Override
     public @Nullable Object getRouteMatchMetadata() {
         return routeMatch;
     }
@@ -367,6 +379,16 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public void setUriTemplateMetadata(@Nullable String uriTemplate) {
         this.uriTemplate = uriTemplate;
+    }
+
+    @Override
+    public @Nullable Object getRouteWaitsForMetadata() {
+        return routeWaitsFor;
+    }
+
+    @Override
+    public void setRouteWaitsForMetadata(@Nullable Object routeWaitsFor) {
+        this.routeWaitsFor = routeWaitsFor;
     }
 
     @Override
@@ -944,7 +966,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T> {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, RouteWaitsForHolder, ServerHttpRequest<T> {
 
         @Nullable
         private URI uri;
@@ -1041,6 +1063,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
+        public <A> Optional<A> getAttribute(CharSequence name, Class<A> type) {
+            return NettyHttpRequest.this.getAttribute(name, type);
+        }
+
+        @Override
         public MutableHttpRequest<T> setAttribute(CharSequence name, @Nullable Object value) {
             NettyHttpRequest.this.setAttribute(name, value);
             return this;
@@ -1074,6 +1101,16 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public void setUriTemplateMetadata(@Nullable String uriTemplate) {
             NettyHttpRequest.this.setUriTemplateMetadata(uriTemplate);
+        }
+
+        @Override
+        public @Nullable Object getRouteWaitsForMetadata() {
+            return NettyHttpRequest.this.getRouteWaitsForMetadata();
+        }
+
+        @Override
+        public void setRouteWaitsForMetadata(@Nullable Object routeWaitsFor) {
+            NettyHttpRequest.this.setRouteWaitsForMetadata(routeWaitsFor);
         }
 
         @Override
