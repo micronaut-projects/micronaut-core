@@ -182,6 +182,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private EventLoopGroup workerGroup;
     @Nullable
     private EventLoopGroup parentGroup;
+    @Nullable
+    private EventLoopGroupConfiguration workerConfiguration;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     @Nullable
     private volatile List<Listener> activeListeners = null;
@@ -320,8 +322,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             //suppress unused
             //done here to prevent a blocking service loader in the event loop
             EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
+            workerConfiguration = workerConfig;
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
+            checkTransportCompatibility(parentGroup, workerGroup);
             Supplier<ServerBootstrap> serverBootstrap = SupplierUtil.memoized(() -> {
                 ServerBootstrap sb = createServerBootstrap();
                 processOptions(serverConfiguration.getOptions(), sb::option);
@@ -540,7 +544,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return nettyEmbeddedServices.getEventLoopGroupRegistry()
                 .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
-                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent));
+                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent, workerConfiguration));
                     shutdownParent = true;
                     return newGroup;
                 });
@@ -553,29 +557,50 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * {@value #DEFAULT_PARENT_THREADS} thread rather than to the worker group default of
      * {@link EventLoopGroupConfiguration#getThreadCoreRatio()} threads per core.
      *
+     * <p>The server socket channel class is chosen from the worker transport, and the server
+     * channel is registered on the acceptor group, so unless a transport is configured explicitly
+     * for the acceptor group it uses the same transport as the worker group.
+     *
      * @param parent The configured parent event loop group settings, if any
+     * @param workerConfig The worker event loop group configuration, if any
      * @return The configuration to create the acceptor group from
      */
-    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent) {
+    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent,
+                                                                     @Nullable EventLoopGroupConfiguration workerConfig) {
         EventLoopGroupConfiguration source = parent == null ? new DefaultEventLoopGroupConfiguration() : parent;
-        if (source.getNumThreads() != 0) {
+        boolean inheritTransport = workerConfig != null && (parent == null || !parent.isTransportConfigured());
+        if (source.getNumThreads() != 0 && !inheritTransport) {
             // explicitly configured, honour it as-is
             return source;
         }
         return new DefaultEventLoopGroupConfiguration(
             // keep a name the user configured; only the implicit acceptor group is called "parent"
             parent == null ? NettyHttpServerConfiguration.Parent.NAME : source.getName(),
-            DEFAULT_PARENT_THREADS,
+            source.getNumThreads() != 0 ? source.getNumThreads() : DEFAULT_PARENT_THREADS,
             source.getThreadCoreRatio(),
             source.getIoRatio().orElse(null),
             // the transport list below already reflects the (deprecated) native preference
             false,
-            source.getTransport(),
+            inheritTransport && workerConfig != null ? workerConfig.getTransport() : source.getTransport(),
             source.getExecutorName().orElse(null),
             source.getShutdownQuietPeriod(),
             source.getShutdownTimeout(),
             source.isLoomCarrier()
         );
+    }
+
+    /**
+     * The server channel class follows the worker transport but the server channel is registered
+     * on the acceptor group, so both groups must use the same I/O type.
+     *
+     * @param parentGroup The acceptor group
+     * @param workerGroup The worker group
+     */
+    private static void checkTransportCompatibility(EventLoopGroup parentGroup, EventLoopGroup workerGroup) {
+        if (parentGroup instanceof IoEventLoopGroup parentIo && workerGroup instanceof IoEventLoopGroup workerIo
+            && parentIo.isIoType(NioIoHandler.class) != workerIo.isIoType(NioIoHandler.class)) {
+            throw new IllegalStateException("The transport of the acceptor event loop group ('micronaut.server.netty.parent.transport') is incompatible with the transport of the worker event loop group ('micronaut.netty.event-loops.default.transport' or 'micronaut.server.netty.worker.transport'). Configure the same transport for both, or remove the parent transport setting so it follows the worker transport.");
+        }
     }
 
     /**

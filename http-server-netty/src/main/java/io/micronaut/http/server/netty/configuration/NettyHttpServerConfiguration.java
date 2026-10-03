@@ -1670,6 +1670,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             this.transport = transport;
         }
 
+        /**
+         * @return Whether a transport was selected explicitly, either via {@code transport} or
+         * via the legacy {@code prefer-native-transport} flag
+         */
+        @Internal
+        public boolean isTransportConfigured() {
+            return transport != null || preferNativeTransport;
+        }
+
         @Override
         public Duration getShutdownQuietPeriod() {
             return shutdownQuietPeriod;
