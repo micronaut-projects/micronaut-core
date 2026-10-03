@@ -149,6 +149,25 @@ dependencies {
     }
 
     testImplementation(libs.junit.jupiter.params)
+    testImplementation(projects.micronautInjectTestUtils)
+}
+
+/**
+ * Gives the test JVM the jar of a released micronaut-core, so that a test can run the loader of that release. As in
+ * :test-suite, whose tests these are.
+ */
+class ReleasedCore(
+    @get:Input val version: String,
+    @get:Classpath val jar: FileCollection
+) : CommandLineArgumentProvider {
+    override fun asArguments() = listOf("-Dreleased.micronaut-core.$version=${jar.singleFile.absolutePath}")
+}
+
+// detached, so that the substitution of the modules of this build by their projects does not apply
+val releasedCores = listOf("4.10.30", "5.2.12").map { version ->
+    ReleasedCore(version, configurations.detachedConfiguration(dependencies.create("io.micronaut:micronaut-core:$version")).apply {
+        isTransitive = false
+    })
 }
 
 tasks {
@@ -157,5 +176,6 @@ tasks {
         exclude("**/classnotfound/**")
         // The shared tests resolve files relative to test-suite
         workingDir = testSuiteDir.asFile
+        jvmArgumentProviders.addAll(releasedCores)
     }
 }
