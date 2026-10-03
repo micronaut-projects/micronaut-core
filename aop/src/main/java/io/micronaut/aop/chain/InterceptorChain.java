@@ -29,8 +29,6 @@ import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
-import io.micronaut.context.Qualifier;
-import io.micronaut.context.RegisteredBeanInterceptors;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -42,12 +40,9 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -151,7 +146,8 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(BeanContext beanContext,
                                                                     ExecutableMethod<T, ?> method,
                                                                     List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        return resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
+        return beanContext.getBean(InterceptorRegistry.ARGUMENT)
+            .resolveMethodInterceptors(method, interceptors, InterceptorKind.AROUND);
     }
 
     /**
@@ -170,7 +166,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(InterceptorRegistry interceptorRegistry,
                                                                     ExecutableMethod<T, ?> method,
                                                                     List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        return resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
+        return interceptorRegistry.resolveMethodInterceptors(method, interceptors, InterceptorKind.AROUND);
     }
 
     /**
@@ -189,9 +185,8 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(BeanContext beanContext,
                                                                           ExecutableMethod<T, ?> method,
                                                                           List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.INTRODUCTION);
-        final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
-        return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+        return beanContext.getBean(InterceptorRegistry.ARGUMENT)
+            .resolveMethodInterceptors(method, interceptors, InterceptorKind.INTRODUCTION);
     }
 
     /**
@@ -210,9 +205,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(InterceptorRegistry interceptorRegistry,
                                                                           ExecutableMethod<T, ?> method,
                                                                           List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.INTRODUCTION);
-        final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
-        return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+        return interceptorRegistry.resolveMethodInterceptors(method, interceptors, InterceptorKind.INTRODUCTION);
     }
 
     /**
@@ -241,32 +234,8 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
                                                                   boolean introduction,
                                                                   @Nullable BeanRegistration<?> target,
                                                                   @Nullable Object bean) {
-        if (target != null && target.getBean() == bean) {
-            // read before a selector is created for it, on every call
-            Interceptor<?, ?>[][] kept = RegisteredBeanInterceptors.kept(target, targetDefinition);
-            if (kept != null) {
-                return kept;
-            }
-            Interceptor<?, ?>[][] selection = RegisteredBeanInterceptors.select(target, targetDefinition, resolutionContext -> selectForMethods(
-                resolutionContext.getContext().getBean(InterceptorRegistry.ARGUMENT),
-                methods,
-                introduction,
-                resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
-            ));
-            if (selection != null) {
-                return selection;
-            }
-        }
-        Interceptor<?, ?>[][] unowned = RegisteredBeanInterceptors.keptUnowned(beanLocator, targetDefinition);
-        if (unowned != null) {
-            return unowned;
-        }
-        return RegisteredBeanInterceptors.selectUnowned(beanLocator, targetDefinition, Interceptor.ARGUMENT, bindingOf(methods), registrations -> selectForMethods(
-            beanLocator.getBean(InterceptorRegistry.ARGUMENT),
-            methods,
-            introduction,
-            registrations
-        ));
+        return beanLocator.getBean(InterceptorRegistry.ARGUMENT)
+            .candidateResolver().resolveTargetInterceptors(beanLocator, targetDefinition, methods, introduction, target, bean);
     }
 
     /**
@@ -281,36 +250,12 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     @Internal
     @UsedByGeneratedCode
     public static @Nullable BeanRegistration<?> findProxyTargetRegistration(BeanLocator beanLocator, @Nullable Object bean) {
-        if (bean == null || !(beanLocator instanceof BeanDefinitionRegistry registry)) {
+        if (bean == null || !(beanLocator instanceof BeanDefinitionRegistry definitions)) {
             return null;
         }
-        return registry.findBeanRegistration(bean).orElse(null);
+        return definitions.findBeanRegistration(bean).orElse(null);
     }
 
-    private static Qualifier<Interceptor<?, ?>> bindingOf(ExecutableMethod<?, ?>[] methods) {
-        // each method keeps its own occurrences of a binding annotation that binds members
-        AnnotationMetadata[] interceptionPoints = new AnnotationMetadata[methods.length];
-        for (int i = 0; i < methods.length; i++) {
-            interceptionPoints[i] = methods[i].getAnnotationMetadata();
-        }
-        return InterceptorBindingQualifier.ofInterceptionPoints(interceptionPoints);
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Interceptor<?, ?>[][] selectForMethods(InterceptorRegistry registry,
-                                                          ExecutableMethod<?, ?>[] methods,
-                                                          boolean introduction,
-                                                          Collection<? extends BeanRegistration<?>> registrations) {
-        List list = new ArrayList<>(registrations);
-        Interceptor<?, ?>[][] selection = new Interceptor[methods.length][];
-        for (int i = 0; i < methods.length; i++) {
-            ExecutableMethod method = methods[i];
-            selection[i] = introduction
-                ? resolveIntroductionInterceptors(registry, method, list)
-                : resolveAroundInterceptors(registry, method, list);
-        }
-        return selection;
-    }
 
     /**
      * Resolves the {@link Around} interceptors for a method.
@@ -360,24 +305,6 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         }
         Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
-    }
-
-    private static <T> Interceptor<T, ?>[] resolveInterceptors(BeanContext beanContext,
-                                                               ExecutableMethod<T, ?> method,
-                                                               List<BeanRegistration<Interceptor<T, ?>>> interceptors,
-                                                               InterceptorKind interceptorKind) {
-        return resolveInterceptors(beanContext.getBean(InterceptorRegistry.class), method, interceptors, interceptorKind);
-    }
-
-    private static <T> Interceptor<T, ?>[] resolveInterceptors(InterceptorRegistry interceptorRegistry,
-                                                               ExecutableMethod<T, ?> method,
-                                                               List<BeanRegistration<Interceptor<T, ?>>> interceptors,
-                                                               InterceptorKind interceptorKind) {
-        return interceptorRegistry.resolveInterceptors(
-            method,
-            interceptors,
-            interceptorKind
-        );
     }
 
     private static void instrumentAnnotationMetadata(@Nullable BeanContext beanContext, ExecutableMethod<?, ?> method) {
