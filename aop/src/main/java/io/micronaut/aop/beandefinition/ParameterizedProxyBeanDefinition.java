@@ -16,7 +16,7 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.ConstructorInterceptorChain;
+import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -51,12 +51,11 @@ public interface ParameterizedProxyBeanDefinition<T>
             "Resolved instantiation values cannot be null"
         );
         List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
-        return ConstructorInterceptorChain.instantiate(
+        return context.getBean(InterceptorRegistry.ARGUMENT).chainFactory().instantiate(
             resolutionContext,
-            context,
-            interceptors,
             this,
             new InterceptedParametrizedConstructor<>(this, resolutionContext, context),
+            interceptors,
             ADDITIONAL_PROXY_CONSTRUCTOR_PARAMETERS_COUNT,
             constructorValues
         );

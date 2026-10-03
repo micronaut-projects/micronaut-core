@@ -1,7 +1,6 @@
 package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.RegisteredBeanInterceptors
 import io.micronaut.core.type.Argument
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.context.scope.refresh.RefreshScope
@@ -168,7 +167,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def interceptor = ctx.classLoader.loadClass('test.SlowInterceptor')
         def events = ctx.classLoader.loadClass('test.Events')
         def call = CompletableFuture.supplyAsync {
-            RegisteredBeanInterceptors.select(target, new Object()) { resolution ->
+            ctx.select(target, new Object()) { resolution ->
                 resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
             }
         }
@@ -219,11 +218,12 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         interceptor.created == 0
 
         when:
-        def selected = RegisteredBeanInterceptors.select(target, key) { resolution ->
+        def selected = ctx.select(target, key) { resolution ->
             selections++
             resolution.getInterceptorRegistrations(Argument.of(interceptor), null).first().bean
         }
-        def reused = RegisteredBeanInterceptors.select(target, key) { throw new AssertionError('selection was not cached') }
+        def reused = ctx.select(target, key) { throw new AssertionError('selection was not cached') }
+        assert ctx.getSelection(target, key).is(selected)
         ctx.close()
 
         then:
@@ -245,7 +245,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def entered = new java.util.concurrent.CountDownLatch(1)
         def release = new java.util.concurrent.CountDownLatch(1)
         def selection = CompletableFuture.supplyAsync {
-            RegisteredBeanInterceptors.selectUnowned(ctx, new Object(), Argument.of(interceptor), null) { registrations ->
+            ctx.selectUnowned(new Object(), Argument.of(interceptor), null) { registrations ->
                 entered.countDown()
                 assert release.await(10, TimeUnit.SECONDS)
                 registrations
