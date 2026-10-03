@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
@@ -73,6 +74,11 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     @Nullable
     private final ClassLoader contextClassLoader;
     private final ClassLoader classLoader;
+    private final CountDownLatch converted = new CountDownLatch(1);
+    private volatile boolean converting;
+    // Written before converted counts down, read after it has
+    @Nullable
+    private Throwable conversionFailure;
     private final Object lock = new Object();
     // The fields below are guarded by the lock
     private int state = OPEN;
@@ -139,8 +145,9 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
         List<BeanDefinitionReference<?>> references = null;
         Throwable thrown = null;
         try {
-            ConversionService _ = ConversionService.SHARED;
-            references = new DefaultBeanDefinitionsProvider().provide(classLoader);
+            if (convert()) {
+                references = new DefaultBeanDefinitionsProvider().provide(classLoader);
+            }
         } catch (Throwable t) {
             thrown = t;
         } finally {
@@ -152,6 +159,50 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
                 failure = thrown;
             }
         }
+    }
+
+    /**
+     * Builds {@link ConversionService#SHARED}. A failure, such as a {@code TypeConverterRegistrar}
+     * that throws, leaves the class of the conversion service erroneous: the context then fails
+     * on it before it asks for the references, and {@link #conversionFailure()} keeps what
+     * building it threw, for {@link Micronaut} to rethrow. The provider does not run.
+     *
+     * @return Whether the shared conversion service was built
+     */
+    @SuppressWarnings("java:S1181") // Kept for Micronaut, which rethrows it unchanged
+    private boolean convert() {
+        converting = true;
+        try {
+            ConversionService _ = ConversionService.SHARED;
+            return true;
+        } catch (Throwable t) {
+            conversionFailure = t;
+            return false;
+        } finally {
+            converted.countDown();
+        }
+    }
+
+    /**
+     * What building {@link ConversionService#SHARED} threw on the task's thread, for the thread
+     * whose context failed. When the task has started building it, this waits until it is done:
+     * a thread that met the class of the conversion service erroneous can get there first.
+     *
+     * @return What building the shared conversion service threw, or {@code null}
+     */
+    @Nullable
+    Throwable conversionFailure() {
+        if (!converting) {
+            // The task has not read the conversion service: the context failed on its own
+            return null;
+        }
+        try {
+            converted.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+        return conversionFailure;
     }
 
     /**
@@ -179,6 +230,10 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
             result = null;
             failure = null;
         }
+        if (thrown == null) {
+            // Set before the task finished, if the provider did not run
+            thrown = conversionFailure;
+        }
         if (thrown != null) {
             return ExceptionUtils.sneakyThrow(thrown);
         }
@@ -199,7 +254,8 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
      * Gives the result up, now or when the task finishes, unless a context took it. Never waits
      * for the task.
      *
-     * @return What the task threw, when it finished without being handed over, or {@code null}
+     * @return What the provider threw, when the task finished without being handed over, or
+     * {@code null}
      */
     @Nullable
     Throwable giveUp() {

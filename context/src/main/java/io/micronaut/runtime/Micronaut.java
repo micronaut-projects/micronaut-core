@@ -32,6 +32,7 @@ import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -241,8 +242,13 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * the application or a configurer set a provider of its own, and afterwards a prefetch that
      * the context did not take gives its result up.
      *
+     * <p>When the prefetch failed to build the shared conversion service, the context fails on
+     * the class that this left erroneous, with a {@link NoClassDefFoundError}. What the prefetch
+     * met, which the context would have met without it, is rethrown instead.</p>
+     *
      * @return The application context, not started
      */
+    @SuppressWarnings("java:S1181") // Rethrown, or replaced by what the prefetch met first
     private ApplicationContext buildContext() {
         BeanDefinitionPrefetch prefetch = BEAN_DEFINITION_PREFETCH;
         if (prefetch == null) {
@@ -253,6 +259,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         }
         try {
             return super.build();
+        } catch (Throwable t) {
+            Throwable conversionFailure = prefetch.conversionFailure();
+            if (conversionFailure != null) {
+                return ExceptionUtils.sneakyThrow(conversionFailure);
+            }
+            throw t;
         } finally {
             Throwable failure = prefetch.giveUp();
             if (failure != null) {

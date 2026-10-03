@@ -142,6 +142,29 @@ class BeanDefinitionPrefetchStartupTest {
         }
     }
 
+    /**
+     * A {@link TypeConverterRegistrar} that throws stops the application with the prefetch as it
+     * does without it: the same exit status and the same chain of causes, and no warning about the
+     * prefetch. With the prefetch, it throws on the pool thread that builds the shared conversion
+     * service, and the context then fails on the class that this left erroneous: Micronaut
+     * rethrows what the pool thread met.
+     */
+    @Test
+    void aFailingTypeConverterRegistrarStopsTheApplicationAsItDoesWithoutThePrefetch() throws IOException {
+        List<Path> classPath = List.of(services(Map.of(TypeConverterRegistrar.class, FailingRegistrar.class)));
+        ChildJvm on = run(classPath, ON, THREE_THREADS, "-Dprefetch-test.await=true");
+        ChildJvm off = run(classPath, THREE_THREADS);
+
+        assertNotEquals(0, off.exitCode(), off.output());
+        assertEquals(off.exitCode(), on.exitCode(), on.output());
+        assertTrue(off.causes().stream().anyMatch(cause -> cause.contains(FailingRegistrar.MESSAGE)), off.output());
+        assertEquals(off.causes(), on.causes(), on.output());
+        // The registrar failed on the task's thread with the prefetch on, and on the main thread without it
+        assertTrue(on.output().contains("at " + TASK + ".convert("), on.output());
+        assertFalse(off.output().contains("at " + TASK + "."), off.output());
+        assertFalse(on.output().contains("The bean definition prefetch ("), on.output());
+    }
+
     @Test
     void aReferenceThatFailsToLinkIsSkippedAsItIsWithoutThePrefetch() throws IOException {
         List<Path> entries = List.of(entries(FIRST, FAILS_TO_LINK));
@@ -227,6 +250,18 @@ class BeanDefinitionPrefetchStartupTest {
             Files.createFile(directory.resolve(name));
         }
         return entries;
+    }
+
+    /**
+     * A class path entry that registers the given services.
+     */
+    private Path services(Map<Class<?>, Class<?>> services) throws IOException {
+        Path root = Files.createTempDirectory(temp, "services");
+        Path directory = Files.createDirectories(root.resolve("META-INF/services"));
+        for (Map.Entry<Class<?>, Class<?>> service : services.entrySet()) {
+            Files.writeString(directory.resolve(service.getKey().getName()), service.getValue().getName());
+        }
+        return root;
     }
 
     private static ChildJvm run(List<Path> extraClassPath, String... jvmArgs) {
@@ -362,6 +397,18 @@ class BeanDefinitionPrefetchStartupTest {
                     thread = current.getName();
                 }
             }
+        }
+    }
+
+    /**
+     * Fails to register its converters.
+     */
+    public static final class FailingRegistrar implements TypeConverterRegistrar {
+        static final String MESSAGE = "probe failure of " + FailingRegistrar.class.getName();
+
+        @Override
+        public void register(MutableConversionService conversionService) {
+            throw new IllegalStateException(MESSAGE);
         }
     }
 
