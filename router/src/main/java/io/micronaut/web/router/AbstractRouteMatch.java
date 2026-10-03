@@ -54,6 +54,11 @@ import java.util.Optional;
  */
 abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
+    private static final @Nullable Object[] EMPTY_VALUES = new Object[0];
+    private static final boolean[] EMPTY_FULFILLED = new boolean[0];
+    private static final PostponedRequestArgumentBinder<?>[] EMPTY_POSTPONED = new PostponedRequestArgumentBinder[0];
+    private static final PendingRequestBindingResult<?>[] EMPTY_PENDING = new PendingRequestBindingResult[0];
+
     protected final ConversionService conversionService;
     protected final MethodBasedRouteInfo<T, R> routeInfo;
     protected final MethodExecutionHandle<T, R> methodExecutionHandle;
@@ -84,10 +89,18 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         this.arguments = executableMethod.getArguments();
         this.argumentNames = routeInfo.getArgumentNames();
         int length = arguments.length;
-        this.argumentValues = new Object[length];
-        this.fulfilledArguments = new boolean[length];
-        this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
-        this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
+        if (length == 0) {
+            // empty arrays cannot be written to, so a route without arguments shares them
+            this.argumentValues = EMPTY_VALUES;
+            this.fulfilledArguments = EMPTY_FULFILLED;
+            this.postponedArgumentBinders = (PostponedRequestArgumentBinder<Object>[]) EMPTY_POSTPONED;
+            this.pendingRequestBindingResults = EMPTY_PENDING;
+        } else {
+            this.argumentValues = new Object[length];
+            this.fulfilledArguments = new boolean[length];
+            this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
+            this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
+        }
         if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
             unsafeMethodExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
         } else {
