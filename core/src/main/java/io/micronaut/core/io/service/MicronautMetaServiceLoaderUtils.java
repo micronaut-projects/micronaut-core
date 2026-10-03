@@ -371,7 +371,7 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * @param <S> The service type
      */
-    // package-private, as is its superclass, for the test that checks when the service index is asked for
+    // package-private, unlike its superclass, for the test that checks when the service index is asked for
     @SuppressWarnings("java:S1948")
     static final class MicronautServiceCollector<S> extends RecursiveActionValuesCollector<S> {
 
@@ -494,7 +494,7 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * @param <S> The type
      */
-    abstract static class RecursiveActionValuesCollector<S> extends RecursiveAction {
+    private abstract static class RecursiveActionValuesCollector<S> extends RecursiveAction {
 
         /**
          * Collects loaded values.

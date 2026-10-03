@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.io.service;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.core.util.StringUtils;
@@ -29,7 +29,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,10 +52,11 @@ import java.util.jar.Manifest;
  * A precomputed index of the services of a closed class path, which lets service loading on the JVM skip the scan of
  * {@code META-INF/services} and {@code META-INF/micronaut} for the types it covers.
  *
- * <p>Besides the class loader it was built for, the index only holds names. Services are still instantiated, filtered
- * and ordered as the scan does it, with one fork-join task per name, joined in order. A packager that sees the
- * complete class path of an application builds the index at packaging time, for example with
- * {@link ServiceIndexBuilder}, and registers it at run time through a {@link StaticOptimizations.Loader}:</p>
+ * <p>This is internal API, for the Micronaut tools that package an application. Such a tool builds the index at
+ * packaging time, for example with {@link ServiceIndexBuilder}, and generates a {@link StaticOptimizations.Loader}
+ * that registers it at run time. It must compile that loader against the version of Micronaut core that the
+ * application runs with, because this API can change in any release. Users switch the index off, or validate it,
+ * with the two system properties below.</p>
  *
  * <pre>{@code
  * public final class GeneratedServiceIndexLoader implements StaticOptimizations.Loader<ServiceIndex> {
@@ -66,10 +66,12 @@ import java.util.jar.Manifest;
  * }
  * }</pre>
  *
- * <p>The index follows these rules:</p>
+ * <p>Besides the class loader it was built for, the index only holds names. Services are still instantiated, filtered
+ * and ordered as the scan does it, with one fork-join task per name, joined in order. The index follows these
+ * rules:</p>
  * <ul>
- *     <li>It is only served for the {@link #classLoader() class loader} it was built for. Any other class loader,
- *     including a child of that class loader, scans the class path.</li>
+ *     <li>It is only served for the class loader it was built for. Any other class loader, including a child of that
+ *     class loader, scans the class path.</li>
  *     <li>It is ignored in native image code, where the service table built by the native image feature is used. An
  *     index that a loader registers there, which includes the build of the image, is dropped and never read. A
  *     producer must therefore not emit an index for a native packaging: the generated loader and its names would
@@ -79,8 +81,8 @@ import java.util.jar.Manifest;
  *     <li>The name condition given to {@link SoftServiceLoader#load(Class, ClassLoader, java.util.function.Predicate)}
  *     is tested on every name of the index.</li>
  *     <li>At most one index can be registered: registering a second one fails.</li>
- *     <li>Setting the system property {@value #ENABLED_PROPERTY} to {@code false} switches the index off, so that
- *     the class path is scanned. The property is read at the start of each lookup: when a
+ *     <li>Setting the system property {@code micronaut.service.index.enabled} to {@code false} switches the index
+ *     off, so that the class path is scanned. The property is read at the start of each lookup: when a
  *     {@link SoftServiceLoader.ServiceCollector} is created, which {@link SoftServiceLoader} does for each collection
  *     of a type, and on each call of
  *     {@link MicronautMetaServiceLoaderUtils#findMicronautMetaServiceEntries(ClassLoader, String)}. A collector that
@@ -103,9 +105,9 @@ import java.util.jar.Manifest;
  *     of the class path that is compared, so a thin JAR is compared together with the libraries its manifest lists.
  *     For any other class loader nothing is compared, and the producer is responsible for only registering an index
  *     that matches. An index without a class path is not checked and costs no I/O.</li>
- *     <li>If the system property {@value #VALIDATE_PROPERTY} is {@code true} when the index is first used, that
- *     lookup also scans the class path and compares the result with the index, without regard to the order. If the
- *     names differ, or the class path check above fails, that lookup and every later one fail with a
+ *     <li>If the system property {@code micronaut.service.index.validate} is {@code true} when the index is first
+ *     used, that lookup also scans the class path and compares the result with the index, without regard to the
+ *     order. If the names differ, or the class path check above fails, that lookup and every later one fail with a
  *     {@link ServiceConfigurationError} that lists the differences. This costs more than not having an index, so it
  *     is meant for the tests of a producer and for diagnosing an application, not for production.</li>
  * </ul>
@@ -137,34 +139,22 @@ import java.util.jar.Manifest;
  * unloaded. That is harmless for a packaged application, whose index is built for the class loader of the
  * application, but it rules out registering an index for a unit that a container deploys and undeploys.</p>
  *
- * @param classLoader       The class loader the index was built for, and the only one it is served for
- * @param micronautServices The entries under {@code META-INF/micronaut/<type>/} for every type, as
- *                          {@link MicronautMetaServiceLoaderUtils#findAllMicronautMetaServices(ClassLoader)} finds them.
- *                          It is exhaustive: a type that is missing has no such entries
- * @param standardServices  The names listed by the {@code META-INF/services/<type>} files of each indexed type, in the
- *                          order the scan finds them. A type that is missing is scanned
- * @param classPath         The entries of the class path the index was built for, in any order, or null to not
- *                          compare the class path
  * @author Álvaro Sánchez-Mariscal
  * @since 5.3.0
  */
-@Experimental
-public record ServiceIndex(ClassLoader classLoader,
-                           Map<String, Set<String>> micronautServices,
-                           Map<String, List<String>> standardServices,
-                           @Nullable List<ClassPathEntry> classPath)
-    implements StaticOptimizations.SetOnce, StaticOptimizations.JvmOnly {
+@Internal
+public final class ServiceIndex implements StaticOptimizations.SetOnce, StaticOptimizations.JvmOnly {
 
     /**
      * The system property that switches the index off when it is set to {@code false}.
      */
-    public static final String ENABLED_PROPERTY = "micronaut.service.index.enabled";
+    static final String ENABLED_PROPERTY = "micronaut.service.index.enabled";
 
     /**
      * The system property that, when it is set to {@code true}, makes the first lookup that uses the index compare
      * it with a scan of the class path, and fail if they differ.
      */
-    public static final String VALIDATE_PROPERTY = "micronaut.service.index.validate";
+    static final String VALIDATE_PROPERTY = "micronaut.service.index.validate";
 
     private static final int MAX_REPORTED_NAMES = 20;
 
@@ -174,6 +164,57 @@ public record ServiceIndex(ClassLoader classLoader,
     @Nullable
     private static volatile Check lastCheck;
 
+    private final ClassLoader classLoader;
+    private final Map<String, Set<String>> micronautServices;
+    private final Map<String, List<String>> standardServices;
+    @Nullable
+    private final List<ClassPathEntry> classPath;
+
+    /**
+     * Creates an index that keeps the given maps as they are, and a copy of the class path.
+     *
+     * @param classLoader       The class loader the index was built for, and the only one it is served for
+     * @param micronautServices The entries under {@code META-INF/micronaut/<type>/} for every type
+     * @param standardServices  The names listed by the {@code META-INF/services/<type>} files of each indexed type
+     * @param classPath         The entries of the class path the index was built for, or null to not compare the
+     *                          class path
+     */
+    private ServiceIndex(ClassLoader classLoader,
+                         Map<String, Set<String>> micronautServices,
+                         Map<String, List<String>> standardServices,
+                         @Nullable List<ClassPathEntry> classPath) {
+        this.classLoader = Objects.requireNonNull(classLoader, "classLoader");
+        this.micronautServices = micronautServices;
+        this.standardServices = standardServices;
+        this.classPath = classPath == null ? null : List.copyOf(classPath);
+    }
+
+    /**
+     * Creates an index that uses the given maps, with their sets and lists, as they are. It is meant for generated
+     * code, which builds the collections for the index alone and runs at the start of the application, where copies
+     * would be made for nothing.
+     *
+     * <p>The caller must not modify the maps, the sets or the lists afterwards, and the order in which they iterate
+     * is the order the services are loaded in. Service loading only iterates the sets and asks for their size, so a
+     * set does not have to be hashed: an unmodifiable {@link Set} view of an array of names is enough.</p>
+     *
+     * @param classLoader       The class loader the index was built for, and the only one it is served for
+     * @param micronautServices The entries under {@code META-INF/micronaut/<type>/} for every type, as
+     *                          {@link MicronautMetaServiceLoaderUtils#findAllMicronautMetaServices(ClassLoader)} finds
+     *                          them. It is exhaustive: a type that is missing has no such entries
+     * @param standardServices  The names listed by the {@code META-INF/services/<type>} files of each indexed type, in
+     *                          the order the scan finds them. A type that is missing is scanned
+     * @param classPath         The entries of the class path the index was built for, in any order, or null to not
+     *                          compare the class path
+     * @return The index
+     */
+    public static ServiceIndex ofTrusted(ClassLoader classLoader,
+                                         Map<String, Set<String>> micronautServices,
+                                         Map<String, List<String>> standardServices,
+                                         @Nullable List<ClassPathEntry> classPath) {
+        return new ServiceIndex(classLoader, Collections.unmodifiableMap(micronautServices), Collections.unmodifiableMap(standardServices), classPath);
+    }
+
     /**
      * Creates an index with copies of the given collections, which keep their order and cannot be modified.
      *
@@ -182,50 +223,44 @@ public record ServiceIndex(ClassLoader classLoader,
      * @param standardServices  The names listed by the {@code META-INF/services/<type>} files of each indexed type
      * @param classPath         The entries of the class path the index was built for, or null to not compare the
      *                          class path
-     */
-    public ServiceIndex {
-        Objects.requireNonNull(classLoader, "classLoader");
-        if (!(micronautServices instanceof TrustedMap<?>)) {
-            micronautServices = copyOfSets(micronautServices);
-        }
-        if (!(standardServices instanceof TrustedMap<?>)) {
-            standardServices = copyOfLists(standardServices);
-        }
-        classPath = classPath == null ? null : List.copyOf(classPath);
-    }
-
-    /**
-     * Creates an index that does not list the class path it was built for, with copies of the given collections.
-     *
-     * @param classLoader       The class loader the index was built for, and the only one it is served for
-     * @param micronautServices The entries under {@code META-INF/micronaut/<type>/} for every type
-     * @param standardServices  The names listed by the {@code META-INF/services/<type>} files of each indexed type
-     */
-    public ServiceIndex(ClassLoader classLoader, Map<String, Set<String>> micronautServices, Map<String, List<String>> standardServices) {
-        this(classLoader, micronautServices, standardServices, null);
-    }
-
-    /**
-     * Creates an index that uses the given maps, with their sets and lists, as they are, where the constructors copy
-     * every one of them. It is meant for generated code, which builds the collections for the index alone and runs
-     * at the start of the application, where the copies would be made for nothing.
-     *
-     * <p>The caller must not modify the maps, the sets or the lists afterwards, and the order in which they iterate
-     * is the order the services are loaded in. Service loading only iterates the sets and asks for their size, so a
-     * set does not have to be hashed: an unmodifiable {@link Set} view of an array of names is enough.</p>
-     *
-     * @param classLoader       The class loader the index was built for, and the only one it is served for
-     * @param micronautServices The entries under {@code META-INF/micronaut/<type>/} for every type
-     * @param standardServices  The names listed by the {@code META-INF/services/<type>} files of each indexed type
-     * @param classPath         The entries of the class path the index was built for, or null to not compare the
-     *                          class path
      * @return The index
      */
-    public static ServiceIndex ofTrusted(ClassLoader classLoader,
-                                         Map<String, Set<String>> micronautServices,
-                                         Map<String, List<String>> standardServices,
-                                         @Nullable List<ClassPathEntry> classPath) {
-        return new ServiceIndex(classLoader, new TrustedMap<>(micronautServices), new TrustedMap<>(standardServices), classPath);
+    static ServiceIndex copyOf(ClassLoader classLoader,
+                               Map<String, Set<String>> micronautServices,
+                               Map<String, List<String>> standardServices,
+                               @Nullable List<ClassPathEntry> classPath) {
+        return new ServiceIndex(classLoader, copyOfSets(micronautServices), copyOfLists(standardServices), classPath);
+    }
+
+    /**
+     * @return The class loader the index was built for, and the only one it is served for
+     */
+    ClassLoader classLoader() {
+        return classLoader;
+    }
+
+    /**
+     * @return The entries under {@code META-INF/micronaut/<type>/} for every type. They are exhaustive: a type that is
+     * missing has no such entries
+     */
+    public Map<String, Set<String>> micronautServices() {
+        return micronautServices;
+    }
+
+    /**
+     * @return The names listed by the {@code META-INF/services/<type>} files of each indexed type, in the order the
+     * scan finds them. A type that is missing is scanned
+     */
+    public Map<String, List<String>> standardServices() {
+        return standardServices;
+    }
+
+    /**
+     * @return The entries of the class path the index was built for, in any order, or null if the class path is not
+     * compared
+     */
+    public @Nullable List<ClassPathEntry> classPath() {
+        return classPath;
     }
 
     /**
@@ -680,7 +715,7 @@ public record ServiceIndex(ClassLoader classLoader,
      *             the index itself
      * @since 5.3.0
      */
-    @Experimental
+    @Internal
     public record ClassPathEntry(String name, long size) {
 
         /**
@@ -706,35 +741,5 @@ public record ServiceIndex(ClassLoader classLoader,
      * @param failure The message of the error that every lookup fails with, or null if the lookups do not fail
      */
     private record Check(ServiceIndex index, boolean usable, String detail, @Nullable String failure) {
-    }
-
-    /**
-     * An unmodifiable view of a map that {@link #ofTrusted} was given, which the constructor recognizes and does not
-     * copy. Only that method creates one.
-     *
-     * @param <V> The type of the values
-     */
-    private static final class TrustedMap<V> extends AbstractMap<String, V> {
-
-        private final Map<String, V> map;
-
-        TrustedMap(Map<String, V> map) {
-            this.map = Collections.unmodifiableMap(map);
-        }
-
-        @Override
-        public Set<Entry<String, V>> entrySet() {
-            return map.entrySet();
-        }
-
-        @Override
-        public @Nullable V get(Object key) {
-            return map.get(key);
-        }
-
-        @Override
-        public boolean containsKey(Object key) {
-            return map.containsKey(key);
-        }
     }
 }

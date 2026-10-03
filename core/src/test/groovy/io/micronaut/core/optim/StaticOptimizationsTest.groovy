@@ -168,7 +168,7 @@ class StaticOptimizationsTest extends Specification {
         def registered = StaticOptimizations.SetOnce.find(ServiceIndex.name)
 
         when:
-        StaticOptimizations.set(new ServiceIndex(getClass().classLoader, [:], [:]))
+        StaticOptimizations.set(ServiceIndex.ofTrusted(getClass().classLoader, [:], [:], null))
 
         then:
         IllegalStateException ex = thrown()
@@ -209,7 +209,7 @@ class StaticOptimizationsTest extends Specification {
         def rounds = (1..1000).collect {
             StaticOptimizations.@OPTIMIZATIONS.remove(ServiceIndex)
             StaticOptimizations.SetOnceValues.BY_CLASS_NAME.remove(ServiceIndex.name)
-            def indexes = (1..threads).collect { new ServiceIndex(classLoader, [:], [:]) }
+            def indexes = (1..threads).collect { ServiceIndex.ofTrusted(classLoader, [:], [:], null) }
             def barrier = new CyclicBarrier(threads)
             def winners = indexes.collect { index ->
                 pool.submit({

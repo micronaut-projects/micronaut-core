@@ -72,6 +72,6 @@ public final class ServiceIndexBuilder {
         for (String serviceType : serviceTypes) {
             standardServices.put(serviceType, ServiceScanner.readStandardServiceNames(classLoader, serviceType));
         }
-        return new ServiceIndex(classLoader, micronautServices, standardServices, ServiceIndex.classPathOf(classLoader));
+        return ServiceIndex.copyOf(classLoader, micronautServices, standardServices, ServiceIndex.classPathOf(classLoader));
     }
 }
