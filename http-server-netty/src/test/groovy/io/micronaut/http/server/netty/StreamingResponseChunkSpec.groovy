@@ -45,7 +45,7 @@ class StreamingResponseChunkSpec extends Specification {
         channel.runPendingTasks()
     }
 
-    def 'a streamed json array sends one content message per element'() {
+    def 'adjacent small streamed json array elements share one bounded message'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': 'StreamingResponseChunkSpec'])
         def mon = new Monitor()
@@ -57,9 +57,9 @@ class StreamingResponseChunkSpec extends Specification {
         then: 'the bytes on the wire are unchanged'
         mon.contents.join('') == '[1,2,3]'
 
-        and: 'each element travels with the separator in front of it, and the array is closed by the terminating message'
-        mon.contents == ['[1', ',2', ',3', ']']
-        mon.lastContentIndex == 3
+        and: 'the complete small array is combined into its terminating message'
+        mon.contents == ['[1,2,3]']
+        mon.lastContentIndex == 0
 
         and: 'writes inside a single read cycle share one flush'
         mon.flushes == 1

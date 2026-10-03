@@ -21,6 +21,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.util.concurrent.OrderedEventExecutor;
 import org.jspecify.annotations.Nullable;
@@ -43,7 +44,7 @@ import java.util.Objects;
  * route) hands them over as soon as it is subscribed to, before the protocol handler has even
  * attached the upstream. {@link #open()} makes the writer <i>open</i>: the sink writes the head
  * of the response, the buffered pieces follow, the upstream is started and a buffered completion
- * is applied. From then on pieces go straight to the sink. The terminating piece, a failure or
+ * is applied. From then on adjacent small pieces are combined within one event loop turn, up to 8 KiB. The terminating piece, a failure or
  * {@link #dispose()} make the writer <i>done</i>: further pieces are released, further signals
  * are ignored.
  * <p>
@@ -61,7 +62,17 @@ final class StreamingResponseWriter implements BufferConsumer {
         DONE
     }
 
+    private static final int SMALL_PIECE_LIMIT = 1024;
+    private static final int AGGREGATION_LIMIT = 8192;
+
+    private final OrderedEventExecutor loop;
+    private final ByteBufAllocator allocator;
     private final EventLoopFlow flow;
+    @Nullable
+    private ByteBuf pending;
+    private boolean pendingCopied;
+    private int pendingAcknowledged;
+    private boolean drainScheduled;
     private final Sink sink;
     private State state = State.PENDING;
     private BufferConsumer.@Nullable Upstream upstream;
@@ -88,6 +99,17 @@ final class StreamingResponseWriter implements BufferConsumer {
      * @param sink The protocol-specific sink
      */
     StreamingResponseWriter(OrderedEventExecutor loop, Sink sink) {
+        this(loop, sink, ByteBufAllocator.DEFAULT);
+    }
+
+    /**
+     * @param loop The event loop of the channel
+     * @param sink The protocol-specific sink
+     * @param allocator The allocator of the channel, for combined pieces
+     */
+    StreamingResponseWriter(OrderedEventExecutor loop, Sink sink, ByteBufAllocator allocator) {
+        this.allocator = allocator;
+        this.loop = loop;
         this.flow = new EventLoopFlow(loop);
         this.sink = sink;
     }
@@ -215,6 +237,7 @@ final class StreamingResponseWriter implements BufferConsumer {
     void dispose() {
         state = State.DONE;
         releaseEarlyData();
+        releasePending();
         earlyComplete = false;
         earlyError = null;
         markResponseWritten();
@@ -232,32 +255,156 @@ final class StreamingResponseWriter implements BufferConsumer {
     }
 
     private void reportIfWritable() {
-        if (unconsumedBytes > 0 && sink.isWritable()) {
+        if ((unconsumedBytes > 0 || pending != null) && sink.isWritable()) {
             report();
         }
     }
 
     private void report() {
         long n = takeUnconsumedBytes();
+        ByteBuf current = pending;
+        if (current != null) {
+            // Writable HTTP/1 sinks may consume into this bounded buffer. Otherwise a publisher
+            // that waits for each acknowledgement cannot produce adjacent pieces. Stop granting
+            // credit as soon as a write makes the channel unwritable. HTTP/2 never uses report:
+            // its acknowledgements still cover only bytes handed to the protocol sink.
+            int size = current.readableBytes();
+            n += size - pendingAcknowledged;
+            pendingAcknowledged = size;
+        }
         bytesConsumed(n);
     }
 
     private void write(ReadBuffer buf) {
-        unconsumedBytes += buf.readable();
-        sink.write(NettyReadBufferFactory.toByteBuf(buf), false);
+        ByteBuf next = NettyReadBufferFactory.toByteBuf(buf);
+        if (state != State.OPEN) {
+            next.release();
+            return;
+        }
+        int size = next.readableBytes();
+        if (size > SMALL_PIECE_LIMIT) {
+            drainPending();
+            if (state == State.OPEN) {
+                writeToSink(next, false);
+            } else {
+                next.release();
+            }
+            return;
+        }
+        ByteBuf current = pending;
+        if (current != null && current.readableBytes() + size > AGGREGATION_LIMIT) {
+            drainPending();
+            if (state != State.OPEN) {
+                next.release();
+                return;
+            }
+            current = null;
+        }
+        pending = current == null ? next : combine(current, next);
+        if (pending.readableBytes() == AGGREGATION_LIMIT) {
+            drainPending();
+        } else if (!drainScheduled) {
+            drainScheduled = true;
+            loop.execute(this::drainTurn);
+        }
     }
 
     private void finish(ByteBuf last) {
         state = State.DONE;
-        sink.write(last, true);
+        ByteBuf current = pending;
+        pending = null;
+        int acknowledged = pendingAcknowledged;
+        pendingAcknowledged = 0;
+        if (current != null) {
+            if (!sink.canMergeLast()) {
+                writeToSink(current, false, acknowledged);
+                acknowledged = 0;
+            } else if (!last.isReadable()) {
+                last.release();
+                last = current;
+            } else if (last.readableBytes() <= SMALL_PIECE_LIMIT
+                && current.readableBytes() + last.readableBytes() <= AGGREGATION_LIMIT) {
+                last = combine(current, last);
+            } else {
+                writeToSink(current, false, acknowledged);
+                acknowledged = 0;
+            }
+        }
+        pendingCopied = false;
+        writeToSink(last, true, acknowledged);
         markResponseWritten();
     }
 
     private void fail(Throwable t) {
         state = State.DONE;
         releaseEarlyData();
+        // Preserve the protocol's failure behavior for bytes already received: HTTP/1 flushes
+        // them before closing, while HTTP/2 can release its held frame when resetting.
+        drainPending();
         sink.fail(t);
         markResponseWritten();
+    }
+
+    private ByteBuf combine(ByteBuf current, ByteBuf next) {
+        if (!pendingCopied) {
+            // the allocator of the channel: a piece may come from another one, e.g. a wrapped array
+            ByteBuf copy = allocator.buffer(AGGREGATION_LIMIT, AGGREGATION_LIMIT);
+            append(copy, current);
+            current = copy;
+            pendingCopied = true;
+        }
+        append(current, next);
+        return current;
+    }
+
+    private static void append(ByteBuf target, ByteBuf piece) {
+        int n = piece.readableBytes();
+        if (piece.hasArray()) {
+            // straight from the array, without the NIO view a heap-to-direct copy goes through
+            target.writeBytes(piece.array(), piece.arrayOffset() + piece.readerIndex(), n);
+        } else {
+            target.writeBytes(piece, piece.readerIndex(), n);
+        }
+        piece.release();
+    }
+
+    private void writeToSink(ByteBuf data, boolean last) {
+        writeToSink(data, last, 0);
+    }
+
+    private void writeToSink(ByteBuf data, boolean last, int acknowledged) {
+        // Exclude bytes already accepted into the bounded HTTP/1 aggregation buffer.
+        unconsumedBytes += data.readableBytes() - acknowledged;
+        sink.write(data, last);
+    }
+
+    private void drainPending() {
+        ByteBuf current = pending;
+        pending = null;
+        pendingCopied = false;
+        int acknowledged = pendingAcknowledged;
+        pendingAcknowledged = 0;
+        if (current != null) {
+            writeToSink(current, false, acknowledged);
+        }
+    }
+
+    private void drainTurn() {
+        drainScheduled = false;
+        if (state == State.OPEN) {
+            drainPending();
+            reportIfWritable();
+        }
+    }
+
+    private void releasePending() {
+        ByteBuf current = pending;
+        pending = null;
+        pendingCopied = false;
+        pendingAcknowledged = 0;
+        if (current != null) {
+            current.release();
+        }
     }
 
     private void releaseEarlyData() {
@@ -302,7 +449,6 @@ final class StreamingResponseWriter implements BufferConsumer {
         if (state == State.OPEN) {
             // the final bytes go out as the message that terminates the response, instead of a
             // message of their own followed by an empty terminator
-            unconsumedBytes += buf.readable();
             finish(NettyReadBufferFactory.toByteBuf(buf));
         } else {
             add0(buf);
@@ -375,6 +521,13 @@ final class StreamingResponseWriter implements BufferConsumer {
          * @return {@code true} iff written bytes are consumed immediately
          */
         boolean isWritable();
+
+        /**
+         * @return Whether pending data may be combined with the terminating message
+         */
+        default boolean canMergeLast() {
+            return true;
+        }
 
         /**
          * The body failed. This is called at most once, in place of the last write, and never

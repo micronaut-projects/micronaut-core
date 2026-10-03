@@ -1531,7 +1531,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * messages, and reports consumption while the channel is writable.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements StreamingResponseWriter.Sink {
-        final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this);
+        final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this, requiredCtx().alloc());
         @Nullable
         private HttpResponse initialMessage;
         /**
@@ -1587,6 +1587,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             writeCompressing(content, true, true);
             writer.markResponseWritten();
             PipeliningServerHandler.this.writeSome();
+        }
+
+        @Override
+        public boolean canMergeLast() {
+            // Keep QUIC's separate data and trailer writes: its HTTP object codec may complete
+            // the data promise before it has submitted the trailing headers.
+            return !quic;
         }
 
         @Override

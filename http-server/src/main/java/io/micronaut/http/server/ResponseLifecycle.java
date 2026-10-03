@@ -46,7 +46,6 @@ import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -377,7 +376,7 @@ public abstract class ResponseLifecycle {
             isJson = () -> isJsonRoute;
             MediaType finalMediaType = mediaType;
             pieces = new PieceStream(request, response, isJson);
-            httpContentPublisher = bodyPublisher.concatMap(message -> {
+            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
                 @SuppressWarnings("unchecked")
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
@@ -386,8 +385,7 @@ public abstract class ResponseLifecycle {
                     responseBodyType = Argument.ofInstance(message);
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 }
-                ExecutionFlow<CloseableByteBody> flow = pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
-                return ReactiveExecutionFlow.toPublisher(flow);
+                return pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
             });
         } else {
             MediaType finalMediaType = mediaType;
@@ -405,16 +403,14 @@ public abstract class ResponseLifecycle {
             AtomicBoolean first = new AtomicBoolean(true);
             isJson = () -> isJsonMediaType && jsonFormattable.get();
             pieces = new PieceStream(request, response, isJson);
-            httpContentPublisher = bodyPublisher
-                .concatMap(message -> {
-                    Argument<Object> type = Argument.ofInstance(message);
-                    if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
-                        jsonFormattable.set(false);
-                    }
-                    MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
-                    ExecutionFlow<CloseableByteBody> flow = pieces.write(messageBodyWriter, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
-                    return ReactiveExecutionFlow.toPublisher(flow);
-                });
+            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
+                Argument<Object> type = Argument.ofInstance(message);
+                if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
+                    jsonFormattable.set(false);
+                }
+                MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
+                return pieces.write(messageBodyWriter, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
+            });
         }
 
         httpContentPublisher = httpContentPublisher
