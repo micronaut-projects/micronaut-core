@@ -62,13 +62,12 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import reactor.core.Fuseable;
 import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 import reactor.util.context.Context;
 
 import java.security.Principal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -76,10 +75,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * A handler for {@link WebSocketFrame} instances.
@@ -270,14 +266,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Set<? extends WebSocketSession> getOpenSessions() {
-                return requiredWebSocketSessionRepository.getChannelGroup().stream()
-                        .flatMap((Function<Channel, Stream<WebSocketSession>>) ch -> {
-                            NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
-                            if (s != null && s.isOpen()) {
-                                return Stream.of(s);
-                            }
-                            return Stream.empty();
-                        }).collect(Collectors.toSet());
+                // the group only holds websocket channels, one attribute read each is all it takes
+                Set<WebSocketSession> open = new HashSet<>();
+                for (Channel ch : requiredWebSocketSessionRepository.getChannelGroup()) {
+                    NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+                    if (s != null && s.isOpen()) {
+                        open.add(s);
+                    }
+                }
+                return open;
             }
 
             @Override
@@ -301,46 +298,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         requiredWebSocketSessionRepository.addChannel(channel);
 
         return session;
-    }
-
-    @Override
-    protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, @Nullable Object result) {
-        Publisher<?> actual = Publishers.convertToPublisher(conversionService, result);
-        Publisher<?> traced = (Publisher<Object>) subscriber -> ServerRequestContext.with(originatingRequest,
-                                                                                          () -> actual.subscribe(new Subscriber<Object>() {
-              @Override
-              public void onSubscribe(Subscription s) {
-                  ServerRequestContext.with(
-                          originatingRequest,
-                          () -> subscriber.onSubscribe(
-                                  s));
-              }
-
-              @Override
-              public void onNext(Object object) {
-                  ServerRequestContext.with(
-                          originatingRequest,
-                          () -> subscriber.onNext(
-                                  object));
-              }
-
-              @Override
-              public void onError(Throwable t) {
-                  ServerRequestContext.with(
-                          originatingRequest,
-                          () -> subscriber.onError(
-                                  t));
-              }
-
-              @Override
-              public void onComplete() {
-                  ServerRequestContext.with(
-                          originatingRequest,
-                          subscriber::onComplete);
-              }
-          }));
-
-        return Flux.from(traced).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
 
     @Override
@@ -375,11 +332,17 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         Executor executor = executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
         ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
-        return ExecutionFlow.async(executor, () -> {
+        return ExecutionFlow.<Object>async(executor, () -> {
             Object result = invokeWithContext(boundExecutable, messageHandler).get();
             if (returnType.isReactive() || Publishers.isConvertibleToPublisher(result)) {
-                return ReactiveExecutionFlow.fromPublisher(Publishers.convertToPublisher(conversionService, result))
-                    .putInContext(ServerRequestContext.KEY, originatingRequest);
+                Publisher<Object> converted = Publishers.convertToPublisher(conversionService, result);
+                // scalar results (Mono.just, Mono.empty, Mono.error) need no reactor context
+                Publisher<Object> publisher = converted instanceof Fuseable.ScalarCallable<?>
+                    ? converted
+                    : Flux.from(converted).contextWrite(Context.of(ServerRequestContext.KEY, originatingRequest));
+                // subscribe eagerly so that synchronous results complete inline
+                return ServerRequestContext.with(originatingRequest,
+                    (Supplier<ExecutionFlow<Object>>) () -> ReactiveExecutionFlow.fromPublisherEager(publisher, PropagatedContext.getOrEmpty()));
             }
             if (returnType.isAsync()) {
                 CompletionStage<Object> future = result instanceof CompletionStage<?> stage

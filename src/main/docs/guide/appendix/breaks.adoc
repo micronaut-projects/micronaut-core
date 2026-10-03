@@ -1,6 +1,58 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Refreshing the Logback configuration follows Logback's own lookup (5.3)
+
+When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
+
+* `logback-test.xml` takes precedence over `logback.xml`, and startup no longer fails when there is no `logback.xml`: Logback falls back to its basic console configuration.
+* `Configurator` services run by rank. A `Configurator` that returns `NEUTRAL` or `INVOKE_NEXT_IF_ANY` is followed by the XML configuration file. A `Configurator` that must replace the XML configuration should return `DO_NOT_INVOKE_NEXT_IF_ANY`.
+* The lookup uses the class loader that loaded Logback, as at Logback's startup, and no longer the one that loaded the Micronaut framework. That applies to the `Configurator` services, to `logback-test.xml` and `logback.xml`, and to a `logback.configurationFile` JVM system property that names a classpath resource.
+* Logback resolves the `logback.configurationFile` JVM system property: as a URL, then on the classpath, then on the file system. Previously it was looked up on the classpath and then on the file system, so a URL such as `file:/etc/app/logback.xml` failed the startup, and now it works. When the value is not a URL and no such file exists, or it is a directory, startup no longer fails: Logback falls back to `logback-test.xml`, `logback.xml` or its basic console configuration, and it does not use `logger.config`.
+* When Logback cannot read or parse the file it finds, be it the one set with the `logback.configurationFile` JVM system property, or `logback-test.xml` or `logback.xml` on the classpath, startup no longer fails with a `LoggingSystemException`: Logback reports the error the way it does at startup.
+
+A `logback.xml` file in the working directory is still used when nothing else selects a configuration, that is, when there is no `Configurator` service, the `logback.configurationFile` JVM system property is not set, and neither `logback-test.xml` nor `logback.xml` is on the classpath. Previously that file was also used when only `logback-test.xml` was on the classpath, and now `logback-test.xml` takes precedence over it. The framework reads that file itself, so startup still fails with a `LoggingSystemException` when it cannot be parsed, unlike for the files that Logback finds.
+
+A file set with `logger.config`, or with `logback.configurationFile` in Micronaut configuration unless its value is exactly that of the JVM system property of the same name, now takes precedence over any `Configurator` service, and startup still fails when it does not exist or cannot be parsed. The logging system of the loggers management endpoint now honors `logback.configurationFile` as well.
+
+That logging system, `io.micronaut.management.endpoint.loggers.impl.LogbackLoggingSystem`, is created by the Micronaut framework when the loggers endpoint is enabled. Its public constructor, which reads only `logger.config`, is deprecated for removal, and with `null` it no longer defaults to `logback.xml`: the refresh then configures Logback the way Logback configures itself at startup. Do not construct the class: obtain the bean from the application context, for example by injecting `LoggingSystem` or `ManagedLoggingSystem`, or replace it with a bean of your own that implements both, annotated with `@Replaces(LogbackLoggingSystem.class)`, rather than extending it.
+
+=== Construct advice no longer wraps injection and `@PostConstruct` (5.3)
+
+A api:aop.ConstructorInterceptor[] now wraps only the constructor call. Fields and methods of the bean are injected, and
+its `@PostConstruct` methods run, after every construct interceptor has returned, instead of inside the call to
+`proceed()`. As a result `@PostConstruct` no longer runs before an outer construct interceptor has completed, nor when
+one throws after `proceed()`.
+
+A construct interceptor that used the injected state of the instance returned by `proceed()` should bind to
+`InterceptorKind.POST_CONSTRUCT` instead, where the bean is injected. See <<lifecycleAdvice, Bean Life Cycle Advice>>.
+Beans compiled with an earlier version keep the previous order until they are recompiled.
+
+=== A filter method that changes the URI of its `MutableHttpRequest` parameter changes the request (5.3)
+
+A request filter method without a continuation can declare a api:http.MutableHttpRequest[] parameter. The server request itself cannot be changed, so the method receives a mutable copy of it: headers changed on the copy are applied to the request, but everything else only changes the copy.
+
+Previously, changing the URI of that copy, e.g. `request.uri(URI.create("/v2/items"))` in a `void` filter method, had no effect unless the method returned the copy.
+
+Since Micronaut 5.3, when the method changes the URI of the copy and returns nothing, the rest of the chain continues with the copy:
+
+* the filters after it and the route see the new URI;
+* for a api:http.server.annotation.PreMatching[] filter, the route is matched with the new URI;
+* the body is still read from the original request;
+* for a filter that returns a `Publisher` or `CompletionStage`, the URI is checked when that result completes.
+
+Changes to the query parameters or the body of the copy are still only kept when the method returns the copy.
+
+If an earlier filter continued with a request that cannot be copied this way, for example an `HttpRequestWrapper`, the parameter is now a mutable wrapper of that request. Previously the method failed with an `UnsupportedOperationException`.
+
+=== A reflectively dispatched executable method propagates the method's exception
+
+An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.
+
+A reflectively dispatched method now propagates the method's exception unchanged, checked exceptions included, just as a directly dispatched method does. The same applies to an interceptor that invokes one of its own private executable methods, and to a private `@PostConstruct` or `@PreDestroy` callback of an intercepted bean. An `InvocationException` is still thrown when the reflective call itself fails before the method runs, for example on illegal access. Bean introspections are not affected: a private property accessor dispatched through reflection still wraps what it threw in an `InvocationException`.
+
+Code that caught `InvocationException` to unwrap the cause should catch the method's exception instead. Ordinary executable method dispatch changes for classes compiled with Micronaut 5.2.1 or later: bean definitions compiled with an earlier version keep the previous behavior until they are recompiled. Intercepted lifecycle callbacks are the exception, because the AOP runtime unwraps the exception itself: an interceptor of a private `@PostConstruct` or `@PreDestroy` callback sees the callback's exception, checked exceptions included, even when the bean definition was compiled with an earlier version.
+
 === HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
 
 The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
@@ -55,7 +107,7 @@ The Micronaut APIs use https://jspecify.dev[JSpecify] annotations, and we recomm
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.
 
-There are new options added to api:context.ApplicationContextBuilder[ApplicationContextBuilder] which allow to modify the behavior of the bean context without overring it:
+There are new options added to api:context.ApplicationContextBuilder[ApplicationContextBuilder] which allow modifying the behavior of the bean context without overriding it:
 
 [source,java]
 ----

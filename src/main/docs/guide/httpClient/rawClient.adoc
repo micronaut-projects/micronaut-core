@@ -1,0 +1,15 @@
+The api:http.client.RawHttpClient[] and its asynchronous form api:http.client.AsyncRawHttpClient[] exchange requests and responses as raw bytes: the request body is a api:http.body.CloseableByteBody[] that the client sends as it is, and the response body is handed back unread. A gateway uses them to relay requests to backends.
+
+Each exchange can take api:http.client.RawRequestOptions[], starting from `RawRequestOptions.getDefault()` or `RawRequestOptions.proxy()`. Two of them help a gateway:
+
+* `readIdleTimeout` replaces the read timeout of the client for one exchange: the exchange fails when no response bytes arrive for that long. It can be longer as well as shorter than the `read-timeout` of the client, e.g. for long polls or server-sent events that go quiet for minutes. `null`, the default, keeps the read timeout of the client.
+* `returnUnsentBody` hands the request body back when the exchange fails before any connection was opened or acquired, i.e. the body was never read. The exchange fails with an api:http.client.exceptions.UnprocessedRequestException[] whose `takeUnsentBody()` returns the body, so it can be sent to another server. Whoever takes the body owns it and must send or close it. A request that was redirected does not hand its body back: it was sent to the server that redirected it. Only the asynchronous raw client of the Netty client hands a body back; it is closed otherwise.
+
+The following example sends a request to a primary server and, if no connection to it could be opened, sends the same body to a fallback server:
+
+snippet::io.micronaut.docs.http.client.raw.RawRetry[tags="imports,class", indent=0, title="Retrying a raw exchange with the unsent body"]
+
+<1> The exchange waits up to five minutes for response bytes, whatever the read timeout of the client
+<2> A body that was never sent is handed back instead of being closed
+<3> Take the body from the exception; it is empty if the body was read or taken already
+<4> Send the body to the fallback server, which now owns it

@@ -1,0 +1,12 @@
+// Reports reflection in the main Java sources with the NoReflection check of
+// https://github.com/micronaut-projects/errorprone-no-reflection, failing the compilation on any reflection outside
+// what the module allows in its build file:
+//
+//   noReflection {
+//       allowIn("io.micronaut.core.util.Example", "CLASS_NAMES")   // the categories allowed in a class and its nested classes
+//       allowIn("io.micronaut.example.*")                          // any reflection, in a package and the packages below it
+//   }
+plugins {
+    id "io.micronaut.build.internal.convention-nullaway"
+    id "io.micronaut.errorprone.no-reflection"
+}

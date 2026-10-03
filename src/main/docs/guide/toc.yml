@@ -127,6 +127,7 @@ httpServer:
   clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
+  contentDispositionAnnotation: Response Content-Disposition
   producesAnnotation: Response Content-Type
   consumesAnnotation: Accepted Request Content-Type
   reactiveServer:
@@ -192,6 +193,8 @@ httpServer:
     title: Advanced body access
     byteBodyPrimary: Primary operations
     byteBodySplitting: Splitting
+    byteBodyTrailers: Trailers
+    byteBodyLimitReplay: Limiting and replaying
     byteBodyExample: Example
   sessions: HTTP Sessions
   sse: Server Sent Events
@@ -202,6 +205,7 @@ httpServer:
   http2Server: HTTP/2 Support
   http3Server: HTTP/3 Support
   serverEvents: Server Events
+  trainingRun: Training Runs
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools:
@@ -252,6 +256,7 @@ httpClient:
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
   proxyClient: Proxying Requests with ProxyHttpClient
+  rawClient: Raw Exchanges with RawHttpClient
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
@@ -345,9 +350,22 @@ languageSupport:
     title: Micronaut for Python
     pythonRuntime: Runtime Requirements
     pythonThreading: Python Threading
+    decorators: Annotations as Decorators
+    sourceRoots: Main and Test Sources
     typeOrdering: Type Ordering and Forward References
+    interfaces: Interfaces and Introduction Advice
     standardTypes: Standard Library Type Conversions
+    javaCollections: Java Collections and Serialization
+    runtimeTypes: Python Classes and Objects at Run Time
+    javaImports: Importing Java Types
     keywords: Python Keywords in Java APIs
+    nestedTypes: Nested Java Types
+    pythonExceptions: Python Exceptions Extending Java Exceptions
+    functionalInterfaces: Python Callables as Functional Interfaces
+    javaInterfaces: Implementing Java Interfaces
+    generatedClasses: Generated Java Classes
+    aopProxies: AOP Proxies
+    extendingJavaClasses: Extending Java Classes
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests
@@ -356,6 +374,7 @@ languageSupport:
       title: Async/Await
       asyncioRuntime: Netty-Backed Asyncio Runtime
       asyncioNetworking: Asyncio Networking and TLS
+      asyncioStreaming: Python-Native Streaming
       asyncioUnsupported: Unsupported Asyncio APIs
   kotlin:
     title: Micronaut for Kotlin

@@ -45,10 +45,14 @@ import java.io.OutputStream;
 @BootstrapContextCompatible
 @Internal
 final class ByteArrayBodyHandler implements TypedMessageBodyHandler<byte[]>, ChunkedMessageBodyReader<byte[]> {
+    /**
+     * The type this handler is for, resolved once: isWriteable asks for it on every response.
+     */
+    private static final Argument<byte[]> TYPE = Argument.of(byte[].class);
 
     @Override
     public Argument<byte[]> getType() {
-        return Argument.of(byte[].class);
+        return TYPE;
     }
 
     @Override

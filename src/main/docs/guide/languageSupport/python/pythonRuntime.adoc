@@ -4,12 +4,12 @@ The difference is large: a bridge call from a generated Java stub into Python co
 
 == Choosing a JDK
 
-The GraalPy version is `{graalpyVersion}`. Use a GraalVM JDK from the matching GraalVM release line, for example GraalVM 25.2.x for GraalPy 25.2.x. The JDK's build string then contains the same Truffle line, such as `25.0.4+7-jvmci-25.2-b20`.
+The GraalPy version is `{graalpyVersion}`. Use a GraalVM JDK from the matching GraalVM release line, for example GraalVM 25.4.x for GraalPy 25.4.x. The JDK's build string then contains the same Truffle line, such as `25.0.4.1.1+1-LTS-jvmci-25.4-b23`.
 
 The following JVMs run Python interpreted, even though some of them are GraalVM builds:
 
 * A stock OpenJDK or Oracle JDK.
-* A GraalVM JDK from a different release line, for example GraalVM for JDK 25.0.x with GraalPy 25.2.x. The bundled compiler rejects the mismatched Truffle runtime and Truffle falls back to the interpreter.
+* A GraalVM JDK from a different release line, for example GraalVM for JDK 25.0.x with GraalPy 25.4.x. The bundled compiler rejects the mismatched Truffle runtime and Truffle falls back to the interpreter.
 
 == Detecting the fallback runtime
 

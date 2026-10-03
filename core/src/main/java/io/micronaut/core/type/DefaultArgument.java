@@ -289,7 +289,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
             return false;
         }
         return Objects.equals(type, o.getType()) &&
-            Objects.equals(typeParameters, o.getTypeVariables());
+            equalsTypeVariables(typeParameters, o.getTypeVariables());
     }
 
     @Override
@@ -301,14 +301,44 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
             return false;
         }
         DefaultArgument<?> that = (DefaultArgument<?>) o;
-        return Objects.equals(type, that.type) &&
+        // A wildcard only equals a wildcard with the same bounds, so a plain argument must not equal one either
+        return (this instanceof WildcardArgument<?>) == (that instanceof WildcardArgument<?>) &&
+            Objects.equals(type, that.type) &&
             Objects.equals(getName(), that.getName()) &&
             Objects.equals(typeParameters, that.typeParameters);
     }
 
     @Override
     public int typeHashCode() {
-        return ObjectUtils.hash(type, typeParameters);
+        // Summed the way Map.hashCode sums its entries, but over the type hash codes, to agree with equalsType
+        int typeParametersHash = 0;
+        for (Map.Entry<String, Argument<?>> entry : typeParameters.entrySet()) {
+            typeParametersHash += entry.getKey().hashCode() ^ entry.getValue().typeHashCode();
+        }
+        return 31 * (31 + Objects.hashCode(type)) + typeParametersHash;
+    }
+
+    /**
+     * Compares type variables by their types at every depth, so that a type argument compiled to a
+     * {@link WildcardArgument} has the same type as a plain argument of the type the wildcard is bounded by, as
+     * it had before the bounds were kept: {@code Map<String, ? extends Object>}, which is what a Kotlin
+     * {@code Map<String, Any>} compiles to, has the type of {@code Map<String, Object>}.
+     *
+     * @param typeParameters The type variables of this argument
+     * @param other          The type variables of the other argument
+     * @return Whether they have the same types
+     */
+    private static boolean equalsTypeVariables(Map<String, Argument<?>> typeParameters, Map<String, Argument<?>> other) {
+        if (typeParameters.size() != other.size()) {
+            return false;
+        }
+        for (Map.Entry<String, Argument<?>> entry : typeParameters.entrySet()) {
+            Argument<?> otherTypeParameter = other.get(entry.getKey());
+            if (otherTypeParameter == null || !entry.getValue().equalsType(otherTypeParameter)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

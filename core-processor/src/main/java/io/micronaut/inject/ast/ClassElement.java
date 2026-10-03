@@ -68,7 +68,9 @@ public interface ClassElement extends TypedElement {
     ClassElement[] ZERO_CLASS_ELEMENTS = new ClassElement[0];
 
     /**
-     * Returns the type annotations.
+     * Returns the type annotations. For an array use, these belong to the current array dimension;
+     * use {@link #fromArray()} to read the annotations of its component. They may differ from
+     * {@link #getAnnotationMetadata()}, which retains language-specific legacy conventions for injection.
      * Added by:
      * - The declaration of the type variable {@link java.lang.annotation.ElementType#TYPE_PARAMETER}
      * - The use of the type {@link java.lang.annotation.ElementType#TYPE}
@@ -699,6 +701,10 @@ public interface ClassElement extends TypedElement {
      * Builds a map of all the type parameters for a class, its super classes and interfaces.
      * The resulting map contains the name of the class to the map of the resolved generic types.
      *
+     * <p>The arguments of every super type are expressed in the type arguments of this class: a {@code Reversed}
+     * that extends {@code HashMap} with its own two variables swapped answers with those two variables, in that
+     * swapped order, for {@code HashMap} and for {@code Map} alike.</p>
+     *
      * @return The type arguments for this class element
      */
     default Map<String, Map<String, ClassElement>> getAllTypeArguments() {
@@ -706,7 +712,16 @@ public interface ClassElement extends TypedElement {
         Stream.concat(
                 getInterfaces().stream(),
                 getSuperType().stream()
-        ).map(ClassElement::getAllTypeArguments).forEach(result::putAll);
+        ).forEach(superType -> {
+            // The arguments of a direct super type are written in this type's variables, while those of the
+            // types above it are written in the variables of the super type, which this type binds
+            Map<String, ClassElement> superTypeArguments = superType.getTypeArguments();
+            String superTypeName = superType.getName();
+            superType.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
+                typeName,
+                typeName.equals(superTypeName) ? typeArguments : TypeVariableBinder.bind(typeArguments, superTypeArguments)
+            ));
+        });
         result.put(getName(), getTypeArguments());
         return result;
     }

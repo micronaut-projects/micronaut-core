@@ -16,6 +16,7 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
+import io.micronaut.inject.utils.JsonWriter;
 import org.jspecify.annotations.NullUnmarked;
 
 import java.io.IOException;
@@ -73,15 +74,24 @@ public class ConfigurationMetadata implements Writable {
 
     @Override
     public void writeTo(Writer out) throws IOException {
-        out.write('{');
-        ConfigurationMetadataBuilder.writeAttribute(out, "name", name);
-        out.write(',');
-        ConfigurationMetadataBuilder.writeAttribute(out, "type", type);
+        JsonWriter json = new JsonWriter();
+        writeTo(json);
+        json.writeTo(out);
+    }
+
+    /**
+     * Writes the configuration as a JSON object.
+     *
+     * @param json The writer
+     */
+    public void writeTo(JsonWriter json) {
+        json.beginObject()
+            .name("name").value(name)
+            .name("type").value(type);
         if (description != null) {
-            out.write(',');
-            ConfigurationMetadataBuilder.writeAttribute(out, "description", description);
+            json.name("description").value(description);
         }
-        out.write('}');
+        json.endObject();
     }
 
     @Override

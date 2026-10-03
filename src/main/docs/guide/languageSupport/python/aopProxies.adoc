@@ -1,0 +1,63 @@
+Python beans support <<aop, AOP advice>> the same way Java beans do: around advice such as validation, caching, retry or tracing, introduction advice and life-cycle advice. Where a Java bean is proxied by a compile-time subclass, a Python bean is proxied by a runtime proxy that delegates to the Python object, and the following rules keep the semantics the same.
+
+=== Implicit validation advice
+
+A Java bean with constrained members is validated without declaring `@Validated`: a `jakarta.validation` constraint or `@Valid` on a parameter or on the return value of a method is enough for the method to be intercepted. The same applies to Python beans:
+
+[source,python]
+----
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from jakarta.validation import Valid
+from jakarta.validation.constraints import NotBlank
+
+from .Person import Person
+
+
+@Singleton
+class PersonService:
+    def say_hello(self, name: Annotated[str, NotBlank]) -> str:  # <1>
+        return f"Hello {name}"
+
+    def greet(self, person: Annotated[Person, Valid]) -> str:  # <2>
+        return f"Hello {person.name}"
+----
+
+<1> A constrained parameter makes the method validated; the bean is proxied and both Java and Python callers get a `ConstraintViolationException` for a blank name
+<2> `@Valid` cascades into the properties of an `@Introspected` dataclass
+
+Constrained constructor parameters are validated when the bean is created, and configuration properties are validated after the bean is constructed, again as for Java beans.
+
+=== Calls through `self`
+
+In a Java bean the proxy is a subclass of the bean, so `this` is the proxy and `this.greet(...)` from another method of the bean runs the interceptors of `greet`. A Python bean is a plain object behind its proxy; to give `self.greet(...)` the same behaviour, the runtime installs an attribute per intercepted method on the Python object when the proxy first resolves it. The attribute dispatches through the proxy, so the interceptor chain runs for the nested call, while `self` stays the bean object: its attributes, its identity and `type(self)` are unchanged.
+
+[source,python]
+----
+from jakarta.inject import Singleton
+from micronaut.tracing.annotation import ContinueSpan, NewSpan
+
+
+@Singleton
+class HelloService:
+
+    @NewSpan("hello-world")
+    def hello(self, name: str) -> str:
+        return self.greet("Hello " + name)  # <1>
+
+    @ContinueSpan
+    def greet(self, greeting: str) -> str:
+        return greeting
+----
+
+<1> The `@ContinueSpan` interceptor of `greet` runs for the nested call
+
+The rules for what is dispatched through the proxy are:
+
+* Only intercepted methods are affected. A method without advice called through `self` is a direct Python call, as before.
+* The interceptor chain runs on the object that made the call: a bean of a scope that hands out several objects (`@Prototype`, `@ThreadLocal`, a refreshable bean) keeps the state the calling method set.
+* Keyword arguments and omitted defaulted arguments are supported: `self.format(value, suffix="!")` reaches the interceptors of `format` with the arguments laid out the way the method declares them.
+* A method declaring `*args` or `**kwargs` has no fixed argument layout, and a keyword-only parameter (one after a bare `*`) has no parameter on the generated Java method, so such methods keep direct `self` calls: only calls through the proxy are intercepted.
+* An intercepted `async def` method called through `self` returns an awaitable, as it does when called on the proxy. The interceptors see a `CompletionStage`, as they do for a Java bean, and the caller awaits the result. The method body runs as a task of its own: changes it makes to `contextvars` do not reach the caller, and cancelling the caller cancels the nested call only when the interceptors hand back the stage of the method.
+* The bean object must have a `__dict__`; a class that declares `__slots__` keeps direct `self` calls. The attributes are visible in `vars(self)` and are not part of the state of the bean: a copy of the bean object keeps dispatching to the original.

@@ -35,9 +35,11 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
+import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
+import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -473,6 +475,11 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public AsyncRawHttpClient toAsyncRaw() {
+        return nettyHttpClient.toAsyncRaw();
+    }
+
+    @Override
     public Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request) {
         return nettyHttpClient.proxy(request);
     }
@@ -487,6 +494,11 @@ public class DefaultHttpClient implements
         return nettyHttpClient.exchange(parentRequest, body, originatingThread);
     }
 
+    @Override
+    public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody body, @Nullable Thread originatingThread, RawRequestOptions options) {
+        return nettyHttpClient.exchange(request, body, originatingThread, options);
+    }
+
     /**
      * @param request The request
      * @param <I>     The input type
@@ -495,7 +507,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request) {
-        return nettyHttpClient.resolveRequestURI(request);
+        return nettyHttpClient.resolveRequestURI(request).map(NettyHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**
@@ -507,7 +519,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request, boolean includeContextPath) {
-        return nettyHttpClient.resolveRequestURI(request, includeContextPath);
+        return nettyHttpClient.resolveRequestURI(request, includeContextPath).map(NettyHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**
@@ -519,7 +531,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRedirectURI(HttpRequest<?> parentRequest, HttpRequest<I> request) {
-        return nettyHttpClient.resolveRedirectURI(parentRequest, request);
+        return nettyHttpClient.resolveRedirectURI(parentRequest, request).map(NettyHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**

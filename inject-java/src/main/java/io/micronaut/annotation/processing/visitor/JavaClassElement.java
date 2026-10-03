@@ -121,6 +121,8 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     private final JavaEnclosedElementsQuery sourceEnclosedElementsQuery = new JavaEnclosedElementsQuery(true);
     @Nullable
     private ElementAnnotationMetadata elementTypeAnnotationMetadata;
+    // Innermost dimension first. These describe type uses, not the legacy injection metadata.
+    private List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> arrayTypeAnnotations = List.of();
     @Nullable
     private ClassElement theType;
     @Nullable
@@ -284,12 +286,12 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
     @Override
     protected JavaClassElement copyThis() {
-        return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions);
+        return copyArrayTypeAnnotations(new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions));
     }
 
     @Override
     public ClassElement withTypeArguments(Map<String, ClassElement> newTypeArguments) {
-        return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, newTypeArguments, arrayDimensions);
+        return copyArrayTypeAnnotations(new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, newTypeArguments, arrayDimensions));
     }
 
     @Override
@@ -314,10 +316,16 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             if (getNativeType().typeMirror() == null) {
                 annotationMetadata = super.getAnnotationMetadata();
             } else {
-                annotationMetadata = new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());
+                annotationMetadata = new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(),
+                    getNullabilityAnnotationMetadata());
             }
         }
         return annotationMetadata;
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<AnnotationMetadata> getNullabilityAnnotationMetadata() {
+        return isArray() ? elementAnnotationMetadataFactory.buildTypeAnnotations(this) : getTypeAnnotationMetadata();
     }
 
     @Override
@@ -327,10 +335,26 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        if (isArray() && !arrayTypeAnnotations.isEmpty()) {
+            return arrayDimensions <= arrayTypeAnnotations.size()
+                ? arrayTypeAnnotations.get(arrayDimensions - 1)
+                : ArrayableClassElement.super.getTypeAnnotationMetadata();
+        }
         if (elementTypeAnnotationMetadata == null) {
             elementTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildTypeAnnotations(this);
         }
         return elementTypeAnnotationMetadata;
+    }
+
+    final JavaClassElement withArrayTypeAnnotations(List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> annotations) {
+        JavaClassElement copy = (JavaClassElement) makeCopy();
+        copy.arrayTypeAnnotations = List.copyOf(annotations);
+        return copy;
+    }
+
+    protected final <T extends JavaClassElement> T copyArrayTypeAnnotations(T copy) {
+        ((JavaClassElement) copy).arrayTypeAnnotations = arrayTypeAnnotations;
+        return copy;
     }
 
     @Override
@@ -542,12 +566,44 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             methodElements.add(
                 new JavaMethodElement(
                     JavaClassElement.this,
-                    new JavaNativeElement.Method(recordComponent.getAccessor()),
+                    new JavaNativeElement.Method(resolveRecordAccessor(recordComponent)),
                     elementAnnotationMetadataFactory,
                     visitorContext)
             );
         }
         return methodElements;
+    }
+
+    /**
+     * Resolves the accessor declared for a record component.
+     * <p>
+     * When a record implements an interface that declares the accessor with a supertype
+     * return type, javac emits a synthetic bridge method next to the real accessor. For a
+     * record read from a class file javac resolves {@link RecordComponentElement#getAccessor()}
+     * by name only and can hand back that bridge, whose return type is the interface's type
+     * rather than the component's. The declaration whose return type matches the component
+     * is the accessor the record declares.
+     *
+     * @param recordComponent The record component
+     * @return The accessor returning the component type
+     */
+    private ExecutableElement resolveRecordAccessor(RecordComponentElement recordComponent) {
+        ExecutableElement accessor = recordComponent.getAccessor();
+        Types types = visitorContext.getTypes();
+        TypeMirror componentType = recordComponent.asType();
+        if (types.isSameType(accessor.getReturnType(), componentType)) {
+            return accessor;
+        }
+        for (Element enclosedElement : classElement.getEnclosedElements()) {
+            if (enclosedElement.getKind() == ElementKind.METHOD
+                && enclosedElement instanceof ExecutableElement candidate
+                && candidate.getParameters().isEmpty()
+                && candidate.getSimpleName().contentEquals(recordComponent.getSimpleName())
+                && types.isSameType(candidate.getReturnType(), componentType)) {
+                return candidate;
+            }
+        }
+        return accessor;
     }
 
     private List<FieldElement> getRecordFields() {
@@ -604,10 +660,10 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             return this;
         }
         JavaNativeElement.Class nativeType = getNativeType();
-        if (this.arrayDimensions - 1 == arrayDimensions  && nativeType.typeMirror() instanceof ArrayType array) {
+        for (int i = this.arrayDimensions; i > arrayDimensions && nativeType.typeMirror() instanceof ArrayType array; i--) {
             nativeType = new JavaNativeElement.Class(nativeType.element(), array.getComponentType(), nativeType.owner());
         }
-        return new JavaClassElement(nativeType, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
+        return copyArrayTypeAnnotations(new JavaClassElement(nativeType, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc));
     }
 
     @Override

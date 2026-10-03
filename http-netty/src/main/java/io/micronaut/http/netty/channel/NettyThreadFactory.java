@@ -122,6 +122,11 @@ public class NettyThreadFactory {
      */
     @Internal
     public static final class EventLoopCustomizableThreadFactory implements ThreadFactory {
+        /**
+         * The thread pool name used when no event loop group name is given.
+         */
+        public static final String DEFAULT_POOL_NAME = "default-eventLoopGroup";
+
         private final boolean daemon;
         private final int priority;
         private final boolean nonBlocking;
@@ -135,7 +140,19 @@ public class NettyThreadFactory {
         }
 
         public ThreadFactory customizeForEventLoop() {
-            return new CustomizedThreadFactory(daemon, priority, nonBlocking);
+            return customizeForEventLoop(DEFAULT_POOL_NAME);
+        }
+
+        /**
+         * Create a thread factory for a single event loop group, using the given thread pool name
+         * so that its threads can be told apart from those of other event loop groups.
+         *
+         * @param poolName The thread pool name
+         * @return The thread factory for the event loop group
+         * @since 5.2.0
+         */
+        public ThreadFactory customizeForEventLoop(String poolName) {
+            return new CustomizedThreadFactory(poolName, daemon, priority, nonBlocking);
         }
 
         @Override
@@ -147,8 +164,8 @@ public class NettyThreadFactory {
     private static final class CustomizedThreadFactory extends DefaultThreadFactory {
         private final boolean nonBlocking;
 
-        public CustomizedThreadFactory(boolean daemon, int priority, boolean nonBlocking) {
-            super("default-eventLoopGroup", daemon, priority);
+        public CustomizedThreadFactory(String poolName, boolean daemon, int priority, boolean nonBlocking) {
+            super(poolName, daemon, priority);
             this.nonBlocking = nonBlocking;
         }
 

@@ -38,6 +38,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.visitor.util.VisitorContextUtils;
 import io.micronaut.inject.writer.GeneratedFile;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
@@ -187,6 +188,21 @@ public final class PythonVisitorContext implements VisitorContext {
         } else {
             System.out.println("WARN: " + message);
         }
+    }
+
+    /**
+     * The options of the compilation: the {@code -A} annotation processor options of the javac invocation the
+     * Python compiler drives, merged with the {@code micronaut.*} system properties, exactly as the Java visitor
+     * context reports them. Without a Java visitor context only the system properties are available.
+     *
+     * @return The options whose names start with {@link #MICRONAUT_BASE_OPTION_NAME}
+     */
+    @Override
+    public Map<String, String> getOptions() {
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.getOptions();
+        }
+        return VisitorContextUtils.getSystemOptions();
     }
 
     @Override

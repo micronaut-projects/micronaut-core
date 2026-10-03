@@ -1010,25 +1010,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
-        if (repeatableTypeName == null) {
-            return List.of();
-        }
-        List<AnnotationValue<T>> results = resolveRepeatableAnnotations(repeatableTypeName, allAnnotations, allStereotypes);
-        if (results != null) {
-            return results;
-        }
-        if (allAnnotations != null) {
-            final Map<CharSequence, Object> values = allAnnotations.get(annotationType);
-            if (values != null) {
-                results = List.of(newAnnotationValue(annotationType, values));
-            }
-        }
-        if (results == null) {
-            results = List.of();
-        }
-        annotationValuesByType.put(annotationType, results);
-        return results;
+        return resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
@@ -1052,10 +1034,34 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
+        return resolveAnnotationValuesByName(annotationType, declaredAnnotations, declaredStereotypes);
+    }
+
+    /**
+     * The values of an annotation looked up by name: the occurrences of a repeatable annotation, read from its
+     * container, or the single value of a non-repeatable one.
+     *
+     * @param annotationType    The annotation type name
+     * @param sourceAnnotations The annotations to read, either all of them or only the declared ones
+     * @param sourceStereotypes The stereotypes the container of a repeatable annotation may be among
+     * @param <T>               The annotation type
+     * @return The values, empty when the annotation is not present
+     */
+    private <T extends Annotation> List<AnnotationValue<T>> resolveAnnotationValuesByName(String annotationType,
+                                                                                          @Nullable Map<String, Map<CharSequence, Object>> sourceAnnotations,
+                                                                                          @Nullable Map<String, Map<CharSequence, Object>> sourceStereotypes) {
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
-        List<AnnotationValue<T>> results = resolveRepeatableAnnotations(repeatableTypeName, declaredAnnotations, declaredStereotypes);
-        if (results != null) {
-            return results;
+        if (repeatableTypeName != null) {
+            List<AnnotationValue<T>> results = resolveRepeatableAnnotations(repeatableTypeName, sourceAnnotations, sourceStereotypes);
+            if (results != null) {
+                return results;
+            }
+        }
+        if (sourceAnnotations != null) {
+            Map<CharSequence, Object> values = sourceAnnotations.get(annotationType);
+            if (values != null) {
+                return List.of(newAnnotationValue(annotationType, values));
+            }
         }
         return List.of();
     }
@@ -1308,6 +1314,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (values != null) {
                 return Optional.of(newAnnotationValue(annotation, values));
             }
+        }
+        if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+            return Optional.empty();
         }
         return firstRepeatedValue(getAnnotationValuesByName(annotation));
     }
@@ -1606,7 +1615,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
         // a repeatable is stored under its container, so read the member off the first repeated value,
-        // which is the one the Class overloads answer with
+        // which is the one the Class overloads answer with; a miss on any other annotation ends here
+        if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+            return null;
+        }
         List<AnnotationValue<Annotation>> repeated = getAnnotationValuesByName(annotation);
         if (repeated.isEmpty()) {
             return null;

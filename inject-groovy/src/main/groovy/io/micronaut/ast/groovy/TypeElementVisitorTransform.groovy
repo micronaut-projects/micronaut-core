@@ -35,11 +35,13 @@ import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.CompileUnit
 import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
+import org.codehaus.groovy.control.Phases
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
@@ -53,7 +55,8 @@ import java.lang.reflect.Modifier
  * @since 1.0
  */
 @CompileStatic
-// IMPORTANT NOTE: This transform runs in phase SEMANTIC_ANALYSIS so it runs before InjectTransform
+// IMPORTANT NOTE: This transform is registered for SEMANTIC_ANALYSIS, but the visiting itself happens at the end
+// of CANONICALIZATION, after Groovy's own local transforms of that phase and before InjectTransform (see visit)
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitAware {
 
@@ -62,8 +65,29 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
     protected static ThreadLocal<List<AbstractBeanDefinitionBuilder>> beanDefinitionBuilders = ThreadLocal.withInitial({ -> [] })
     private CompilationUnit compilationUnit
 
+    /**
+     * Groovy runs the global transforms of a phase before the local ones, so a transform invoked here would see a
+     * record before {@code RecordTypeASTTransformation} has made it one, and a {@code @TupleConstructor},
+     * {@code @Canonical} or {@code @Immutable} class before its constructors and methods exist. The visiting is
+     * therefore deferred to a phase operation for CANONICALIZATION: registered from an earlier phase, the compiler
+     * appends it after every operation of that phase, the local transforms included, and it still runs before the
+     * operation {@link InjectTransform} registers from within CANONICALIZATION. The operation is registered once per
+     * compilation unit and processes every source unit of the compilation, the ones queued later included.
+     */
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
+        if (compilationUnit == null) {
+            visitTypes(source)
+            return
+        }
+        CompileUnit ast = compilationUnit.getAST()
+        if (ast.getNodeMetaData(TypeElementVisitorTransform) == null) {
+            ast.putNodeMetaData(TypeElementVisitorTransform, Boolean.TRUE)
+            compilationUnit.addNewPhaseOperation({ SourceUnit sourceUnit -> visitTypes(sourceUnit) } as CompilationUnit.ISourceUnitOperation, Phases.CANONICALIZATION)
+        }
+    }
+
+    private void visitTypes(SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         List<ClassNode> classes = moduleNode.getClasses()
         Map<String, LoadedVisitor> visitors = loadedVisitors.get()

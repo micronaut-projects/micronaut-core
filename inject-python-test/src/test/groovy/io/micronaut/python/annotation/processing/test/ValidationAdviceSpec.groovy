@@ -1,7 +1,7 @@
 package io.micronaut.python.annotation.processing.test
 
-import io.micronaut.aop.writer.RuntimeProxyBeanDefinitionWriter
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 class ValidationAdviceSpec extends AbstractPythonTypeElementSpec {
 
@@ -31,7 +31,7 @@ class StubIntroduction(MethodInterceptor):
 
     void "test only the constrained method of an introduction class is validated"() {
         when:
-        BeanDefinition definition = buildBeanDefinition("python", "MyBean" + RuntimeProxyBeanDefinitionWriter.RUNTIME_PROXY_SUFFIX, STUB + '''
+        BeanDefinition definition = buildBeanDefinition("python", "MyBean" + BeanDefinitionVisitor.PROXY_SUFFIX, STUB + '''
 @Stub
 class MyBean(ABC):
     @abstractmethod
@@ -54,7 +54,7 @@ class MyBean(ABC):
 
     void "test a constrained method inherited from a super class is validated"() {
         when:
-        BeanDefinition definition = buildBeanDefinition("python", "MyBean" + RuntimeProxyBeanDefinitionWriter.RUNTIME_PROXY_SUFFIX, STUB + '''
+        BeanDefinition definition = buildBeanDefinition("python", "MyBean" + BeanDefinitionVisitor.PROXY_SUFFIX, STUB + '''
 class Parent(ABC):
     @abstractmethod
     @Executable

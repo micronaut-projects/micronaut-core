@@ -64,8 +64,6 @@ import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.InstantiationUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import jakarta.annotation.Nonnull;
@@ -78,7 +76,6 @@ import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -92,6 +89,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import static io.micronaut.core.annotation.AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
 import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
@@ -111,7 +109,7 @@ public final class AnnotationMetadataSupport {
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
 
-    private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
+    private static final Map<Class<? extends Annotation>, Function<InvocationHandler, Object>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
 
     /**
@@ -342,7 +340,48 @@ public final class AnnotationMetadataSupport {
      * @return The annotation
      */
     static Optional<Class<? extends Annotation>> getAnnotationType(String name) {
-        return getAnnotationType(name, AnnotationMetadataSupport.class.getClassLoader());
+        // a caller naming no loader is answered for the thread context loader, the loader of the deployment it
+        // runs in, never for the loader of this class: that one sees the application's copy of a type where a
+        // child-first deployment loader defines another
+        final ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+        final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
+        if (type != null) {
+            // the registered type is kept for a context that defines it or sits above the loader defining it,
+            // a thread of the container a deployment runs in; only a context loader apart from it - another
+            // deployment, which may define a copy of its own - resolves the name again
+            if (contextLoader == null || isSelfOrAncestor(contextLoader, type.getClassLoader())) {
+                return Optional.of(type);
+            }
+            return getAnnotationType(name, contextLoader);
+        }
+        final ClassLoader ownLoader = AnnotationMetadataSupport.class.getClassLoader();
+        if (contextLoader != null && contextLoader != ownLoader) {
+            final Optional<Class<? extends Annotation>> fromContext = getAnnotationType(name, contextLoader);
+            if (fromContext.isPresent()) {
+                return fromContext;
+            }
+        }
+        return getAnnotationType(name, ownLoader);
+    }
+
+    /**
+     * Whether a loader is the given one or one of the parents it delegates to.
+     *
+     * @param candidate The loader that may be the given one or one of its parents
+     * @param loader    The loader whose parents are walked, {@code null} for the bootstrap loader
+     * @return True if it is
+     */
+    private static boolean isSelfOrAncestor(ClassLoader candidate, @Nullable ClassLoader loader) {
+        if (loader == null) {
+            // the bootstrap loader defines a type no other loader can shadow
+            return true;
+        }
+        for (ClassLoader current = loader; current != null; current = current.getParent()) {
+            if (current == candidate) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -483,21 +522,28 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * The factory of the proxies of the given annotation type, the loader and the interfaces of the proxy resolved
+     * once per type.
+     *
+     * <p>The instance is created with {@link Proxy#newProxyInstance}, rather than by calling the constructor of the
+     * proxy class, because an annotation type is allowed to be package private: the JDK then defines the proxy
+     * class in the annotation's own package and makes the proxy class package private too, so its constructor is
+     * not accessible from here, while {@link Proxy#newProxyInstance} makes it accessible itself.</p>
+     *
      * @param annotation The annotation
-     * @return The proxy class
+     * @return The proxy factory
      */
-    @SuppressWarnings("unchecked")
-    static Optional<Constructor<InvocationHandler>> getProxyClass(Class<? extends Annotation> annotation) {
+    static Function<InvocationHandler, Object> getProxyFactory(Class<? extends Annotation> annotation) {
         return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
             // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
             // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
             // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
-            ClassLoader annotationLoader = annotation.getClassLoader();
+            ClassLoader annotationLoader = aClass.getClassLoader();
             ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
                 ? AnnotationValueProvider.class.getClassLoader()
                 : annotationLoader;
-            Class proxyClass = Proxy.getProxyClass(proxyLoader, annotation, AnnotationValueProvider.class);
-            return ReflectionUtils.findConstructor(proxyClass, InvocationHandler.class);
+            Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
+            return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
         });
     }
 
@@ -510,25 +556,15 @@ public final class AnnotationMetadataSupport {
      * @return The annotation
      */
     @Internal
+    @SuppressWarnings("unchecked")
     public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
-        Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
-        if (proxyClass.isPresent()) {
-            // the defaults of the annotation type itself, the ones equals completes the members with: a hash
-            // computed from the registry keyed by annotation name could differ from them when another class
-            // loader registered the same name, and two equal annotations would then hash apart
-            Map<CharSequence, Object> values = new HashMap<>(AnnotationDefaults.of(annotationClass));
-            AnnotationValue<T> proxyAnnotationValue = removeInternalAnnotationValues(annotationValue);
-            if (proxyAnnotationValue != null) {
-                proxyAnnotationValue.getValues().forEach((key, o) -> values.put(key.toString(), o));
-            }
-            int hashCode = AnnotationUtil.calculateHashCode(values);
-
-            Optional<?> instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), new AnnotationProxyHandler<>(hashCode, annotationClass, proxyAnnotationValue));
-            if (instantiated.isPresent()) {
-                return (T) instantiated.get();
-            }
+        AnnotationValue<T> proxyAnnotationValue = removeInternalAnnotationValues(annotationValue);
+        try {
+            return (T) getProxyFactory(annotationClass)
+                .apply(new AnnotationProxyHandler<>(annotationClass, proxyAnnotationValue));
+        } catch (Exception e) {
+            throw new AnnotationMetadataException("Failed to build annotation for type: " + annotationClass.getName(), e);
         }
-        throw new AnnotationMetadataException("Failed to build annotation for type: " + annotationClass.getName());
     }
 
     @Nullable
@@ -548,6 +584,25 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * The hash of a member value as {@link Annotation#hashCode()} defines it: the hash of the content of an
+     * array, for a primitive array as for an object one, and the hash of the value otherwise.
+     */
+    private static int memberHashCode(Object value) {
+        return switch (value) {
+            case Object[] members -> Arrays.hashCode(members);
+            case int[] members -> Arrays.hashCode(members);
+            case long[] members -> Arrays.hashCode(members);
+            case boolean[] members -> Arrays.hashCode(members);
+            case byte[] members -> Arrays.hashCode(members);
+            case char[] members -> Arrays.hashCode(members);
+            case short[] members -> Arrays.hashCode(members);
+            case float[] members -> Arrays.hashCode(members);
+            case double[] members -> Arrays.hashCode(members);
+            default -> value.hashCode();
+        };
+    }
+
+    /**
      * An array member of an annotation, comparing by content rather than by identity, so that the maps holding
      * two annotations' members can be compared with {@link Map#equals}.
      */
@@ -560,20 +615,7 @@ public final class AnnotationMetadataSupport {
 
         @Override
         public int hashCode() {
-            // the hash of the content, for a primitive array as for an object one, so that equal members hash
-            // alike and the members of a type do not all fall into one bucket
-            return switch (array) {
-                case Object[] members -> Arrays.deepHashCode(members);
-                case int[] members -> Arrays.hashCode(members);
-                case long[] members -> Arrays.hashCode(members);
-                case boolean[] members -> Arrays.hashCode(members);
-                case byte[] members -> Arrays.hashCode(members);
-                case char[] members -> Arrays.hashCode(members);
-                case short[] members -> Arrays.hashCode(members);
-                case float[] members -> Arrays.hashCode(members);
-                case double[] members -> Arrays.hashCode(members);
-                default -> Objects.hashCode(array);
-            };
+            return memberHashCode(array);
         }
     }
 
@@ -583,20 +625,63 @@ public final class AnnotationMetadataSupport {
      * @param <A> The annotation type
      */
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
-        private final int hashCode;
         private final Class<A> annotationClass;
         @Nullable
         private final AnnotationValue<A> annotationValue;
+        // the hash is computed when first asked for, and kept the way String keeps its own: the two fields are
+        // written without synchronization, which at worst computes the same hash twice
+        private int hashCode;
+        private boolean hashCodeIsZero;
 
-        AnnotationProxyHandler(int hashCode, Class<A> annotationClass, @Nullable AnnotationValue<A> annotationValue) {
-            this.hashCode = hashCode;
+        AnnotationProxyHandler(Class<A> annotationClass, @Nullable AnnotationValue<A> annotationValue) {
             this.annotationClass = annotationClass;
             this.annotationValue = annotationValue;
         }
 
+        /**
+         * The hash code {@link Annotation#hashCode()} defines: the sum over the members of the hash of the
+         * member name times 127, exclusive-ored with the hash of the member value. The values hashed are the
+         * ones the proxy answers - an enum constant, a class, a nested annotation - and not the forms the
+         * annotation value stores them in, which hash differently and would set the proxy apart from the equal
+         * annotation the JVM created.
+         */
         @Override
         public int hashCode() {
-            return hashCode;
+            int hash = hashCode;
+            if (hash == 0 && !hashCodeIsZero) {
+                for (Method member : AnnotationDefaults.membersOf(annotationClass)) {
+                    Object value;
+                    try {
+                        value = member(annotationValue, member);
+                    } catch (RuntimeException e) {
+                        // a member that cannot be answered fails when it is read; the hash is not the place
+                        // to report it, so it falls back to the stored form
+                        value = annotationValue == null ? null : annotationValue.getValues().get(member.getName());
+                    }
+                    if (value != null) {
+                        hash += (127 * member.getName().hashCode()) ^ memberHashCode(value);
+                    }
+                }
+                if (hash == 0) {
+                    hashCodeIsZero = true;
+                } else {
+                    hashCode = hash;
+                }
+            }
+            return hash;
+        }
+
+        /**
+         * A member as the proxy answers it: the value the annotation value carries, converted to the type the
+         * member declares, or the default of the member.
+         */
+        @Nullable
+        private static Object member(@Nullable AnnotationValue<?> value, Method member) {
+            String name = member.getName();
+            if (value != null && value.contains(name)) {
+                return value.getRequiredValue(name, member.getReturnType());
+            }
+            return member.getDefaultValue();
         }
 
         @Override
@@ -615,20 +700,34 @@ public final class AnnotationMetadataSupport {
 
             final AnnotationValue<?> otherValues = getAnnotationValues(other);
 
-            if (this.annotationValue == null && otherValues == null) {
-                return true;
-            } else if (this.annotationValue == null || otherValues == null) {
+            if (otherValues == null) {
                 return false;
-            } else {
-                // the contract of Annotation#equals compares the members two annotations answer, not the way
-                // either of them stores them: a value that omits a member equal to its default and one that
-                // writes it out answer the same member, so both are completed by the defaults of the type
-                // before they are compared. Comparing the stored values instead makes equality depend on the
-                // representation, breaks symmetry against an annotation the JVM created, and leaves equivalent
-                // annotations as separate entries of a set, while hashCode - computed over the completed
-                // members - says they are the same
-                return effectiveValues(this.annotationValue).equals(effectiveValues(otherValues));
             }
+            // the contract of Annotation#equals compares the members two annotations answer, not the way
+            // either of them stores them: a value that omits a member equal to its default and one that
+            // writes it out answer the same member, so both are completed by the defaults of the type
+            // before they are compared. Comparing the stored values instead makes equality depend on the
+            // representation, breaks symmetry against an annotation the JVM created, and leaves equivalent
+            // annotations as separate entries of a set, while hashCode - computed over the completed
+            // members - says they are the same
+            AnnotationValue<A> values = annotationValue();
+            if (effectiveValues(values).equals(effectiveValues(otherValues))) {
+                return true;
+            }
+            // stored values that differ can still answer the same members: a nested annotation is stored as
+            // an annotation value, which is not completed by the defaults of its own type, so the members are
+            // compared as they are answered, a nested annotation by its own equals
+            try {
+                for (Method member : AnnotationDefaults.membersOf(annotationClass)) {
+                    if (!Objects.deepEquals(member(values, member), member(otherValues, member))) {
+                        return false;
+                    }
+                }
+            } catch (RuntimeException e) {
+                // a member that cannot be answered
+                return false;
+            }
+            return true;
         }
 
         /**
@@ -662,22 +761,21 @@ public final class AnnotationMetadataSupport {
         }
 
         @Override
+        @Nullable
         public Object invoke(Object proxy, Method method, @Nullable Object @Nullable [] args) {
             String name = method.getName();
             if ((args == null || args.length == 0) && "hashCode".equals(name)) {
-                return hashCode;
+                return hashCode();
             } else if ((args != null && args.length == 1) && "equals".equals(name)) {
                 return equals(args[0]);
             } else if ("toString".equals(name)) {
-                return Objects.requireNonNull(annotationValue).toString();
+                return annotationValue().toString();
             } else if ("annotationType".equals(name)) {
                 return annotationClass;
             } else if (method.getReturnType() == AnnotationValue.class) {
-                return Objects.requireNonNull(annotationValue);
-            } else if (annotationValue != null && annotationValue.contains(name)) {
-                return annotationValue.getRequiredValue(name, method.getReturnType());
+                return annotationValue();
             }
-            return method.getDefaultValue();
+            return member(annotationValue, method);
         }
 
         @Override

@@ -429,6 +429,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private ReturnType<R> returnType;
         private final Argument<?>[] arguments;
         private final boolean argumentsAnnotationsWithExpressions;
+        @Nullable
+        @SuppressWarnings("java:S3077") // a Method is immutable: publishing the reference publishes it
+        private volatile Method targetMethod;
 
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,
@@ -503,7 +506,13 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public Method getTargetMethod() {
-            return dispatcher.getTargetMethodByIndex(index);
+            // The generated getTargetMethodByIndex looks the method up reflectively on every call; resolve once
+            Method method = targetMethod;
+            if (method == null) {
+                method = dispatcher.getTargetMethodByIndex(index);
+                targetMethod = method;
+            }
+            return method;
         }
 
         @Override
@@ -599,8 +608,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     arguments[i] = argument;
                 } else {
                     foundExpressions = true;
-                    if (argument instanceof GenericPlaceholder<?> genericPlaceholder) {
-                        arguments[i] = Argument.ofTypeVariable(argument.getType(), argument.getName(), genericPlaceholder.getVariableName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
+                    if (argument instanceof GenericPlaceholder<?>) {
+                        // the placeholder keeps what it is: the bounds of its variable, and whether it stands for a
+                        // type resolved in place of the variable
+                        arguments[i] = argument.withAnnotationMetadata(wrappedArgumentAnnotationMetadata);
                     } else {
                         arguments[i] = Argument.of(argument.getType(), argument.getName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
                     }

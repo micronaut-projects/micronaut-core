@@ -585,6 +585,10 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             }
             if (MAP_TYPES.contains(type)) {
                 Argument<?>[] typeParameters = argument.getTypeParameters();
+                // The processor decides this over the same map types, and additionally collects a map keyed
+                // by an enum naming the beans of an @EachProperty or @EachBean type - see
+                // BeanInjectionUtils#isKeyedByBeanName. A reflective definition does not iterate those, so
+                // there are no beans an enum could name and a key that holds the name is the only key here.
                 if (typeParameters.length == 2 && CharSequence.class.isAssignableFrom(typeParameters[0].getType())) {
                     return MAP;
                 }

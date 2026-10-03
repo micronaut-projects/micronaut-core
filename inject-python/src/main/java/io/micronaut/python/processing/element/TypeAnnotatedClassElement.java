@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -40,6 +41,7 @@ import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -47,16 +49,69 @@ import java.util.function.Predicate;
 
 /**
  * Class element wrapper that applies additional type-use annotation metadata.
- *
- * @param delegate The wrapped class element
- * @param typeAnnotationMetadata The type-use annotation metadata
  */
 @Internal
 @Experimental
-public record TypeAnnotatedClassElement(
-    ClassElement delegate,
-    ElementAnnotationMetadata typeAnnotationMetadata
-) implements ClassElement {
+public sealed class TypeAnnotatedClassElement implements ClassElement permits TypeAnnotatedEnumElement {
+
+    private final ClassElement delegate;
+    private final ElementAnnotationMetadata typeAnnotationMetadata;
+
+    /**
+     * @param delegate The wrapped class element
+     * @param typeAnnotationMetadata The type-use annotation metadata
+     */
+    TypeAnnotatedClassElement(ClassElement delegate, ElementAnnotationMetadata typeAnnotationMetadata) {
+        this.delegate = Objects.requireNonNull(delegate, "delegate");
+        this.typeAnnotationMetadata = Objects.requireNonNull(typeAnnotationMetadata, "typeAnnotationMetadata");
+    }
+
+    /**
+     * Wraps a class element with type-use annotation metadata. An enum stays an {@link EnumElement}, so that visitors
+     * recognize an attribute typed {@code Color | None} as an enum.
+     *
+     * @param delegate The wrapped class element
+     * @param typeAnnotationMetadata The type-use annotation metadata
+     * @return The wrapper
+     */
+    public static TypeAnnotatedClassElement of(ClassElement delegate, ElementAnnotationMetadata typeAnnotationMetadata) {
+        if (delegate instanceof EnumElement enumElement) {
+            return new TypeAnnotatedEnumElement(enumElement, typeAnnotationMetadata);
+        }
+        return new TypeAnnotatedClassElement(delegate, typeAnnotationMetadata);
+    }
+
+    /**
+     * @return The wrapped class element
+     */
+    public ClassElement delegate() {
+        return delegate;
+    }
+
+    /**
+     * @return The type-use annotation metadata
+     */
+    public ElementAnnotationMetadata typeAnnotationMetadata() {
+        return typeAnnotationMetadata;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof TypeAnnotatedClassElement that
+            && getClass() == that.getClass()
+            && delegate.equals(that.delegate)
+            && typeAnnotationMetadata.equals(that.typeAnnotationMetadata);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(delegate, typeAnnotationMetadata);
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() + "[delegate=" + delegate + ", typeAnnotationMetadata=" + typeAnnotationMetadata + "]";
+    }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
@@ -164,18 +219,23 @@ public record TypeAnnotatedClassElement(
     }
 
     @Override
+    public String getCanonicalName() {
+        return delegate.getCanonicalName();
+    }
+
+    @Override
     public boolean isEnum() {
         return delegate.isEnum();
     }
 
     @Override
     public ClassElement toArray() {
-        return new TypeAnnotatedClassElement(delegate.toArray(), typeAnnotationMetadata);
+        return of(delegate.toArray(), typeAnnotationMetadata);
     }
 
     @Override
     public ClassElement fromArray() {
-        return new TypeAnnotatedClassElement(delegate.fromArray(), typeAnnotationMetadata);
+        return of(delegate.fromArray(), typeAnnotationMetadata);
     }
 
     @Override
@@ -340,7 +400,7 @@ public record TypeAnnotatedClassElement(
 
     @Override
     public ClassElement getRawClassElement() {
-        return new TypeAnnotatedClassElement(delegate.getRawClassElement(), typeAnnotationMetadata);
+        return of(delegate.getRawClassElement(), typeAnnotationMetadata);
     }
 
     @Override
@@ -360,7 +420,7 @@ public record TypeAnnotatedClassElement(
 
     @Override
     public ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new TypeAnnotatedClassElement(
+        return of(
             delegate.withAnnotationMetadata(annotationMetadata),
             typeAnnotationMetadata
         );
@@ -368,7 +428,7 @@ public record TypeAnnotatedClassElement(
 
     @Override
     public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
-        return new TypeAnnotatedClassElement(
+        return of(
             delegate.withTypeArguments(typeArguments),
             typeAnnotationMetadata
         );
@@ -376,7 +436,7 @@ public record TypeAnnotatedClassElement(
 
     @Override
     public ClassElement withTypeArguments(Collection<ClassElement> typeArguments) {
-        return new TypeAnnotatedClassElement(
+        return of(
             delegate.withTypeArguments(typeArguments),
             typeAnnotationMetadata
         );

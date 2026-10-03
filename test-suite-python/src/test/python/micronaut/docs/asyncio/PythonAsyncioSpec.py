@@ -103,3 +103,28 @@ class PythonAsyncioSpec:
         context_id = self.client.toBlocking().retrieve("/async-demo/context-id")
 
         assert context_id != builtins.__MN_CTX_ID__
+
+    @Test
+    def constructorInjectedAsyncControllerRunsInEventLoopContext(self):
+        response = self.client.toBlocking().retrieve("/async-constructor/message")
+        assert "constructor:backend!" == response, response
+
+    @Test
+    def constructorInjectedAsyncControllerCanAwaitPythonBean(self):
+        response = self.client.toBlocking().retrieve("/async-constructor/greeting")
+        assert "hello constructor!" == response, response
+
+    @Test
+    def constructorInjectedAsyncControllerCanAwaitHostBean(self):
+        response = self.client.toBlocking().retrieve("/async-constructor/exchange")
+        assert "constructor:backend" == response, response
+
+    @Test
+    def injectedPythonBeanCanAwaitItsOwnInjectedClient(self):
+        response = self.client.toBlocking().retrieve("/async-bean-await/backend-greeting")
+        assert "hello backend" == response, response
+
+    @Test
+    def asyncControllerCanAwaitInjectedPythonBean(self):
+        response = self.client.toBlocking().retrieve("/async-bean-await/greeting")
+        assert "hello attribute" == response, response

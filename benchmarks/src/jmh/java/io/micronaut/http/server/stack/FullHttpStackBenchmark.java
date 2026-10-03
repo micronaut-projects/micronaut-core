@@ -31,7 +31,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class FullHttpStackBenchmark {
@@ -45,9 +44,7 @@ public class FullHttpStackBenchmark {
     @Benchmark
     public void test(Holder holder) {
         ByteBuf response = holder.exchange();
-        if (!holder.responseBytes.equals(response)) {
-            throw new AssertionError("Response did not match");
-        }
+        BenchOptions.verifyResponse(holder.responseBytes, response);
         response.release();
     }
 
@@ -151,11 +148,7 @@ public class FullHttpStackBenchmark {
         MICRONAUT {
             @Override
             Stack openChannel() {
-                ApplicationContext ctx = ApplicationContext.run(Map.of(
-                    "spec.name", "FullHttpStackBenchmark",
-                    //"micronaut.server.netty.server-type", NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT,
-                    "micronaut.server.date-header", false // disabling this makes the response identical each time
-                ));
+                ApplicationContext ctx = ApplicationContext.run(BenchOptions.serverProperties("FullHttpStackBenchmark"));
                 EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
                 EmbeddedChannel channel = ((NettyHttpServer) server).buildEmbeddedChannel(false);
                 return new Stack(channel, ctx);

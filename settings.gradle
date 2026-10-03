@@ -6,7 +6,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '8.0.1'
+    id 'io.micronaut.build.shared.settings' version '8.1.3'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -84,11 +84,15 @@ include "test-suite-http-server-tck-netty"
 include "test-suite-http2-server-tck-netty"
 include "test-suite-kotlin"
 include "test-suite-kotlin-ksp-all-open"
+include "test-suite-kotlinx-reactor"
 include "test-suite-groovy"
 include "test-suite-python"
 include "test-suite-logback"
 include "test-suite-logback-external-configuration"
 include "test-suite-logback-graalvm"
+include "test-suite-logback-no-xml"
+include "test-suite-logback-test-xml"
+include "test-suite-logback-working-directory"
 include "test-suite-netty-ssl-graalvm"
 include "test-suite-kotlin-graalvm"
 include "test-utils"

@@ -343,6 +343,13 @@ public interface HttpHeaders extends Headers {
     String IF_UNMODIFIED_SINCE = "If-Unmodified-Since";
 
     /**
+     * {@code "Keep-Alive"}.
+     *
+     * @since 5.3.0
+     */
+    String KEEP_ALIVE = "Keep-Alive";
+
+    /**
      * {@code "Last-Modified"}.
      */
     String LAST_MODIFIED = "Last-Modified";

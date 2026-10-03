@@ -22,11 +22,15 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.TypeRef;
 import io.micronaut.python.processing.model.TypeVar;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Implementation of {@link GenericPlaceholderElement} for Python TypeVars.
@@ -65,6 +69,45 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
     @Override
     protected AbstractPythonElement copyThis() {
         return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement);
+    }
+
+    /**
+     * The bound and the constraints of a PEP 695 type parameter ({@code [S: Book]}) as Java types, the
+     * bounds of the type variable the generated Java declaration carries. {@code object} is left out:
+     * {@link Object} is the implicit bound of a Java type variable.
+     *
+     * @param typeVar       The type parameter
+     * @param environment   The processing environment resolving the bound
+     * @param selfReference Whether a bound names the element declaring the type parameter, which has no
+     *                      Java counterpart and is left out
+     * @return The bounds, empty for an unbounded type parameter
+     */
+    static List<ClassElement> resolveBounds(TypeVar typeVar,
+                                            PythonProcessingEnvironment environment,
+                                            Predicate<TypeRef> selfReference) {
+        List<ClassElement> bounds = new ArrayList<>();
+        addBound(bounds, typeVar.bound(), environment, selfReference);
+        for (Object constraint : typeVar.constraints()) {
+            addBound(bounds, constraint, environment, selfReference);
+        }
+        return bounds;
+    }
+
+    private static void addBound(List<ClassElement> bounds,
+                                 Object bound,
+                                 PythonProcessingEnvironment environment,
+                                 Predicate<TypeRef> selfReference) {
+        if (bound == null) {
+            return;
+        }
+        TypeRef typeRef = bound instanceof TypeRef typeReference ? typeReference : new TypeRef(bound.toString());
+        if (selfReference.test(typeRef)) {
+            return;
+        }
+        ClassElement boundElement = environment.visitorContext().getTypeResolver().resolve(typeRef, Map.of());
+        if (!Object.class.getName().equals(boundElement.getName())) {
+            bounds.add(boundElement);
+        }
     }
 
     @Override

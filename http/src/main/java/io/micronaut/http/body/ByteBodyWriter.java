@@ -37,6 +37,11 @@ import java.io.OutputStream;
 @BootstrapContextCompatible
 @Internal
 final class ByteBodyWriter implements TypedMessageBodyWriter<ByteBody>, ResponseBodyWriter<ByteBody> {
+    /**
+     * The type this handler is for, resolved once: isWriteable asks for it on every response.
+     */
+    private static final Argument<ByteBody> TYPE = Argument.of(ByteBody.class);
+
     @Override
     public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<ByteBody> type, MediaType mediaType, ByteBody object) throws CodecException {
         return object.move();
@@ -44,7 +49,7 @@ final class ByteBodyWriter implements TypedMessageBodyWriter<ByteBody>, Response
 
     @Override
     public Argument<ByteBody> getType() {
-        return Argument.of(ByteBody.class);
+        return TYPE;
     }
 
     @Override

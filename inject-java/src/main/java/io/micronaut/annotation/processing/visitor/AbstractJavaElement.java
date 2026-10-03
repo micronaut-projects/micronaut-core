@@ -32,6 +32,7 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
@@ -337,11 +338,45 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
         }
         if (type instanceof ArrayType at) {
             TypeMirror componentType = at.getComponentType();
-            return newClassElement(owner, componentType, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, at, doc)
-                .toArray();
+            ClassElement component = newClassElement(owner, componentType, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, arrayType == null ? at : arrayType, doc);
+            ClassElement array = component.toArray();
+            if (arrayType == null) {
+                // Keep every dimension separately from the legacy component metadata used for injection.
+                List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> annotations = new ArrayList<>();
+                TypeMirror dimension = at;
+                while (dimension instanceof ArrayType arrayDimension) {
+                    annotations.add(elementAnnotationMetadataFactory.buildTypeAnnotations(
+                        visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeMirror(dimension), dimension));
+                    dimension = arrayDimension.getComponentType();
+                }
+                // Resolving T in T[] can contribute additional dimensions (for example, T = String[]).
+                ClassElement resolvedComponent = component;
+                for (int i = 1; i < annotations.size(); i++) {
+                    resolvedComponent = resolvedComponent.fromArray();
+                }
+                while (resolvedComponent.isArray()) {
+                    annotations.add(resolvedComponent.getTypeAnnotationMetadata());
+                    resolvedComponent = resolvedComponent.fromArray();
+                }
+                Collections.reverse(annotations);
+                if (array instanceof JavaClassElement javaArray) {
+                    return javaArray.withArrayTypeAnnotations(annotations);
+                }
+                if (array instanceof PrimitiveElement primitiveArray) {
+                    return primitiveArray.withArrayTypeAnnotations(annotations);
+                }
+            }
+            return array;
         }
         if (type instanceof PrimitiveType pt) {
-            return PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            PrimitiveElement primitiveElement = PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            if (!pt.getAnnotationMirrors().isEmpty()) {
+                // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
+                return primitiveElement.withTypeAnnotationMetadata(
+                    elementAnnotationMetadataFactory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeMirror(pt), pt)
+                );
+            }
+            return primitiveElement;
         }
         if (type instanceof WildcardType wt) {
             return resolveWildcard(owner, declaredTypeArguments, visitedTypes, representedTypeParameter, wt, doc);

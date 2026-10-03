@@ -23,15 +23,18 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.ContentDisposition;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.util.ContentDispositionUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
@@ -53,6 +56,9 @@ import java.util.concurrent.ExecutorService;
 @Internal
 public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
+    private static final Class<?> IMMUTABLE_LIST_1 = List.of(1).getClass();
+    private static final Class<?> IMMUTABLE_LIST_N = List.of(1, 2, 3).getClass();
+
     protected final ReturnType<? extends R> returnType;
     protected final List<MediaType> consumesMediaTypes;
     protected final List<MediaType> producesMediaTypes;
@@ -62,8 +68,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     protected final boolean producesMediaTypesContainsAll;
     @Nullable
     protected final HttpStatus definedStatus;
+    @Nullable
+    protected final String definedContentDisposition;
     protected final boolean isWebSocketRoute;
     private final boolean isVoid;
+    @Nullable
+    private LastProducesMatch lastProducesMatch;
     private final boolean imperative;
     private final boolean suspended;
     private final boolean reactive;
@@ -116,6 +126,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.isVoid = returnType.isVoid();
         isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
         definedStatus = annotationMetadata.enumValue(Status.class, HttpStatus.class).orElse(null);
+        definedContentDisposition = annotationMetadata.findAnnotation(ContentDisposition.class)
+            .map(av -> ContentDispositionUtils.toHeaderValue(
+                av.enumValue("type", ContentDisposition.Type.class).orElse(ContentDisposition.Type.ATTACHMENT).toHeaderToken(),
+                av.stringValue("filename").filter(StringUtils::isNotEmpty).orElse(null)))
+            .orElse(null);
 
         if (producesMediaTypes.isEmpty()) {
             MediaType[] producesTypes = MediaType.of(annotationMetadata.stringValues(Produces.class));
@@ -251,6 +266,25 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         if (CollectionUtils.isEmpty(acceptableTypes)) {
             return true;
         }
+        // Accept header values are parsed into shared, immutable lists by MediaType.orderedOf,
+        // so the answer for the last list instance seen can be reused by identity.
+        LastProducesMatch last = lastProducesMatch;
+        if (last != null && last.acceptableTypes == acceptableTypes) {
+            return last.result;
+        }
+        boolean result = computeAnyMediaTypesMatch(producedMediaTypes, acceptableTypes);
+        if (acceptableTypes.size() > 1 && isImmutableList(acceptableTypes)) {
+            lastProducesMatch = new LastProducesMatch(acceptableTypes, result);
+        }
+        return result;
+    }
+
+    private static boolean isImmutableList(Collection<MediaType> types) {
+        // only lists that cannot change after the fact are safe to key the cache on
+        return types.getClass() == IMMUTABLE_LIST_1 || types.getClass() == IMMUTABLE_LIST_N;
+    }
+
+    private static boolean computeAnyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
         for (MediaType acceptableType : acceptableTypes) {
             if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
                 return true;
@@ -326,6 +360,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @Nullable
+    public String findContentDispositionHeader() {
+        return definedContentDisposition;
+    }
+
+    @Override
     public boolean isErrorRoute() {
         return isErrorRoute;
     }
@@ -358,5 +398,15 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean needsRequestBody() {
         return isPermitsBody;
+    }
+
+    /**
+     * The result of the last produces check, keyed by the identity of the acceptable types list.
+     * Published racily: the holder is immutable, so a thread sees either a complete entry or none.
+     *
+     * @param acceptableTypes The acceptable types list
+     * @param result          Whether it matched
+     */
+    private record LastProducesMatch(Collection<MediaType> acceptableTypes, boolean result) {
     }
 }
