@@ -20,6 +20,7 @@ ioc:
   how: How Does it Work?
   iocDebugging: Debugging Dependency Injection
   beanContext: The BeanContext
+  beanDefinitionPrefetch: Bean Definition Prefetch (Experimental)
   injection:
     title: Dependency Injection Types
     constructorInjection: Constructor Injection

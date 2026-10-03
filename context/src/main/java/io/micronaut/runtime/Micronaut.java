@@ -18,6 +18,7 @@ package io.micronaut.runtime;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
@@ -57,6 +58,15 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
     private static final String BANNER_NAME = "micronaut-banner.txt";
+    /**
+     * The experimental bean definition prefetch, or {@code null} when it is off or stood down.
+     * Started before {@link #LOG}, whose creation usually configures logging, so that the two
+     * overlap. With the property unset, the class of the task is not even loaded.
+     */
+    @Nullable
+    private static final BeanDefinitionPrefetch BEAN_DEFINITION_PREFETCH = Boolean.getBoolean(BeanDefinitionPrefetch.PROPERTY)
+        ? BeanDefinitionPrefetch.start(Micronaut.class.getClassLoader())
+        : null;
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
 
@@ -76,7 +86,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     public ApplicationContext start() {
         long start = System.nanoTime();
         printBanner();
-        ApplicationContext applicationContext = super.build();
+        ApplicationContext applicationContext = buildContext();
 
         try {
 
@@ -222,6 +232,36 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             handleStartupException(applicationContext.getEnvironment(), e);
             Thread.currentThread().interrupt();
             return applicationContext;
+        }
+    }
+
+    /**
+     * Builds the context. A running or finished bean definition prefetch is handed to it, unless
+     * the application or a configurer set a provider of its own, and afterwards a prefetch that
+     * the context did not take gives its result up.
+     *
+     * @return The application context, not started
+     */
+    private ApplicationContext buildContext() {
+        BeanDefinitionPrefetch prefetch = BEAN_DEFINITION_PREFETCH;
+        if (prefetch == null) {
+            return super.build();
+        }
+        if (getBeanDefinitionsProvider() instanceof DefaultBeanDefinitionsProvider) {
+            beanDefinitionsProvider(prefetch);
+        }
+        try {
+            return super.build();
+        } finally {
+            Throwable failure = prefetch.giveUp();
+            if (failure != null) {
+                // The context read the references itself, beside the prefetch. A reference whose static initializer
+                // failed on the prefetch's thread reached it as a NoClassDefFoundError, which Micronaut skips
+                LOG.warn("The bean definition prefetch ({}=true) failed and was not handed to the application context, "
+                        + "so Micronaut may have skipped a bean definition that would otherwise stop the application. "
+                        + "Start without {}=true to see Micronaut's own handling",
+                    BeanDefinitionPrefetch.PROPERTY, BeanDefinitionPrefetch.PROPERTY, failure);
+            }
         }
     }
 
