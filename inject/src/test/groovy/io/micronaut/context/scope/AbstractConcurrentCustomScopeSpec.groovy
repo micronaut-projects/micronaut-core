@@ -1,5 +1,6 @@
 package io.micronaut.context.scope
 
+import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.exceptions.BeanDestructionException
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanIdentifier
@@ -672,7 +673,7 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         TestCreationContext(BeanIdentifier id, Runnable onCreate = {}, BeanDefinition<Object> definition = null) {
             this.id = id
             this.onCreate = onCreate
-            this.definition = definition
+            this.definition = definition ?: RuntimeBeanDefinition.builder(Object).build()
         }
 
         @Override
@@ -715,7 +716,7 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
 
         BeanIdentifier id
         Object bean
-        BeanDefinition<Object> definition
+        BeanDefinition<Object> definition = RuntimeBeanDefinition.builder(Object).build()
         boolean closed
         boolean failToClose
         Runnable onClose = {}

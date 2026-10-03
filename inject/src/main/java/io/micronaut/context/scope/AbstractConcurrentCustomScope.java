@@ -16,6 +16,7 @@
 package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanDestructionOrder;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.exceptions.BeanDestructionException;
 import org.jspecify.annotations.Nullable;
@@ -171,7 +172,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         try {
             if (CollectionUtils.isNotEmpty(scopeMap)) {
 
-                for (CreatedBean<?> createdBean : scopeMap.values()) {
+                for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
                     try {
                         createdBean.close();
                     } catch (BeanDestructionException e) {
@@ -512,7 +513,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         // closes it, the other leaves it alone and finds it gone
         while (true) {
             final List<CreatedBean<?>> closedInThisPass = new ArrayList<>();
-            for (CreatedBean<?> createdBean : new ArrayList<>(scopeMap.values())) {
+            for (CreatedBean<?> createdBean : BeanDestructionOrder.sort(scopeMap.values())) {
                 if (closing.add(new IdentityKey(createdBean))) {
                     closeQuietly(createdBean);
                     closedInThisPass.add(createdBean);
