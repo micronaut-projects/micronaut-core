@@ -113,6 +113,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -164,6 +165,7 @@ import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
+import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
@@ -708,6 +710,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private ClassTypeDef superType = TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE;
     private boolean superBeanDefinition = false;
+    private TypeDef beanDefinitionTypeArgument;
+    private final List<ClassTypeDef> beanDefinitionInterfaces = new ArrayList<>();
     private boolean isSuperFactory = false;
     private final AnnotationMetadata annotationMetadata;
     // Sometimes the original annotations are hierarchy etc and there we cannot contribute defaults easily
@@ -907,8 +911,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             .addModifiers(Modifier.PUBLIC)
             .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", BeanDefinitionReference.class.getName()).build())
             .superclass(TypeDef.parameterized(superType, argumentType));
+        this.beanDefinitionTypeArgument = argumentType;
 
-        loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(beanDefinitionTypeDef, loadTypeMethods);
+        loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(beanDefinitionTypeDef, loadTypeMethods, visitorContext);
 
         typeArguments = beanType.getAllTypeArguments();
 
@@ -1282,7 +1287,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      * @param interfaceType An interface to add
      */
     public void visitBeanDefinitionInterface(Class<? extends BeanDefinition> interfaceType) {
-        this.classDefBuilder.addSuperinterface(TypeDef.of(interfaceType));
+        addBeanDefinitionInterface(ClassTypeDef.of(interfaceType));
     }
 
     /**
@@ -1292,6 +1297,32 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         this.superBeanDefinition = true;
         this.superType = ClassTypeDef.of(name);
         classDefBuilder.superclass(superType);
+    }
+
+    /**
+     * Visits the super bean definition together with its bean type argument, which the generic bean definition
+     * interfaces implemented by this definition must repeat.
+     *
+     * @param name             The super bean definition name
+     * @param beanTypeArgument The bean type argument of the super bean definition
+     * @since 5.2
+     */
+    public void visitSuperBeanDefinition(String name, TypeDef beanTypeArgument) {
+        visitSuperBeanDefinition(name);
+        this.beanDefinitionTypeArgument = beanTypeArgument;
+        // The super definition is generated and only known by name, so its generic methods cannot be looked up
+        // through it. It already implements both interfaces (through AbstractInitializableBeanDefinition); naming them
+        // with the bean type exposes `instantiate` and `inject` to override resolution, and changes nothing else
+        addBeanDefinitionInterface(ClassTypeDef.of(InstantiatableBeanDefinition.class));
+        addBeanDefinitionInterface(ClassTypeDef.of(InjectableBeanDefinition.class));
+    }
+
+    /**
+     * @return The bean type argument of the generic bean definition interfaces this definition implements
+     * @since 5.2
+     */
+    public TypeDef getBeanDefinitionTypeArgument() {
+        return beanDefinitionTypeArgument;
     }
 
     /**
@@ -1321,7 +1352,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     public void setValidated(boolean validated) {
         if (validated) {
             if (!this.validated) {
-                classDefBuilder.addSuperinterface(ClassTypeDef.of(ValidatedBeanDefinition.class));
+                addBeanDefinitionInterface(ClassTypeDef.of(ValidatedBeanDefinition.class));
                 this.validated = true;
             }
         } else {
@@ -1353,7 +1384,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      */
     public void setInterceptedType(String typeName) {
         if (typeName != null) {
-            classDefBuilder.addSuperinterface(TypeDef.of(AdvisedBeanType.class));
+            addBeanDefinitionInterface(ClassTypeDef.of(AdvisedBeanType.class));
         }
         this.interceptedType = typeName;
     }
@@ -1491,9 +1522,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         }
 
         if (needsPostConstruct()) {
-            classDefBuilder.addSuperinterface(TypeDef.of(InitializingBeanDefinition.class));
+            addBeanDefinitionInterface(ClassTypeDef.of(InitializingBeanDefinition.class));
             if (isPostConstructIntercepted()) {
-                classDefBuilder.addSuperinterface(TypeDef.of(InitializableIntercepted.class));
+                addBeanDefinitionInterface(ClassTypeDef.of(InitializableIntercepted.class));
                 if (superBeanDefinition) {
                     classDefBuilder.addMethod(MethodDef.override(METHOD_INITIALIZE)
                         .build((aThis, methodParameters) -> aThis.superRef(ClassTypeDef.of(InitializableIntercepted.class))
@@ -1511,9 +1542,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         }
 
         if (needsPreDestroy()) {
-            classDefBuilder.addSuperinterface(TypeDef.of(DisposableBeanDefinition.class));
+            addBeanDefinitionInterface(ClassTypeDef.of(DisposableBeanDefinition.class));
             if (isPreDestroyIntercepted()) {
-                classDefBuilder.addSuperinterface(TypeDef.of(DisposableIntercepted.class));
+                addBeanDefinitionInterface(ClassTypeDef.of(DisposableIntercepted.class));
                 if (superBeanDefinition) {
                     classDefBuilder.addMethod(MethodDef.override(METHOD_DISPOSE)
                         .build((aThis, methodParameters) -> aThis.superRef(ClassTypeDef.of(DisposableIntercepted.class))
@@ -1581,6 +1612,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         }
 
         List<OutputObjectDef> classes = new ArrayList<>();
+        for (ClassTypeDef beanDefinitionInterface : beanDefinitionInterfaces) {
+            // Only the Signature attribute of the bytecode, which already names the bean type in the superclass
+            classDefBuilder.addSuperinterface(TypeDef.parameterized(beanDefinitionInterface, beanDefinitionTypeArgument));
+        }
         classes.add(new OutputObjectDef(classDefBuilder.build(), BeanDefinitionReference.class, originatingElements, describe().toByteArray()));
         if (executableMethodsClass != null) {
             classes.add(executableMethodsClass);
@@ -1733,7 +1768,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
                 }
             }
-            classDefBuilder.addSuperinterface(interceptedInterface);
+            addBeanDefinitionInterface(interceptedInterface);
 
             // The interceptor chain runs in the default method of the intercepted interface, which returns as soon
             // as the chain has: members are injected and post-construct run here, on the instance it returned, so that
@@ -1795,13 +1830,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     } else {
                         statements.add(newInstance.returning());
                     }
-                    return StatementDef.multi(statements);
+                    return rethrowCheckedExceptions(producingMethodElement(), StatementDef.multi(statements));
                 }));
         } else {
             MethodDef.MethodDefBuilder buildMethodBuilder;
             if (isParametrized) {
                 buildMethodBuilder = MethodDef.override(PARAMETRIZED_DO_INSTANTIATE_METHOD);
-                classDefBuilder.addSuperinterface(TypeDef.of(ParametrizedInstantiatableBeanDefinition.class));
+                addBeanDefinitionInterface(ClassTypeDef.of(ParametrizedInstantiatableBeanDefinition.class));
             } else {
                 buildMethodBuilder = MethodDef.override(INSTANTIATE_METHOD);
             }
@@ -1813,7 +1848,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     List<? extends ExpressionDef> values = resolveConstructorValues(aThis, methodParameters, isParametrized, statements);
                     ExpressionDef newInstance = buildNewInstance(aThis, methodParameters, statements, values);
                     statements.add(injectAndReturn(aThis, methodParameters, newInstance));
-                    return StatementDef.multi(statements);
+                    return rethrowCheckedExceptions(producingMethodElement(), StatementDef.multi(statements));
                 })
             );
         }
@@ -1835,7 +1870,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                 hasInjectPoint |= BeanDefinitionWriter.hasInjectScope(fieldDefinition.fieldElement());
                             }
                             case InjectMethod(var methodDefinition) -> {
-                                statements.add(injectStatement(injectMethodSignature, methodDefinition));
+                                statements.add(rethrowCheckedExceptions(methodDefinition.methodElement(), injectStatement(injectMethodSignature, methodDefinition)));
                                 hasInjectPoint |= BeanDefinitionWriter.hasInjectScope(methodDefinition.methodElement().getParameters());
                             }
                             case InjectFieldConfigurationBuilder(
@@ -2049,7 +2084,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct) {
             return beanInstance.returning();
         }
-        return beanInstance.newLocal("instance", instanceVar -> {
+        // The instance is held as the bean type: an intercepted construction returns what the erased interface method
+        // declares, and `initialize` takes the bean type its definition is parameterized with
+        ExpressionDef typedInstance = beanTypeDef.equals(beanInstance.type()) ? beanInstance : beanInstance.cast(beanTypeDef);
+        return typedInstance.newLocal("instance", instanceVar -> {
             List<StatementDef> statements = new ArrayList<>();
             if (needsInjectMethod) {
                 statements.add(
@@ -2090,6 +2128,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return !preDestroyMethods.isEmpty() || isPreDestroyIntercepted();
     }
 
+    private void addBeanDefinitionInterface(ClassTypeDef beanDefinitionInterface) {
+        if (!beanDefinitionInterfaces.contains(beanDefinitionInterface)) {
+            beanDefinitionInterfaces.add(beanDefinitionInterface);
+        }
+    }
+
     private MethodDef buildDisposeMethod(MethodDef.MethodDefBuilder override, @Nullable Method interceptMethod) {
         return buildLifeCycleMethod(override, PRE_DESTROY_METHOD, preDestroyMethods, interceptMethod);
     }
@@ -2126,7 +2170,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 for (int position = 0; position < lifecycleMethods.size(); position++) {
                     MethodDefinition<ClassElement, MethodElement> lifecycleMethod = lifecycleMethods.get(position);
                     if (interceptMethod == null) {
-                        statements.add(injectStatement(injectMethodSignature, lifecycleMethod));
+                        statements.add(rethrowCheckedExceptions(lifecycleMethod.methodElement(), injectStatement(injectMethodSignature, lifecycleMethod)));
                     } else {
                         statements.add(interceptedLifecycleStatement(injectMethodSignature, lifecycleMethod, interceptMethod, position));
                     }
@@ -2319,6 +2363,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                          List<? extends ExpressionDef> values,
                                          List<StatementDef> additionalStatements) {
         MethodElement constructor = constructorDefinition.constructorElement();
+        // `new` of an abstract class does not compile as source; the definition of an abstract bean never instantiates it
+        boolean requiresReflection = constructorDefinition.requiresReflection() || isAbstract;
         if (interceptedType == null && MethodGenUtils.hasDefaultsParameters(List.of(constructor.getParameters()))) {
             // NOTE: Proxies will handle the default constructor call
             List<ExpressionDef> variables = new ArrayList<>(values.size());
@@ -2351,9 +2397,44 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 newValues.add(values.get(i).cast(types.get(i)));
             }
             values = newValues;
-            return MethodGenUtils.invokeBeanConstructor(constructor, constructorDefinition.requiresReflection(), true, values, hasValuesExpressions, additionalStatements);
+            return castReflectiveInstance(requiresReflection,
+                MethodGenUtils.invokeBeanConstructor(constructor, requiresReflection, true, values, hasValuesExpressions, additionalStatements));
         }
-        return MethodGenUtils.invokeBeanConstructor(constructor, constructorDefinition.requiresReflection(), false, values, null, additionalStatements);
+        return castReflectiveInstance(requiresReflection,
+            MethodGenUtils.invokeBeanConstructor(constructor, requiresReflection, false, values, null, additionalStatements));
+    }
+
+    /**
+     * As source code, a call to a method declaring checked exceptions must handle them; rethrow them unchanged, which
+     * the bytecode does without declaring them.
+     *
+     * @param methodElement The invoked method
+     * @param statement     The statement invoking it
+     * @return The statement
+     */
+    private StatementDef rethrowCheckedExceptions(@Nullable MethodElement methodElement, StatementDef statement) {
+        if (methodElement == null || methodElement.getThrownTypes().length == 0) {
+            return statement;
+        }
+        return StatementDef.doTry(statement).doCatch(Throwable.class, exceptionVar ->
+            ClassTypeDef.of(ExceptionUtils.class)
+                .invokeStatic(ReflectionUtils.getRequiredInternalMethod(ExceptionUtils.class, "sneakyThrow", Throwable.class), exceptionVar)
+                .cast(ClassTypeDef.of(RuntimeException.class))
+                .doThrow());
+    }
+
+    @Nullable
+    private MethodElement producingMethodElement() {
+        return switch (elementProducerDefinition) {
+            case ConstructorDefinition<?, ?> cd -> (MethodElement) cd.constructorElement();
+            case MethodDefinition<?, ?> md -> (MethodElement) md.methodElement();
+            case FieldDefinition<?, ?> fd -> null;
+        };
+    }
+
+    private ExpressionDef castReflectiveInstance(boolean requiresReflection, ExpressionDef instance) {
+        // Reflective instantiation returns Object, which source code cannot pass on as the bean type
+        return requiresReflection ? instance.cast(beanTypeDef) : instance;
     }
 
     private ExpressionDef getContainsPropertyCheck(VariableDef.This aThis,
@@ -3378,11 +3459,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private ExpressionDef getValueBypassingBeanContext(ClassElement type, List<VariableDef.MethodParameter> methodParameters) {
         // Used in instantiate and inject methods
+        // Cast to the requested type: it can be a subtype such as ApplicationContext
         if (type.isAssignable(BeanResolutionContext.class)) {
-            return methodParameters.get(INSTANTIATE_METHOD_BEAN_RESOLUTION_CONTEXT_PARAM);
+            return methodParameters.get(INSTANTIATE_METHOD_BEAN_RESOLUTION_CONTEXT_PARAM).cast(TypeDef.erasure(type));
         }
         if (type.isAssignable(BeanContext.class)) {
-            return methodParameters.get(INSTANTIATE_METHOD_BEAN_CONTEXT_PARAM);
+            return methodParameters.get(INSTANTIATE_METHOD_BEAN_CONTEXT_PARAM).cast(TypeDef.erasure(type));
         }
         if (visitorContext.getClassElement(ConversionService.class).orElseThrow().equals(type)) {
             // We only want to assign to exact `ConversionService` classes not to classes extending `ConversionService`

@@ -42,13 +42,11 @@ import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.ObjectDef;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -410,9 +408,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             if (serviceClass != null) {
                 visitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
             }
-            try (OutputStream outputStream = visitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
-                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
-            }
+            visitorContext.visitObjectDef(objectDef, originatingElements.getOriginatingElements());
         } catch (ElementPostponedToNextRoundException ignore) {
             // Ignore, next round will redo
         } catch (IOException e) {
