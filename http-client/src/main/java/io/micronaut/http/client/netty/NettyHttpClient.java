@@ -2685,7 +2685,9 @@ final class NettyHttpClient implements
     private String getHostHeader(RequestKey requestKey) {
         StringBuilder host = new StringBuilder(requestKey.getHost());
         int port = requestKey.getPort();
-        if (port > -1 && port != 80 && port != 443) {
+        // RFC 9110 7.2: the port may only be omitted when it is the default port of the scheme
+        int defaultPort = requestKey.isSecure() ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+        if (port > -1 && port != defaultPort) {
             host.append(":").append(port);
         }
         return host.toString();

@@ -343,6 +343,39 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 host header for #scheme://#authority omits only the default port of the scheme'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        if (scheme == 'https') {
+            conn.setupHttp1Tls()
+        } else {
+            conn.setupHttp1()
+        }
+        patch(client, conn)
+
+        conn.testExchangeResponse(conn.testExchangeRequest(client, authority), 'keep-alive', hostHeader)
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        scheme  | authority          | hostHeader
+        'http'  | 'example.com'      | 'example.com'
+        'http'  | 'example.com:80'   | 'example.com'
+        'http'  | 'example.com:443'  | 'example.com:443'
+        'http'  | 'example.com:8080' | 'example.com:8080'
+        'https' | 'example.com'      | 'example.com'
+        'https' | 'example.com:443'  | 'example.com'
+        'https' | 'example.com:80'   | 'example.com:80'
+        'https' | 'example.com:8443' | 'example.com:8443'
+    }
+
     def 'simple h2c get'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.plaintext-mode': 'h2c',
