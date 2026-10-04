@@ -56,6 +56,8 @@ public class CorsOriginConfiguration {
     private Long maxAge = 1800L;
 
     /**
+     * Returns the allowed origins.
+     *
      * @return The allowed origins
      */
     public List<String> getAllowedOrigins() {
@@ -74,6 +76,8 @@ public class CorsOriginConfiguration {
     }
 
     /**
+     * Returns the regular expression used to match allowed origins.
+     *
      * @return a regular expression for matching Allowed Origins.
      */
     public Optional<String> getAllowedOriginsRegex() {
@@ -93,6 +97,8 @@ public class CorsOriginConfiguration {
     }
 
     /**
+     * Returns the allowed methods.
+     *
      * @return The allowed methods
      */
     public List<HttpMethod> getAllowedMethods() {
@@ -111,6 +117,8 @@ public class CorsOriginConfiguration {
     }
 
     /**
+     * Returns the allowed headers.
+     *
      * @return The allowed headers
      */
     public List<String> getAllowedHeaders() {
@@ -129,6 +137,8 @@ public class CorsOriginConfiguration {
     }
 
     /**
+     * Returns the exposed headers.
+     *
      * @return The exposed headers
      */
     public List<String> getExposedHeaders() {
@@ -147,6 +157,8 @@ public class CorsOriginConfiguration {
     }
 
     /**
+     * Returns whether credentials are allowed.
+     *
      * @return Whether to allow credentials
      */
     public boolean isAllowCredentials() {
@@ -163,6 +175,8 @@ public class CorsOriginConfiguration {
     }
 
     /**
+     * Returns the maximum age of a preflight response.
+     *
      * @return The max age. A value of -1 indicates no max age
      */
     public Long getMaxAge() {
@@ -183,6 +197,8 @@ public class CorsOriginConfiguration {
     }
 
     /**
+     * Returns whether private-network access is allowed.
+     *
      * @return Whether to allow private network
      * @since 4.3.0
      */
