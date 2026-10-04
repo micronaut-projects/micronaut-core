@@ -2143,7 +2143,7 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
-    void awaitedJavaFailureOnALoopOfTheApplicationRaisesTheWrapper() throws Exception {
+    void awaitedJavaFailureOnALoopOfTheApplicationRaisesTheWrapper() {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             Value target = context.eval(PYTHON, """
                 class Target:
