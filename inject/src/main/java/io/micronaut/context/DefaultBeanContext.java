@@ -157,7 +157,7 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext, TargetInterceptorSelections permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext, DependencyOwner permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -244,7 +244,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
 
     private final CustomScopeRegistry customScopeRegistry;
     // the interceptors of targets this context holds no registration for, by the definition of the target
-    private final Map<Object, BeanDependencies> contextSelectionOwners = new ConcurrentHashMap<>();
+    private final Map<Object, BeanDependencies> contextOwners = new ConcurrentHashMap<>();
     private final BeanResolutionCustomizer beanResolutionCustomizer;
     private final RuntimeBeanDefinition<BeanDependencyResolver> dependencyResolverDefinition = RuntimeBeanDefinition
         .<BeanDependencyResolver>builder(BeanDependencyResolver.class, () -> new DefaultBeanDependencyResolver(this))
@@ -494,7 +494,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
 
             // the interceptors of targets this context holds no registration for have no other owner. They go last,
             // so that a singleton calling such a target as it is destroyed is still intercepted by them
-            destroyContextSelections();
+            destroyContextOwners();
 
             if (checkEnabledBeans != null) {
                 checkEnabledBeans.cancel(true);
@@ -4120,45 +4120,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
         }
     }
 
+    // The context is the owner of what is resolved for a bean it holds no registration for, such as the
+    // interceptors a proxy selects for a target supplied from outside. They are destroyed when the context stops.
     @Override
-    public <S> @Nullable S findTargetSelection(BeanRegistration<?> target, Object key) {
-        BeanDependencies owner = target.getDependencies();
+    public <S> @Nullable S findResolved(Object key) {
+        BeanDependencies owner = contextOwners.get(key);
         return owner == null ? null : owner.findResolved(key);
     }
 
+    // Two threads asking at once may each compute a value; the first kept is the one handed out from then on,
+    // and what was created for the other is destroyed at once, as it is when the computation fails.
     @Override
-    public <S> @Nullable S selectForTarget(BeanRegistration<?> target, Object key, Function<BeanResolutionContext, S> selector) {
-        BeanDependencies owner = target.getDependencies();
-        return owner == null ? null : owner.resolveOnce(this, target.getBeanDefinition(), key, selector);
-    }
-
-    @Override
-    public <S> @Nullable S findContextSelection(Object key) {
-        BeanDependencies owner = contextSelectionOwners.get(key);
-        return owner == null ? null : owner.findResolved(key);
-    }
-
-    // The interceptors no scope holds that a selection is computed from are created for it, and this context is
-    // their only owner: they are destroyed when it stops, or at once when the selection fails or another thread
-    // kept its own first.
-    @Override
-    public <I, S> S selectForContext(Object key,
-                                     Argument<I> interceptorType,
-                                     @Nullable Qualifier<I> binding,
-                                     Function<Collection<BeanRegistration<I>>, S> selector) {
-        BeanDependencies kept = contextSelectionOwners.get(key);
+    public <S> @Nullable S resolveOnce(BeanLocator context, @Nullable BeanDefinition<?> definition, Object key,
+                                       Function<BeanResolutionContext, S> operation) {
+        BeanDependencies kept = contextOwners.get(key);
         if (kept == null) {
-            // A context-owned selection uses the same transaction as a registered target. Only the winning
-            // owner survives; failure and a lost race release their dependents through the same owner.
             BeanDependencies owner = new BeanDependencies();
-            S value = Objects.requireNonNull(owner.resolveOnce(this, null, key, resolution ->
-                selector.apply(resolution.getInterceptorRegistrations(interceptorType, binding))));
+            S value = owner.resolveOnce(this, definition, key, operation);
             boolean published = false;
             try {
-                synchronized (contextSelectionOwners) {
+                synchronized (contextOwners) {
                     // Shutdown can start after resolution committed but before the context took ownership.
                     owner.checkOpen(this);
-                    kept = contextSelectionOwners.putIfAbsent(key, owner);
+                    kept = contextOwners.putIfAbsent(key, owner);
                     published = kept == null;
                 }
                 if (published) {
@@ -4170,14 +4154,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
                 }
             }
         }
-        return Objects.requireNonNull(kept.findResolved(key));
+        return kept.findResolved(key);
     }
 
-    private void destroyContextSelections() {
+    private void destroyContextOwners() {
         List<BeanDependencies> owners;
-        synchronized (contextSelectionOwners) {
-            owners = new ArrayList<>(contextSelectionOwners.values());
-            contextSelectionOwners.clear();
+        synchronized (contextOwners) {
+            owners = new ArrayList<>(contextOwners.values());
+            contextOwners.clear();
         }
         for (BeanDependencies owner : owners) {
             destroyCreatedBeans(owner.takeDependents(), null);

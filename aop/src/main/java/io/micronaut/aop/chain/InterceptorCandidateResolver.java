@@ -22,8 +22,8 @@ import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DependencyOwner;
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.TargetInterceptorSelections;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -187,33 +187,42 @@ public class InterceptorCandidateResolver {
     public Interceptor<?, ?>[][] resolveTargetInterceptors(BeanLocator beanLocator,
         BeanDefinition<?> targetDefinition, ExecutableMethod<?, ?>[] methods, boolean introduction,
         @Nullable BeanRegistration<?> target, @Nullable Object bean) {
-        if (beanLocator instanceof TargetInterceptorSelections selections) {
-            if (target != null && target.getBean() == bean) {
-                // read before a selector is created for it, on every call
-                Interceptor<?, ?>[][] kept = selections.findTargetSelection(target, targetDefinition);
-                if (kept != null) {
-                    return kept;
-                }
-                Interceptor<?, ?>[][] selection = selections.selectForTarget(target, targetDefinition, resolutionContext -> selectForMethods(
-                    methods,
-                    introduction,
-                    resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
-                ));
+        // kept by the target, which then owns the unscoped interceptors created for it
+        if (target != null && target.getBean() == bean) {
+            DependencyOwner targetOwner = target.dependencyOwner();
+            if (targetOwner != null) {
+                Interceptor<?, ?>[][] selection = selectOnce(targetOwner, beanLocator, target.getBeanDefinition(), targetDefinition, methods, introduction);
                 if (selection != null) {
                     return selection;
                 }
             }
-            Interceptor<?, ?>[][] unowned = selections.findContextSelection(targetDefinition);
-            if (unowned != null) {
-                return unowned;
+        }
+        // or by the context, for a target it holds no registration for
+        if (beanLocator instanceof DependencyOwner contextOwner) {
+            Interceptor<?, ?>[][] selection = selectOnce(contextOwner, beanLocator, null, targetDefinition, methods, introduction);
+            if (selection != null) {
+                return selection;
             }
-            return selections.selectForContext(targetDefinition, Interceptor.ARGUMENT, bindingOf(methods),
-                registrations -> selectForMethods(methods, introduction, registrations));
         }
         // Other locators keep no selections: the interceptors are looked up and selected for the call.
         return selectForMethods(methods, introduction, beanLocator instanceof BeanDefinitionRegistry definitions
             ? definitions.getBeanRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
             : List.of());
+    }
+
+    private Interceptor<?, ?> @Nullable [][] selectOnce(DependencyOwner owner, BeanLocator beanLocator,
+                                                         @Nullable BeanDefinition<?> root, Object key,
+                                                         ExecutableMethod<?, ?>[] methods, boolean introduction) {
+        // read first, on every call of a proxy that selects for its target, before a selector is created
+        Interceptor<?, ?>[][] kept = owner.findResolved(key);
+        if (kept != null) {
+            return kept;
+        }
+        return owner.resolveOnce(beanLocator, root, key, resolutionContext -> selectForMethods(
+            methods,
+            introduction,
+            resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
+        ));
     }
 
     private Qualifier<Interceptor<?, ?>> bindingOf(ExecutableMethod<?, ?>[] methods) {

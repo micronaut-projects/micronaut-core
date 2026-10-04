@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ObjectUtils;
@@ -153,6 +154,18 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      */
     @Nullable
     BeanDependencies getDependencies() {
+        return dependencies;
+    }
+
+    /**
+     * Returns the owner of what was created for this bean, for a caller outside this module that keeps a value
+     * with the lifetime of the bean.
+     *
+     * @return The owner, or null for a registration the container does not own
+     * @since 5.3.0
+     */
+    @Internal
+    public @Nullable DependencyOwner dependencyOwner() {
         return dependencies;
     }
 
