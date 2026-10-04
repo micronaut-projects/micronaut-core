@@ -17,7 +17,6 @@ package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorRegistry;
-import io.micronaut.aop.chain.ConstructorInterceptorChain;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -74,7 +73,7 @@ public interface ParameterizedInterceptedBeanDefinition<T>
      * @since 5.2.0
      */
     default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveLifecycleInterceptors(BeanResolutionContext resolutionContext,
-                                                                                            AnnotationMetadataProvider constructor) {
+                                                                                   AnnotationMetadataProvider constructor) {
         return resolutionContext.getBean(InterceptorRegistry.ARGUMENT).candidateResolver().resolveBeanCandidates(resolutionContext, constructor);
     }
 
@@ -86,18 +85,17 @@ public interface ParameterizedInterceptedBeanDefinition<T>
         if (declared != null) {
             // An explicitly supplied set is bound for construction only, so it is used here but not shared with the
             // post-construct interception of this bean, which may bind interceptors this set does not contain.
-            return ConstructorInterceptorChain.instantiate(resolutionContext, context, declared, this, constructor, 0, values);
+            return context.getBean(InterceptorRegistry.ARGUMENT).chainFactory().instantiate(resolutionContext, this, constructor, declared, 0, values);
         }
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveLifecycleInterceptors(resolutionContext, constructor);
         if (interceptors != null) {
             resolutionContext.setBeanInterceptors(this, interceptors);
         }
-        return ConstructorInterceptorChain.instantiate(
+        return context.getBean(InterceptorRegistry.ARGUMENT).chainFactory().instantiate(
             resolutionContext,
-            context,
-            interceptors,
             this,
             constructor,
+            interceptors,
             0,
             values
         );

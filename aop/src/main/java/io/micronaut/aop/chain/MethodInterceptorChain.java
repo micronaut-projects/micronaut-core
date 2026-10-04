@@ -20,7 +20,6 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
-import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -29,7 +28,6 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -40,7 +38,7 @@ import java.util.Objects;
 import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
 
 /**
- * An internal representation of the {@link Interceptor} chain. This class implements {@link MethodInvocationContext} and is
+ * An internal representation of the {@link Interceptor} chain. This class implements {@link LifecycleInvocation} and is
  * consumed by the framework itself and should not be used directly in application code.
  *
  * @param <T> type
@@ -50,7 +48,7 @@ import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
  */
 @Internal
 @UsedByGeneratedCode
-public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
+public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements LifecycleInvocation<T, R> {
 
     private final @Nullable InterceptorKind kind;
 
@@ -79,7 +77,25 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         T target,
         ExecutableMethod<T, R> executionHandle,
         @Nullable InterceptorKind kind) {
-        super(interceptors, target, executionHandle, EMPTY_OBJECT_ARRAY);
+        this(interceptors, target, executionHandle, kind, EMPTY_OBJECT_ARRAY);
+    }
+
+    /**
+     * Creates an invocation with an explicit kind and arguments.
+     * @param interceptors The selected interceptors
+     * @param target The invocation target
+     * @param executionHandle The executable method
+     * @param kind The interception kind
+     * @param originalParameters The invocation arguments
+     * @since 5.3.0
+     */
+    public MethodInterceptorChain(
+        Interceptor<T, R>[] interceptors,
+        T target,
+        ExecutableMethod<T, R> executionHandle,
+        @Nullable InterceptorKind kind,
+        @Nullable Object... originalParameters) {
+        super(interceptors, target, executionHandle, originalParameters);
         this.kind = kind;
     }
 
@@ -142,6 +158,21 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         }
     }
 
+    /**
+     * Executes a lifecycle invocation, preserving nullable unadvised results and rejecting null advice results.
+     * @param definition The lifecycle owner
+     * @return The invocation result
+     * @since 5.3.0
+     */
+    @Override
+    @Nullable
+    public R proceedLifecycle(BeanDefinition<T> definition) {
+        if (interceptorCount == 0) {
+            return executionHandle.invoke(target);
+        }
+        return Objects.requireNonNull(proceed(), getKind().name() + " interceptor chain illegal returned null for type: " + definition.getBeanType());
+    }
+
     @Override
     public String getMethodName() {
         return executionHandle.getMethodName();
@@ -180,12 +211,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Internal method that handles the logic for executing {@link InterceptorKind#POST_CONSTRUCT} interception.
      *
-     * <p>Superseded by
-     * {@link #initialize(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object, Collection)},
-     * which is what the framework calls now so that post-construct interception can reuse the interceptors already
-     * resolved while the bean was constructed. This form resolves interceptors by binding, and nothing in the
-     * framework or in currently generated code calls it. It is kept because it is part of the generated-code surface:
-     * bean definitions compiled by earlier versions call it directly.</p>
+     * <p>Delegates to the chain factory, which reuses the candidates retained during creation.
+     * Earlier generated definitions without retained candidates keep their binding-based resolution behavior.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext The bean context
@@ -214,8 +241,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      *
      * <p>Called for a bean whose interceptors were resolved once while it was constructed, so that a
      * {@code @Prototype} interceptor which ran the constructor also runs {@code @PostConstruct}. Passing
-     * {@code null} resolves interceptors by binding, which is what the five-argument form does and what generated
-     * code from earlier versions continues to do.</p>
+     * {@code null} uses the candidates retained in the resolution context, falling back to binding-based
+     * resolution for earlier generated definitions without retained candidates.</p>
      *
      * @param resolutionContext  The resolution context
      * @param beanContext        The bean context
@@ -237,23 +264,19 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return doIntercept(
-            resolutionContext,
-            beanContext,
-            definition,
-            postConstructMethod,
-            bean,
-            InterceptorKind.POST_CONSTRUCT,
-            interceptors
+        // Older generated callers use an empty explicit set to request discovery.
+        return beanContext.getBean(InterceptorRegistry.ARGUMENT).chainFactory().initialize(
+            resolutionContext, definition, postConstructMethod, bean,
+            interceptors == null || interceptors.isEmpty() ? null : interceptors
         );
     }
 
     /**
      * Internal method that handles the logic for executing {@link InterceptorKind#PRE_DESTROY} interception.
      *
-     * <p>Uses the candidates the bean's dependency owner retained while the bean was created and installs on the
-     * destruction context. Earlier generated definitions without retained candidates keep their existing
-     * resolution behavior.</p>
+     * <p>The chain factory reuses the candidates installed on the destruction context by the bean's
+     * dependency owner. Earlier generated definitions without retained candidates keep their existing resolution
+     * behavior.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext The bean context
@@ -281,7 +304,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * reuses registrations already resolved for this bean.
      *
      * <p>Non-empty explicit registrations take precedence over candidates retained on the destruction context.
-     * Null or empty explicit registrations use the retained candidates; an empty retained set is authoritative.</p>
+     * Null or empty explicit registrations preserve legacy discovery behavior; an empty retained set is authoritative.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext       The bean context
@@ -303,53 +326,10 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return doIntercept(
-            resolutionContext,
-            beanContext,
-            definition,
-            preDestroyMethod,
-            bean,
-            InterceptorKind.PRE_DESTROY,
-            interceptors
+        // Older generated callers use an empty explicit set to request discovery.
+        return beanContext.getBean(InterceptorRegistry.ARGUMENT).chainFactory().dispose(
+            resolutionContext, definition, preDestroyMethod, bean,
+            interceptors == null || interceptors.isEmpty() ? null : interceptors
         );
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    @Nullable
-    private static <T1> T1 doIntercept(
-        BeanResolutionContext resolutionContext,
-        BeanContext beanContext,
-        BeanDefinition<T1> definition,
-        ExecutableMethod<T1, T1> interceptedMethod,
-        T1 bean,
-        InterceptorKind kind,
-        @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> shared) {
-        final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
-        // Explicit registrations are used as handed over. Without them, including an empty set from an older
-        // generated caller, the candidates retained while the bean was created are, or legacy discovery.
-        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = shared != null && !shared.isEmpty()
-            ? shared
-            : interceptorRegistry.candidateResolver().resolveLifecycleCandidates(resolutionContext, definition, interceptedMethod, bean, kind);
-        final Interceptor[] resolvedInterceptors = interceptorRegistry
-            .resolveInterceptors(
-                (ExecutableMethod) interceptedMethod,
-                (Collection) resolved,
-                kind
-            );
-
-        if (ArrayUtils.isNotEmpty(resolvedInterceptors)) {
-            final MethodInterceptorChain<T1, T1> chain = new MethodInterceptorChain<>(
-                resolvedInterceptors,
-                bean,
-                interceptedMethod,
-                kind
-            );
-            return Objects.requireNonNull(
-                chain.proceed(),
-                kind.name() + " interceptor chain illegal returned null for type: " + definition.getBeanType()
-            );
-        } else {
-            return interceptedMethod.invoke(bean);
-        }
     }
 }

@@ -157,7 +157,7 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext, TargetInterceptorSelections permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -4120,37 +4120,32 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    /**
-     * @param key The key
-     * @return The selection this context keeps for targets it holds no registration for, or {@code null}
-     */
-    @Nullable
-    Object keptUnownedInterceptors(Object key) {
-        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
-        return kept == null ? null : kept.selection;
+    @Override
+    public <S> @Nullable S getSelection(BeanRegistration<?> target, Object key) {
+        return target.keptSelection(key);
     }
 
-    /**
-     * Returns the interceptors this context keeps for targets it holds no registration for, see
-     * {@link RegisteredBeanInterceptors#selectUnowned(BeanLocator, Object, Argument, Qualifier, Function)}.
-     *
-     * <p>The interceptors no scope holds that a selection is computed from are created for it, and this context is
-     * their only owner: they are destroyed when it stops, or at once when the selection fails or another thread kept
-     * its own first.</p>
-     *
-     * @param key             The key
-     * @param interceptorType The interceptor type
-     * @param binding         The interceptor binding qualifier
-     * @param selector        Computes the selection from the registrations of the interceptors
-     * @param <I>             The interceptor type
-     * @param <S>             The selection type
-     * @return The selection
-     */
+    @Override
+    public <S> @Nullable S select(BeanRegistration<?> target, Object key, Function<BeanResolutionContext, S> selector) {
+        return target.select(key, selector);
+    }
+
+    @Override
     @SuppressWarnings("unchecked")
-    <I, S> S selectUnownedInterceptors(Object key,
-                                       Argument<I> interceptorType,
-                                       @Nullable Qualifier<I> binding,
-                                       Function<Collection<BeanRegistration<I>>, S> selector) {
+    public <S> @Nullable S getUnownedSelection(Object key) {
+        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
+        return kept == null ? null : (S) kept.selection;
+    }
+
+    // The interceptors no scope holds that a selection is computed from are created for it, and this context is
+    // their only owner: they are destroyed when it stops, or at once when the selection fails or another thread
+    // kept its own first.
+    @Override
+    @SuppressWarnings("unchecked")
+    public <I, S> S selectUnowned(Object key,
+                                  Argument<I> interceptorType,
+                                  @Nullable Qualifier<I> binding,
+                                  Function<Collection<BeanRegistration<I>>, S> selector) {
         UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
         if (kept == null) {
             // A context-owned selection uses the same transaction as a registered target. Only the winning
