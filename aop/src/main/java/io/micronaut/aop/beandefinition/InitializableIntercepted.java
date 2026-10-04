@@ -44,12 +44,6 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
         // every @PostConstruct callback of the bean, superclass callbacks first. An interceptor that does not proceed
         // keeps all of them from running. The callbacks themselves are listed by getPostConstructExecutableMethods().
         Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
-        if (shared == null) {
-            @SuppressWarnings("unchecked")
-            Collection<BeanRegistration<Interceptor<?, ?>>> current =
-                (Collection<BeanRegistration<Interceptor<?, ?>>>) resolutionContext.getBeanInterceptors(this);
-            shared = current;
-        }
         return Objects.requireNonNull(MethodInterceptorChain.initialize(
             resolutionContext,
             context,

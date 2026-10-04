@@ -15,7 +15,10 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.aop.chain.InterceptorCandidateResolver;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
@@ -50,6 +53,19 @@ public interface InterceptorRegistry {
         Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
         InterceptorKind interceptorKind
     );
+
+    /**
+     * Returns the service that acquires and retains the interceptor candidates of a bean. A registry may return
+     * its own to customize acquisition; an implementation that does should return the same instance on every call.
+     *
+     * @return The candidate resolver
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default InterceptorCandidateResolver candidateResolver() {
+        return new InterceptorCandidateResolver(this);
+    }
 
     /**
      * Resolves interceptors for the given constructor.

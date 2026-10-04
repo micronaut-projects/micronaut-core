@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
@@ -26,9 +25,6 @@ import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -36,13 +32,9 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 
 import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
@@ -259,9 +251,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Internal method that handles the logic for executing {@link InterceptorKind#PRE_DESTROY} interception.
      *
-     * <p>Resolves interceptors by binding. Unlike post-construct, destruction has nothing resolved in advance to hand
-     * over, because it runs with a fresh resolution context, so this remains the form the framework calls; the
-     * overload taking registrations exists for a caller that does hold them.</p>
+     * <p>Uses the candidates the bean's dependency owner retained while the bean was created and installs on the
+     * destruction context. Earlier generated definitions without retained candidates keep their existing
+     * resolution behavior.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext The bean context
@@ -288,9 +280,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * Variant of {@link #dispose(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object)} that
      * reuses registrations already resolved for this bean.
      *
-     * <p>Nothing supplies registrations here today: destruction runs with a fresh resolution context, so a bean
-     * reaches its interceptors either through the field on its proxy or through the registrations the container
-     * passes to the dispose call. The parameter exists so a caller that does hold them can hand them over.</p>
+     * <p>Non-empty explicit registrations take precedence over candidates retained on the destruction context.
+     * Null or empty explicit registrations use the retained candidates; an empty retained set is authoritative.</p>
      *
      * @param resolutionContext The resolution context
      * @param beanContext       The bean context
@@ -333,24 +324,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         T1 bean,
         InterceptorKind kind,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> shared) {
-        final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
-        final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
-
-        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved;
-        if (shared != null && !shared.isEmpty()) {
-            // Resolved once while the bean was created and handed to this interception point.
-            resolved = shared;
-        } else if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
-            // Retained by the generated proxy.
-            resolved = intercepted.$interceptorRegistrations();
-        } else if (kind == InterceptorKind.PRE_DESTROY) {
-            // Destruction runs with a resolution context of its own. Reuse the interceptor instances the bean owns.
-            resolved = resolveLifecycleInterceptors(resolutionContext, binding);
-        } else {
-            // the bean's own: an instance created for an earlier interception point of the bean is used again
-            resolved = resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
-        }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
+        // Explicit registrations are used as handed over. Without them, including an empty set from an older
+        // generated caller, the candidates retained while the bean was created are, or legacy discovery.
+        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = shared != null && !shared.isEmpty()
+            ? shared
+            : interceptorRegistry.candidateResolver().resolveLifecycleCandidates(resolutionContext, definition, interceptedMethod, bean, kind);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
             .resolveInterceptors(
                 (ExecutableMethod) interceptedMethod,
@@ -372,74 +351,5 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         } else {
             return interceptedMethod.invoke(bean);
         }
-    }
-
-    /**
-     * Resolves the interceptor candidates for pre-destroy interception.
-     *
-     * <p>The interceptors the container hands over when the bean was constructed with some are the candidate set.
-     * Otherwise the interceptor instances among the dependents of the bean are, together with the singletons bound to
-     * the event, and when the bean has none the interceptors are resolved by binding as the bean's own.</p>
-     *
-     * @param resolutionContext The resolution context
-     * @param binding           The binding of the interception point
-     * @return The interceptor registrations to select from
-     * @since 5.2.0
-     */
-    @SuppressWarnings("unchecked")
-    private static Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleInterceptors(
-        BeanResolutionContext resolutionContext,
-        Collection<AnnotationValue<?>> binding) {
-
-        Object attribute = resolutionContext.getAttribute(BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS);
-        if (attribute instanceof List<?> existing) {
-            return (List<BeanRegistration<Interceptor<?, ?>>>) existing;
-        }
-        Qualifier<Interceptor<?, ?>> qualifier = Qualifiers.byInterceptorBindingValues(binding);
-        List<BeanRegistration<Interceptor<?, ?>>> existing = findExistingInterceptors(resolutionContext);
-        if (existing.isEmpty()) {
-            // resolved as the bean's own, which finds those created for an earlier interception point of the bean
-            return resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, qualifier);
-        }
-        // The interceptor instances among the dependents of the bean, such as those a proxy retained and handed to
-        // the target it destroys, are the candidates, as before. A singleton bound to the event is no dependent of
-        // the bean, so it is added.
-        List<BeanRegistration<Interceptor<?, ?>>> candidates = new ArrayList<>(existing);
-        BeanContext beanContext = resolutionContext.getContext();
-        for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, qualifier)) {
-            if (definition.isSingleton()) {
-                candidates.add(beanContext.getBeanRegistration(definition));
-            }
-        }
-        return candidates;
-    }
-
-    /**
-     * Finds interceptor registrations already associated with a legacy disposal path. New bean registrations carry
-     * the exact selected set through {@link BeanResolutionContext#EXISTING_INTERCEPTOR_REGISTRATIONS}; this fallback
-     * remains for generated factory definitions that cannot transfer that set during construction.
-     *
-     * @param resolutionContext The resolution context
-     * @return Existing interceptor registrations
-     */
-    @SuppressWarnings("unchecked")
-    private static List<BeanRegistration<Interceptor<?, ?>>> findExistingInterceptors(BeanResolutionContext resolutionContext) {
-        List<BeanRegistration<?>> dependents = resolutionContext.getDependentBeans();
-        if (dependents.isEmpty() && resolutionContext.getAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS) instanceof List<?> attribute) {
-            dependents = (List<BeanRegistration<?>>) attribute;
-        }
-        if (dependents.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<BeanRegistration<Interceptor<?, ?>>> interceptors = null;
-        for (BeanRegistration<?> dependent : dependents) {
-            if (dependent.getBean() instanceof Interceptor) {
-                if (interceptors == null) {
-                    interceptors = new ArrayList<>(dependents.size());
-                }
-                interceptors.add((BeanRegistration<Interceptor<?, ?>>) dependent);
-            }
-        }
-        return interceptors == null ? Collections.emptyList() : interceptors;
     }
 }
