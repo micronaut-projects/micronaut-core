@@ -20,13 +20,15 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Function;
+
 /**
  * An injected resolver whose dependencies are held by its own registration, which is a dependent of the consumer.
  *
  * @since 5.3.0
  */
 @Internal
-final class DefaultBeanDependencyResolver implements BeanDependencyGroup {
+final class DefaultBeanDependencyResolver implements BeanDependencyGroup, DependencyOwner {
     private final DefaultBeanContext context;
     final BeanDependencies dependencies;
 
@@ -85,5 +87,16 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup {
     @Override
     public void close() {
         dependencies.close(context);
+    }
+
+    @Override
+    public <S> @Nullable S findResolved(Object key) {
+        return dependencies.findResolved(key);
+    }
+
+    @Override
+    public <S> @Nullable S resolveOnce(BeanLocator context, @Nullable BeanDefinition<?> definition, Object key,
+                                       Function<BeanResolutionContext, S> operation) {
+        return dependencies.resolveOnce(context, definition, key, operation);
     }
 }

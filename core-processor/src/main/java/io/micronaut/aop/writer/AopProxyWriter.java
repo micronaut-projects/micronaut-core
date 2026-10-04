@@ -247,7 +247,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         ExecutableMethod[].class,
         boolean.class,
         BeanRegistration.class,
-        Object.class
+        Object.class,
+        BeanDependencyGroup.class
     );
     private static final Method METHOD_FIND_PROXY_TARGET_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(
         InterceptorCandidateResolver.class,
@@ -609,7 +610,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             aThis.field(proxyMethodsField),
             TypeDef.Primitive.BOOLEAN.constant(isIntroduction),
             targetRegistration,
-            target
+            target,
+            aThis.field(BEAN_DEPENDENCIES, TypeDef.of(BeanDependencyGroup.class))
         );
     }
 
@@ -1061,7 +1063,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     aThis.field(proxyMethodsField),
                     TypeDef.Primitive.BOOLEAN.constant(isIntroduction),
                     aThis.field(Objects.requireNonNull(fields.targetRegistration())),
-                    aThis.field(Objects.requireNonNull(targetField))
+                    aThis.field(Objects.requireNonNull(targetField)),
+                    aThis.field(BEAN_DEPENDENCIES, TypeDef.of(BeanDependencyGroup.class))
                 ))
             );
         }
