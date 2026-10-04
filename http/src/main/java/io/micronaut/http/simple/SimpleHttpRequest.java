@@ -77,8 +77,20 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     private void updateCookies() {
         headers.remove(HttpHeaders.COOKIE);
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
         for (Cookie cookie : cookies.getAll()) {
-            headers.add(HttpHeaders.COOKIE, ClientCookieEncoder.INSTANCE.encode(cookie));
+            String encoded = ClientCookieEncoder.INSTANCE.encode(cookie);
+            if (encoded != null && !encoded.isEmpty()) {
+                if (!first) {
+                    sb.append("; ");
+                }
+                sb.append(encoded);
+                first = false;
+            }
+        }
+        if (sb.length() > 0) {
+            headers.set(HttpHeaders.COOKIE, sb.toString());
         }
     }
 
