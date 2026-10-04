@@ -20,6 +20,7 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.value.PropertyResolver;
+import io.micronaut.http.server.HttpServerConfiguration;
 
 /**
  * Passes if a cross-origin response policy is configured. Without one there is no populator, and
@@ -29,7 +30,7 @@ import io.micronaut.core.value.PropertyResolver;
  */
 @Internal
 final class CrossOriginPoliciesCondition implements Condition {
-    private static final String PREFIX = "micronaut.server.cors.";
+    private static final String PREFIX = HttpServerConfiguration.PREFIX + ".cors.";
 
     @Override
     public boolean matches(ConditionContext context) {

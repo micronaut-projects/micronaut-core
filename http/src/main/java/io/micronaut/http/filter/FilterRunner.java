@@ -224,7 +224,7 @@ public class FilterRunner {
                                                     PropagatedContext propagatedContext) {
         ListIterator<InternalHttpFilter> iterator;
         if (preMatchingFilters != null) {
-            List<InternalHttpFilter> filtersToRun = filterFilters(preMatchingFilters, request, true);
+            List<InternalHttpFilter> filtersToRun = reduceFilters(preMatchingFilters, request, true);
             if (filtersToRun.isEmpty()) {
                 // No pre-matching filters
                 try {
@@ -232,7 +232,7 @@ public class FilterRunner {
                 } catch (Throwable t) {
                     return processFailure(request, t, propagatedContext);
                 }
-                filtersToRun = filterFilters(findInternalFiltersAfterRouteMatch(request), request, false);
+                filtersToRun = reduceFilters(findInternalFiltersAfterRouteMatch(request), request, false);
                 iterator = filtersToRun.listIterator();
             } else {
                 // Pre-matching filters plus route match resolver
@@ -242,7 +242,7 @@ public class FilterRunner {
                 f.filterIterator = iterator;
             }
         } else {
-            iterator = filters == null ? List.<InternalHttpFilter>of().listIterator() : filterFilters(filters, request, false).listIterator();
+            iterator = filters == null ? List.<InternalHttpFilter>of().listIterator() : reduceFilters(filters, request, false).listIterator();
         }
         if (!iterator.hasNext()) {
             return provideResponse(request, propagatedContext);
@@ -272,10 +272,10 @@ public class FilterRunner {
                                                                    PropagatedContext propagatedContext) {
         List<InternalHttpFilter> filtersToRun = new ArrayList<>();
         if (preMatchingFilters != null) {
-            filtersToRun.addAll(filterFilters(preMatchingFilters, request, false));
+            filtersToRun.addAll(reduceFilters(preMatchingFilters, request, false));
         }
         if (filters != null) {
-            filtersToRun.addAll(filterFilters(filters, request, false));
+            filtersToRun.addAll(reduceFilters(filters, request, false));
         }
         if (filtersToRun.isEmpty()) {
             return ExecutionFlow.just(response);
@@ -297,7 +297,7 @@ public class FilterRunner {
      *                list itself is returned if all its filters are enabled, which is the common case
      * @return The enabled filters
      */
-    private List<InternalHttpFilter> filterFilters(List<InternalHttpFilter> filters, HttpRequest<?> request, boolean mutable) {
+    private List<InternalHttpFilter> reduceFilters(List<InternalHttpFilter> filters, HttpRequest<?> request, boolean mutable) {
         int size = filters.size();
         if (mutable) {
             int firstEnabled = 0;
