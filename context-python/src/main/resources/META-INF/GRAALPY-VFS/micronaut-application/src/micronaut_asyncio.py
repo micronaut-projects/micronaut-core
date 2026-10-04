@@ -239,6 +239,18 @@ def _is_java_throwable(value):
         return False
 
 
+# the Python exceptions the bridge stores for a Java failure, as opposed to a Python exception of the
+# application that happens to carry a java_exception attribute
+_JAVA_FAILURE_TYPES = (MicronautJavaException, MicronautJavaOSError, MicronautJavaConnectionRefused, MicronautJavaTimeout, MicronautJavaAddressError)
+
+
+def _in_micronaut_task():
+    try:
+        return isinstance(tasks.current_task(), _MicronautTask)
+    except RuntimeError:
+        return False
+
+
 class _MicronautWait:
     """Suspend until a future is done, yielding the future itself to the task as ``Future.__await__``
     does, so cancelling the awaiting task cancels the future.
@@ -301,7 +313,11 @@ class _MicronautStageFuture(_MicronautJavaFailureAwaitable, futures.Future):
     def _micronaut_raised_java_failure(self, failure):
         if not self.done() or self.cancelled() or failure is not self.exception():
             return None
-        return failure.java_exception if _is_java_failure(failure) else None
+        if not isinstance(failure, _JAVA_FAILURE_TYPES) or not _in_micronaut_task():
+            # a task of a loop the bridge does not own could not re-raise the Java exception if its
+            # coroutine let it escape: there the wrapper is raised
+            return None
+        return failure.java_exception
 
 
 class _MicronautTask(_MicronautJavaFailureAwaitable, tasks.Task):

@@ -2143,12 +2143,41 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void awaitedJavaFailureOnALoopOfTheApplicationRaisesTheWrapper() throws Exception {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new FailingAsyncClient()));
+            // the tasks of a loop the bridge does not own cannot carry a Java exception: the wrapper is raised
+            Value result = context.eval(PYTHON, """
+                import asyncio
+                async def message(target):
+                    return await target.client.message()
+                async def call(target):
+                    try:
+                        await asyncio.create_task(message(target))
+                    except RuntimeError as e:
+                        return type(e).__name__ + ":" + str(e.java_exception.getMessage())
+                def run(target):
+                    return asyncio.run(call(target))
+                run
+                """).execute(target);
+            assertEquals("MicronautJavaException:backend down", result.asString());
+        }
+    }
+
+    @Test
     void awaitedStageFailingWithAPythonExceptionRaisesThatException() throws Exception {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             Value failing = context.eval(PYTHON, """
                 class Rejected(Exception):
                     pass
                 rejected = Rejected("no")
+                # an application attribute of that name does not make it a bridge wrapper
+                rejected.java_exception = "not a bridge wrapper"
                 async def fail():
                     raise rejected
                 fail
