@@ -81,6 +81,16 @@ final class FlowConcatMap<T, R> extends FluxOperator<T, R> {
          */
         private boolean terminated;
         private boolean cancelled;
+        /**
+         * The flow of the item that is being mapped, while it has not completed. Cancelled
+         * together with the upstream.
+         */
+        private @Nullable ExecutionFlow<? extends R> pendingFlow;
+        /**
+         * The number of items whose mapping has started, and the number of those that are done.
+         */
+        private long started;
+        private long finished;
 
         MapSubscriber(CoreSubscriber<? super R> actual, Function<? super T, ? extends ExecutionFlow<? extends R>> mapper) {
             this.actual = actual;
@@ -130,17 +140,24 @@ final class FlowConcatMap<T, R> extends FluxOperator<T, R> {
 
         @Override
         public void cancel() {
+            ExecutionFlow<? extends R> flow;
             synchronized (this) {
                 if (cancelled) {
                     return;
                 }
                 cancelled = true;
+                flow = pendingFlow;
+                pendingFlow = null;
             }
             upstream().cancel();
+            if (flow != null) {
+                flow.cancel();
+            }
         }
 
         @Override
         public void onNext(T t) {
+            long item;
             synchronized (this) {
                 requested = false;
                 if (cancelled || terminated) {
@@ -148,6 +165,7 @@ final class FlowConcatMap<T, R> extends FluxOperator<T, R> {
                     return;
                 }
                 active = true;
+                item = ++started;
             }
             ExecutionFlow<? extends R> flow;
             try {
@@ -160,14 +178,31 @@ final class FlowConcatMap<T, R> extends FluxOperator<T, R> {
             ImperativeExecutionFlow<? extends R> complete = flow.tryComplete();
             if (complete != null) {
                 done(complete.getValue(), complete.getError());
-            } else {
-                flow.onComplete(this::done);
+                return;
+            }
+            // registered before the flow can be cancelled, which rejects further steps. A result
+            // that is produced after a cancellation is discarded in done
+            flow.onComplete(this::done);
+            boolean cancelNow;
+            synchronized (this) {
+                // the subscriber may have cancelled while the mapper ran. The flow is only
+                // published while it has not completed: done may already have run, and may
+                // even have started the next item
+                cancelNow = cancelled;
+                if (!cancelNow && finished < item) {
+                    pendingFlow = flow;
+                }
+            }
+            if (cancelNow) {
+                flow.cancel();
             }
         }
 
         private void done(@Nullable R value, @Nullable Throwable error) {
             boolean drop;
             synchronized (this) {
+                pendingFlow = null;
+                finished++;
                 drop = cancelled || terminated;
                 if (!drop && error != null) {
                     terminated = true;

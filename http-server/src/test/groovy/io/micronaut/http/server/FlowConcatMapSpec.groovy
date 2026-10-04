@@ -160,6 +160,52 @@ class FlowConcatMapSpec extends Specification {
         subscriber.error == null
     }
 
+    def 'cancelling the subscription cancels the pending flow'() {
+        given:
+        def flow = DelayedExecutionFlow.<String> create()
+        def flowCancelled = false
+        flow.onCancel { flowCancelled = true }
+        def upstreamCancelled = false
+        def subscriber = new RecordingSubscriber()
+        new FlowConcatMap<Integer, String>(Flux.range(0, 3).doOnCancel { upstreamCancelled = true }, { flow }).subscribe(subscriber)
+        subscriber.request(10)
+
+        when:
+        subscriber.subscription.cancel()
+
+        then:
+        flowCancelled
+        upstreamCancelled
+        subscriber.items == []
+        !subscriber.completed
+        subscriber.error == null
+    }
+
+    def 'a flow returned after the subscription was cancelled is cancelled'() {
+        given:
+        def flow = DelayedExecutionFlow.<String> create()
+        def flowCancelled = false
+        flow.onCancel { flowCancelled = true }
+        def discarded = []
+        def subscriber = new RecordingSubscriber(Context.of("reactor.onDiscard.local", { discarded << it } as java.util.function.Consumer))
+        new FlowConcatMap<Integer, String>(Flux.range(0, 3), {
+            // the subscriber cancels while the mapper runs
+            subscriber.subscription.cancel()
+            flow
+        }).subscribe(subscriber)
+
+        when:
+        subscriber.request(10)
+        flow.complete("late")
+
+        then:
+        flowCancelled
+        subscriber.items == []
+        discarded == ["late"]
+        !subscriber.completed
+        subscriber.error == null
+    }
+
     def 'a subscriber may request from onNext without reentrant emission'() {
         given:
         def depth = 0
