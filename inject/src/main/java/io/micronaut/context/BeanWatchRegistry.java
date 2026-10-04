@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -266,7 +267,9 @@ final class BeanWatchRegistry {
     List<ConfigurationWatcher.Outcome> configurationChanged(ConfigurationChange change) {
         List<ConfigurationWatcher.Outcome> outcomes = new ArrayList<>();
         List<Owner> toRecreate = new ArrayList<>();
-        List<Integer> recreateOutcomes = new ArrayList<>();
+        // the owner each RECREATE outcome asked for, by the outcome's own index, taken as the outcome is added: a
+        // second walk over the registrations would not line up with the outcomes once a watch failed or closed
+        Map<Integer, Owner> recreateOutcomes = new LinkedHashMap<>();
         for (Registration registration : ordered()) {
             if (registration.closed.get() || !(registration instanceof ConfigurationRegistration configurationRegistration)
                 || !change.touches(configurationRegistration.prefix)) {
@@ -288,7 +291,7 @@ final class BeanWatchRegistry {
                     if (!toRecreate.contains(owner)) {
                         toRecreate.add(owner);
                     }
-                    recreateOutcomes.add(outcomes.size());
+                    recreateOutcomes.put(outcomes.size(), owner);
                 }
             }
             outcomes.add(outcome);
@@ -303,13 +306,9 @@ final class BeanWatchRegistry {
         }
         if (!notRecreated.isEmpty()) {
             // the outcome reported is what happened, not what the watcher asked for
-            int index = 0;
-            for (Registration registration : ordered()) {
-                if (registration instanceof ConfigurationRegistration configurationRegistration && change.touches(configurationRegistration.prefix)) {
-                    if (recreateOutcomes.contains(index) && registration.owner != null && notRecreated.contains(registration.owner)) {
-                        outcomes.set(index, ConfigurationWatcher.Outcome.IGNORED);
-                    }
-                    index++;
+            for (Map.Entry<Integer, Owner> entry : recreateOutcomes.entrySet()) {
+                if (notRecreated.contains(entry.getValue())) {
+                    outcomes.set(entry.getKey(), ConfigurationWatcher.Outcome.IGNORED);
                 }
             }
         }

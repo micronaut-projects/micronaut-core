@@ -297,6 +297,22 @@ class BeanWatchTest {
     }
 
     @Test
+    void aRecreateThatCannotHappenIsReportedIgnoredEvenAfterAWatchThatFailed() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            // a watch ahead of it fails and reports no outcome
+            beanContext.watchConfiguration("protos", change -> {
+                throw new IllegalStateException("boom");
+            });
+            // a watch that answers APPLIED, and the prototype's, which answers RECREATE
+            beanContext.watchConfiguration("protos.main", change -> Outcome.APPLIED);
+            context.getBean(RecreatingPrototype.class);
+
+            assertEquals(List.of(Outcome.APPLIED, Outcome.IGNORED), beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.main.url"))));
+        }
+    }
+
+    @Test
     void configurationChangesAreMatchedAtDotBoundariesInEverySpelling() {
         assertTrue(ConfigurationChange.ofKeys(Set.of("datasources.default.url")).touches("datasources.default"));
         assertTrue(ConfigurationChange.ofKeys(Set.of("datasources.default")).touches("datasources.default"));
