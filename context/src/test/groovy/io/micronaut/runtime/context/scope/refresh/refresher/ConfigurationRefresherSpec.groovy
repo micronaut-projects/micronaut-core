@@ -148,6 +148,44 @@ class ConfigurationRefresherSpec extends Specification {
         context.close()
     }
 
+    void "without a dependency graph a setter bean that lost a key is rebound in place, so a holder that cached it is still refreshed"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "pool.size": 5, "bound.label": "a"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        def configuration = context.getBean(PoolConfiguration)
+
+        expect:
+        context.findDependencyGraph().isEmpty()
+
+        when: "a key goes away"
+        values.remove("pool.size")
+        def result = refresher.refresh()
+
+        then: "nothing recreates what holds the bean, so the bean stays the one they hold"
+        result.change().changed() == ["pool.size"] as Set
+        result.recreated().isEmpty()
+        result.rebound()*.beanType == [PoolConfiguration]
+        context.getBean(PoolConfiguration).is(configuration)
+
+        when: "a later change"
+        values["pool.url"] = "two"
+        refresher.refresh()
+
+        then: "reaches the instance the holder cached"
+        configuration.url == "two"
+
+        cleanup:
+        context.close()
+    }
+
     void "without a dependency graph the beans holding a recreated configuration are found by type"() {
         given:
         Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "bound.label": "a"]

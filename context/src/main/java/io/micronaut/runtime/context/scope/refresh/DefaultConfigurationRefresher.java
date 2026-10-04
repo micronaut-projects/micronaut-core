@@ -248,7 +248,11 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
                 recreated.add(definition);
                 continue;
             }
-            boolean recreate = bindsThroughConstructor(definition) || (prefix != null && lostKeys(change, prefix));
+            // a removed key is reset to its default by a new instance only where the graph recreates the beans that
+            // received the old one: without it, a holder that cached the old instance, as the router caches a filter,
+            // would keep a configuration that no refresh reaches any more, so the bean is rebound in place as before
+            boolean recreate = bindsThroughConstructor(definition)
+                || (prefix != null && lostKeys(change, prefix) && context.findDependencyGraph().isPresent());
             if (recreate && context instanceof DefaultBeanContext defaultBeanContext && bean != null) {
                 if (context.findDependencyGraph().isEmpty()) {
                     // no graph outside development mode: the beans that received the instance are found by the
