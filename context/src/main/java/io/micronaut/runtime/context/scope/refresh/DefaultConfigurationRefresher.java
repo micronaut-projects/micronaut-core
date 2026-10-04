@@ -243,7 +243,13 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
                 continue;
             }
             if (prefix != null && definition.isIterable() && !change.all() && environment.getProperties(prefix).isEmpty()) {
-                // an  entry whose keys all went: the bean goes with them
+                // an entry whose keys all went: the bean goes with them, and so do the singletons that received it,
+                // as for a constructor-bound bean, or they would keep an entry no configuration backs any more. They
+                // are created again on their next use: a holder of every entry sees the ones that remain, a holder
+                // of this entry fails as it would at a startup without it
+                if (context instanceof DefaultBeanContext defaultBeanContext) {
+                    destroyDependents(defaultBeanContext, definition);
+                }
                 context.destroyBean(registration);
                 recreated.add(definition);
                 continue;
