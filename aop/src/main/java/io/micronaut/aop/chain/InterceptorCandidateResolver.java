@@ -190,11 +190,11 @@ public class InterceptorCandidateResolver {
         if (beanLocator instanceof TargetInterceptorSelections selections) {
             if (target != null && target.getBean() == bean) {
                 // read before a selector is created for it, on every call
-                Interceptor<?, ?>[][] kept = selections.getSelection(target, targetDefinition);
+                Interceptor<?, ?>[][] kept = selections.findTargetSelection(target, targetDefinition);
                 if (kept != null) {
                     return kept;
                 }
-                Interceptor<?, ?>[][] selection = selections.select(target, targetDefinition, resolutionContext -> selectForMethods(
+                Interceptor<?, ?>[][] selection = selections.selectForTarget(target, targetDefinition, resolutionContext -> selectForMethods(
                     methods,
                     introduction,
                     resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
@@ -203,11 +203,11 @@ public class InterceptorCandidateResolver {
                     return selection;
                 }
             }
-            Interceptor<?, ?>[][] unowned = selections.getUnownedSelection(targetDefinition);
+            Interceptor<?, ?>[][] unowned = selections.findContextSelection(targetDefinition);
             if (unowned != null) {
                 return unowned;
             }
-            return selections.selectUnowned(targetDefinition, Interceptor.ARGUMENT, bindingOf(methods),
+            return selections.selectForContext(targetDefinition, Interceptor.ARGUMENT, bindingOf(methods),
                 registrations -> selectForMethods(methods, introduction, registrations));
         }
         // Other locators keep no selections: the interceptors are looked up and selected for the call.
