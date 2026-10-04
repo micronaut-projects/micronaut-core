@@ -59,9 +59,15 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
     private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
     private final BeanContext beanContext;
+    private final InterceptorCandidateResolver candidateResolver = new InterceptorCandidateResolver(this);
 
     public DefaultInterceptorRegistry(BeanContext beanContext) {
         this.beanContext = beanContext;
+    }
+
+    @Override
+    public InterceptorCandidateResolver candidateResolver() {
+        return candidateResolver;
     }
 
     @Override

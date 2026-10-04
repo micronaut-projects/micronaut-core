@@ -26,8 +26,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayList;
@@ -83,13 +81,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             executableMethods = proxyBeanDefinition.getExecutableMethods();
         }
         InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
-
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getBeanRegistrations(
-            (Argument) Argument.of(Interceptor.class),
-            binding
-        ));
-        resolutionContext.setBeanInterceptors(proxyBeanDefinition, interceptors);
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = interceptorRegistry.candidateResolver().captureProxyCandidates(resolutionContext, proxyBeanDefinition, executableMethods);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
             Interceptor<T, ?>[] methodInterceptors = InterceptorChain.resolveAroundInterceptors(interceptorRegistry, executableMethod, interceptors);
@@ -128,13 +120,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
 
         Collection<ExecutableMethod<T, ?>> executableMethods = proxyBeanDefinition.getExecutableMethods();
         InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
-
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getBeanRegistrations(
-            (Argument) Argument.of(Interceptor.class),
-            binding
-        ));
-        resolutionContext.setBeanInterceptors(proxyBeanDefinition, interceptors);
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = interceptorRegistry.candidateResolver().captureProxyCandidates(resolutionContext, proxyBeanDefinition, executableMethods);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
             // Only the abstract methods are implemented by the introduction advice,
