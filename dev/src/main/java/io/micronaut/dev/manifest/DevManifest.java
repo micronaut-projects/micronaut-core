@@ -117,12 +117,6 @@ public final class DevManifest {
      */
     public static final String REQUESTS_RETAIN_SOCKETS = PREFIX + "requests.retain-sockets";
 
-    private static final Duration DEFAULT_HOLD_TIMEOUT = Duration.ofSeconds(30);
-    /**
-     * Shorter than the hold: a connection that never finishes, a websocket or an event stream, holds every restart this long.
-     */
-    private static final Duration DEFAULT_DRAIN_TIMEOUT = Duration.ofSeconds(10);
-
     /**
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
      * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
@@ -133,6 +127,12 @@ public final class DevManifest {
      * bounds that growth with room to spare.
      */
     public static final int NATIVE_MAX_GENERATIONS = 50;
+
+    private static final Duration DEFAULT_HOLD_TIMEOUT = Duration.ofSeconds(30);
+    /**
+     * Shorter than the hold: a connection that never finishes, a websocket or an event stream, holds every restart this long.
+     */
+    private static final Duration DEFAULT_DRAIN_TIMEOUT = Duration.ofSeconds(10);
 
     private static final String TEST = "test.";
 

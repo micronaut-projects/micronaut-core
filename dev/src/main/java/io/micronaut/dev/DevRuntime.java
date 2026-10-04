@@ -56,8 +56,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import io.micronaut.runtime.EmbeddedApplication;
-import io.micronaut.runtime.graceful.GracefulShutdownCapable;
-import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
@@ -127,7 +125,6 @@ public final class DevRuntime implements Closeable {
     private static final Duration COALESCE = Duration.ofMillis(150);
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
-    private static final Duration SERVER_START_WAIT = Duration.ofSeconds(10);
     private static final int MAX_PROPAGATION_PASSES = 5;
 
     private final DevManifest manifest;
@@ -143,11 +140,6 @@ public final class DevRuntime implements Closeable {
     private final CountDownLatch closedLatch = new CountDownLatch(1);
     private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>();
     private volatile CompletableFuture<Void> ready = CompletableFuture.completedFuture(null);
-    /**
-     * Completes when the requests the gate holds may proceed: when the batch is done, or when a restart drains the
-     * generation they arrived on, which serves them before it stops.
-     */
-    private volatile CompletableFuture<Void> admitted = CompletableFuture.completedFuture(null);
     private volatile @Nullable ApplicationContext context;
     private volatile @Nullable Thread applicationThread;
     private volatile @Nullable CompileFailure lastFailure;
@@ -179,7 +171,7 @@ public final class DevRuntime implements Closeable {
      */
     private @Nullable Pending failedBatch;
     private final @Nullable TestSession tests;
-    private final @Nullable DevServerSockets serverSockets;
+    private final RestartRequests requests;
 
     /**
      * Creates the runtime; {@link #start(String[])} runs it.
@@ -218,7 +210,7 @@ public final class DevRuntime implements Closeable {
         }
         this.tests = manifest.mode() == DevMode.TEST ? new TestSession(this, manifest, this.compilers) : null;
         // in test mode the tests start their own servers, each on a port of its own
-        this.serverSockets = tests == null && manifest.retainServerSockets() ? new DevServerSockets() : null;
+        this.requests = new RestartRequests(manifest, tests == null && manifest.retainServerSockets());
     }
 
     /**
@@ -443,7 +435,7 @@ public final class DevRuntime implements Closeable {
      * @return The future
      */
     public CompletableFuture<Void> whenAdmitted() {
-        return admitted;
+        return requests.whenAdmitted();
     }
 
     /**
@@ -453,7 +445,7 @@ public final class DevRuntime implements Closeable {
      * @return The sockets
      */
     public Optional<DevServerSockets> serverSockets() {
-        return Optional.ofNullable(serverSockets);
+        return requests.serverSockets();
     }
 
     /**
@@ -831,10 +823,7 @@ public final class DevRuntime implements Closeable {
             if (current != null && current.isRunning()) {
                 stopGeneration(current);
             }
-            DevServerSockets sockets = serverSockets;
-            if (sockets != null) {
-                sockets.close();
-            }
+            requests.close();
             for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
                 compiler.close();
             }
@@ -865,59 +854,6 @@ public final class DevRuntime implements Closeable {
      * context's lock, takes the two locks in the opposite order; when the JVM exits, both hooks run at once
      * and would deadlock.
      */
-    /**
-     * Shuts the HTTP servers of a generation down gracefully before the context stops: they stop accepting, close their
-     * idle connections, and let every request in flight finish, within {@link DevManifest#requestDrainTimeout()}. A
-     * request that would otherwise still run while the context destroys its beans fails half way through.
-     */
-    private void drain(ApplicationContext generation) {
-        List<CompletableFuture<?>> draining = new ArrayList<>();
-        for (BeanRegistration<EmbeddedServer> registration : generation.getActiveBeanRegistrations(EmbeddedServer.class)) {
-            if (registration.getBean() instanceof GracefulShutdownCapable server && registration.getBean().isRunning()) {
-                try {
-                    draining.add(server.shutdownGracefully().toCompletableFuture());
-                } catch (RuntimeException e) {
-                    LOG.debug("Cannot drain {}", server, e);
-                }
-            }
-        }
-        if (draining.isEmpty()) {
-            return;
-        }
-        Duration timeout = manifest.requestDrainTimeout();
-        try {
-            CompletableFuture.allOf(draining.toArray(CompletableFuture[]::new)).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-            LOG.warn("Requests or connections were still open on generation {} after {} ms; it stops anyway ({})",
-                classLoader.generation(), timeout.toMillis(), DevManifest.REQUESTS_DRAIN_TIMEOUT);
-        } catch (ExecutionException e) {
-            LOG.debug("Draining generation {} failed", classLoader.generation(), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    /**
-     * Waits, briefly, for the HTTP servers of a generation that just started: the application starts them after its
-     * context, on its own thread.
-     */
-    private static void awaitServers(ApplicationContext generation) {
-        long deadline = System.nanoTime() + SERVER_START_WAIT.toNanos();
-        while (System.nanoTime() < deadline && generation.isRunning()) {
-            Collection<BeanRegistration<EmbeddedServer>> servers = generation.getActiveBeanRegistrations(EmbeddedServer.class);
-            // every server created so far: one that starts later than the first must not lose the socket it is about to claim
-            if (!servers.isEmpty() && servers.stream().allMatch(registration -> registration.getBean().isRunning())) {
-                return;
-            }
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
     private static void stopGeneration(ApplicationContext generation) {
         // only the applications already created: looking one up must not create it while stopping. Each is stopped
         // whether it reports running or not, as the hook does: the hook's stop clears the flag before it stops the
@@ -1150,13 +1086,8 @@ public final class DevRuntime implements Closeable {
             // a request waits for the batch: the gate filter holds those on open connections, and the servers stop
             // accepting new ones, which wait in the backlog for whichever generation runs once the batch is done
             CompletableFuture<Void> gate = new CompletableFuture<>();
-            CompletableFuture<Void> admission = new CompletableFuture<>();
             ready = gate;
-            admitted = admission;
-            DevServerSockets sockets = serverSockets;
-            if (sockets != null) {
-                sockets.pause();
-            }
+            CompletableFuture<Void> admission = requests.batchStarted();
             List<Pending> batches = new ArrayList<>();
             batches.add(first);
             try {
@@ -1176,10 +1107,7 @@ public final class DevRuntime implements Closeable {
                     last = Math.max(last, batch.sequence);
                 }
                 completed.accumulateAndGet(last, Math::max);
-                if (sockets != null) {
-                    sockets.resume();
-                }
-                admission.complete(null);
+                requests.batchDone(admission);
                 gate.complete(null);
             }
         }
@@ -1320,7 +1248,7 @@ public final class DevRuntime implements Closeable {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
                 configurationChange = refresh.change();
-                String stale = staleAfterRefresh(current, refresh.change());
+                String stale = ConfigurationStaleness.afterRefresh(current, refresh.change());
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
                 } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailed) {
@@ -1348,103 +1276,6 @@ public final class DevRuntime implements Closeable {
             return;
         }
         restart(changeSet, configurationChange, start);
-    }
-
-    /**
-     * What a refresh cannot update: a singleton that received a changed property through {@code @Value}
-     * or {@code @Property} rather than a configuration bean, and a definition whose {@code @Requires} names a
-     * changed property, whose presence the change may have flipped. Either one makes the batch restart.
-     *
-     * @return Why a restart is needed, or null when the refresh covered the change
-     */
-    @Nullable
-    private static String staleAfterRefresh(@Nullable ApplicationContext current, ConfigurationChange change) {
-        if (current == null || change.all()) {
-            return current == null ? null : "every property may have changed";
-        }
-        // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
-        // is as stale as the singleton would be
-        Set<BeanDefinition<?>> definitions = new LinkedHashSet<>();
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
-        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
-            BeanDefinition<?> definition = registration.getBeanDefinition();
-            definitions.add(definition);
-            graph.ifPresent(g -> definitions.addAll(g.transitiveDependenciesOf(definition)));
-        }
-        for (BeanDefinition<?> definition : definitions) {
-            if (definition.isConfigurationProperties()) {
-                continue;
-            }
-            if (injectsChangedProperty(definition, change)) {
-                return definition.getBeanType().getName() + " injects a changed property directly";
-            }
-        }
-        for (io.micronaut.inject.BeanDefinitionReference<?> reference : current.getBeanDefinitionReferences()) {
-            for (io.micronaut.core.annotation.AnnotationValue<io.micronaut.context.annotation.Requires> requires : reference.getAnnotationMetadata().getAnnotationValuesByType(io.micronaut.context.annotation.Requires.class)) {
-                String property = requires.stringValue("property").orElse(null);
-                if (property != null && change.touches(property)) {
-                    return reference.getBeanDefinitionName() + " requires a changed property";
-                }
-            }
-        }
-        return null;
-    }
-
-    private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
-        for (io.micronaut.core.type.Argument<?> argument : definition.getConstructor().getArguments()) {
-            if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
-                return true;
-            }
-        }
-        for (io.micronaut.inject.FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
-            if (mentionsChangedProperty(field.getAnnotationMetadata(), change)) {
-                return true;
-            }
-        }
-        for (io.micronaut.inject.MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
-            for (io.micronaut.core.type.Argument<?> argument : method.getArguments()) {
-                if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
-     * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
-     */
-    private static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
-        // the raw values: a string value read through the metadata has its placeholders resolved already
-        Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
-        if (property != null && change.touches(property.toString())) {
-            return true;
-        }
-        Object raw = metadata.getValues(io.micronaut.context.annotation.Value.class.getName()).get("value");
-        if (raw == null) {
-            return false;
-        }
-        String expression = raw.toString();
-        if (expression.contains("#{") && expression.contains("env")) {
-            // an evaluated expression reading the environment: which keys it reads is not known, so any change counts
-            return true;
-        }
-        int start = expression.indexOf("${");
-        while (start >= 0) {
-            int end = expression.indexOf('}', start);
-            if (end < 0) {
-                break;
-            }
-            String placeholder = expression.substring(start + 2, end);
-            int colon = placeholder.indexOf(':');
-            String key = (colon >= 0 ? placeholder.substring(0, colon) : placeholder).trim();
-            if (!key.isEmpty() && change.touches(key)) {
-                return true;
-            }
-            start = expression.indexOf("${", end);
-        }
-        return false;
     }
 
     /**
@@ -1688,8 +1519,7 @@ public final class DevRuntime implements Closeable {
         if (old != null && old.isRunning()) {
             // the requests held during the batch, and those in flight, finish on the generation they arrived on
             // before it stops; the servers stop accepting, and new connections wait for the next generation
-            admitted.complete(null);
-            drain(old);
+            requests.beforeStop(old, classLoader.generation());
             if (closed || Thread.currentThread().isInterrupted()) {
                 // the runtime closes: it stops the generation that still runs, and none is launched after it
                 return;
@@ -1724,11 +1554,7 @@ public final class DevRuntime implements Closeable {
             fresh = launch("reload");
         } catch (RuntimeException e) {
             startFailed = true;
-            DevServerSockets sockets = serverSockets;
-            if (sockets != null) {
-                // no generation runs until the next batch: a request is answered at once rather than left waiting
-                sockets.serveUnavailable(e.getMessage() == null ? e.getClass().getName() : e.getMessage());
-            }
+            requests.startFailed(e);
             // the retained beans belong to nobody now: the old context, stopped, still knows how to dispose them
             for (BeanRegistration<?> registration : takeRetainedRegistrations()) {
                 try {
@@ -1742,17 +1568,7 @@ public final class DevRuntime implements Closeable {
             throw e;
         }
         startFailed = false;
-        DevServerSockets started = serverSockets;
-        if (started != null) {
-            // a generation runs again: its server binds a moment after its context starts, and until then a request
-            // waits in the backlog for it rather than being told the application is not running
-            started.stopServingUnavailable();
-            if (started.isBound()) {
-                // once its servers accept, a socket none of them claimed belongs to a listener the configuration dropped
-                awaitServers(fresh);
-                started.releaseUnclaimed();
-            }
-        }
+        requests.started(fresh);
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
@@ -2010,80 +1826,6 @@ public final class DevRuntime implements Closeable {
             allChanged.removeAll(other.deleted);
             allDeleted.removeAll(other.changed);
             return new SourceChanges(allChanged, allDeleted);
-        }
-    }
-
-    /**
-     * A batch waiting for the reload thread.
-     */
-    private static class Pending {
-        final Map<SourceKind, SourceChanges> sources;
-        final Map<SourceKind, SourceChanges> testSources;
-        final Map<ResourceKind, SourceChanges> resources;
-        final boolean full;
-        final @Nullable TestRequest requested;
-        long sequence;
-
-        Pending(Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources, boolean full) {
-            this(sources, Map.of(), resources, full, null);
-        }
-
-        Pending(Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources, Map<ResourceKind, SourceChanges> resources,
-                boolean full, @Nullable TestRequest requested) {
-            this.sources = sources;
-            this.testSources = testSources;
-            this.resources = resources;
-            this.full = full;
-            this.requested = requested;
-        }
-
-        boolean forcesRestart() {
-            return false;
-        }
-
-        boolean isEmpty() {
-            return !full && !forcesRestart() && requested == null
-                && sources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty())
-                && testSources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty())
-                && resources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty());
-        }
-
-        /**
-         * How many tests a request runs, for merging two of them: the widest wins, every test, then the last run's
-         * again, which holds the failures, then the failures alone.
-         */
-        private static int breadth(TestRequest request) {
-            return switch (request) {
-                case ALL -> 2;
-                case RERUN -> 1;
-                case FAILED -> 0;
-            };
-        }
-
-        static Pending merge(List<Pending> batches) {
-            Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
-            Map<SourceKind, SourceChanges> testSources = new EnumMap<>(SourceKind.class);
-            Map<ResourceKind, SourceChanges> resources = new EnumMap<>(ResourceKind.class);
-            boolean full = false;
-            boolean restart = false;
-            TestRequest requested = null;
-            for (Pending batch : batches) {
-                batch.sources.forEach((kind, changes) -> sources.merge(kind, changes, SourceChanges::merge));
-                batch.testSources.forEach((kind, changes) -> testSources.merge(kind, changes, SourceChanges::merge));
-                batch.resources.forEach((kind, changes) -> resources.merge(kind, changes, SourceChanges::merge));
-                full |= batch.full;
-                restart |= batch.forcesRestart();
-                if (batch.requested != null && (requested == null || breadth(batch.requested) > breadth(requested))) {
-                    requested = batch.requested;
-                }
-            }
-            boolean forced = restart;
-            return new Pending(sources, testSources, resources, full, requested) {
-                @Override
-                boolean forcesRestart() {
-                    return forced;
-                }
-            };
         }
     }
 }

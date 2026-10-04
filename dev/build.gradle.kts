@@ -98,6 +98,7 @@ noReflection {
     allowIn("io.micronaut.dev.DevRuntime", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.DevRuntime", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.DevRuntime", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.Pending", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.ManifestRetentionPolicy", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_LOADING")
