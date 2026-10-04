@@ -34,8 +34,8 @@ import java.util.function.Function;
 final class BeanDependencies implements DependentBeanProvider {
     private List<BeanRegistration<?>> owned = List.of();
     private List<BeanRegistration<?>> required = List.of();
-    private boolean closing;
-    private boolean destroyed;
+    private InterceptorCandidates interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
+    private OwnershipState state = OwnershipState.OPEN;
     /** The destruction invocation a temporary group belongs to, which may resolve during shutdown; null for any other owner. */
     final @Nullable DefaultBeanResolutionContext destructionContext;
 
@@ -51,6 +51,30 @@ final class BeanDependencies implements DependentBeanProvider {
      */
     BeanDependencies(@Nullable DefaultBeanResolutionContext destructionContext) {
         this.destructionContext = destructionContext;
+    }
+
+    /**
+     * @return The interceptor candidates retained for the lifecycle of the owner, unresolved until creation captures them
+     */
+    synchronized InterceptorCandidates interceptorCandidates() {
+        return interceptorCandidates;
+    }
+
+    /**
+     * @return The retained candidates as the nullable list the resolution context and registration contracts use,
+     * null while they are unresolved
+     */
+    synchronized @Nullable List<BeanRegistration<?>> interceptorRegistrations() {
+        return interceptorCandidates.legacyRegistrations();
+    }
+
+    /**
+     * Records the complete candidate set, an empty one included, so that later lifecycle phases do not discover again.
+     *
+     * @param registrations The candidates
+     */
+    synchronized void retainInterceptorCandidates(List<BeanRegistration<?>> registrations) {
+        interceptorCandidates = new InterceptorCandidates.Resolved(registrations);
     }
 
     /**
@@ -113,12 +137,14 @@ final class BeanDependencies implements DependentBeanProvider {
      * @return Whether this owner stopped accepting new dependencies
      */
     synchronized boolean isClosing() {
-        return closing;
+        return state != OwnershipState.OPEN;
     }
 
     /** Rejects further resolution through this owner while keeping what it holds, as the destruction of its bean begins. */
     synchronized void stopResolving() {
-        closing = true;
+        if (state == OwnershipState.OPEN) {
+            state = OwnershipState.RESOLUTION_STOPPED;
+        }
     }
 
     /**
@@ -126,12 +152,11 @@ final class BeanDependencies implements DependentBeanProvider {
      *
      * @return {@code true} for the one caller that may run the destruction callbacks
      */
-    synchronized boolean markDestroyed() {
-        closing = true;
-        if (destroyed) {
+    synchronized boolean beginDestruction() {
+        if (state == OwnershipState.DESTRUCTION_CLAIMED || state == OwnershipState.OWNERSHIP_RELEASED) {
             return false;
         }
-        destroyed = true;
+        state = OwnershipState.DESTRUCTION_CLAIMED;
         return true;
     }
 
@@ -141,11 +166,11 @@ final class BeanDependencies implements DependentBeanProvider {
      * @return The dependents the caller must destroy
      */
     synchronized List<BeanRegistration<?>> takeDependents() {
-        closing = true;
-        destroyed = true;
+        state = OwnershipState.OWNERSHIP_RELEASED;
         List<BeanRegistration<?>> taken = owned;
         owned = List.of();
         required = List.of();
+        interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
         return taken;
     }
 
@@ -155,16 +180,23 @@ final class BeanDependencies implements DependentBeanProvider {
      * @return {@code false} when the owner was destroyed while its bean was being created, such as a proxy a
      * creation listener destroyed: nothing is attached, and the caller releases what was created
      */
-    synchronized boolean initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
-        if (destroyed) {
+    synchronized boolean initialize(@Nullable List<BeanRegistration<?>> created, InterceptorCandidates candidates) {
+        if (state == OwnershipState.DESTRUCTION_CLAIMED || state == OwnershipState.OWNERSHIP_RELEASED) {
             return false;
         }
-        attach(created == null ? List.of() : created, resolved == null ? List.of() : resolved);
+        if (candidates instanceof InterceptorCandidates.Resolved) {
+            interceptorCandidates = candidates;
+        }
+        List<BeanRegistration<?>> retained = switch (interceptorCandidates) {
+            case InterceptorCandidates.Unresolved ignored -> List.of();
+            case InterceptorCandidates.Resolved selected -> selected.registrations();
+        };
+        attach(created == null ? List.of() : created, retained);
         return true;
     }
 
     @SuppressWarnings("ReferenceEquality") // A lifecycle belongs to an instance, even when two beans compare equal.
-    private void attach(List<BeanRegistration<?>> created, List<?> resolved) {
+    private void attach(List<BeanRegistration<?>> created, List<BeanRegistration<?>> resolved) {
         if (!created.isEmpty()) {
             List<BeanRegistration<?>> added = new ArrayList<>(owned);
             added.addAll(created);
@@ -174,9 +206,8 @@ final class BeanDependencies implements DependentBeanProvider {
             return;
         }
         List<BeanRegistration<?>> shared = new ArrayList<>(required);
-        for (Object value : resolved) {
-            if (value instanceof BeanRegistration<?> registration
-                && owned.stream().noneMatch(bean -> bean == registration)
+        for (BeanRegistration<?> registration : resolved) {
+            if (owned.stream().noneMatch(bean -> bean == registration)
                 && shared.stream().noneMatch(bean -> bean.getBean() == registration.getBean())) {
                 shared.add(registration);
             }
@@ -191,7 +222,7 @@ final class BeanDependencies implements DependentBeanProvider {
      * @param context The context
      */
     synchronized void checkOpen(DefaultBeanContext context) {
-        if (closing || destructionContext != null && !destructionContext.isDestructionInvocationActive()
+        if (isClosing() || destructionContext != null && !destructionContext.isDestructionInvocationActive()
             || destructionContext == null && context.isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot resolve a dependency after owner destruction or context shutdown has begun");
         }
@@ -227,5 +258,32 @@ final class BeanDependencies implements DependentBeanProvider {
                 throw failure;
             }
         }
+    }
+
+    /**
+     * Controls dependency publication and the single destruction claim. Destruction may start directly from
+     * {@link #OPEN}; failed creation may release ownership without claiming destruction of the owner bean.
+     */
+    private enum OwnershipState {
+        /** New dependencies may be resolved and attached to the owner. */
+        OPEN,
+
+        /**
+         * New dependency resolution and publication are blocked. Existing dependencies are retained, and
+         * a caller may still claim destruction.
+         */
+        RESOLUTION_STOPPED,
+
+        /**
+         * One caller has claimed destruction. Further claims are rejected, while existing dependencies
+         * remain owned until they are transferred for cleanup.
+         */
+        DESTRUCTION_CLAIMED,
+
+        /**
+         * Owned dependencies have been transferred for cleanup and retained references have been cleared.
+         * Resolution and destruction claims remain blocked; cleanup may still be running or may have failed.
+         */
+        OWNERSHIP_RELEASED
     }
 }

@@ -36,8 +36,6 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Nullable
     @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
     private volatile AbstractBeanResolutionContext proxyTargetContext;
-    @Nullable
-    private final List<?> interceptorRegistrations;
     // the interceptors a proxy fronting the bean selected for it, see RegisteredBeanInterceptors
     @SuppressWarnings("java:S3077") // a KeptSelection is immutable, set under the lock of this registration
     @Nullable
@@ -45,13 +43,16 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     // whether this bean was created as an interceptor of the bean it is a dependent of
     private volatile boolean createdAsInterceptor;
 
+    @SuppressWarnings("unchecked") // Adapt the registration compatibility boundary once.
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
                               @Nullable List<?> interceptorRegistrations) {
-        this(beanContext, identifier, beanDefinition, createdBean, dependents, interceptorRegistrations, new BeanDependencies());
+        this(beanContext, identifier, beanDefinition, createdBean, dependents,
+            interceptorRegistrations == null ? InterceptorCandidates.Unresolved.INSTANCE
+                : new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) interceptorRegistrations), new BeanDependencies());
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -59,29 +60,27 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
-                              @Nullable List<?> interceptorRegistrations,
+                              InterceptorCandidates interceptorCandidates,
                               BeanDependencies dependencies) {
         super(identifier, beanDefinition, createdBean, dependencies);
         this.beanContext = beanContext;
         // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
         // duplicate registrations or add them back to an owner that was already destroyed.
         if ((getDependencies() == dependencies || createdBean instanceof DefaultBeanDependencyResolver)
-            && !getDependencies().initialize(dependents, interceptorRegistrations)
+            && !getDependencies().initialize(dependents, interceptorCandidates)
             && beanContext instanceof DefaultBeanContext context) {
             // The owner was destroyed before its creation completed and released what it held then. Dependents
             // created with the bean would be attached to an owner that no longer destroys anything.
             context.destroyCreatedBeans(dependents, null);
         }
-        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     @Override
     public void close() {
-        // idempotent, as AutoCloseable asks an implementation to be: destroying a bean runs its pre-destroy
-        // listeners, its @PreDestroy and its disposer, and a registration closed twice — by a
-        // try-with-resources and an explicit close, or by two owners that each believe they hold it — must
-        // not run them twice
-        if (markDestroyed()) {
+        // Closing and direct context destruction share one claim, so the callbacks run once. The default context
+        // takes the claim itself as it destroys the registration; for any other context it is taken here.
+        boolean claimedByContext = beanContext instanceof DefaultBeanContext;
+        if (claimedByContext || beginDestruction()) {
             beanContext.destroyBean(this);
         }
     }
@@ -100,12 +99,12 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
-     * Marks the registration as destroyed, so that closing it afterwards does not destroy the bean again.
+     * Claims destruction before callbacks run, so that closing or destroying the registration again does nothing.
      *
      * @return {@code true} if the registration had not been closed or marked before
      */
-    boolean markDestroyed() {
-        return getDependencies().markDestroyed();
+    boolean beginDestruction() {
+        return getDependencies().beginDestruction();
     }
 
     @Override
@@ -119,11 +118,10 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     /**
-     * @return The interceptor registrations selected while this bean was created, or {@code null}
+     * @return The interceptor candidate state retained while this bean was created
      */
-    @Nullable
-    List<?> getInterceptorRegistrations() {
-        return interceptorRegistrations;
+    InterceptorCandidates getInterceptorCandidates() {
+        return getDependencies().interceptorCandidates();
     }
 
     /**

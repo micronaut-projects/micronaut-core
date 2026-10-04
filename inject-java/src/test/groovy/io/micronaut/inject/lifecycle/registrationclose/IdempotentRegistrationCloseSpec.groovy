@@ -28,21 +28,38 @@ class IdempotentRegistrationCloseSpec extends Specification {
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run()
 
-    void "closing a registration twice destroys the bean once"() {
+    void "destroying through #first then #second runs destruction listeners once"() {
         given:
         SimpleBeanPreDestroyListener preDestroy = context.getBean(SimpleBeanPreDestroyListener)
         SimpleBeanDestroyedListener destroyed = context.getBean(SimpleBeanDestroyedListener)
         int destroyedBefore = destroyed.destroyed.size()
         int preDestroyBefore = preDestroy.destroyed.size()
 
-        when: "the registration is closed twice"
+        when:
         BeanRegistration<SimpleBean> registration =
                 context.getBeanRegistration(Argument.of(SimpleBean), null)
-        registration.close()
-        registration.close()
+        destroy(context, registration, first)
+        destroy(context, registration, second)
 
         then: "each destruction listener saw the bean once"
         preDestroy.destroyed.size() == preDestroyBefore + 1
         destroyed.destroyed.size() == destroyedBefore + 1
+
+        where:
+        [first, second] << [['close', 'context', 'dependent'], ['close', 'context', 'dependent']].combinations()
+    }
+
+    private void destroy(ApplicationContext context, BeanRegistration<?> registration, String entryPoint) {
+        switch (entryPoint) {
+            case 'close':
+                registration.close()
+                break
+            case 'context':
+                context.destroyBean(registration)
+                break
+            case 'dependent':
+                context.destroyDependentBean(registration)
+                break
+        }
     }
 }
