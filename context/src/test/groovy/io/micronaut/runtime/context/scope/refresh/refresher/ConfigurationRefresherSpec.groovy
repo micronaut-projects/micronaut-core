@@ -230,6 +230,7 @@ class ConfigurationRefresherSpec extends Specification {
         def refresher = context.getBean(ConfigurationRefresher)
         def user = context.getBean(EndpointUser)
         def users = context.getBean(EndpointsUser)
+        def other = context.getBean(OtherEndpointUser)
 
         expect:
         context.findDependencyGraph().isPresent() == graph
@@ -244,6 +245,10 @@ class ConfigurationRefresherSpec extends Specification {
         result.recreated()*.beanType == [EndpointConfiguration]
         !context.getActiveBeanRegistrations(EndpointUser).any { it.bean.is(user) }
         !context.getActiveBeanRegistrations(EndpointsUser).any { it.bean.is(users) }
+
+        and: "a holder of another entry did not receive the removed one and keeps its instance"
+        context.getActiveBeanRegistrations(OtherEndpointUser).any { it.bean.is(other) }
+        context.getBean(OtherEndpointUser).is(other)
 
         and: "a holder of every entry is created again with the ones that remain"
         context.getBean(EndpointsUser).endpoints*.url == ["a"]

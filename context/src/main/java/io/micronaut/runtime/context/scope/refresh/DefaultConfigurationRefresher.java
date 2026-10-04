@@ -306,6 +306,9 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
     private void destroyDependentsByType(DefaultBeanContext beanContext, BeanDefinition<?> definition) {
         Set<Class<?>> types = new java.util.HashSet<>();
         types.add(definition.getBeanType());
+        // an @EachProperty entry is received only by the injection points that name it, or name none: a holder
+        // of another entry, @Named("other"), did not receive it and keeps what it holds
+        String entry = definition.getDeclaredQualifier() instanceof io.micronaut.core.naming.Named named ? named.getName() : null;
         boolean found = true;
         List<BeanRegistration<?>> toDestroy = new ArrayList<>();
         while (found) {
@@ -315,7 +318,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
                 if (candidate == definition || toDestroy.contains(registration) || !candidate.isSingleton()) {
                     continue;
                 }
-                if (injects(candidate, types)) {
+                if (injects(candidate, types, definition.getBeanType(), entry)) {
                     toDestroy.add(registration);
                     types.add(candidate.getBeanType());
                     found = true;
@@ -327,25 +330,41 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         }
     }
 
-    private static boolean injects(BeanDefinition<?> definition, Set<Class<?>> types) {
+    private static boolean injects(BeanDefinition<?> definition, Set<Class<?>> types, Class<?> entryType, @Nullable String entry) {
         for (io.micronaut.core.type.Argument<?> argument : definition.getConstructor().getArguments()) {
-            if (isOneOf(argument, types)) {
+            if (receives(argument, types, entryType, entry)) {
                 return true;
             }
         }
         for (io.micronaut.inject.FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
-            if (isOneOf(field.asArgument(), types)) {
+            if (receives(field.asArgument(), types, entryType, entry)) {
                 return true;
             }
         }
         for (io.micronaut.inject.MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
             for (io.micronaut.core.type.Argument<?> argument : method.getArguments()) {
-                if (isOneOf(argument, types)) {
+                if (receives(argument, types, entryType, entry)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    /**
+     * Whether an injection point receives one of the types, leaving out the entry's type where the
+     * injection point names another entry.
+     */
+    private static boolean receives(io.micronaut.core.type.Argument<?> argument, Set<Class<?>> types, Class<?> entryType, @Nullable String entry) {
+        if (entry != null) {
+            String named = argument.getAnnotationMetadata().stringValue(io.micronaut.core.annotation.AnnotationUtil.NAMED).orElse(null);
+            if (named != null && !named.equals(entry)) {
+                Set<Class<?>> others = new java.util.HashSet<>(types);
+                others.remove(entryType);
+                return isOneOf(argument, others);
+            }
+        }
+        return isOneOf(argument, types);
     }
 
     private static boolean isOneOf(io.micronaut.core.type.Argument<?> argument, Set<Class<?>> types) {
