@@ -38,6 +38,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -163,7 +164,7 @@ final class ConfigurationStaleness {
         for (String member : List.of(RequiresCondition.MEMBER_BEAN, RequiresCondition.MEMBER_BEANS, RequiresCondition.MEMBER_MISSING_BEANS)) {
             for (AnnotationClassValue<?> type : requires.annotationClassValues(member)) {
                 Class<?> beanType = type.getType().orElse(null);
-                if (beanType != null && boundToChange(references, beanType, change, 0)) {
+                if (beanType != null && boundToChange(references, beanType, change, new HashSet<>())) {
                     return "requires " + (member.equals(RequiresCondition.MEMBER_MISSING_BEANS) ? "the absence of " : "") + "a bean of " + beanType.getName() + ", bound to a changed property";
                 }
             }
@@ -175,8 +176,9 @@ final class ConfigurationStaleness {
      * Whether a bean of the type is bound to a changed key: a configuration bean under a touched prefix, whose entries
      * or properties the change may have added, removed or changed, or an {@code @EachBean} of one.
      */
-    private static boolean boundToChange(List<BeanDefinitionReference<?>> references, Class<?> type, ConfigurationChange change, int depth) {
-        if (depth > 4) {
+    private static boolean boundToChange(List<BeanDefinitionReference<?>> references, Class<?> type, ConfigurationChange change, Set<Class<?>> visited) {
+        if (!visited.add(type)) {
+            // an @EachBean chain that comes back to a type already followed
             return false;
         }
         // the references rather than the definitions: an @EachProperty with no entry yet has no definition
@@ -192,18 +194,20 @@ final class ConfigurationStaleness {
             }
             String prefix = metadata.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
             if (prefix != null) {
-                // the prefix of an @EachProperty, without its wildcard, holds every entry
-                if (prefix.endsWith(".*")) {
-                    prefix = prefix.substring(0, prefix.length() - 2);
-                } else if (prefix.endsWith("[*]")) {
-                    prefix = prefix.substring(0, prefix.length() - 3);
+                // the prefix of an @EachProperty up to its first wildcard holds every entry, of a nested one too
+                int wildcard = prefix.indexOf('*');
+                if (wildcard >= 0) {
+                    prefix = prefix.substring(0, wildcard);
+                    while (prefix.endsWith(".") || prefix.endsWith("[")) {
+                        prefix = prefix.substring(0, prefix.length() - 1);
+                    }
                 }
-                if (change.touches(prefix)) {
+                if (prefix.isEmpty() || change.touches(prefix)) {
                     return true;
                 }
             }
             Class<?> each = metadata.classValue(EachBean.class).orElse(null);
-            if (each != null && boundToChange(references, each, change, depth + 1)) {
+            if (each != null && boundToChange(references, each, change, visited)) {
                 return true;
             }
         }

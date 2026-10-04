@@ -53,6 +53,7 @@ class ConfigurationStalenessTest {
         {"staleness.toggle.enabled", "BeanPropertyBean"},
         {"staleness.entries.one.url", "BeansBean"},
         {"staleness.others.two", "MissingBeansBean"},
+        {"staleness.outers.a.inners.b.count", "NestedBeansBean"},
     };
 
     @Test
@@ -243,5 +244,20 @@ class ConfigurationStalenessTest {
     @Requires(property = "spec.name", value = SPEC)
     @Requires(missingBeans = OtherClient.class)
     static class MissingBeansBean {
+    }
+
+    @EachProperty("staleness.outers")
+    @Requires(property = "spec.name", value = SPEC)
+    static class Outer {
+        @EachProperty("inners")
+        @Requires(property = "spec.name", value = SPEC)
+        static class Inner {
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    @Requires(beans = Outer.Inner.class)
+    static class NestedBeansBean {
     }
 }
