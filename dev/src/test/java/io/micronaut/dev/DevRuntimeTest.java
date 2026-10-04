@@ -317,6 +317,69 @@ class DevRuntimeTest {
         }
     }
 
+    @Test
+    void anEditThatFlipsARequirementRestartsSoThatTheBeanAppearsOrDisappears() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Files.writeString(src.resolve("Toggle.java"), "package app; @jakarta.inject.Singleton @io.micronaut.context.annotation.Requires(missingProperty = \"app.off\") public class Toggle { }");
+        Files.writeString(src.resolve("Gated.java"), "package app; @jakarta.inject.Singleton @io.micronaut.context.annotation.Requires(property = \"app.on\") public class Gated { }");
+        Path config = project.resolve("src/main/resources/application.properties");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config, "app.label=alpha\n");
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            assertTrue(first.containsBean(first.getClassLoader().loadClass("app.Toggle")));
+            // asked for while running, the disabled reference is forgotten by the context
+            assertFalse(first.containsBean(first.getClassLoader().loadClass("app.Gated")));
+
+            // a key no requirement reads refreshes in place
+            Files.writeString(config, "app.label=beta\n");
+            runtime.changed(List.of(config), List.of());
+            assertEquals("beta", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+
+            // the key a disabled bean requires appears: the bean appears with a restart
+            Files.writeString(config, "app.label=beta\napp.on=true\n");
+            runtime.changed(List.of(config), List.of());
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertFalse(first.isRunning());
+            assertTrue(second.containsBean(second.getClassLoader().loadClass("app.Gated")));
+            assertTrue(second.containsBean(second.getClassLoader().loadClass("app.Toggle")));
+
+            // the key a bean requires to be missing appears: the bean disappears with a restart
+            Files.writeString(config, "app.label=beta\napp.on=true\napp.off=true\n");
+            runtime.changed(List.of(config), List.of());
+            ApplicationContext third = runtime.awaitGeneration(3, Duration.ofMinutes(2));
+            assertFalse(second.isRunning());
+            assertFalse(third.containsBean(third.getClassLoader().loadClass("app.Toggle")));
+            assertTrue(third.containsBean(third.getClassLoader().loadClass("app.Gated")));
+        } finally {
+            runtime.close();
+        }
+    }
+
     private static List<Path> removedIn(List<ResourceChange> changes) {
         return changes.stream().flatMap(change -> change.removed().stream()).toList();
     }

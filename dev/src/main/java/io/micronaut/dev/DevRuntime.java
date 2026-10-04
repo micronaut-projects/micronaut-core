@@ -1299,12 +1299,13 @@ public final class DevRuntime implements Closeable {
             // rebound, the refreshable beans disposed of, the watches told; a watch that cannot apply its change
             // answers REQUIRES_RESTART, and a bean retained across restarts that watched a touched prefix is not
             // kept when the restart comes
+            ConfigurationStaleness.Requirements requirements = ConfigurationStaleness.beforeRefresh(current);
             RefreshResult refresh = refreshConfiguration(current);
             if (refresh == null) {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
                 configurationChange = refresh.change();
-                String stale = ConfigurationStaleness.afterRefresh(current, refresh.change());
+                String stale = ConfigurationStaleness.afterRefresh(current, refresh.change(), requirements);
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
                 } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailed) {
