@@ -148,6 +148,11 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         private boolean finished;
         private boolean reset;
+        /**
+         * {@code true} iff a task to resume the response writer is submitted and has not run yet,
+         * see {@link #onOutboundWritable()}.
+         */
+        private boolean outboundWritableScheduled;
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
 
@@ -180,6 +185,38 @@ abstract class MultiplexedServerHandler {
          * Close the input of the stream.
          */
         abstract void closeInput();
+
+        /**
+         * Whether data written to this stream now still fits the peer's flow control window and
+         * the channel is writable, so that a streamed response may report it as consumed right
+         * away instead of waiting for the frames to be written. The data queued by the protocol
+         * stays bounded by the window. Protocols without such a signal return {@code false}.
+         *
+         * @return {@code true} iff more data can be queued without exceeding the window
+         */
+        boolean isOutboundWritable() {
+            return false;
+        }
+
+        /**
+         * Called by the protocol when {@link #isOutboundWritable()} became {@code true}. The
+         * protocol may call this while it writes queued data (e.g. from the HTTP/2 flow controller
+         * listener), so the writer resumes in a separate task: data written synchronously here
+         * would be queued while the protocol is still writing.
+         */
+        final void onOutboundWritable() {
+            if (outboundWritableScheduled) {
+                return;
+            }
+            outboundWritableScheduled = true;
+            requiredCtx().executor().execute(() -> {
+                outboundWritableScheduled = false;
+                ResponseStreamer streamer = responseStreamer;
+                if (streamer != null && !finished && !reset && isOutboundWritable()) {
+                    streamer.writer.onWritable();
+                }
+            });
+        }
 
         /**
          * Called when the request headers are read.
@@ -817,8 +854,10 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public boolean isWritable() {
-                // consumption is reported once the batch is written, see endBatch
-                return false;
+                // while the window has room, written bytes count as consumed right away;
+                // otherwise consumption is reported once the batch is written, see endBatch, or
+                // when the stream becomes writable again, see onOutboundWritable
+                return !finished && !reset && isOutboundWritable();
             }
 
             /**

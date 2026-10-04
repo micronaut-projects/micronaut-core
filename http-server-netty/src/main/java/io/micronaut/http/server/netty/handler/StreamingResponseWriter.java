@@ -264,10 +264,10 @@ final class StreamingResponseWriter implements BufferConsumer {
         long n = takeUnconsumedBytes();
         ByteBuf current = pending;
         if (current != null) {
-            // Writable HTTP/1 sinks may consume into this bounded buffer. Otherwise a publisher
-            // that waits for each acknowledgement cannot produce adjacent pieces. Stop granting
-            // credit as soon as a write makes the channel unwritable. HTTP/2 never uses report:
-            // its acknowledgements still cover only bytes handed to the protocol sink.
+            // Writable sinks may consume into this bounded buffer. Otherwise a publisher that
+            // waits for each acknowledgement cannot produce adjacent pieces. Stop granting credit
+            // as soon as a write makes the sink unwritable: the channel for HTTP/1, the stream's
+            // flow control window or the channel for HTTP/2.
             int size = current.readableBytes();
             n += size - pendingAcknowledged;
             pendingAcknowledged = size;
