@@ -67,6 +67,9 @@ class PropertiesLoggingLevelsConfigurerSpec extends Specification {
         then: "the level is set, and once"
         recording.set.count("fn.logger=DEBUG") == 1
 
+        and: "without a refresh scope the event refreshes nothing but the levels, as before the refresher"
+        context.getBean(PropertiesLoggingLevelsConfigurer.PropertiesLoggingLevelsConfiguration).levels["fn.logger"] == (scoped ? LogLevel.DEBUG : LogLevel.INFO)
+
         when: "the refresher runs and publishes the event for the listeners written before it"
         values["logger.levels.fn.logger"] = "warn"
         context.getBean(io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher).refresh()
