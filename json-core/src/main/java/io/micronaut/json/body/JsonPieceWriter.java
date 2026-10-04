@@ -105,11 +105,11 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
 
     /**
      * The stream the JSON writer writes to for the whole response. The bytes of a piece go into a
-     * heap array that is kept across the pieces, and are copied out at their exact size when the
-     * piece is done. Most pieces are small, and the copy is cheaper than taking a buffer of the
-     * {@link ReadBufferFactory} for every piece: the transport combines adjacent small pieces
-     * anyway. A piece that fills most of the array takes the array itself instead of a copy, and
-     * the next piece starts on a new one.
+     * heap array that is kept across the pieces. A small piece is copied out at its exact size,
+     * which is cheaper than taking a buffer of the {@link ReadBufferFactory} for every piece: the
+     * transport combines adjacent small pieces anyway. A larger piece is copied into a buffer of
+     * the factory, so it reaches the transport without leaving garbage behind, and the array is
+     * kept for the next piece.
      *
      * <p>Closing the stream does nothing: a mapper may close the stream it was given after every
      * value, as {@link JsonMapper#writeValue(OutputStream, Argument, Object)} implementations
@@ -118,6 +118,8 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
      */
     private static final class BufferStream extends OutputStream {
         private static final int INITIAL_CAPACITY = 512;
+        private static final int SMALL_PIECE_LIMIT = 1024;
+        private static final int MAX_RETAINED_CAPACITY = 64 * 1024;
 
         private final ReadBufferFactory factory;
         private byte[] scratch = new byte[INITIAL_CAPACITY];
@@ -163,16 +165,20 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
             }
             count = 0;
             byte[] current = scratch;
-            if (n > current.length >> 1 && current.length > INITIAL_CAPACITY) {
-                // a copy would be most of the array: hand the array over and start a new one
-                scratch = new byte[INITIAL_CAPACITY];
-                return factory.adapt(ByteBuffer.wrap(current, 0, n));
+            ReadBuffer piece;
+            if (n <= SMALL_PIECE_LIMIT) {
+                // the transport combines adjacent small pieces, so an exact heap copy is cheapest
+                piece = factory.adapt(Arrays.copyOf(current, n));
+            } else {
+                // a larger piece goes out on its own: copy it into a buffer of the factory, which
+                // the transport writes without another copy, and keep the array for the next piece
+                piece = factory.copyOf(ByteBuffer.wrap(current, 0, n));
             }
-            if (current.length > INITIAL_CAPACITY << 4) {
-                // do not keep an array that one large piece grew for the small pieces after it
+            if (current.length > MAX_RETAINED_CAPACITY) {
+                // do not keep an array that one very large piece grew for the pieces after it
                 scratch = new byte[INITIAL_CAPACITY];
             }
-            return factory.adapt(Arrays.copyOf(current, n));
+            return piece;
         }
 
         /**
