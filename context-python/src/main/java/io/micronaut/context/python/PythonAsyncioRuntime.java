@@ -36,8 +36,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -502,9 +504,46 @@ public final class PythonAsyncioRuntime {
     private static void completeAwaitable(Context context, Value future, @Nullable Object result, @Nullable Throwable throwable) {
         // a Java stage may complete after the coroutine that awaited it returned: the completion is
         // guest work of its own, tracked by a frame and skipped once the context is closing
-        if (!PythonContextRegistry.tryWithExecutionFrame(context, () -> awaitableCompleter(context).executeVoid(future, result, throwable))) {
+        if (!PythonContextRegistry.tryWithExecutionFrame(context, () -> awaitableCompleter(context).executeVoid(future, result, throwable == null ? null : awaitedFailure(context, throwable)))) {
             LOG.debug("Skipping the completion of an awaitable whose Python context is closing");
         }
+    }
+
+    /**
+     * The failure of a Java stage as the Python code awaiting it sees it. The stage of an intercepted
+     * {@code async def} fails with the Python exception of the coroutine, wrapped by the interceptor
+     * chain in a {@link CompletionException} around the {@link PolyglotException} (or the generated
+     * Java exception) that carried it through Java: the awaiting code gets the Python exception object
+     * back, so {@code except MyError} matches. A Java failure is unwrapped from the completion
+     * wrappers, so the awaiting code sees the exception the Java code threw.
+     *
+     * @param context The context of the awaiting code
+     * @param throwable The failure of the stage
+     * @return The Python exception of this context, or the Java throwable
+     */
+    static Object awaitedFailure(Context context, Throwable throwable) {
+        Throwable failure = throwable;
+        while (true) {
+            if ((failure instanceof CompletionException || failure instanceof ExecutionException) && failure.getCause() != null) {
+                failure = failure.getCause();
+            } else if (failure instanceof PolyglotException polyglotException && polyglotException.isHostException()) {
+                failure = polyglotException.asHostException();
+            } else {
+                break;
+            }
+        }
+        Value guest = null;
+        if (failure instanceof PolyglotException polyglotException && polyglotException.isGuestException()) {
+            guest = polyglotException.getGuestObject();
+        } else if (failure instanceof ValueCoercible coercible) {
+            // the generated Java exception of a Python exception class extending a Java one
+            guest = coercible.asPolyglotValue();
+        }
+        // a Python exception of another context cannot be raised here: the awaiting code gets the Java view
+        if (guest != null && guest.isException() && PythonCoercion.isValueInContext(guest, context)) {
+            return guest;
+        }
+        return failure;
     }
 
     /**

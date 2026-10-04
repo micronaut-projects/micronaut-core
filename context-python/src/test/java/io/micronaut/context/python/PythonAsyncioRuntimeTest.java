@@ -1398,11 +1398,13 @@ final class PythonAsyncioRuntimeTest {
                 """);
             PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ReactiveClient()));
             Value coroutine = context.eval(PYTHON, """
+                import java
+                IllegalStateException = java.type("java.lang.IllegalStateException")
                 async def fail(target):
                     try:
                         await target.client.error()
-                    except RuntimeError as exc:
-                        return str(exc)
+                    except IllegalStateException as exc:
+                        return str(exc.getMessage())
                     return "missing-error"
                 fail
                 """).execute(target);
@@ -2091,15 +2093,99 @@ final class PythonAsyncioRuntimeTest {
             assertEquals("backend down", assertInstanceOf(IllegalStateException.class, exception.getCause()).getMessage());
 
             Value catching = context.eval(PYTHON, """
+                import java
+                IllegalStateException = java.type("java.lang.IllegalStateException")
                 async def call(target):
                     try:
                         return await target.client.message()
-                    except Exception as e:
-                        return type(e).__name__ + ":" + str(e.java_exception.getMessage())
+                    except IllegalStateException as e:
+                        return "IllegalStateException:" + str(e.getMessage())
                 call
                 """).execute(target);
             CompletionStage caught = PythonAsyncioRuntime.toCompletionStage(catching);
-            assertEquals("MicronautJavaException:backend down", caught.toCompletableFuture().get(1, TimeUnit.SECONDS));
+            assertEquals("IllegalStateException:backend down", caught.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void awaitedJavaFailureCrossesTasksAsItself() throws Exception {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new FailingAsyncClient()));
+
+            Value tasks = context.eval(PYTHON, """
+                import asyncio
+                import java
+                IllegalStateException = java.type("java.lang.IllegalStateException")
+                async def message(target):
+                    return await target.client.message()
+                async def call(target):
+                    seen = []
+                    try:
+                        await asyncio.ensure_future(message(target))
+                    except IllegalStateException as e:
+                        seen.append("task:" + str(e.getMessage()))
+                    # gather stores what exception() answers: a Python exception carrying the Java one
+                    try:
+                        await asyncio.gather(message(target))
+                    except RuntimeError as e:
+                        seen.append(type(e).__name__ + ":" + str(e.java_exception.getMessage()))
+                    return ",".join(seen)
+                call
+                """).execute(target);
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(tasks);
+            assertEquals("task:backend down,MicronautJavaException:backend down", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void awaitedStageFailingWithAPythonExceptionRaisesThatException() throws Exception {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value failing = context.eval(PYTHON, """
+                class Rejected(Exception):
+                    pass
+                rejected = Rejected("no")
+                async def fail():
+                    raise rejected
+                fail
+                """);
+            // the stage of a coroutine fails with the PolyglotException of its Python exception, which an
+            // interceptor chain wraps in a CompletionException
+            CompletableFuture<Object> wrapped = new CompletableFuture<>();
+            PythonAsyncioRuntime.toCompletionStage(failing.execute()).whenComplete((value, failure) ->
+                wrapped.completeExceptionally(new CompletionException((Throwable) failure)));
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new StageClient(wrapped)));
+            Value catching = context.eval(PYTHON, """
+                async def call(target):
+                    try:
+                        await target.client.stage()
+                    except Rejected as e:
+                        return "same" if e is rejected else "copy"
+                call
+                """).execute(target);
+            CompletionStage caught = PythonAsyncioRuntime.toCompletionStage(catching);
+            assertEquals("same", caught.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    public static final class StageClient {
+        private final CompletionStage<Object> stage;
+
+        StageClient(CompletionStage<Object> stage) {
+            this.stage = stage;
+        }
+
+        public CompletionStage<Object> stage() {
+            return stage;
         }
     }
 
