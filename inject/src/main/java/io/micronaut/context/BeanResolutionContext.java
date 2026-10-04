@@ -69,7 +69,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * creation and must be treated as an implementation detail.</p>
      *
      * @since 5.2.0
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
 
     /**
@@ -80,7 +83,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * implementation detail.</p>
      *
      * @since 5.2.1
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String SHARED_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.sharedInterceptorRegistrations";
 
     /**
@@ -90,7 +96,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * is read only for compatibility. Current callers use {@link #setBeanInterceptors(BeanDefinition, List)}.</p>
      *
      * @since 5.2.0
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String EXISTING_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.existingInterceptorRegistrations";
 
     @Override

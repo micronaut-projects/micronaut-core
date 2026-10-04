@@ -1,7 +1,7 @@
 package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.aop.InterceptorRegistry
+import io.micronaut.aop.chain.InterceptorChainFactory
 
 class ConstructorChainFactorySpec extends AbstractTypeElementSpec {
     void 'default factory subclasses can decorate independent constructor invocations'() {
@@ -23,21 +23,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 import java.util.*;
 
-@Singleton @Bean(typed = InterceptorRegistry.class) @Replaces(InterceptorRegistry.class)
-class CustomRegistry implements InterceptorRegistry {
-    final InterceptorRegistry delegate;
-    final CustomFactory factory = new CustomFactory(this);
-    CustomRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
-    public InterceptorChainFactory chainFactory() { return factory; }
-    public <T> Interceptor<T, ?>[] resolveInterceptors(Executable<T, ?> method,
-            Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
-        return delegate.resolveInterceptors(method, candidates, kind);
-    }
-    public <T> Interceptor<T, T>[] resolveConstructorInterceptors(BeanConstructor<T> constructor,
-            Collection<BeanRegistration<Interceptor<T, T>>> candidates) {
-        return delegate.resolveConstructorInterceptors(constructor, candidates);
-    }
-}
+@Singleton @Bean(typed = InterceptorChainFactory.class) @Replaces(InterceptorChainFactory.class)
 class CustomFactory extends DefaultInterceptorChainFactory {
     final List<RecordingInvocation<?>> invocations = new ArrayList<>();
     CustomFactory(InterceptorRegistry registry) { super(registry); }
@@ -86,7 +72,7 @@ class Advice implements ConstructorInterceptor<Object> {
         when:
         def first = context.createBean(type, [value: 'first'])
         def second = context.createBean(type, [value: 'second'])
-        def invocations = context.getBean(InterceptorRegistry).chainFactory().invocations
+        def invocations = context.getBean(InterceptorChainFactory).invocations
 
         then:
         first.value == 'first!'

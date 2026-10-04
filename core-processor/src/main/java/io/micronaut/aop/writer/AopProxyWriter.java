@@ -185,14 +185,14 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_WRITE_LOCK = "$target_wl";
 
     private static final Method RESOLVE_METHOD_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorRegistry.class, "resolveMethodInterceptors", ExecutableMethod.class, Collection.class, InterceptorKind.class);
+        InterceptorCandidateResolver.class, "selectMethodInterceptors", ExecutableMethod.class, Collection.class, InterceptorKind.class);
     private static final Method BUILD_METHOD_CHAIN = ReflectionUtils.getRequiredInternalMethod(
         InterceptorChainFactory.class, "buildMethodChain", Object.class, ExecutableMethod.class,
         Interceptor[].class, Object[].class);
-    private static final Method GET_CHAIN_FACTORY = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorRegistry.class, "chainFactory");
+    private static final Method GET_BEAN_BY_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
+        BeanLocator.class, "getBean", Argument.class);
     private static final Method GET_CANDIDATE_RESOLVER = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorRegistry.class, "candidateResolver");
+        InterceptorChainFactory.class, "candidateResolver");
     private static final FieldDef FIELD_CANDIDATE_RESOLVER = FieldDef.builder("$interceptorCandidates", TypeDef.of(InterceptorCandidateResolver.class))
         .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
     private static final FieldDef FIELD_CHAIN_FACTORY = FieldDef.builder("$interceptorChainFactory", TypeDef.of(InterceptorChainFactory.class))
@@ -772,12 +772,15 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         FieldDef proxyMethodsField = proxyFields.proxyMethods();
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
+        // the chain factory is a bean of the context the proxy is created in; the candidate resolver comes with it
+        bodyBuilders.add((aThis, parameters) -> aThis.field(FIELD_CHAIN_FACTORY)
+            .assign(parameters.get(constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER)).invoke(GET_BEAN_BY_ARGUMENT,
+                ClassTypeDef.of(InterceptorChainFactory.class).getStaticField("ARGUMENT", ClassTypeDef.of(Argument.class)))
+                .cast(InterceptorChainFactory.class)));
         if (interceptorsPerTarget || hotswap) {
             bodyBuilders.add((aThis, parameters) -> aThis.field(FIELD_CANDIDATE_RESOLVER)
-                .assign(parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)).invoke(GET_CANDIDATE_RESOLVER)));
+                .assign(aThis.field(FIELD_CHAIN_FACTORY).invoke(GET_CANDIDATE_RESOLVER)));
         }
-        bodyBuilders.add((aThis, parameters) -> aThis.field(FIELD_CHAIN_FACTORY)
-            .assign(parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)).invoke(GET_CHAIN_FACTORY)));
         bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
             methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
         ));
@@ -1003,7 +1006,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     methods.stream().map(methodElement -> {
                             boolean introduction = isIntroduction && (methodElement.isAbstract() || (methodElement.getDeclaringType().isInterface() && !methodElement.isDefault()));
 
-                            return parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)).invoke(
+                            return aThis.field(FIELD_CHAIN_FACTORY).invoke(GET_CANDIDATE_RESOLVER).invoke(
                                 RESOLVE_METHOD_INTERCEPTORS,
                                 // The executable method
                                 aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
@@ -1065,7 +1068,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             aThis.field(interceptorsField).assign(
                 ClassTypeDef.of(Interceptor.class).array(2).instantiate(
                     methods.stream().map(methodElement ->
-                        parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)).invoke(
+                        aThis.field(FIELD_CHAIN_FACTORY).invoke(GET_CANDIDATE_RESOLVER).invoke(
                             RESOLVE_METHOD_INTERCEPTORS,
                             // The executable method
                             aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
