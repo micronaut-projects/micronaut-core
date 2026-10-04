@@ -18,17 +18,24 @@ package io.micronaut.aop.chain;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.context.BeanDefinitionRegistry;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.Qualifier;
+import io.micronaut.context.TargetInterceptorSelections;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.proxy.InterceptedBean;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import org.jspecify.annotations.Nullable;
@@ -124,6 +131,105 @@ public class InterceptorCandidateResolver {
         ));
         resolutionContext.setBeanInterceptors(definition, candidates);
         return candidates;
+    }
+
+    /**
+     * Finds an existing registration for a target supplied to a proxy, including a swapped-in target.
+     * This lookup neither creates a bean nor takes ownership of it.
+     * @param beanLocator The context used by the proxy
+     * @param bean The target, or null
+     * @return The existing registration, or null when the locator does not hold it
+     */
+    @UsedByGeneratedCode
+    public @Nullable BeanRegistration<?> findProxyTargetRegistration(BeanLocator beanLocator, @Nullable Object bean) {
+        if (bean == null || !(beanLocator instanceof BeanDefinitionRegistry definitions)) {
+            return null;
+        }
+        return definitions.findBeanRegistration(bean).orElse(null);
+    }
+
+    /**
+     * Reuses a target's cached selection or acquires candidates through its dependency owner.
+     * @param beanLocator The context used for unmanaged targets
+     * @param targetDefinition The target definition
+     * @param methods The intercepted methods
+     * @param introduction Whether introduction advice is required
+     * @param target The target registration, if known
+     * @param bean The invocation target
+     * @return The interceptors selected for each method
+     */
+    @UsedByGeneratedCode
+    public Interceptor<?, ?>[][] resolveTargetInterceptors(BeanLocator beanLocator,
+        BeanDefinition<?> targetDefinition, ExecutableMethod<?, ?>[] methods, boolean introduction,
+        @Nullable BeanRegistration<?> target, @Nullable Object bean) {
+        if (beanLocator instanceof TargetInterceptorSelections selections) {
+            if (target != null && target.getBean() == bean) {
+                // read before a selector is created for it, on every call
+                Interceptor<?, ?>[][] kept = selections.getSelection(target, targetDefinition);
+                if (kept != null) {
+                    return kept;
+                }
+                Interceptor<?, ?>[][] selection = selections.select(target, targetDefinition, resolutionContext -> selectForMethods(
+                    methods,
+                    introduction,
+                    resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
+                ));
+                if (selection != null) {
+                    return selection;
+                }
+            }
+            Interceptor<?, ?>[][] unowned = selections.getUnownedSelection(targetDefinition);
+            if (unowned != null) {
+                return unowned;
+            }
+            return selections.selectUnowned(targetDefinition, Interceptor.ARGUMENT, bindingOf(methods),
+                registrations -> selectForMethods(methods, introduction, registrations));
+        }
+        // Other locators keep no selections: the interceptors are looked up and selected for the call.
+        return selectForMethods(methods, introduction, beanLocator instanceof BeanDefinitionRegistry definitions
+            ? definitions.getBeanRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
+            : List.of());
+    }
+
+    private Qualifier<Interceptor<?, ?>> bindingOf(ExecutableMethod<?, ?>[] methods) {
+        // each method keeps its own occurrences of a binding annotation that binds members
+        AnnotationMetadata[] interceptionPoints = new AnnotationMetadata[methods.length];
+        for (int i = 0; i < methods.length; i++) {
+            interceptionPoints[i] = methods[i].getAnnotationMetadata();
+        }
+        return InterceptorBindingQualifier.ofInterceptionPoints(interceptionPoints);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Interceptor<?, ?>[][] selectForMethods(ExecutableMethod<?, ?>[] methods,
+                                                          boolean introduction,
+                                                          Collection<? extends BeanRegistration<?>> registrations) {
+        List list = new ArrayList<>(registrations);
+        Interceptor<?, ?>[][] selection = new Interceptor[methods.length][];
+        for (int i = 0; i < methods.length; i++) {
+            ExecutableMethod method = methods[i];
+            selection[i] = registry.resolveMethodInterceptors(method, list,
+                introduction ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND);
+        }
+        return selection;
+    }
+
+    /**
+     * Acquires candidates for constructor-only discovery when no explicit set was supplied.
+     * @param resolutionContext The resolution context
+     * @param definition The bean definition
+     * @param constructor The intercepted constructor
+     * @param <T> The bean type
+     * @return The acquired candidates
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T> Collection<BeanRegistration<Interceptor<T, T>>> resolveConstructorCandidates(
+        BeanResolutionContext resolutionContext,
+        BeanDefinition<T> definition,
+        BeanConstructor<T> constructor) {
+        AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
+        Collection<AnnotationValue<?>> bindings = AbstractInterceptorChain.resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
+        return (Collection) resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(bindings));
     }
 
     /**

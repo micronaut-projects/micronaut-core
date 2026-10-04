@@ -15,13 +15,18 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.aop.chain.DefaultInterceptorChainFactory;
 import io.micronaut.aop.chain.InterceptorCandidateResolver;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.ExecutableMethod;
+
 import org.jspecify.annotations.NullMarked;
 
 import java.util.Collection;
@@ -55,6 +60,31 @@ public interface InterceptorRegistry {
     );
 
     /**
+     * Selects the interceptors for a method invocation. Introduction invocations execute around advice
+     * before introduction advice. Selection can be retained and reused by independent invocations.
+     *
+     * @param method The intercepted method
+     * @param candidates The acquired interceptor registrations
+     * @param kind The interception kind
+     * @param <T> The bean type
+     * @return The selected interceptors in invocation order
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default <T> Interceptor<T, ?>[] resolveMethodInterceptors(
+        ExecutableMethod<T, ?> method,
+        Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
+        InterceptorKind kind
+    ) {
+        Interceptor<T, ?>[] selected = resolveInterceptors(method, candidates, kind);
+        if (kind != InterceptorKind.INTRODUCTION) {
+            return selected;
+        }
+        return ArrayUtils.concat(resolveInterceptors(method, candidates, InterceptorKind.AROUND), selected);
+    }
+
+    /**
      * Returns the service that acquires and retains the interceptor candidates of a bean. A registry may return
      * its own to customize acquisition; an implementation that does should return the same instance on every call.
      *
@@ -65,6 +95,20 @@ public interface InterceptorRegistry {
     @UsedByGeneratedCode
     default InterceptorCandidateResolver candidateResolver() {
         return new InterceptorCandidateResolver(this);
+    }
+
+    /**
+     * Returns the factory that builds the invocations of the beans this registry selects interceptors for.
+     * A registry may return its own to customize invocation construction; an implementation that does should
+     * return the same instance on every call.
+     *
+     * @return The chain factory
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default InterceptorChainFactory chainFactory() {
+        return new DefaultInterceptorChainFactory(this);
     }
 
     /**

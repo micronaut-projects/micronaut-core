@@ -60,6 +60,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
     private final BeanContext beanContext;
     private final InterceptorCandidateResolver candidateResolver = new InterceptorCandidateResolver(this);
+    private final InterceptorChainFactory chainFactory = new DefaultInterceptorChainFactory(this);
 
     public DefaultInterceptorRegistry(BeanContext beanContext) {
         this.beanContext = beanContext;
@@ -68,6 +69,11 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     @Override
     public InterceptorCandidateResolver candidateResolver() {
         return candidateResolver;
+    }
+
+    @Override
+    public InterceptorChainFactory chainFactory() {
+        return chainFactory;
     }
 
     @Override
