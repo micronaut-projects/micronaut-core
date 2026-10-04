@@ -126,6 +126,16 @@ class ConfigurationStalenessTest {
     }
 
     @Test
+    void aCustomConditionBehindAnUnmetPropertyIsNotRun() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", SPEC))) {
+            assertFalse(context.containsBean(ShortCircuitedBean.class));
+            ConfigurationStaleness.Requirements before = ConfigurationStaleness.beforeRefresh(context);
+            context.getEnvironment().addPropertySource(PropertySource.of("short", Map.of("staleness.short-flag", true)));
+            assertNull(ConfigurationStaleness.afterRefresh(context, ConfigurationChange.ofKeys(Set.of("staleness.short-flag")), before));
+        }
+    }
+
+    @Test
     void withoutARunningContextNothingIsStale() {
         assertNull(ConfigurationStaleness.afterRefresh(null, ConfigurationChange.ofKeys(Set.of("staleness.missing")),
             ConfigurationStaleness.beforeRefresh(null)));
@@ -287,5 +297,19 @@ class ConfigurationStalenessTest {
     @Requires(property = "spec.name", value = SPEC)
     @Requires(condition = LazyFlagCondition.class)
     static class LazyFlaggedBean {
+    }
+
+    public static final class ShortFlagCondition implements Condition {
+        @Override
+        public boolean matches(ConditionContext context) {
+            return context.getProperty("staleness.short-flag", Boolean.class).orElse(false);
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    @Requires(property = "staleness.never-set")
+    @Requires(condition = ShortFlagCondition.class)
+    static class ShortCircuitedBean {
     }
 }

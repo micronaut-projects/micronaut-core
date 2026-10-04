@@ -23,7 +23,9 @@ import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.TrueCondition;
+import io.micronaut.context.conditions.MatchesConditionUtils;
 import io.micronaut.context.conditions.MatchesCustomCondition;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -325,14 +327,21 @@ final class ConfigurationStaleness {
             if (!component.probed()) {
                 continue;
             }
+            // a bean another requirement disables, such as an unmet property, stays disabled whatever its custom
+            // conditions answer, and the context short-circuits them, so they are not run here either: that
+            // requirement flips only with a key the static check reads, which restarts first
+            Boolean unmet = null;
             for (AnnotationValue<Requires> requires : component.requirements()) {
                 AnnotationClassValue<?> condition = requires.annotationClassValue(RequiresCondition.MEMBER_CONDITION).orElse(null);
                 if (condition == null || condition.getName().equals(TrueCondition.class.getName())) {
                     continue;
                 }
+                if (unmet == null) {
+                    unmet = !preConditionsHold(current, component);
+                }
                 Object result;
                 try {
-                    result = new MatchesCustomCondition(condition).matches(new ProbeConditionContext(current, component.component()));
+                    result = unmet ? "unmet" : new MatchesCustomCondition(condition).matches(new ProbeConditionContext(current, component.component()));
                 } catch (RuntimeException | LinkageError e) {
                     result = e.getClass().getName();
                 }
@@ -340,6 +349,31 @@ final class ConfigurationStaleness {
             }
         }
         return outcomes;
+    }
+
+    /**
+     * Whether every requirement core decides before loading a bean holds: the properties, the environment, the
+     * classes and the like, none of which runs application code.
+     */
+    private static boolean preConditionsHold(ApplicationContext current, Conditional component) {
+        ProbeConditionContext context = new ProbeConditionContext(current, component.component());
+        for (AnnotationValue<Requires> requires : component.requirements()) {
+            if (requires.hasEvaluatedExpressions()) {
+                continue;
+            }
+            List<Condition> pre = new ArrayList<>();
+            try {
+                MatchesConditionUtils.createConditions(requires, pre, new ArrayList<>());
+                for (Condition condition : pre) {
+                    if (!condition.matches(context)) {
+                        return false;
+                    }
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // undecided: the custom conditions are run
+            }
+        }
+        return true;
     }
 
     private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
