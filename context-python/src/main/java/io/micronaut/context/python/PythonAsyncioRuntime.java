@@ -205,11 +205,12 @@ public final class PythonAsyncioRuntime {
                         scheduler.run();
                         return null;
                     });
-                } catch (Throwable e) {
+                } catch (RuntimeException e) {
+                    // the context is closing: schedule() completes the future on any other failure
                     future.completeExceptionally(e);
                 }
             };
-            Future<?> ignored = executor.submit(PropagatedContext.wrapCurrent(tracked));
+            executor.execute(PropagatedContext.wrapCurrent(tracked));
             return true;
         } catch (RuntimeException e) {
             LOG.debug("The blocking executor refused a Python coroutine; it runs on the calling thread", e);
