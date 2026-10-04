@@ -46,7 +46,7 @@ final class JsonChunkedProcessor {
         return Flux.concat(input
                 .concatMap(b -> Flux.<ByteBuffer<?>>create(s -> {
                     try {
-                        countLoop(s, b);
+                        countComponents(s, b);
                         s.complete();
                     } catch (IOException e) {
                         s.error(e);
@@ -72,6 +72,23 @@ final class JsonChunkedProcessor {
         if (this.compositeBuffer != null) {
             this.compositeBuffer.release();
             this.compositeBuffer = null;
+        }
+    }
+
+    /**
+     * The counter reads its input byte by byte, which on a composite buffer means finding the
+     * component for every byte. The components are fed one after the other instead: the counter
+     * takes input in any number of pieces, and a value spanning components is buffered like one
+     * spanning chunks. The parts share the reference count of their component.
+     */
+    private void countComponents(FluxSink<? super ByteBuffer<?>> out, ByteBuf content) throws IOException {
+        if (content instanceof CompositeByteBuf composite && composite.numComponents() > 1) {
+            for (ByteBuf part : composite.decompose(composite.readerIndex(), composite.readableBytes())) {
+                countLoop(out, part);
+            }
+            content.readerIndex(content.writerIndex());
+        } else {
+            countLoop(out, content);
         }
     }
 
