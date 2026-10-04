@@ -209,14 +209,15 @@ class PipeliningServerHandlerSpec extends Specification {
         flushesInTurn == flushesBefore
         mon.flush == flushesBefore + 1
 
-        and: 'the upstream was told right away that the bytes were consumed, since the channel is writable'
+        and: 'the writable channel accepts bytes into the bounded aggregate'
         consumedInTurn == pieces.sum { it.length() }
+        upstream.consumed == pieces.sum { it.length() }
 
-        and: 'the messages are unchanged: the response and one content message per piece'
+        and: 'adjacent small pieces share one bounded content message'
         outbound[0] == resp
-        outbound.size() == pieces.size() + 1
+        outbound.size() == 2
         outbound.drop(1).every { it instanceof HttpContent && !(it instanceof LastHttpContent) }
-        outbound.drop(1).collect { ((HttpContent) it).content().toString(StandardCharsets.UTF_8) } == pieces
+        outbound.drop(1).collect { ((HttpContent) it).content().toString(StandardCharsets.UTF_8) } == [pieces.join('')]
 
         when: 'the body completes in a later turn'
         streamingBody.sharedBuffer().complete()
@@ -268,15 +269,11 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.checkException()
         cleaned == 1
         ch.readOutbound() == resp
-        HttpContent first = ch.readOutbound()
-        !(first instanceof LastHttpContent)
-        first.content().toString(StandardCharsets.UTF_8) == "foo"
         LastHttpContent last = ch.readOutbound()
-        last.content().toString(StandardCharsets.UTF_8) == "bar"
+        last.content().toString(StandardCharsets.UTF_8) == "foobar"
         ch.readOutbound() == null
 
         cleanup:
-        first?.release()
         last?.release()
         ch.finishAndReleaseAll()
     }
@@ -298,7 +295,8 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-                def content = Flux.range(0, 4)
+                // Exceed the 8 KiB aggregation window so the producer must observe backpressure.
+                def content = Flux.range(0, 32)
                     .map { Unpooled.wrappedBuffer(new byte[1024]) }
                     .doOnNext { emitted++ }
                 outboundAccess.write(response, new NettyByteBodyFactory(ctx.channel()).adaptNetty(content))
@@ -317,7 +315,7 @@ class PipeliningServerHandlerSpec extends Specification {
 
         then:
         initiallyEmitted > 0
-        initiallyEmitted < 4
+        initiallyEmitted < 32
         !ch.isWritable()
 
         when:
@@ -328,20 +326,20 @@ class PipeliningServerHandlerSpec extends Specification {
         outboundBuffer.setUserDefinedWritability(1, false)
 
         then:
-        emitted == (quic ? initiallyEmitted : 4)
+        emitted == (quic ? initiallyEmitted : 32)
 
         when:
         ch.runPendingTasks()
 
         then:
-        emitted == (quic ? initiallyEmitted : 4)
+        emitted == (quic ? initiallyEmitted : 32)
 
         when:
         outboundBuffer.setUserDefinedWritability(1, true)
         ch.runPendingTasks()
 
         then:
-        emitted == 4
+        emitted == 32
 
         cleanup:
         ch.finishAndReleaseAll()
@@ -1413,8 +1411,9 @@ class PipeliningServerHandlerSpec extends Specification {
         then:
         ch.checkException()
         ch.readOutbound() == firstResp
-        ch.readOutbound() == new DefaultHttpContent(c1)
-        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        LastHttpContent completed = ch.readOutbound()
+        completed.content().toString(StandardCharsets.UTF_8) == "foo"
+        completed.release()
         // the failed response is discarded instead of being written, and the connection is closed
         ch.readOutbound() == null
         !ch.open
