@@ -298,7 +298,8 @@ class Http2ServerHandlerSpec extends Specification {
         client.readInbound() instanceof Http2SettingsFrame
         client.readInbound() instanceof Http2SettingsAckFrame
         client.readInbound() instanceof Http2HeadersFrame
-        duplexHandler.dataFrames == [['[1', false], [',2]', true]]
+        // the window has room, so the elements are combined with the closing bracket
+        duplexHandler.dataFrames == [['[1,2]', true]]
 
         cleanup:
         client.checkException()
@@ -308,7 +309,7 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.advance(client, server)
     }
 
-    def "response pieces written in one event loop turn share one flush and one consumption signal"() {
+    def "response pieces written in one event loop turn share one flush and are consumed while the window has room"() {
         given:
         def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
         def streamingBody = null
@@ -361,17 +362,17 @@ class Http2ServerHandlerSpec extends Specification {
             consumptionsInTurn = upstream.consumptions
         }
         EmbeddedTestUtil.advance(server, client)
-        then: 'nothing is flushed or acknowledged before the turn ends'
+        then: 'nothing is flushed before the turn ends, but the pieces fit the window and count as consumed right away'
         flushesInTurn == flushesBefore
-        consumptionsInTurn == 0
+        consumptionsInTurn == pieces.size()
 
         and: 'one flush covers all pieces, and they arrive unchanged'
         flushes.count == flushesBefore + 1
         duplexHandler.received.toString(StandardCharsets.UTF_8) == pieces.join('')
         duplexHandler.dataFrames.every { !it[1] }
 
-        and: 'the upstream is told once that the whole batch was consumed'
-        upstream.consumptions == 1
+        and: 'the written batch is not reported a second time'
+        upstream.consumptions == pieces.size()
         upstream.consumed == pieces.sum { it.length() }
 
         when: 'more pieces arrive in a later turn, the last of them with the completion'
@@ -555,7 +556,10 @@ class Http2ServerHandlerSpec extends Specification {
                         read++
                         return 1
                     }
-                }, OptionalLong.empty(), service, new NettyByteBodyFactory(ctx.channel())))
+                    // read on the event loop: the embedded event loop treats every thread as its
+                    // own, so reads on another thread would run the response writer concurrently
+                    // with the test thread
+                }, OptionalLong.empty(), ctx.executor(), new NettyByteBodyFactory(ctx.channel())))
             }
 
             @Override
@@ -580,13 +584,14 @@ class Http2ServerHandlerSpec extends Specification {
         client.readInbound() instanceof Http2HeadersFrame
         new PollingConditions(timeout: 5).eventually {
             EmbeddedTestUtil.advance(client, server)
-            // 8192 is ExtendedInputStream.CHUNK_SIZE
-            read == (windowSize.intdiv(8192) + 1) * 8192
+            // 8192 is ExtendedInputStream.CHUNK_SIZE. The chunks that fit the window are
+            // consumed right away. The chunk held for the end of the turn is not counted against
+            // the window yet, so one more chunk is read than the window takes
+            read == (windowSize.intdiv(8192) + 2) * 8192
             duplexHandler.received.readableBytes() == windowSize
         }
 
         when:"consume some of the bytes"
-        read = 0
         // have to munch a number of bytes that is:
         // - not too close to a multiple of windowSize so that we aren't below the window update threshold
         // - not too small to be satisfied by the existing buffered chunks
@@ -601,7 +606,9 @@ class Http2ServerHandlerSpec extends Specification {
         then:"more chunks read from the input stream"
         new PollingConditions(timeout: 5).eventually {
             EmbeddedTestUtil.advance(client, server)
-            read == 6 * 8192
+            // in total, the chunks that cover the initial and the freed window, plus the chunk
+            // held for the end of the turn
+            read == 15 * 8192
             duplexHandler.received.readableBytes() == windowSize
         }
 
