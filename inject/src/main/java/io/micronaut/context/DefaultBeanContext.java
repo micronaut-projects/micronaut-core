@@ -244,7 +244,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
 
     private final CustomScopeRegistry customScopeRegistry;
     // the interceptors of targets this context holds no registration for, by the definition of the target
-    private final Map<Object, UnownedInterceptorSelection> unownedInterceptorSelections = new ConcurrentHashMap<>();
+    private final Map<Object, BeanDependencies> contextSelectionOwners = new ConcurrentHashMap<>();
     private final BeanResolutionCustomizer beanResolutionCustomizer;
     private final RuntimeBeanDefinition<BeanDependencyResolver> dependencyResolverDefinition = RuntimeBeanDefinition
         .<BeanDependencyResolver>builder(BeanDependencyResolver.class, () -> new DefaultBeanDependencyResolver(this))
@@ -494,7 +494,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
 
             // the interceptors of targets this context holds no registration for have no other owner. They go last,
             // so that a singleton calling such a target as it is destroyed is still intercepted by them
-            destroyUnownedInterceptorSelections();
+            destroyContextSelections();
 
             if (checkEnabledBeans != null) {
                 checkEnabledBeans.cancel(true);
@@ -1342,7 +1342,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
     private void releaseDependents(BeanRegistration<?> registration, @Nullable Throwable failure) {
         try {
             if (registration instanceof BeanDisposingRegistration<?> disposing) {
-                disposing.takeSelection();
+                disposing.getDependencies().forgetResolved();
                 disposing.getDependencies().close(this);
             } else {
                 registration.close();
@@ -4121,45 +4121,44 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
     }
 
     @Override
-    public <S> @Nullable S getSelection(BeanRegistration<?> target, Object key) {
-        return target.keptSelection(key);
+    public <S> @Nullable S findTargetSelection(BeanRegistration<?> target, Object key) {
+        BeanDependencies owner = target.getDependencies();
+        return owner == null ? null : owner.findResolved(key);
     }
 
     @Override
-    public <S> @Nullable S select(BeanRegistration<?> target, Object key, Function<BeanResolutionContext, S> selector) {
-        return target.select(key, selector);
+    public <S> @Nullable S selectForTarget(BeanRegistration<?> target, Object key, Function<BeanResolutionContext, S> selector) {
+        BeanDependencies owner = target.getDependencies();
+        return owner == null ? null : owner.resolveOnce(this, target.getBeanDefinition(), key, selector);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <S> @Nullable S getUnownedSelection(Object key) {
-        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
-        return kept == null ? null : (S) kept.selection;
+    public <S> @Nullable S findContextSelection(Object key) {
+        BeanDependencies owner = contextSelectionOwners.get(key);
+        return owner == null ? null : owner.findResolved(key);
     }
 
     // The interceptors no scope holds that a selection is computed from are created for it, and this context is
     // their only owner: they are destroyed when it stops, or at once when the selection fails or another thread
     // kept its own first.
     @Override
-    @SuppressWarnings("unchecked")
-    public <I, S> S selectUnowned(Object key,
-                                  Argument<I> interceptorType,
-                                  @Nullable Qualifier<I> binding,
-                                  Function<Collection<BeanRegistration<I>>, S> selector) {
-        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
+    public <I, S> S selectForContext(Object key,
+                                     Argument<I> interceptorType,
+                                     @Nullable Qualifier<I> binding,
+                                     Function<Collection<BeanRegistration<I>>, S> selector) {
+        BeanDependencies kept = contextSelectionOwners.get(key);
         if (kept == null) {
             // A context-owned selection uses the same transaction as a registered target. Only the winning
-            // selection survives; failure and a lost race release their dependents through the same owner.
-            BeanDependencies dependencies = new BeanDependencies();
-            S value = dependencies.resolve(this, null, resolution ->
-                selector.apply(resolution.getInterceptorRegistrations(interceptorType, binding)));
-            UnownedInterceptorSelection selection = new UnownedInterceptorSelection(value, dependencies);
+            // owner survives; failure and a lost race release their dependents through the same owner.
+            BeanDependencies owner = new BeanDependencies();
+            S value = Objects.requireNonNull(owner.resolveOnce(this, null, key, resolution ->
+                selector.apply(resolution.getInterceptorRegistrations(interceptorType, binding))));
             boolean published = false;
             try {
-                synchronized (unownedInterceptorSelections) {
+                synchronized (contextSelectionOwners) {
                     // Shutdown can start after resolution committed but before the context took ownership.
-                    dependencies.checkOpen(this);
-                    kept = unownedInterceptorSelections.putIfAbsent(key, selection);
+                    owner.checkOpen(this);
+                    kept = contextSelectionOwners.putIfAbsent(key, owner);
                     published = kept == null;
                 }
                 if (published) {
@@ -4167,21 +4166,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
                 }
             } finally {
                 if (!published) {
-                    destroyCreatedBeans(dependencies.takeDependents(), null);
+                    destroyCreatedBeans(owner.takeDependents(), null);
                 }
             }
         }
-        return (S) kept.selection;
+        return Objects.requireNonNull(kept.findResolved(key));
     }
 
-    private void destroyUnownedInterceptorSelections() {
-        List<UnownedInterceptorSelection> selections;
-        synchronized (unownedInterceptorSelections) {
-            selections = new ArrayList<>(unownedInterceptorSelections.values());
-            unownedInterceptorSelections.clear();
+    private void destroyContextSelections() {
+        List<BeanDependencies> owners;
+        synchronized (contextSelectionOwners) {
+            owners = new ArrayList<>(contextSelectionOwners.values());
+            contextSelectionOwners.clear();
         }
-        for (UnownedInterceptorSelection selection : selections) {
-            destroyCreatedBeans(selection.dependencies.takeDependents(), null);
+        for (BeanDependencies owner : owners) {
+            destroyCreatedBeans(owner.takeDependents(), null);
         }
     }
 
@@ -4220,9 +4219,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Targe
         if (cleanupError != null) {
             throw cleanupError;
         }
-    }
-
-    private record UnownedInterceptorSelection(Object selection, BeanDependencies dependencies) {
     }
 
     /**

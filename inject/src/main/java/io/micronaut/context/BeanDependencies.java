@@ -36,6 +36,9 @@ final class BeanDependencies implements DependentBeanProvider {
     private List<BeanRegistration<?>> required = List.of();
     private InterceptorCandidates interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
     private OwnershipState state = OwnershipState.OPEN;
+    /** The value resolved once through this owner and kept while it is open, or null. */
+    @SuppressWarnings("java:S3077") // replaced under the lock of this owner; its value is read through its own volatile field
+    private volatile @Nullable Resolved resolved;
     /** The destruction invocation a temporary group belongs to, which may resolve during shutdown; null for any other owner. */
     final @Nullable DefaultBeanResolutionContext destructionContext;
 
@@ -167,6 +170,7 @@ final class BeanDependencies implements DependentBeanProvider {
      */
     synchronized List<BeanRegistration<?>> takeDependents() {
         state = OwnershipState.OWNERSHIP_RELEASED;
+        resolved = null;
         List<BeanRegistration<?>> taken = owned;
         owned = List.of();
         required = List.of();
@@ -257,6 +261,86 @@ final class BeanDependencies implements DependentBeanProvider {
                 context.destroyCreatedBeans(resolution.getAndResetDependentBeans(), failure);
                 throw failure;
             }
+        }
+    }
+
+    /**
+     * Returns the value kept for a key by {@link #resolveOnce}, without resolving anything. A proxy reads the
+     * interceptors it selected for a target this way on every call.
+     *
+     * @param key The key, compared by identity
+     * @param <S> The value type
+     * @return The value, or null when none is kept for the key
+     */
+    @SuppressWarnings("unchecked")
+    <S> @Nullable S findResolved(Object key) {
+        Resolved kept = resolved;
+        return kept != null && kept.key == key ? (S) kept.value : null;
+    }
+
+    /**
+     * Returns the value kept for a key, computing it once through this owner. What the operation creates becomes
+     * a dependent of the owner, and the value is kept until the owner is released, so that it lives exactly as
+     * long as the beans it refers to. One value is kept at a time; another key replaces it.
+     *
+     * <p>The operation runs outside the lock of the owner, as every resolution does, and under a lock of its own,
+     * so that two callers asking at once create the dependents once.</p>
+     *
+     * @param context The context
+     * @param definition The definition the resolution is rooted at, or null
+     * @param key The key, compared by identity
+     * @param operation Computes the value
+     * @param <S> The value type
+     * @return The value, or null when the owner is closing and nothing can become its dependent any more
+     */
+    @SuppressWarnings("unchecked")
+    <S> @Nullable S resolveOnce(DefaultBeanContext context, @Nullable BeanDefinition<?> definition, Object key,
+                                Function<? super DefaultBeanResolutionContext, S> operation) {
+        Resolved slot;
+        synchronized (this) {
+            if (isClosing()) {
+                return null;
+            }
+            slot = resolved;
+            if (slot == null || slot.key != key) {
+                slot = new Resolved(key);
+                resolved = slot;
+            }
+        }
+        synchronized (slot) {
+            if (slot.value == null && !slot.forgotten) {
+                slot.value = resolve(context, definition, operation);
+            }
+            return (S) slot.value;
+        }
+    }
+
+    /**
+     * Drops the value kept by {@link #resolveOnce}, waiting for a computation in flight, so that nothing is kept
+     * once the dependents it refers to are released.
+     */
+    void forgetResolved() {
+        Resolved slot;
+        synchronized (this) {
+            slot = resolved;
+            resolved = null;
+        }
+        if (slot != null) {
+            synchronized (slot) {
+                slot.forgotten = true;
+                slot.value = null;
+            }
+        }
+    }
+
+    /** The slot of one {@link #resolveOnce} key; its monitor serializes the computation with forgetting it. */
+    private static final class Resolved {
+        final Object key;
+        volatile @Nullable Object value;
+        boolean forgotten;
+
+        Resolved(Object key) {
+            this.key = key;
         }
     }
 

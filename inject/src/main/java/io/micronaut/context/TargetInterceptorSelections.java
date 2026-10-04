@@ -24,7 +24,7 @@ import java.util.function.Function;
 
 /**
  * Keeps the interceptors a proxy selected for a target that exists already. A selection is kept by the
- * registration of the target, which owns the unscoped interceptors created for it, or by the context for a
+ * dependency owner of the target, which owns the unscoped interceptors created for it, or by the context for a
  * target it holds no registration for. Keys are compared by identity.
  *
  * @since 5.3.0
@@ -40,7 +40,7 @@ public interface TargetInterceptorSelections {
      * @param <S> The selection type
      * @return The selection, or null when none is kept
      */
-    <S> @Nullable S getSelection(BeanRegistration<?> target, Object key);
+    <S> @Nullable S findTargetSelection(BeanRegistration<?> target, Object key);
 
     /**
      * Returns the selection kept on a registration, computing it once through the dependency owner of the
@@ -52,7 +52,7 @@ public interface TargetInterceptorSelections {
      * @param <S> The selection type
      * @return The selection, or null when the registration cannot own interceptors or is destroyed
      */
-    <S> @Nullable S select(BeanRegistration<?> target, Object key, Function<BeanResolutionContext, S> selector);
+    <S> @Nullable S selectForTarget(BeanRegistration<?> target, Object key, Function<BeanResolutionContext, S> selector);
 
     /**
      * Returns the selection the context keeps for targets it holds no registration for, without resolving any bean.
@@ -61,7 +61,7 @@ public interface TargetInterceptorSelections {
      * @param <S> The selection type
      * @return The selection, or null when none is kept
      */
-    <S> @Nullable S getUnownedSelection(Object key);
+    <S> @Nullable S findContextSelection(Object key);
 
     /**
      * Returns the selection the context keeps for targets it holds no registration for, computing it once.
@@ -75,6 +75,6 @@ public interface TargetInterceptorSelections {
      * @param <S> The selection type
      * @return The selection
      */
-    <I, S> S selectUnowned(Object key, Argument<I> interceptorType, @Nullable Qualifier<I> binding,
-                           Function<Collection<BeanRegistration<I>>, S> selector);
+    <I, S> S selectForContext(Object key, Argument<I> interceptorType, @Nullable Qualifier<I> binding,
+                              Function<Collection<BeanRegistration<I>>, S> selector);
 }

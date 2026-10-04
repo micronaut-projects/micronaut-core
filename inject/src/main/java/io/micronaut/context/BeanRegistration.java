@@ -27,7 +27,6 @@ import io.micronaut.inject.BeanType;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
 
 /**
  * <p>A bean registration is an association between a {@link BeanDefinition} and a created bean, typically a
@@ -162,16 +161,6 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      */
     List<BeanRegistration<?>> dependentBeans() {
         return dependencies == null ? List.of() : dependencies.dependentBeans();
-    }
-
-    // The selection a proxy fronting this bean keeps for it, see TargetInterceptorSelections. A registration the
-    // container does not own keeps none.
-    <S> @Nullable S keptSelection(Object key) {
-        return null;
-    }
-
-    <S> @Nullable S select(Object key, Function<BeanResolutionContext, S> selector) {
-        return null;
     }
 
     @Override
