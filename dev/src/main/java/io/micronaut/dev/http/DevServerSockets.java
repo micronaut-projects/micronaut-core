@@ -205,6 +205,13 @@ public final class DevServerSockets implements AutoCloseable {
         }
     }
 
+    /**
+     * Stops answering with a 503: a generation runs again, and its servers accept on the sockets once they start.
+     */
+    public synchronized void stopServingUnavailable() {
+        stopResponder();
+    }
+
     @Override
     public synchronized void close() {
         closed = true;

@@ -1720,6 +1720,12 @@ public final class DevRuntime implements Closeable {
             throw e;
         }
         startFailed = false;
+        DevServerSockets started = serverSockets;
+        if (started != null) {
+            // a generation runs again: its server binds a moment after its context starts, and until then a request
+            // waits in the backlog for it rather than being told the application is not running
+            started.stopServingUnavailable();
+        }
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
