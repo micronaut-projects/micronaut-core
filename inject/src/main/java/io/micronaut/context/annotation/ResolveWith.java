@@ -25,7 +25,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Selects a context-managed provider for the full declared injection value, including container types.
+ * Selects a context-managed {@link BeanInjectionProvider} for the full declared injection value, including container types.
  * Explicit {@link Parameter}, {@link Property} and {@link Value} injection retain precedence.
  * This annotation selects resolution behavior; it is not a qualifier or an injection marker.
  *

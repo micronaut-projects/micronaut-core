@@ -32,6 +32,7 @@ import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.BeansI
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.MapOfBeansInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.OptionalBeanInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.ParameterInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.ProviderInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint;
 import io.micronaut.context.beans.definition.ConstructorDefinition;
 import io.micronaut.context.beans.definition.FieldDefinition;
@@ -320,7 +321,7 @@ public class BeanInjectionUtils {
                 if (!provider.isAssignable(BeanInjectionProvider.class)) {
                     throw new IllegalArgumentException("The injection provider " + providerName + " must implement BeanInjectionProvider");
                 }
-                return new BeanInjectionPoint<>(genericType, annotationMetadata);
+                return new ProviderInjectionPoint<>(genericType, annotationMetadata, provider);
             }
             isArray = genericType.isArray();
             if (genericType.isAssignable(Collection.class) || isArray) {
