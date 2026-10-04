@@ -31,6 +31,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.InstantiatableBeanDefinition;
@@ -41,6 +42,9 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -64,6 +68,12 @@ public abstract sealed class ProxyTargetHandlerBean<H extends ProxyTargetHandler
     }
 
     private final Class<H> type;
+    /**
+     * The binding of each proxy constructor this handler is injected into, which is the same for every proxy it
+     * creates. Keyed by the identity of the parameter: arguments are equal by type and name, which every handler
+     * parameter of a kind shares.
+     */
+    private final Map<Argument<?>, Optional<Qualifier<Interceptor<?, ?>>>> bindings = Collections.synchronizedMap(new IdentityHashMap<>());
     private final Function<ProxyTargetHandler.Creation, H> constructor;
 
     private ProxyTargetHandlerBean(Class<H> type, Function<ProxyTargetHandler.Creation, H> constructor) {
@@ -78,13 +88,7 @@ public abstract sealed class ProxyTargetHandlerBean<H extends ProxyTargetHandler
         // the injection point: the handler parameter of the constructor of the proxy
         BeanResolutionContext.Segment<?, ?> injectionPoint = resolutionContext.getPath().currentSegment().orElse(null);
         if (injectionPoint != null) {
-            AnnotationValue<Annotation> bound = injectionPoint.getArgument().getAnnotationMetadata()
-                .findAnnotation(ProxyTargetHandler.BINDING).orElse(null);
-            if (bound != null) {
-                MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
-                metadata.addDeclaredAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, bound.getValues());
-                binding = Qualifiers.byInterceptorBinding(metadata);
-            }
+            binding = bindings.computeIfAbsent(injectionPoint.getArgument(), ProxyTargetHandlerBean::bindingOf).orElse(null);
             qualifier = injectionPoint.getDeclaringTypeQualifier();
         }
         if (qualifier == null || qualifier instanceof InterceptorBindingQualifier) {
@@ -92,6 +96,18 @@ public abstract sealed class ProxyTargetHandlerBean<H extends ProxyTargetHandler
         }
         return constructor.apply(new ProxyTargetHandler.Creation(
             resolutionContext.getBean(InterceptorChainFactory.ARGUMENT), binding, resolutionContext, context, qualifier));
+    }
+
+    private static Optional<Qualifier<Interceptor<?, ?>>> bindingOf(Argument<?> handlerParameter) {
+        AnnotationValue<Annotation> bound = handlerParameter.getAnnotationMetadata()
+            .findAnnotation(ProxyTargetHandler.BINDING).orElse(null);
+        if (bound == null || bound.getAnnotations(AnnotationMetadata.VALUE_MEMBER).isEmpty()) {
+            // a proxy that takes its interceptors from its targets binds none
+            return Optional.empty();
+        }
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        metadata.addDeclaredAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, bound.getValues());
+        return Optional.of(Qualifiers.byInterceptorBinding(metadata));
     }
 
     @Override
