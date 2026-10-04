@@ -107,7 +107,14 @@ public final class DevGateFilter {
         }
         // held until the batch is done, or until a restart drains this generation, which serves it before it stops
         CompletableFuture<@Nullable HttpResponse<?>> response = new CompletableFuture<>();
-        admitted.whenComplete((ignored, error) -> response.complete(then.get()));
+        admitted.whenComplete((ignored, error) -> {
+            try {
+                response.complete(then.get());
+            } catch (RuntimeException e) {
+                // the request's own error handling answers it, now rather than at the end of the hold
+                response.completeExceptionally(e);
+            }
+        });
         response.completeOnTimeout(unavailable(hold), hold.toMillis(), TimeUnit.MILLISECONDS);
         return response;
     }

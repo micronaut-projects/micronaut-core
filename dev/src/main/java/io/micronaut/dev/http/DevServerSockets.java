@@ -147,7 +147,10 @@ public final class DevServerSockets implements AutoCloseable {
         }
     }
 
-    private void releaseUnclaimed() {
+    /**
+     * Closes the sockets no server accepts on: their listener is gone from the running generation's configuration.
+     */
+    public synchronized void releaseUnclaimed() {
         accepting.removeIf(entry -> !entry.open.getAsBoolean());
         sockets.values().removeIf(socket -> {
             if (isAccepting(socket)) {

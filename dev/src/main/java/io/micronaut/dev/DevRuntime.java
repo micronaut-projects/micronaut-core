@@ -127,6 +127,7 @@ public final class DevRuntime implements Closeable {
     private static final Duration COALESCE = Duration.ofMillis(150);
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
+    private static final Duration SERVER_START_WAIT = Duration.ofSeconds(10);
     private static final int MAX_PROPAGATION_PASSES = 5;
 
     private final DevManifest manifest;
@@ -893,6 +894,27 @@ public final class DevRuntime implements Closeable {
             LOG.debug("Draining generation {} failed", classLoader.generation(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Waits, briefly, for the HTTP servers of a generation that just started: the application starts them after its
+     * context, on its own thread.
+     */
+    private static void awaitServers(ApplicationContext generation) {
+        long deadline = System.nanoTime() + SERVER_START_WAIT.toNanos();
+        while (System.nanoTime() < deadline && generation.isRunning()) {
+            for (BeanRegistration<EmbeddedServer> registration : generation.getActiveBeanRegistrations(EmbeddedServer.class)) {
+                if (registration.getBean().isRunning()) {
+                    return;
+                }
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
@@ -1725,6 +1747,11 @@ public final class DevRuntime implements Closeable {
             // a generation runs again: its server binds a moment after its context starts, and until then a request
             // waits in the backlog for it rather than being told the application is not running
             started.stopServingUnavailable();
+            if (started.isBound()) {
+                // once its servers accept, a socket none of them claimed belongs to a listener the configuration dropped
+                awaitServers(fresh);
+                started.releaseUnclaimed();
+            }
         }
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());

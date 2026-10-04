@@ -41,4 +41,14 @@ class DevGateFilterHoldTest {
         // admitted later: the answer stays the 503
         admitted.complete(null);
     }
+
+    @Test
+    void aFailureAnsweringAnAdmittedRequestFailsItAtOnce() {
+        CompletableFuture<Void> admitted = new CompletableFuture<>();
+        CompletableFuture<HttpResponse<?>> response = DevGateFilter.hold(admitted, Duration.ofSeconds(30), () -> {
+            throw new IllegalStateException("cannot render");
+        });
+        admitted.complete(null);
+        assertTrue(response.isCompletedExceptionally());
+    }
 }
