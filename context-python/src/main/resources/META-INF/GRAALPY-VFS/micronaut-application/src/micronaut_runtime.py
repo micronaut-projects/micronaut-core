@@ -295,13 +295,16 @@ def __micronaut_create_raw_instance(cls):
     return cls.__new__(cls)
 
 
-class _MicronautSelfInvocation:
-    """Instance attribute that routes ``self.method(...)`` of a proxied bean through the interceptor chain.
+class _MicronautInterceptedCall:
+    """Calls the interceptor chain of a proxied method the way Python calls the method itself.
 
-    The override was created for the bean object that carries the attribute, so the chain runs on the
-    calling object; it binds the class function to that object, so the attribute is never re-entered.
-    Keyword and omitted defaulted arguments are laid out positionally the way the generated Java method
-    declares them.
+    The chain is a Java executable taking the arguments of the generated Java method positionally, one
+    per parameter after ``self``. Python callers pass keyword arguments and omit defaulted ones, so the
+    call is bound through the signature of the class function: keyword arguments take their place and
+    omitted ones are filled from the Python defaults, and the interceptors see the full argument list.
+
+    Used for the overrides of the scoped proxy and introduction targets (calls through the proxy) and
+    for the instance attributes that route ``self.method(...)`` of a proxied bean through the chain.
     """
 
     __slots__ = ("_function", "_override", "_parameters")
@@ -313,7 +316,12 @@ class _MicronautSelfInvocation:
 
     def __call__(self, *args, **kwargs):
         parameters = self._parameters
+        if len(args) > len(parameters):
+            raise TypeError(f"{self._function.__qualname__}() takes {len(parameters) + 1} positional arguments but {len(args) + 1} were given")
         if kwargs or len(args) < len(parameters):
+            for parameter in parameters[:len(args)]:
+                if parameter.name in kwargs:
+                    raise TypeError(f"{self._function.__qualname__}() got multiple values for argument '{parameter.name}'")
             values = list(args)
             for parameter in parameters[len(args):]:
                 if parameter.name in kwargs:
@@ -328,7 +336,7 @@ class _MicronautSelfInvocation:
         return self._override(*args)
 
     def __getattr__(self, name):
-        if name in _MicronautSelfInvocation.__slots__:
+        if name in _MicronautInterceptedCall.__slots__:
             raise AttributeError(name)
         return getattr(self._function, name)
 
@@ -357,33 +365,56 @@ class _MicronautStageAwaitable:
 
 # the parameter layout of a class function, computed once per function: a bean of a prototype-like scope
 # is bound on every instantiation
-_micronaut_self_invocation_layouts = {}
+_micronaut_positional_layouts = {}
 
 
-def _micronaut_self_invocation_layout(function):
+def _micronaut_positional_layout(function):
     """The parameters after ``self``, or ``None`` when the layout cannot be mapped onto the Java method.
 
     A method taking ``*args`` or ``**kwargs`` has no positional layout, and the generated Java method
-    has no parameter for a keyword-only one; the self-invocations of such methods stay direct rather
-    than dropping or misplacing arguments.
+    has no parameter for a keyword-only or positional-only one (``self`` aside); such methods are called
+    with the arguments as given rather than dropping or misplacing arguments.
     """
     try:
-        return _micronaut_self_invocation_layouts[function]
+        return _micronaut_positional_layouts[function]
     except KeyError:
         pass
     except TypeError:
         return None
     parameters = None
-    try:
-        parameters = tuple(inspect.signature(function).parameters.values())[1:]
-        for parameter in parameters:
-            if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY):
-                parameters = None
-                break
-    except (TypeError, ValueError):
-        pass
-    _micronaut_self_invocation_layouts[function] = parameters
+    # a static or class method has no self to drop from its signature
+    if callable(function) and not isinstance(function, (staticmethod, classmethod)):
+        try:
+            parameters = tuple(inspect.signature(function).parameters.values())[1:]
+            for parameter in parameters:
+                if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY, parameter.POSITIONAL_ONLY):
+                    parameters = None
+                    break
+        except (TypeError, ValueError):
+            parameters = None
+    _micronaut_positional_layouts[function] = parameters
     return parameters
+
+
+def _micronaut_intercepted_call(function, override):
+    """The override of an intercepted method, callable with the keyword and defaulted arguments of the Python function.
+
+    The override itself when the function has no positional layout. The function is the one the class
+    declared: an introduction replaces its abstract methods with stubs, which have no layout.
+    """
+    parameters = _micronaut_positional_layout(function)
+    if parameters is None:
+        return override
+    return _MicronautInterceptedCall(function, override, parameters)
+
+
+def _micronaut_intercepted_member(cls, name, override):
+    return _micronaut_intercepted_call(__micronaut_get_raw_class_member(cls, name), override)
+
+
+# the Java proxy creator's name for it; the scoped proxy class calls the single underscore names, which
+# its body does not mangle
+__micronaut_intercepted_call = _micronaut_intercepted_call
 
 
 def __micronaut_is_coroutine_function(function):
@@ -420,12 +451,10 @@ def __micronaut_bind_self_invocations(target, names, overrides):
             # again, or a value the bean wrote, which shadows the method as it does in plain Python
             continue
         function = __micronaut_get_raw_class_member(cls, name)
-        if function is None or not callable(function):
-            continue
-        parameters = _micronaut_self_invocation_layout(function)
+        parameters = _micronaut_positional_layout(function)
         if parameters is None:
             continue
-        object.__setattr__(target, name, _MicronautSelfInvocation(function, overrides[i], parameters))
+        object.__setattr__(target, name, _MicronautInterceptedCall(function, overrides[i], parameters))
 
 
 def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=None):
@@ -458,7 +487,7 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
             return target
 
         def _micronaut_put_override(self, name, value):
-            object.__getattribute__(self, "_micronaut_overrides")[name] = value
+            object.__getattribute__(self, "_micronaut_overrides")[name] = _micronaut_intercepted_member(cls, name, value)
 
         def _micronaut_put_setter_override(self, name, value):
             object.__getattribute__(self, "_micronaut_setter_overrides")[name] = value

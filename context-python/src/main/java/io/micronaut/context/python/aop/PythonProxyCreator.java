@@ -93,6 +93,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     private static final String BIND_SELF_INVOCATIONS = "__micronaut_bind_self_invocations";
     private static final String IS_COROUTINE_FUNCTION = "__micronaut_is_coroutine_function";
     private static final String AWAIT_STAGE = "__micronaut_await_stage";
+    private static final String INTERCEPTED_CALL = "__micronaut_intercepted_call";
 
     private final Collection<TargetTypeMapping<?>> targetTypeMappings;
 
@@ -127,7 +128,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 ignored -> new ArrayList<>()
             ).add(interceptedMethod);
         }
-        Map<String, ProxyExecutable> introductionFunctions = new LinkedHashMap<>();
+        Value interceptedCall = PythonContextRuntime.helper(value.getContext(), INTERCEPTED_CALL);
+        Map<String, Value> introductionFunctions = new LinkedHashMap<>();
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
             List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue()
@@ -145,7 +147,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 methodSelector(methodName, interceptedMethods),
                 originalFunction
             );
-            introductionFunctions.put(methodName, proxiedFunction);
+            // bound through the signature the class declares, before the abstract methods are stubbed
+            introductionFunctions.put(methodName, interceptedCall.execute(originalFunction, proxiedFunction));
         }
         // stubs the abstract methods once per class and context, as newIntroduction does
         PythonContextRuntime.helper(value.getContext(), PREPARE_INTRODUCTION).execute(value);
@@ -156,7 +159,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             throw new IllegalStateException("Introduction proxy target cannot be null");
         }
         targetBeanRef.set(target);
-        for (Map.Entry<String, ProxyExecutable> entry : introductionFunctions.entrySet()) {
+        for (Map.Entry<String, Value> entry : introductionFunctions.entrySet()) {
             targetValue.putMember(entry.getKey(), entry.getValue());
         }
         return target;
