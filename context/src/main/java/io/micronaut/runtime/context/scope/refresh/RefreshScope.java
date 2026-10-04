@@ -57,6 +57,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     private final Map<BeanIdentifier, CreatedBean<?>> refreshableBeans = new ConcurrentHashMap<>(10);
     private final ConcurrentMap<Object, ReadWriteLock> locks = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
+    private volatile boolean stopped;
 
     /**
      * @param beanContext     The bean context to allow DI of beans annotated with @Inject
@@ -105,7 +106,14 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     }
 
     @Override
+    public RefreshScope start() {
+        stopped = false;
+        return this;
+    }
+
+    @Override
     public RefreshScope stop() {
+        stopped = true;
         disposeOfAllBeans();
         locks.clear();
         return this;
@@ -139,6 +147,10 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
      * @param event The event
      */
     public final void onRefreshEvent(RefreshEvent event) {
+        if (stopped) {
+            // the scope of a stopped context holds no beans, and its context resolves none
+            return;
+        }
         // the refresher runs the phases, rebinding the configuration beans before disposing of the refreshable
         // ones and telling the configuration watches; an event the refresher itself published is done with
         DefaultConfigurationRefresher refresher = beanContext.findBean(DefaultConfigurationRefresher.class).orElse(null);
