@@ -167,7 +167,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def interceptor = ctx.classLoader.loadClass('test.SlowInterceptor')
         def events = ctx.classLoader.loadClass('test.Events')
         def call = CompletableFuture.supplyAsync {
-            ctx.selectForTarget(target, new Object()) { resolution ->
+            target.dependencyOwner().resolveOnce(ctx, target.beanDefinition, new Object()) { resolution ->
                 resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
             }
         }
@@ -218,12 +218,12 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         interceptor.created == 0
 
         when:
-        def selected = ctx.selectForTarget(target, key) { resolution ->
+        def selected = target.dependencyOwner().resolveOnce(ctx, target.beanDefinition, key) { resolution ->
             selections++
             resolution.getInterceptorRegistrations(Argument.of(interceptor), null).first().bean
         }
-        def reused = ctx.selectForTarget(target, key) { throw new AssertionError('selection was not cached') }
-        assert ctx.findTargetSelection(target, key).is(selected)
+        def reused = target.dependencyOwner().resolveOnce(ctx, target.beanDefinition, key) { throw new AssertionError('selection was not cached') }
+        assert target.dependencyOwner().findResolved(key).is(selected)
         ctx.close()
 
         then:
@@ -245,7 +245,8 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def entered = new java.util.concurrent.CountDownLatch(1)
         def release = new java.util.concurrent.CountDownLatch(1)
         def selection = CompletableFuture.supplyAsync {
-            ctx.selectForContext(new Object(), Argument.of(interceptor), null) { registrations ->
+            ctx.resolveOnce(ctx, null, new Object()) { resolution ->
+                def registrations = resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
                 entered.countDown()
                 assert release.await(10, TimeUnit.SECONDS)
                 registrations

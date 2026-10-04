@@ -31,7 +31,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-final class BeanDependencies implements DependentBeanProvider {
+final class BeanDependencies implements DependentBeanProvider, DependencyOwner {
     private List<BeanRegistration<?>> owned = List.of();
     private List<BeanRegistration<?>> required = List.of();
     private InterceptorCandidates interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
@@ -264,38 +264,22 @@ final class BeanDependencies implements DependentBeanProvider {
         }
     }
 
-    /**
-     * Returns the value kept for a key by {@link #resolveOnce}, without resolving anything. A proxy reads the
-     * interceptors it selected for a target this way on every call.
-     *
-     * @param key The key, compared by identity
-     * @param <S> The value type
-     * @return The value, or null when none is kept for the key
-     */
+    @Override
     @SuppressWarnings("unchecked")
-    <S> @Nullable S findResolved(Object key) {
+    public <S> @Nullable S findResolved(Object key) {
         Resolved kept = resolved;
         return kept != null && kept.key == key ? (S) kept.value : null;
     }
 
-    /**
-     * Returns the value kept for a key, computing it once through this owner. What the operation creates becomes
-     * a dependent of the owner, and the value is kept until the owner is released, so that it lives exactly as
-     * long as the beans it refers to. One value is kept at a time; another key replaces it.
-     *
-     * <p>The operation runs outside the lock of the owner, as every resolution does, and under a lock of its own,
-     * so that two callers asking at once create the dependents once.</p>
-     *
-     * @param context The context
-     * @param definition The definition the resolution is rooted at, or null
-     * @param key The key, compared by identity
-     * @param operation Computes the value
-     * @param <S> The value type
-     * @return The value, or null when the owner is closing and nothing can become its dependent any more
-     */
+    // The operation runs outside the lock of the owner, as every resolution does, and under the lock of its slot,
+    // so that two callers asking at once create the dependents once.
+    @Override
     @SuppressWarnings("unchecked")
-    <S> @Nullable S resolveOnce(DefaultBeanContext context, @Nullable BeanDefinition<?> definition, Object key,
-                                Function<? super DefaultBeanResolutionContext, S> operation) {
+    public <S> @Nullable S resolveOnce(BeanLocator context, @Nullable BeanDefinition<?> definition, Object key,
+                                       Function<BeanResolutionContext, S> operation) {
+        if (!(context instanceof DefaultBeanContext beanContext)) {
+            return null;
+        }
         Resolved slot;
         synchronized (this) {
             if (isClosing()) {
@@ -309,7 +293,7 @@ final class BeanDependencies implements DependentBeanProvider {
         }
         synchronized (slot) {
             if (slot.value == null && !slot.forgotten) {
-                slot.value = resolve(context, definition, operation);
+                slot.value = resolve(beanContext, definition, operation);
             }
             return (S) slot.value;
         }
