@@ -37,7 +37,7 @@ import java.util.function.Function;
 @Internal
 public final class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
     @Nullable
-    private final BeanDependencies owner;
+    private final DefaultBeanDependencies dependencies;
     private final @Nullable Thread destructionThread;
     private volatile boolean closed;
     @Nullable
@@ -52,14 +52,14 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         this(context, rootDefinition, null);
     }
 
-    DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition, @Nullable BeanDependencies owner) {
-        this(context, rootDefinition, owner, false);
+    DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition, @Nullable DefaultBeanDependencies dependencies) {
+        this(context, rootDefinition, dependencies, false);
     }
 
     DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition,
-                                 @Nullable BeanDependencies owner, boolean destruction) {
+                                 @Nullable DefaultBeanDependencies dependencies, boolean destruction) {
         super((DefaultBeanContext) context, rootDefinition);
-        this.owner = owner;
+        this.dependencies = dependencies;
         this.destructionThread = destruction ? Thread.currentThread() : null;
     }
 
@@ -78,7 +78,7 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         if (!isDestructionInvocationActive()) {
             throw new IllegalStateException("Destruction dependencies are only available during the synchronous destruction invocation");
         }
-        try (BeanDependencyGroup group = new DefaultBeanDependencyResolver(context, new BeanDependencies(this))) {
+        try (BeanDependencyGroup group = new DefaultBeanDependencyResolver(context, new DefaultBeanDependencies(this))) {
             return action.apply(group);
         }
     }
@@ -97,7 +97,7 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     @Override
     public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
         Collection<BeanRegistration<I>> registrations = super.getInterceptorRegistrations(interceptorType, binding);
-        if (owner != null && getPath().isEmpty()) {
+        if (dependencies != null && getPath().isEmpty()) {
             registrations.forEach(this::require);
         }
         return registrations;
@@ -107,11 +107,11 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     @Nullable
     <I> BeanRegistration<I> findInterceptor(BeanDefinition<I> definition) {
         BeanRegistration<I> created = super.findInterceptor(definition);
-        if (created != null || owner == null || !getPath().isEmpty()) {
+        if (created != null || dependencies == null || !getPath().isEmpty()) {
             // A nested bean owns its own interceptors, even when resolved during another bean's selection.
             return created;
         }
-        return findInterceptor(owner.dependentBeans(), definition);
+        return findInterceptor(dependencies.dependentBeans(), definition);
     }
 
     @Override

@@ -74,7 +74,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     BeanCreationState creationState;
     /** The owner of the proxy whose lazy target this context creates, so that the target is released with the proxy. */
     @Nullable
-    BeanDependencies lazyProxyDependencies;
+    DefaultBeanDependencies lazyProxyDependencies;
     /** The attribute a {@link ProxyInterceptors} waits under between {@link #prepareProxyTarget} and the creation of the target. */
     private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
 

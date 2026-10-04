@@ -23,7 +23,6 @@ import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DependencyOwner;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -175,9 +174,8 @@ public class InterceptorCandidateResolver {
     }
 
     /**
-     * Reuses a target's cached selection or acquires candidates through its dependency owner.
+     * Selects the interceptors of a proxy that fronts one target and keeps them itself.
      * @param beanLocator The context used for unmanaged targets
-     * @param targetDefinition The target definition
      * @param methods The intercepted methods
      * @param introduction Whether introduction advice is required
      * @param target The target registration, if known
@@ -188,45 +186,53 @@ public class InterceptorCandidateResolver {
      */
     @UsedByGeneratedCode
     public Interceptor<?, ?>[][] resolveTargetInterceptors(BeanLocator beanLocator,
-        BeanDefinition<?> targetDefinition, ExecutableMethod<?, ?>[] methods, boolean introduction,
+        ExecutableMethod<?, ?>[] methods, boolean introduction,
         @Nullable BeanRegistration<?> target, @Nullable Object bean, @Nullable BeanDependencyGroup proxyDependencies) {
-        // kept by the target, which then owns the unscoped interceptors created for it
-        if (target != null && target.getBean() == bean) {
-            DependencyOwner targetOwner = target.dependencyOwner();
-            if (targetOwner != null) {
-                Interceptor<?, ?>[][] selection = selectOnce(targetOwner, beanLocator, target.getBeanDefinition(), targetDefinition, methods, introduction);
-                if (selection != null) {
-                    return selection;
-                }
-            }
-        }
-        // or by the proxy, for a target that has no owner of its own: one the context did not create, or one
-        // that is being destroyed. The interceptors are then those of the proxy, destroyed with it.
-        if (proxyDependencies instanceof DependencyOwner proxyOwner) {
-            Interceptor<?, ?>[][] selection = selectOnce(proxyOwner, beanLocator, null, targetDefinition, methods, introduction);
-            if (selection != null) {
-                return selection;
-            }
-        }
-        // Nothing can keep a selection: the interceptors are looked up and selected for the call.
+        return targetInterceptors(beanLocator, methods, introduction, proxyDependencies).select(target, bean);
+    }
+
+    /**
+     * Creates the holder a proxy keeps the interceptors it selects for each of its targets in.
+     *
+     * @param beanLocator The context of the proxy
+     * @param methods The intercepted methods
+     * @param introduction Whether introduction advice is required
+     * @param proxyDependencies The dependency group of the proxy, which owns the interceptors of a target that
+     *                          cannot own any itself
+     * @return The holder
+     */
+    @UsedByGeneratedCode
+    public TargetInterceptors targetInterceptors(BeanLocator beanLocator, ExecutableMethod<?, ?>[] methods,
+                                                 boolean introduction, @Nullable BeanDependencyGroup proxyDependencies) {
+        return new TargetInterceptors(this, beanLocator, methods, introduction, proxyDependencies);
+    }
+
+    /**
+     * Selects the interceptors of the given methods from those bound to them, resolved as the bean's own.
+     *
+     * @param methods The intercepted methods
+     * @param introduction Whether introduction advice is required
+     * @param resolutionContext The resolution context of the bean that owns the interceptors
+     * @return The interceptors selected for each method
+     */
+    Interceptor<?, ?>[][] selectForMethods(ExecutableMethod<?, ?>[] methods, boolean introduction,
+                                           BeanResolutionContext resolutionContext) {
+        return selectForMethods(methods, introduction,
+            resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods)));
+    }
+
+    /**
+     * Selects the interceptors of the given methods for one call, when nothing can own them.
+     *
+     * @param beanLocator The context of the proxy
+     * @param methods The intercepted methods
+     * @param introduction Whether introduction advice is required
+     * @return The interceptors selected for each method
+     */
+    Interceptor<?, ?>[][] selectUnowned(BeanLocator beanLocator, ExecutableMethod<?, ?>[] methods, boolean introduction) {
         return selectForMethods(methods, introduction, beanLocator instanceof BeanDefinitionRegistry definitions
             ? definitions.getBeanRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
             : List.of());
-    }
-
-    private Interceptor<?, ?> @Nullable [][] selectOnce(DependencyOwner owner, BeanLocator beanLocator,
-                                                         @Nullable BeanDefinition<?> root, Object key,
-                                                         ExecutableMethod<?, ?>[] methods, boolean introduction) {
-        // read first, on every call of a proxy that selects for its target, before a selector is created
-        Interceptor<?, ?>[][] kept = owner.findResolved(key);
-        if (kept != null) {
-            return kept;
-        }
-        return owner.resolveOnce(beanLocator, root, key, resolutionContext -> selectForMethods(
-            methods,
-            introduction,
-            resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
-        ));
     }
 
     private Qualifier<Interceptor<?, ?>> bindingOf(ExecutableMethod<?, ?>[] methods) {

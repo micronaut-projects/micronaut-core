@@ -56,7 +56,7 @@ public final class BeanDestructionOrder {
         for (BeanRegistration<?> owned : registration.dependentBeans()) {
             collectDependencyRegistrations(owned, visited);
         }
-        BeanDependencies dependencies = registration.getDependencies();
+        DefaultBeanDependencies dependencies = registration.getDependencies();
         if (dependencies != null) {
             // Shared registrations remain owned by their scopes and form leaves of this consumer's tree.
             visited.addAll(dependencies.requiredBeans());

@@ -45,7 +45,7 @@ class BeanDependenciesStateSpec extends Specification {
 
     void 'retained candidates distinguish unresolved from an authoritative empty selection'() {
         given:
-        def dependencies = new BeanDependencies()
+        def dependencies = new DefaultBeanDependencies()
 
         expect:
         dependencies.interceptorCandidates() == InterceptorCandidates.Unresolved.INSTANCE
@@ -64,7 +64,7 @@ class BeanDependenciesStateSpec extends Specification {
         def definition = RuntimeBeanDefinition.builder(Object, { new Object() } as Supplier<Object>).build()
         def registration = new BeanRegistration(BeanIdentifier.of('advice'), definition, new Object())
         def supplied = [registration]
-        def dependencies = new BeanDependencies()
+        def dependencies = new DefaultBeanDependencies()
 
         when:
         dependencies.retainInterceptorCandidates(supplied)
@@ -117,7 +117,7 @@ class BeanDependenciesStateSpec extends Specification {
         given:
         def definition = RuntimeBeanDefinition.builder(Object, { new Object() } as Supplier<Object>).build()
         def registration = new BeanRegistration(BeanIdentifier.of('dependent'), definition, new Object())
-        def dependencies = new BeanDependencies()
+        def dependencies = new DefaultBeanDependencies()
         dependencies.initialize([registration], new InterceptorCandidates.Resolved([]))
 
         when:

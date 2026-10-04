@@ -28,15 +28,15 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-final class DefaultBeanDependencyResolver implements BeanDependencyGroup, DependencyOwner {
+final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDependencies {
     private final DefaultBeanContext context;
-    final BeanDependencies dependencies;
+    final DefaultBeanDependencies dependencies;
 
     DefaultBeanDependencyResolver(DefaultBeanContext context) {
-        this(context, new BeanDependencies());
+        this(context, new DefaultBeanDependencies());
     }
 
-    DefaultBeanDependencyResolver(DefaultBeanContext context, BeanDependencies dependencies) {
+    DefaultBeanDependencyResolver(DefaultBeanContext context, DefaultBeanDependencies dependencies) {
         this.context = context;
         this.dependencies = dependencies;
     }
@@ -90,13 +90,8 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, Depend
     }
 
     @Override
-    public <S> @Nullable S findResolved(Object key) {
-        return dependencies.findResolved(key);
-    }
-
-    @Override
-    public <S> @Nullable S resolveOnce(BeanLocator context, @Nullable BeanDefinition<?> definition, Object key,
-                                       Function<BeanResolutionContext, S> operation) {
-        return dependencies.resolveOnce(context, definition, key, operation);
+    public <S> @Nullable S resolveDependencies(BeanLocator context, @Nullable BeanDefinition<?> definition,
+                                               Function<BeanResolutionContext, S> operation) {
+        return dependencies.resolveDependencies(context, definition, operation);
     }
 }
