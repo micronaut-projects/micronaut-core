@@ -25,8 +25,8 @@ import java.util.function.Function;
  * An owner of dependencies, seen from outside the injection module: it resolves a value on behalf of what it
  * owns for and keeps it for as long as that lives. A proxy keeps the interceptors it selected for a target this
  * way, so that the unscoped ones are created once per target and destroyed with it. The owner of a bean is
- * reached through {@link BeanRegistration#dependencyOwner()}; the context is the owner for a bean it holds no
- * registration for.
+ * reached through {@link BeanRegistration#dependencyOwner()}. For a target that has none, the proxy keeps the
+ * selection with its own dependency group.
  *
  * @since 5.3.0
  */

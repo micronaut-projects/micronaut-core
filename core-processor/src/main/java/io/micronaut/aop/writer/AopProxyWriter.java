@@ -245,7 +245,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         ExecutableMethod[].class,
         boolean.class,
         BeanRegistration.class,
-        Object.class
+        Object.class,
+        BeanDependencyGroup.class
     );
     private static final Method METHOD_FIND_PROXY_TARGET_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(
         InterceptorCandidateResolver.class,
@@ -254,6 +255,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         Object.class
     );
     private static final String FIELD_TARGET_REGISTRATION = "$targetRegistration";
+    private static final String FIELD_BEAN_DEPENDENCIES = "$beanDependencies";
     private static final String LOCAL_TARGET = "target";
     private static final String METHOD_RESOLVE_TARGET_REGISTRATION = "$resolveTargetRegistration";
     private static final ClassTypeDef TYPE_BEAN_REGISTRATION = ClassTypeDef.of(BeanRegistration.class);
@@ -607,7 +609,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             aThis.field(proxyMethodsField),
             TypeDef.Primitive.BOOLEAN.constant(isIntroduction),
             targetRegistration,
-            target
+            target,
+            aThis.field(FIELD_BEAN_DEPENDENCIES, TypeDef.of(BeanDependencyGroup.class))
         );
     }
 
@@ -793,7 +796,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             int beanContextArgumentIndex = constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER);
             int qualifierIndex = constructor.findParameterIndex(QUALIFIER_PARAMETER);
 
-            FieldDef dependenciesField = FieldDef.builder("$beanDependencies", BeanDependencyGroup.class)
+            FieldDef dependenciesField = FieldDef.builder(FIELD_BEAN_DEPENDENCIES, BeanDependencyGroup.class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
             proxyBuilder.addField(dependenciesField);
             bodyBuilders.add((aThis, parameters) -> aThis.field(dependenciesField).assign(
@@ -1059,7 +1062,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     aThis.field(proxyMethodsField),
                     TypeDef.Primitive.BOOLEAN.constant(isIntroduction),
                     aThis.field(Objects.requireNonNull(fields.targetRegistration())),
-                    aThis.field(Objects.requireNonNull(targetField))
+                    aThis.field(Objects.requireNonNull(targetField)),
+                    aThis.field(FIELD_BEAN_DEPENDENCIES, TypeDef.of(BeanDependencyGroup.class))
                 ))
             );
         }

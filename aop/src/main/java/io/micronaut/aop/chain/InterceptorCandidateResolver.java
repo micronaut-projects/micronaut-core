@@ -19,6 +19,7 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.context.BeanDefinitionRegistry;
+import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -181,12 +182,14 @@ public class InterceptorCandidateResolver {
      * @param introduction Whether introduction advice is required
      * @param target The target registration, if known
      * @param bean The invocation target
+     * @param proxyDependencies The dependency group of the proxy, which keeps the selection for a target that
+     *                          cannot own interceptors itself
      * @return The interceptors selected for each method
      */
     @UsedByGeneratedCode
     public Interceptor<?, ?>[][] resolveTargetInterceptors(BeanLocator beanLocator,
         BeanDefinition<?> targetDefinition, ExecutableMethod<?, ?>[] methods, boolean introduction,
-        @Nullable BeanRegistration<?> target, @Nullable Object bean) {
+        @Nullable BeanRegistration<?> target, @Nullable Object bean, @Nullable BeanDependencyGroup proxyDependencies) {
         // kept by the target, which then owns the unscoped interceptors created for it
         if (target != null && target.getBean() == bean) {
             DependencyOwner targetOwner = target.dependencyOwner();
@@ -197,14 +200,15 @@ public class InterceptorCandidateResolver {
                 }
             }
         }
-        // or by the context, for a target it holds no registration for
-        if (beanLocator instanceof DependencyOwner contextOwner) {
-            Interceptor<?, ?>[][] selection = selectOnce(contextOwner, beanLocator, null, targetDefinition, methods, introduction);
+        // or by the proxy, for a target that has no owner of its own: one the context did not create, or one
+        // that is being destroyed. The interceptors are then those of the proxy, destroyed with it.
+        if (proxyDependencies instanceof DependencyOwner proxyOwner) {
+            Interceptor<?, ?>[][] selection = selectOnce(proxyOwner, beanLocator, null, targetDefinition, methods, introduction);
             if (selection != null) {
                 return selection;
             }
         }
-        // Other locators keep no selections: the interceptors are looked up and selected for the call.
+        // Nothing can keep a selection: the interceptors are looked up and selected for the call.
         return selectForMethods(methods, introduction, beanLocator instanceof BeanDefinitionRegistry definitions
             ? definitions.getBeanRegistrations(Interceptor.ARGUMENT, bindingOf(methods))
             : List.of());

@@ -157,7 +157,7 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext, DependencyOwner permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -244,7 +244,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Depen
 
     private final CustomScopeRegistry customScopeRegistry;
     // the interceptors of targets this context holds no registration for, by the definition of the target
-    private final Map<Object, BeanDependencies> contextOwners = new ConcurrentHashMap<>();
     private final BeanResolutionCustomizer beanResolutionCustomizer;
     private final RuntimeBeanDefinition<BeanDependencyResolver> dependencyResolverDefinition = RuntimeBeanDefinition
         .<BeanDependencyResolver>builder(BeanDependencyResolver.class, () -> new DefaultBeanDependencyResolver(this))
@@ -491,10 +490,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Depen
                 }
                 destroySingletons(stragglers, processed);
             }
-
-            // the interceptors of targets this context holds no registration for have no other owner. They go last,
-            // so that a singleton calling such a target as it is destroyed is still intercepted by them
-            destroyContextOwners();
 
             if (checkEnabledBeans != null) {
                 checkEnabledBeans.cancel(true);
@@ -4117,54 +4112,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Depen
             if (registration instanceof BeanDisposingRegistration<I> disposingRegistration) {
                 disposingRegistration.markCreatedAsInterceptor();
             }
-        }
-    }
-
-    // The context is the owner of what is resolved for a bean it holds no registration for, such as the
-    // interceptors a proxy selects for a target supplied from outside. They are destroyed when the context stops.
-    @Override
-    public <S> @Nullable S findResolved(Object key) {
-        BeanDependencies owner = contextOwners.get(key);
-        return owner == null ? null : owner.findResolved(key);
-    }
-
-    // Two threads asking at once may each compute a value; the first kept is the one handed out from then on,
-    // and what was created for the other is destroyed at once, as it is when the computation fails.
-    @Override
-    public <S> @Nullable S resolveOnce(BeanLocator context, @Nullable BeanDefinition<?> definition, Object key,
-                                       Function<BeanResolutionContext, S> operation) {
-        BeanDependencies kept = contextOwners.get(key);
-        if (kept == null) {
-            BeanDependencies owner = new BeanDependencies();
-            S value = owner.resolveOnce(this, definition, key, operation);
-            boolean published = false;
-            try {
-                synchronized (contextOwners) {
-                    // Shutdown can start after resolution committed but before the context took ownership.
-                    owner.checkOpen(this);
-                    kept = contextOwners.putIfAbsent(key, owner);
-                    published = kept == null;
-                }
-                if (published) {
-                    return value;
-                }
-            } finally {
-                if (!published) {
-                    destroyCreatedBeans(owner.takeDependents(), null);
-                }
-            }
-        }
-        return kept.findResolved(key);
-    }
-
-    private void destroyContextOwners() {
-        List<BeanDependencies> owners;
-        synchronized (contextOwners) {
-            owners = new ArrayList<>(contextOwners.values());
-            contextOwners.clear();
-        }
-        for (BeanDependencies owner : owners) {
-            destroyCreatedBeans(owner.takeDependents(), null);
         }
     }
 

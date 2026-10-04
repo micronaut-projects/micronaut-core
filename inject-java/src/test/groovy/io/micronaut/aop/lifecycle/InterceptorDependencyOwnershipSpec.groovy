@@ -232,7 +232,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         events.LOG == ['target:false', 'interceptor']
     }
 
-    void 'an unmanaged selection racing context shutdown releases its interceptors'() {
+    void 'a selection kept by a dependency group racing context shutdown releases its interceptors'() {
         given:
         def ctx = buildContext(IMPORTS + '''
 @Prototype class UnmanagedInterceptor implements MethodInterceptor<Object, Object> {
@@ -245,7 +245,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def entered = new java.util.concurrent.CountDownLatch(1)
         def release = new java.util.concurrent.CountDownLatch(1)
         def selection = CompletableFuture.supplyAsync {
-            ctx.resolveOnce(ctx, null, new Object()) { resolution ->
+            ctx.createDependencyGroup().resolveOnce(ctx, null, new Object()) { resolution ->
                 def registrations = resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
                 entered.countDown()
                 assert release.await(10, TimeUnit.SECONDS)
