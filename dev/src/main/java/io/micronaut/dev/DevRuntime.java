@@ -1668,6 +1668,10 @@ public final class DevRuntime implements Closeable {
             // before it stops; the servers stop accepting, and new connections wait for the next generation
             admitted.complete(null);
             drain(old);
+            if (closed || Thread.currentThread().isInterrupted()) {
+                // the runtime closes: it stops the generation that still runs, and none is launched after it
+                return;
+            }
         }
         GenerationClassLoader retired = classLoader.swap();
         Collection<BeanRegistration<?>> retained = List.of();

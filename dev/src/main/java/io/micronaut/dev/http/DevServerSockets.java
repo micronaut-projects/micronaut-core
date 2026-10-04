@@ -59,6 +59,10 @@ public final class DevServerSockets implements AutoCloseable {
     private static final int BACKLOG = 1024;
     private static final int MAX_REQUEST_HEAD = 64 * 1024;
     private static final int READ_TIMEOUT_MILLIS = 2_000;
+    /**
+     * The first byte of a TLS record carrying a handshake, a ClientHello.
+     */
+    private static final int TLS_HANDSHAKE = 0x16;
 
     private final Map<String, ServerSocketChannel> sockets = new LinkedHashMap<>();
     private final List<Accepting> accepting = new ArrayList<>();
@@ -84,7 +88,9 @@ public final class DevServerSockets implements AutoCloseable {
         }
         // a server is about to accept on the sockets: the responder of a failed start lets go of them first
         stopResponder();
-        String key = (host == null ? "*" : host) + ':' + port;
+        InetSocketAddress address = host == null ? new InetSocketAddress(port) : new InetSocketAddress(host, port);
+        // the resolved address: two spellings of one host share a socket
+        String key = address.toString();
         ServerSocketChannel socket = sockets.get(key);
         if (socket != null && isAccepting(socket)) {
             return null;
@@ -93,7 +99,7 @@ public final class DevServerSockets implements AutoCloseable {
             socket = ServerSocketChannel.open();
             try {
                 socket.setOption(StandardSocketOptions.SO_REUSEADDR, true);
-                socket.bind(host == null ? new InetSocketAddress(port) : new InetSocketAddress(host, port), BACKLOG);
+                socket.bind(address, BACKLOG);
                 socket.configureBlocking(false);
             } catch (IOException | RuntimeException e) {
                 socket.close();
@@ -130,11 +136,30 @@ public final class DevServerSockets implements AutoCloseable {
      * Stops the servers accepting: new connections wait in the backlog.
      */
     public synchronized void pause() {
+        if (responder == null) {
+            // a socket the running generation does not accept on belongs to a listener its configuration no longer has
+            releaseUnclaimed();
+        }
         for (Accepting entry : accepting) {
             if (entry.open.getAsBoolean()) {
                 entry.autoRead.accept(false);
             }
         }
+    }
+
+    private void releaseUnclaimed() {
+        accepting.removeIf(entry -> !entry.open.getAsBoolean());
+        sockets.values().removeIf(socket -> {
+            if (isAccepting(socket)) {
+                return false;
+            }
+            try {
+                socket.close();
+            } catch (IOException e) {
+                LOG.debug("Cannot close {}", socket, e);
+            }
+            return true;
+        });
     }
 
     /**
@@ -285,9 +310,14 @@ public final class DevServerSockets implements AutoCloseable {
                 connection.configureBlocking(true);
                 connection.socket().setSoTimeout(READ_TIMEOUT_MILLIS);
                 InputStream in = connection.socket().getInputStream();
+                int first = in.read();
+                if (first == TLS_HANDSHAKE) {
+                    // an HTTPS listener: a plaintext answer would be a protocol error, the client sees the connection close
+                    return;
+                }
                 // the request head, so that closing the connection does not discard unread bytes and reset the response
-                int matched = 0;
-                for (int read = 0; read < MAX_REQUEST_HEAD && matched < 4; read++) {
+                int matched = first == '\r' ? 1 : 0;
+                for (int read = 1; first >= 0 && read < MAX_REQUEST_HEAD && matched < 4; read++) {
                     int b = in.read();
                     if (b < 0) {
                         break;
