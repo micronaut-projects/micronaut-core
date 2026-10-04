@@ -17,7 +17,6 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.InvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -74,20 +73,19 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @param beanDefinition The bean constructor
      * @param beanConstructor The bean constructor
      * @param interceptors The interceptors
-     * @param originalParameters The parameters
-     * @param additionalInterceptorParametersCount The additional interceptor parameters count
+     * @param declaredParameters The arguments the bean declares, which interceptors see and may change
+     * @param internalParameters The internal arguments a proxy constructor declares after them, empty otherwise
      */
-    @UsedByGeneratedCode
     public ConstructorInterceptorChain(
         BeanDefinition<T> beanDefinition,
         BeanConstructor<T> beanConstructor,
         Interceptor<T, T>[] interceptors,
-        int additionalInterceptorParametersCount,
-        @Nullable Object... originalParameters) {
-        super(interceptors, resolveConcreteSubset(beanDefinition, originalParameters, additionalInterceptorParametersCount));
+        @Nullable Object[] declaredParameters,
+        @Nullable Object[] internalParameters) {
+        super(interceptors, declaredParameters);
         this.beanConstructor = Objects.requireNonNull(beanConstructor, "Bean constructor cannot be null");
-        this.internalParameters = resolveInterceptorArguments(beanDefinition, originalParameters, additionalInterceptorParametersCount);
-        this.interceptedConstructor = resolveInterceptedConstructor(beanDefinition, beanConstructor, additionalInterceptorParametersCount, internalParameters);
+        this.internalParameters = internalParameters;
+        this.interceptedConstructor = resolveInterceptedConstructor(beanDefinition, beanConstructor, internalParameters);
     }
 
     @Override
@@ -105,7 +103,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         Interceptor<T, T> interceptor;
         if (interceptorCount == 0 || index == interceptorCount) {
             final @Nullable Object[] finalParameters;
-            if (ArrayUtils.isNotEmpty(internalParameters)) {
+            if (internalParameters.length > 0) {
                 finalParameters = ArrayUtils.concat(getParameterValues(), internalParameters);
             } else {
                 finalParameters = getParameterValues();
@@ -153,7 +151,9 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @param <T1> The bean type
      * @return The instantiated bean
      * @since 3.0.0
+     * @deprecated Bean definitions instantiate through {@link InterceptorChainFactory#instantiate}. Kept for definitions compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @Internal
     @UsedByGeneratedCode
     public static <T1> T1 instantiate(
@@ -180,7 +180,9 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @param <T1> The bean type
      * @return The instantiated bean
      * @since 3.0.0
+     * @deprecated Bean definitions instantiate through {@link InterceptorChainFactory#instantiate}. Kept for definitions compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @Internal
     @UsedByGeneratedCode
     public static <T1> T1 instantiate(
@@ -192,8 +194,10 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         int additionalProxyConstructorParametersCount,
         @Nullable Object... parameters) {
 
-        return beanContext.getBean(InterceptorRegistry.ARGUMENT).chainFactory().instantiate(
-            resolutionContext, definition, constructor, interceptors, additionalProxyConstructorParametersCount, parameters
+        // Callers compiled by earlier versions pass a count for every definition; only a proxy declares internal arguments.
+        int internalCount = definition instanceof AdvisedBeanType ? additionalProxyConstructorParametersCount : 0;
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
+            resolutionContext, definition, constructor, interceptors, internalCount, parameters
         );
     }
 
@@ -224,56 +228,17 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         return Objects.requireNonNull(bean, "Constructor interceptor chain illegally returned null for constructor: " + beanConstructor.getDescription());
     }
 
-    private static @Nullable Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,
-                                                            @Nullable Object[] originalParameters,
-                                                            int additionalProxyConstructorParametersCount) {
-        if (beanDefinition instanceof AdvisedBeanType) {
-            validateAdditionalProxyParameters(originalParameters, additionalProxyConstructorParametersCount);
-            return Arrays.copyOfRange(
-                originalParameters,
-                0,
-                originalParameters.length - additionalProxyConstructorParametersCount
-            );
-        }
-        return originalParameters;
-    }
-
-    private static @Nullable Object[] resolveInterceptorArguments(BeanDefinition<?> beanDefinition,
-                                                                  @Nullable Object[] originalParameters,
-                                                                  int additionalProxyConstructorParametersCount) {
-        if (beanDefinition instanceof AdvisedBeanType) {
-            validateAdditionalProxyParameters(originalParameters, additionalProxyConstructorParametersCount);
-            return Arrays.copyOfRange(
-                originalParameters,
-                originalParameters.length - additionalProxyConstructorParametersCount,
-                originalParameters.length
-            );
-        }
-        return originalParameters;
-    }
-
-    private static void validateAdditionalProxyParameters(@Nullable Object[] parameters,
-                                                          int additionalProxyConstructorParametersCount) {
-        // intercepted bean constructors include additional arguments in
-        // addition to the arguments declared in the bean
-        // Here we subtract these from the parameters made visible to the interceptor consumer
-        if (parameters.length < additionalProxyConstructorParametersCount) {
-            throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
-        }
-    }
-
     /**
      * Resolves the constructor that interceptors see.
      *
      * <p>The constructor of a proxied bean is the generated proxy constructor: it declares the parameters of the
      * intercepted bean's constructor followed by the internal parameters the proxy needs. The parameter values are
-     * already trimmed to the ones declared by the bean (see {@code resolveConcreteSubset}), so the constructor is
+     * already trimmed to the ones declared by the bean, so the constructor is
      * trimmed the same way to keep {@link #getConstructor()}, {@link #getArguments()} and
      * {@link #getDeclaringType()} consistent with {@link #getParameterValues()}.</p>
      *
      * @param beanDefinition The bean definition
      * @param beanConstructor The constructor that is invoked
-     * @param additionalProxyConstructorParametersCount The additional proxy constructor parameters count
      * @param internalParameters The values of the additional proxy constructor parameters
      * @param <T> The bean type
      * @return The constructor to expose to interceptors
@@ -281,15 +246,14 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     @SuppressWarnings("unchecked")
     private static <T> BeanConstructor<T> resolveInterceptedConstructor(BeanDefinition<T> beanDefinition,
                                                                         BeanConstructor<T> beanConstructor,
-                                                                        int additionalProxyConstructorParametersCount,
                                                                         @Nullable Object[] internalParameters) {
-        if (additionalProxyConstructorParametersCount > 0 && beanDefinition instanceof AdvisedBeanType<?> advisedBeanType) {
+        if (internalParameters.length > 0 && beanDefinition instanceof AdvisedBeanType<?> advisedBeanType) {
             Argument<?>[] proxyArguments = beanConstructor.getArguments();
-            if (proxyArguments.length >= additionalProxyConstructorParametersCount) {
+            if (proxyArguments.length >= internalParameters.length) {
                 return new InterceptedTargetConstructor<>(
                     beanConstructor,
                     (Class<T>) advisedBeanType.getInterceptedType(),
-                    Arrays.copyOfRange(proxyArguments, 0, proxyArguments.length - additionalProxyConstructorParametersCount),
+                    Arrays.copyOfRange(proxyArguments, 0, proxyArguments.length - internalParameters.length),
                     internalParameters
                 );
             }

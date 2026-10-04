@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.beandefinition;
 
-import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
@@ -40,7 +40,7 @@ public interface DisposableIntercepted<T> extends DisposableBeanDefinition<T> {
         // @PreDestroy callback of the bean, superclass callbacks first, in the same order as post-construct. An
         // interceptor that does not proceed keeps all of them from running. The callbacks themselves are listed by
         // getPreDestroyExecutableMethods().
-        return Objects.requireNonNull(context.getBean(InterceptorRegistry.ARGUMENT).chainFactory().dispose(
+        return Objects.requireNonNull(context.getBean(InterceptorChainFactory.ARGUMENT).dispose(
             resolutionContext,
             this,
             new InterceptedDisposeMethod<>(this, resolutionContext, context, bean),

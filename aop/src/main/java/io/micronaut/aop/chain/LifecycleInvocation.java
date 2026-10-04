@@ -17,7 +17,6 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -32,8 +31,7 @@ public interface LifecycleInvocation<T, R> extends MethodInvocationContext<T, R>
     /**
      * Executes the lifecycle invocation, preserving nullable unadvised results and rejecting null advice results.
      *
-     * @param definition The lifecycle owner
      * @return The invocation result
      */
-    @Nullable R proceedLifecycle(BeanDefinition<T> definition);
+    @Nullable R proceedLifecycle();
 }

@@ -31,6 +31,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.proxy.InterceptedBean;
@@ -45,22 +46,46 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Acquires interceptor candidates through their dependency owner, independently of invocation construction.
- * An {@link InterceptorRegistry} returns a subclass from {@link InterceptorRegistry#candidateResolver()} to
- * customize acquisition.
+ * Acquires interceptor candidates through their dependency owner and selects from them, independently of
+ * invocation construction. An {@link InterceptorChainFactory} returns a subclass from
+ * {@link InterceptorChainFactory#candidateResolver()} to customize acquisition.
  *
  * @since 5.3.0
  */
 @Internal
 public class InterceptorCandidateResolver {
     private final InterceptorRegistry registry;
-    private final LegacyInterceptorCandidateResolver legacyResolver = new LegacyInterceptorCandidateResolver();
+    // asked in order: what creation retained first, then discovery for definitions that retained nothing
+    private final List<LifecycleCandidateSource> lifecycleSources = List.of(
+        new RetainedLifecycleCandidates(), new LegacyLifecycleCandidates());
 
     /**
      * @param registry The selection strategy used after candidate acquisition
      */
     public InterceptorCandidateResolver(InterceptorRegistry registry) {
         this.registry = registry;
+    }
+
+    /**
+     * Selects the interceptors for a method invocation. Introduction invocations execute around advice before
+     * introduction advice. The selection can be retained and reused by independent invocations.
+     *
+     * @param method The intercepted method
+     * @param candidates The acquired interceptor registrations
+     * @param kind The interception kind
+     * @param <T> The bean type
+     * @return The selected interceptors in invocation order
+     */
+    @UsedByGeneratedCode
+    public <T> Interceptor<T, ?>[] selectMethodInterceptors(
+        ExecutableMethod<T, ?> method,
+        Collection<BeanRegistration<Interceptor<T, ?>>> candidates,
+        InterceptorKind kind) {
+        Interceptor<T, ?>[] selected = registry.resolveInterceptors(method, candidates, kind);
+        if (kind != InterceptorKind.INTRODUCTION) {
+            return selected;
+        }
+        return ArrayUtils.concat(registry.resolveInterceptors(method, candidates, InterceptorKind.AROUND), selected);
     }
 
     /**
@@ -77,7 +102,7 @@ public class InterceptorCandidateResolver {
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }
-        return new ArrayList((Collection) resolutionContext.getInterceptorRegistrations(
+        return new ArrayList(resolutionContext.getInterceptorRegistrations(
             Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(metadata)));
     }
 
@@ -208,7 +233,7 @@ public class InterceptorCandidateResolver {
         Interceptor<?, ?>[][] selection = new Interceptor[methods.length][];
         for (int i = 0; i < methods.length; i++) {
             ExecutableMethod method = methods[i];
-            selection[i] = registry.resolveMethodInterceptors(method, list,
+            selection[i] = selectMethodInterceptors(method, list,
                 introduction ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND);
         }
         return selection;
@@ -242,13 +267,16 @@ public class InterceptorCandidateResolver {
      * @param kind The lifecycle kind
      * @return The candidates
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
     public Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleCandidates(
         BeanResolutionContext resolutionContext, BeanDefinition<?> definition,
         ExecutableMethod<?, ?> method, Object bean, InterceptorKind kind) {
-        List<?> retained = resolutionContext.getBeanInterceptors(definition);
-        return retained == null
-            ? legacyResolver.resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind)
-            : (List) retained;
+        for (LifecycleCandidateSource source : lifecycleSources) {
+            Collection<BeanRegistration<Interceptor<?, ?>>> candidates =
+                source.findLifecycleCandidates(resolutionContext, definition, method, bean, kind);
+            if (candidates != null) {
+                return candidates;
+            }
+        }
+        return List.of();
     }
 }

@@ -28,11 +28,12 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.Collection;
 
 /**
- * Default chain factory. Candidates the caller does not supply are acquired through the registry's
- * {@link InterceptorRegistry#candidateResolver() candidate resolver}, and selected by the registry.
+ * Default chain factory. Candidates the caller does not supply are acquired through its
+ * {@link #candidateResolver() candidate resolver} and selected by the interceptor registry.
  * Subclasses override a build method to decorate or replace the invocation it returns.
  *
  * @since 5.3.0
@@ -40,12 +41,27 @@ import java.util.Collection;
 @Internal
 public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
     private final InterceptorRegistry registry;
+    private final InterceptorCandidateResolver candidateResolver;
 
     /**
      * @param registry The interceptor registry the invocations are selected by
      */
     public DefaultInterceptorChainFactory(InterceptorRegistry registry) {
+        this(registry, new InterceptorCandidateResolver(registry));
+    }
+
+    /**
+     * @param registry The interceptor registry the invocations are selected by
+     * @param candidateResolver The resolver that acquires the candidates
+     */
+    public DefaultInterceptorChainFactory(InterceptorRegistry registry, InterceptorCandidateResolver candidateResolver) {
         this.registry = registry;
+        this.candidateResolver = candidateResolver;
+    }
+
+    @Override
+    public InterceptorCandidateResolver candidateResolver() {
+        return candidateResolver;
     }
 
     @Override
@@ -65,9 +81,9 @@ public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
         Collection<BeanRegistration<Interceptor<?, ?>>> resolved = candidates;
         if (resolved == null) {
-            resolved = registry.candidateResolver().resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind);
+            resolved = candidateResolver.resolveLifecycleCandidates(resolutionContext, definition, method, bean, kind);
         }
-        Interceptor<T, R>[] interceptors = (Interceptor[]) registry.resolveMethodInterceptors(method, (Collection) resolved, kind);
+        Interceptor<T, R>[] interceptors = (Interceptor[]) candidateResolver.selectMethodInterceptors(method, (Collection) resolved, kind);
         return new MethodInterceptorChain<>(interceptors, bean, method, kind, ArrayUtils.EMPTY_OBJECT_ARRAY);
     }
 
@@ -81,10 +97,19 @@ public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
         @Nullable Object... parameters) {
         Collection<BeanRegistration<Interceptor<T, T>>> resolved = candidates;
         if (resolved == null) {
-            resolved = registry.candidateResolver().resolveConstructorCandidates(resolutionContext, definition, constructor);
+            resolved = candidateResolver.resolveConstructorCandidates(resolutionContext, definition, constructor);
         }
+        // A proxy constructor declares the arguments of the bean followed by internal ones. Interceptors see only
+        // the former; the latter are handed back to the constructor when the chain proceeds.
+        int internalCount = additionalProxyConstructorParametersCount;
+        if (parameters.length < internalCount) {
+            throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
+        }
+        int declaredCount = parameters.length - internalCount;
+        @Nullable Object[] declared = internalCount == 0 ? parameters : Arrays.copyOf(parameters, declaredCount);
+        @Nullable Object[] internal = internalCount == 0
+            ? ArrayUtils.EMPTY_OBJECT_ARRAY : Arrays.copyOfRange(parameters, declaredCount, parameters.length);
         return new ConstructorInterceptorChain<>(definition, constructor,
-            registry.resolveConstructorInterceptors(constructor, resolved),
-            additionalProxyConstructorParametersCount, parameters);
+            registry.resolveConstructorInterceptors(constructor, resolved), declared, internal);
     }
 }

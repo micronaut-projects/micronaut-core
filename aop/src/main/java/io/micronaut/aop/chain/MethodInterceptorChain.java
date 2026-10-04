@@ -17,7 +17,6 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
@@ -160,17 +159,16 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
 
     /**
      * Executes a lifecycle invocation, preserving nullable unadvised results and rejecting null advice results.
-     * @param definition The lifecycle owner
      * @return The invocation result
      * @since 5.3.0
      */
     @Override
     @Nullable
-    public R proceedLifecycle(BeanDefinition<T> definition) {
+    public R proceedLifecycle() {
         if (interceptorCount == 0) {
             return executionHandle.invoke(target);
         }
-        return Objects.requireNonNull(proceed(), getKind().name() + " interceptor chain illegal returned null for type: " + definition.getBeanType());
+        return Objects.requireNonNull(proceed(), getKind().name() + " interceptor chain illegal returned null for type: " + executionHandle.getDeclaringType());
     }
 
     @Override
@@ -222,7 +220,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param <T1> The bean type
      * @return the bean instance
      * @since 3.0.0
+     * @deprecated Bean definitions initialize through {@link InterceptorChainFactory#initialize}. Kept for definitions compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @Internal
     @UsedByGeneratedCode
     @Nullable
@@ -253,7 +253,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param <T1>               The bean type
      * @return the bean instance
      * @since 5.2.0
+     * @deprecated Bean definitions initialize through {@link InterceptorChainFactory#initialize}. Kept for definitions compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @Internal
     @UsedByGeneratedCode
     @Nullable
@@ -265,7 +267,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
         // Older generated callers use an empty explicit set to request discovery.
-        return beanContext.getBean(InterceptorRegistry.ARGUMENT).chainFactory().initialize(
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).initialize(
             resolutionContext, definition, postConstructMethod, bean,
             interceptors == null || interceptors.isEmpty() ? null : interceptors
         );
@@ -286,7 +288,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param <T1> The bean type
      * @return the bean instance
      * @since 3.0.0
+     * @deprecated Bean definitions dispose through {@link InterceptorChainFactory#dispose}. Kept for definitions compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @Internal
     @UsedByGeneratedCode
     @Nullable
@@ -315,7 +319,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param <T1>              The bean type
      * @return the bean instance
      * @since 5.2.0
+     * @deprecated Bean definitions dispose through {@link InterceptorChainFactory#dispose}. Kept for definitions compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @Internal
     @UsedByGeneratedCode
     @Nullable
@@ -327,7 +333,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
         // Older generated callers use an empty explicit set to request discovery.
-        return beanContext.getBean(InterceptorRegistry.ARGUMENT).chainFactory().dispose(
+        return beanContext.getBean(InterceptorChainFactory.ARGUMENT).dispose(
             resolutionContext, definition, preDestroyMethod, bean,
             interceptors == null || interceptors.isEmpty() ? null : interceptors
         );

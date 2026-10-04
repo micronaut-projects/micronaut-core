@@ -33,23 +33,7 @@ class CountingRegistry implements InterceptorRegistry {
     final List<Object> targetLookups = new ArrayList<>();
     final List<BeanRegistration<?>> targetRegistrations = new ArrayList<>();
     final InterceptorRegistry delegate;
-    final CustomFactory factory = new CustomFactory(this);
-    final InterceptorCandidateResolver resolver = new InterceptorCandidateResolver(this) {
-        public BeanRegistration<?> findProxyTargetRegistration(BeanLocator locator, Object bean) {
-            targetLookups.add(bean);
-            BeanRegistration<?> registration = super.findProxyTargetRegistration(locator, bean);
-            targetRegistrations.add(registration);
-            return registration;
-        }
-    };
     CountingRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
-    public InterceptorCandidateResolver candidateResolver() { return resolver; }
-    public InterceptorChainFactory chainFactory() { return factory; }
-    public <T> Interceptor<T, ?>[] resolveMethodInterceptors(ExecutableMethod<T, ?> method,
-            Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
-        methodSelections++;
-        return InterceptorRegistry.super.resolveMethodInterceptors(method, candidates, kind);
-    }
     public <T> Interceptor<T, ?>[] resolveInterceptors(Executable<T, ?> method,
             Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
         selections++;
@@ -60,10 +44,29 @@ class CountingRegistry implements InterceptorRegistry {
         return delegate.resolveConstructorInterceptors(constructor, candidates);
     }
 }
+@Singleton @Bean(typed = InterceptorChainFactory.class) @Replaces(InterceptorChainFactory.class)
 class CustomFactory implements InterceptorChainFactory {
     final List<MethodInvocationContext<?, ?>> invocations = new ArrayList<>();
     final InterceptorChainFactory delegate;
-    CustomFactory(InterceptorRegistry registry) { delegate = new DefaultInterceptorChainFactory(registry); }
+    final InterceptorCandidateResolver resolver;
+    CustomFactory(InterceptorRegistry registry) {
+        CountingRegistry counting = (CountingRegistry) registry;
+        resolver = new InterceptorCandidateResolver(registry) {
+            public BeanRegistration<?> findProxyTargetRegistration(BeanLocator locator, Object bean) {
+                counting.targetLookups.add(bean);
+                BeanRegistration<?> registration = super.findProxyTargetRegistration(locator, bean);
+                counting.targetRegistrations.add(registration);
+                return registration;
+            }
+            public <T> Interceptor<T, ?>[] selectMethodInterceptors(ExecutableMethod<T, ?> method,
+                    Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
+                counting.methodSelections++;
+                return super.selectMethodInterceptors(method, candidates, kind);
+            }
+        };
+        delegate = new DefaultInterceptorChainFactory(registry, resolver);
+    }
+    public InterceptorCandidateResolver candidateResolver() { return resolver; }
     public <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
             Interceptor<T, R>[] interceptors, Object... arguments) {
         MethodInvocationContext<T, R> chain = new RecordingInvocation<>(
@@ -120,7 +123,7 @@ class Advice implements MethodInterceptor<Object, Object> {
 }
 """)
         def bean = context.getBean(context.classLoader.loadClass('method.factory.Subject'))
-        def factory = context.getBean(InterceptorRegistry).chainFactory()
+        def factory = context.getBean(InterceptorChainFactory)
         def registry = context.getBean(InterceptorRegistry)
 
         when:
@@ -219,7 +222,7 @@ class IntroductionAdvice implements MethodInterceptor<Object, Object> {
 @Singleton @Introduce @Wrap interface Subject { String echo(String value); }
 ''')
         def bean = context.getBean(context.classLoader.loadClass('method.factory.Subject'))
-        def factory = context.getBean(InterceptorRegistry).chainFactory()
+        def factory = context.getBean(InterceptorChainFactory)
 
         expect:
         bean.echo('value') == 'around:introduced:value'

@@ -21,21 +21,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 import java.util.*;
 
-@Singleton @Bean(typed = InterceptorRegistry.class) @Replaces(InterceptorRegistry.class)
-class CustomRegistry implements InterceptorRegistry {
-    final InterceptorRegistry delegate;
-    final CustomFactory factory = new CustomFactory(this);
-    CustomRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
-    public InterceptorChainFactory chainFactory() { return factory; }
-    public <T> Interceptor<T, ?>[] resolveInterceptors(Executable<T, ?> method,
-            Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
-        return delegate.resolveInterceptors(method, candidates, kind);
-    }
-    public <T> Interceptor<T, T>[] resolveConstructorInterceptors(BeanConstructor<T> constructor,
-            Collection<BeanRegistration<Interceptor<T, T>>> candidates) {
-        return delegate.resolveConstructorInterceptors(constructor, candidates);
-    }
-}
+@Singleton @Bean(typed = InterceptorChainFactory.class) @Replaces(InterceptorChainFactory.class)
 class CustomFactory extends DefaultInterceptorChainFactory {
     final List<InterceptorKind> seen = new ArrayList<>();
     CustomFactory(InterceptorRegistry registry) { super(registry); }
@@ -70,7 +56,7 @@ class Advice implements Interceptor<Object, Object> {
 
         when:
         def registration = context.getBeanRegistration(context.classLoader.loadClass('lifecycle.factory.Subject'), null)
-        def factory = context.getBean(InterceptorRegistry).chainFactory()
+        def factory = context.getBean(InterceptorChainFactory)
 
         then:
         factory.class.simpleName == 'CustomFactory'
@@ -93,8 +79,10 @@ class Advice implements Interceptor<Object, Object> {
         def source = '''
 package lifecycle.registry;
 import io.micronaut.aop.*;
+import io.micronaut.aop.chain.DefaultInterceptorChainFactory;
 import io.micronaut.aop.chain.DefaultInterceptorRegistry;
 import io.micronaut.aop.chain.InterceptorCandidateResolver;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.beans.BeanConstructor;
@@ -110,9 +98,7 @@ class CustomRegistry implements InterceptorRegistry {
     final List<InterceptorKind> seen = new ArrayList<>();
     final List<String> acquisitions = new ArrayList<>();
     final InterceptorRegistry delegate;
-    final InterceptorCandidateResolver resolver = new CustomResolver(this, acquisitions);
     CustomRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
-    public InterceptorCandidateResolver candidateResolver() { return resolver; }
     public <T> Interceptor<T, ?>[] resolveInterceptors(Executable<T, ?> method,
             Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
         seen.add(kind);
@@ -122,6 +108,12 @@ class CustomRegistry implements InterceptorRegistry {
             Collection<BeanRegistration<Interceptor<T, T>>> candidates) {
         seen.add(InterceptorKind.AROUND_CONSTRUCT);
         return delegate.resolveConstructorInterceptors(constructor, candidates);
+    }
+}
+@Singleton @Bean(typed = InterceptorChainFactory.class) @Replaces(InterceptorChainFactory.class)
+class CustomFactory extends DefaultInterceptorChainFactory {
+    CustomFactory(InterceptorRegistry registry) {
+        super(registry, new CustomResolver(registry, ((CustomRegistry) registry).acquisitions));
     }
 }
 class CustomResolver extends InterceptorCandidateResolver {

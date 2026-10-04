@@ -25,8 +25,6 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanDefinitionRegistry;
-import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.annotation.Type;
@@ -37,7 +35,6 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
@@ -139,15 +136,17 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * @param interceptors The array of interceptors
      * @param <T> The intercepted type
      * @return The filtered array of interceptors
+     * @deprecated Generated code selects interceptors through {@link InterceptorCandidateResolver#selectMethodInterceptors}.
+     * Kept for proxies compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
     public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(BeanContext beanContext,
                                                                     ExecutableMethod<T, ?> method,
                                                                     List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        return beanContext.getBean(InterceptorRegistry.ARGUMENT)
-            .resolveMethodInterceptors(method, interceptors, InterceptorKind.AROUND);
+        return resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
     }
 
     /**
@@ -159,14 +158,17 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * @param <T> The intercepted type
      * @return The filtered array of interceptors
      * @since 4.3.0
+     * @deprecated Generated code selects interceptors through {@link InterceptorCandidateResolver#selectMethodInterceptors}.
+     * Kept for proxies compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
     public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(InterceptorRegistry interceptorRegistry,
                                                                     ExecutableMethod<T, ?> method,
                                                                     List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        return interceptorRegistry.resolveMethodInterceptors(method, interceptors, InterceptorKind.AROUND);
+        return resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
     }
 
     /**
@@ -178,15 +180,19 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * @param <T> The intercepted type
      * @return The filtered array of interceptors
      * @since 4.3.0
+     * @deprecated Generated code selects interceptors through {@link InterceptorCandidateResolver#selectMethodInterceptors}.
+     * Kept for proxies compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
     public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(BeanContext beanContext,
                                                                           ExecutableMethod<T, ?> method,
                                                                           List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        return beanContext.getBean(InterceptorRegistry.ARGUMENT)
-            .resolveMethodInterceptors(method, interceptors, InterceptorKind.INTRODUCTION);
+        final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.INTRODUCTION);
+        final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
+        return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
     /**
@@ -198,64 +204,20 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
      * @param <T> The intercepted type
      * @return The filtered array of interceptors
      * @since 4.3.0
+     * @deprecated Generated code selects interceptors through {@link InterceptorCandidateResolver#selectMethodInterceptors}.
+     * Kept for proxies compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
     public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(InterceptorRegistry interceptorRegistry,
                                                                           ExecutableMethod<T, ?> method,
                                                                           List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
-        return interceptorRegistry.resolveMethodInterceptors(method, interceptors, InterceptorKind.INTRODUCTION);
+        final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.INTRODUCTION);
+        final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
+        return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
-
-    /**
-     * Resolves the interceptors of the methods of a proxy that fronts a separate target and resolves its interceptors
-     * for each target, see {@link Around#lazyInterceptorsPerTarget()}: those of the given target.
-     *
-     * <p>A non-singleton interceptor is the target's own, created with the target or for it now, as a dependent of the
-     * target's registration, and destroyed with the target. The selection is made once per target and kept on its
-     * registration. A target the context holds no registration for, such as an object handed to {@code swap}, is
-     * intercepted with instances the context creates once for the target's definition.</p>
-     *
-     * @param beanLocator      The bean locator
-     * @param targetDefinition The definition of the target
-     * @param methods          The methods the proxy intercepts
-     * @param introduction     Whether the proxy introduces its methods
-     * @param target           The registration of the target the proxy holds, or {@code null}
-     * @param bean             The target of the call, which the registration is used for when it is the target's
-     * @return The interceptors, by method
-     * @since 5.3.0
-     */
-    @Internal
-    @UsedByGeneratedCode
-    public static Interceptor<?, ?>[][] resolveTargetInterceptors(BeanLocator beanLocator,
-                                                                  BeanDefinition<?> targetDefinition,
-                                                                  ExecutableMethod<?, ?>[] methods,
-                                                                  boolean introduction,
-                                                                  @Nullable BeanRegistration<?> target,
-                                                                  @Nullable Object bean) {
-        return beanLocator.getBean(InterceptorRegistry.ARGUMENT)
-            .candidateResolver().resolveTargetInterceptors(beanLocator, targetDefinition, methods, introduction, target, bean);
-    }
-
-    /**
-     * Finds the registration of a target handed to a proxy that resolves its interceptors for each target, such as by
-     * {@code swap}.
-     *
-     * @param beanLocator The bean locator
-     * @param bean        The target
-     * @return The registration the context holds for it, or {@code null}
-     * @since 5.3.0
-     */
-    @Internal
-    @UsedByGeneratedCode
-    public static @Nullable BeanRegistration<?> findProxyTargetRegistration(BeanLocator beanLocator, @Nullable Object bean) {
-        if (bean == null || !(beanLocator instanceof BeanDefinitionRegistry definitions)) {
-            return null;
-        }
-        return definitions.findBeanRegistration(bean).orElse(null);
-    }
-
 
     /**
      * Resolves the {@link Around} interceptors for a method.
@@ -305,6 +267,24 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         }
         Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+    }
+
+    private static <T> Interceptor<T, ?>[] resolveInterceptors(BeanContext beanContext,
+                                                               ExecutableMethod<T, ?> method,
+                                                               List<BeanRegistration<Interceptor<T, ?>>> interceptors,
+                                                               InterceptorKind interceptorKind) {
+        return resolveInterceptors(beanContext.getBean(InterceptorRegistry.class), method, interceptors, interceptorKind);
+    }
+
+    private static <T> Interceptor<T, ?>[] resolveInterceptors(InterceptorRegistry interceptorRegistry,
+                                                               ExecutableMethod<T, ?> method,
+                                                               List<BeanRegistration<Interceptor<T, ?>>> interceptors,
+                                                               InterceptorKind interceptorKind) {
+        return interceptorRegistry.resolveInterceptors(
+            method,
+            interceptors,
+            interceptorKind
+        );
     }
 
     private static void instrumentAnnotationMetadata(@Nullable BeanContext beanContext, ExecutableMethod<?, ?> method) {

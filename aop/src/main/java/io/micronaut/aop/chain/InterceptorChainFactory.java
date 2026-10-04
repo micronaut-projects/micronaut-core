@@ -17,13 +17,13 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
@@ -31,14 +31,23 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collection;
 
 /**
- * Builds and executes method, lifecycle and constructor interceptor chains. An {@link InterceptorRegistry}
- * returns its own from {@link InterceptorRegistry#chainFactory()} to customize invocation construction.
- * Each build returns independent invocation state.
+ * Builds and executes method, lifecycle and constructor interceptor chains. It is a bean of the context, so
+ * replacing the bean customizes invocation construction. Each build returns independent invocation state.
  *
  * @since 5.3.0
  */
 @Internal
 public interface InterceptorChainFactory {
+    /** Constant for bean lookup. */
+    Argument<InterceptorChainFactory> ARGUMENT = Argument.of(InterceptorChainFactory.class);
+
+    /**
+     * Returns the service that acquires and selects the interceptor candidates the chains are built from.
+     *
+     * @return The candidate resolver, the same instance on every call
+     */
+    @UsedByGeneratedCode
+    InterceptorCandidateResolver candidateResolver();
 
     /**
      * Builds a method invocation from interceptors already selected for its target. Generated proxies retain the
@@ -71,7 +80,7 @@ public interface InterceptorChainFactory {
      * @param candidates Explicit candidates, or null to use retained candidates or discovery
      * @param <T> The bean type
      * @param <R> The result type
-     * @return A new lifecycle chain; execute with {@link LifecycleInvocation#proceedLifecycle(BeanDefinition)}
+     * @return A new lifecycle chain; execute with {@link LifecycleInvocation#proceedLifecycle()}
      */
     <T, R> LifecycleInvocation<T, R> buildLifecycleChain(
         BeanResolutionContext resolutionContext,
@@ -116,7 +125,7 @@ public interface InterceptorChainFactory {
                                       ExecutableMethod<T, T> method, T bean,
                                       @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
         return buildLifecycleChain(resolutionContext, definition, method, bean, InterceptorKind.POST_CONSTRUCT, candidates)
-            .proceedLifecycle(definition);
+            .proceedLifecycle();
     }
 
     /**
@@ -134,7 +143,7 @@ public interface InterceptorChainFactory {
                                    ExecutableMethod<T, T> method, T bean,
                                    @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
         return buildLifecycleChain(resolutionContext, definition, method, bean, InterceptorKind.PRE_DESTROY, candidates)
-            .proceedLifecycle(definition);
+            .proceedLifecycle();
     }
 
     /**

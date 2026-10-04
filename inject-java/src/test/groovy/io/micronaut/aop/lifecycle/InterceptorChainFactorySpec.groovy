@@ -7,6 +7,7 @@ import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.chain.ConstructorInvocation
 import io.micronaut.aop.chain.LifecycleInvocation
+import io.micronaut.aop.chain.InterceptorCandidateResolver
 import io.micronaut.aop.chain.InterceptorChainFactory
 import io.micronaut.aop.chain.InterceptorChain
 import io.micronaut.aop.chain.DefaultInterceptorChainFactory
@@ -98,11 +99,11 @@ class InterceptorChainFactorySpec extends Specification {
         if (entry == 'factory') {
             factory."$operation"(resolution, definition, method, bean, [])
         } else {
-            factory.buildLifecycleChain(resolution, definition, method, bean, kind, []).proceedLifecycle(definition)
+            factory.buildLifecycleChain(resolution, definition, method, bean, kind, []).proceedLifecycle()
         }
 
         then:
-        1 * registry.resolveMethodInterceptors(method, [], kind) >> ([advice] as Interceptor[])
+        1 * registry.resolveInterceptors(method, [], kind) >> ([advice] as Interceptor[])
         def failure = thrown(NullPointerException)
         failure.message.contains(kind.name())
         0 * method.invoke(_, _)
@@ -125,7 +126,7 @@ class InterceptorChainFactorySpec extends Specification {
         def result = factory."$operation"(resolution, definition, method, bean, [])
 
         then:
-        1 * registry.resolveMethodInterceptors(method, [], kind) >> ([] as Interceptor[])
+        1 * registry.resolveInterceptors(method, [], kind) >> ([] as Interceptor[])
         1 * method.invoke(bean, [] as Object[]) >> null
         result == null
         0 * resolution._
@@ -210,30 +211,13 @@ class InterceptorChainFactorySpec extends Specification {
         def instantiated = factory.instantiate(resolution, definition, constructor, [], 0)
 
         then:
-        2 * lifecycle.proceedLifecycle(definition) >> bean
+        2 * lifecycle.proceedLifecycle() >> bean
         1 * construction.instantiate() >> bean
         0 * lifecycle.proceed()
         0 * construction.proceed()
         initialized.is(bean)
         disposed.is(bean)
         instantiated.is(bean)
-    }
-
-    void 'static selection entry points delegate to the registry instance operation'() {
-        given:
-        def registry = Mock(InterceptorRegistry)
-        def method = Mock(ExecutableMethod)
-        def selected = [] as Interceptor[]
-
-        when:
-        def around = InterceptorChain.resolveAroundInterceptors(registry, method, [])
-        def introduction = InterceptorChain.resolveIntroductionInterceptors(registry, method, [])
-
-        then:
-        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.AROUND) >> selected
-        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.INTRODUCTION) >> selected
-        around.is(selected)
-        introduction.is(selected)
     }
 
     void 'lifecycle chains carry their kind and method chains derive it from their target'() {
@@ -252,8 +236,8 @@ class InterceptorChainFactorySpec extends Specification {
         def disposed = factory.buildLifecycleChain(resolution, definition, method, bean, InterceptorKind.PRE_DESTROY, [])
 
         then:
-        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.POST_CONSTRUCT) >> selected
-        1 * registry.resolveMethodInterceptors(method, [], InterceptorKind.PRE_DESTROY) >> selected
+        1 * registry.resolveInterceptors(method, [], InterceptorKind.POST_CONSTRUCT) >> selected
+        1 * registry.resolveInterceptors(method, [], InterceptorKind.PRE_DESTROY) >> selected
         0 * registry._
         [resolved, initialized, disposed]*.kind == [InterceptorKind.AROUND, InterceptorKind.POST_CONSTRUCT, InterceptorKind.PRE_DESTROY]
         resolved.parameterValues == ['argument']
@@ -262,6 +246,11 @@ class InterceptorChainFactorySpec extends Specification {
     private static class CustomInvocations implements InterceptorChainFactory {
         LifecycleInvocation lifecycle
         ConstructorInvocation construction
+
+        @Override
+        InterceptorCandidateResolver candidateResolver() {
+            throw new UnsupportedOperationException()
+        }
 
         @Override
         <T, R> LifecycleInvocation<T, R> buildLifecycleChain(BeanResolutionContext resolution,
