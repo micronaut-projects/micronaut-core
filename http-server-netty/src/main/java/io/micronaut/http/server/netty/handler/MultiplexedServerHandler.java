@@ -211,9 +211,9 @@ abstract class MultiplexedServerHandler {
             outboundWritableScheduled = true;
             requiredCtx().executor().execute(() -> {
                 outboundWritableScheduled = false;
-                ResponseStreamer streamer = responseStreamer;
-                if (streamer != null && !finished && !reset && isOutboundWritable()) {
-                    streamer.writer.onWritable();
+                ResponseStreamer current = responseStreamer;
+                if (current != null && !finished && !reset && isOutboundWritable()) {
+                    current.writer.onWritable();
                 }
             });
         }
