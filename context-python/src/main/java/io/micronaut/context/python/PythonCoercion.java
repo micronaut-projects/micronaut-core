@@ -976,10 +976,10 @@ public final class PythonCoercion {
     }
 
     /**
-     * Convert a constructor argument of a startup-context object for the replayed constructor in an event-loop
-     * context: Python beans and host beans as async members, other values as a constructor call converts them.
+     * Convert a constructor argument of an instance whose class declares coroutine methods: Python beans and host
+     * beans as async members, other values as a constructor call converts them.
      *
-     * @param context The event-loop context
+     * @param context The context the instance is created in
      * @param value The Java constructor argument
      * @return The context-local argument
      */

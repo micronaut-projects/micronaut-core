@@ -302,8 +302,30 @@ final class PythonAsyncioRuntimeTest {
         }
     }
 
+    // a Python singleton holding mutable state behind a lock, constructed with a Java dependency
+    private static final String STATEFUL_SERVICE = """
+        import asyncio
+        import threading
+        class StatefulService:
+            def __init__(self, resolver):
+                self.resolver = resolver
+                self.lock = threading.Lock()
+                self.calls = 0
+            def describe(self):
+                return self.resolver.toString()
+            async def increment(self):
+                await asyncio.sleep(0)
+                with self.lock:
+                    self.calls += 1
+                    return self.calls
+            async def countdown(self, n):
+                for i in range(n, 0, -1):
+                    await asyncio.sleep(0)
+                    yield i
+        """;
+
     @Test
-    void aNullableAsyncMemberIsCopiedIntoTheEventLoopContext() {
+    void anAsyncMethodOfAPythonBeanRunsOnTheBeansOwnObject() {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -312,27 +334,22 @@ final class PythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
             Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
             PythonPool pool = applicationContext.getBean(PythonPool.class);
-            String holder = "class Holder:\n    pass\n";
-            primary.eval(PYTHON, holder);
-            pool.getEventLoopContext(eventLoop).eval(PYTHON, holder);
+            primary.eval(PYTHON, STATEFUL_SERVICE);
+            pool.getEventLoopContext(eventLoop).eval(PYTHON, STATEFUL_SERVICE);
             PythonContextRuntime.PythonClassReference reference = new PythonContextRuntime.PythonClassReference(
-                PYTHON, "Holder", new String[0], "Holder", "class-instance:Holder");
-            Value fallback = primary.eval(PYTHON, "Holder()");
-            PythonContextRuntime.rememberAsyncMember(fallback, "client", null);
-            PythonContextRuntime.rememberAsyncMember(fallback, "name", "x");
+                PYTHON, "StatefulService", new String[0], "StatefulService", "class-instance:StatefulService");
+            Value service = PythonContextRuntime.newInstance(primary, reference, new StringBuilder("resolver"));
 
-            Value target = PythonContextRuntime.asyncInstance(fallback, reference);
-
-            assertEquals(pool.getEventLoopContext(eventLoop), target.getContext());
-            assertTrue(target.getMember("client").isNull(), "a member remembered as null was not copied as None");
-            assertEquals("x", target.getMember("name").asString());
+            // a copy in the event-loop context would be a second singleton, and it would need the Java dependency again
+            assertSame(service, PythonContextRuntime.asyncInstance(service, reference));
+            assertEquals("resolver", service.invokeMember("describe").asString());
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
         }
     }
 
     @Test
-    void aConstructorInjectedAsyncInstanceIsCreatedWithTheSameArgumentsInTheEventLoopContext() {
+    void aCoroutineInTheEventLoopContextAwaitsAPythonSingletonInItsOwnContext() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -341,45 +358,31 @@ final class PythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
             Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
             PythonPool pool = applicationContext.getBean(PythonPool.class);
-            String service = """
-                import builtins
-                class AsyncService:
-                    def __init__(self, dependency, name, names):
-                        self.dependency = dependency
-                        self.name = name
-                        self.names = names
-                        self.context_marker = builtins.__dict__.get("__service_marker__")
-                    async def call(self):
-                        return self.name
-                """;
-            primary.eval(PYTHON, service);
-            primary.eval(PYTHON, "import builtins\nbuiltins.__service_marker__ = 'startup'");
             Context eventLoopContext = pool.getEventLoopContext(eventLoop);
-            eventLoopContext.eval(PYTHON, service);
-            eventLoopContext.eval(PYTHON, "import builtins\nbuiltins.__service_marker__ = 'event-loop'");
+            primary.eval(PYTHON, STATEFUL_SERVICE);
             PythonContextRuntime.PythonClassReference reference = new PythonContextRuntime.PythonClassReference(
-                PYTHON, "AsyncService", new String[0], "AsyncService", "class-instance:AsyncService");
-            StringBuilder dependency = new StringBuilder("dependency");
-            Value fallback = PythonContextRuntime.newInstance(primary, reference, dependency, "x", List.of("a", "b"));
+                PYTHON, "StatefulService", new String[0], "StatefulService", "class-instance:StatefulService");
+            Value service = PythonContextRuntime.newInstance(primary, reference, new StringBuilder("resolver"));
+            ValueCoercible wrapper = () -> service;
+            eventLoopContext.eval(PYTHON, """
+                async def call_service(service):
+                    first = await service.increment()
+                    second = await service.increment()
+                    counted = [i async for i in service.countdown(2)]
+                    return f"{first},{second},{counted},{service.describe()}"
+                """);
+            Value callService = eventLoopContext.getBindings(PYTHON).getMember("call_service");
 
-            Value target = PythonContextRuntime.asyncInstance(fallback, reference);
+            for (Object injected : List.of(wrapper, PythonCoercion.asyncMemberValue(eventLoopContext, wrapper))) {
+                CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(callService.execute(injected));
+                eventLoop.runUntilComplete(stage);
+                assertEquals(eventLoopContext, callService.getContext());
+                assertTrue(stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString().endsWith(",[2, 1],resolver"),
+                    () -> "unexpected result " + stage.toCompletableFuture().join());
+            }
 
-            assertEquals(eventLoopContext, target.getContext());
-            assertEquals("x", target.getMember("name").asString());
-            assertEquals("event-loop", target.getMember("context_marker").asString(), "__init__ did not run in the event-loop context");
-            assertEquals(2, target.getMember("names").getArraySize());
-            assertEquals("dependency", target.getMember("dependency").invokeMember("toString").asString());
-            Value again = PythonContextRuntime.asyncInstance(fallback, reference);
-            assertEquals("event-loop", again.getMember("context_marker").asString(),
-                "the startup value replaced a member the event-loop __init__ set");
-
-            Value other = PythonContextRuntime.newInstance(primary, reference, dependency, "y", List.of("c"));
-            Value otherTarget = PythonContextRuntime.asyncInstance(other, reference);
-
-            assertEquals("y", otherTarget.getMember("name").asString());
-            assertEquals(1, otherTarget.getMember("names").getArraySize());
-            assertEquals("x", PythonContextRuntime.asyncInstance(fallback, reference).getMember("name").asString(),
-                "two startup instances of a class shared one event-loop instance");
+            // both calls reached the one object: the state of a singleton is shared by every event loop
+            assertEquals(4, service.getMember("calls").asInt());
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
         }

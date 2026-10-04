@@ -152,6 +152,15 @@ def __micronaut_has_coroutine_methods(cls):
     return False
 
 
+def __micronaut_async_function_kind(member):
+    """'coroutine' or 'async_generator' for an async function or bound method, otherwise ''."""
+    if inspect.iscoroutinefunction(member):
+        return "coroutine"
+    if inspect.isasyncgenfunction(member):
+        return "async_generator"
+    return ""
+
+
 def __micronaut_is_plain_bean_instance(obj, qualname):
     """Whether obj is an instance of the bean class itself, not an introduction or a scoped proxy."""
     cls = type(obj)
