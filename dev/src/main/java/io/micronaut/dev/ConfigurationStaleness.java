@@ -237,11 +237,11 @@ final class ConfigurationStaleness {
         Map<String, Conditional> byName = new LinkedHashMap<>();
         ClassLoader classLoader = current.getClassLoader();
         for (BeanDefinitionReference<?> reference : references) {
-            add(byName, reference.getBeanDefinitionName(), reference);
+            add(current, byName, reference.getBeanDefinitionName(), reference);
         }
         try {
             for (BeanConfiguration configuration : MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(classLoader, BeanConfiguration.class, null)) {
-                add(byName, "the bean configuration " + configuration.getName(), configuration);
+                add(current, byName, "the bean configuration " + configuration.getName(), configuration);
             }
         } catch (RuntimeException | LinkageError e) {
             // no bean configuration to read
@@ -249,7 +249,7 @@ final class ConfigurationStaleness {
         return List.copyOf(byName.values());
     }
 
-    private static void add(Map<String, Conditional> byName, String name, AnnotationMetadataProvider component) {
+    private static void add(ApplicationContext current, Map<String, Conditional> byName, String name, AnnotationMetadataProvider component) {
         if (byName.containsKey(name)) {
             return;
         }
@@ -264,11 +264,12 @@ final class ConfigurationStaleness {
             return;
         }
         AnnotationMetadataProvider evaluated = component;
-        if (component instanceof BeanDefinitionReference<?> reference && !(component instanceof BeanDefinition<?>)
+        if (component instanceof BeanDefinitionReference<?> reference
             && requirements.stream().anyMatch(requires -> requires.contains(RequiresCondition.MEMBER_CONDITION))) {
-            // a custom condition is evaluated against the bean definition, as core does once the reference is loaded
+            // a custom condition is evaluated against the bean definition, as core does once the reference is loaded,
+            // and loaded through the running context its metadata resolves placeholders against the environment
             try {
-                evaluated = reference.load();
+                evaluated = reference.load(current);
             } catch (RuntimeException | LinkageError e) {
                 // the reference answers its metadata still
             }
