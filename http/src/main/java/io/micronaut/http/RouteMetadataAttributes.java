@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -120,6 +121,20 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
             return true;
         }
         return false;
+    }
+
+    /**
+     * Whether an attribute of a message that stores the route metadata in its holder is known to
+     * be absent without creating the attribute map of the message: the name is empty, or no
+     * attribute was set and the name is not a metadata key.
+     *
+     * @param attributes The attribute map of the message, or {@code null} if not created yet
+     * @param name       The attribute name
+     * @return {@code true} if the attribute is absent, {@code false} if the attribute map must be
+     * consulted
+     */
+    public static boolean isAbsent(@Nullable ConvertibleValues<Object> attributes, @Nullable CharSequence name) {
+        return StringUtils.isEmpty(name) || attributes == null && !isMetadataKey(name.toString());
     }
 
     /**
