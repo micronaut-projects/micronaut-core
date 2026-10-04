@@ -526,7 +526,18 @@ public final class DevRuntime implements Closeable {
             }
             Path resourceRoot = mostSpecificRoot(absolute);
             if (resourceRoot != null) {
-                resources.merge(resourceRootKinds.get(resourceRoot), change, SourceChanges::merge);
+                ResourceKind kind = resourceRootKinds.get(resourceRoot);
+                if (deleted) {
+                    for (Path removed : liveRemoved(absolute)) {
+                        Path removedRoot = mostSpecificRoot(removed);
+                        if (removedRoot != null) {
+                            resources.merge(resourceRootKinds.get(removedRoot), new SourceChanges(Set.of(), Set.of(removed)), SourceChanges::merge);
+                        }
+                    }
+                } else {
+                    classLoader.liveResources().seen(absolute);
+                    resources.merge(kind, change, SourceChanges::merge);
+                }
             } else {
                 LOG.debug("{} is under no source or resource root: ignored", absolute);
             }
@@ -1034,12 +1045,35 @@ public final class DevRuntime implements Closeable {
                 continue;
             }
             if (change.type() == WatchEventType.DELETE) {
-                removed.add(change.path());
+                for (Path file : liveRemoved(change.path())) {
+                    if (own.equals(mostSpecificRoot(file))) {
+                        removed.add(file);
+                    }
+                }
             } else {
+                classLoader.liveResources().seen(change.path());
                 changed.add(change.path());
             }
         }
         return new Pending(Map.of(), Map.of(root.kind(), new SourceChanges(changed, removed)), false);
+    }
+
+    /**
+     * The resources a deletion removes: the file deleted, or every file known under a directory deleted as a whole,
+     * whose events may name only the directory. Each is recorded as belonging to its live root, so that the build
+     * output's copy of it is not served in its place.
+     */
+    private Set<Path> liveRemoved(Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+        Set<Path> removed = new LinkedHashSet<>();
+        removed.add(absolute);
+        List<Path> under = classLoader.liveResources().knownUnder(absolute);
+        if (under.isEmpty()) {
+            classLoader.liveResources().seen(absolute);
+        } else {
+            removed.addAll(under);
+        }
+        return removed;
     }
 
     /**
