@@ -216,6 +216,51 @@ class ConfigurationRefresherSpec extends Specification {
         context.close()
     }
 
+    void "the singletons holding a removed @EachProperty entry go with it, with a dependency graph: #graph"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec.eachProperty", "endpoints.one.url": "a", "endpoints.two.url": "b"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().trackBeanDependencies(graph).propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        def user = context.getBean(EndpointUser)
+        def users = context.getBean(EndpointsUser)
+
+        expect:
+        context.findDependencyGraph().isPresent() == graph
+        user.endpoint.url == "b"
+        users.endpoints*.url.sort() == ["a", "b"]
+
+        when: "the entry the singletons hold is removed"
+        values.remove("endpoints.two.url")
+        def result = refresher.refresh()
+
+        then: "the entry is gone, and so are the instances that held it"
+        result.recreated()*.beanType == [EndpointConfiguration]
+        !context.getActiveBeanRegistrations(EndpointUser).any { it.bean.is(user) }
+        !context.getActiveBeanRegistrations(EndpointsUser).any { it.bean.is(users) }
+
+        and: "a holder of every entry is created again with the ones that remain"
+        context.getBean(EndpointsUser).endpoints*.url == ["a"]
+
+        when: "the holder of the removed entry is looked up"
+        context.getBean(EndpointUser)
+
+        then: "it cannot be created, as at a startup without the entry"
+        thrown(io.micronaut.context.exceptions.DependencyInjectionException)
+
+        cleanup:
+        context.close()
+
+        where:
+        graph << [true, false]
+    }
+
     void "refreshAll treats everything as changed"() {
         given:
         def context = ApplicationContext.run(["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "bound.label": "a"])
