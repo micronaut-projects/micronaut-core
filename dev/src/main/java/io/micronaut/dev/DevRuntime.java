@@ -904,10 +904,10 @@ public final class DevRuntime implements Closeable {
     private static void awaitServers(ApplicationContext generation) {
         long deadline = System.nanoTime() + SERVER_START_WAIT.toNanos();
         while (System.nanoTime() < deadline && generation.isRunning()) {
-            for (BeanRegistration<EmbeddedServer> registration : generation.getActiveBeanRegistrations(EmbeddedServer.class)) {
-                if (registration.getBean().isRunning()) {
-                    return;
-                }
+            Collection<BeanRegistration<EmbeddedServer>> servers = generation.getActiveBeanRegistrations(EmbeddedServer.class);
+            // every server created so far: one that starts later than the first must not lose the socket it is about to claim
+            if (!servers.isEmpty() && servers.stream().allMatch(registration -> registration.getBean().isRunning())) {
+                return;
             }
             try {
                 Thread.sleep(10);
