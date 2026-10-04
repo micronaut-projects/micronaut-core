@@ -29,7 +29,9 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +60,16 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      * prototype share its definition: the edge goes when the last of them is destroyed.
      */
     private final Map<BeanDependency, AtomicInteger> instances = new ConcurrentHashMap<>();
+    /**
+     * The live fresh registrations of singleton definitions, by definition, which share their edges with the
+     * instance the singleton scope holds.
+     */
+    private final Map<Key, Set<BeanRegistration<?>>> freshSingletons = new ConcurrentHashMap<>();
+    /**
+     * How many owner instances received an edge through their resolvers. Such an edge belongs to the instances that
+     * recorded it, not to every instance of the definition, so only their release removes it.
+     */
+    private final Map<BeanDependency, AtomicInteger> owned = new ConcurrentHashMap<>();
 
     /**
      * Records that the bean the given resolution context is creating received the given bean at the
@@ -66,7 +78,6 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      * @param resolutionContext The resolution context of the receiving bean, or null outside a resolution
      * @param dependency The received bean's definition
      */
-    @SuppressWarnings("unchecked")
     void record(@Nullable BeanResolutionContext resolutionContext, BeanDefinition<?> dependency) {
         if (resolutionContext == null) {
             return;
@@ -75,9 +86,170 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         if (segment == null) {
             return;
         }
-        BeanDefinition<?> dependent = segment.getDeclaringType();
+        BeanDefinition<?> dependent = receiver(segment);
         if (dependent == null || dependent == dependency) {
             return;
+        }
+        Argument<?> argument = segment.getArgument();
+        add(new BeanDependency(
+            dependent,
+            dependency,
+            kindOf(segment),
+            argument != null && argument.isProvider(),
+            argument != null && (argument.isContainerType() || argument.getType().isArray())
+        ));
+    }
+
+    /**
+     * The bean a {@link BeanDependencyResolver} is being injected into, which owns what is later resolved or
+     * created through the resolver and the groups it opens.
+     *
+     * @param resolutionContext The resolution context injecting the resolver
+     * @return The owner, or null outside the creation of a bean
+     */
+    @Nullable
+    Owner ownerOf(@Nullable BeanResolutionContext resolutionContext) {
+        if (resolutionContext == null) {
+            return null;
+        }
+        BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        if (segment == null) {
+            return null;
+        }
+        BeanDefinition<?> dependent = receiver(segment);
+        return dependent == null ? null : new Owner(dependent);
+    }
+
+    /**
+     * Records that the owner of a resolver received the given bean through it: a bean the resolver looked up or a
+     * fresh registration one of its groups created. The owner holds it as it holds what its constructor received, so
+     * the edge is neither lazy nor reinjectable, and it stays until the owner is destroyed, once per owner instance.
+     *
+     * @param owner The owner of the resolver
+     * @param dependency The received bean's definition
+     */
+    void recordOwned(Owner owner, BeanDefinition<?> dependency) {
+        if (owner.definition == dependency) {
+            return;
+        }
+        BeanDependency edge = new BeanDependency(owner.definition, dependency, InjectionKind.OTHER, false, false);
+        synchronized (owner) {
+            // under the owner's lock: once the owner is released, a lookup that raced its destruction adds nothing
+            if (owner.released || !owner.edges.add(edge)) {
+                return;
+            }
+            link(edge);
+            owned.computeIfAbsent(edge, e -> new AtomicInteger()).incrementAndGet();
+        }
+    }
+
+    /**
+     * Forgets what one owner instance received through its resolver, as the owner's destruction begins; what the
+     * owner records after this is dropped.
+     *
+     * @param owner The owner
+     */
+    void release(Owner owner) {
+        List<BeanDependency> edges;
+        synchronized (owner) {
+            if (owner.released) {
+                return;
+            }
+            owner.released = true;
+            edges = List.copyOf(owner.edges);
+            owner.edges.clear();
+        }
+        for (BeanDependency edge : edges) {
+            AtomicInteger count = owned.get(edge);
+            if (count != null && count.decrementAndGet() > 0) {
+                continue;
+            }
+            owned.remove(edge);
+            if (!instances.containsKey(edge)) {
+                unlink(edge);
+            }
+        }
+    }
+
+    private void add(BeanDependency edge) {
+        link(edge);
+        if (!edge.dependent().isSingleton()) {
+            instances.computeIfAbsent(edge, e -> new AtomicInteger()).incrementAndGet();
+        }
+    }
+
+    private void link(BeanDependency edge) {
+        byDependent.computeIfAbsent(Key.of(edge.dependent()), k -> ConcurrentHashMap.newKeySet()).add(edge);
+        byDependency.computeIfAbsent(Key.of(edge.dependency()), k -> ConcurrentHashMap.newKeySet()).add(edge);
+    }
+
+    private void unlink(BeanDependency edge) {
+        Key dependentKey = Key.of(edge.dependent());
+        Set<BeanDependency> edges = byDependent.get(dependentKey);
+        if (edges != null) {
+            edges.remove(edge);
+            if (edges.isEmpty()) {
+                byDependent.remove(dependentKey, edges);
+            }
+        }
+        Key dependencyKey = Key.of(edge.dependency());
+        Set<BeanDependency> dependents = byDependency.get(dependencyKey);
+        if (dependents != null) {
+            dependents.remove(edge);
+            if (dependents.isEmpty()) {
+                byDependency.remove(dependencyKey, dependents);
+            }
+        }
+    }
+
+    /**
+     * Records a fresh registration of a singleton definition, which lives beside the instance the singleton scope
+     * holds and records what it received under the same definition: neither may forget those edges while the other
+     * still holds them.
+     *
+     * @param registration The fresh registration
+     */
+    void freshCreated(BeanRegistration<?> registration) {
+        BeanDefinition<?> definition = registration.getBeanDefinition();
+        if (definition.isSingleton()) {
+            // one atomic step per key with the removal of an emptied set, so a registration never joins a detached set
+            freshSingletons.compute(Key.of(definition), (key, fresh) -> {
+                Set<BeanRegistration<?>> live = fresh == null ? Collections.newSetFromMap(new IdentityHashMap<>()) : fresh;
+                live.add(registration);
+                return live;
+            });
+        }
+    }
+
+    /**
+     * Forgets what a destroyed bean received, unless another live instance of a singleton definition still holds it:
+     * the one the singleton scope holds, or a fresh registration.
+     *
+     * @param registration The destroyed registration
+     * @param scopedAlive Whether the singleton scope still holds an instance of the definition
+     */
+    void destroyed(BeanRegistration<?> registration, boolean scopedAlive) {
+        BeanDefinition<?> definition = registration.getBeanDefinition();
+        if (definition.isSingleton()) {
+            boolean[] freshAlive = new boolean[1];
+            freshSingletons.computeIfPresent(Key.of(definition), (key, fresh) -> {
+                fresh.remove(registration);
+                freshAlive[0] = !fresh.isEmpty();
+                return freshAlive[0] ? fresh : null;
+            });
+            if (scopedAlive || freshAlive[0]) {
+                return;
+            }
+        }
+        remove(definition);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private static BeanDefinition<?> receiver(BeanResolutionContext.Segment<?, ?> segment) {
+        BeanDefinition<?> dependent = segment.getDeclaringType();
+        if (dependent == null) {
+            return null;
         }
         // a segment is pushed with the target definition while the bean being created may be one member of an
         // @EachBean or @EachProperty set: the qualifier the context resolves it under tells the members apart
@@ -85,19 +257,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         if (dependentQualifier != null && !(dependent instanceof BeanDefinitionDelegate<?>) && !(dependent instanceof RuntimeBeanDefinition<?>)) {
             dependent = BeanDefinitionDelegate.create((BeanDefinition<Object>) dependent, (Qualifier<Object>) dependentQualifier);
         }
-        Argument<?> argument = segment.getArgument();
-        BeanDependency edge = new BeanDependency(
-            dependent,
-            dependency,
-            kindOf(segment),
-            argument != null && argument.isProvider(),
-            argument != null && (argument.isContainerType() || argument.getType().isArray())
-        );
-        byDependent.computeIfAbsent(Key.of(dependent), k -> ConcurrentHashMap.newKeySet()).add(edge);
-        byDependency.computeIfAbsent(Key.of(dependency), k -> ConcurrentHashMap.newKeySet()).add(edge);
-        if (!dependent.isSingleton()) {
-            instances.computeIfAbsent(edge, e -> new AtomicInteger()).incrementAndGet();
-        }
+        return dependent;
     }
 
     private static InjectionKind kindOf(BeanResolutionContext.Segment<?, ?> segment) {
@@ -212,6 +372,12 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
                     continue;
                 }
                 instances.remove(edge);
+                if (owned.containsKey(edge)) {
+                    // received through a resolver by instances still alive: their release removes it
+                    continue;
+                }
+            } else {
+                owned.remove(edge);
             }
             edges.remove(edge);
             Key dependencyKey = Key.of(edge.dependency());
@@ -260,6 +426,22 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         byDependent.clear();
         byDependency.clear();
         instances.clear();
+        freshSingletons.clear();
+        owned.clear();
+    }
+
+    /**
+     * One instance of the bean a resolver was injected into, with the edges recorded for that instance, so that a bean
+     * looked up through the resolver many times is one edge of one instance, released with that instance.
+     */
+    static final class Owner {
+        private final BeanDefinition<?> definition;
+        private final Set<BeanDependency> edges = new LinkedHashSet<>();
+        private boolean released;
+
+        private Owner(BeanDefinition<?> definition) {
+            this.definition = definition;
+        }
     }
 
     private record Key(Class<?> definitionClass, @Nullable Object qualifier, @Nullable Class<?> beanType) {

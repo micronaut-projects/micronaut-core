@@ -1348,8 +1348,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
         if (dependencyGraph != null) {
-            // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed
-            dependencyGraph.remove(definition);
+            // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
+            // A singleton definition may have a fresh registration beside the scoped instance, and both record under it
+            dependencyGraph.destroyed(registration, definition.isSingleton() && singletonScope.findBeanRegistration(definition) != null);
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -3210,6 +3211,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             @SuppressWarnings("unchecked")
             BeanRegistration<T> resolver = (BeanRegistration<T>) createRegistration(resolutionContext,
                 Argument.of(BeanDependencyResolver.class), null, dependencyResolverDefinition, true);
+            if (dependencyGraph != null && resolver.bean() instanceof DefaultBeanDependencyResolver dependencyResolver) {
+                // what the bean later resolves or creates through the resolver is the bean's, as an injection would be
+                dependencyResolver.owner(dependencyGraph.ownerOf(resolutionContext), true);
+            }
             return resolver;
         }
         if (InjectionPoint.class.isAssignableFrom(beanClass)) {
@@ -3744,8 +3749,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     final <T> BeanRegistration<T> createFreshRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> definition) {
-        return createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
+        BeanRegistration<T> registration = createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
             definition, resolutionContext != null, true);
+        if (dependencyGraph != null) {
+            // what the fresh instance received is recorded under its definition as it is created; a singleton's
+            // fresh instance shares those edges with the scoped one, so destroying either must not forget them
+            dependencyGraph.freshCreated(registration);
+        }
+        return registration;
+    }
+
+    /**
+     * Records that the owner of a resolver received a bean through it, as the bean's injection would have been.
+     *
+     * @param owner The owner, or null when the graph is not recorded or the resolver has none
+     * @param registration The received registration
+     */
+    final void recordOwnedDependency(DefaultBeanDependencyGraph.@Nullable Owner owner, BeanRegistration<?> registration) {
+        if (dependencyGraph != null && owner != null) {
+            dependencyGraph.recordOwned(owner, registration.getBeanDefinition());
+        }
     }
 
     @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
@@ -4528,6 +4551,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private void stopDependencyResolution(BeanRegistration<?> registration, Set<BeanRegistration<?>> visited) {
         if (!visited.add(registration)) {
             return;
+        }
+        if (dependencyGraph != null && registration.getBean() instanceof DefaultBeanDependencyResolver resolver) {
+            // the owner of the resolver is being destroyed: what it received through the resolver goes, and a lookup
+            // racing the destruction records nothing
+            resolver.releaseOwner(dependencyGraph);
         }
         DefaultBeanDependencies dependencies = registration.getDependencies();
         if (dependencies != null) {

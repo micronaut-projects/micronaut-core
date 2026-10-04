@@ -31,6 +31,10 @@ import java.util.function.Function;
 final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDependencies {
     private final DefaultBeanContext context;
     final DefaultBeanDependencies dependencies;
+    /** The bean the resolver was injected into, which the dependency graph records what it receives under; null when not recorded. */
+    private volatile DefaultBeanDependencyGraph.@Nullable Owner owner;
+    /** Whether this is the resolver injected into the owner, rather than a group it opened, and so releases the owner. */
+    private volatile boolean ownersResolver;
 
     DefaultBeanDependencyResolver(DefaultBeanContext context) {
         this(context, new DefaultBeanDependencies());
@@ -48,11 +52,13 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(Argument<T> type, @Nullable Qualifier<T> qualifier) {
-        return dependencies.resolve(context, null, resolution -> {
+        BeanRegistration<T> resolved = dependencies.resolve(context, null, resolution -> {
             BeanRegistration<T> registration = context.getBeanRegistration(resolution, type, qualifier);
             resolution.require(registration);
             return registration;
         });
+        context.recordOwnedDependency(owner, resolved);
+        return resolved;
     }
 
     @Override
@@ -68,6 +74,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     public BeanDependencyGroup createGroup() {
         return dependencies.resolve(context, null, resolution -> {
             BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies.destructionContext);
+            ((DefaultBeanDependencyResolver) child.bean()).owner(owner, false);
             resolution.addDependentBean(child);
             return (BeanDependencyGroup) child.bean();
         });
@@ -75,8 +82,33 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
 
     @Override
     public <T> BeanRegistration<T> createBeanRegistration(BeanDefinition<T> definition) {
-        return dependencies.resolve(context, null, resolution ->
+        BeanRegistration<T> created = dependencies.resolve(context, null, resolution ->
             context.createFreshRegistration(resolution, definition));
+        context.recordOwnedDependency(owner, created);
+        return created;
+    }
+
+    /**
+     * Sets the bean the resolver was injected into, which owns what is resolved and created through it.
+     *
+     * @param owner The owner, or null when the dependency graph is not recorded
+     * @param injected Whether this is the resolver injected into the owner, which releases the owner as its destruction begins
+     */
+    void owner(DefaultBeanDependencyGraph.@Nullable Owner owner, boolean injected) {
+        this.owner = owner;
+        this.ownersResolver = injected;
+    }
+
+    /**
+     * Releases the owner's edges in the dependency graph, as the destruction of the owner begins.
+     *
+     * @param graph The graph
+     */
+    void releaseOwner(DefaultBeanDependencyGraph graph) {
+        DefaultBeanDependencyGraph.Owner current = owner;
+        if (ownersResolver && current != null) {
+            graph.release(current);
+        }
     }
 
     @Override

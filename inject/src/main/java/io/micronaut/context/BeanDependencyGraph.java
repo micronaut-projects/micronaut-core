@@ -39,6 +39,11 @@ import java.util.Set;
  * recorded under the prototype's definition, so a singleton reached through a prototype is still a
  * transitive dependent of what it holds.</p>
  *
+ * <p>A {@link BeanContext#createBeanRegistration(BeanDefinition) fresh registration} records what it received
+ * under its definition, as any instance does, and a singleton's fresh instance shares those edges with the scoped
+ * one until both are destroyed. What a bean resolves or creates through an injected {@link BeanDependencyResolver},
+ * or a group the resolver opened, is recorded as received by that bean, with {@link InjectionKind#OTHER}.</p>
+ *
  * @author graemerocher
  * @since 5.3.0
  */
