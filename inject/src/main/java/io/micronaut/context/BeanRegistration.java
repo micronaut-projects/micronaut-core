@@ -42,7 +42,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     final BeanDefinition<T> beanDefinition;
     final T bean;
     private final int order;
-    private final @Nullable BeanDependencies dependencies;
+    private final @Nullable DefaultBeanDependencies dependencies;
 
     /**
      * @param identifier     The bean identifier
@@ -65,13 +65,13 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @param dependencies The owner created with the bean, or null for a registration the container does not own
      */
     BeanRegistration(BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean,
-                     @Nullable BeanDependencies dependencies) {
+                     @Nullable DefaultBeanDependencies dependencies) {
         // A wrapper around a retained proxy or resolver shares its original owner, including closure state.
         if (bean instanceof DefaultBeanDependencyResolver resolver) {
             this.dependencies = resolver.dependencies;
         } else if (bean instanceof InterceptedBeanProxy<?> proxy
-            && proxy.$beanDependencies() instanceof DefaultBeanDependencyResolver owner) {
-            this.dependencies = owner.dependencies;
+            && proxy.$beanDependencies() instanceof DefaultBeanDependencyResolver resolver) {
+            this.dependencies = resolver.dependencies;
         } else {
             this.dependencies = dependencies;
         }
@@ -153,19 +153,19 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @return The owner of what was created for this bean, or null for a registration the container does not own
      */
     @Nullable
-    BeanDependencies getDependencies() {
+    DefaultBeanDependencies getDependencies() {
         return dependencies;
     }
 
     /**
-     * Returns the owner of what was created for this bean, for a caller outside this module that keeps a value
-     * with the lifetime of the bean.
+     * Returns the dependencies of this bean instance, through which a caller outside this module creates
+     * something that is destroyed with the bean.
      *
-     * @return The owner, or null for a registration the container does not own
+     * @return The dependencies, or null for a registration the container does not own
      * @since 5.3.0
      */
     @Internal
-    public @Nullable DependencyOwner dependencyOwner() {
+    public @Nullable BeanDependencies dependencies() {
         return dependencies;
     }
 

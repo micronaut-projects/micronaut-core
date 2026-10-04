@@ -167,7 +167,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def interceptor = ctx.classLoader.loadClass('test.SlowInterceptor')
         def events = ctx.classLoader.loadClass('test.Events')
         def call = CompletableFuture.supplyAsync {
-            target.dependencyOwner().resolveOnce(ctx, target.beanDefinition, new Object()) { resolution ->
+            target.dependencies().resolveDependencies(ctx, target.beanDefinition) { resolution ->
                 resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
             }
         }
@@ -211,28 +211,22 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def interceptor = ctx.classLoader.loadClass('test.AInterceptor')
         def target = ctx.getBeanRegistration(type, null)
         def events = ctx.classLoader.loadClass('test.Events')
-        def key = new Object()
-        int selections = 0
 
         expect:
         interceptor.created == 0
 
         when:
-        def selected = target.dependencyOwner().resolveOnce(ctx, target.beanDefinition, key) { resolution ->
-            selections++
+        target.dependencies().resolveDependencies(ctx, target.beanDefinition) { resolution ->
             resolution.getInterceptorRegistrations(Argument.of(interceptor), null).first().bean
         }
-        def reused = target.dependencyOwner().resolveOnce(ctx, target.beanDefinition, key) { throw new AssertionError('selection was not cached') }
-        assert target.dependencyOwner().findResolved(key).is(selected)
         ctx.close()
 
         then:
-        selected.is(reused)
-        selections == 1
+        interceptor.created == 1
         events.LOG == ['target:false', 'interceptor']
     }
 
-    void 'a selection kept by a dependency group racing context shutdown releases its interceptors'() {
+    void 'a selection made through a dependency group racing context shutdown releases its interceptors'() {
         given:
         def ctx = buildContext(IMPORTS + '''
 @Prototype class UnmanagedInterceptor implements MethodInterceptor<Object, Object> {
@@ -245,7 +239,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def entered = new java.util.concurrent.CountDownLatch(1)
         def release = new java.util.concurrent.CountDownLatch(1)
         def selection = CompletableFuture.supplyAsync {
-            ctx.createDependencyGroup().resolveOnce(ctx, null, new Object()) { resolution ->
+            ctx.createDependencyGroup().resolveDependencies(ctx, null) { resolution ->
                 def registrations = resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
                 entered.countDown()
                 assert release.await(10, TimeUnit.SECONDS)

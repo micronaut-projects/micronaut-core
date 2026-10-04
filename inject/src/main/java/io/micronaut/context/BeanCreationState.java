@@ -26,13 +26,13 @@ import java.util.List;
  *
  * <p>A bean can resolve dependencies and select interceptors before its instance exists, so the owner is created
  * first and kept on the resolution context for the duration of the creation. On success the same
- * {@link BeanDependencies} becomes the owner held by the registration of the bean; on failure it releases what
+ * {@link DefaultBeanDependencies} becomes the owner held by the registration of the bean; on failure it releases what
  * was created. Each creation has its own state, so a nested creation does not attach to its parent.</p>
  */
 @Internal
 final class BeanCreationState {
     final BeanDefinition<?> definition;
-    final BeanDependencies dependencies = new BeanDependencies();
+    final DefaultBeanDependencies dependencies = new DefaultBeanDependencies();
     final List<BeanRegistration<?>> proxyInterceptors;
 
     BeanCreationState(BeanDefinition<?> definition, List<BeanRegistration<?>> proxyInterceptors) {

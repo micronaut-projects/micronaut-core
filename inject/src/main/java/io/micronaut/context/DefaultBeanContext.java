@@ -1337,7 +1337,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private void releaseDependents(BeanRegistration<?> registration, @Nullable Throwable failure) {
         try {
             if (registration instanceof BeanDisposingRegistration<?> disposing) {
-                disposing.getDependencies().forgetResolved();
                 disposing.getDependencies().close(this);
             } else {
                 registration.close();
@@ -4447,7 +4446,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     BeanRegistration<BeanDependencyResolver> newDependencyGroupRegistration(@Nullable DefaultBeanResolutionContext destructionContext) {
         return BeanRegistration.of(this, BeanIdentifier.of(BeanDependencyResolver.class.getName()),
-            dependencyResolverDefinition, new DefaultBeanDependencyResolver(this, new BeanDependencies(destructionContext)));
+            dependencyResolverDefinition, new DefaultBeanDependencyResolver(this, new DefaultBeanDependencies(destructionContext)));
     }
 
     boolean isContextConfigured() {
@@ -4462,7 +4461,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!visited.add(registration)) {
             return;
         }
-        BeanDependencies dependencies = registration.getDependencies();
+        DefaultBeanDependencies dependencies = registration.getDependencies();
         if (dependencies != null) {
             dependencies.stopResolving();
         }

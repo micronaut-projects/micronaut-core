@@ -48,7 +48,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               @Nullable List<?> interceptorRegistrations) {
         this(beanContext, identifier, beanDefinition, createdBean, dependents,
             interceptorRegistrations == null ? InterceptorCandidates.Unresolved.INSTANCE
-                : new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) interceptorRegistrations), new BeanDependencies());
+                : new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) interceptorRegistrations), new DefaultBeanDependencies());
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -57,7 +57,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
                               InterceptorCandidates interceptorCandidates,
-                              BeanDependencies dependencies) {
+                              DefaultBeanDependencies dependencies) {
         super(identifier, beanDefinition, createdBean, dependencies);
         this.beanContext = beanContext;
         // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
@@ -109,7 +109,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     @Override
-    BeanDependencies getDependencies() {
+    DefaultBeanDependencies getDependencies() {
         return Objects.requireNonNull(super.getDependencies());
     }
 
