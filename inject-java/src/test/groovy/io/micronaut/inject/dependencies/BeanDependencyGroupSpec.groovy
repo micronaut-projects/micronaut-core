@@ -130,7 +130,7 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         thrown(IllegalStateException)
     }
 
-    void "temporary destruction dependencies use the explicit event context"() {
+    void "temporary destruction dependencies are resolved through the pre-destroy event"() {
         given:
         def ctx = buildContext(HEADER + '''
 @Singleton class Owner {
@@ -138,11 +138,11 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
 }
 @Singleton class Disposer implements io.micronaut.context.event.BeanPreDestroyEventListener<Owner> {
     static BeanDependencyGroup escaped;
-    static BeanResolutionContext invocation;
+    static io.micronaut.context.event.BeanPreDestroyEvent<Owner> invocation;
     private final BeanContext context;
     Disposer(BeanContext context) { this.context = context; }
     public Owner onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Owner> event) {
-        invocation = event.getResolutionContext();
+        invocation = event;
         invocation.withDependencies(group -> {
             escaped = group;
             group.getBean(Resource.class);
@@ -194,17 +194,16 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         thrown(IllegalStateException)
     }
 
-    void "destruction permission cannot escape through another thread or a context copy"() {
+    void "destruction permission cannot escape through another thread"() {
         given:
         def ctx = buildContext(HEADER + '''
 @Singleton class Owner { }
 @Singleton class Disposer implements io.micronaut.context.event.BeanPreDestroyEventListener<Owner> {
     public Owner onPreDestroy(io.micronaut.context.event.BeanPreDestroyEvent<Owner> event) {
-        BeanResolutionContext invocation = event.getResolutionContext();
-        invocation.withDependencies(group -> {
+        event.withDependencies(group -> {
             CompletableFuture.runAsync(() -> {
                 try {
-                    invocation.withDependencies(other -> null);
+                    event.withDependencies(other -> null);
                     throw new AssertionError("cross-thread invocation allowed");
                 } catch (IllegalStateException expected) { Log.events.add("thread rejected"); }
                 try {
@@ -212,12 +211,6 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
                     throw new AssertionError("cross-thread lookup allowed");
                 } catch (IllegalStateException expected) { Log.events.add("group thread rejected"); }
             }).join();
-            try (BeanResolutionContext copy = invocation.copy()) {
-                try {
-                    copy.withDependencies(other -> null);
-                    throw new AssertionError("copy granted destruction permission");
-                } catch (IllegalStateException expected) { Log.events.add("copy rejected"); }
-            }
             group.getBean(Resource.class);
             return null;
         });
@@ -232,7 +225,7 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
         ctx.close()
 
         then:
-        log.events == ['thread rejected', 'group thread rejected', 'copy rejected', 'resource']
+        log.events == ['thread rejected', 'group thread rejected', 'resource']
     }
 
     void "disposable definitions receive an explicit context whose permission ends with destruction"() {

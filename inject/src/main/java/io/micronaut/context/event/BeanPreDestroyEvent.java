@@ -75,16 +75,4 @@ public class BeanPreDestroyEvent<T> extends BeanEvent<T> {
     public <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
         return resolutionContext != null ? resolutionContext.withDependencies(action) : getSource().withDependencies(action);
     }
-
-    /**
-     * Returns the resolution context of the container's destruction invocation. Listeners use
-     * {@link #withDependencies(Function)} instead.
-     *
-     * @return The resolution context, or {@code null} for an event created with the original constructor
-     * @since 5.3.0
-     */
-    @Internal
-    public @Nullable BeanResolutionContext getResolutionContext() {
-        return resolutionContext;
-    }
 }
