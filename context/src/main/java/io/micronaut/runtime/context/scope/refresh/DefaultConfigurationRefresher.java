@@ -115,7 +115,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         for (String key : keys) {
             Object was = before.get(key);
             Object is = after.get(key);
-            if (java.util.Objects.equals(was, is)) {
+            if (java.util.Objects.deepEquals(was, is)) {
                 continue;
             }
             changed.add(key);
