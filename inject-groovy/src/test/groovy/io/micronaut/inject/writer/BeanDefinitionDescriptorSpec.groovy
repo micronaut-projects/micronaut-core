@@ -32,13 +32,6 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
     }
 
     @Override
-    protected List<String> getArrayClassNames() {
-        // the class of an array of a primitive type is given a name that no class has, and the definition holds the
-        // value by that name
-        return ['[Lint;', '[Ljava.lang.Object;']
-    }
-
-    @Override
     protected List<Class<?>> getEmptyArrayTypes() {
         // an empty array of an annotation of the same compilation is one of objects
         return [String[], int[], Object[]]
