@@ -23,15 +23,18 @@ import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.manifest.DevMode;
+import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
+import io.micronaut.scheduling.io.watch.FileWatcher;
 
 import java.util.Map;
 
 /**
  * Configures every application context an application builds while a {@link DevRuntime} runs the
  * process: the reloadable class loader, the {@code dev} environment, the retained beans of the
- * previous generation, and the runtime itself as a bean. Service-loaded through the thread context
- * loader, which the launcher points at the reloadable tier; does nothing outside development mode.
+ * previous generation, the runtime itself as a bean, and a {@link FileWatcher} backed by the runtime's one
+ * watcher. Service-loaded through the thread context loader, which the launcher points at the
+ * reloadable tier; does nothing outside development mode.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -72,8 +75,15 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
     @Override
     public void configure(ApplicationContext applicationContext) {
         DevRuntime runtime = DevRuntime.current();
-        if (runtime != null) {
-            runtime.contextCreated(applicationContext);
+        if (runtime == null) {
+            return;
+        }
+        runtime.contextCreated(applicationContext);
+        DirectoryWatcher watcher = runtime.fileWatcher();
+        if (watcher != null && runtime.manifest().mode() != DevMode.TEST) {
+            // the context's own watch thread is off: modules register with the engine's one watcher instead, through a
+            // view that closes their registrations when this context stops
+            applicationContext.registerSingleton(FileWatcher.class, new DevFileWatcher(watcher, runtime.pinnedWatches(), applicationContext.getClassLoader()));
         }
     }
 
