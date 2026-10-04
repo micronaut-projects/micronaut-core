@@ -2,6 +2,9 @@ package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
@@ -46,6 +49,10 @@ class ConfigurationStalenessTest {
         {"staleness.factory", "StalenessFactory"},
         // a package-level requirement of a bean configuration
         {"staleness.package", "io.micronaut.dev.staleness"},
+        // bean with beanProperty, beans and missingBeans of a type bound to the configuration, directly or as an @EachBean
+        {"staleness.toggle.enabled", "BeanPropertyBean"},
+        {"staleness.entries.one.url", "BeansBean"},
+        {"staleness.others.two", "MissingBeansBean"},
     };
 
     @Test
@@ -187,5 +194,54 @@ class ConfigurationStalenessTest {
     @Requires(property = "spec.name", value = SPEC)
     @Requires(condition = FlagCondition.class)
     static class FlaggedBean {
+    }
+
+    @ConfigurationProperties("staleness.toggle")
+    @Requires(property = "spec.name", value = SPEC)
+    static class ToggleConfig {
+        private boolean enabled;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    @Requires(bean = ToggleConfig.class, beanProperty = "enabled", value = "true")
+    static class BeanPropertyBean {
+    }
+
+    @EachProperty("staleness.entries")
+    @Requires(property = "spec.name", value = SPEC)
+    static class Entry {
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    @Requires(beans = Entry.class)
+    static class BeansBean {
+    }
+
+    @EachProperty("staleness.others")
+    @Requires(property = "spec.name", value = SPEC)
+    static class Other {
+    }
+
+    @EachBean(Other.class)
+    @Requires(property = "spec.name", value = SPEC)
+    static class OtherClient {
+        OtherClient(Other other) {
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    @Requires(missingBeans = OtherClient.class)
+    static class MissingBeansBean {
     }
 }

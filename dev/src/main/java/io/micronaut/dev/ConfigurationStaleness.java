@@ -20,11 +20,14 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RequiresCondition;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.TrueCondition;
 import io.micronaut.context.conditions.MatchesCustomCondition;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
@@ -68,8 +71,9 @@ final class ConfigurationStaleness {
         if (current == null || !current.isRunning()) {
             return Requirements.NONE;
         }
-        List<Conditional> components = conditionals(current);
-        return new Requirements(components, customOutcomes(current, components));
+        List<BeanDefinitionReference<?>> references = references(current);
+        List<Conditional> components = conditionals(current, references);
+        return new Requirements(references, components, customOutcomes(current, components));
     }
 
     /**
@@ -81,11 +85,13 @@ final class ConfigurationStaleness {
      * <p>A requirement that reads the configuration flips with it: {@code property}, whatever it compares the
      * value with ({@code value}, {@code notEquals}, {@code pattern}, {@code defaultValue}), and
      * {@code missingProperty}, when the change touches the key or a key under it; one with an evaluated expression,
-     * which may read any key; and a custom {@code condition}, which is evaluated again and compared with what it
-     * answered before the refresh. The others cannot flip with a configuration edit: {@code env} and
-     * {@code notEnv} read the environment names fixed at startup, {@code configuration} only asks whether the
-     * bean configuration exists, whose own requirements are checked here like a bean's, and {@code beans} and
-     * {@code missingBeans} follow the requirements of those beans, checked here too.</p>
+     * which may read any key; {@code bean} (with {@code beanProperty}), {@code beans} and {@code missingBeans} of a
+     * type bound to a touched prefix, a configuration bean or an {@code @EachBean} of one, whose entries or values
+     * the change may have added, removed or changed; and a custom {@code condition}, which is evaluated again and
+     * compared with what it answered before the refresh. The others cannot flip with a configuration edit:
+     * {@code env} and {@code notEnv} read the environment names fixed at startup, {@code configuration} only asks
+     * whether the bean configuration exists, whose own requirements are checked here like a bean's, and the beans
+     * that {@code beans} and {@code missingBeans} name have their own requirements checked here too.</p>
      *
      * @param current The running context, refreshed
      * @param change  The keys the refresh changed
@@ -116,7 +122,7 @@ final class ConfigurationStaleness {
         }
         for (Conditional component : before.components()) {
             for (AnnotationValue<Requires> requires : component.requirements()) {
-                String stale = staleRequirement(requires, change);
+                String stale = staleRequirement(before.references(), requires, change);
                 if (stale != null) {
                     return component.name() + " " + stale;
                 }
@@ -138,7 +144,7 @@ final class ConfigurationStaleness {
      * @return What the requirement reads, or null when the change cannot flip it
      */
     @Nullable
-    private static String staleRequirement(AnnotationValue<Requires> requires, ConfigurationChange change) {
+    private static String staleRequirement(List<BeanDefinitionReference<?>> references, AnnotationValue<Requires> requires, ConfigurationChange change) {
         if (requires.hasEvaluatedExpressions()) {
             return "has a requirement with an evaluated expression, which may read a changed property";
         }
@@ -152,25 +158,80 @@ final class ConfigurationStaleness {
         if (missing != null && !missing.isEmpty() && change.touches(missing)) {
             return "requires a changed property to be missing";
         }
+        // bean and beanProperty, beans, missingBeans: whether a bean of the type exists, or what its property holds, follows
+        // the configuration when the type is bound to it, directly or as an @EachBean of what is
+        for (String member : List.of(RequiresCondition.MEMBER_BEAN, RequiresCondition.MEMBER_BEANS, RequiresCondition.MEMBER_MISSING_BEANS)) {
+            for (AnnotationClassValue<?> type : requires.annotationClassValues(member)) {
+                Class<?> beanType = type.getType().orElse(null);
+                if (beanType != null && boundToChange(references, beanType, change, 0)) {
+                    return "requires " + (member.equals(RequiresCondition.MEMBER_MISSING_BEANS) ? "the absence of " : "") + "a bean of " + beanType.getName() + ", bound to a changed property";
+                }
+            }
+        }
         return null;
     }
 
     /**
-     * Every bean reference the generation's class loader holds, the disabled ones too, since a running context
-     * forgets a reference it found disabled and an edit may enable it, with those registered at runtime, and every
-     * bean configuration, whose package-level requirements enable or disable the beans within it: each one that has
-     * a requirement.
+     * Whether a bean of the type is bound to a changed key: a configuration bean under a touched prefix, whose entries
+     * or properties the change may have added, removed or changed, or an {@code @EachBean} of one.
      */
-    private static List<Conditional> conditionals(ApplicationContext current) {
-        Map<String, Conditional> byName = new LinkedHashMap<>();
-        ClassLoader classLoader = current.getClassLoader();
+    private static boolean boundToChange(List<BeanDefinitionReference<?>> references, Class<?> type, ConfigurationChange change, int depth) {
+        if (depth > 4) {
+            return false;
+        }
+        // the references rather than the definitions: an @EachProperty with no entry yet has no definition
+        for (BeanDefinitionReference<?> reference : references) {
+            AnnotationMetadata metadata;
+            try {
+                if (!type.isAssignableFrom(reference.getBeanType())) {
+                    continue;
+                }
+                metadata = reference.getAnnotationMetadata();
+            } catch (RuntimeException | LinkageError e) {
+                continue;
+            }
+            String prefix = metadata.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
+            if (prefix != null) {
+                // the prefix of an @EachProperty, without its wildcard, holds every entry
+                if (prefix.endsWith(".*")) {
+                    prefix = prefix.substring(0, prefix.length() - 2);
+                } else if (prefix.endsWith("[*]")) {
+                    prefix = prefix.substring(0, prefix.length() - 3);
+                }
+                if (change.touches(prefix)) {
+                    return true;
+                }
+            }
+            Class<?> each = metadata.classValue(EachBean.class).orElse(null);
+            if (each != null && boundToChange(references, each, change, depth + 1)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Every bean reference the generation's class loader holds, the disabled ones too, since a running context
+     * forgets a reference it found disabled and an edit may enable it, with those registered at runtime.
+     */
+    private static List<BeanDefinitionReference<?>> references(ApplicationContext current) {
         List<BeanDefinitionReference<?>> references = new ArrayList<>();
         try {
-            references.addAll(new DefaultBeanDefinitionsProvider().provide(classLoader));
+            references.addAll(new DefaultBeanDefinitionsProvider().provide(current.getClassLoader()));
         } catch (RuntimeException | LinkageError e) {
             // the references the context holds still count
         }
         references.addAll(current.getBeanDefinitionReferences());
+        return references;
+    }
+
+    /**
+     * Each bean reference with a requirement, and each bean configuration with one, whose package-level requirements
+     * enable or disable the beans within it.
+     */
+    private static List<Conditional> conditionals(ApplicationContext current, List<BeanDefinitionReference<?>> references) {
+        Map<String, Conditional> byName = new LinkedHashMap<>();
+        ClassLoader classLoader = current.getClassLoader();
         for (BeanDefinitionReference<?> reference : references) {
             add(byName, reference.getBeanDefinitionName(), reference);
         }
@@ -195,9 +256,20 @@ final class ConfigurationStaleness {
         } catch (RuntimeException | LinkageError e) {
             return;
         }
-        if (!requirements.isEmpty()) {
-            byName.put(name, new Conditional(name, component, requirements));
+        if (requirements.isEmpty()) {
+            return;
         }
+        AnnotationMetadataProvider evaluated = component;
+        if (component instanceof BeanDefinitionReference<?> reference && !(component instanceof BeanDefinition<?>)
+            && requirements.stream().anyMatch(requires -> requires.contains(RequiresCondition.MEMBER_CONDITION))) {
+            // a custom condition is evaluated against the bean definition, as core does once the reference is loaded
+            try {
+                evaluated = reference.load();
+            } catch (RuntimeException | LinkageError e) {
+                // the reference answers its metadata still
+            }
+        }
+        byName.put(name, new Conditional(name, evaluated, requirements));
     }
 
     /**
@@ -249,7 +321,7 @@ final class ConfigurationStaleness {
      * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
      * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
      */
-    private static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
+    private static boolean mentionsChangedProperty(AnnotationMetadata metadata, ConfigurationChange change) {
         // the raw values: a string value read through the metadata has its placeholders resolved already
         Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
         if (property != null && change.touches(property.toString())) {
@@ -284,11 +356,12 @@ final class ConfigurationStaleness {
     /**
      * The requirements of the running generation before a refresh.
      *
+     * @param references Every bean reference, the disabled ones too
      * @param components Each bean reference and bean configuration with a requirement
      * @param outcomes   What each custom condition among them answered, in order
      */
-    record Requirements(List<Conditional> components, List<Outcome> outcomes) {
-        static final Requirements NONE = new Requirements(List.of(), List.of());
+    record Requirements(List<BeanDefinitionReference<?>> references, List<Conditional> components, List<Outcome> outcomes) {
+        static final Requirements NONE = new Requirements(List.of(), List.of(), List.of());
     }
 
     /**
