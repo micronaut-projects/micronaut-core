@@ -389,6 +389,51 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void containersCrossTheContextsOfAnAwaitedPythonSingleton() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+            Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+            Value service = primary.eval(PYTHON, """
+                import asyncio
+                class Summary:
+                    def __init__(self, names, total):
+                        self.names = names
+                        self.total = total
+                class Summarizer:
+                    async def summarize(self, request, items):
+                        await asyncio.sleep(0)
+                        names = [item["name"] for item in items]
+                        return {"who": request["who"], "names": names, "total": sum(i["n"] for i in items)}
+                    async def summary(self, items):
+                        return Summary([item["name"] for item in items], len(items))
+                Summarizer()
+                """);
+            ValueCoercible wrapper = () -> service;
+            eventLoopContext.eval(PYTHON, """
+                async def call_summarizer(summarizer):
+                    items = [{"name": "a", "n": 1}, {"name": "b", "n": 2}]
+                    result = await summarizer.summarize({"who": "me"}, items)
+                    summary = await summarizer.summary(items)
+                    return f"{result['who']}:{','.join(result['names'])}:{result['total']}:{list(summary.names)}:{summary.total}"
+                """);
+            Value call = eventLoopContext.getBindings(PYTHON).getMember("call_summarizer");
+
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(call.execute(wrapper));
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("me:a,b:3:['a', 'b']:2", stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString());
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
     void eventLoopContextAllocationDoesNotExhaustBlockingPool() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
