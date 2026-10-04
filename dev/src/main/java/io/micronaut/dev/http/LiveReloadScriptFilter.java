@@ -70,7 +70,7 @@ public final class LiveReloadScriptFilter {
         if (server == null || !runtime.manifest().liveReload().injectScript()) {
             return;
         }
-        if (response.getHeaders().contains(HttpHeaders.CONTENT_SECURITY_POLICY)) {
+        if (response.getHeaders().contains(HttpHeaders.CONTENT_SECURITY_POLICY) || isEncoded(response)) {
             return;
         }
         Object body = response.getBody().orElse(null);
@@ -107,11 +107,39 @@ public final class LiveReloadScriptFilter {
             return;
         }
         response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
-        if (body instanceof byte[] || !(body instanceof CharSequence)) {
-            response.body(injected.getBytes(charset));
-        } else {
-            response.body(injected);
+        replaceBody(response, injected, charset);
+    }
+
+    /**
+     * Whether the body is compressed or otherwise encoded, which the script cannot be spliced into.
+     *
+     * @param response The response
+     * @return True if a content coding other than identity applies
+     */
+    static boolean isEncoded(MutableHttpResponse<?> response) {
+        String encoding = response.getHeaders().get(HttpHeaders.CONTENT_ENCODING);
+        return encoding != null && !encoding.isBlank() && !"identity".equalsIgnoreCase(encoding.trim());
+    }
+
+    /**
+     * Replaces the body with the page carrying the script, and the framing headers with ones that describe it: a
+     * length set by a controller or the static resource resolver is that of the page without the script, and a
+     * transfer coding set for that page no longer applies. The page is sent as the bytes counted, in the charset the
+     * content type now declares, so that no writer encodes it again with another charset.
+     *
+     * @param response The response
+     * @param injected The page with the script
+     * @param charset The charset the page is encoded with
+     */
+    static void replaceBody(MutableHttpResponse<?> response, String injected, Charset charset) {
+        byte[] bytes = injected.getBytes(charset);
+        MediaType contentType = response.getContentType().orElse(MediaType.TEXT_HTML_TYPE);
+        if (contentType.getCharset().isEmpty()) {
+            response.contentType(new MediaType(contentType.getName(), java.util.Map.of(MediaType.CHARSET_PARAMETER, charset.name())));
         }
+        response.body(bytes);
+        response.getHeaders().remove(HttpHeaders.TRANSFER_ENCODING);
+        response.contentLength(bytes.length);
     }
 
     /**
