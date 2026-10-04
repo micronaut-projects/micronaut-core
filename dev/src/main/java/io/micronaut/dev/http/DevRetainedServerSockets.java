@@ -55,6 +55,6 @@ final class DevRetainedServerSockets implements RetainedServerSockets {
 
     @Override
     public void accepting(ServerSocketChannel socket, Channel channel) {
-        runtime.serverSockets().ifPresent(sockets -> sockets.accepting(autoRead -> channel.config().setAutoRead(autoRead), channel::isOpen));
+        runtime.serverSockets().ifPresent(sockets -> sockets.accepting(socket, autoRead -> channel.config().setAutoRead(autoRead), channel::isOpen));
     }
 }

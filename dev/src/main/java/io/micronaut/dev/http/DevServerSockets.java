@@ -66,22 +66,29 @@ public final class DevServerSockets implements AutoCloseable {
     private @Nullable Responder responder;
 
     /**
-     * The socket for a listener: bound the first time it is asked for, the same one afterwards. A random port,
-     * {@code 0}, is chosen once and kept, so that the application keeps its port across generations.
+     * The socket for a listener on a fixed port: bound the first time it is asked for, the same one afterwards. None
+     * for a random port, which several listeners may ask for at once and which no generation has to keep, nor for a
+     * port a server still accepts on, which the listener binds as usual, and fails to.
      *
      * @param host The host, null for the wildcard address
-     * @param port The port, 0 for a random one
-     * @return The socket
+     * @param port The port
+     * @return The socket, or null for the listener to bind its own
      * @throws IOException When it cannot be bound
      */
-    public synchronized ServerSocketChannel serverSocket(@Nullable String host, int port) throws IOException {
+    public synchronized @Nullable ServerSocketChannel serverSocket(@Nullable String host, int port) throws IOException {
         if (closed) {
             throw new IOException("The development runtime is closed");
+        }
+        if (port <= 0) {
+            return null;
         }
         // a server is about to accept on the sockets: the responder of a failed start lets go of them first
         stopResponder();
         String key = (host == null ? "*" : host) + ':' + port;
         ServerSocketChannel socket = sockets.get(key);
+        if (socket != null && isAccepting(socket)) {
+            return null;
+        }
         if (socket == null || !socket.isOpen()) {
             socket = ServerSocketChannel.open();
             try {
@@ -100,13 +107,23 @@ public final class DevServerSockets implements AutoCloseable {
     /**
      * Records the server channel accepting on a socket, so that accepting can be paused while a batch is processed.
      *
+     * @param socket The socket
      * @param autoRead Turns the channel's accepting on or off
      * @param open Whether the channel is still open
      */
-    public synchronized void accepting(Consumer<Boolean> autoRead, BooleanSupplier open) {
+    public synchronized void accepting(ServerSocketChannel socket, Consumer<Boolean> autoRead, BooleanSupplier open) {
         // a server that starts while a batch is processed is the batch's new generation: it accepts at once
         accepting.removeIf(entry -> !entry.open.getAsBoolean());
-        accepting.add(new Accepting(autoRead, open));
+        accepting.add(new Accepting(socket, autoRead, open));
+    }
+
+    private boolean isAccepting(ServerSocketChannel socket) {
+        for (Accepting entry : accepting) {
+            if (entry.socket == socket && entry.open.getAsBoolean()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -186,7 +203,7 @@ public final class DevServerSockets implements AutoCloseable {
         }
     }
 
-    private record Accepting(Consumer<Boolean> autoRead, BooleanSupplier open) {
+    private record Accepting(ServerSocketChannel socket, Consumer<Boolean> autoRead, BooleanSupplier open) {
     }
 
     /**
