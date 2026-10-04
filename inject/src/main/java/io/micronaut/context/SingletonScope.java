@@ -248,7 +248,8 @@ final class SingletonScope {
                                                  @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = singletonByBeanDefinition.get(BeanDefinitionIdentity.of(beanDefinition));
         if (beanRegistration == null) {
-            return findCachedSingletonBeanRegistration(beanType, qualifier);
+            // Do not fall back to cached registration by type/qualifier; we must respect the exact definition.
+            return null;
         }
         return beanRegistration;
     }
