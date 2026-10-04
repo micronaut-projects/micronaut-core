@@ -89,7 +89,7 @@ final class ConfigurationStaleness {
      * which may read any key; {@code bean} (with {@code beanProperty}), {@code beans} and {@code missingBeans} of a
      * type bound to a touched prefix, a configuration bean or an {@code @EachBean} of one, whose entries or values
      * the change may have added, removed or changed; and a custom {@code condition}, which is evaluated again and
-     * compared with what it answered before the refresh. The others cannot flip with a configuration edit:
+     * compared with what it answered before the refresh, for a bean the context has decided already. The others cannot flip with a configuration edit:
      * {@code env} and {@code notEnv} read the environment names fixed at startup, {@code configuration} only asks
      * whether the bean configuration exists, whose own requirements are checked here like a bean's, and the beans
      * that {@code beans} and {@code missingBeans} name have their own requirements checked here too.</p>
@@ -236,12 +236,14 @@ final class ConfigurationStaleness {
     private static List<Conditional> conditionals(ApplicationContext current, List<BeanDefinitionReference<?>> references) {
         Map<String, Conditional> byName = new LinkedHashMap<>();
         ClassLoader classLoader = current.getClassLoader();
+        Set<String> resolved = resolved(current, references);
         for (BeanDefinitionReference<?> reference : references) {
-            add(current, byName, reference.getBeanDefinitionName(), reference);
+            String name = reference.getBeanDefinitionName();
+            add(current, byName, name, reference, resolved.contains(name));
         }
         try {
             for (BeanConfiguration configuration : MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(classLoader, BeanConfiguration.class, null)) {
-                add(current, byName, "the bean configuration " + configuration.getName(), configuration);
+                add(current, byName, "the bean configuration " + configuration.getName(), configuration, true);
             }
         } catch (RuntimeException | LinkageError e) {
             // no bean configuration to read
@@ -249,7 +251,43 @@ final class ConfigurationStaleness {
         return List.copyOf(byName.values());
     }
 
-    private static void add(ApplicationContext current, Map<String, Conditional> byName, String name, AnnotationMetadataProvider component) {
+    /**
+     * The beans whose conditions the running context has decided: those it holds an instance of, with what they
+     * depend on, and those it forgot after finding them disabled. Any other reference is evaluated, lazily, against
+     * the refreshed configuration when it is first asked for, so its custom conditions are not run here: they may
+     * look beans up or do other work the application never asked for.
+     */
+    private static Set<String> resolved(ApplicationContext current, List<BeanDefinitionReference<?>> references) {
+        Set<String> held = new HashSet<>();
+        for (BeanDefinitionReference<?> reference : current.getBeanDefinitionReferences()) {
+            held.add(reference.getBeanDefinitionName());
+        }
+        // a bean whose definition failed its conditions keeps its reference, and is tracked by type instead
+        Set<String> disabledTypes = new HashSet<>();
+        for (io.micronaut.context.DisabledBean<?> disabled : current.getDisabledBeans()) {
+            disabledTypes.add(disabled.getBeanType().getName());
+        }
+        Set<String> resolved = new HashSet<>();
+        for (BeanDefinitionReference<?> reference : references) {
+            try {
+                if (!held.contains(reference.getBeanDefinitionName()) || disabledTypes.contains(reference.getBeanType().getName())) {
+                    resolved.add(reference.getBeanDefinitionName());
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // a reference whose type cannot load is never resolved
+            }
+        }
+        Optional<io.micronaut.context.BeanDependencyGraph> graph = current.findDependencyGraph();
+        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
+            BeanDefinition<?> definition = registration.getBeanDefinition();
+            resolved.add(definition.getClass().getName());
+            graph.ifPresent(g -> g.transitiveDependenciesOf(definition).forEach(d -> resolved.add(d.getClass().getName())));
+        }
+        return resolved;
+    }
+
+    private static void add(ApplicationContext current, Map<String, Conditional> byName, String name, AnnotationMetadataProvider component,
+                            boolean probed) {
         if (byName.containsKey(name)) {
             return;
         }
@@ -264,7 +302,7 @@ final class ConfigurationStaleness {
             return;
         }
         AnnotationMetadataProvider evaluated = component;
-        if (component instanceof BeanDefinitionReference<?> reference
+        if (probed && component instanceof BeanDefinitionReference<?> reference
             && requirements.stream().anyMatch(requires -> requires.contains(RequiresCondition.MEMBER_CONDITION))) {
             // a custom condition is evaluated against the bean definition, as core does once the reference is loaded,
             // and loaded through the running context its metadata resolves placeholders against the environment
@@ -274,7 +312,7 @@ final class ConfigurationStaleness {
                 // the reference answers its metadata still
             }
         }
-        byName.put(name, new Conditional(name, evaluated, requirements));
+        byName.put(name, new Conditional(name, evaluated, requirements, probed));
     }
 
     /**
@@ -284,6 +322,9 @@ final class ConfigurationStaleness {
     private static List<Outcome> customOutcomes(ApplicationContext current, List<Conditional> components) {
         List<Outcome> outcomes = new ArrayList<>();
         for (Conditional component : components) {
+            if (!component.probed()) {
+                continue;
+            }
             for (AnnotationValue<Requires> requires : component.requirements()) {
                 AnnotationClassValue<?> condition = requires.annotationClassValue(RequiresCondition.MEMBER_CONDITION).orElse(null);
                 if (condition == null || condition.getName().equals(TrueCondition.class.getName())) {
@@ -375,8 +416,9 @@ final class ConfigurationStaleness {
      * @param name         How a restart names it
      * @param component    The reference or the configuration
      * @param requirements Its {@code @Requires}
+     * @param probed       Whether its custom conditions are evaluated: the running context decided it already
      */
-    record Conditional(String name, AnnotationMetadataProvider component, List<AnnotationValue<Requires>> requirements) {
+    record Conditional(String name, AnnotationMetadataProvider component, List<AnnotationValue<Requires>> requirements, boolean probed) {
     }
 
     /**

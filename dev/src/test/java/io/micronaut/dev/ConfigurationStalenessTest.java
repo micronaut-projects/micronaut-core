@@ -111,6 +111,21 @@ class ConfigurationStalenessTest {
     }
 
     @Test
+    void aCustomConditionTheContextDecidedWithoutBeingAskedStillCounts() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", SPEC))) {
+            // never asked for by the test, the bean was decided at startup and that decision is kept
+            assertTrue(context.getDisabledBeans().stream().anyMatch(d -> d.getBeanType().equals(LazyFlaggedBean.class)));
+            ConfigurationStaleness.Requirements before = ConfigurationStaleness.beforeRefresh(context);
+            context.getEnvironment().addPropertySource(PropertySource.of("lazy", Map.of("staleness.lazy-flag", true)));
+            String stale = ConfigurationStaleness.afterRefresh(context, ConfigurationChange.ofKeys(Set.of("staleness.lazy-flag")), before);
+            assertNotNull(stale);
+            assertTrue(stale.contains("LazyFlagCondition"), stale);
+            // which only a restart replaces
+            assertFalse(context.containsBean(LazyFlaggedBean.class));
+        }
+    }
+
+    @Test
     void withoutARunningContextNothingIsStale() {
         assertNull(ConfigurationStaleness.afterRefresh(null, ConfigurationChange.ofKeys(Set.of("staleness.missing")),
             ConfigurationStaleness.beforeRefresh(null)));
@@ -259,5 +274,18 @@ class ConfigurationStalenessTest {
     @Requires(property = "spec.name", value = SPEC)
     @Requires(beans = Outer.Inner.class)
     static class NestedBeansBean {
+    }
+
+    public static final class LazyFlagCondition implements Condition {
+        @Override
+        public boolean matches(ConditionContext context) {
+            return context.getProperty("staleness.lazy-flag", Boolean.class).orElse(false);
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    @Requires(condition = LazyFlagCondition.class)
+    static class LazyFlaggedBean {
     }
 }
