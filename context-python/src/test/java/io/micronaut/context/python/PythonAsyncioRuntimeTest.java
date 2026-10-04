@@ -325,6 +325,8 @@ final class PythonAsyncioRuntimeTest {
         """;
 
     @Test
+    // asyncInstance is deprecated but still called by code generated before 5.2.14: it must return the bean itself
+    @SuppressWarnings({"removal", "java:S5738"})
     void anAsyncMethodOfAPythonBeanRunsOnTheBeansOwnObject() {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
