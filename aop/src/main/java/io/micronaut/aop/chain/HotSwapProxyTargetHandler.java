@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.Interceptor;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
@@ -32,7 +31,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @since 5.3.0
  */
 @Internal
-@SuppressWarnings({"NullAway.Init", "rawtypes", "unchecked"})
+@SuppressWarnings("NullAway.Init")
 public final class HotSwapProxyTargetHandler<T> extends ProxyTargetHandler<T> {
     private final Lock readLock;
     private final Lock writeLock;
@@ -54,16 +53,15 @@ public final class HotSwapProxyTargetHandler<T> extends ProxyTargetHandler<T> {
 
     @Override
     void initTarget(BeanResolutionContext resolutionContext) {
-        BeanRegistration<T> resolved = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, targetType, qualifier);
+        BeanRegistration<T> resolved = resolveTargetRegistration(resolutionContext);
         registration = resolved;
         target = resolved.getBean();
     }
 
     @Override
     void initInterceptors() {
-        super.initInterceptors();
-        if (perTarget) {
-            targetInterceptors = resolver.targetInterceptors(beanContext, methods, introduction, dependencies);
+        if (isPerTarget()) {
+            targetInterceptors = interceptorsOfTargets();
         }
     }
 
@@ -71,9 +69,7 @@ public final class HotSwapProxyTargetHandler<T> extends ProxyTargetHandler<T> {
     public @Nullable Object invoke(int index, Object[] arguments) {
         TargetInterceptors ofTargets = targetInterceptors;
         if (ofTargets == null) {
-            Interceptor[][] selected = interceptors;
-            assert selected != null;
-            return proceed(target(), index, selected[index], arguments);
+            return proceed(target(), index, arguments);
         }
         // read under the one lock they are swapped under, so that a call never has the target of before a swap
         // with the registration of after it
@@ -112,7 +108,7 @@ public final class HotSwapProxyTargetHandler<T> extends ProxyTargetHandler<T> {
             T previous = target;
             target = newTarget;
             // the registration of the new target, which carries the interceptors it owns, when the context holds one
-            registration = (BeanRegistration<T>) resolver.findProxyTargetRegistration(beanContext, newTarget);
+            registration = findRegistration(newTarget);
             return previous;
         } finally {
             writeLock.unlock();

@@ -32,6 +32,8 @@ import org.jspecify.annotations.Nullable;
 public final class FixedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
     private BeanRegistration<T> registration;
     private T target;
+    /** The interceptors of the target, when they are those of the target: it never changes, so they are kept here. */
+    private Interceptor[] @Nullable [] ofTarget;
 
     /**
      * @param creation The injection point the handler is created for
@@ -42,23 +44,21 @@ public final class FixedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
 
     @Override
     void initTarget(BeanResolutionContext resolutionContext) {
-        registration = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, targetType, qualifier);
+        registration = resolveTargetRegistration(resolutionContext);
         target = registration.getBean();
     }
 
     @Override
     void initInterceptors() {
-        // the target never changes, so its interceptors are selected once, here
-        interceptors = perTarget
-            ? resolver.resolveTargetInterceptors(beanContext, methods, introduction, registration, target, dependencies)
-            : selectFromProxy();
+        if (isPerTarget()) {
+            ofTarget = interceptorsOfTarget(registration);
+        }
     }
 
     @Override
     public @Nullable Object invoke(int index, Object[] arguments) {
-        Interceptor[][] selected = interceptors;
-        assert selected != null;
-        return proceed(target, index, selected[index], arguments);
+        Interceptor[][] selected = ofTarget;
+        return selected == null ? proceed(target, index, arguments) : proceed(target, index, selected[index], arguments);
     }
 
     @Override

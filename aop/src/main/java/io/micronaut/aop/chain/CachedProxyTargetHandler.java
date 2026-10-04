@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.Interceptor;
 import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -29,7 +28,6 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Internal
-@SuppressWarnings({"NullAway.Init", "rawtypes"})
 public final class CachedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
     /** A copy of the context the proxy was created in, which the target is resolved through; released after. */
     private @Nullable BeanResolutionContext lookupContext;
@@ -49,14 +47,13 @@ public final class CachedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
 
     @Override
     void initTarget(BeanResolutionContext resolutionContext) {
-        lookupContext = resolutionContext.copyForLazyProxyTarget(targetDefinition);
+        lookupContext = lookupContext(resolutionContext);
     }
 
     @Override
     void initInterceptors() {
-        super.initInterceptors();
-        if (perTarget) {
-            targetInterceptors = resolver.targetInterceptors(beanContext, methods, introduction, dependencies);
+        if (isPerTarget()) {
+            targetInterceptors = interceptorsOfTargets();
         }
     }
 
@@ -66,12 +63,9 @@ public final class CachedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
         BeanRegistration<T> resolved = resolveRegistration();
         T bean = resolved.getBean();
         TargetInterceptors ofTargets = targetInterceptors;
-        if (ofTargets != null) {
-            return proceed(bean, index, ofTargets.resolve(resolved, bean)[index], arguments);
-        }
-        Interceptor[][] selected = interceptors;
-        assert selected != null;
-        return proceed(bean, index, selected[index], arguments);
+        return ofTargets == null
+            ? proceed(bean, index, arguments)
+            : proceed(bean, index, ofTargets.resolve(resolved, bean)[index], arguments);
     }
 
     private BeanRegistration<T> resolveRegistration() {
@@ -80,7 +74,7 @@ public final class CachedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
             synchronized (this) {
                 resolved = registration;
                 if (resolved == null) {
-                    BeanDependencyGroup ofProxy = dependencies;
+                    BeanDependencyGroup ofProxy = dependencies();
                     if (ofProxy != null && ofProxy.isClosed()) {
                         throw new IllegalStateException("Cannot create a target after proxy destruction");
                     }
@@ -88,7 +82,7 @@ public final class CachedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
                     if (context == null) {
                         throw new IllegalStateException("The context the target is resolved through was released");
                     }
-                    resolved = context.getProxyTargetBeanRegistration(targetDefinition, targetType, qualifier);
+                    resolved = resolveTargetRegistration(context);
                     registration = resolved;
                     target = resolved.getBean();
                     lookupContext = null;

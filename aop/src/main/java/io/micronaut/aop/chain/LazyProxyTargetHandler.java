@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.Interceptor;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
@@ -29,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Internal
-@SuppressWarnings({"NullAway.Init", "rawtypes"})
+@SuppressWarnings("NullAway.Init")
 public final class LazyProxyTargetHandler<T> extends ProxyTargetHandler<T> {
     /** A copy of the context the proxy was created in, which the target is looked up through. */
     private BeanResolutionContext lookupContext;
@@ -45,14 +44,13 @@ public final class LazyProxyTargetHandler<T> extends ProxyTargetHandler<T> {
 
     @Override
     void initTarget(BeanResolutionContext resolutionContext) {
-        lookupContext = resolutionContext.copyForLazyProxyTarget(targetDefinition);
+        lookupContext = lookupContext(resolutionContext);
     }
 
     @Override
     void initInterceptors() {
-        super.initInterceptors();
-        if (perTarget) {
-            targetInterceptors = resolver.targetInterceptors(beanContext, methods, introduction, dependencies);
+        if (isPerTarget()) {
+            targetInterceptors = interceptorsOfTargets();
         }
     }
 
@@ -60,18 +58,16 @@ public final class LazyProxyTargetHandler<T> extends ProxyTargetHandler<T> {
     public @Nullable Object invoke(int index, Object[] arguments) {
         TargetInterceptors ofTargets = targetInterceptors;
         if (ofTargets == null) {
-            Interceptor[][] selected = interceptors;
-            assert selected != null;
-            return proceed(target(), index, selected[index], arguments);
+            return proceed(target(), index, arguments);
         }
         // the target and its registration are looked up together, so that they belong to each other
-        BeanRegistration<T> registration = lookupContext.getProxyTargetBeanRegistration(targetDefinition, targetType, qualifier);
+        BeanRegistration<T> registration = resolveTargetRegistration(lookupContext);
         T target = registration.getBean();
         return proceed(target, index, ofTargets.resolve(registration, target)[index], arguments);
     }
 
     @Override
     public T target() {
-        return lookupContext.getProxyTargetBean(targetDefinition, targetType, qualifier);
+        return resolveTarget(lookupContext);
     }
 }

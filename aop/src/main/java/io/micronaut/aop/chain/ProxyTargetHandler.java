@@ -61,28 +61,28 @@ public abstract class ProxyTargetHandler<T> {
      */
     public static final String BINDING = "io.micronaut.aop.chain.ProxyTargetHandler.Binding";
 
-    final InterceptorChainFactory chainFactory;
-    final InterceptorCandidateResolver resolver;
-    final BeanContext beanContext;
-    /** The definition, the type and the qualifier of the target. */
-    BeanDefinition<T> targetDefinition;
-    Argument<T> targetType;
-    @Nullable Qualifier<T> qualifier;
-    /** The dependencies of the proxy. */
-    @Nullable BeanDependencyGroup dependencies;
-    /** The proxied methods; the proxy refers to each by its index. */
-    ExecutableMethod<T, ?>[] methods;
-    boolean introduction;
-    /** Whether the interceptors of a call are those of its target and not those of the proxy. */
-    boolean perTarget;
-    /** The interceptors of each method, unless they are selected for the target of each call. */
-    Interceptor[] @Nullable [] interceptors;
+    private final InterceptorChainFactory chainFactory;
+    private final InterceptorCandidateResolver resolver;
+    private final BeanContext beanContext;
     /** The binding the interceptors of the proxy are qualified by, or null when it binds none. */
     private final @Nullable Qualifier<Interceptor<?, ?>> binding;
-    /** The context the proxy is created in, released once the handler is bound. */
-    private @Nullable BeanResolutionContext creationContext;
     /** The interceptors the proxy was created with; empty when they are those of the target. */
     private final List<BeanRegistration<Interceptor<?, ?>>> registrations;
+    /** The context the proxy is created in, released once the handler is bound. */
+    private @Nullable BeanResolutionContext creationContext;
+    /** The definition, the type and the qualifier of the target. */
+    private BeanDefinition<T> targetDefinition;
+    private Argument<T> targetType;
+    private @Nullable Qualifier<T> qualifier;
+    /** The dependencies of the proxy. */
+    private @Nullable BeanDependencyGroup dependencies;
+    /** The proxied methods; the proxy refers to each by its index. */
+    private ExecutableMethod<T, ?>[] methods;
+    private boolean introduction;
+    /** Whether the interceptors of a call are those of its target and not those of the proxy. */
+    private boolean perTarget;
+    /** The interceptors of each method selected from those of the proxy, unless they are those of the target. */
+    private Interceptor[] @Nullable [] interceptors;
 
     ProxyTargetHandler(Creation creation) {
         this.chainFactory = creation.chainFactory();
@@ -134,6 +134,9 @@ public abstract class ProxyTargetHandler<T> {
             proxied[i] = targetDefinition.getRequiredMethod(methodNames[i], methodArguments[i]);
         }
         this.methods = proxied;
+        if (!perTarget) {
+            interceptors = selectFromProxy();
+        }
         initInterceptors();
     }
 
@@ -144,23 +147,100 @@ public abstract class ProxyTargetHandler<T> {
      */
     abstract void initTarget(BeanResolutionContext resolutionContext);
 
-    /** Selects the interceptors that do not depend on the target of a call. */
+    /** Prepares the interceptors of targets, for a proxy that takes them from its targets. Runs after the target is prepared. */
     void initInterceptors() {
-        if (!perTarget) {
-            interceptors = selectFromProxy();
-        }
     }
 
-    /**
-     * @return The interceptors of each method, selected from those the proxy was created with
-     */
-    final Interceptor[][] selectFromProxy() {
+    private Interceptor[][] selectFromProxy() {
         InterceptorKind kind = introduction ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND;
         Interceptor[][] selected = new Interceptor[methods.length][];
         for (int i = 0; i < selected.length; i++) {
             selected[i] = resolver.selectMethodInterceptors((ExecutableMethod) methods[i], (List) registrations, kind);
         }
         return selected;
+    }
+
+    /**
+     * @return Whether the interceptors of a call are those of its target and not those of the proxy
+     */
+    final boolean isPerTarget() {
+        return perTarget;
+    }
+
+    /**
+     * @param context The context to resolve through
+     * @return The target, with its registration
+     */
+    final BeanRegistration<T> resolveTargetRegistration(BeanResolutionContext context) {
+        return context.getProxyTargetBeanRegistration(targetDefinition, targetType, qualifier);
+    }
+
+    /**
+     * @param context The context to resolve through
+     * @return The target
+     */
+    final T resolveTarget(BeanResolutionContext context) {
+        return context.getProxyTargetBean(targetDefinition, targetType, qualifier);
+    }
+
+    /**
+     * @param context The context the proxy is created in
+     * @return A copy of it to look the target up through after the proxy is created
+     */
+    final BeanResolutionContext lookupContext(BeanResolutionContext context) {
+        return context.copyForLazyProxyTarget(targetDefinition);
+    }
+
+    /**
+     * @param bean A target the proxy was given
+     * @return Its registration, if the context holds one
+     */
+    final @Nullable BeanRegistration<T> findRegistration(T bean) {
+        return (BeanRegistration<T>) resolver.findProxyTargetRegistration(beanContext, bean);
+    }
+
+    /**
+     * @return A holder of the interceptors of each target the proxy fronts
+     */
+    final TargetInterceptors interceptorsOfTargets() {
+        return resolver.targetInterceptors(beanContext, methods, introduction, dependencies);
+    }
+
+    /**
+     * @param registration The registration of the one target of the proxy
+     * @return The interceptors of that target, which the caller keeps
+     */
+    final Interceptor[][] interceptorsOfTarget(BeanRegistration<T> registration) {
+        return resolver.resolveTargetInterceptors(beanContext, methods, introduction, registration, registration.getBean(), dependencies);
+    }
+
+    /**
+     * Runs a call with the interceptors of the proxy.
+     *
+     * @param target The target of the call
+     * @param index The index of the proxied method
+     * @param arguments The arguments of the call
+     * @return What the call returns
+     */
+    final @Nullable Object proceed(Object target, int index, Object[] arguments) {
+        Interceptor[][] selected = interceptors;
+        if (selected == null) {
+            throw new IllegalStateException("The proxy takes its interceptors from its targets");
+        }
+        return proceed(target, index, selected[index], arguments);
+    }
+
+    /**
+     * Runs a call with the given interceptors.
+     *
+     * @param target The target of the call
+     * @param index The index of the proxied method
+     * @param selected The interceptors of the method
+     * @param arguments The arguments of the call
+     * @return What the call returns
+     */
+    final @Nullable Object proceed(Object target, int index, Interceptor[] selected, Object[] arguments) {
+        return chainFactory.buildMethodChain(target, (ExecutableMethod) methods[index], selected, arguments).proceed();
     }
 
     /**
@@ -172,10 +252,6 @@ public abstract class ProxyTargetHandler<T> {
      */
     @UsedByGeneratedCode
     public abstract @Nullable Object invoke(int index, Object[] arguments);
-
-    final @Nullable Object proceed(Object target, int index, Interceptor[] selected, Object[] arguments) {
-        return chainFactory.buildMethodChain(target, (ExecutableMethod) methods[index], selected, arguments).proceed();
-    }
 
     /**
      * @return The target of a call made now
