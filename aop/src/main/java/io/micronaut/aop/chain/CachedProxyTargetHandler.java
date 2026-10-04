@@ -28,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Internal
-public final class CachedProxyTargetHandler<T> extends ProxyTargetHandler<T> {
+public final class CachedProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> {
     /** A copy of the context the proxy was created in, which the target is resolved through; released after. */
     private @Nullable BeanResolutionContext lookupContext;
     /** The registration of the target, null until the first call. Written with the monitor of the handler held. */

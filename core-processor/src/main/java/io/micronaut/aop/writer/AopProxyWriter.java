@@ -26,6 +26,7 @@ import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.CachedProxyTargetHandler;
 import io.micronaut.aop.chain.FixedProxyTargetHandler;
 import io.micronaut.aop.chain.HotSwapProxyTargetHandler;
+import io.micronaut.aop.chain.HotSwappableProxyTargetHandler;
 import io.micronaut.aop.chain.InterceptorCandidateResolver;
 import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.chain.LazyProxyTargetHandler;
@@ -179,7 +180,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Method HANDLER_DEPENDENCIES = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "dependencies");
     private static final Method HANDLER_INTERCEPTED_METHODS = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "interceptedMethods");
     private static final Method HANDLER_INTERCEPTOR_REGISTRATIONS = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "interceptorRegistrations");
-    private static final Method HANDLER_SWAP = ReflectionUtils.getRequiredInternalMethod(HotSwapProxyTargetHandler.class, "swap", Object.class);
+    private static final Method HANDLER_SWAP = ReflectionUtils.getRequiredInternalMethod(HotSwappableProxyTargetHandler.class, "swap", Object.class);
 
     private final Set<ClassElement> defaultMethodInterfaceTypes = new LinkedHashSet<>();
     private final boolean hotswap;
@@ -476,8 +477,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
      */
     private List<OutputObjectDef> buildProxyTarget(ClassDef.ClassDefBuilder proxyBuilder) {
         ParameterElement handlerParameter = constructor.getParameter(HANDLER_PARAMETER);
-        ClassTypeDef handlerType = (ClassTypeDef) TypeDef.erasure(handlerParameter.getType());
-        FieldDef handlerField = FieldDef.builder(FIELD_HANDLER, handlerType)
+        // held and called through the interface; the parameter declares the kind the container injects
+        FieldDef handlerField = FieldDef.builder(FIELD_HANDLER,
+                ClassTypeDef.of(hotswap ? HotSwappableProxyTargetHandler.class : ProxyTargetHandler.class))
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
             .build();
         proxyBuilder.addField(handlerField);

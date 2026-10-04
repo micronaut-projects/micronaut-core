@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  */
 @Internal
 @SuppressWarnings("NullAway.Init")
-public final class LazyProxyTargetHandler<T> extends ProxyTargetHandler<T> {
+public final class LazyProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> {
     /** A copy of the context the proxy was created in, which the target is looked up through. */
     private BeanResolutionContext lookupContext;
     /** The interceptors of each target, when they are those of the target. */

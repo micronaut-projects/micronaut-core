@@ -18,7 +18,6 @@ package io.micronaut.aop.chain;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.locks.Lock;
@@ -32,7 +31,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @Internal
 @SuppressWarnings("NullAway.Init")
-public final class HotSwapProxyTargetHandler<T> extends ProxyTargetHandler<T> {
+public final class HotSwapProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> implements HotSwappableProxyTargetHandler<T> {
     private final Lock readLock;
     private final Lock writeLock;
     /** The target and its registration, read and written together under the lock. */
@@ -95,13 +94,7 @@ public final class HotSwapProxyTargetHandler<T> extends ProxyTargetHandler<T> {
         }
     }
 
-    /**
-     * Replaces the target.
-     *
-     * @param newTarget The new target
-     * @return The previous target
-     */
-    @UsedByGeneratedCode
+    @Override
     public T swap(T newTarget) {
         writeLock.lock();
         try {
