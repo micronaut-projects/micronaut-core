@@ -51,10 +51,15 @@ import javax.persistence.Id
 import javax.persistence.Version
 import java.lang.annotation.Annotation
 import java.lang.reflect.Field
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.stream.Collectors
 import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    private static final String BASIC_JDK_VALUE_TYPE_REGISTRATION_MESSAGE =
+        "Basic JDK value type [java.lang.String] cannot be registered as introspectable or serializable"
 
     void "test record with multiple constructors"() {
         when:
@@ -112,6 +117,26 @@ class Test {
         introspection != null
         introspection.getBeanProperties().size() == 2
         introspection.getProperty("content").get().get(new MuxedEvent1("abc", "xyz")) == "xyz"
+    }
+
+    void "test @Introspected(classes/classNames) rejects basic jdk value type"() {
+        when:
+        buildBeanIntrospection('test.Test', """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected($memberDeclaration)
+class Test {
+}
+""")
+
+        then:
+        RuntimeException e = thrown()
+        e.message.contains(BASIC_JDK_VALUE_TYPE_REGISTRATION_MESSAGE)
+
+        where:
+        memberDeclaration << ['classes = String.class', 'classNames = "java.lang.String"']
     }
 
     @NextMajorVersion("This test should fail and require ReflectiveAccess on fields/class or there should be an option on the introspected to use reflective access by default by annotating the introspected type")
@@ -3086,6 +3111,67 @@ class Book {
         context?.close()
     }
 
+    // This generates the BeanIntrospectionReference class by hand because the runtime checks are designed to catch
+    // existing incrementally compiled codebases where the metadata already exists. The annotation processor won't
+    // allow such reference classes to be created anymore, but we still want to help users who have them in their
+    // codebases already. This test was added in March 2026. Eventually it can be removed, after we think users have
+    // all cleared their old build trees, or if the Micronaut compiler is adjusted to always delete obsolete generated
+    // files.
+    void "test BeanIntrospector rejects basic jdk value type reference registration"() {
+        given:
+        ClassLoader generatedClassLoader = buildClassLoader('test.StringIntrospectionReference', '''
+package test;
+
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospectionReference;
+
+public class StringIntrospectionReference implements BeanIntrospectionReference<String> {
+    @Override
+    public boolean isPresent() {
+        return true;
+    }
+
+    @Override
+    public Class<String> getBeanType() {
+        return String.class;
+    }
+
+    @Override
+    public BeanIntrospection<String> load() {
+        throw new UnsupportedOperationException("Not needed for this test");
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    @Override
+    public String getName() {
+        return String.class.getName();
+    }
+}
+''')
+        Path tempDir = Files.createTempDirectory("bean-introspector-basic-type-")
+        Path servicesDir = tempDir.resolve("META-INF/services")
+        Files.createDirectories(servicesDir)
+        Path serviceFile = servicesDir.resolve("io.micronaut.core.beans.BeanIntrospectionReference")
+        Files.writeString(serviceFile, "test.StringIntrospectionReference\n")
+        URLClassLoader classLoader = new URLClassLoader([tempDir.toUri().toURL()] as URL[], generatedClassLoader)
+        BeanIntrospector classLoaderIntrospector = BeanIntrospector.forClassLoader(classLoader)
+
+        when:
+        classLoaderIntrospector.findIntrospection(String.class)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains(BASIC_JDK_VALUE_TYPE_REGISTRATION_MESSAGE)
+
+        cleanup:
+        classLoader?.close()
+    }
+
     void "test multiple constructors with @JsonCreator"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''
@@ -6023,4 +6109,3 @@ class AbcPerson {
         }
     }
 }
-

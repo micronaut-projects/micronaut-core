@@ -272,6 +272,19 @@ public class ClassUtils {
     }
 
     /**
+     * Format the error message used when a basic JDK value type is registered in bean/introspection infrastructure.
+     *
+     * @param name The basic type name
+     * @return The formatted error message
+     * @since 4.10.17
+     */
+    @NonNull
+    public static String basicJavaTypeRegistrationMessage(@NonNull String name) {
+        return ("Basic JDK value type [%s] cannot be registered as introspectable or serializable. " +
+            "Register a dedicated wrapper/holder type instead.").formatted(name);
+    }
+
+    /**
      * The primitive type for the given type name. For example the value "byte" returns {@link Byte#TYPE}.
      *
      * @param primitiveType The type name
