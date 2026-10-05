@@ -757,10 +757,7 @@ class StreamingResponseWriterSpec extends Specification {
             onLoop {
                 (1 + random.nextInt(12)).times {
                     if (random.nextInt(4) == 0) {
-                        sink.writable = !sink.writable
-                        if (sink.writable) {
-                            writer.onWritable()
-                        }
+                        toggleWritable(sink, writer)
                     }
                     int size = random.nextInt(5) == 0 ? 1025 + random.nextInt(3000) : 1 + random.nextInt(1024)
                     added += size
@@ -784,6 +781,17 @@ class StreamingResponseWriterSpec extends Specification {
         upstream.consumed == added
         sink.transport.sum { it.length() } == added
         sink.transport.every { it.length() <= 8192 }
+    }
+
+    /**
+     * Flip the writability of the sink, resuming the writer when it becomes writable, as the
+     * HTTP/2 flow controller listener does.
+     */
+    private static void toggleWritable(HoldingSink sink, StreamingResponseWriter writer) {
+        sink.writable = !sink.writable
+        if (sink.writable) {
+            writer.onWritable()
+        }
     }
 
     private static ReadBuffer piece(String s) {
@@ -826,6 +834,7 @@ class StreamingResponseWriterSpec extends Specification {
 
         @Override
         void open() {
+            // the head of the response is not part of the credit being tested
         }
 
         @Override
