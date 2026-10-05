@@ -447,7 +447,7 @@ final class UriRouteSet {
             DynamicRouteTarget target = DynamicRouteTarget.of(match.getRouteInfo());
             if (target == null) {
                 result.add(match);
-            } else if (dynamicMatch == null || match.getRouteInfo().compareTo((UriRouteInfo) dynamicMatch.getRouteInfo()) < 0) {
+            } else if (dynamicMatch == null || match.getRouteInfo().compareTo(dynamicMatch.getRouteInfo()) < 0) {
                 dynamicMatch = match;
                 dynamicTarget = target;
             }

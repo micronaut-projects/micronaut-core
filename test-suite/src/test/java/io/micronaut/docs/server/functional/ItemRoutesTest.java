@@ -55,8 +55,9 @@ class ItemRoutesTest {
         assertTrue(http.retrieve(HttpRequest.GET("/items/count"), Integer.class) >= 1);
 
         assertEquals(HttpStatus.NO_CONTENT, http.exchange(HttpRequest.DELETE("/items/" + id)).getStatus());
+        var notFoundRequest = HttpRequest.GET("/items/" + id);
         HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class,
-            () -> http.retrieve(HttpRequest.GET("/items/" + id)));
+            () -> http.retrieve(notFoundRequest));
         assertEquals(HttpStatus.NOT_FOUND, notFound.getStatus());
     }
 
@@ -81,8 +82,9 @@ class ItemRoutesTest {
         BlockingHttpClient http = client.toBlocking();
         Item item = http.retrieve(HttpRequest.POST("/items", new Item(0, "book")), Item.class);
         assertEquals(HttpStatus.OK, http.exchange(HttpRequest.HEAD("/items/" + item.id())).getStatus());
+        var notAllowedRequest = HttpRequest.PATCH("/items/" + item.id(), "");
         HttpClientResponseException notAllowed = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.PATCH("/items/" + item.id(), "")));
+            () -> http.exchange(notAllowedRequest));
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, notAllowed.getStatus());
     }
 }

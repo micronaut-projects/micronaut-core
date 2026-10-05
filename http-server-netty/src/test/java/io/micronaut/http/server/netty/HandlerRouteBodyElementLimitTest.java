@@ -79,8 +79,9 @@ class HandlerRouteBodyElementLimitTest {
         try (ApplicationContext ctx = run()) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
             try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
-                HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () ->
-                    client.toBlocking().retrieve(HttpRequest.POST("/elements", json).contentType(contentType)));
+                var blocking = client.toBlocking();
+                var request = HttpRequest.POST("/elements", json).contentType(contentType);
+                HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> blocking.retrieve(request));
                 return error.getStatus();
             }
         }

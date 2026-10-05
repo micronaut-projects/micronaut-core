@@ -86,7 +86,7 @@ record RoutePrefix(String value) {
         if (first == VARIABLE_START && uri.length() > 1) {
             char operator = uri.charAt(1);
             if (operator == SLASH || operator == '?' || operator == '&' || operator == '#') {
-                // an expression that expands with its own separator, e.g. {/segment} or {?query}
+                // an expression that expands with its own separator: a path segment or a query expression
                 return value + uri;
             }
         }

@@ -188,7 +188,8 @@ class RouteConditionTest {
         assertTrue(RouteConditions.matches(after(NOON), request, atNoon), "the start is included");
         assertTrue(RouteConditions.matches(between(NOON, NOON.plusSeconds(60)), request, atNoon));
         assertFalse(RouteConditions.matches(between(NOON, NOON), request, atNoon), "an empty period");
-        assertThrows(IllegalArgumentException.class, () -> between(NOON, NOON.minusSeconds(1)));
+        Instant inverted = NOON.minusSeconds(1);
+        assertThrows(IllegalArgumentException.class, () -> between(NOON, inverted));
         assertThrows(IllegalArgumentException.class, () -> new RouteCondition.TimeWindow(null, null));
 
         assertTrue(meets(after(Instant.EPOCH), request), "the system clock");
