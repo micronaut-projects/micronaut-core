@@ -33,6 +33,8 @@ import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -69,6 +71,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
         ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
         if (server != null) {
@@ -80,8 +83,16 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
             Argument<Object> targetType = (Argument<Object>) context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             MediaType mediaType = source.getContentType().orElse(null);
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
-                Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
-                if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
+                // the route reads the elements of its body argument with a reader specialized for them
+                MessageBodyReader<?> reader = RouteAttributes.getRouteInfo(source)
+                    .map(RouteInfo::getMessageBodyReader)
+                    .filter(r -> ((MessageBodyReader<Object>) r).isReadable(targetType, mediaType))
+                    .orElse(null);
+                if (reader == null) {
+                    reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType)).orElse(null);
+                }
+                if (reader instanceof ChunkedMessageBodyReader<?> chunked) {
+                    ChunkedMessageBodyReader<Object> piecewise = (ChunkedMessageBodyReader<Object>) chunked;
                     Publisher<?> pub = piecewise.readChunked(targetType, mediaType, source.getHeaders(), rootBody.toByteBufferPublisher());
                     return () -> Optional.of(pub);
                 }

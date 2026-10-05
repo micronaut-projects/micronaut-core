@@ -78,6 +78,11 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     }
 
     @Override
+    public NettyJsonStreamHandler<T> createSpecific(Argument<T> type) {
+        return new NettyJsonStreamHandler<>(jsonMessageHandler.createSpecific(type));
+    }
+
+    @Override
     public boolean isReadable(Argument<T> type, @Nullable MediaType mediaType) {
         return mediaType != null && mediaType.matches(MediaType.APPLICATION_JSON_STREAM_TYPE);
     }
