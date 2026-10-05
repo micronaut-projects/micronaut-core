@@ -89,6 +89,22 @@ class PythonAsyncioSpec:
         assert "changed" == response, response
 
     @Test
+    def singletonModuleAsyncRouteSeesGlobalResetToNone(self):
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting/before-reset")
+        assert "before-reset" == self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting-reset")
+        response = self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        assert "None" == response, response
+
+    @Test
+    def singletonModuleStateFlowsFromStartupModuleOnly(self):
+        # the startup module owns module state: a global an async route assigns is replaced on the next async call
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting/from-sync")
+        assert "from-async" == self.client.toBlocking().retrieve("/singleton-async-routes/async-greeting/from-async")
+        response = self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        assert "from-sync" == response, response
+
+    @Test
     def asyncRequestsAreConcurrentOnSingleEventLoop(self):
         self.client.toBlocking().retrieve("/async-backend/reset-stats")
         elapsed_millis = AsyncioConcurrentClientRunner.retrieveConcurrently(

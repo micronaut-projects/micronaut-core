@@ -1063,8 +1063,9 @@ public final class PythonCoercion {
 
     /**
      * Copy the module-level state of a module script into its import in another context: the members
-     * {@link #copyTransferableMembers(Value, Value)} copies, except Java types, which the importing context
-     * bound itself (with {@code java.type} or an import) and which are not state.
+     * {@link #copyTransferableMembers(Value, Value)} copies, and globals set back to {@code None}, except Java
+     * types, which the importing context bound itself (with {@code java.type} or an import) and which are not
+     * state.
      *
      * @param source The source module.
      * @param target The target module.
@@ -1079,6 +1080,11 @@ public final class PythonCoercion {
             }
             Value member = source.getMember(key);
             if (member == null || member.isMetaObject() || member.isHostObject() && member.asHostObject() instanceof Class<?>) {
+                continue;
+            }
+            if (PythonConversion.isNone(member)) {
+                // a global reset to None is state too
+                putMember(target, key, null);
                 continue;
             }
             Object transferable = transferableMember(member, target.getContext());

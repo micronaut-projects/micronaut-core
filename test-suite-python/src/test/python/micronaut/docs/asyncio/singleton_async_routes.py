@@ -38,7 +38,21 @@ def set_greeting(value: str) -> str:
     return greeting
 
 
+@Get("/greeting-reset")
+def reset_greeting() -> str:
+    global greeting
+    greeting = None
+    return "reset"
+
+
+@Get("/async-greeting/{value}")
+async def set_async_greeting(value: str) -> str:
+    global greeting
+    greeting = value
+    return greeting
+
+
 @Get("/greeting")
 async def async_greeting() -> str:
     await asyncio.sleep(0)
-    return greeting
+    return str(greeting)

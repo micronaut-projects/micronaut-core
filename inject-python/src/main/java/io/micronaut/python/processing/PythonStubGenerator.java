@@ -5659,6 +5659,39 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    /**
+     * Assigns an injected member adapted for async code, and remembers the Java value so that an instance of
+     * the object in an event-loop context receives the member too.
+     *
+     * @param targetValue The Python object
+     * @param name The member name
+     * @param value The Java value
+     * @return The statement
+     */
+    private static StatementDef putAsyncMember(ExpressionDef targetValue, String name, ExpressionDef value) {
+        return StatementDef.multi(
+            PYTHON_COERCION.invokeStatic(
+                PUT_MEMBER,
+                TypeDef.VOID,
+                targetValue,
+                ExpressionDef.constant(name),
+                PYTHON_COERCION.invokeStatic(
+                    "asyncMemberValue",
+                    TypeDef.OBJECT,
+                    targetValue,
+                    value.cast(TypeDef.OBJECT)
+                )
+            ),
+            PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                "rememberAsyncMember",
+                TypeDef.VOID,
+                targetValue,
+                ExpressionDef.constant(name),
+                value.cast(TypeDef.OBJECT)
+            )
+        );
+    }
+
     private void addSetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, VisitorContext visitorContext, boolean adaptAsyncMembers) {
         TypeDef returnType = TypeDef.VOID;
         String setterName = beanSetterName(beanProperty.getName());
@@ -5681,27 +5714,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 );
             }
-            return StatementDef.multi(
-                PYTHON_COERCION.invokeStatic(
-                    PUT_MEMBER,
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    PYTHON_COERCION.invokeStatic(
-                        "asyncMemberValue",
-                        TypeDef.OBJECT,
-                        targetValue,
-                        methodParameters.getFirst().cast(TypeDef.OBJECT)
-                    )
-                ),
-                PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "rememberAsyncMember",
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    methodParameters.getFirst().cast(TypeDef.OBJECT)
-                )
-            );
+            return putAsyncMember(targetValue, beanProperty.getName(), methodParameters.getFirst());
         })));
     }
 
@@ -5727,27 +5740,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 );
             }
-            return StatementDef.multi(
-                PYTHON_COERCION.invokeStatic(
-                    PUT_MEMBER,
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    PYTHON_COERCION.invokeStatic(
-                        "asyncMemberValue",
-                        TypeDef.OBJECT,
-                        targetValue,
-                        methodParameters.getFirst().cast(TypeDef.OBJECT)
-                    )
-                ),
-                PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "rememberAsyncMember",
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    methodParameters.getFirst().cast(TypeDef.OBJECT)
-                )
-            );
+            return putAsyncMember(targetValue, beanProperty.getName(), methodParameters.getFirst());
         })));
     }
 
@@ -5788,26 +5781,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (adaptAsyncMembers) {
                 // the module's async routes run on its import in an event-loop context: the member is
                 // remembered so that import receives it too, adapted for awaiting there
-                result = StatementDef.multi(
-                    targetValue.invoke(
-                        PUT_MEMBER,
-                        TypeDef.VOID,
-                        ExpressionDef.constant(beanProperty.getName()),
-                        PYTHON_COERCION.invokeStatic(
-                            "asyncMemberValue",
-                            TypeDef.OBJECT,
-                            targetValue,
-                            methodParameters.getFirst().cast(TypeDef.OBJECT)
-                        )
-                    ),
-                    PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                        "rememberAsyncMember",
-                        TypeDef.VOID,
-                        targetValue,
-                        ExpressionDef.constant(beanProperty.getName()),
-                        methodParameters.getFirst().cast(TypeDef.OBJECT)
-                    )
-                );
+                result = putAsyncMember(targetValue, beanProperty.getName(), methodParameters.getFirst());
             } else {
                 var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
                 List<ExpressionDef> parameters = new ArrayList<>();

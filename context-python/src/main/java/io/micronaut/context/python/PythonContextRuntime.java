@@ -339,6 +339,11 @@ public final class PythonContextRuntime {
      * context, but an async route of it is awaited on the event loop: the module is imported in the event-loop
      * context, which runs its top-level code there, and receives the module state and the members injected into
      * the startup module, as an event-loop instance of a class bean does.
+     * <p>
+     * The startup module owns the state, which flows one way: its transferable globals are copied before every
+     * async call, so a global an async route assigns stays local to that event loop's import and is replaced by
+     * the startup module's value on the next async call. There is one import per event loop, so an assignment
+     * there could not be shared anyway; module state an async route has to change belongs in a bean.
      *
      * @param fallback The startup-context module
      * @param packageName The Python package, or {@code python} for top-level scripts
