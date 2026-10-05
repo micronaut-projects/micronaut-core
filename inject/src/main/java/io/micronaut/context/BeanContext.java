@@ -234,6 +234,29 @@ public interface BeanContext extends
     }
 
     /**
+     * <p>Creates a new instance of the bean of the given definition performing dependency injection and returning a new instance.</p>
+     *
+     * <p>The definition is not looked up again, so a caller that already holds it, for example from
+     * {@link #getBeanDefinitions(Class)}, can create instances repeatedly without resolving the bean type and qualifier
+     * on every call. The instance is otherwise created as by {@link #createBean(Class, Qualifier, Object...)}, including
+     * the {@link io.micronaut.context.event.BeanCreatedEventListener} callbacks.</p>
+     *
+     * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
+     * the {@code args} parameter will be used</p>
+     *
+     * <p>Note that the instance returned is not saved as a singleton in the context.</p>
+     *
+     * @param definition The bean definition, which must be one of this context
+     * @param args       The argument values
+     * @param <T>        The bean generic type
+     * @return The instance
+     * @since 5.3.0
+     */
+    default <T> T createBean(BeanDefinition<T> definition, @Nullable Object... args) {
+        return createBean(definition.getBeanType(), definition.getDeclaredQualifier(), args);
+    }
+
+    /**
      * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
      * destroyed and removed from the context, otherwise null will be returned.
      *

@@ -1125,6 +1125,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         );
     }
 
+    @Override
+    public <T> T createBean(BeanDefinition<T> definition, @Nullable Object... args) {
+        ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
+        try (BeanResolutionContext resolutionContext = newResolutionContext(definition, null)) {
+            return doCreateBeanWithArguments(resolutionContext, definition, Argument.of(definition.getBeanType()), null, args);
+        }
+    }
+
     private <T> T doCreateBeanWithArguments(BeanResolutionContext resolutionContext,
                                             BeanDefinition<T> definition,
                                             Argument<T> beanType,
