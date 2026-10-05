@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -276,6 +277,53 @@ class LoomCarrierGroupTest {
                 thread.join(10_000);
                 assertFalse(thread.isAlive(), "virtual thread submitted around termination never ran in iteration " + i);
             }
+        }
+    }
+
+    @Test
+    void carrierDoesNotParkWhileContinuationsAreQueued() throws Exception {
+        // The IO thread blocks on a monitor held by a parked virtual thread of this runner. That
+        // holder is then made runnable by another thread carried by the runner, which queues the
+        // holder's continuation without unparking the carrier. With one continuation per carrier
+        // loop iteration, the carrier must not park while the holder is still queued, or the IO
+        // thread waits forever.
+        for (int i = 0; i < 20; i++) {
+            Object lock = new Object();
+            CountDownLatch holding = new CountDownLatch(1);
+            Thread holder = runner.newThread(() -> {
+                synchronized (lock) {
+                    holding.countDown();
+                    LockSupport.park();
+                }
+            });
+            holder.start();
+            assertTrue(holding.await(10, TimeUnit.SECONDS));
+            awaitState(holder, Thread.State.WAITING);
+
+            CompletableFuture<Void> ioDone = new CompletableFuture<>();
+            runner.eventLoop().execute(() -> {
+                synchronized (lock) {
+                    ioDone.complete(null);
+                }
+            });
+            awaitState(runner.ioThread, Thread.State.BLOCKED);
+
+            Thread unparker = runner.newThread(() -> LockSupport.unpark(holder));
+            unparker.start();
+
+            ioDone.get(10, TimeUnit.SECONDS);
+            holder.join(10_000);
+            unparker.join(10_000);
+            assertFalse(holder.isAlive(), "holder never ran in iteration " + i);
+            assertFalse(unparker.isAlive(), "unparker never ran in iteration " + i);
+        }
+    }
+
+    private static void awaitState(Thread thread, Thread.State state) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (thread.getState() != state) {
+            assertTrue(System.nanoTime() < deadline, thread + " did not reach " + state + ", is " + thread.getState());
+            Thread.sleep(1);
         }
     }
 }
