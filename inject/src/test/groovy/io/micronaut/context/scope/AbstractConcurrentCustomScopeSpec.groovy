@@ -562,6 +562,164 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
      * A scope map that puts one more entry in the first time its keys are read, standing for a bean created by
      * another thread while the scope is being destroyed.
      */
+    void "under a lock per scope map creations of one identifier into different maps do not block each other"() {
+        given: "two maps standing for two requests, each owning the locks of its creations"
+        def scope = new PerMapLockScope()
+        def first = new LockOwningScopeMap()
+        def second = new LockOwningScopeMap()
+        def id = BeanIdentifier.of("myBean")
+        // every creation waits for the other one to have begun, which only creations that do not contend can
+        def bothCreating = new CountDownLatch(2)
+        def onCreate = {
+            bothCreating.countDown()
+            assert bothCreating.await(5, TimeUnit.SECONDS): "the creation into the other map should be in flight too"
+        }
+        def firstContext = new TestCreationContext(id, onCreate)
+        def secondContext = new TestCreationContext(id, onCreate)
+        def executor = Executors.newFixedThreadPool(2)
+
+        when:
+        def futures = [[first, firstContext], [second, secondContext]].collect { map, ctx ->
+            executor.submit({ scope.withScopeMap(map) { scope.getOrCreate(ctx) } } as java.util.concurrent.Callable<Object>)
+        }
+        def beans = futures.collect { it.get(10, TimeUnit.SECONDS) }
+
+        then:
+        firstContext.created.size() == 1
+        secondContext.created.size() == 1
+        !beans[0].is(beans[1])
+        first.get(id).bean().is(beans[0])
+        second.get(id).bean().is(beans[1])
+
+        cleanup:
+        executor.shutdownNow()
+    }
+
+    void "creations of one identifier are serialized within one map and by default across maps"() {
+        given:
+        def firstMap = new LockOwningScopeMap()
+        def secondMap = sameMap ? firstMap : new LockOwningScopeMap()
+        def id = BeanIdentifier.of("myBean")
+        def creating = new CountDownLatch(1)
+        def release = new CountDownLatch(1)
+        def firstContext = new TestCreationContext(id, {
+            creating.countDown()
+            assert release.await(5, TimeUnit.SECONDS)
+        })
+        def secondContext = new TestCreationContext(id)
+
+        when: "a creation is in flight and another of the same identifier begins"
+        def firstThread = Thread.start { scope.withScopeMap(firstMap) { scope.getOrCreate(firstContext) } }
+        assert creating.await(5, TimeUnit.SECONDS)
+        def secondThread = Thread.start { scope.withScopeMap(secondMap) { scope.getOrCreate(secondContext) } }
+
+        then: "the second one waits on the creation lock"
+        awaitBlocked(secondThread)
+        secondContext.created.isEmpty()
+
+        when:
+        release.countDown()
+        firstThread.join(5000)
+        secondThread.join(5000)
+
+        then: "within one map the bean is created once, across maps once per map"
+        !firstThread.alive
+        !secondThread.alive
+        firstContext.created.size() == 1
+        secondContext.created.size() == (sameMap ? 0 : 1)
+
+        where:
+        scope                  | sameMap
+        new TestScope(true)    | false
+        new TestScope(true)    | true
+        new PerMapLockScope()  | true
+    }
+
+    void "under a lock per scope map a destruction waits for the creation into its map while another map creates the same identifier"() {
+        given:
+        def scope = new PerMapLockScope()
+        def first = new LockOwningScopeMap()
+        def second = new LockOwningScopeMap()
+        def id = BeanIdentifier.of("myBean")
+        def firstCreating = new CountDownLatch(1)
+        def secondCreating = new CountDownLatch(1)
+        def releaseFirst = new CountDownLatch(1)
+        def releaseSecond = new CountDownLatch(1)
+        def firstContext = new TestCreationContext(id, {
+            firstCreating.countDown()
+            assert releaseFirst.await(5, TimeUnit.SECONDS)
+        })
+        def secondContext = new TestCreationContext(id, {
+            secondCreating.countDown()
+            assert releaseSecond.await(5, TimeUnit.SECONDS)
+        })
+
+        when: "both maps create the identifier at once, the second one announcing its creation after the first"
+        def firstThread = Thread.start { scope.withScopeMap(first) { scope.getOrCreate(firstContext) } }
+        assert firstCreating.await(5, TimeUnit.SECONDS)
+        def secondThread = Thread.start { scope.withScopeMap(second) { scope.getOrCreate(secondContext) } }
+        assert secondCreating.await(5, TimeUnit.SECONDS)
+        def destroyer = Thread.start { scope.destroyScope(first) }
+
+        then: "the destruction of the first map still sees the creation into it and waits for it"
+        awaitBlocked(destroyer)
+
+        when:
+        releaseFirst.countDown()
+        firstThread.join(5000)
+        destroyer.join(5000)
+
+        then: "the bean of the first map is destroyed, the creation into the second map is left alone"
+        !destroyer.alive
+        firstContext.created[0].closed
+        first.isEmpty()
+        secondThread.alive
+
+        when:
+        releaseSecond.countDown()
+        secondThread.join(5000)
+
+        then:
+        !secondThread.alive
+        !secondContext.created[0].closed
+        second.get(id).is(secondContext.created[0])
+    }
+
+    /**
+     * Waits for the given thread to block on a monitor, failing if it ends or does not block in time.
+     */
+    private static boolean awaitBlocked(Thread thread) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (thread.state != Thread.State.BLOCKED) {
+            assert thread.alive: "the thread ended instead of blocking"
+            assert System.nanoTime() < deadline: "the thread did not block, it is " + thread.state
+            Thread.onSpinWait()
+        }
+        return true
+    }
+
+    /**
+     * A scope map that holds the creation locks of its own beans, as the owner of a request's scope map could.
+     */
+    static class LockOwningScopeMap extends ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> {
+        final ConcurrentMap<BeanIdentifier, Object> creationLocks = new ConcurrentHashMap<>()
+    }
+
+    /**
+     * A scope locking per bean whose maps are independent of each other, so that it locks creation per map.
+     */
+    static class PerMapLockScope extends TestScope {
+
+        PerMapLockScope() {
+            super(true, new LockOwningScopeMap())
+        }
+
+        @Override
+        protected Object getCreationLock(Map<BeanIdentifier, CreatedBean<?>> scopeMap, BeanIdentifier identifier) {
+            return ((LockOwningScopeMap) scopeMap).creationLocks.computeIfAbsent(identifier, key -> new Object())
+        }
+    }
+
     static class LatecomerMap implements ConcurrentMap<BeanIdentifier, CreatedBean<?>> {
 
         @Delegate

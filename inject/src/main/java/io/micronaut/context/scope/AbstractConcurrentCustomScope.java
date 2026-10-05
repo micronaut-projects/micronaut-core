@@ -63,12 +63,14 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     private final Lock w = rwl.writeLock();
     private final ConcurrentMap<BeanIdentifier, Object> creationLocks = new ConcurrentHashMap<>();
     /**
-     * The identifier of every creation in flight in the {@code lockPerBean} mode, against the scope map it creates
-     * into, published before the creation begins and removed once it has published its bean or failed. It is what
-     * makes a creation that is not yet in the scope map visible to a destruction of that map, which would otherwise
-     * see an empty map, finish, and leave the bean that the creation then publishes to be never destroyed.
+     * Every creation in flight in the {@code lockPerBean} mode, by the scope map it creates into and its identifier,
+     * published before the creation begins and removed once it has published its bean or failed. It is what makes a
+     * creation that is not yet in the scope map visible to a destruction of that map, which would otherwise see an
+     * empty map, finish, and leave the bean that the creation then publishes to be never destroyed. Keyed by the map
+     * as well as the identifier, since a scope that {@link #getCreationLock(Map, BeanIdentifier) locks per map} may
+     * create one identifier into two maps at once.
      */
-    private final ConcurrentMap<BeanIdentifier, Map<BeanIdentifier, CreatedBean<?>>> creationsInFlight = new ConcurrentHashMap<>();
+    private final Set<CreationInFlight> creationsInFlight = ConcurrentHashMap.newKeySet();
 
     /**
      * The beans a destruction in the {@code lockPerBean} mode is closing, while they are still held: a bean is
@@ -101,8 +103,10 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * that map afterwards, exactly as one that arrives after the scope-wide write lock is released does.
      * {@link #findBeanRegistration(Object)} works on the scope map without any lock, which is why the map returned by
      * {@link #getScopeMap(boolean)} must then be a {@link ConcurrentMap}: {@link #getOrCreate(BeanCreationContext)}
-     * rejects any other map with an {@link IllegalStateException}. The lock objects live as long as the scope, one
-     * per identifier ever created or removed through it.</p>
+     * rejects any other map with an {@link IllegalStateException}. By default the lock objects live as long as the
+     * scope, one per identifier ever created or removed through it, and are shared by every scope map; a scope whose
+     * maps are independent of each other can lock per map instead by overriding
+     * {@link #getCreationLock(Map, BeanIdentifier)}.</p>
      *
      * @param annotationType The annotation type
      * @param lockPerBean    Whether to lock creation per {@link BeanIdentifier} rather than for the whole scope
@@ -124,6 +128,33 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     @Override
     public final Class<A> annotationType() {
         return annotationType;
+    }
+
+    /**
+     * The lock under which a bean of the given identifier is created into, removed from or destroyed with the given
+     * scope map, when creation is locked per bean (see {@link #AbstractConcurrentCustomScope(Class, boolean)}); it is
+     * not used otherwise.
+     *
+     * <p>By default the lock belongs to the identifier alone and is shared by every scope map of the scope, so the
+     * first creation of a bean in one map waits for a creation of the same identifier in any other map. A scope with
+     * many maps that are independent of each other - a request scope, with one map per request - can override this
+     * to return a lock owned by the given map, for example one held next to the map by the object that owns it, so
+     * that creations into different maps do not contend and a slow creation in one does not stall the others.</p>
+     *
+     * <p>An override must return the same lock object for the same map and identifier for as long as the map is in
+     * use: a creation, a removal and a destruction of the map synchronize on it to wait for each other. It must not
+     * return a lock that is held by anything else while beans are created, and it is called on the creation path, so
+     * it should be cheap and must not create beans of this scope.</p>
+     *
+     * @param scopeMap   The scope map the bean is created into or taken out of
+     * @param identifier The identifier of the bean
+     * @return The lock object to synchronize on, never {@code null}
+     * @since 5.3.0
+     */
+    protected Object getCreationLock(Map<BeanIdentifier, CreatedBean<?>> scopeMap, BeanIdentifier identifier) {
+        // the lock is allocated in the map, never the bean: a creation that resolves another bean of this scope
+        // would otherwise be a recursive update of the map
+        return creationLocks.computeIfAbsent(identifier, key -> new Object());
     }
 
     /**
@@ -367,9 +398,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         if (createdBean != null) {
             return (T) createdBean.bean();
         }
-        // the lock is allocated in the map, never the bean: a creation that resolves another bean of this scope
-        // would otherwise be a recursive update of the map
-        final Object lock = creationLocks.computeIfAbsent(id, key -> new Object());
+        final Object lock = getCreationLock(scopeMap, id);
         synchronized (lock) {
             // re-check
             createdBean = scopeMap.get(id);
@@ -377,12 +406,13 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                 // announced before the bean is created, and while this thread holds the identifier's lock, so that a
                 // destruction of this map sees the creation and waits on that lock for what is published here,
                 // instead of observing an empty map and leaving the bean behind undestroyed
-                creationsInFlight.put(id, scopeMap);
+                final CreationInFlight creation = new CreationInFlight(scopeMap, id);
+                creationsInFlight.add(creation);
                 try {
                     createdBean = doCreate(creationContext);
                     scopeMap.put(id, createdBean);
                 } finally {
-                    creationsInFlight.remove(id);
+                    creationsInFlight.remove(creation);
                 }
             }
             return (T) createdBean.bean();
@@ -403,7 +433,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         final CreatedBean<?> createdBean;
         // under the identifier's lock so that a creation of the identifier in flight is waited for and then removed,
         // as under the scope-wide lock
-        synchronized (creationLocks.computeIfAbsent(identifier, key -> new Object())) {
+        synchronized (getCreationLock(scopeMap, identifier)) {
             createdBean = scopeMap.remove(identifier);
         }
         if (createdBean == null) {
@@ -453,11 +483,11 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                     return Optional.empty();
                 }
                 awaited.add(inFlight);
-                awaitCreation(inFlight);
+                awaitCreation(scopeMap, inFlight);
                 continue;
             }
             final boolean removed;
-            synchronized (creationLocks.computeIfAbsent(createdBean.id(), key -> new Object())) {
+            synchronized (getCreationLock(scopeMap, createdBean.id())) {
                 // only the entry that was located, another thread may have removed or replaced it since
                 removed = scopeMap.remove(createdBean.id(), createdBean);
             }
@@ -471,13 +501,15 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     }
 
     /**
-     * Waits for a creation of the given identifier to have published its bean or to have failed. A creation holds
-     * the identifier's lock from before it begins until after it publishes, so having taken that lock is the wait.
+     * Waits for a creation of the given identifier into the given map to have published its bean or to have failed.
+     * A creation holds the identifier's lock from before it begins until after it publishes, so having taken that
+     * lock is the wait.
      *
+     * @param scopeMap   The scope map
      * @param identifier The identifier
      */
-    private void awaitCreation(BeanIdentifier identifier) {
-        synchronized (creationLocks.computeIfAbsent(identifier, key -> new Object())) {
+    private void awaitCreation(Map<BeanIdentifier, CreatedBean<?>> scopeMap, BeanIdentifier identifier) {
+        synchronized (getCreationLock(scopeMap, identifier)) {
             LOG.trace("Waited for the creation of {} of scope @{}", identifier, annotationType.getSimpleName());
         }
     }
@@ -491,9 +523,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      */
     @Nullable
     private BeanIdentifier identifierInFlightFor(Map<BeanIdentifier, CreatedBean<?>> scopeMap, Set<BeanIdentifier> exclude) {
-        for (Map.Entry<BeanIdentifier, Map<BeanIdentifier, CreatedBean<?>>> creation : creationsInFlight.entrySet()) {
-            if (creation.getValue() == scopeMap && !exclude.contains(creation.getKey())) {
-                return creation.getKey();
+        for (CreationInFlight creation : creationsInFlight) {
+            if (creation.scopeMap() == scopeMap && !exclude.contains(creation.identifier())) {
+                return creation.identifier();
             }
         }
         return null;
@@ -523,7 +555,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             for (BeanIdentifier id = identifierInFlightFor(scopeMap, Set.of()); id != null; id = identifierInFlightFor(scopeMap, Set.of())) {
                 final CreatedBean<?> published;
                 // under the identifier's lock, so that the creation in flight is waited for and what it published is seen
-                synchronized (creationLocks.computeIfAbsent(id, key -> new Object())) {
+                synchronized (getCreationLock(scopeMap, id)) {
                     published = scopeMap.get(id);
                 }
                 if (published != null && closing.add(new IdentityKey(published))) {
@@ -538,7 +570,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             for (CreatedBean<?> closedBean : closedInThisPass) {
                 final boolean stillHeld;
                 // under the identifier's lock, so that a creation racing this take-out is not taken out unclosed
-                synchronized (creationLocks.computeIfAbsent(closedBean.id(), key -> new Object())) {
+                synchronized (getCreationLock(scopeMap, closedBean.id())) {
                     // taken out by identity rather than by identifier, so that a scope keying its map by
                     // something of its own - anything other than the identifier the bean carries - has its entry
                     // taken out all the same, and so that a bean a racing creation published is left alone
@@ -662,6 +694,26 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         @Override
         public int hashCode() {
             return System.identityHashCode(createdBean);
+        }
+    }
+
+    /**
+     * A creation in flight: the scope map it creates into, held by identity, since two scope maps may be equal, and
+     * the identifier of the bean it creates.
+     *
+     * @param scopeMap   The scope map
+     * @param identifier The identifier
+     */
+    private record CreationInFlight(Map<BeanIdentifier, CreatedBean<?>> scopeMap, BeanIdentifier identifier) {
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof CreationInFlight other && other.scopeMap == scopeMap && other.identifier.equals(identifier);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * System.identityHashCode(scopeMap) + identifier.hashCode();
         }
     }
 
