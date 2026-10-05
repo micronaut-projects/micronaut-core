@@ -170,9 +170,17 @@ public record Cidr(byte[] network, int prefix) {
         if (address.indexOf(':') < 0) {
             return ipv4(address);
         }
+        int zone = address.indexOf('%');
+        if (zone >= 0) {
+            // the zone id of a scoped address, e.g. fe80::1%en0, names an interface: not part of the address
+            if (zone == address.length() - 1) {
+                return null;
+            }
+            address = address.substring(0, zone);
+        }
         for (int i = 0; i < address.length(); i++) {
             char c = address.charAt(i);
-            if (Character.digit(c, 16) < 0 && c != ':' && c != '.' && c != '%') {
+            if (Character.digit(c, 16) < 0 && c != ':' && c != '.') {
                 return null;
             }
         }

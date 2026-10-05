@@ -99,6 +99,33 @@ class PeerAddressConditionTest {
     }
 
     @Test
+    void aScopedIpv6AddressMatchesWithoutItsZone() {
+        assertNotNull(Cidr.address("fe80::1%en0"));
+        assertNotNull(Cidr.address("[fe80::1%en0]:4711"));
+        assertTrue(Cidr.parse("fe80::/10").contains(Cidr.address("fe80::1%en0")));
+        HttpRequest<?> request = new RemoteRequest(HttpRequest.GET("/x"), null);
+        RouteConditionContext scoped = new RouteConditionContext() {
+            @Override
+            public @Nullable String host(HttpRequest<?> request) {
+                return null;
+            }
+
+            @Override
+            public @Nullable String clientAddress(HttpRequest<?> request) {
+                return "fe80::1%en0";
+            }
+
+            @Override
+            public Clock clock() {
+                return Clock.systemUTC();
+            }
+        };
+        assertTrue(RouteConditions.matches(remoteAddress("fe80::/10"), request, scoped), "the zone id does not prevent a match");
+        assertNull(Cidr.address("fe80::1%"), "an empty zone id");
+        assertNull(Cidr.address("fe80::zz%en0"), "not hexadecimal before the zone id");
+    }
+
+    @Test
     void equalityNormalizationAndCost() {
         assertEquals(peerAddress("10.0.0.0/8"), peerAddress("10.1.2.3/8"), "equal ranges");
         assertEquals(new RouteCondition.PeerAddress(List.of(Cidr.parse("::1"))), peerAddress("::1"));
