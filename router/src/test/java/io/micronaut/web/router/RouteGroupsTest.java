@@ -317,15 +317,15 @@ class RouteGroupsTest {
     void theFiltersOfTheGroupOfALocatorRunBeforeTheFiltersOfTheLocatedRoute() {
         List<String> trace = new ArrayList<>();
         LocatedRoutes<?> items = TestLocatedRoutes.of(order -> order.path("/items", itemsGroup -> {
-            itemsGroup.before(request -> record(trace, "table-group"));
-            itemsGroup.GET("/{item}").before(request -> record(trace, "located-route")).and().handle(RouteGroupsTest::ok);
+            itemsGroup.before(request -> traced(trace, "table-group"));
+            itemsGroup.GET("/{item}").before(request -> traced(trace, "located-route")).and().handle(RouteGroupsTest::ok);
         }));
         LocatedRoutes<?> orders = TestLocatedRoutes.of(order -> order.group(inner -> {
-            inner.before(request -> record(trace, "inner-locator-group"));
+            inner.before(request -> traced(trace, "inner-locator-group"));
             inner.locate("/lines", (request, pathVariables) -> "lines", target -> items);
         }));
         Router router = router(routes -> routes.path("/shop", shop -> {
-            shop.before(request -> record(trace, "shop"));
+            shop.before(request -> traced(trace, "shop"));
             shop.locate("/orders/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> orders);
         }));
 
