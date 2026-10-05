@@ -138,7 +138,8 @@ class ClientExchangeOrderingTest {
 
     @Test
     void theTimerSendsTheHeldBodyAndALateContinueDoesNotSendItAgain() {
-        Attempt attempt = start(expectContinue(), buffered(payload()), false);
+        ByteBuf payload = payload();
+        Attempt attempt = start(expectContinue(), buffered(payload), false);
         Assertions.assertEquals(List.of("head"), written());
 
         fireTimers();
@@ -151,6 +152,8 @@ class ClientExchangeOrderingTest {
         respond("ok");
         attempt.assertResponse("ok");
         assertFinished(attempt, false, LoadBalancer.Outcome.SUCCESS);
+        Assertions.assertEquals(1, payload.refCnt());
+        payload.release();
         assertConnectionUsable();
     }
 
@@ -355,13 +358,18 @@ class ClientExchangeOrderingTest {
 
     @Test
     void theTimerOfAFinishedExchangeDoesNotSendAfterTheConnectionIsReused() {
-        Attempt first = start(expectContinue(), buffered(payload()), false);
+        ByteBuf firstPayload = payload();
+        Attempt first = start(expectContinue(), buffered(firstPayload), false);
         channel.writeInbound(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE));
         respond("first");
         first.assertResponse("first");
         Assertions.assertEquals(List.of("head", "last:payload"), written());
 
-        Attempt second = start(expectContinue(), buffered(payload()), false);
+        Assertions.assertEquals(1, firstPayload.refCnt());
+        firstPayload.release();
+
+        ByteBuf secondPayload = payload();
+        Attempt second = start(expectContinue(), buffered(secondPayload), false);
         Assertions.assertEquals(List.of("head"), written());
         fireTimers();
         // only the timer of the second exchange sends its body
@@ -369,6 +377,8 @@ class ClientExchangeOrderingTest {
         respond("second");
         second.assertResponse("second");
         Assertions.assertEquals(List.of(LoadBalancer.Outcome.SUCCESS, LoadBalancer.Outcome.SUCCESS), outcomes);
+        Assertions.assertEquals(1, secondPayload.refCnt());
+        secondPayload.release();
         assertConnectionUsable();
     }
 
