@@ -122,8 +122,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             routeSets.add(new RouteSet(builder.getUriRoutes(), builder.getStatusRoutes(), builder.getErrorRoutes(), builder.getFilterRoutes(),
                 builder.getExposedPorts()));
         }
-        for (AssembledRoutes routes : assembled) {
-            RouteAssembly assembly = routes.routes();
+        for (AssembledRoutes assembledRoutes : assembled) {
+            RouteAssembly assembly = assembledRoutes.routes();
             routeSets.add(new RouteSet(assembly.uriRoutes(), assembly.statusRoutes(), assembly.errorRoutes(), assembly.filterRoutes(),
                 assembly.exposedPorts()));
         }

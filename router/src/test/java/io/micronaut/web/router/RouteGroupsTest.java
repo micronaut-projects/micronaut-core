@@ -40,6 +40,7 @@ import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -94,7 +95,7 @@ class RouteGroupsTest {
             routes.GET("/outside", RouteGroupsTest::ok);
             routes.path("/api", api -> {
                 api.GET("/before-the-filter", RouteGroupsTest::ok);
-                api.before(request -> record(trace, "api"));
+                api.before(request -> traced(trace, "api"));
                 api.GET("/after-the-filter", RouteGroupsTest::ok);
                 api.path("/nested", nested -> nested.GET("/route", RouteGroupsTest::ok));
                 api.POST("/declared-last", RouteGroupsTest::ok);
@@ -128,22 +129,22 @@ class RouteGroupsTest {
         Router router = router(routes -> routes.group(outer -> {
             outer.path("/api", inner -> {
                 inner.GET("/orders")
-                    .before(request -> record(trace, "route-before1"))
+                    .before(request -> traced(trace, "route-before1"))
                     .and()
-                    .before(request -> record(trace, "route-before2"))
+                    .before(request -> traced(trace, "route-before2"))
                     .and()
                     .after((request, response) -> trace.add("route-after1"))
                     .and()
                     .after((request, response) -> trace.add("route-after2")).and()
                     .handle(RouteGroupsTest::ok);
                 inner.after((request, response) -> trace.add("inner-after1"));
-                inner.before(request -> record(trace, "inner-before1"));
+                inner.before(request -> traced(trace, "inner-before1"));
                 inner.after((request, response) -> trace.add("inner-after2"));
-                inner.before(request -> record(trace, "inner-before2"));
+                inner.before(request -> traced(trace, "inner-before2"));
             });
-            outer.before(request -> record(trace, "outer-before1"));
+            outer.before(request -> traced(trace, "outer-before1"));
             outer.after((request, response) -> trace.add("outer-after1"));
-            outer.before(request -> record(trace, "outer-before2"));
+            outer.before(request -> traced(trace, "outer-before2"));
             outer.after((request, response) -> trace.add("outer-after2"));
         }));
 
@@ -188,13 +189,13 @@ class RouteGroupsTest {
         Router router = router(routes -> routes.group(group -> {
             // the lambda arity selects the variant, as it does on a route
             HttpRouteGroup same = group
-                .before(request -> record(trace, "before"))
+                .before(request -> traced(trace, "before"))
                 .and()
-                .before((request, propagatedContext) -> record(trace, "context-before"))
+                .before((request, propagatedContext) -> traced(trace, "context-before"))
                 .and()
-                .beforeAsync(request -> CompletableFuture.completedFuture(record(trace, "async-before")))
+                .beforeAsync(request -> CompletableFuture.completedFuture(traced(trace, "async-before")))
                 .and()
-                .beforeAsync((request, propagatedContext) -> CompletableFuture.completedFuture(record(trace, "async-context-before")))
+                .beforeAsync((request, propagatedContext) -> CompletableFuture.completedFuture(traced(trace, "async-context-before")))
                 .and()
                 .after((request, response) -> trace.add("after"))
                 .and()
@@ -204,7 +205,7 @@ class RouteGroupsTest {
                 .and()
                 .afterAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(trace.add("async-context-after")))
                 .and();
-            assertTrue(same == group);
+            assertSame(group, same);
             group.GET("/all")
                 .before(request -> { })
                 .and()
@@ -225,13 +226,13 @@ class RouteGroupsTest {
         Router router = router(routes -> {
             routes.group(group -> {
                 // the four families of request filters line up with the response filters
-                group.beforeReplacing(request -> record(trace, "replacing"))
+                group.beforeReplacing(request -> traced(trace, "replacing"))
                     .and()
-                    .beforeReplacing((request, propagatedContext) -> record(trace, "context-replacing"))
+                    .beforeReplacing((request, propagatedContext) -> traced(trace, "context-replacing"))
                     .and()
-                    .beforeReplacingAsync(request -> CompletableFuture.completedFuture(record(trace, "async-replacing")))
+                    .beforeReplacingAsync(request -> CompletableFuture.completedFuture(traced(trace, "async-replacing")))
                     .and()
-                    .beforeReplacingAsync((request, propagatedContext) -> CompletableFuture.completedFuture(record(trace, "async-context-replacing")))
+                    .beforeReplacingAsync((request, propagatedContext) -> CompletableFuture.completedFuture(traced(trace, "async-context-replacing")))
                     .and()
                     .before(request -> {
                         trace.add("in-place");
@@ -274,7 +275,7 @@ class RouteGroupsTest {
         List<String> trace = new ArrayList<>();
         Router router = router(routes -> routes.path("/api", api -> {
             api.route(HttpMethod.GET, "/declared/{id}").handle(RouteGroupsTest::ok);
-            api.before(request -> record(trace, "group"));
+            api.before(request -> traced(trace, "group"));
         }));
         run(router, HttpRequest.GET("/api/declared/5"), trace);
         assertEquals(List.of("group", "handler"), trace);
@@ -346,7 +347,7 @@ class RouteGroupsTest {
         DefaultHttpRouteBuilder shared = new DefaultHttpRouteBuilder(assembly);
         // two HttpRoutes beans share the builder
         Consumer<HttpRouteBuilder> first = routes -> routes.group(all -> {
-            all.before(request -> record(trace, "first"));
+            all.before(request -> traced(trace, "first"));
             all.GET("/first", RouteGroupsTest::ok);
         });
         Consumer<HttpRouteBuilder> second = routes -> routes.GET("/second", RouteGroupsTest::ok);
@@ -367,7 +368,7 @@ class RouteGroupsTest {
         List<String> trace = new ArrayList<>();
         Router router = router(routes -> routes.path("/api", api -> {
             api.route(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/both").handle(RouteGroupsTest::ok);
-            api.before(request -> record(trace, "api"));
+            api.before(request -> traced(trace, "api"));
         }));
         run(router, HttpRequest.PUT("/api/both", ""), trace);
         run(router, HttpRequest.PATCH("/api/both", ""), trace);
@@ -391,7 +392,7 @@ class RouteGroupsTest {
         return response;
     }
 
-    private static HttpResponse<?> record(List<String> trace, String step) {
+    private static HttpResponse<?> traced(List<String> trace, String step) {
         trace.add(step);
         return null;
     }

@@ -148,7 +148,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             if (method.isPresent(Error.class, AnnotationMetadata.VALUE_MEMBER)) {
                 Optional<Class> annotationValue = method.classValue(Error.class);
                 if (annotationValue.isPresent() && Throwable.class.isAssignableFrom(annotationValue.get())) {
-                    exceptionType = (Class<? extends Throwable>) annotationValue.get();
+                    exceptionType = annotationValue.get();
                 }
             }
             if (exceptionType == null) {

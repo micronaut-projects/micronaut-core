@@ -238,18 +238,18 @@ public final class RouteConditions {
      */
     static int cost(RouteCondition condition) {
         return switch (condition) {
-            case Method method -> COST_METHOD;
-            case TimeWindow timeWindow -> COST_LOOKUP;
+            case Method _ -> COST_METHOD;
+            case TimeWindow _ -> COST_LOOKUP;
             case Header header -> cost(header.value());
             case Query query -> cost(query.value());
             case RouteCondition.Cookie cookie -> cost(cookie.value());
             case Host host -> Math.max(COST_RESOLVED, cost(host.host()));
-            case RemoteAddress remoteAddress -> COST_RESOLVED;
-            case PeerAddress peerAddress -> COST_RESOLVED;
+            case RemoteAddress _ -> COST_RESOLVED;
+            case PeerAddress _ -> COST_RESOLVED;
             case Not not -> cost(not.condition());
             case AllOf allOf -> maxCost(allOf.conditions());
             case AnyOf anyOf -> maxCost(anyOf.conditions());
-            case Custom custom -> COST_CUSTOM;
+            case Custom _ -> COST_CUSTOM;
         };
     }
 
@@ -267,13 +267,13 @@ public final class RouteConditions {
      */
     static int cost(ValueMatcher matcher) {
         return switch (matcher) {
-            case ValueMatcher.Equals equals -> COST_LOOKUP;
-            case ValueMatcher.OneOf oneOf -> COST_LOOKUP;
-            case ValueMatcher.Present present -> COST_LOOKUP;
-            case ValueMatcher.StartsWith startsWith -> COST_AFFIX;
-            case ValueMatcher.EndsWith endsWith -> COST_AFFIX;
-            case ValueMatcher.Contains contains -> COST_AFFIX;
-            case ValueMatcher.Regex regex -> COST_REGEX;
+            case ValueMatcher.Equals _ -> COST_LOOKUP;
+            case ValueMatcher.OneOf _ -> COST_LOOKUP;
+            case ValueMatcher.Present _ -> COST_LOOKUP;
+            case ValueMatcher.StartsWith _ -> COST_AFFIX;
+            case ValueMatcher.EndsWith _ -> COST_AFFIX;
+            case ValueMatcher.Contains _ -> COST_AFFIX;
+            case ValueMatcher.Regex _ -> COST_REGEX;
             case ValueMatcher.Not not -> cost(not.matcher());
             case ValueMatcher.AllOf allOf -> maxMatcherCost(allOf.matchers());
             case ValueMatcher.AnyOf anyOf -> maxMatcherCost(anyOf.matchers());
@@ -539,7 +539,7 @@ public final class RouteConditions {
             case ValueMatcher.Contains contains -> contains(value, from, to, contains.part(), contains.ignoreCase());
             case ValueMatcher.OneOf oneOf -> oneOf(oneOf, value, from, to);
             case ValueMatcher.Regex regex -> regex.pattern().matcher(value).region(from, to).matches();
-            case ValueMatcher.Present present -> true;
+            case ValueMatcher.Present _ -> true;
             case ValueMatcher.Not not -> !matches(not.matcher(), value, from, to);
             case ValueMatcher.AllOf allOf -> {
                 for (ValueMatcher part : allOf.matchers()) {
