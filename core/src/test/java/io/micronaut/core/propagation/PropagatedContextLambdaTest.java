@@ -143,8 +143,9 @@ abstract class PropagatedContextLambdaTest {
         PropagatedContext propagatedContext = PropagatedContext.empty().plus(new PropagatedElement());
 
         List<PropagatedContextElement> elements = propagatedContext.getAllElements();
-        assertThrows(UnsupportedOperationException.class, () -> elements.add(new PropagatedElement()));
-        assertThrows(UnsupportedOperationException.class, () -> elements.set(0, new PropagatedElement()));
+        PropagatedElement added = new PropagatedElement();
+        assertThrows(UnsupportedOperationException.class, () -> elements.add(added));
+        assertThrows(UnsupportedOperationException.class, () -> elements.set(0, added));
         assertEquals(1, propagatedContext.getAllElements().size());
     }
 

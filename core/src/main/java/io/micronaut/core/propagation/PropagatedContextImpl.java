@@ -424,7 +424,7 @@ final class PropagatedContextImpl implements PropagatedContext {
 
         @Override
         public long estimateSize() {
-            return index + 1;
+            return (long) index + 1;
         }
 
         @Override
