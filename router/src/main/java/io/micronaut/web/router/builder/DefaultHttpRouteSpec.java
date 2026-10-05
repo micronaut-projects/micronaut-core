@@ -143,7 +143,7 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
-    public <B> HttpBodyRouteSpec<B> body(Argument<B> bodyType) {
+    public <B extends @Nullable Object> HttpBodyRouteSpec<B> body(Argument<B> bodyType) {
         Objects.requireNonNull(bodyType, "bodyType");
         return new DefaultHttpBodyRouteSpec<>(route, bodyType);
     }
@@ -177,13 +177,13 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
-    public void respond(Supplier<? extends HttpResponse<?>> response) {
+    public void respond(Supplier<? extends @Nullable HttpResponse<?>> response) {
         Supplier<? extends HttpResponse<?>> checked = route.terminal(response, "response");
         respond(() -> HandlerMethod.respond(checked), null, false);
     }
 
     @Override
-    public void respond(Function<? super PathVariables, ? extends HttpResponse<?>> response) {
+    public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, "response");
         respond(() -> HandlerMethod.respond(checked), null, false);
     }

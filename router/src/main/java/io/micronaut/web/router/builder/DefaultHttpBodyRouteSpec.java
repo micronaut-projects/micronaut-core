@@ -35,7 +35,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Internal
-final class DefaultHttpBodyRouteSpec<B> implements HttpBodyRouteSpec<B>, ContextFilterSpec<HttpBodyRouteSpec<B>> {
+final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements HttpBodyRouteSpec<B>, ContextFilterSpec<HttpBodyRouteSpec<B>> {
 
     private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
 

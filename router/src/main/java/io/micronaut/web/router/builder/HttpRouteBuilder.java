@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds routes to handler functions: in an {@link HttpRoutes} bean, which adds them to the
@@ -85,7 +86,7 @@ public sealed interface HttpRouteBuilder extends HttpRouteScope permits DefaultH
      * @param <T>      The type
      * @return The nullable body type, with the annotations of the given one
      */
-    static <T> Argument<T> nullableBody(Argument<T> bodyType) {
+    static <T> Argument<@Nullable T> nullableBody(Argument<T> bodyType) {
         return HandlerMethod.nullable(bodyType);
     }
 
@@ -97,7 +98,7 @@ public sealed interface HttpRouteBuilder extends HttpRouteScope permits DefaultH
      * @return The nullable body type
      * @see #nullableBody(Argument)
      */
-    static <T> Argument<T> nullableBody(Class<T> type) {
+    static <T> Argument<@Nullable T> nullableBody(Class<T> type) {
         return nullableBody(Argument.of(type));
     }
 }

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A route handler written as a function of the request and the {@link PathVariables} of the
@@ -52,6 +53,6 @@ public interface RequestHandler {
      * is {@code false}
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
+    @Nullable HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
 
 }

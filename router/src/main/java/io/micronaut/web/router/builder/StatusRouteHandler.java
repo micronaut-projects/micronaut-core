@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A handler function for a response status: it answers a request whose response has the status
@@ -41,5 +42,5 @@ public interface StatusRouteHandler {
      * {@code micronaut.server.not-found-on-missing-body} is {@code false}
      * @throws Exception An error, answered with the default error response
      */
-    HttpResponse<?> handle(HttpRequest<?> request) throws Exception;
+    @Nullable HttpResponse<?> handle(HttpRequest<?> request) throws Exception;
 }

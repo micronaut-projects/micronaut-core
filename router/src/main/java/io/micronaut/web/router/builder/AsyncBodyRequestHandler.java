@@ -22,6 +22,7 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 
 import java.util.concurrent.CompletionStage;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A route handler that receives the body of the request and completes the response later: the
@@ -69,7 +70,7 @@ import java.util.concurrent.CompletionStage;
  */
 @Experimental
 @FunctionalInterface
-public interface AsyncBodyRequestHandler<B> {
+public interface AsyncBodyRequestHandler<B extends @Nullable Object> {
 
     /**
      * Handle the request.
@@ -82,5 +83,5 @@ public interface AsyncBodyRequestHandler<B> {
      * {@code 204} if {@code micronaut.server.not-found-on-missing-body} is {@code false}
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, B body) throws Exception;
+    CompletionStage<? extends @Nullable HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, B body) throws Exception;
 }

@@ -156,7 +156,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * @param response Creates the response
      * @return The method that calls it
      */
-    static HandlerMethod<HttpResponse<?>> respond(Supplier<? extends HttpResponse<?>> response) {
+    static HandlerMethod<HttpResponse<?>> respond(Supplier<? extends @Nullable HttpResponse<?>> response) {
         return new HandlerMethod<>(
             response,
             Supplier.class,
@@ -173,7 +173,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * @param response Creates the response from the path variables
      * @return The method that calls it
      */
-    static HandlerMethod<HttpResponse<?>> respond(Function<? super PathVariables, ? extends HttpResponse<?>> response) {
+    static HandlerMethod<HttpResponse<?>> respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         return new HandlerMethod<>(
             response,
             Function.class,
@@ -369,6 +369,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     @Override
+    @SuppressWarnings("NullAway") // like the method of a controller, a handler may return null, see RequestHandler
     public R invoke(@Nullable Object... arguments) {
         try {
             return invoker.invoke(arguments);
@@ -771,7 +772,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @FunctionalInterface
     private interface Invoker<R> {
-        R invoke(@Nullable Object[] arguments) throws Exception;
+        @Nullable R invoke(@Nullable Object[] arguments) throws Exception;
     }
 
 }

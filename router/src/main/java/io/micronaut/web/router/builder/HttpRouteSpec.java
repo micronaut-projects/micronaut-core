@@ -25,6 +25,7 @@ import io.micronaut.http.form.FormData;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A pending route to a handler function, declared with a creator of the {@link HttpRouteBuilder},
@@ -120,7 +121,7 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @param <B>      The body type
      * @return The route, whose terminals take a handler of the body
      */
-    <B> HttpBodyRouteSpec<B> body(Argument<B> bodyType);
+    <B extends @Nullable Object> HttpBodyRouteSpec<B> body(Argument<B> bodyType);
 
     /**
      * Like the variant taking an {@link Argument}, with the body type as a class: {@code body(Argument.of(bodyType))}.
@@ -225,7 +226,7 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @throws IllegalStateException if the route was already ended
      * @since 5.3.0
      */
-    void respond(Supplier<? extends HttpResponse<?>> response);
+    void respond(Supplier<? extends @Nullable HttpResponse<?>> response);
 
     /**
      * End the route with a response the function creates from the path variables of the matched
@@ -243,5 +244,5 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @throws IllegalStateException if the route was already ended
      * @since 5.3.0
      */
-    void respond(Function<? super PathVariables, ? extends HttpResponse<?>> response);
+    void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response);
 }

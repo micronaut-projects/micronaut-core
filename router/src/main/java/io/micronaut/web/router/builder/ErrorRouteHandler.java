@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A handler function for an error: it answers a request whose handling failed with an exception
@@ -43,5 +44,5 @@ public interface ErrorRouteHandler<E extends Throwable> {
      * {@code micronaut.server.not-found-on-missing-body} is {@code false}
      * @throws Exception An error, answered with the default error response
      */
-    HttpResponse<?> handle(HttpRequest<?> request, E error) throws Exception;
+    @Nullable HttpResponse<?> handle(HttpRequest<?> request, E error) throws Exception;
 }

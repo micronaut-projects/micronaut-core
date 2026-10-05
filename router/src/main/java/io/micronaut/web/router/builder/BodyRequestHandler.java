@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A route handler that receives the body of the request, see the body stages of
@@ -42,7 +43,7 @@ import io.micronaut.http.PathVariables;
  */
 @Experimental
 @FunctionalInterface
-public interface BodyRequestHandler<B> {
+public interface BodyRequestHandler<B extends @Nullable Object> {
 
     /**
      * Handle the request.
@@ -55,5 +56,5 @@ public interface BodyRequestHandler<B> {
      * is {@code false}
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables, B body) throws Exception;
+    @Nullable HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables, B body) throws Exception;
 }

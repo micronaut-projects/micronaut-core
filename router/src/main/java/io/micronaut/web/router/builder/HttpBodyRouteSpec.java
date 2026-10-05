@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A pending route whose handler receives the body of the request, after a body stage of
@@ -38,7 +39,7 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface HttpBodyRouteSpec<B> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec {
+public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec {
 
     /**
      * Declare the type of the body of the responses of the route, see
