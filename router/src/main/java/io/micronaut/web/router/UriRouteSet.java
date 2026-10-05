@@ -31,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -58,10 +57,18 @@ final class UriRouteSet {
 
     private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
 
+    /**
+     * The most routes of a method that are matched by trying each of them, without an index: a
+     * lookup in the index walks the request path through a trie, which costs more than it saves
+     * when the method has few routes, see {@link RouteIndex}.
+     */
+    private static final int DIRECT_SCAN_MAX_ROUTES = 16;
+
     private final Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
     private final Map<String, UriRouteInfo<Object, Object>[]> allRoutesByMethod;
     /**
-     * The index of the routes of each method, by method name, see {@link #allRoutesByMethod}.
+     * The index of the routes of each method with more than {@link #DIRECT_SCAN_MAX_ROUTES}
+     * routes, by method name, see {@link #allRoutesByMethod}.
      */
     private final Map<String, RouteIndex> indexesByMethod;
     /**
@@ -98,7 +105,9 @@ final class UriRouteSet {
         this.allRoutesByMethod = customMethodMap;
         Map<String, RouteIndex> indexes = CollectionUtils.newHashMap(customMethodMap.size());
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> e : customMethodMap.entrySet()) {
-            indexes.put(e.getKey(), indexRoutes(e.getValue()));
+            if (e.getValue().length > DIRECT_SCAN_MAX_ROUTES) {
+                indexes.put(e.getKey(), indexRoutes(e.getValue()));
+            }
         }
         this.indexesByMethod = indexes;
         this.hasDynamicTargets = hasDynamicTargets;
@@ -362,8 +371,10 @@ final class UriRouteSet {
                 continue;
             }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
-            for (int candidate : index(entry.getKey()).candidates(uri)) {
-                UriRouteInfo<Object, Object> route = routes[candidate];
+            int[] candidates = candidates(entry.getKey(), uri);
+            int count = candidates == null ? routes.length : candidates.length;
+            for (int i = 0; i < count; i++) {
+                UriRouteInfo<Object, Object> route = routes[candidates == null ? i : candidates[i]];
                 if (!isOwnRoute(entry.getKey(), route)) {
                     continue;
                 }
@@ -402,8 +413,10 @@ final class UriRouteSet {
                 continue;
             }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
-            for (int candidate : index(entry.getKey()).candidates(path)) {
-                UriRouteInfo<Object, Object> route = routes[candidate];
+            int[] candidates = candidates(entry.getKey(), path);
+            int count = candidates == null ? routes.length : candidates.length;
+            for (int i = 0; i < count; i++) {
+                UriRouteInfo<Object, Object> route = routes[candidates == null ? i : candidates[i]];
                 if (!isOwnRoute(entry.getKey(), route)) {
                     continue;
                 }
@@ -470,39 +483,35 @@ final class UriRouteSet {
         if (routes == null || routes.length == 0) {
             return Collections.emptyList();
         }
-        // the candidates as bits of their positions: a single word, without an allocation, for up to 64 routes
-        RouteIndex index = index(methodKey);
-        long[] words = index.isSingleWord() ? null : index.candidateBits(uri);
-        long singleWord = words == null ? index.candidateMask(uri) : 0;
-        int wordCount = words == null ? 1 : words.length;
+        // few routes are tried one by one, more are narrowed by the index: neither allocates
+        int[] candidates = candidates(methodKey, uri);
+        int count = candidates == null ? routes.length : candidates.length;
         boolean permitsBody = httpMethod.permitsRequestBody();
         MediaType contentType = null;
         Collection<MediaType> acceptedProducedTypes = null;
         // most requests match a single route: keep it in a local and only allocate a list once a second match shows up
         UriRouteMatch<T, R> first = null;
         List<UriRouteMatch<T, R>> matches = null;
-        for (int w = 0; w < wordCount; w++) {
-            for (long word = words == null ? singleWord : words[w]; word != 0; word &= word - 1) {
-                UriRouteInfo<Object, Object> route = routes[(w << 6) + Long.numberOfTrailingZeros(word)];
-                if (permitsBody && contentType == null && !route.consumesAll()) {
-                    contentType = request.getContentType().orElse(null);
+        for (int i = 0; i < count; i++) {
+            UriRouteInfo<Object, Object> route = routes[candidates == null ? i : candidates[i]];
+            if (permitsBody && contentType == null && !route.consumesAll()) {
+                contentType = request.getContentType().orElse(null);
+            }
+            if (acceptedProducedTypes == null && !route.producesAll()) {
+                acceptedProducedTypes = request.accept();
+            }
+            UriRouteMatch match = matchRoute(request, route, uri, ports, permitsBody, contentType, acceptedProducedTypes);
+            if (match == null) {
+                continue;
+            }
+            if (first == null) {
+                first = match;
+            } else {
+                if (matches == null) {
+                    matches = new ArrayList<>(4);
+                    matches.add(first);
                 }
-                if (acceptedProducedTypes == null && !route.producesAll()) {
-                    acceptedProducedTypes = request.accept();
-                }
-                UriRouteMatch match = matchRoute(request, route, uri, ports, permitsBody, contentType, acceptedProducedTypes);
-                if (match == null) {
-                    continue;
-                }
-                if (first == null) {
-                    first = match;
-                } else {
-                    if (matches == null) {
-                        matches = new ArrayList<>(4);
-                        matches.add(first);
-                    }
-                    matches.add(match);
-                }
+                matches.add(match);
             }
         }
         if (matches != null) {
@@ -568,9 +577,15 @@ final class UriRouteSet {
         return !ports.contains(request.getServerAddress().getPort());
     }
 
-    private RouteIndex index(String methodKey) {
-        // every method with routes has an index
-        return Objects.requireNonNull(indexesByMethod.get(methodKey));
+    /**
+     * @param methodKey The method key of the routes
+     * @param path      The request path
+     * @return The positions of the routes of the method that can match the path, shared and
+     * read-only, or {@code null} to try every route: the method has too few routes for an index
+     */
+    private int @Nullable [] candidates(String methodKey, String path) {
+        RouteIndex index = indexesByMethod.get(methodKey);
+        return index == null ? null : index.candidates(path);
     }
 
     private static RouteIndex indexRoutes(UriRouteInfo<Object, Object>[] routes) {

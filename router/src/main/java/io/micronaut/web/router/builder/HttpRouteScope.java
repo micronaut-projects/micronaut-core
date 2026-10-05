@@ -16,7 +16,6 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 
