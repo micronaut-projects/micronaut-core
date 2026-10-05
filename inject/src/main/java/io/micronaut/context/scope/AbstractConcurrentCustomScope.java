@@ -524,8 +524,8 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     @Nullable
     private BeanIdentifier identifierInFlightFor(Map<BeanIdentifier, CreatedBean<?>> scopeMap, Set<BeanIdentifier> exclude) {
         for (CreationInFlight creation : creationsInFlight) {
-            if (creation.scopeMap() == scopeMap && !exclude.contains(creation.identifier())) {
-                return creation.identifier();
+            if (creation.scopeMap == scopeMap && !exclude.contains(creation.identifier)) {
+                return creation.identifier;
             }
         }
         return null;
@@ -698,22 +698,18 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     }
 
     /**
-     * A creation in flight: the scope map it creates into, held by identity, since two scope maps may be equal, and
-     * the identifier of the bean it creates.
-     *
-     * @param scopeMap   The scope map
-     * @param identifier The identifier
+     * A creation in flight: the scope map it creates into and the identifier of the bean it creates. It is equal only
+     * to itself: the creation that announces it is the one that takes it out again, and the default equality of a
+     * record would compare scope maps by their contents, which change as beans are put in them.
      */
-    private record CreationInFlight(Map<BeanIdentifier, CreatedBean<?>> scopeMap, BeanIdentifier identifier) {
+    private static final class CreationInFlight {
 
-        @Override
-        public boolean equals(Object o) {
-            return o instanceof CreationInFlight other && other.scopeMap == scopeMap && other.identifier.equals(identifier);
-        }
+        private final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
+        private final BeanIdentifier identifier;
 
-        @Override
-        public int hashCode() {
-            return 31 * System.identityHashCode(scopeMap) + identifier.hashCode();
+        private CreationInFlight(Map<BeanIdentifier, CreatedBean<?>> scopeMap, BeanIdentifier identifier) {
+            this.scopeMap = scopeMap;
+            this.identifier = identifier;
         }
     }
 
