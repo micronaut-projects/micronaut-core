@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class FilterRunnerAsyncRouteMatchTest {
 
     @Test
-    void aFailureAfterTheRouteMatchIsNotProcessedAgain() throws Exception {
+    void aFailureAfterTheRouteMatchIsNotProcessedAgain() {
         var failures = new CopyOnWriteArrayList<Throwable>();
         var routeFailure = new RuntimeException("route failed");
         var handlingFailure = new RuntimeException("handling failed");

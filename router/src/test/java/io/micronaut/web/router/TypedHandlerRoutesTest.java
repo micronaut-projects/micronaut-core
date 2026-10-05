@@ -207,7 +207,8 @@ class TypedHandlerRoutesTest {
             order.GET("/id").handle((request, pathVariables, target) -> HttpResponse.ok(target.id())));
         Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order " + pathVariables.getString("id"),
             target -> orders));
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> router.findClosest(HttpRequest.GET("/orders/1/id")));
+        var orderId = HttpRequest.GET("/orders/1/id");
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> router.findClosest(orderId));
         assertTrue(error.getMessage().contains(Order.class.getName()), error.getMessage());
         assertTrue(error.getMessage().contains("order 1"), error.getMessage());
     }
@@ -220,7 +221,8 @@ class TypedHandlerRoutesTest {
         assertNotNull(match);
         HandlerMethod<?> handler = (HandlerMethod<?>) ((DefaultUrlRouteInfo<?, ?>) match.getRouteInfo()).getTargetMethod();
         PathVariables pathVariables = new DefaultPathVariables(Map.of(), ConversionService.SHARED);
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> handler.invoke(new Object[]{HttpRequest.GET("/id"), pathVariables}));
+        Object[] arguments = {HttpRequest.GET("/id"), pathVariables};
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> handler.invoke(arguments));
         assertTrue(error.getMessage().contains(Order.class.getName()), error.getMessage());
     }
 

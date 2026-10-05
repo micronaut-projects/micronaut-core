@@ -45,18 +45,21 @@ class LocatorRoutesTest {
             assertEquals("north", http.retrieve(HttpRequest.GET(prefix + "/north")));
             assertEquals("coffee", http.retrieve(HttpRequest.GET(prefix + "/north/items/1")));
             assertEquals("juice", http.retrieve(HttpRequest.GET(prefix + "/south/items/0")));
+            var unknownShopRequest = HttpRequest.GET(prefix + "/west/items/0");
             HttpClientResponseException unknownShop = assertThrows(HttpClientResponseException.class,
-                () -> http.retrieve(HttpRequest.GET(prefix + "/west/items/0")));
+                () -> http.retrieve(unknownShopRequest));
             assertEquals(HttpStatus.NOT_FOUND, unknownShop.getStatus());
+            var notAllowedRequest = HttpRequest.DELETE(prefix + "/north/items/0");
             HttpClientResponseException notAllowed = assertThrows(HttpClientResponseException.class,
-                () -> http.retrieve(HttpRequest.DELETE(prefix + "/north/items/0")));
+                () -> http.retrieve(notAllowedRequest));
             assertEquals(HttpStatus.METHOD_NOT_ALLOWED, notAllowed.getStatus());
         }
         // the routes the function chose for the located shop
         assertEquals("coffee", http.retrieve(HttpRequest.GET("/archived-shops/north/items/1")));
         assertEquals("juice", http.retrieve(HttpRequest.GET("/archived-shops/south/item")));
+        var notRoutedRequest = HttpRequest.GET("/archived-shops/south/items/0");
         HttpClientResponseException notRouted = assertThrows(HttpClientResponseException.class,
-            () -> http.retrieve(HttpRequest.GET("/archived-shops/south/items/0")));
+            () -> http.retrieve(notRoutedRequest));
         assertEquals(HttpStatus.NOT_FOUND, notRouted.getStatus());
     }
 }

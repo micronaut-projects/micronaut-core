@@ -75,6 +75,7 @@ public final class RouteLocator implements DynamicRouteTarget {
      * The request attribute of the targets that asynchronous locators located for the request.
      */
     private static final String LOCATED_ATTRIBUTE = "micronaut.router.located";
+    private static final String LOCATOR = "locator";
 
     private final @Nullable LocatorHandler<?> locator;
     private final @Nullable AsyncLocatorHandler<?> asyncLocator;
@@ -89,7 +90,7 @@ public final class RouteLocator implements DynamicRouteTarget {
      */
     public <T> RouteLocator(LocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf,
                             RouteTableFactory tables) {
-        this.locator = Objects.requireNonNull(locator, "locator");
+        this.locator = Objects.requireNonNull(locator, LOCATOR);
         this.asyncLocator = null;
         this.routesOf = routesOf(routesOf);
         this.tables = Objects.requireNonNull(tables, "tables");
@@ -104,7 +105,7 @@ public final class RouteLocator implements DynamicRouteTarget {
     public <T> RouteLocator(AsyncLocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf,
                             RouteTableFactory tables) {
         this.locator = null;
-        this.asyncLocator = Objects.requireNonNull(locator, "locator");
+        this.asyncLocator = Objects.requireNonNull(locator, LOCATOR);
         this.routesOf = routesOf(routesOf);
         this.tables = Objects.requireNonNull(tables, "tables");
     }
@@ -300,7 +301,7 @@ public final class RouteLocator implements DynamicRouteTarget {
         Outcome outcome = outcomes.get(key);
         if (outcome == null) {
             try {
-                outcome = new Outcome(Objects.requireNonNull(locator, "locator").locate(original, pathVariables), null, null, null, location);
+                outcome = new Outcome(Objects.requireNonNull(locator, LOCATOR).locate(original, pathVariables), null, null, null, location);
             } catch (Exception e) {
                 outcome = new Outcome(null, e, null, null, location);
             }

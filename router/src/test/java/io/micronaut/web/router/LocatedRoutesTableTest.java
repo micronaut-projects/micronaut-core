@@ -183,7 +183,8 @@ class LocatedRoutesTableTest {
         });
         Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> pathVariables.getLong("id"), items));
 
-        assertThrows(IllegalStateException.class, () -> router.findClosest(HttpRequest.GET("/orders/1/items")));
+        var orderItems = HttpRequest.GET("/orders/1/items");
+        assertThrows(IllegalStateException.class, () -> router.findClosest(orderItems));
         fail.set(false);
         assertNotNull(router.findClosest(HttpRequest.GET("/orders/1/items")));
         assertEquals(2, items.declared.get());
@@ -204,18 +205,20 @@ class LocatedRoutesTableTest {
     void theBuilderOfLocatedRoutesIsClosedWhenTheyFail() {
         AtomicReference<HttpRouteScope> kept = new AtomicReference<>();
         RouteTableFactory tables = new RouteTableFactory(null, ConversionService.SHARED);
-        assertThrows(UnsupportedOperationException.class, () -> tables.table(TestLocatedRoutes.of(routes -> {
+        LocatedRoutes<?> failing = TestLocatedRoutes.of(routes -> {
             kept.set(routes);
             throw new UnsupportedOperationException("failed");
-        })));
+        });
+        assertThrows(UnsupportedOperationException.class, () -> tables.table(failing));
         ClosedRouteBuilderTest.assertClosed(() -> kept.get().GET("/late", LocatedRoutesTableTest::ok));
     }
 
     @Test
     void locatedRoutesCannotDeclareGlobalErrorRoutes() {
         RouteTableFactory tables = new RouteTableFactory(null, ConversionService.SHARED);
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> tables.table(TestLocatedRoutes.of(routes ->
-            routes.error(IllegalStateException.class, (request, e) -> HttpResponse.serverError()))));
+        LocatedRoutes<?> globalErrors = TestLocatedRoutes.of(routes ->
+            routes.error(IllegalStateException.class, (request, e) -> HttpResponse.serverError()));
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> tables.table(globalErrors));
         assertTrue(error.getMessage().contains("error routes"), error.getMessage());
     }
 

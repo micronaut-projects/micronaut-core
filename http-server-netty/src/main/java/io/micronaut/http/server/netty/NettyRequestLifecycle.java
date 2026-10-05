@@ -136,12 +136,12 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
 
     @Override
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
-        NettyHttpRequest<?> nettyRequest = this.nettyRequest;
-        if (nettyRequest == null) {
+        NettyHttpRequest<?> pendingRequest = this.nettyRequest;
+        if (pendingRequest == null) {
             return;
         }
         // the client closes the connection: no one waits for the target any more
-        ChannelFuture closeFuture = nettyRequest.getChannelHandlerContext().channel().closeFuture();
+        ChannelFuture closeFuture = pendingRequest.getChannelHandlerContext().channel().closeFuture();
         ChannelFutureListener cancel = future -> RouteLocator.cancelPendingLocations(request);
         closeFuture.addListener(cancel);
         located.whenComplete((ignored, error) -> closeFuture.removeListener(cancel));

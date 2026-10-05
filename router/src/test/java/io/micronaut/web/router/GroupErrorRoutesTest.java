@@ -121,7 +121,8 @@ class GroupErrorRoutesTest {
             routes.error(IllegalStateException.class, new NamedError<>("global in located routes"));
         });
         Router globalRouter = router(routes -> routes.locate("/global/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> global));
-        assertThrows(IllegalArgumentException.class, () -> globalRouter.findClosest(HttpRequest.GET("/global/1/items")));
+        var globalItems = HttpRequest.GET("/global/1/items");
+        assertThrows(IllegalArgumentException.class, () -> globalRouter.findClosest(globalItems));
         LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.group(group -> {
             group.GET("/items", GroupErrorRoutesTest::ok);
             group.error(IllegalArgumentException.class, new NamedError<>("table argument"));

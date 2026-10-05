@@ -685,6 +685,7 @@ public class RequestLifecycle {
      * @since 5.3.0
      */
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
+        // nothing to cancel by default: a server that knows when the client goes away overrides this
     }
 
     /**

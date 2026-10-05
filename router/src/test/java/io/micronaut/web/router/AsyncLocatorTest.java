@@ -88,8 +88,10 @@ class AsyncLocatorTest {
 
         // completed stages locate at once
         assertNull(router.findClosest(HttpRequest.GET("/orders/0/items")));
-        assertEquals("no order", assertThrows(IllegalStateException.class, () -> router.findClosest(HttpRequest.GET("/orders/1/items"))).getMessage());
-        assertEquals("bad order", assertThrows(IllegalArgumentException.class, () -> router.findClosest(HttpRequest.GET("/orders/2/items"))).getMessage());
+        var noOrder = HttpRequest.GET("/orders/1/items");
+        assertEquals("no order", assertThrows(IllegalStateException.class, () -> router.findClosest(noOrder)).getMessage());
+        var badOrder = HttpRequest.GET("/orders/2/items");
+        assertEquals("bad order", assertThrows(IllegalArgumentException.class, () -> router.findClosest(badOrder)).getMessage());
         assertNotNull(router.findClosest(HttpRequest.GET("/orders/3/items")));
     }
 
