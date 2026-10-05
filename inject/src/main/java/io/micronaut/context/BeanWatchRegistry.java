@@ -501,6 +501,18 @@ final class BeanWatchRegistry {
     }
 
     /**
+     * @return Whether a class change watch is registered and active
+     */
+    boolean hasClassChangeWatches() {
+        for (Registration registration : registrations) {
+            if (registration instanceof ClassChangeRegistration && !registration.closed.get()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Delivers a class change to the class change watches, in order, failures isolated.
      */
     void classesChanged(ClassChangeEvent change) {

@@ -7,6 +7,7 @@ import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.reload.ClassChange;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ResourceKind;
@@ -349,8 +350,11 @@ class BeanWatchTest {
             context.publishEvent(first);
             assertEquals(List.of(first), cache.evicted);
             assertEquals(List.of("watch", "listener"), ClassChangeOrder.SEEN);
+            // published through the typed publisher a launcher may inject, rather than through the context
+            ApplicationEventPublisher<ClassChangeEvent> publisher = context.getBean(Argument.of(ApplicationEventPublisher.class, ClassChangeEvent.class));
+            assertFalse(publisher.isEmpty(), "a publisher with class change watches to call is not empty");
             ClassChangeEvent second = classChange(2);
-            context.publishEvent(second);
+            publisher.publishEvent(second);
             assertEquals(List.of(first, second), cache.evicted);
 
             // the cache is destroyed: the watch it registered while it was created goes with it
@@ -371,6 +375,7 @@ class BeanWatchTest {
 
             // classes never change outside development mode: the watch is inactive from the start
             assertFalse(watch.isActive());
+            assertFalse(((DefaultBeanContext) context).hasClassChangeWatches());
             context.publishEvent(classChange(1));
             assertTrue(seen.isEmpty());
             assertFalse(context.getBean(ClassCache.class).watch.isActive());
