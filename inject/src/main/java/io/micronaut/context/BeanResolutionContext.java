@@ -69,7 +69,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * creation and must be treated as an implementation detail.</p>
      *
      * @since 5.2.0
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
 
     /**
@@ -80,17 +83,23 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * implementation detail.</p>
      *
      * @since 5.2.1
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String SHARED_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.sharedInterceptorRegistrations";
 
     /**
      * Attribute that exposes the interceptor registrations selected while creating the bean being disposed.
      *
      * <p>The value is a read-only {@code List<BeanRegistration<?>>}. It is set only while a bean is being disposed and
-     * is intended for lifecycle interception.</p>
+     * is read only for compatibility. Current callers use {@link #setBeanInterceptors(BeanDefinition, List)}.</p>
      *
      * @since 5.2.0
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String EXISTING_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.existingInterceptorRegistrations";
 
     @Override
@@ -196,6 +205,22 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     default @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
         return getAttribute(INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> stored
             && stored.get(definition) instanceof List<?> registrations ? registrations : null;
+    }
+
+    /**
+     * Returns retained destruction candidates, including advice borrowed from an owning proxy.
+     * This does not resolve new beans and does not change the candidates used for initialization.
+     * @param definition The bean being created
+     * @return Its destruction candidates, or {@code null} if none have been recorded
+     * @since 5.3.0
+     */
+    default @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
+        List<?> retained = getBeanInterceptors(definition);
+        if (retained != null) {
+            return retained;
+        }
+        // Compatibility with callers that supplied destruction candidates through the old context attribute.
+        return getAttribute(EXISTING_INTERCEPTOR_REGISTRATIONS) instanceof List<?> legacy ? legacy : null;
     }
 
     /**

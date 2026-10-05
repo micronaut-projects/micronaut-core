@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,14 +26,13 @@ import java.util.List;
  *
  * <p>A bean can resolve dependencies and select interceptors before its instance exists, so the owner is created
  * first and kept on the resolution context for the duration of the creation. On success the same
- * {@link BeanDependencies} becomes the owner held by the registration of the bean; on failure it releases what
+ * {@link DefaultBeanDependencies} becomes the owner held by the registration of the bean; on failure it releases what
  * was created. Each creation has its own state, so a nested creation does not attach to its parent.</p>
  */
 @Internal
 final class BeanCreationState {
     final BeanDefinition<?> definition;
-    final BeanDependencies dependencies = new BeanDependencies();
-    @Nullable List<?> interceptors;
+    final DefaultBeanDependencies dependencies = new DefaultBeanDependencies();
     final List<BeanRegistration<?>> proxyInterceptors;
 
     BeanCreationState(BeanDefinition<?> definition, List<BeanRegistration<?>> proxyInterceptors) {
@@ -42,19 +40,19 @@ final class BeanCreationState {
         this.proxyInterceptors = proxyInterceptors;
     }
 
-    @Nullable List<?> lifecycleInterceptors() {
+    InterceptorCandidates lifecycleInterceptorCandidates() {
+        InterceptorCandidates candidates = dependencies.interceptorCandidates();
         if (proxyInterceptors.isEmpty()) {
-            return interceptors;
+            return candidates;
         }
-        ArrayList<Object> selected = new ArrayList<>(proxyInterceptors);
-        if (interceptors != null) {
-            for (Object value : interceptors) {
-                if (value instanceof BeanRegistration<?> candidate
-                    && proxyInterceptors.stream().noneMatch(existing -> existing.definition().equals(candidate.definition()))) {
+        ArrayList<BeanRegistration<?>> selected = new ArrayList<>(proxyInterceptors);
+        if (candidates instanceof InterceptorCandidates.Resolved resolved) {
+            for (BeanRegistration<?> candidate : resolved.registrations()) {
+                if (proxyInterceptors.stream().noneMatch(existing -> existing.definition().equals(candidate.definition()))) {
                     selected.add(candidate);
                 }
             }
         }
-        return List.copyOf(selected);
+        return new InterceptorCandidates.Resolved(selected);
     }
 }

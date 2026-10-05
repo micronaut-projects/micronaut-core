@@ -74,7 +74,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     BeanCreationState creationState;
     /** The owner of the proxy whose lazy target this context creates, so that the target is released with the proxy. */
     @Nullable
-    BeanDependencies lazyProxyDependencies;
+    DefaultBeanDependencies lazyProxyDependencies;
     /** The attribute a {@link ProxyInterceptors} waits under between {@link #prepareProxyTarget} and the creation of the target. */
     private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
 
@@ -113,9 +113,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    @SuppressWarnings("unchecked") // Adapt the existing resolution-context contract at its boundary.
     public void setBeanInterceptors(BeanDefinition<?> definition, List<?> registrations) {
         if (creationState != null && creationState.definition.equals(definition)) {
-            creationState.interceptors = registrations;
+            creationState.dependencies.retainInterceptorCandidates((List<BeanRegistration<?>>) registrations);
         } else {
             BeanResolutionContext.super.setBeanInterceptors(definition, registrations);
         }
@@ -128,7 +129,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         if (legacy != null) {
             return legacy;
         }
-        return creationState != null && creationState.definition.equals(definition) ? creationState.interceptors : null;
+        return creationState != null && creationState.definition.equals(definition) ? creationState.dependencies.interceptorRegistrations() : null;
+    }
+
+    @Override
+    public @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
+        return creationState != null && creationState.definition.equals(definition)
+            ? creationState.lifecycleInterceptorCandidates().legacyRegistrations() : BeanResolutionContext.super.getBeanDestructionInterceptors(definition);
     }
 
     @Override

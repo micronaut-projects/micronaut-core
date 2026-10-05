@@ -16,7 +16,7 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.BeanRegistration;
@@ -44,19 +44,12 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
         // every @PostConstruct callback of the bean, superclass callbacks first. An interceptor that does not proceed
         // keeps all of them from running. The callbacks themselves are listed by getPostConstructExecutableMethods().
         Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
-        if (shared == null) {
-            @SuppressWarnings("unchecked")
-            Collection<BeanRegistration<Interceptor<?, ?>>> current =
-                (Collection<BeanRegistration<Interceptor<?, ?>>>) resolutionContext.getBeanInterceptors(this);
-            shared = current;
-        }
-        return Objects.requireNonNull(MethodInterceptorChain.initialize(
+        return Objects.requireNonNull(context.getBean(InterceptorChainFactory.ARGUMENT).initialize(
             resolutionContext,
-            context,
             this,
             new InitializableInterceptedMethod<>(this, resolutionContext, context, bean),
             bean,
-            shared
+            shared == null || shared.isEmpty() ? null : shared
         ));
     }
 
