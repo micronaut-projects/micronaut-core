@@ -92,6 +92,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     private static final String SCOPED_PROXY_REGISTER_MEMBER_METHOD = "_micronaut_register_member";
     private static final String BIND_SELF_INVOCATIONS = "__micronaut_bind_self_invocations";
     private static final String IS_COROUTINE_FUNCTION = "__micronaut_is_coroutine_function";
+    private static final String IS_ASYNC_GENERATOR_FUNCTION = "__micronaut_is_async_generator_function";
     private static final String AWAIT_STAGE = "__micronaut_await_stage";
     private static final String INTERCEPTED_CALL = "__micronaut_intercepted_call";
 
@@ -334,6 +335,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             } else {
                 MethodSelector<T> methodSelector = methodSelector(methodName, interceptedMethods);
                 boolean coroutineFunction = isCoroutineFunction(pythonClass, originalFunction);
+                boolean asyncGeneratorFunction = isAsyncGeneratorFunction(pythonClass, originalFunction);
                 proxiedFunction = proxiedFunction(
                     false,
                     true,
@@ -343,10 +345,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     null,
                     methodSelector,
                     originalFunction,
-                    coroutineFunction
+                    coroutineFunction,
+                    asyncGeneratorFunction
                 );
                 if (originalFunction != null) {
-                    targetSupplier.interceptedMethodAdded(methodName, methodSelector, originalFunction, coroutineFunction);
+                    targetSupplier.interceptedMethodAdded(methodName, methodSelector, originalFunction, coroutineFunction, asyncGeneratorFunction);
                 }
             }
             proxyValue.getMember(SCOPED_PROXY_OVERRIDE_METHOD).execute(methodName, proxiedFunction);
@@ -540,13 +543,19 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             targetBeanRef,
             methodSelector,
             originalFunction,
-            isCoroutineFunction(owner, originalFunction)
+            isCoroutineFunction(owner, originalFunction),
+            isAsyncGeneratorFunction(owner, originalFunction)
         );
     }
 
     private static boolean isCoroutineFunction(Value owner, @Nullable Value originalFunction) {
         return originalFunction != null
             && PythonContextRuntime.helper(owner.getContext(), IS_COROUTINE_FUNCTION).execute(originalFunction).asBoolean();
+    }
+
+    private static boolean isAsyncGeneratorFunction(Value owner, @Nullable Value originalFunction) {
+        return originalFunction != null
+            && PythonContextRuntime.helper(owner.getContext(), IS_ASYNC_GENERATOR_FUNCTION).execute(originalFunction).asBoolean();
     }
 
     @SuppressWarnings("java:S107") // these parameters describe the complete proxy invocation context
@@ -559,7 +568,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         @Nullable AtomicReference<Object> targetBeanRef,
         MethodSelector<T> methodSelector,
         @Nullable Value originalFunction,
-        boolean coroutineFunction
+        boolean coroutineFunction,
+        boolean asyncGeneratorFunction
     ) {
         return args -> {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = methodSelector.find(args);
@@ -608,6 +618,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                         && Publisher.class.isAssignableFrom(executableMethod.getReturnType().getType())) {
                         return PythonAsyncioRuntime.toPublisher(result);
                     }
+                    if (asyncGeneratorFunction
+                        && Publisher.class.isAssignableFrom(executableMethod.getReturnType().getType())) {
+                        return PythonAsyncioRuntime.generatorToPublisher(result);
+                    }
                     return box(executableMethod.getReturnType().asArgument(), result);
                 };
             }
@@ -616,6 +630,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 // the caller may run in another context than the one the proxy was created in (an
                 // event-loop context receives copies of the overrides): the awaitable belongs to the caller
                 return awaitable(Context.getCurrent(), stage);
+            }
+            if (asyncGeneratorFunction && result instanceof Publisher<?> publisher) {
+                return PythonAsyncioRuntime.asyncioHelper(Context.getCurrent(), "as_async_iterable").execute(publisher);
             }
             return unbox(owner.getContext(), result);
         };
@@ -985,8 +1002,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             this.resolvedTarget = resolvedTarget;
         }
 
-        void interceptedMethodAdded(String methodName, MethodSelector<T> methodSelector, Value originalFunction, boolean coroutineFunction) {
-            interceptedFunctions.add(new InterceptedFunction<>(methodName, methodSelector, originalFunction, coroutineFunction));
+        void interceptedMethodAdded(String methodName, MethodSelector<T> methodSelector, Value originalFunction, boolean coroutineFunction, boolean asyncGeneratorFunction) {
+            interceptedFunctions.add(new InterceptedFunction<>(methodName, methodSelector, originalFunction, coroutineFunction, asyncGeneratorFunction));
         }
 
         @Override
@@ -1023,7 +1040,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     null,
                     function.methodSelector(),
                     function.originalFunction(),
-                    function.coroutineFunction()
+                    function.coroutineFunction(),
+                    function.asyncGeneratorFunction()
                 );
             }
             Value targetValue = asValue(target);
@@ -1035,7 +1053,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         String methodName,
         MethodSelector<T> methodSelector,
         Value originalFunction,
-        boolean coroutineFunction
+        boolean coroutineFunction,
+        boolean asyncGeneratorFunction
     ) {
     }
 
