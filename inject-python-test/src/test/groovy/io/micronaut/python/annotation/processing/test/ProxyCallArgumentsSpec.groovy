@@ -232,6 +232,17 @@ class LookupCaller:
         nested == "global:b!"
         InterceptionLog.methods() == ["outer(b)", "lookup(b,global,!)"]
 
+        when: "Java invokes the method through its executable method"
+        InterceptionLog.reset()
+        def service = getBean(context, "python.LookupService")
+        def method = getBeanDefinition(context, "python.LookupService").findMethod("lookup", String, String, String).get()
+        def invoked = method.invoke(service, "c", "local", "!")
+
+        then: "the positional-only parameters are passed positionally"
+        method.arguments*.name == ["key", "scope", "suffix"]
+        invoked == "local:c!"
+        InterceptionLog.methods() == ["lookup(c,local,!)"]
+
         when: "a positional-only parameter is passed by keyword"
         InterceptionLog.reset()
         def keyword = caller.keyword()
