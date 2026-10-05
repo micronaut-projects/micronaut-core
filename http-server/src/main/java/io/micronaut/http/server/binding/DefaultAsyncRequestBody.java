@@ -190,7 +190,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     }
 
     @Override
-    public <T> CompletionStage<@Nullable T> body(Argument<T> type) {
+    public <T extends @Nullable Object> CompletionStage<@Nullable T> body(Argument<T> type) {
         Objects.requireNonNull(type, "type");
         if (type.isAsyncOrReactive()) {
             throw new IllegalArgumentException("The body cannot be read as the reactive or asynchronous type " + type.getTypeName()
