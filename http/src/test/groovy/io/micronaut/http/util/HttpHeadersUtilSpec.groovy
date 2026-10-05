@@ -81,6 +81,63 @@ class HttpHeadersUtilSpec extends Specification {
         "*"                                            | null
     }
 
+    void "trace by logger name preserves masking and respects #level"(Level level) {
+        given:
+        String loggerName = "example.headers.named-${level}"
+        def logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(loggerName)
+        def previousLevel = logger.level
+        def appender = new MemoryAppender()
+        appender.start()
+        logger.addAppender(appender)
+        logger.level = level
+        def headers = new MockHttpHeaders([
+            'Authorization': ['Bearer private'],
+            'Proxy-Authorization': ['private-proxy'],
+            'Credential': ['private-credential'],
+            'Signature': ['private-signature'],
+            'Password': ['private-password'],
+            'Certificate': ['private-certificate'],
+            'Api-Key': ['private-key'],
+            'Secret': ['private-secret'],
+            'Token': ['private-token'],
+            'Cookie': ['cookie'],
+            'Set-Cookie': ['set-cookie'],
+            'X-Forwarded-For': ['first', 'second'],
+            'X-Forwarded-Host': ['host'],
+            'X-Real-IP': ['ip']
+        ])
+
+        when:
+        HttpHeadersUtil.trace(logger, headers)
+        def baseline = appender.events.toList()
+        appender.events.clear()
+        HttpHeadersUtil.trace(loggerName, headers)
+        def named = appender.events.toList()
+
+        then:
+        named == baseline
+        if (level == Level.TRACE) {
+            assert named.size() == 15
+            assert named.containsAll(['Authorization', 'Proxy-Authorization', 'Credential',
+                'Signature', 'Password', 'Certificate', 'Api-Key', 'Secret', 'Token']
+                .collect { "$it: *MASKED*".toString() })
+            assert named.containsAll(['Cookie: cookie', 'Set-Cookie: set-cookie',
+                'X-Forwarded-For: first', 'X-Forwarded-For: second',
+                'X-Forwarded-Host: host', 'X-Real-IP: ip'])
+            assert !named.any { it.contains('private') }
+        } else {
+            assert named.empty
+        }
+
+        cleanup:
+        logger.detachAppender(appender)
+        appender.stop()
+        logger.level = previousLevel
+
+        where:
+        level << [Level.TRACE, Level.INFO]
+    }
+
     @See("https://udn.realityripple.com/docs/Web/HTTP/Headers/Accept-Charset")
     void "acceptCharset"(String headerValue, Charset expectedCharset) {
         when:
