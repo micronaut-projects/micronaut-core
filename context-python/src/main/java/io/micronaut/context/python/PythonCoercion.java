@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -676,6 +677,7 @@ public final class PythonCoercion {
     private static @Nullable Object coerceStandardTypeToContext(@Nullable Object value, Context context) {
         return switch (value) {
             case null -> null;
+            case BigDecimal decimal -> standardTypeHelper(context).execute("decimal", decimal.toString());
             case LocalDate localDate ->
                 standardTypeHelper(context).execute("date", localDate.toString());
             case LocalTime localTime ->

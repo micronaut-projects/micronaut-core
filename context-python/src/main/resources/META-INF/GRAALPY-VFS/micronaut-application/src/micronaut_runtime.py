@@ -7,6 +7,7 @@ datetime construction, async member adaptation).
 """
 import asyncio
 import datetime
+import decimal
 import importlib
 import inspect
 import keyword
@@ -85,6 +86,8 @@ def __micronaut_python_dict(keys, values):
 
 
 def __micronaut_to_python_standard_type(kind, value, nanos=0):
+    if kind == "decimal":
+        return decimal.Decimal(value)
     if kind == "date":
         return datetime.date.fromisoformat(value)
     if kind == "time":

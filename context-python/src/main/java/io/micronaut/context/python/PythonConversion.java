@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -127,6 +128,20 @@ public final class PythonConversion {
      */
     public static boolean isNone(@Nullable Value value) {
         return value == null || value.isNull();
+    }
+
+    /**
+     * Converts a finite Python {@code decimal.Decimal} through its exact decimal representation,
+     * retaining precision and scale without a binary floating-point intermediate.
+     *
+     * @param value The Python decimal
+     * @return The decimal value
+     */
+    static BigDecimal convertBigDecimal(Value value) {
+        if (!value.invokeMember("is_finite").asBoolean()) {
+            throw new IllegalArgumentException("Non-finite decimal.Decimal cannot be converted to BigDecimal");
+        }
+        return new BigDecimal(value.invokeMember("__str__").asString());
     }
 
     /**
