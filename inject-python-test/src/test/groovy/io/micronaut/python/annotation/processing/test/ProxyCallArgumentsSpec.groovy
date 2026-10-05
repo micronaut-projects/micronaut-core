@@ -166,7 +166,7 @@ class FormattingCaller:
         missing.contains("missing required argument: 'value'")
         unexpected.contains("unexpected keyword argument 'other'")
         duplicate.contains("multiple values for argument 'value'")
-        tooMany.contains("takes 4 positional arguments but 5 were given")
+        tooMany.contains("takes from 2 to 4 positional arguments but 5 were given")
         InterceptionLog.methods().isEmpty()
 
         cleanup:

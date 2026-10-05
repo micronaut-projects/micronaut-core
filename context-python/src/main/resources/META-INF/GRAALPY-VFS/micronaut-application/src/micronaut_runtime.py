@@ -317,7 +317,11 @@ class _MicronautInterceptedCall:
     def __call__(self, *args, **kwargs):
         parameters = self._parameters
         if len(args) > len(parameters):
-            raise TypeError(f"{self._function.__qualname__}() takes {len(parameters) + 1} positional arguments but {len(args) + 1} were given")
+            # counted with self, as the plain Python call reports it
+            maximum = len(parameters) + 1
+            minimum = 1 + sum(1 for parameter in parameters if parameter.default is parameter.empty)
+            expected = str(maximum) if minimum == maximum else f"from {minimum} to {maximum}"
+            raise TypeError(f"{self._function.__qualname__}() takes {expected} positional arguments but {len(args) + 1} were given")
         if kwargs or len(args) < len(parameters):
             for parameter in parameters[:len(args)]:
                 if parameter.name in kwargs:
