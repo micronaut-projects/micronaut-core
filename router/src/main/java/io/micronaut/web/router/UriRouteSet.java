@@ -498,11 +498,6 @@ final class UriRouteSet {
         if (dynamicTarget == null || dynamicMatch == null) {
             return matches;
         }
-        if (request.getMethod() == HttpMethod.CUSTOM) {
-            // a request with a custom method is not located, see RouteLocator: the routes it may
-            // be allowed are the locator routes
-            return matches;
-        }
         result.addAll(dynamicTarget.findAny(request, dynamicMatch));
         return result;
     }

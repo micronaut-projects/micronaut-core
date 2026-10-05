@@ -25,6 +25,7 @@ import io.micronaut.web.router.builder.LocatedRoutes;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -35,10 +36,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The constraints of a located route see the variables of the prefix, a request with a custom
- * method is not located, and a locator that fails is answered by the error routes of its group.
+ * method is located, and a locator that fails is answered by the error routes of its group.
  */
 class LocatorMatchingTest {
 
@@ -56,20 +58,42 @@ class LocatorMatchingTest {
     }
 
     @Test
-    void aRequestWithACustomMethodIsNotLocatedToFindTheAllowedMethods() {
+    void aRequestWithACustomMethodIsLocatedOnceToFindTheAllowedMethods() {
         AtomicInteger calls = new AtomicInteger();
         LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items", (request, pathVariables) -> HttpResponse.ok()));
-        Router router = router(routes -> routes.locateAsync("/orders/{id}", (request, pathVariables) -> {
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> {
             calls.incrementAndGet();
-            return new CompletableFuture<>();
+            return "order";
         }, target -> items));
 
         HttpRequest<?> request = HttpRequest.create(HttpMethod.CUSTOM, "/orders/1/items", "PROPFIND");
         assertNull(router.findClosest(request));
-        // the locator routes, of the standard methods
-        assertFalse(router.findAny(request).isEmpty());
-        assertEquals(0, calls.get());
-        assertFalse(RouteLocator.isLocating(request));
+        // the located routes, not the locator routes
+        List<UriRouteMatch<Object, Object>> allowed = router.findAny(request);
+        assertFalse(allowed.isEmpty());
+        for (UriRouteMatch<Object, Object> match : allowed) {
+            assertTrue(Set.of("GET", "HEAD").contains(match.getRouteInfo().getHttpMethodName()), match.getRouteInfo().getHttpMethodName());
+        }
+        assertEquals(1, calls.get(), "the locator is called once per request");
+    }
+
+    @Test
+    void aRequestWithACustomMethodMatchesTheLocatedRouteOfItsMethod() {
+        AtomicInteger calls = new AtomicInteger();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> {
+            located.GET("/items", (request, pathVariables) -> HttpResponse.ok());
+            located.route("PROPFIND", "/items").handle((request, pathVariables) -> HttpResponse.ok());
+        });
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> {
+            calls.incrementAndGet();
+            return "order";
+        }, target -> items));
+
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.create(HttpMethod.CUSTOM, "/orders/1/items", "PROPFIND"));
+        assertNotNull(match);
+        assertEquals("PROPFIND", match.getRouteInfo().getHttpMethodName());
+        assertEquals("1", match.getVariableValues().get("id"));
+        assertEquals(1, calls.get());
     }
 
     @Test

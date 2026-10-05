@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests.routing;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -34,17 +35,21 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * How the router matches a locator route: the error routes of the group of a locator route
  * answer the failure of its locator, the constraints of a located route see the path variables
- * of the prefix, and a request with a custom HTTP method is not located, not even to find the
- * allowed methods: the request is answered as before, with a {@code 405}.
+ * of the prefix, and a request with a custom HTTP method is located like any other: it is
+ * answered by the located route of its method, or of any method, and otherwise with a
+ * {@code 405} that allows the methods of the located routes. The locator runs once per request.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -54,6 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class HandlerRouteLocatorMatchingTest {
     public static final String SPEC_NAME = "HandlerRouteLocatorMatchingTest";
     private static final AtomicInteger CUSTOM_LOCATED = new AtomicInteger();
+    private static final AtomicInteger ASYNC_CUSTOM_LOCATED = new AtomicInteger();
 
     @Test
     void theGroupErrorRouteAnswersAFailedSynchronousLocator() throws IOException {
@@ -88,15 +94,73 @@ public class HandlerRouteLocatorMatchingTest {
     }
 
     @Test
-    void aRequestWithACustomMethodIsNotLocated() throws IOException {
+    void aRequestWithACustomMethodTheLocatedRoutesDoNotHaveIsAMethodNotAllowed() throws IOException {
         try (ServerUnderTest server = server()) {
             int located = CUSTOM_LOCATED.get();
             AssertionUtils.assertThrows(server, HttpRequest.create(HttpMethod.CUSTOM, "/matching/custom/1/items", "PROPFIND"),
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.METHOD_NOT_ALLOWED)
+                    .assertResponse(response -> assertEquals(Set.of("GET", "HEAD", "POST"), allowed(response)))
                     .build());
-            assertEquals(located, CUSTOM_LOCATED.get(), "the locator is not called for a custom method");
+            assertEquals(located + 1, CUSTOM_LOCATED.get(), "the locator is called once");
         }
+    }
+
+    @Test
+    void aRequestWithACustomMethodIsAnsweredByTheLocatedRouteOfItsMethod() throws IOException {
+        assertCustomMethodLocated("/matching/custom/42/props", CUSTOM_LOCATED);
+    }
+
+    @Test
+    void aRequestWithACustomMethodIsAnsweredByTheLocatedRouteOfItsMethodOfAnAsynchronousLocator() throws IOException {
+        assertCustomMethodLocated("/matching/async-custom/42/props", ASYNC_CUSTOM_LOCATED);
+    }
+
+    private static void assertCustomMethodLocated(String path, AtomicInteger calls) throws IOException {
+        try (ServerUnderTest server = server()) {
+            int located = calls.get();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, path, "PROPFIND"),
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("PROPFIND props of 42")
+                    .build());
+            assertEquals(located + 1, calls.get(), "the locator is called once");
+        }
+    }
+
+    @Test
+    void theLocatedRoutesOfAStandardAndACustomMethodAtTheSamePathBothAnswer() throws IOException {
+        try (ServerUnderTest server = server()) {
+            int located = CUSTOM_LOCATED.get();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/matching/custom/7/props"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("GET props of 7")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/matching/custom/7/props", "PROPFIND"),
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("PROPFIND props of 7")
+                    .build());
+            assertEquals(located + 2, CUSTOM_LOCATED.get(), "the locator is called once per request");
+        }
+    }
+
+    @Test
+    void aRequestWithACustomMethodIsAnsweredByALocatedRouteOfAnyMethod() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/matching/custom/3/all", "QUERY"),
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("QUERY all of 3")
+                    .build());
+        }
+    }
+
+    private static Set<String> allowed(HttpResponse<?> response) {
+        return response.getHeaders().getAll(HttpHeaders.ALLOW).stream()
+            .flatMap(value -> Arrays.stream(value.split(",")))
+            .map(String::trim)
+            .collect(Collectors.toSet());
     }
 
     private static ServerUnderTest server() {
@@ -105,6 +169,10 @@ public class HandlerRouteLocatorMatchingTest {
 
     private static HttpResponse<String> text(HttpStatus status, String body) {
         return HttpResponse.<String>status(status).body(body).contentType(MediaType.TEXT_PLAIN_TYPE);
+    }
+
+    private static HttpResponse<String> methodOf(HttpRequest<?> request, String resource, String id) {
+        return text(HttpStatus.OK, request.getMethodName() + " " + resource + " of " + id);
     }
 
     private static void sleep() {
@@ -150,10 +218,25 @@ public class HandlerRouteLocatorMatchingTest {
                 .constrain(pathVariables -> "1".equals(pathVariables.get("id", String.class)))
                 .handle((request, pathVariables) -> text(HttpStatus.OK, "items of " + pathVariables.get("id", String.class))));
             routes.locate("/matching/orders/{id}", (request, pathVariables) -> "order", order -> constrained);
+            LocatedRoutes<?> custom = TckLocatedRoutes.of(located -> {
+                located.GET("/items", (request, pathVariables) -> text(HttpStatus.OK, "items"));
+                located.POST("/items", (request, pathVariables) -> text(HttpStatus.OK, "items"));
+                located.GET("/props", (request, pathVariables) -> methodOf(request, "props", pathVariables.get("id", String.class)));
+                located.route("PROPFIND", "/props").handle((request, pathVariables) ->
+                    methodOf(request, "props", pathVariables.get("id", String.class)));
+                located.any("/all").handle((request, pathVariables) -> methodOf(request, "all", pathVariables.get("id", String.class)));
+            });
             routes.locate("/matching/custom/{id}", (request, pathVariables) -> {
                 CUSTOM_LOCATED.incrementAndGet();
                 return "order";
-            }, order -> items);
+            }, order -> custom);
+            routes.locateAsync("/matching/async-custom/{id}", (request, pathVariables) -> {
+                ASYNC_CUSTOM_LOCATED.incrementAndGet();
+                return CompletableFuture.supplyAsync(() -> {
+                    sleep();
+                    return "order";
+                }, executor);
+            }, order -> custom);
         }
     }
 }

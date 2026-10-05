@@ -387,7 +387,9 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
      * {@code 405}, reuses the target, or the exception, of the first call. The routes of a
      * {@link LocatedRoutes} instance are declared once, when the first target it routes is
      * located, and shared by every locator that answers the instance.
-     * Requests with a custom HTTP method are not located.</p>
+     * A request with a custom HTTP method is located like any other: the located routes of that
+     * method answer it, or those declared with {@code any(...)}, and the allowed methods of its
+     * {@code 405} are those of the located routes.</p>
      *
      * @param prefixUri The URI template of the prefix
      * @param locator   Locates the target, or answers {@code null} for {@code 404}

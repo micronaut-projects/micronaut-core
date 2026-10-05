@@ -325,6 +325,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
                     grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
                 }
             }
+            // a request with a custom method is located too, and matched against the located
+            // routes of its method, or of any method
+            grouped(assembly.addRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
         }
     }
 
