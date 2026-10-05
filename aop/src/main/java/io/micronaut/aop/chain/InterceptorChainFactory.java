@@ -39,6 +39,7 @@ import java.util.Collection;
 @Internal
 public interface InterceptorChainFactory {
     /** Constant for bean lookup. */
+    @UsedByGeneratedCode
     Argument<InterceptorChainFactory> ARGUMENT = Argument.of(InterceptorChainFactory.class);
 
     /**

@@ -163,6 +163,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         BeanDefinition<T1> definition,
         BeanConstructor<T1> constructor,
         @Nullable Object... parameters) {
+        LegacyGeneratedCode.warn("ConstructorInterceptorChain.instantiate");
         int micronaut3additionalProxyConstructorParametersCount = 3;
         return instantiate(resolutionContext, beanContext, interceptors, definition, constructor, micronaut3additionalProxyConstructorParametersCount, parameters);
     }
@@ -193,6 +194,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         BeanConstructor<T1> constructor,
         int additionalProxyConstructorParametersCount,
         @Nullable Object... parameters) {
+        LegacyGeneratedCode.warn("ConstructorInterceptorChain.instantiate");
 
         // Callers compiled by earlier versions pass a count for every definition; only a proxy declares internal arguments.
         int internalCount = definition instanceof AdvisedBeanType ? additionalProxyConstructorParametersCount : 0;

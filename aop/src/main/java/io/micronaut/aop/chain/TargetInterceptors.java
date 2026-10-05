@@ -93,6 +93,7 @@ public final class TargetInterceptors {
      */
     private final Map<BeanDependencies, WeakReference<Selected>> byTarget = new WeakHashMap<>();
     /** The interceptors the proxy owns, for targets that cannot own any. Selected on first use. */
+    @SuppressWarnings("java:S3077") // the array is never written after it is published, only the reference is
     private volatile Interceptor<?, ?> @Nullable [][] ofProxy;
 
     TargetInterceptors(InterceptorCandidateResolver resolver, BeanLocator beanLocator,
@@ -252,6 +253,7 @@ public final class TargetInterceptors {
      */
     private static final class Selected {
         /** Null until selected; read without the monitor by later calls. */
+        @SuppressWarnings("java:S3077") // the array is never written after it is published, only the reference is
         volatile Interceptor<?, ?> @Nullable [][] interceptors;
     }
 

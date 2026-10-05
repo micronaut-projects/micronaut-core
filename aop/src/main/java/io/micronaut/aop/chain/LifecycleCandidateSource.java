@@ -33,7 +33,7 @@ import java.util.Collection;
  * @since 5.3.0
  */
 @Internal
-interface LifecycleCandidateSource {
+sealed interface LifecycleCandidateSource permits RetainedLifecycleCandidates, LegacyLifecycleCandidates {
 
     /**
      * Finds the candidates for a lifecycle callback of a bean.

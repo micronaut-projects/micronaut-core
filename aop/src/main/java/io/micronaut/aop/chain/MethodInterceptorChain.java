@@ -232,6 +232,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean) {
+        LegacyGeneratedCode.warn("MethodInterceptorChain.initialize");
         return initialize(resolutionContext, beanContext, definition, postConstructMethod, bean, null);
     }
 
@@ -266,6 +267,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
+        LegacyGeneratedCode.warn("MethodInterceptorChain.initialize");
         // Older generated callers use an empty explicit set to request discovery.
         return beanContext.getBean(InterceptorChainFactory.ARGUMENT).initialize(
             resolutionContext, definition, postConstructMethod, bean,
@@ -300,6 +302,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean) {
+        LegacyGeneratedCode.warn("MethodInterceptorChain.dispose");
         return dispose(resolutionContext, beanContext, definition, preDestroyMethod, bean, null);
     }
 
@@ -332,6 +335,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
+        LegacyGeneratedCode.warn("MethodInterceptorChain.dispose");
         // Older generated callers use an empty explicit set to request discovery.
         return beanContext.getBean(InterceptorChainFactory.ARGUMENT).dispose(
             resolutionContext, definition, preDestroyMethod, bean,

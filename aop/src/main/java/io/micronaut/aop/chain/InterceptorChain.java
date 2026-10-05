@@ -146,6 +146,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(BeanContext beanContext,
                                                                     ExecutableMethod<T, ?> method,
                                                                     List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
+        LegacyGeneratedCode.warn("InterceptorChain.resolveAroundInterceptors");
         return resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
     }
 
@@ -168,6 +169,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveAroundInterceptors(InterceptorRegistry interceptorRegistry,
                                                                     ExecutableMethod<T, ?> method,
                                                                     List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
+        LegacyGeneratedCode.warn("InterceptorChain.resolveAroundInterceptors");
         return resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
     }
 
@@ -190,6 +192,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(BeanContext beanContext,
                                                                           ExecutableMethod<T, ?> method,
                                                                           List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
+        LegacyGeneratedCode.warn("InterceptorChain.resolveIntroductionInterceptors");
         final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.INTRODUCTION);
         final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
@@ -214,6 +217,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static <T> Interceptor<T, ?>[] resolveIntroductionInterceptors(InterceptorRegistry interceptorRegistry,
                                                                           ExecutableMethod<T, ?> method,
                                                                           List<BeanRegistration<Interceptor<T, ?>>> interceptors) {
+        LegacyGeneratedCode.warn("InterceptorChain.resolveIntroductionInterceptors");
         final Interceptor<T, ?>[] introductionInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.INTRODUCTION);
         final Interceptor<T, ?>[] aroundInterceptors = resolveInterceptors(interceptorRegistry, method, interceptors, InterceptorKind.AROUND);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
@@ -234,6 +238,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     @UsedByGeneratedCode
     @Deprecated
     public static Interceptor[] resolveAroundInterceptors(@Nullable BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
+        LegacyGeneratedCode.warn("InterceptorChain.resolveAroundInterceptors");
         instrumentAnnotationMetadata(beanContext, method);
         return resolveInterceptorsInternal(method, Around.class, interceptors, beanContext != null ? beanContext.getClassLoader() : InterceptorChain.class.getClassLoader());
     }
@@ -254,6 +259,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public static Interceptor[] resolveIntroductionInterceptors(@Nullable BeanContext beanContext,
                                                                 ExecutableMethod<?, ?> method,
                                                                 Interceptor... interceptors) {
+        LegacyGeneratedCode.warn("InterceptorChain.resolveIntroductionInterceptors");
         instrumentAnnotationMetadata(beanContext, method);
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext != null ? beanContext.getClassLoader() : InterceptorChain.class.getClassLoader());
         if (introductionInterceptors.length == 0) {

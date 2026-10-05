@@ -33,7 +33,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-public interface BeanDependencies {
+public sealed interface BeanDependencies permits DefaultBeanDependencies, DefaultBeanDependencyResolver {
 
     /**
      * Runs a resolution on behalf of the bean. What the operation creates becomes a dependent of the bean,
