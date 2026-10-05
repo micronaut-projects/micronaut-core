@@ -54,6 +54,10 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     // Matches cache
     private UriMatchInfo rootMatchInfo;
     private UriMatchInfo exactMatchInfo;
+    /**
+     * The number of variables with a regular expression, computed once, or -1.
+     */
+    private int patternVariableCount = -1;
 
     /**
      * Construct a new URI template for the given template.
@@ -555,9 +559,15 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * @since 5.3.0
      */
     public int getPatternVariableCount() {
-        PathEvaluator evaluator = new PathEvaluator();
-        visitParts(parts, evaluator);
-        return evaluator.patternVariableCount;
+        int count = patternVariableCount;
+        if (count < 0) {
+            // computed once: the router reads it to break the ties of ambiguous requests
+            PathEvaluator evaluator = new PathEvaluator();
+            visitParts(parts, evaluator);
+            count = evaluator.patternVariableCount;
+            patternVariableCount = count;
+        }
+        return count;
     }
 
     /**

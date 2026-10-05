@@ -31,7 +31,6 @@ import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
 import jakarta.inject.Inject;
@@ -355,7 +354,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (route instanceof IndexedRoute indexed) {
             return indexed.getPatternVariableCount();
         }
-        return new UriTemplateMatcher(route.getUriMatchTemplate().toString()).getPatternVariableCount();
+        return route.getUriMatchTemplate().getPatternVariableCount();
     }
 
     @Override

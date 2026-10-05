@@ -54,6 +54,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     // Matches cache
     private UriMatchInfo rootMatchInfo;
     private UriMatchInfo exactMatchInfo;
+    /**
+     * The number of variables with a regular expression, computed once, or -1.
+     */
+    private int patternVariableCount = -1;
 
     /**
      * Construct a new URI template for the given template.
@@ -216,6 +220,22 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             }
         }
         return null;
+    }
+
+    /**
+     * The number of path variables constrained by a regular expression, computed once, see
+     * {@link UriTemplateMatcher#getPatternVariableCount()}.
+     *
+     * @return The number of path variables with a regular expression
+     * @since 5.3.0
+     */
+    public int getPatternVariableCount() {
+        int count = patternVariableCount;
+        if (count < 0) {
+            count = new UriTemplateMatcher(toString()).getPatternVariableCount();
+            patternVariableCount = count;
+        }
+        return count;
     }
 
     @Override
