@@ -230,9 +230,14 @@ public class ServiceIndexTest {
         assertEquals(List.of("z", "x", "z"), index.standardServices().get(SERVICE));
         assertEquals(Set.of(SERVICE), index.micronautServices().keySet());
         assertEquals(List.of(new ClassPathEntry("app.jar", 1)), index.classPath());
-        assertThrows(UnsupportedOperationException.class, () -> index.micronautServices().get(SERVICE).add("d"));
-        assertThrows(UnsupportedOperationException.class, () -> index.standardServices().put(OTHER_SERVICE, List.of()));
-        assertThrows(UnsupportedOperationException.class, () -> index.classPath().add(new ClassPathEntry("other.jar", 1)));
+        Set<String> entries = index.micronautServices().get(SERVICE);
+        Map<String, List<String>> names = index.standardServices();
+        List<String> noNames = List.of();
+        List<ClassPathEntry> indexedClassPath = index.classPath();
+        ClassPathEntry otherEntry = new ClassPathEntry("other.jar", 1);
+        assertThrows(UnsupportedOperationException.class, () -> entries.add("d"));
+        assertThrows(UnsupportedOperationException.class, () -> names.put(OTHER_SERVICE, noNames));
+        assertThrows(UnsupportedOperationException.class, () -> indexedClassPath.add(otherEntry));
         assertNull(ServiceIndex.copyOf(ServiceIndexTest.class.getClassLoader(), micronautServices, standardServices, null).classPath());
     }
 
@@ -259,9 +264,13 @@ public class ServiceIndexTest {
         assertNull(trusted.classPath());
         assertEquals(List.of(SERVICE), List.copyOf(trusted.micronautServices().keySet()));
         assertEquals(Set.of(), trusted.micronautServices().getOrDefault(MISSING_SERVICE, Set.of()));
-        assertThrows(UnsupportedOperationException.class, () -> trusted.micronautServices().put(OTHER_SERVICE, Set.of()));
-        assertThrows(UnsupportedOperationException.class, () -> trusted.micronautServices().remove(SERVICE));
-        assertThrows(UnsupportedOperationException.class, () -> trusted.standardServices().put(OTHER_SERVICE, List.of()));
+        Map<String, Set<String>> trustedEntries = trusted.micronautServices();
+        Map<String, List<String>> trustedNames = trusted.standardServices();
+        Set<String> noEntries = Set.of();
+        List<String> noNames = List.of();
+        assertThrows(UnsupportedOperationException.class, () -> trustedEntries.put(OTHER_SERVICE, noEntries));
+        assertThrows(UnsupportedOperationException.class, () -> trustedEntries.remove(SERVICE));
+        assertThrows(UnsupportedOperationException.class, () -> trustedNames.put(OTHER_SERVICE, noNames));
         // the index serves the names as the scan would
         assertEquals(List.of("z", "x", "z", "c", "a", "b"), names(classLoader, SERVICE, trusted, false));
 
@@ -694,10 +703,12 @@ public class ServiceIndexTest {
             System.setProperty(ServiceIndex.VALIDATE_PROPERTY, "true");
             forgetTheLastCheck();
 
-            ServiceConfigurationError e = assertThrows(ServiceConfigurationError.class, () -> SoftServiceLoader.load(Greeter.class, classLoader).collectAll());
-            assertTrue(e.getMessage().contains("META-INF/micronaut/" + Greeter.class.getName() + ": not on the class path [" + Hey.class.getName() + "]"), e.getMessage());
-            assertTrue(e.getMessage().contains("META-INF/services/" + Greeter.class.getName() + ": not on the class path [" + Hello.class.getName() + ", " + Hi.class.getName() + "]"), e.getMessage());
-            assertThrows(ServiceConfigurationError.class, () -> MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, Greeter.class.getName()));
+            SoftServiceLoader<Greeter> loader = SoftServiceLoader.load(Greeter.class, classLoader);
+            String greeter = Greeter.class.getName();
+            ServiceConfigurationError e = assertThrows(ServiceConfigurationError.class, loader::collectAll);
+            assertTrue(e.getMessage().contains("META-INF/micronaut/" + greeter + ": not on the class path [" + Hey.class.getName() + "]"), e.getMessage());
+            assertTrue(e.getMessage().contains("META-INF/services/" + greeter + ": not on the class path [" + Hello.class.getName() + ", " + Hi.class.getName() + "]"), e.getMessage());
+            assertThrows(ServiceConfigurationError.class, () -> MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, greeter));
             // the lookups of any other class loader are not affected
             assertEquals(List.of(), SoftServiceLoader.load(Greeter.class, ServiceIndexTest.class.getClassLoader()).collectAll());
         } finally {
@@ -1121,18 +1132,12 @@ public class ServiceIndexTest {
     }
 
     public static final class Hello implements Greeter {
-        public Hello() {
-        }
     }
 
     public static final class Hi implements Greeter {
-        public Hi() {
-        }
     }
 
     public static final class Hey implements Greeter {
-        public Hey() {
-        }
     }
 
     /**

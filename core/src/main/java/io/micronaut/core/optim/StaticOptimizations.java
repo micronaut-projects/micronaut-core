@@ -99,6 +99,7 @@ public abstract class StaticOptimizations {
      * Does nothing. Calling it initializes this class, which runs the loaders, as calling any of its static methods
      * does.
      */
+    @SuppressWarnings("java:S3398") // in SetOnce, calling it would not initialize this class
     private static void runLoaders() {
         // the loaders run in the static initializer
     }

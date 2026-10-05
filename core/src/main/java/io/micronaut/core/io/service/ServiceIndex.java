@@ -161,6 +161,7 @@ public final class ServiceIndex implements StaticOptimizations.SetOnce, StaticOp
     private static final Object CHECK_LOCK = new Object();
 
     // the check of the index that was last looked up: at most one index is registered, so one slot is enough
+    @SuppressWarnings("java:S3077") // a Check is an immutable record: publishing the reference publishes it
     @Nullable
     private static volatile Check lastCheck;
 
