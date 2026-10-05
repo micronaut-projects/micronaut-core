@@ -7,7 +7,6 @@ datetime construction, async member adaptation).
 """
 import asyncio
 import datetime
-import decimal
 import importlib
 import inspect
 import keyword
@@ -87,6 +86,10 @@ def __micronaut_python_dict(keys, values):
 
 def __micronaut_to_python_standard_type(kind, value, nanos=0):
     if kind == "decimal":
+        # imported on first use: importing decimal with this module made the imports of a nested
+        # application's context walk into the frames of the enclosing context (Truffle rejects the
+        # invalid sharing of AST nodes under -ea)
+        import decimal
         return decimal.Decimal(value)
     if kind == "date":
         return datetime.date.fromisoformat(value)
