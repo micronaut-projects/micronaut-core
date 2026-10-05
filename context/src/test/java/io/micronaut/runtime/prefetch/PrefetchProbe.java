@@ -52,27 +52,27 @@ public final class PrefetchProbe {
     }
 
     public static void initialized(String name) {
-        record(INITIALIZED, name);
+        add(INITIALIZED, name);
     }
 
     public static void constructed(String name) {
-        record(CONSTRUCTED, name);
+        add(CONSTRUCTED, name);
     }
 
     public static void failRuntime(String name) {
         IllegalStateException failure = new IllegalStateException("probe failure of " + name);
         THROWN.put(name, failure);
-        record(INITIALIZED, name);
+        add(INITIALIZED, name);
         throw failure;
     }
 
     public static void failField(String name) {
-        record(INITIALIZED, name);
+        add(INITIALIZED, name);
         throw new NoSuchFieldError("probe field of " + name);
     }
 
     public static void failLinkage(String name) {
-        record(INITIALIZED, name);
+        add(INITIALIZED, name);
         throw new NoClassDefFoundError("probe/Missing");
     }
 
@@ -82,7 +82,7 @@ public final class PrefetchProbe {
      * @param name The fixture
      */
     public static void block(String name) {
-        record(INITIALIZED, name);
+        add(INITIALIZED, name);
         entered.countDown();
         try {
             if (!released.await(60, TimeUnit.SECONDS)) {
@@ -123,7 +123,7 @@ public final class PrefetchProbe {
         return found;
     }
 
-    private static void record(String kind, String name) {
+    private static void add(String kind, String name) {
         EVENTS.add(new Event(kind, name, Thread.currentThread()));
     }
 }

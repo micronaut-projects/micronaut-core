@@ -40,7 +40,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -157,7 +156,8 @@ class BeanDefinitionPrefetchTest {
         assertEquals(1, PrefetchProbe.events(PrefetchProbe.INITIALIZED, FAILS_AT_RUNTIME).size());
         // What the default provider throws on a class loader that has not met the fixture yet
         URLClassLoader fresh = loader(FIRST, FAILS_AT_RUNTIME);
-        RuntimeException expected = assertThrows(RuntimeException.class, () -> new DefaultBeanDefinitionsProvider().provide(fresh));
+        DefaultBeanDefinitionsProvider provider = new DefaultBeanDefinitionsProvider();
+        RuntimeException expected = assertThrows(RuntimeException.class, () -> provider.provide(fresh));
         assertEquals(expected.getClass(), thrown.getClass());
         assertEquals(expected.getMessage(), thrown.getMessage());
         assertEquals(expected.getCause().getClass(), thrown.getCause().getClass());
@@ -172,7 +172,8 @@ class BeanDefinitionPrefetchTest {
         Throwable thrown = assertThrows(Throwable.class, () -> task.provide(loader));
 
         URLClassLoader fresh = loader(FIRST, FAILS_WITH_NO_SUCH_FIELD);
-        Throwable expected = assertThrows(Throwable.class, () -> new DefaultBeanDefinitionsProvider().provide(fresh));
+        DefaultBeanDefinitionsProvider provider = new DefaultBeanDefinitionsProvider();
+        Throwable expected = assertThrows(Throwable.class, () -> provider.provide(fresh));
         assertEquals(chain(expected), chain(thrown));
         assertTrue(chain(thrown).contains(NoSuchFieldError.class.getName() + ": probe field of " + FAILS_WITH_NO_SUCH_FIELD), chain(thrown)::toString);
     }

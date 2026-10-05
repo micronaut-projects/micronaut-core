@@ -182,13 +182,12 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
         converting = true;
         try {
             ConversionService _ = ConversionService.SHARED;
-            return true;
         } catch (Throwable t) {
             conversionFailure = t;
-            return false;
         } finally {
             converted.countDown();
         }
+        return conversionFailure == null;
     }
 
     /**

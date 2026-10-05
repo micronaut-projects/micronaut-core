@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.management.ManagementFactory;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -86,7 +87,7 @@ class BeanDefinitionPrefetchStartupTest {
     Path temp;
 
     @Test
-    void offLoadsNothingNewAndLeavesTheProviderAlone() throws IOException {
+    void offLoadsNothingNewAndLeavesTheProviderAlone() {
         ChildJvm initialized = run(List.of(), "-Dprefetch-test.mode=init", "-verbose:class", THREE_THREADS);
         ChildJvm started = run(List.of(), THREE_THREADS);
 
@@ -97,7 +98,7 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     @Test
-    void onHandsTheReferencesOfTheDefaultProviderToTheContext() throws IOException {
+    void onHandsTheReferencesOfTheDefaultProviderToTheContext() {
         ChildJvm initialized = run(List.of(), "-Dprefetch-test.mode=init", ON, THREE_THREADS);
         ChildJvm started = run(List.of(), ON, THREE_THREADS);
         ChildJvm off = run(List.of(), THREE_THREADS);
@@ -109,7 +110,7 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     @Test
-    void standsDownBelowThreePoolThreadsAndInANativeImage() throws IOException {
+    void standsDownBelowThreePoolThreadsAndInANativeImage() {
         for (String standDown : List.of(PARALLELISM + "1", PARALLELISM + "2", "-Dorg.graalvm.nativeimage.imagecode=runtime")) {
             ChildJvm child = run(List.of(), "-Dprefetch-test.mode=init", ON, THREE_THREADS, standDown);
             assertEquals("0", child.value("POOL_SIZE"), standDown + "\n" + child.output());
@@ -322,7 +323,14 @@ class BeanDefinitionPrefetchStartupTest {
         for (Path path : extraClassPath) {
             classPath.append(File.pathSeparator).append(path);
         }
-        TrainingRunTest.ChildJvm child = TrainingRunTest.ChildJvm.run(Main.class, classPath.toString(), Map.of(), jvmArgs);
+        List<String> args = new ArrayList<>(List.of(jvmArgs));
+        // The JaCoCo agent of the test JVM, when it has one, so that the coverage of the child JVM is recorded too
+        for (String arg : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+            if (arg.startsWith("-javaagent:") && arg.contains("jacocoagent")) {
+                args.add(arg);
+            }
+        }
+        TrainingRunTest.ChildJvm child = TrainingRunTest.ChildJvm.run(Main.class, classPath.toString(), Map.of(), args.toArray(String[]::new));
         return new ChildJvm(child.exitCode(), child.output());
     }
 
