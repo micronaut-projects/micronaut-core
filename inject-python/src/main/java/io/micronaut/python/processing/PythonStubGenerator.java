@@ -4568,17 +4568,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         arguments
                     );
                 } else {
-                    ExpressionDef targetValueExpression = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
-                    ClassElement declaringType = methodElement.getDeclaringType();
-                    if (isAsyncMethod && !declaringType.isAbstract()) {
-                        targetValueExpression = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                            "asyncInstance",
-                            POLYGLOT_VALUE,
-                            targetValueExpression,
-                            pythonClassReference(bridgeOwner, declaringType)
-                        );
-                    }
-                    var targetValue = targetValueExpression;
+                    // an async method runs on the bean's own object, in its own context, like any other method
+                    var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
                     var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
                     if (receiverOffset == 1) {
                         parameterExpressions.add(aThis);
@@ -5717,24 +5708,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 );
             }
-            return StatementDef.multi(
+            return PYTHON_COERCION.invokeStatic(
+                PUT_MEMBER,
+                TypeDef.VOID,
+                targetValue,
+                ExpressionDef.constant(beanProperty.getName()),
                 PYTHON_COERCION.invokeStatic(
-                    PUT_MEMBER,
-                    TypeDef.VOID,
+                    "asyncMemberValue",
+                    TypeDef.OBJECT,
                     targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    PYTHON_COERCION.invokeStatic(
-                        "asyncMemberValue",
-                        TypeDef.OBJECT,
-                        targetValue,
-                        methodParameters.getFirst().cast(TypeDef.OBJECT)
-                    )
-                ),
-                PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "rememberAsyncMember",
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 )
             );
@@ -5763,24 +5745,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 );
             }
-            return StatementDef.multi(
+            return PYTHON_COERCION.invokeStatic(
+                PUT_MEMBER,
+                TypeDef.VOID,
+                targetValue,
+                ExpressionDef.constant(beanProperty.getName()),
                 PYTHON_COERCION.invokeStatic(
-                    PUT_MEMBER,
-                    TypeDef.VOID,
+                    "asyncMemberValue",
+                    TypeDef.OBJECT,
                     targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    PYTHON_COERCION.invokeStatic(
-                        "asyncMemberValue",
-                        TypeDef.OBJECT,
-                        targetValue,
-                        methodParameters.getFirst().cast(TypeDef.OBJECT)
-                    )
-                ),
-                PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "rememberAsyncMember",
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 )
             );

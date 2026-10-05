@@ -99,10 +99,12 @@ class PythonAsyncioSpec:
         assert 3 == response.priority
 
     @Test
-    def asyncControllerUsesEventLoopContext(self):
+    def asyncSingletonControllerRunsInItsOwnContext(self):
+        # a singleton is one object in one context: its coroutines are not run on a copy in the event-loop
+        # context, which would be a second controller (see PythonAsyncSingletonSpec)
         context_id = self.client.toBlocking().retrieve("/async-demo/context-id")
 
-        assert context_id != builtins.__MN_CTX_ID__
+        assert context_id == builtins.__MN_CTX_ID__
 
     @Test
     def constructorInjectedAsyncControllerRunsInEventLoopContext(self):
