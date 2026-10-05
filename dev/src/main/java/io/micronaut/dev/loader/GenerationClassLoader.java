@@ -28,11 +28,13 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
@@ -197,14 +199,13 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @param contents The new contents
      * @return Whether a file of that name was in the snapshot and is replaced
      * @throws IOException if the file cannot be written
+     * @throws IllegalArgumentException if the name is not relative to the roots, or resolves outside them
      * @since 5.3.0
      */
     public boolean replaceResource(String resource, byte[] contents) throws IOException {
-        if (resource.isEmpty() || resource.startsWith("/") || java.util.Arrays.asList(resource.split("/")).contains("..")) {
-            throw new IllegalArgumentException("Not a resource of the generation: " + resource);
-        }
+        checkRelative(resource);
         for (int i = live.size(); i < roots.size(); i++) {
-            Path file = roots.get(i).resolve(resource);
+            Path file = resolveUnder(roots.get(i), resource);
             if (Files.isRegularFile(file)) {
                 Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
                 Files.write(temporary, contents);
@@ -213,6 +214,45 @@ public final class GenerationClassLoader extends URLClassLoader {
             }
         }
         return false;
+    }
+
+    /**
+     * Rejects a resource name that is not relative with {@code /} as separator: empty; absolute; with a drive, as in
+     * {@code C:/file} or {@code C:file}; with a backslash, which Windows reads as a separator, so that {@code ..\outside}
+     * and {@code \\server\share} would escape the root there; or with a {@code ..} segment.
+     *
+     * @param resource The resource name
+     */
+    static void checkRelative(String resource) {
+        boolean drive = resource.length() >= 2 && resource.charAt(1) == ':';
+        if (resource.isEmpty() || resource.startsWith("/") || drive || resource.indexOf('\\') >= 0
+            || Arrays.asList(resource.split("/")).contains("..")) {
+            throw new IllegalArgumentException("Not a resource of the generation: " + resource);
+        }
+    }
+
+    /**
+     * Resolves a resource name under a root, refusing a name the file system reads as absolute and a target that,
+     * normalized, is not under the normalized root: the last word on where a write goes, whatever the platform's
+     * separators and roots.
+     *
+     * @param root The root
+     * @param resource The resource name
+     * @return The file under the root
+     */
+    static Path resolveUnder(Path root, String resource) {
+        Path relative;
+        try {
+            relative = root.getFileSystem().getPath(resource);
+        } catch (InvalidPathException e) {
+            throw new IllegalArgumentException("Not a resource of the generation: " + resource, e);
+        }
+        Path base = root.toAbsolutePath().normalize();
+        Path target = base.resolve(relative).normalize();
+        if (relative.isAbsolute() || relative.getRoot() != null || !target.startsWith(base) || target.equals(base)) {
+            throw new IllegalArgumentException("Not a resource of the generation: " + resource);
+        }
+        return target;
     }
 
     /**
