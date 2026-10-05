@@ -2,6 +2,7 @@ package io.micronaut.inject.context.watch;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.WatchableBeanContext;
@@ -21,16 +22,25 @@ import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.context.watch.ResourceSelector;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -371,6 +381,165 @@ class BeanWatchTest {
     }
 
     @Test
+    void aDefinitionChangeMadeWhileTheFirstBatchIsReadIsDeliveredAfterItAndNeverBeforeIt() throws Exception {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            WatchableBeanContext watchable = (WatchableBeanContext) context;
+            List<BeanDefinitionChange<Rule>> changes = new CopyOnWriteArrayList<>();
+            CountDownLatch reading = new CountDownLatch(1);
+            CountDownLatch proceed = new CountDownLatch(1);
+            AtomicReference<BeanWatch> watch = new AtomicReference<>();
+            Thread registering = new Thread(() -> {
+                // the qualifier pauses this thread once, inside the read of the first batch: the watch is registered by then
+                PausingQualifier qualifier = new PausingQualifier(Thread.currentThread(), reading, proceed);
+                watch.set(watchable.watchDefinitions(Argument.of(Rule.class), qualifier, changes::add));
+            }, "registering");
+            registering.start();
+            assertTrue(reading.await(10, TimeUnit.SECONDS));
+
+            // another thread applies a change while the first batch is read: its delivery waits for the first batch
+            RuntimeBeanDefinition<Rule> late = rule("late");
+            Thread changing = new Thread(() -> context.registerBeanDefinition(late), "changing");
+            changing.start();
+            awaitParked(changing);
+            assertTrue(changes.isEmpty(), "nothing is delivered ahead of the first batch");
+
+            proceed.countDown();
+            registering.join(10_000);
+            changing.join(10_000);
+            assertFalse(registering.isAlive());
+            assertFalse(changing.isAlive());
+
+            // the first batch came first, the change after it, and the late rule reached the watcher
+            assertTrue(watch.get().isActive());
+            assertTrue(changes.get(0).initial());
+            assertTrue(changes.stream().skip(1).noneMatch(BeanDefinitionChange::initial));
+            assertTrue(changes.size() <= 2);
+            assertTrue(changes.stream().anyMatch(change -> change.added().contains(late)));
+            assertTrue(changes.get(changes.size() - 1).current().contains(late));
+            assertEquals(Set.of(ARule.class, BRule.class), beanTypes(changes.get(0).added().stream().filter(d -> d != late).toList()));
+        }
+    }
+
+    @Test
+    void aDefinitionChangeAppliedBeforeTheWatchIsRegisteredShowsInTheFirstBatchOnly() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            RuntimeBeanDefinition<Rule> early = rule("early");
+            context.registerBeanDefinition(early);
+            List<BeanDefinitionChange<Rule>> changes = new ArrayList<>();
+            ((WatchableBeanContext) context).watchDefinitions(Rule.class, null, changes::add);
+
+            assertEquals(1, changes.size());
+            assertTrue(changes.get(0).added().contains(early));
+        }
+    }
+
+    @Test
+    void aConfigurationWatchWithAFirstBatchReadsTheConfigurationAsItIsAndMissesNoRefreshMadeMeanwhile() throws Exception {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            AtomicReference<String> size = new AtomicReference<>("1");
+            List<String> seen = new CopyOnWriteArrayList<>();
+            CountDownLatch reading = new CountDownLatch(1);
+            CountDownLatch proceed = new CountDownLatch(1);
+            Thread registering = new Thread(() -> beanContext.watchConfiguration("pool", change -> {
+                if (change.initial()) {
+                    // the first batch reads the configuration, slowly
+                    seen.add("initial " + size.get() + " all=" + change.all());
+                    reading.countDown();
+                    await(proceed);
+                    return Outcome.RECREATE;
+                }
+                seen.add("change " + size.get());
+                return Outcome.APPLIED;
+            }, true), "registering");
+            registering.start();
+            assertTrue(reading.await(10, TimeUnit.SECONDS));
+
+            // a refresh lands while the first batch is read: it is delivered once the first batch returns
+            AtomicReference<List<Outcome>> outcomes = new AtomicReference<>();
+            Thread refreshing = new Thread(() -> {
+                size.set("2");
+                outcomes.set(beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("pool.size"))));
+            }, "refreshing");
+            refreshing.start();
+            awaitParked(refreshing);
+            assertEquals(List.of("initial 1 all=true"), seen);
+
+            proceed.countDown();
+            registering.join(10_000);
+            refreshing.join(10_000);
+            assertEquals(List.of("initial 1 all=true", "change 2"), seen);
+            assertEquals(List.of(Outcome.APPLIED), outcomes.get());
+
+            // a watch without a first batch is not called until a refresh touches it
+            List<ConfigurationChange> plain = new ArrayList<>();
+            beanContext.watchConfiguration("pool", change -> {
+                plain.add(change);
+                return Outcome.APPLIED;
+            });
+            assertTrue(plain.isEmpty());
+            assertTrue(ConfigurationChange.ofInitial().initial());
+            assertFalse(ConfigurationChange.ofAll().initial());
+        }
+    }
+
+    @Test
+    void watchersThatMakeChangesOfAnotherKindOnTwoThreadsDoNotDeadlock() throws Exception {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            CountDownLatch inConfigurationWatcher = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            List<String> configurationCalls = new CopyOnWriteArrayList<>();
+            // a configuration watcher that registers a definition, the first time slowly
+            beanContext.watchConfiguration("loop", change -> {
+                configurationCalls.add(Thread.currentThread().getName());
+                if (configurationCalls.size() == 1) {
+                    inConfigurationWatcher.countDown();
+                    await(release);
+                    context.registerBeanDefinition(rule("z"));
+                }
+                return Outcome.APPLIED;
+            });
+            // a definition watcher that refreshes the configuration the other one watches
+            beanContext.watchDefinitions(Rule.class, null, change -> {
+                if (!change.initial()) {
+                    beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("loop.key")));
+                }
+            });
+
+            Thread refreshing = new Thread(() -> beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("loop.key"))), "refreshing");
+            refreshing.start();
+            assertTrue(inConfigurationWatcher.await(10, TimeUnit.SECONDS));
+            // while the configuration watcher runs on one thread, the definition watcher refreshes on another
+            Thread registering = new Thread(() -> context.registerBeanDefinition(rule("y")), "registering");
+            registering.start();
+            registering.join(10_000);
+            assertFalse(registering.isAlive(), () -> "a thread delivering to a watch does not wait for another delivering one: " + java.util.Arrays.toString(registering.getStackTrace()));
+
+            release.countDown();
+            refreshing.join(10_000);
+            assertFalse(refreshing.isAlive());
+            // every refresh reached the configuration watcher, one at a time, on the thread that was delivering to it
+            assertEquals(List.of("refreshing", "refreshing", "refreshing"), configurationCalls);
+        }
+    }
+
+    @Test
+    void aConfigurationWatchWithAFirstBatchRegisteredBeforeStartupIsCalledOnceAtStartup() {
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).build()) {
+            List<ConfigurationChange> seen = new ArrayList<>();
+            ((WatchableBeanContext) context).watchConfiguration("pool", change -> {
+                seen.add(change);
+                return Outcome.APPLIED;
+            }, true);
+            assertTrue(seen.isEmpty());
+            context.start();
+            assertEquals(1, seen.size());
+            assertTrue(seen.get(0).initial());
+        }
+    }
+
+    @Test
     void configurationChangesAreMatchedAtDotBoundariesInEverySpelling() {
         assertTrue(ConfigurationChange.ofKeys(Set.of("datasources.default.url")).touches("datasources.default"));
         assertTrue(ConfigurationChange.ofKeys(Set.of("datasources.default")).touches("datasources.default"));
@@ -381,6 +550,79 @@ class BeanWatchTest {
         assertTrue(ConfigurationChange.ofKeys(Set.of("a.b")).touchesAny("x", "a"));
         assertTrue(ConfigurationChange.ofKeys(Set.of("MICRONAUT_SERVER_THREAD_SELECTION")).touches("micronaut.server.thread-selection"));
         assertTrue(ConfigurationChange.ofKeys(Set.of("micronaut.server.thread-selection")).touches("micronaut.server"));
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("not released");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void awaitParked(Thread thread) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (thread.getState() != Thread.State.WAITING && thread.getState() != Thread.State.BLOCKED) {
+            assertTrue(thread.isAlive(), thread.getName() + " finished without waiting");
+            assertTrue(System.nanoTime() < deadline, thread.getName() + " never waited");
+            Thread.sleep(5);
+        }
+    }
+
+    /**
+     * Qualifies every candidate; the first time the given thread asks, it signals and waits.
+     */
+    static final class PausingQualifier implements Qualifier<Rule> {
+        private final Thread thread;
+        private final CountDownLatch reading;
+        private final CountDownLatch proceed;
+        private final AtomicBoolean paused = new AtomicBoolean();
+
+        PausingQualifier(Thread thread, CountDownLatch reading, CountDownLatch proceed) {
+            this.thread = thread;
+            this.reading = reading;
+            this.proceed = proceed;
+        }
+
+        private void pause() {
+            if (Thread.currentThread() == thread && paused.compareAndSet(false, true)) {
+                reading.countDown();
+                await(proceed);
+            }
+        }
+
+        @Override
+        public <BT extends BeanType<Rule>> Stream<BT> reduce(Class<Rule> beanType, Stream<BT> candidates) {
+            pause();
+            return candidates;
+        }
+
+        @Override
+        public <BT extends BeanType<Rule>> Collection<BT> filter(Class<Rule> beanType, Collection<BT> candidates) {
+            pause();
+            return candidates;
+        }
+
+        @Override
+        public <BT extends QualifiedBeanType<Rule>> Collection<BT> filterQualified(Class<Rule> beanType, Collection<BT> candidates) {
+            pause();
+            return candidates;
+        }
+
+        @Override
+        public boolean doesQualify(Class<Rule> beanType, BeanType<Rule> candidate) {
+            pause();
+            return true;
+        }
+
+        @Override
+        public boolean doesQualify(Class<Rule> beanType, QualifiedBeanType<Rule> candidate) {
+            pause();
+            return true;
+        }
     }
 
     static final class OrderedWatcher implements BeanDefinitionWatcher<Rule>, Ordered {

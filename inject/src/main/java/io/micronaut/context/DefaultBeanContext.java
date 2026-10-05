@@ -665,10 +665,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     @Override
-    public BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher) {
+    public BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher, boolean initial) {
         ArgumentUtils.requireNonNull("prefix", prefix);
         ArgumentUtils.requireNonNull("watcher", watcher);
-        return watches.watchConfiguration(prefix, watcher);
+        return watches.watchConfiguration(prefix, watcher, initial);
     }
 
     @Override

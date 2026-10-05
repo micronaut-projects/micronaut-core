@@ -29,18 +29,21 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * One batch of configuration changes, as a refresh computed it.
+ * One batch of configuration changes, as a refresh computed it, or the first batch of a watch that
+ * asked for one, which describes the configuration as it is rather than a change.
  *
  * @param all Whether everything is to be considered changed, as a full refresh does
  * @param changed The keys whose value changed, was added or was removed
  * @param previous The previous values of the changed keys, absent for keys that were added
  * @param current The current values of the changed keys, absent for keys that were removed
+ * @param initial Whether this is the first batch of a watch, delivered when it is registered: everything is
+ * to be read as it is now, and {@link #all()} holds
  * @author graemerocher
  * @since 5.3.0
  */
 @Experimental
 @NullMarked
-public record ConfigurationChange(boolean all, Set<String> changed, Map<String, @Nullable Object> previous, Map<String, @Nullable Object> current) {
+public record ConfigurationChange(boolean all, Set<String> changed, Map<String, @Nullable Object> previous, Map<String, @Nullable Object> current, boolean initial) {
 
     /**
      * Validating constructor.
@@ -49,11 +52,33 @@ public record ConfigurationChange(boolean all, Set<String> changed, Map<String, 
      * @param changed The changed keys
      * @param previous The previous values
      * @param current The current values
+     * @param initial Whether initial
      */
     public ConfigurationChange {
         changed = Collections.unmodifiableSet(new LinkedHashSet<>(Objects.requireNonNull(changed, "changed")));
         previous = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(previous, "previous")));
         current = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(current, "current")));
+    }
+
+    /**
+     * A change that is not a first batch.
+     *
+     * @param all Whether all
+     * @param changed The changed keys
+     * @param previous The previous values
+     * @param current The current values
+     */
+    public ConfigurationChange(boolean all, Set<String> changed, Map<String, @Nullable Object> previous, Map<String, @Nullable Object> current) {
+        this(all, changed, previous, current, false);
+    }
+
+    /**
+     * The first batch of a watch that asked for one: every key, to be read as it is now.
+     *
+     * @return The change
+     */
+    public static ConfigurationChange ofInitial() {
+        return new ConfigurationChange(true, Set.of(), Map.of(), Map.of(), true);
     }
 
     /**

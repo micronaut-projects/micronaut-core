@@ -59,6 +59,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 
 /**
@@ -99,7 +101,21 @@ final class BeanWatchRegistry {
     private final Map<Object, List<Registration>> ownedByBean = new IdentityHashMap<>();
     private final Set<Object> adaptedProcessors = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<ResourceKind, ResourceChange> resourceState = new ConcurrentHashMap<>();
-    private final Object lifecycle = new Object();
+    /**
+     * Held, briefly and never across a watcher, to number a change and queue its batches, to register a watch
+     * and queue its first batch, and to read or update the resource state: a watch's queue is therefore in the
+     * order of the numbers, and its first batch ahead of every change numbered after it was registered.
+     */
+    private final Object enqueue = new Object();
+    /**
+     * Numbers the changes as their batches are queued, so that a watch knows which ones its first batch shows.
+     */
+    private final AtomicLong epoch = new AtomicLong();
+    /**
+     * How many watches the current thread is delivering to: such a thread never waits for another one to
+     * deliver, which is what rules out a cycle of threads each waiting inside a watcher for the other.
+     */
+    private final ThreadLocal<int[]> draining = ThreadLocal.withInitial(() -> new int[1]);
     private volatile boolean started;
 
     BeanWatchRegistry(DefaultBeanContext context) {
@@ -118,8 +134,8 @@ final class BeanWatchRegistry {
         return register(new MethodRegistration<>(annotationType, watcher, false));
     }
 
-    BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher) {
-        return register(new ConfigurationRegistration(prefix, watcher));
+    BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher, boolean initial) {
+        return register(new ConfigurationRegistration(prefix, watcher, initial));
     }
 
     BeanWatch watchResources(ResourceSelector selector, ResourceWatcher watcher) {
@@ -220,12 +236,19 @@ final class BeanWatchRegistry {
             owner.registrations.add(registration);
         }
         boolean deliverNow;
-        synchronized (lifecycle) {
+        synchronized (enqueue) {
             registrations.add(registration);
             deliverNow = started;
+            if (deliverNow) {
+                registration.queueFirstBatch();
+                synchronized (registration.queue) {
+                    // claimed before any change can be queued behind it: the registering thread delivers the first batch
+                    registration.drainer = Thread.currentThread();
+                }
+            }
         }
         if (deliverNow) {
-            deliverInitial(registration);
+            drain(registration);
         }
         return registration;
     }
@@ -234,78 +257,165 @@ final class BeanWatchRegistry {
      * Delivers the startup batch to every watch registered so far; later registrations get theirs at once.
      */
     void start() {
-        List<Registration> pending;
-        synchronized (lifecycle) {
+        List<Delivery> firstBatches = new ArrayList<>();
+        synchronized (enqueue) {
             if (started) {
                 return;
             }
             started = true;
-            pending = ordered();
+            for (Registration registration : ordered()) {
+                firstBatches.add(registration.queueFirstBatch());
+            }
         }
-        for (Registration registration : pending) {
-            deliverInitial(registration);
-        }
+        firstBatches.forEach(this::deliver);
     }
 
-    private void deliverInitial(Registration registration) {
-        // a watch registered while the context starts is delivered to by whichever of the two got it first, once
-        if (registration.closed.get() || !registration.initialDelivered.compareAndSet(false, true)) {
-            return;
+    /**
+     * Whether a change, numbered when it was queued, is still to be delivered to a watch when its turn comes:
+     * the watch is open, and its first batch was read before the change was applied. A first batch that is
+     * still to be read, or that was read after the change, shows it already.
+     *
+     * @param registration The watch
+     * @param sequence The number of the change
+     * @return True to deliver
+     */
+    private static boolean followsFirstBatch(Registration registration, long sequence) {
+        return !registration.closed.get() && registration.initialDelivered.get() && sequence > registration.readEpoch;
+    }
+
+    /**
+     * Has a queued batch delivered: by this thread, which drains the watch's queue when no other thread does,
+     * or by the thread draining it, which this one waits for unless it is itself delivering to a watch.
+     *
+     * @param delivery The batch
+     * @return Whether it was delivered, or skipped, by the time this returns
+     */
+    private boolean deliver(Delivery delivery) {
+        Registration registration = delivery.registration;
+        Thread current = Thread.currentThread();
+        boolean claim;
+        Thread drainer;
+        synchronized (registration.queue) {
+            drainer = registration.drainer;
+            claim = drainer == null;
+            if (claim) {
+                registration.drainer = current;
+            }
         }
+        if (claim) {
+            drain(registration);
+            return true;
+        }
+        if (drainer == current || draining.get()[0] > 0) {
+            // delivering to a watch already: the thread draining this queue delivers the batch after the ones before it
+            return !delivery.handOff();
+        }
+        delivery.awaitDone();
+        return true;
+    }
+
+    /**
+     * Delivers the queued batches of a watch, in order, until its queue is empty. The current thread has claimed
+     * the queue.
+     */
+    private void drain(Registration registration) {
+        int[] depth = draining.get();
+        depth[0]++;
         try {
-            registration.deliverInitial();
-        } catch (Throwable e) {
-            report(registration, e);
+            while (true) {
+                Delivery next;
+                synchronized (registration.queue) {
+                    next = registration.queue.poll();
+                    if (next == null) {
+                        registration.drainer = null;
+                        return;
+                    }
+                }
+                next.run();
+            }
+        } finally {
+            depth[0]--;
         }
     }
 
     /**
      * Delivers a change of definitions: the removed ones are no longer resolvable, the added ones are.
+     * The caller applied the change before calling this.
      */
     void definitionsChanged(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-        if (!started || (removed.isEmpty() && added.isEmpty())) {
+        if (removed.isEmpty() && added.isEmpty()) {
             return;
         }
-        for (Registration registration : ordered()) {
-            if (registration.closed.get()) {
-                continue;
+        List<Delivery> deliveries = new ArrayList<>();
+        synchronized (enqueue) {
+            if (!started) {
+                return;
             }
-            try {
-                registration.deliverDefinitions(removed, added);
-            } catch (Throwable e) {
-                report(registration, e);
+            long sequence = epoch.incrementAndGet();
+            for (Registration registration : ordered()) {
+                if (!registration.closed.get() && registration.watchesDefinitions()) {
+                    deliveries.add(registration.enqueue(new Delivery(registration, sequence, () -> registration.deliverDefinitions(removed, added))));
+                }
             }
         }
+        deliveries.forEach(this::deliver);
     }
 
     /**
      * Delivers a configuration change to the watches whose prefix it touches, after the configuration
-     * beans were rebound.
+     * beans were rebound. A watch that another thread is delivering to while this one delivers to a watch
+     * itself is given the change by that thread, which acts on its answer: such an answer is not among the
+     * outcomes returned.
      *
      * @return The outcomes, one per watch delivered to
      */
     List<ConfigurationWatcher.Outcome> configurationChanged(ConfigurationChange change) {
+        List<Delivery> deliveries = new ArrayList<>();
+        synchronized (enqueue) {
+            long sequence = epoch.incrementAndGet();
+            for (Registration registration : ordered()) {
+                if (registration.closed.get() || !(registration instanceof ConfigurationRegistration configurationRegistration)
+                    || !change.touches(configurationRegistration.prefix)) {
+                    continue;
+                }
+                Delivery delivery = new Delivery(registration, sequence, null);
+                delivery.action = () -> delivery.outcome = configurationRegistration.watcher.onChange(change);
+                // answered after the caller stopped waiting: the thread that delivered acts on the answer
+                delivery.afterHandOff = () -> recreate(List.of(delivery));
+                deliveries.add(registration.enqueue(delivery));
+            }
+        }
+        List<Delivery> answered = new ArrayList<>(deliveries.size());
+        for (Delivery delivery : deliveries) {
+            if (deliver(delivery)) {
+                answered.add(delivery);
+            }
+        }
+        return recreate(answered);
+    }
+
+    /**
+     * Collects the answers of delivered configuration batches, in order, and replaces the beans whose watch
+     * answered {@link ConfigurationWatcher.Outcome#RECREATE}.
+     *
+     * @return The outcomes, one per batch delivered
+     */
+    private List<ConfigurationWatcher.Outcome> recreate(List<Delivery> deliveries) {
         List<ConfigurationWatcher.Outcome> outcomes = new ArrayList<>();
         List<Owner> toRecreate = new ArrayList<>();
         // the owner each RECREATE outcome asked for, by the outcome's own index, taken as the outcome is added: a
         // second walk over the registrations would not line up with the outcomes once a watch failed or closed
         Map<Integer, Owner> recreateOutcomes = new LinkedHashMap<>();
-        for (Registration registration : ordered()) {
-            if (registration.closed.get() || !(registration instanceof ConfigurationRegistration configurationRegistration)
-                || !change.touches(configurationRegistration.prefix)) {
-                continue;
-            }
-            ConfigurationWatcher.Outcome outcome;
-            try {
-                outcome = configurationRegistration.watcher.onChange(change);
-            } catch (Throwable e) {
-                report(registration, e);
+        for (Delivery delivery : deliveries) {
+            ConfigurationWatcher.Outcome outcome = delivery.outcome;
+            if (outcome == null) {
+                // skipped, or failed: no answer
                 continue;
             }
             if (outcome == ConfigurationWatcher.Outcome.RECREATE) {
-                Owner owner = registration.owner;
+                Owner owner = delivery.owner;
                 if (owner == null || owner.bean == null) {
-                    LOG.warn("A configuration watch on [{}] answered RECREATE but was not registered while its bean was created; nothing to recreate", configurationRegistration.prefix);
+                    LOG.warn("A configuration watch on [{}] answered RECREATE but was not registered while its bean was created; nothing to recreate", ((ConfigurationRegistration) delivery.registration).prefix);
                     outcome = ConfigurationWatcher.Outcome.IGNORED;
                 } else {
                     if (!toRecreate.contains(owner)) {
@@ -341,50 +451,150 @@ final class BeanWatchRegistry {
      * receives that state as its first batch.
      */
     void resourcesChanged(ResourceChange change) {
-        resourceState.compute(change.kind(), (kind, state) -> {
-            if (change.initial() || state == null) {
-                return change.initial() ? change : null;
-            }
-            // the state a late watch starts from follows every change: what went is gone, what came is present
-            Set<Path> present = new LinkedHashSet<>(state.changed());
-            change.removed().forEach(present::remove);
-            present.addAll(change.changed());
-            // the roots are the latest reported: a later batch may add or drop a root
-            return new ResourceChange(kind, change.roots(), new ArrayList<>(present), List.of(), true);
-        });
-        for (Registration registration : ordered()) {
-            if (registration.closed.get() || !(registration instanceof ResourceRegistration resourceRegistration)
-                || resourceRegistration.selector.kind() != change.kind()) {
-                continue;
-            }
-            ResourceChange selected = change.select(resourceRegistration.selector);
-            if (selected.isEmpty() && !change.initial()) {
-                continue;
-            }
-            if (change.initial()) {
-                // reported before the context started: this is the watch's first batch, not to be repeated at startup
-                registration.initialDelivered.set(true);
-            }
-            try {
-                resourceRegistration.watcher.onChange(selected);
-            } catch (Throwable e) {
-                report(registration, e);
+        List<Delivery> deliveries = new ArrayList<>();
+        synchronized (enqueue) {
+            // the state and the number of the change move together, so that a first batch read from the state
+            // knows exactly which changes it shows
+            ResourceChange known = resourceState.compute(change.kind(), (kind, state) -> {
+                if (change.initial() || state == null) {
+                    return change.initial() ? change : null;
+                }
+                // the state a late watch starts from follows every change: what went is gone, what came is present
+                Set<Path> present = new LinkedHashSet<>(state.changed());
+                change.removed().forEach(present::remove);
+                present.addAll(change.changed());
+                // the roots are the latest reported: a later batch may add or drop a root
+                return new ResourceChange(kind, change.roots(), new ArrayList<>(present), List.of(), true);
+            });
+            long sequence = epoch.incrementAndGet();
+            for (Registration registration : ordered()) {
+                if (registration.closed.get() || !(registration instanceof ResourceRegistration resourceRegistration)
+                    || resourceRegistration.selector.kind() != change.kind()) {
+                    continue;
+                }
+                ResourceChange selected = change.select(resourceRegistration.selector);
+                if (selected.isEmpty() && !change.initial()) {
+                    continue;
+                }
+                Delivery delivery = new Delivery(registration, sequence, () -> resourceRegistration.watcher.onChange(selected));
+                delivery.filter = () -> {
+                    if (change.initial()) {
+                        if (registration.initialDelivered.get() && sequence <= registration.readEpoch) {
+                            // its first batch was read from this state already
+                            return false;
+                        }
+                        // reported before the context started: this is the watch's first batch, not to be repeated at startup
+                        registration.initialDelivered.set(true);
+                        registration.readEpoch = sequence;
+                        return true;
+                    }
+                    if (!registration.initialDelivered.get()) {
+                        // the first batch, still to be read, is the state this change left; with no state, nothing will be
+                        return known == null;
+                    }
+                    return sequence > registration.readEpoch;
+                };
+                deliveries.add(registration.enqueue(delivery));
             }
         }
+        deliveries.forEach(this::deliver);
     }
 
     /**
      * Delivers a class change to the class change watches, in order, failures isolated.
      */
     void classesChanged(ClassChangeEvent change) {
-        for (Registration registration : ordered()) {
-            if (registration.closed.get() || !(registration instanceof ClassChangeRegistration classChangeRegistration)) {
-                continue;
+        List<Delivery> deliveries = new ArrayList<>();
+        synchronized (enqueue) {
+            long sequence = epoch.incrementAndGet();
+            for (Registration registration : ordered()) {
+                if (!registration.closed.get() && registration instanceof ClassChangeRegistration classChangeRegistration) {
+                    deliveries.add(registration.enqueue(new Delivery(registration, sequence, () -> classChangeRegistration.watcher.onChange(change))));
+                }
             }
+        }
+        deliveries.forEach(this::deliver);
+    }
+
+    /**
+     * One batch queued for one watch, delivered when its turn comes.
+     */
+    private static final class Delivery {
+        final Registration registration;
+        final long sequence;
+        @Nullable
+        final Owner owner;
+        @Nullable
+        Runnable action;
+        /**
+         * Decides, when its turn comes, whether the batch is delivered; by default when it follows the first batch.
+         */
+        @Nullable
+        BooleanSupplier filter;
+        /**
+         * Run by the delivering thread when the batch was delivered after the thread that queued it stopped waiting.
+         */
+        @Nullable
+        Runnable afterHandOff;
+        volatile ConfigurationWatcher.@Nullable Outcome outcome;
+        private boolean done;
+        private boolean handedOff;
+
+        Delivery(Registration registration, long sequence, @Nullable Runnable action) {
+            this.registration = registration;
+            this.sequence = sequence;
+            this.action = action;
+            this.owner = registration.owner;
+        }
+
+        void run() {
             try {
-                classChangeRegistration.watcher.onChange(change);
+                boolean deliver = filter != null ? filter.getAsBoolean() && !registration.closed.get() : followsFirstBatch(registration, sequence);
+                if (deliver && action != null) {
+                    action.run();
+                }
             } catch (Throwable e) {
                 report(registration, e);
+            }
+            boolean afterCallerLeft;
+            synchronized (this) {
+                done = true;
+                afterCallerLeft = handedOff;
+                notifyAll();
+            }
+            if (afterCallerLeft && afterHandOff != null) {
+                try {
+                    afterHandOff.run();
+                } catch (Throwable e) {
+                    report(registration, e);
+                }
+            }
+        }
+
+        /**
+         * Leaves the batch to the thread draining the queue.
+         *
+         * @return False if it was delivered already, true if it is left
+         */
+        synchronized boolean handOff() {
+            if (done) {
+                return false;
+            }
+            handedOff = true;
+            return true;
+        }
+
+        synchronized void awaitDone() {
+            boolean interrupted = false;
+            while (!done) {
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -507,6 +717,21 @@ final class BeanWatchRegistry {
     private abstract class Registration implements BeanWatch {
         final AtomicBoolean closed = new AtomicBoolean();
         final AtomicBoolean initialDelivered = new AtomicBoolean();
+        /**
+         * The batches queued for the watch, the first one included, delivered one at a time and in order by the
+         * thread that drains the queue; also the monitor that guards the queue and its drainer.
+         */
+        final ArrayDeque<Delivery> queue = new ArrayDeque<>();
+        /**
+         * The thread delivering the queued batches, null while none is.
+         */
+        @Nullable
+        Thread drainer;
+        /**
+         * The number of the last change applied before the first batch was read; -1 until it is read, and for
+         * a watch without a first batch, which receives every change delivered after it is registered.
+         */
+        volatile long readEpoch = -1;
         final boolean adapted;
         @Nullable
         Object adaptedProcessor;
@@ -517,11 +742,57 @@ final class BeanWatchRegistry {
             this.adapted = adapted;
         }
 
+        Registration(boolean adapted, boolean firstBatch) {
+            this(adapted);
+            if (!firstBatch) {
+                // nothing to read first: every change delivered from now on is for this watch
+                initialDelivered.set(true);
+            }
+        }
+
+        /**
+         * Queues a batch. Called with the registry's enqueue lock held, so that batches queue in the order of their numbers.
+         *
+         * @param delivery The batch, complete
+         * @return The batch
+         */
+        Delivery enqueue(Delivery delivery) {
+            synchronized (queue) {
+                queue.add(delivery);
+            }
+            return delivery;
+        }
+
+        /**
+         * Queues the first batch, which reads the state when its turn comes. Called with the enqueue lock held.
+         *
+         * @return The batch
+         */
+        Delivery queueFirstBatch() {
+            Delivery first = new Delivery(this, 0, () -> {
+                // a watch registered while the context starts gets its first batch once, from whichever queued it first
+                if (!closed.get() && initialDelivered.compareAndSet(false, true)) {
+                    // taken before the state is read: every change numbered up to here was applied before the read
+                    readEpoch = epoch.get();
+                    deliverInitial();
+                }
+            });
+            first.filter = () -> true;
+            return enqueue(first);
+        }
+
         abstract Object watcher();
 
         abstract void deliverInitial();
 
         abstract void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added);
+
+        /**
+         * @return Whether the watch sees definition changes, so that one is queued for it
+         */
+        boolean watchesDefinitions() {
+            return true;
+        }
 
         @Override
         public void close() {
@@ -651,9 +922,16 @@ final class BeanWatchRegistry {
             // one by one, so a prototype among the candidates is not created again for every batch
             List<BeanRegistration<T>> came = new ArrayList<>(addedHere.size());
             for (BeanDefinition<T> definition : addedHere) {
+                if (known.containsKey(definition)) {
+                    // its bean was delivered already, in the first batch read after the definition was added
+                    continue;
+                }
                 BeanRegistration<T> registration = context.getBeanRegistration(definition);
                 came.add(registration);
                 known.put(definition, registration);
+            }
+            if (came.isEmpty() && gone.isEmpty()) {
+                return;
             }
             watcher.onChange(new BeanChange<>(came, gone, new ArrayList<>(known.values()), false));
         }
@@ -730,10 +1008,13 @@ final class BeanWatchRegistry {
         private final String prefix;
         private final ConfigurationWatcher watcher;
 
-        ConfigurationRegistration(String prefix, ConfigurationWatcher watcher) {
-            super(false);
+        private final boolean initial;
+
+        ConfigurationRegistration(String prefix, ConfigurationWatcher watcher, boolean initial) {
+            super(false, initial);
             this.prefix = prefix;
             this.watcher = watcher;
+            this.initial = initial;
         }
 
         @Override
@@ -743,11 +1024,20 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverInitial() {
-            // configuration has no startup batch: nothing changed yet
+            if (initial) {
+                // the watcher reads the configuration as it is now; what it answers is not acted on, since its
+                // bean, if it has one, is still being created
+                watcher.onChange(ConfigurationChange.ofInitial());
+            }
         }
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+        }
+
+        @Override
+        boolean watchesDefinitions() {
+            return false;
         }
     }
 
@@ -768,7 +1058,12 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverInitial() {
-            ResourceChange state = resourceState.get(selector.kind());
+            ResourceChange state;
+            synchronized (enqueue) {
+                // read with the number of the last change it shows, which later changes are compared with
+                readEpoch = epoch.get();
+                state = resourceState.get(selector.kind());
+            }
             if (state != null) {
                 watcher.onChange(state.select(selector));
             }
@@ -777,13 +1072,18 @@ final class BeanWatchRegistry {
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
         }
+
+        @Override
+        boolean watchesDefinitions() {
+            return false;
+        }
     }
 
     private final class ClassChangeRegistration extends Registration {
         private final ClassChangeWatcher watcher;
 
         ClassChangeRegistration(ClassChangeWatcher watcher) {
-            super(false);
+            super(false, false);
             this.watcher = watcher;
         }
 
@@ -799,6 +1099,11 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+        }
+
+        @Override
+        boolean watchesDefinitions() {
+            return false;
         }
     }
 

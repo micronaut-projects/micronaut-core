@@ -44,6 +44,28 @@ import java.lang.annotation.Annotation;
  * release. The context is the only implementation; a module tests for it with {@code instanceof}
  * and watches nothing when the context it is given is another one.</p>
  *
+ * <h2>Reading and watching at once</h2>
+ * <p>A bean that reads what it derives state from and then registers a watch can miss a change made in
+ * between. The first batch closes that gap: it is read after the watch is registered, under the watch's
+ * own delivery lock, so a bean that builds its state from the first batch, rather than from a read of
+ * its own, misses nothing. The guarantees, for every watch:</p>
+ * <ul>
+ * <li>Batches reach a watcher one at a time, the first batch first, then the changes in the order they
+ * were numbered as their delivery began; none is delivered before the first batch, nor concurrently with
+ * another. No lock is held while a watcher runs: a change made by a watcher, to a watch another thread is
+ * delivering to, is delivered by that thread after the batch it is on, and a configuration watch's answer to
+ * it is acted on there rather than returned to the refresh.</li>
+ * <li>No change is lost: one applied after the first batch was read is delivered after it.</li>
+ * <li>A change applied before the first batch began to be read shows in it, and is not delivered again.
+ * Only a change applied while the first batch was being read can show in it and also be delivered
+ * after it; a watcher treats an addition it already has, or a removal of something it never had, as
+ * nothing to do. Resource watches know their state exactly and never see such a repeat.</li>
+ * </ul>
+ * <p>Definition, bean, method and resource watches always have a first batch. A configuration watch has
+ * one when registered with {@link #watchConfiguration(String, ConfigurationWatcher, boolean)}, which calls
+ * the watcher once with {@link io.micronaut.context.watch.ConfigurationChange#ofInitial()} to read the
+ * configuration as it is. A class change watch has none: nothing has changed when it is registered.</p>
+ *
  * @author graemerocher
  * @since 5.3.0
  */
@@ -127,7 +149,25 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
      * @param watcher The watcher
      * @return The watch
      */
-    BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher);
+    default BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher) {
+        return watchConfiguration(prefix, watcher, false);
+    }
+
+    /**
+     * Watches the configuration under a prefix, optionally starting with a first batch. With
+     * {@code initial}, the watcher is called once at registration, at startup when the context has not
+     * started yet, with {@link io.micronaut.context.watch.ConfigurationChange#ofInitial()}: it reads the
+     * configuration as it is then, and every refresh after that read reaches it, which a read of its own
+     * before registering cannot promise. What the watcher answers to the first batch is not acted on: its
+     * bean, if it has one, is still being created. Without {@code initial} this is
+     * {@link #watchConfiguration(String, ConfigurationWatcher)}.
+     *
+     * @param prefix The prefix, such as {@code datasources.default}
+     * @param watcher The watcher
+     * @param initial Whether the watcher is first called with the configuration as it is
+     * @return The watch
+     */
+    BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher, boolean initial);
 
     /**
      * Watches the resources a selector selects: the files of a kind of resource root, by glob. The

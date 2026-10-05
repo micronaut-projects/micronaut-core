@@ -31,7 +31,9 @@ public interface ConfigurationWatcher {
 
     /**
      * Called after the configuration beans under the prefix have been rebound, so that the watcher reads
-     * the new values from them.
+     * the new values from them. A watch registered with a first batch is also called once when it is
+     * registered, with a change whose {@link ConfigurationChange#initial()} holds, to read the values as
+     * they are; its answer to that call is not acted on.
      *
      * @param change The change, which touches the watched prefix
      * @return What the watcher did
