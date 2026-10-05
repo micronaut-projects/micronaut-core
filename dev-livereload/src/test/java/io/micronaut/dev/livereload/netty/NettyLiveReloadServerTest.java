@@ -76,4 +76,49 @@ class NettyLiveReloadServerTest {
             assertEquals(0, server.connections());
         }
     }
+
+    @Test
+    @Timeout(60)
+    void theLiveReloadSocketAcceptsItsClientsAndRefusesOtherSitesAndOtherPaths() throws Exception {
+        try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
+            int port = server.port();
+            // a client that is no page, the browser extensions, and the application's pages on a localhost name or address
+            assertStatus(101, upgrade(port, "/livereload", null));
+            assertStatus(101, upgrade(port, "/livereload", "chrome-extension://jnihajbhpnppcggbcgedagnkighmdlei"));
+            assertStatus(101, upgrade(port, "/livereload", "moz-extension://0f8b7a6c-1d2e-4f5a-9b8c-7d6e5f4a3b2c"));
+            assertStatus(101, upgrade(port, "/livereload", "http://localhost:8080"));
+            assertStatus(101, upgrade(port, "/livereload", "http://127.0.0.1:8080"));
+            assertStatus(101, upgrade(port, "/livereload", "http://app.localhost:8080"));
+            assertStatus(101, upgrade(port, "/livereload", "http://[::1]:8080"));
+            assertStatus(101, upgrade(port, "/livereload?snipver=1", null));
+
+            // a page of another site, a rebinding page, and an opaque origin are refused
+            assertStatus(403, upgrade(port, "/livereload", "https://evil.example"));
+            assertStatus(403, upgrade(port, "/livereload", "http://rebound.example:" + port));
+            assertStatus(403, upgrade(port, "/livereload", "null"));
+
+            // an upgrade to another path is refused rather than left open
+            assertStatus(404, upgrade(port, "/other", null));
+            assertStatus(404, upgrade(port, "/livereloadx", null));
+        }
+    }
+
+    private static void assertStatus(int expected, String statusLine) {
+        assertTrue(statusLine.contains(" " + expected + " "), statusLine);
+    }
+
+    private static String upgrade(int port, String path, @org.jspecify.annotations.Nullable String origin) throws Exception {
+        String request = "GET " + path + " HTTP/1.1\r\nHost: localhost:" + port
+            + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n"
+            + (origin == null ? "" : "Origin: " + origin + "\r\n") + "\r\n";
+        try (java.net.Socket socket = new java.net.Socket("127.0.0.1", port)) {
+            socket.setSoTimeout(5_000);
+            socket.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            socket.getOutputStream().flush();
+            String status = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream(), java.nio.charset.StandardCharsets.US_ASCII)).readLine();
+            return status == null ? "" : status;
+        } catch (java.net.SocketTimeoutException e) {
+            return "no answer";
+        }
+    }
 }

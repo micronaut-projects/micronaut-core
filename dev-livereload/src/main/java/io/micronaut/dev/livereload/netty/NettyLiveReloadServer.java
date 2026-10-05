@@ -41,11 +41,13 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +55,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -62,6 +68,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@code path} and {@code liveCSS} over WebSocket at {@code /livereload}, and {@code /livereload.js}
  * for pages that do not use a browser extension. It listens on the loopback address only, on an
  * event loop of its own, so it belongs to the launcher and outlives every application context.
+ * The socket accepts native clients, the browser extensions and pages of a localhost origin, and refuses other
+ * sites and other paths.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -76,6 +84,8 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     private static final String SCRIPT_RESOURCE = "META-INF/micronaut-dev/livereload.js";
     private static final AttributeKey<Boolean> GREETED = AttributeKey.valueOf("micronaut-dev-livereload-greeted");
     private static final int MAX_CONTENT_LENGTH = 64 * 1024;
+    // the origins of the LiveReload browser extensions
+    private static final Set<String> EXTENSION_SCHEMES = Set.of("chrome-extension", "moz-extension", "safari-web-extension");
 
     private final EventLoopGroup group;
     private final Channel channel;
@@ -170,7 +180,38 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     }
 
     /**
-     * Serves the client script; every other plain request is a 404, and an upgrade passes through.
+     * Whether a page of this origin may follow the LiveReload socket. A WebSocket is not bound by the same-origin policy,
+     * so without this any site the developer visits could connect to the loopback port, watch the reloads and hold
+     * connections open. Allowed are clients that are no page, which send no origin; the browser extensions the protocol
+     * was made for; and pages served by a localhost name or the loopback address, on any port, which are the
+     * application's pages wherever its generations bind, and this server's own. A page of another site is refused,
+     * and so is a rebinding page, whose origin keeps the name it was loaded from. The script a browser extension injects
+     * runs in the page and connects with the page's origin, so an application is opened through a localhost name.
+     *
+     * @param origin The {@code Origin} header, null when absent
+     * @return Whether the upgrade is allowed
+     */
+    static boolean isAllowedOrigin(@Nullable String origin) {
+        if (origin == null) {
+            return true;
+        }
+        try {
+            URI uri = new URI(origin.trim());
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            if (EXTENSION_SCHEMES.contains(scheme)) {
+                return true;
+            }
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            return (scheme.equals("http") || scheme.equals("https"))
+                && (host.equals("localhost") || host.endsWith(".localhost") || host.equals("127.0.0.1") || host.equals("[::1]"));
+        } catch (URISyntaxException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Serves the client script; every other plain request is a 404. A WebSocket upgrade goes on to the handshake when
+     * it is for the LiveReload socket and from an allowed origin, and is refused otherwise.
      */
     private static final class ScriptHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
@@ -179,7 +220,17 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             // only a WebSocket upgrade goes on to the handshake; a client offering h2c on a plain request, as the
             // JDK client does, gets the script like any other
             if (request.headers().containsValue(HttpHeaderNames.UPGRADE, HttpHeaderValues.WEBSOCKET, true)) {
-                context.fireChannelRead(request.retain());
+                String path = new QueryStringDecoder(request.uri()).path();
+                if (!path.equals(WEBSOCKET_PATH)) {
+                    // the handshake would pass an upgrade for another path on, and the connection would stay open
+                    refuse(context, HttpResponseStatus.NOT_FOUND, "LiveReload");
+                } else if (!isAllowedOrigin(request.headers().get(HttpHeaderNames.ORIGIN))) {
+                    refuse(context, HttpResponseStatus.FORBIDDEN, "Forbidden");
+                } else {
+                    // the handshake is given the path alone, since Netty's does not complete with a query
+                    request.setUri(WEBSOCKET_PATH);
+                    context.fireChannelRead(request.retain());
+                }
                 return;
             }
             FullHttpResponse response;
@@ -192,6 +243,14 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             }
             response.headers().set(HttpHeaderNames.CACHE_CONTROL, "no-store");
             response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+            HttpUtil.setContentLength(response, response.content().readableBytes());
+            HttpUtil.setKeepAlive(response, false);
+            context.writeAndFlush(response).addListener(future -> context.close());
+        }
+
+        private static void refuse(ChannelHandlerContext context, HttpResponseStatus status, String body) {
+            FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, Unpooled.copiedBuffer(body, StandardCharsets.UTF_8));
+            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=utf-8");
             HttpUtil.setContentLength(response, response.content().readableBytes());
             HttpUtil.setKeepAlive(response, false);
             context.writeAndFlush(response).addListener(future -> context.close());
