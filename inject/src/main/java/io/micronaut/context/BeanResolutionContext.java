@@ -149,12 +149,9 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @return The bean
      * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
      *                                                             type
-     * @throws UnsupportedOperationException if this context cannot resolve a definition as a given type
      * @since 5.3.0
      */
-    default <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        throw new UnsupportedOperationException("This implementation of BeanResolutionContext doesn't support resolving a bean definition as a given type");
-    }
+    <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType);
 
     /**
      * Obtains the bean registrations for the given type and qualifier.
