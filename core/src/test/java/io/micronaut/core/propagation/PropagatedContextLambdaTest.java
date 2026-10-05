@@ -12,6 +12,8 @@ import java.util.Objects;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -88,6 +90,62 @@ abstract class PropagatedContextLambdaTest {
                 })
             )
         );
+    }
+
+    @Test
+    void testFindAllIsMostRecentFirstAndFiltersByType() {
+        PropagatedElement e1 = new PropagatedElement();
+        OwnedElement o1 = new OwnedElement("a");
+        PropagatedElement e2 = new PropagatedElement();
+        OwnedElement o2 = new OwnedElement("b");
+        PropagatedContext propagatedContext = PropagatedContext.empty().plus(e1).plus(o1).plus(e2).plus(o2);
+
+        assertEquals(List.of(e2, e1), propagatedContext.findAll(PropagatedElement.class).toList());
+        assertEquals(List.of(o2, o1), propagatedContext.findAll(OwnedElement.class).toList());
+        assertEquals(List.of(o2, e2, o1, e1), propagatedContext.findAll(PropagatedContextElement.class).toList());
+        // Short-circuiting and re-traversal must work on the in-place iteration
+        assertEquals(o2, propagatedContext.findAll(OwnedElement.class).findFirst().orElseThrow());
+        assertEquals(List.of(o1), propagatedContext.findAll(OwnedElement.class).skip(1).toList());
+        assertEquals(List.of(e1, o1, e2, o2), propagatedContext.getAllElements());
+    }
+
+    @Test
+    void testFindOrNullWithFilter() {
+        OwnedElement a1 = new OwnedElement("a");
+        OwnedElement b1 = new OwnedElement("b");
+        OwnedElement a2 = new OwnedElement("a");
+        PropagatedContext propagatedContext = PropagatedContext.empty().plus(a1).plus(b1).plus(new PropagatedElement()).plus(a2);
+
+        assertSame(a2, propagatedContext.findOrNull(OwnedElement.class, e -> e.owner().equals("a")));
+        assertSame(b1, propagatedContext.findOrNull(OwnedElement.class, e -> e.owner().equals("b")));
+        assertNull(propagatedContext.findOrNull(OwnedElement.class, e -> e.owner().equals("c")));
+        assertNull(propagatedContext.findOrNull(SetContextName.class, e -> true));
+        assertSame(a2, propagatedContext.minus(a2).plus(a2).findOrNull(OwnedElement.class, e -> e.owner().equals("a")));
+        assertSame(a1, propagatedContext.minus(a2).findOrNull(OwnedElement.class, e -> e.owner().equals("a")));
+    }
+
+    @Test
+    void testLookupsOnEmptyContext() {
+        PropagatedContext propagatedContext = PropagatedContext.empty();
+
+        assertEquals(List.of(), propagatedContext.findAll(PropagatedElement.class).toList());
+        assertNull(propagatedContext.findOrNull(PropagatedElement.class, e -> true));
+        assertNull(propagatedContext.findOrNull(PropagatedElement.class));
+        assertEquals(List.of(), propagatedContext.getAllElements());
+        PropagatedContext emptied = propagatedContext.plus(new PropagatedElement());
+        emptied = emptied.minus(emptied.get(PropagatedElement.class));
+        assertEquals(List.of(), emptied.findAll(PropagatedElement.class).toList());
+        assertNull(emptied.findOrNull(PropagatedElement.class, e -> true));
+    }
+
+    @Test
+    void testGetAllElementsIsUnmodifiable() {
+        PropagatedContext propagatedContext = PropagatedContext.empty().plus(new PropagatedElement());
+
+        List<PropagatedContextElement> elements = propagatedContext.getAllElements();
+        assertThrows(UnsupportedOperationException.class, () -> elements.add(new PropagatedElement()));
+        assertThrows(UnsupportedOperationException.class, () -> elements.set(0, new PropagatedElement()));
+        assertEquals(1, propagatedContext.getAllElements().size());
     }
 
     @Test
@@ -236,6 +294,19 @@ abstract class PropagatedContextLambdaTest {
     }
 
     static class PropagatedElement implements PropagatedContextElement {
+    }
+
+    private record OwnedElement(String owner) implements PropagatedContextElement {
+
+        @Override
+        public boolean equals(Object o) {
+            return this == o;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(this);
+        }
     }
 
     private static final ThreadLocal<String> CONTEXT_NAME_HOLDER = ThreadLocal.withInitial(() -> "");
