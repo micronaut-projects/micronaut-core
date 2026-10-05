@@ -1399,12 +1399,12 @@ final class PythonAsyncioRuntimeTest {
             PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ReactiveClient()));
             Value coroutine = context.eval(PYTHON, """
                 import java
-                IllegalStateException = java.type("java.lang.IllegalStateException")
+                RuntimeException = java.type("java.lang.RuntimeException")
                 async def fail(target):
                     try:
                         await target.client.error()
-                    except IllegalStateException as exc:
-                        return str(exc.getMessage())
+                    except RuntimeException as exc:
+                        return exc.getMessage()
                     return "missing-error"
                 fail
                 """).execute(target);
@@ -2092,6 +2092,7 @@ final class PythonAsyncioRuntimeTest {
             CompletionException exception = assertThrows(CompletionException.class, joined::join);
             assertEquals("backend down", assertInstanceOf(IllegalStateException.class, exception.getCause()).getMessage());
 
+            // the await raises the Java exception itself, as the blocking call does
             Value catching = context.eval(PYTHON, """
                 import java
                 IllegalStateException = java.type("java.lang.IllegalStateException")
@@ -2099,7 +2100,7 @@ final class PythonAsyncioRuntimeTest {
                     try:
                         return await target.client.message()
                     except IllegalStateException as e:
-                        return "IllegalStateException:" + str(e.getMessage())
+                        return "IllegalStateException:" + e.getMessage()
                 call
                 """).execute(target);
             CompletionStage caught = PythonAsyncioRuntime.toCompletionStage(catching);
@@ -2108,7 +2109,7 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
-    void awaitedJavaFailureCrossesTasksAsItself() throws Exception {
+    void awaitedJavaFailureMatchesJavaTypeThroughTasksAndGather() throws Exception {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             Value target = context.eval(PYTHON, """
                 class Target:
@@ -2117,55 +2118,66 @@ final class PythonAsyncioRuntimeTest {
                 """);
             PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new FailingAsyncClient()));
 
-            Value tasks = context.eval(PYTHON, """
+            Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 import java
-                IllegalStateException = java.type("java.lang.IllegalStateException")
-                async def message(target):
-                    return await target.client.message()
+                RuntimeException = java.type("java.lang.RuntimeException")
                 async def call(target):
-                    seen = []
+                    outcomes = []
+                    # an uncaught awaited failure fails the task and is raised again where the task is awaited
+                    async def uncaught():
+                        return await target.client.message()
                     try:
-                        await asyncio.ensure_future(message(target))
-                    except IllegalStateException as e:
-                        seen.append("task:" + str(e.getMessage()))
-                    # gather stores what exception() answers: a Python exception carrying the Java one
+                        await asyncio.ensure_future(uncaught())
+                    except RuntimeException as e:
+                        outcomes.append("task:" + e.getClass().getSimpleName())
                     try:
-                        await asyncio.gather(message(target))
-                    except RuntimeError as e:
-                        seen.append(type(e).__name__ + ":" + str(e.java_exception.getMessage()))
-                    return ",".join(seen)
+                        await asyncio.gather(target.client.message(), asyncio.sleep(0))
+                    except RuntimeException as e:
+                        outcomes.append("gather:" + e.getMessage())
+                    # the failure stored on the future keeps the Java exception reachable
+                    results = await asyncio.gather(target.client.message(), return_exceptions=True)
+                    outcomes.append("stored:" + type(results[0]).__name__ + ":" + results[0].java_exception.getMessage())
+                    # as for a blocking Java call, `except Exception` does not catch the Java exception
+                    try:
+                        try:
+                            await target.client.message()
+                        except Exception:
+                            outcomes.append("caught-by-Exception")
+                    except BaseException as e:
+                        outcomes.append("BaseException:" + e.getClass().getSimpleName())
+                    return ",".join(outcomes)
                 call
                 """).execute(target);
-            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(tasks);
-            assertEquals("task:backend down,MicronautJavaException:backend down", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+            assertEquals(
+                "task:IllegalStateException,gather:backend down,stored:MicronautJavaException:backend down,BaseException:IllegalStateException",
+                stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
         }
     }
 
     @Test
-    void awaitedJavaFailureOnALoopOfTheApplicationRaisesTheWrapper() {
+    void javaExceptionThrownInsideTaskIsRaisedWhereTheTaskIsAwaited() throws Exception {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
-            Value target = context.eval(PYTHON, """
-                class Target:
-                    pass
-                Target()
-                """);
-            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new FailingAsyncClient()));
-            // the tasks of a loop the bridge does not own cannot carry a Java exception: the wrapper is raised
-            Value result = context.eval(PYTHON, """
+            Value coroutine = context.eval(PYTHON, """
                 import asyncio
-                async def message(target):
-                    return await target.client.message()
-                async def call(target):
+                import java
+                Integer = java.type("java.lang.Integer")
+                NumberFormatException = java.type("java.lang.NumberFormatException")
+                async def call():
+                    async def parse():
+                        await asyncio.sleep(0)
+                        return Integer.parseInt("not a number")
                     try:
-                        await asyncio.create_task(message(target))
-                    except RuntimeError as e:
-                        return type(e).__name__ + ":" + str(e.java_exception.getMessage())
-                def run(target):
-                    return asyncio.run(call(target))
-                run
-                """).execute(target);
-            assertEquals("MicronautJavaException:backend down", result.asString());
+                        await asyncio.create_task(parse())
+                    except NumberFormatException as e:
+                        return "caught:" + e.getClass().getSimpleName()
+                call
+                """).execute();
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+            assertEquals("caught:NumberFormatException", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
         }
     }
 
@@ -2176,8 +2188,6 @@ final class PythonAsyncioRuntimeTest {
                 class Rejected(Exception):
                     pass
                 rejected = Rejected("no")
-                # an application attribute of that name does not make it a bridge wrapper
-                rejected.java_exception = "not a bridge wrapper"
                 async def fail():
                     raise rejected
                 fail

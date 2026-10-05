@@ -121,22 +121,29 @@ if _policy_local is not None:
 
 
 class MicronautJavaException(RuntimeError):
-    """Python exception carrying a Java ``Throwable`` that failed an awaited Java value.
+    """Python exception storing a Java ``Throwable`` that failed an asyncio future.
 
     GraalPy cannot attach a traceback to a foreign exception, which is what
-    ``asyncio.Future.result`` does when a stored exception is re-raised, nor throw
-    one into a coroutine, which is how a task resumes the coroutine awaiting a
-    failed future. Java failures are therefore stored behind this Python exception.
-    Awaiting the future of a Java value raises ``java_exception`` itself
-    (``_MicronautJavaFailureAwaitable``), and the bridge unwraps it when the failure
-    crosses back into Java, so the original Java exception type is preserved end to
-    end. Code reading a stored failure, ``asyncio.gather`` for instance, sees this
-    ``RuntimeError``; the Java exception is available as ``java_exception``.
+    ``asyncio.Future.set_exception`` and ``Future.result`` do with a stored
+    exception. Java failures are therefore stored behind this Python exception:
+    ``Future.exception()`` returns it, with the Java exception as
+    ``java_exception``. Awaiting the future, or calling ``result()``, raises the
+    Java exception itself, so ``except HttpClientResponseException`` handles an
+    awaited call exactly as it handles the blocking one. The bridge unwraps
+    ``java_exception`` when the failure crosses back into Java, so the original
+    Java exception type is preserved end to end.
     """
 
     def __init__(self, java_exception):
         super().__init__(str(java_exception))
         self.java_exception = java_exception
+
+
+class _MicronautJavaLoopException(MicronautJavaException):
+    """A Java failure of an asyncio API of the loop itself (``create_server``, ``connect_accepted_socket``):
+    raised as this Python exception, which asyncio code handles with ``except Exception``, rather than
+    as the Java exception an awaited Java value raises."""
+
 
 _AsyncioRuntime = java.type("io.micronaut.context.python.PythonAsyncioRuntime")
 
@@ -220,8 +227,18 @@ def _is_java_failure(exception):
     return getattr(exception, "java_exception", None) is not None
 
 
-def _micronaut_java_failure(throwable):
-    failure = _java_failure_type(throwable)(throwable)
+_JavaCompletionException = java.type("java.util.concurrent.CompletionException")
+
+
+def _micronaut_java_failure(throwable, generic_type=MicronautJavaException):
+    # a stage completed by a function that threw reports the exception wrapped: the await raises what
+    # was thrown, as the blocking call would
+    while isinstance(throwable, _JavaCompletionException) and throwable.getCause() is not None:
+        throwable = throwable.getCause()
+    failure_type = _java_failure_type(throwable)
+    if failure_type is MicronautJavaException:
+        failure_type = generic_type
+    failure = failure_type(throwable)
     try:
         failure.__cause__ = throwable
     except Exception:
@@ -229,128 +246,68 @@ def _micronaut_java_failure(throwable):
     return failure
 
 
-_Throwable = java.type("java.lang.Throwable")
+_JavaThrowable = java.type("java.lang.Throwable")
 
 
 def _is_java_throwable(value):
-    try:
-        return java.instanceof(value, _Throwable)
-    except Exception:
-        return False
+    return java.is_object(value) and isinstance(value, _JavaThrowable)
 
 
-# the Python exceptions the bridge stores for a Java failure, as opposed to a Python exception of the
-# application that happens to carry a java_exception attribute
-_JAVA_FAILURE_TYPES = (MicronautJavaException, MicronautJavaOSError, MicronautJavaConnectionRefused, MicronautJavaTimeout, MicronautJavaAddressError)
+def _micronaut_raisable(failure):
+    """The exception to raise for a stored failure: the Java throwable behind a generic Java failure.
 
-
-def _in_micronaut_task():
-    try:
-        return isinstance(tasks.current_task(), _MicronautTask)
-    except RuntimeError:
-        return False
-
-
-class _MicronautWait:
-    """Suspend until a future is done, yielding the future itself to the task as ``Future.__await__``
-    does, so cancelling the awaiting task cancels the future.
-
-    The task wakes the coroutine up by calling ``result()`` on the future and throwing what it raised
-    into the coroutine (``Task.__wakeup``): that is always a Python exception, as GraalPy cannot throw
-    a Java exception into a generator.
+    A generic Java failure is raised as the Java exception, which ``except JavaType`` matches as it
+    does when a blocking Java call throws (and which ``except Exception`` does not catch, as for a
+    blocking call). Networking failures keep the ``OSError`` subclasses asyncio code expects.
     """
-
-    __slots__ = ("_future",)
-
-    def __init__(self, future):
-        self._future = future
-
-    def __await__(self):
-        future = self._future
-        if not future.done():
-            future._asyncio_future_blocking = True
-            yield future
-        if not future.done():
-            raise RuntimeError("await wasn't used with future")
-
-
-async def _micronaut_await(future):
-    try:
-        await _MicronautWait(future)
-        return future.result()
-    except BaseException as failure:
-        java_failure = future._micronaut_raised_java_failure(failure)
-        if java_failure is None:
-            raise
-        # raised by a coroutine frame, which GraalPy supports for a Java exception, unlike a generator
-        # frame (Future.__await__) or generator.throw (Task.__wakeup)
-        raise java_failure
-
-
-class _MicronautJavaFailureAwaitable:
-    """Raises the Java exception of a failed future as itself when the future is awaited.
-
-    GraalPy cannot attach a traceback to a Java exception nor throw one into a coroutine, so
-    ``result()`` and ``exception()`` answer with a Python exception carrying the Java one (a
-    ``MicronautJavaException``), which ``asyncio.gather`` and friends can store. Awaiting the future
-    raises the Java exception, as the blocking call would, so ``except HttpClientResponseException``
-    matches.
-    """
-
-    def _micronaut_raised_java_failure(self, failure):
-        """The Java exception to raise instead of ``failure``, raised by ``result()``, or ``None``."""
-        raise NotImplementedError
-
-    def __await__(self):
-        return _micronaut_await(self).__await__()
-
-    __iter__ = __await__
-
-
-class _MicronautStageFuture(_MicronautJavaFailureAwaitable, futures.Future):
-    """The asyncio future of an awaited Java ``CompletionStage``."""
-
-    def _micronaut_raised_java_failure(self, failure):
-        if not self.done() or self.cancelled() or failure is not self.exception():
-            return None
-        if not isinstance(failure, _JAVA_FAILURE_TYPES) or not _in_micronaut_task():
-            # a task of a loop the bridge does not own could not re-raise the Java exception if its
-            # coroutine let it escape: there the wrapper is raised
-            return None
+    if type(failure) is MicronautJavaException:
         return failure.java_exception
+    return failure
 
 
-class _MicronautTask(_MicronautJavaFailureAwaitable, tasks.Task):
-    """A task whose coroutine failed with a Java exception raises that exception when awaited.
+# asyncio stores a failure with its traceback and re-raises it with that traceback, neither of which
+# GraalPy can do for a Java exception, and GraalPy cannot throw one into a coroutine either (which a
+# task does with the failure of the future it waited for). Every future of this context therefore stores
+# a Java exception behind a MicronautJavaException (a Java call that threw inside a task, an awaited
+# failure re-raised as itself and left uncaught), ``result()`` raises that wrapper, and ``await`` raises
+# the Java exception again inside the awaiting coroutine.
+_future_set_exception = futures.Future.set_exception
 
-    The task stores the Java exception as its coroutine raised it, which ``Task.result`` cannot
-    re-raise in GraalPy: ``result()`` and ``exception()`` answer with a ``MicronautJavaException``.
-    """
 
-    def _micronaut_wrapped_failure(self):
-        if not self.done() or self.cancelled():
-            return None
-        wrapped = getattr(self, "_micronaut_wrapped", None)
-        if wrapped is None:
-            failure = tasks.Task.exception(self)
-            if failure is None or not _is_java_throwable(failure):
-                return None
-            wrapped = self._micronaut_wrapped = _micronaut_java_failure(failure)
-        return wrapped
+def _micronaut_future_set_exception(self, exception):
+    if _is_java_throwable(exception):
+        exception = _micronaut_java_failure(exception)
+    _future_set_exception(self, exception)
 
-    def _micronaut_raised_java_failure(self, failure):
-        wrapped = self._micronaut_wrapped_failure()
-        return wrapped.java_exception if wrapped is not None and failure is wrapped else None
 
-    def exception(self):
-        wrapped = self._micronaut_wrapped_failure()
-        return wrapped if wrapped is not None else super().exception()
+def _micronaut_future_await(self):
+    if not self.done():
+        self._asyncio_future_blocking = True
+        try:
+            yield self  # this tells Task to wait for completion
+        except MicronautJavaException as failure:
+            # the task throws the failure of this future into the coroutine at this point
+            raisable = _micronaut_raisable(failure)
+            if raisable is failure:
+                raise
+        else:
+            raisable = None
+        if raisable is not None:
+            # raised outside the handler: the Java exception gets no implicit context
+            raise raisable
+    if not self.done():
+        raise RuntimeError("await wasn't used with future")
+    if self._exception is not None and not self.cancelled():
+        raisable = _micronaut_raisable(self._exception)
+        if raisable is not self._exception:
+            self._Future__log_traceback = False
+            raise raisable
+    return self.result()  # May raise too.
 
-    def result(self):
-        wrapped = self._micronaut_wrapped_failure()
-        if wrapped is not None:
-            raise wrapped
-        return super().result()
+
+futures.Future.set_exception = _micronaut_future_set_exception
+futures.Future.__await__ = _micronaut_future_await
+futures.Future.__iter__ = _micronaut_future_await
 
 class _MicronautAsyncioHandle:
     """Minimal callback handle used by the Micronaut-managed event loop.
@@ -670,7 +627,7 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
         if kwargs:
             unsupported = ", ".join(sorted(kwargs))
             raise NotImplementedError(f"asyncio task keyword arguments are not supported by the Micronaut Netty event loop: {unsupported}")
-        return _MicronautTask(coro, loop=self, name=name, context=context)
+        return tasks.Task(coro, loop=self, name=name, context=context)
 
     def get_debug(self):
         return self._debug
@@ -822,7 +779,7 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
             if throwable is None:
                 future.set_result(value)
             else:
-                future.set_exception(_micronaut_java_failure(throwable))
+                future.set_exception(_micronaut_java_failure(throwable, _MicronautJavaLoopException))
         _AsyncioRuntime.completeOnLoop(stage, self._java_loop, complete)
         return future
 
@@ -913,7 +870,7 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
                 raise
             if all_errors:
                 # every address was tried; the Java failure carries the earlier attempts as suppressed exceptions
-                attempts = [_micronaut_java_failure(suppressed) for suppressed in failure.java_exception.getSuppressed()]
+                attempts = [_micronaut_java_failure(suppressed, _MicronautJavaLoopException) for suppressed in failure.java_exception.getSuppressed()]
                 attempts.append(failure)
                 raise ExceptionGroup("Multiple exceptions", attempts) from None
             raise
@@ -1171,19 +1128,29 @@ class _MicronautFallbackLoop(asyncio.base_events.BaseEventLoop):
         self._selector.close()
 
 
-def _new_fallback_loop():
+def _new_fallback_loop(executor_adapter=None):
     try:
         loop = asyncio.new_event_loop()
     except OSError:
         # io.UnsupportedOperation ("socket was excluded"): no socket pair for the self-pipe
         loop = _MicronautFallbackLoop()
-    # the tasks of the coroutine raise the Java exceptions they fail with, as on the Micronaut loop
-    loop.set_task_factory(_micronaut_task_factory)
+    if executor_adapter is not None and executor_adapter.isAvailable():
+        # the default executor of an asyncio loop starts Python threads, which an application context
+        # refuses: run_in_executor(None, ...) uses Micronaut's blocking executor, as on the Micronaut loop
+        run_in_executor = loop.run_in_executor
+
+        def micronaut_run_in_executor(executor, func, *args):
+            if executor is not None:
+                return run_in_executor(executor, func, *args)
+            if loop.is_closed():
+                raise RuntimeError("Event loop is closed")
+            future = loop.create_future()
+            # no Java event loop: the worker completes the future through call_soon_threadsafe
+            executor_adapter.run(future, lambda: func(*args), None)
+            return future
+
+        loop.run_in_executor = micronaut_run_in_executor
     return loop
-
-
-def _micronaut_task_factory(loop, coro, **kwargs):
-    return _MicronautTask(coro, loop=loop, **kwargs)
 
 
 # The reactive context (``PythonReactiveContext``: the Reactor context and propagated context of the
@@ -1267,7 +1234,7 @@ def _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, j
         # a Java exception raised inside the coroutine is not re-raised through Future.result, which
         # GraalPy cannot do for foreign exceptions.
         try:
-            fallback_loop = _new_fallback_loop()
+            fallback_loop = _new_fallback_loop(executor_adapter)
             try:
                 completed = asyncio.ensure_future(awaitable, loop=fallback_loop)
                 try:
@@ -1309,9 +1276,9 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
 
     Java calls this when Python code awaits a Java async value. The future is
     created on the running Micronaut loop if one exists, otherwise the helper
-    falls back to the current Python event loop. Awaiting it raises the Java
-    exception of a failed stage as itself, and the Python exception of the
-    coroutine behind the stage as the original object. If the Python future is
+    falls back to the current Python event loop. A stage that failed with the
+    Python exception of the coroutine behind it fails the future with that
+    exception object. If the Python future is
     cancelled, cancellation is propagated back to the Java future when Java
     supplied one.
     """
@@ -1322,12 +1289,12 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
         if java_loop is not None:
             loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
             with _CurrentLoopForCall(loop):
-                future = _MicronautStageFuture(loop=loop)
+                future = loop.create_future()
             if java_future is not None:
                 future.add_done_callback(lambda completed: java_future.cancel(False) if completed.cancelled() else None)
             return future
         loop = asyncio.get_event_loop()
-    future = _MicronautStageFuture(loop=loop)
+    future = loop.create_future()
     if java_future is not None:
         future.add_done_callback(lambda completed: java_future.cancel(False) if completed.cancelled() else None)
     return future
@@ -1483,7 +1450,7 @@ class MicronautPublisherIterator:
         if terminal is None or terminal is _COMPLETED:
             raise StopAsyncIteration
         self._terminal = _COMPLETED
-        raise terminal
+        raise _micronaut_raisable(terminal)
 
     async def aclose(self):
         """Cancel the subscription; a pending ``__anext__`` ends with ``StopAsyncIteration``."""

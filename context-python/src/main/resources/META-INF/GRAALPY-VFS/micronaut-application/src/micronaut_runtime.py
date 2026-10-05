@@ -203,15 +203,21 @@ def __micronaut_get_raw_class_member(cls, name):
 def __micronaut_prepare_introduction(cls):
     """Make an abstract class or Protocol instantiable for a Micronaut introduction.
 
-    Every abstract method gets a stub that the Java proxy replaces; the class is
-    marked so the work happens once per class and context.
+    Every abstract method gets a stub that the Java proxy replaces; coroutine
+    identity is preserved for later proxies of the same class. The class is marked
+    so the work happens once per class and context.
     """
     if cls.__dict__.get("__micronaut_introduction__", False):
         # the marker is not inherited: a subclass that adds abstract methods is prepared on its own
         return cls
     from abc import update_abstractmethods
+
+    async def async_stub(*args, **kwargs):
+        return None
+
     for name in list(getattr(cls, "__abstractmethods__", ())):
-        setattr(cls, name, lambda *args, **kwargs: None)
+        stub = async_stub if inspect.iscoroutinefunction(getattr(cls, name)) else lambda *args, **kwargs: None
+        setattr(cls, name, stub)
     update_abstractmethods(cls)
     if getattr(cls, "_is_protocol", False):
         cls._is_protocol = False
