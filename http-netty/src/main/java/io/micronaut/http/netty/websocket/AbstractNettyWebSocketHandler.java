@@ -345,8 +345,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     return;
                 }
 
-                ByteBuf content;
                 CompositeByteBuf buffer = frameBuffer.getAndSet(null);
+                final ByteBuf content;
                 if (buffer == null) {
                     content = msgContent;
                 } else {
@@ -355,23 +355,28 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
-                content.release();
+                Optional<?> converted;
+                try {
+                    converted = ConversionService.SHARED.convert(content, bodyArgument);
 
-                if (!converted.isPresent()) {
-                    MediaType mediaType;
-                    try {
-                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
-                    } catch (IllegalArgumentException e) {
-                        exceptionCaught(ctx, e);
-                        return;
+                    if (!converted.isPresent()) {
+                        MediaType mediaType;
+                        try {
+                            mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
+                        } catch (IllegalArgumentException e) {
+                            exceptionCaught(ctx, e);
+                            return;
+                        }
+                        try {
+                            // decode the complete payload: a single frame or the assembled fragments
+                            converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(content)));
+                        } catch (CodecException e) {
+                            messageProcessingException(ctx, e);
+                            return;
+                        }
                     }
-                    try {
-                        converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
-                    } catch (CodecException e) {
-                        messageProcessingException(ctx, e);
-                        return;
-                    }
+                } finally {
+                    content.release();
                 }
 
                 if (converted.isPresent()) {
