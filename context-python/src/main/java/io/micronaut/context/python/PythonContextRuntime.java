@@ -72,12 +72,7 @@ public final class PythonContextRuntime {
     private static final String HAS_COROUTINE_METHODS = "__micronaut_has_coroutine_methods";
     private static final String IS_PLAIN_BEAN_INSTANCE = "__micronaut_is_plain_bean_instance";
     private static final String ASYNC_FUNCTION_KIND = "__micronaut_async_function_kind";
-    private static final ClassValue<Map<String, String>> ASYNC_FUNCTION_KINDS = new ClassValue<>() {
-        @Override
-        protected Map<String, String> computeValue(Class<?> type) {
-            return new ConcurrentHashMap<>();
-        }
-    };
+    private static final String INSTANCE_MEMBER_PREFIX = "instance:";
     private static final ClassValue<Optional<PythonClassReference>> PYTHON_CLASS_REFERENCES = new ClassValue<>() {
         @Override
         protected Optional<PythonClassReference> computeValue(Class<?> type) {
@@ -363,13 +358,12 @@ public final class PythonContextRuntime {
      * function runs the coroutine in the owner's context, on that context's loop for the calling event loop, and
      * hands the caller a future of its own loop; an async generator is consumed through a publisher instead.
      *
-     * @param wrapperType The generated wrapper the member was read through, which names the Python class
      * @param owner The Python object the member was read from
      * @param name The member name
      * @param member The member
      * @return A function for the calling context, or {@code null} when the member is used as it is
      */
-    static @Nullable Object crossContextAsyncMember(Class<?> wrapperType, Value owner, String name, Value member) {
+    static @Nullable Object crossContextAsyncMember(Value owner, String name, Value member) {
         if (!member.canExecute()) {
             return null;
         }
@@ -378,15 +372,7 @@ public final class PythonContextRuntime {
         if (caller == null || caller.equals(ownerContext)) {
             return null;
         }
-        String kind;
-        if (isReuseContext()) {
-            // a reused context reloads its modules: a method of the same name may change kind
-            kind = asyncFunctionKind(ownerContext, member);
-        } else {
-            // every call through a wrapper of another context reads the member: ask the guest once per method
-            kind = ASYNC_FUNCTION_KINDS.get(wrapperType).computeIfAbsent(name, ignored -> asyncFunctionKind(ownerContext, member));
-        }
-        return switch (kind) {
+        return switch (asyncFunctionKind(ownerContext, owner, name, member)) {
             case "coroutine" -> (ProxyExecutable) arguments ->
                 PythonAsyncioRuntime.toAwaitable(caller, PythonAsyncioRuntime.toCompletionStage(member.execute((Object[]) arguments)));
             case "async_generator" -> (ProxyExecutable) arguments ->
@@ -396,8 +382,28 @@ public final class PythonContextRuntime {
         };
     }
 
-    private static String asyncFunctionKind(Context context, Value member) {
-        return helper(context, ASYNC_FUNCTION_KIND).execute(member).asString();
+    /*
+     * Every call a caller in another context makes through a wrapper reads the member, so the kind is asked of the
+     * guest once per Python class and member name. Not when the member is an attribute of the object itself, which
+     * another object of the class need not share, nor with a reused context, which reloads its modules.
+     */
+    private static String asyncFunctionKind(Context context, Value owner, String name, Value member) {
+        Value type = isReuseContext() ? null : owner.getMetaObject();
+        Map<String, String> kinds = type == null
+            ? null
+            : PythonContextRegistry.state(context).asyncFunctionKinds.computeIfAbsent(type, ignored -> new ConcurrentHashMap<>());
+        String kind = kinds == null ? null : kinds.get(name);
+        if (kind != null) {
+            return kind;
+        }
+        kind = helper(context, ASYNC_FUNCTION_KIND).execute(owner, name, member).asString();
+        if (kind.startsWith(INSTANCE_MEMBER_PREFIX)) {
+            return kind.substring(INSTANCE_MEMBER_PREFIX.length());
+        }
+        if (kinds != null) {
+            kinds.put(name, kind);
+        }
+        return kind;
     }
 
     private static @Nullable Context currentPolyglotContext() {

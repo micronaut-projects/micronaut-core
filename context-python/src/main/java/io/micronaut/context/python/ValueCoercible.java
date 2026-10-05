@@ -130,7 +130,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
                 return null;
             }
             // a coroutine of this object's context cannot be awaited on the loop of a caller in another one
-            Object asyncMember = PythonContextRuntime.crossContextAsyncMember(getClass(), value, key, member);
+            Object asyncMember = PythonContextRuntime.crossContextAsyncMember(value, key, member);
             return asyncMember != null ? asyncMember : member;
         }
         Object getter = generatedGetter(key);

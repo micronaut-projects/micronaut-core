@@ -57,16 +57,6 @@ final class GraalPyExceptionHandler {
     }
 
     /**
-     * Resolve the host throwable represented by a guest exception value.
-     * <p>
-     * Host exceptions that crossed into Python keep their identity, generated Python exception wrappers
-     * are instantiated, and any other Python exception is reported as the {@link PolyglotException}
-     * that {@link Value#throwException()} produces for it.
-     *
-     * @param exception The exception value
-     * @return The throwable to report to Java
-     */
-    /**
      * The failure of a Java stage as it may be handed to Python code of a context.
      * <p>
      * A Python exception raised in another context (a coroutine of a singleton awaited from an
@@ -101,6 +91,16 @@ final class GraalPyExceptionHandler {
         return replacement;
     }
 
+    /**
+     * Resolve the host throwable represented by a guest exception value.
+     * <p>
+     * Host exceptions that crossed into Python keep their identity, generated Python exception wrappers
+     * are instantiated, and any other Python exception is reported as the {@link PolyglotException}
+     * that {@link Value#throwException()} produces for it.
+     *
+     * @param exception The exception value
+     * @return The throwable to report to Java
+     */
     static Throwable toHostThrowable(Value exception) {
         if (exception.isHostObject() && exception.asHostObject() instanceof Throwable throwable) {
             return throwable;

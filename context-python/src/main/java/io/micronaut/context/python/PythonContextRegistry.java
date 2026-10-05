@@ -786,6 +786,11 @@ final class PythonContextRegistry {
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
         /**
+         * Whether a member of a Python class is an async function, by class and member name: read for every call
+         * a caller in another context makes through a wrapper.
+         */
+        final Map<Value, Map<String, String>> asyncFunctionKinds = new ConcurrentHashMap<>();
+        /**
          * The pooled beans that have an instance in this context, so that closing it can tell them to
          * drop it. The instances themselves live on the bean, which is what makes a collected bean take
          * its instances with it; this is the other half, and neither side can be weak on its own,
@@ -829,6 +834,7 @@ final class PythonContextRegistry {
             }
             pooledHolders.clear();
             coroutineClasses.clear();
+            asyncFunctionKinds.clear();
             helpers.clear();
             classes.clear();
             scopedProxies.clear();

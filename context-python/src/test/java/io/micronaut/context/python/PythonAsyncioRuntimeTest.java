@@ -443,6 +443,58 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void theKindOfAMemberIsResolvedPerPythonClassAndObject() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+            Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+            primary.eval(PYTHON, """
+                import asyncio
+                class Base:
+                    def __init__(self, callback):
+                        self.callback = callback
+                    def work(self):
+                        return "sync"
+                class Async(Base):
+                    async def work(self):
+                        await asyncio.sleep(0)
+                        return "async"
+                async def async_callback():
+                    return "async-callback"
+                def sync_callback():
+                    return "sync-callback"
+                """);
+            Value bindings = primary.getBindings(PYTHON);
+            // one wrapper class for both objects, as a base-class wrapper serves an instance of a subclass
+            ValueCoercible sync = wrap(bindings.getMember("Base").execute(bindings.getMember("sync_callback")));
+            ValueCoercible async = wrap(bindings.getMember("Async").execute(bindings.getMember("async_callback")));
+            eventLoopContext.eval(PYTHON, """
+                async def call_both(sync, async_):
+                    return [sync.work(), await async_.work(), await async_.callback(), sync.callback(),
+                            sync.work(), await async_.work()]
+                """);
+            Value call = eventLoopContext.getBindings(PYTHON).getMember("call_both");
+
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(call.execute(sync, async));
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("['sync', 'async', 'async-callback', 'sync-callback', 'sync', 'async']",
+                stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString());
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    private static ValueCoercible wrap(Value value) {
+        return () -> value;
+    }
+
+    @Test
     void containersCrossTheContextsOfAnAwaitedPythonSingleton() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(

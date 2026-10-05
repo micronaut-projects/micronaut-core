@@ -152,13 +152,24 @@ def __micronaut_has_coroutine_methods(cls):
     return False
 
 
-def __micronaut_async_function_kind(member):
-    """'coroutine' or 'async_generator' for an async function or bound method, otherwise ''."""
+def __micronaut_async_function_kind(owner, name, member):
+    """'coroutine' or 'async_generator' for an async function or bound method, otherwise ''.
+
+    Prefixed with 'instance:' when the member is an attribute of the object itself rather than of its
+    class: another object of the class may hold something else under that name.
+    """
     if inspect.iscoroutinefunction(member):
-        return "coroutine"
-    if inspect.isasyncgenfunction(member):
-        return "async_generator"
-    return ""
+        kind = "coroutine"
+    elif inspect.isasyncgenfunction(member):
+        kind = "async_generator"
+    else:
+        kind = ""
+    try:
+        if name in vars(owner):
+            return "instance:" + kind
+    except TypeError:
+        pass
+    return kind
 
 
 def __micronaut_is_plain_bean_instance(obj, qualname):
