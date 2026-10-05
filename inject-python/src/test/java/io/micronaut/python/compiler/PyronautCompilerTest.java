@@ -54,6 +54,57 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void visitsAPythonClassOnceWhenItsAnnotationsAreCopiedForReflection(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Files.writeString(python.resolve("reflected.py"), """
+            from io.micronaut.python.compiler import TestIsolate
+            @TestIsolate
+            class Reflected:
+                value: int = 1
+            """);
+
+        // the reflection gate copies @TestIsolate onto the generated Java class; the visitors of the
+        // Java round must not visit that class a second time, or the META-INF file is written twice
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .targetDir(output.toFile())
+            .options(List.of("-Amicronaut.introspection.allowReflection=*"))
+            .build()
+            .compile();
+
+        assertTrue(Files.isRegularFile(output.resolve("META-INF/pyronaut/isolating-Reflected.txt")));
+        try (var classLoader = new URLClassLoader(new URL[] {output.toUri().toURL()}, getClass().getClassLoader())) {
+            assertTrue(classLoader.loadClass("python.Reflected").isAnnotationPresent(TestIsolate.class));
+        }
+    }
+
+    @Test
+    void visitsAPythonClassOnceWhenItAllowsReflection(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Files.writeString(python.resolve("hinted.py"), """
+            from io.micronaut.python.compiler import TestIsolate
+            from micronaut.core.annotation import AllowsReflection
+            @AllowsReflection
+            @TestIsolate
+            class Hinted:
+                value: int = 1
+            """);
+
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        assertTrue(Files.isRegularFile(output.resolve("META-INF/pyronaut/isolating-Hinted.txt")));
+        try (var classLoader = new URLClassLoader(new URL[] {output.toUri().toURL()}, getClass().getClassLoader())) {
+            assertTrue(classLoader.loadClass("python.Hinted").isAnnotationPresent(TestIsolate.class));
+        }
+    }
+
+    @Test
     void compilesJavaSourcesWithoutPythonApplication(@TempDir Path sourceDirectory) throws Exception {
         Files.writeString(sourceDirectory.resolve("Greeting.java"), "public class Greeting {}\n");
 

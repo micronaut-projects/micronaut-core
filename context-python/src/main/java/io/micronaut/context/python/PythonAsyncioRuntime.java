@@ -576,9 +576,12 @@ public final class PythonAsyncioRuntime {
     }
 
     private static void completeAwaitable(Context context, Value future, @Nullable Object result, @Nullable Throwable throwable) {
+        // a Python exception of another context is replaced by a Java view first; one of this context is recovered
+        Throwable crossContext = GraalPyExceptionHandler.forContext(context, throwable);
+        Object failure = crossContext == null ? null : awaitedFailure(context, crossContext);
         // a Java stage may complete after the coroutine that awaited it returned: the completion is
         // guest work of its own, tracked by a frame and skipped once the context is closing
-        if (!PythonContextRegistry.tryWithExecutionFrame(context, () -> awaitableCompleter(context).executeVoid(future, result, throwable == null ? null : awaitedFailure(context, throwable)))) {
+        if (!PythonContextRegistry.tryWithExecutionFrame(context, () -> awaitableCompleter(context).executeVoid(future, result, failure))) {
             LOG.debug("Skipping the completion of an awaitable whose Python context is closing");
         }
     }
@@ -635,7 +638,8 @@ public final class PythonAsyncioRuntime {
         Context context = callback.getContext();
         stage.whenComplete((value, throwable) -> {
             Runnable completion = () -> {
-                if (!PythonContextRegistry.tryWithExecutionFrame(context, () -> callback.executeVoid(value, throwable))) {
+                Throwable failure = GraalPyExceptionHandler.forContext(context, throwable);
+                if (!PythonContextRegistry.tryWithExecutionFrame(context, () -> callback.executeVoid(value, failure))) {
                     LOG.debug("Skipping a stage completion whose Python context is closing");
                 }
             };
