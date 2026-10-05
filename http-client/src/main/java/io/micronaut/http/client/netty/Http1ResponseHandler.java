@@ -142,13 +142,24 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void read(ChannelHandlerContext ctx, HttpResponse msg) {
             ReaderState<HttpContent> nextState;
-            if (msg.status().code() == HttpResponseStatus.CONTINUE.code()) {
-                listener.continueReceived(ctx);
+            boolean isContinue = msg.status().code() == HttpResponseStatus.CONTINUE.code();
+            if (isContinue) {
                 nextState = new DiscardingContinueContent(this);
             } else {
                 nextState = new BufferedContent(listener, msg);
             }
+            // commit the state before the callback, so that a failure it triggers sees it
             transitionToState(ctx, this, nextState);
+            if (isContinue) {
+                listener.continueReceived(ctx);
+                if (state != nextState) {
+                    // the callback already ended the exchange
+                    if (msg instanceof HttpContent c) {
+                        c.release();
+                    }
+                    return;
+                }
+            }
 
             if (msg instanceof HttpContent c) {
                 nextState.read(ctx, c);

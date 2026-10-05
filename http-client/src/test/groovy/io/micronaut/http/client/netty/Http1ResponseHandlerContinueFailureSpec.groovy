@@ -6,6 +6,7 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.DecoderResult
+import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.HttpResponse
@@ -86,6 +87,116 @@ class Http1ResponseHandlerContinueFailureSpec extends Specification {
         then: 'the response is not failed again'
         listener.failures == [exc]
         listener.finishCount == 1
+
+        cleanup:
+        channel.finishAndReleaseAll()
+    }
+
+    def "a failure triggered by continueReceived fails the response"() {
+        given:
+        def exc = new Exception("test")
+        def listener = new RecordingListener() {
+            @Override
+            void continueReceived(ChannelHandlerContext ctx) {
+                super.continueReceived(ctx)
+                ctx.pipeline().fireExceptionCaught(exc)
+            }
+        }
+        def channel = new EmbeddedChannel(new Http1ResponseHandler(listener))
+
+        when:
+        channel.writeInbound(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
+        channel.checkException()
+
+        then:
+        noExceptionThrown()
+        listener.continueReceived
+        listener.failures == [exc]
+        listener.finishCount == 1
+        listener.response == null
+
+        cleanup:
+        channel.finishAndReleaseAll()
+    }
+
+    def "a connection close triggered by continueReceived fails the response"() {
+        given:
+        def listener = new RecordingListener() {
+            @Override
+            void continueReceived(ChannelHandlerContext ctx) {
+                super.continueReceived(ctx)
+                ctx.close()
+            }
+        }
+        def channel = new EmbeddedChannel(new Http1ResponseHandler(listener))
+
+        when:
+        channel.writeInbound(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
+        channel.runPendingTasks()
+        channel.checkException()
+
+        then:
+        noExceptionThrown()
+        listener.continueReceived
+        listener.failures.size() == 1
+        listener.failures[0] instanceof ResponseClosedException
+        listener.finishCount == 1
+        listener.response == null
+
+        cleanup:
+        channel.finishAndReleaseAll()
+    }
+
+    def "a channelInactive fired by continueReceived fails the response"() {
+        given:
+        def listener = new RecordingListener() {
+            @Override
+            void continueReceived(ChannelHandlerContext ctx) {
+                super.continueReceived(ctx)
+                ctx.pipeline().fireChannelInactive()
+            }
+        }
+        def channel = new EmbeddedChannel(new Http1ResponseHandler(listener))
+
+        when:
+        channel.writeInbound(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
+        channel.checkException()
+
+        then:
+        noExceptionThrown()
+        listener.continueReceived
+        listener.failures.size() == 1
+        listener.failures[0] instanceof ResponseClosedException
+        listener.finishCount == 1
+        listener.response == null
+
+        cleanup:
+        channel.finishAndReleaseAll()
+    }
+
+    def "a failure triggered by continueReceived for a full 100 Continue message releases its content"() {
+        given:
+        def exc = new Exception("test")
+        def listener = new RecordingListener() {
+            @Override
+            void continueReceived(ChannelHandlerContext ctx) {
+                super.continueReceived(ctx)
+                ctx.pipeline().fireExceptionCaught(exc)
+            }
+        }
+        def channel = new EmbeddedChannel(new Http1ResponseHandler(listener))
+        def content = Unpooled.buffer()
+        def response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, content)
+
+        when:
+        channel.writeInbound(response)
+        channel.checkException()
+
+        then:
+        noExceptionThrown()
+        listener.failures == [exc]
+        listener.finishCount == 1
+        content.refCnt() == 0
 
         cleanup:
         channel.finishAndReleaseAll()
