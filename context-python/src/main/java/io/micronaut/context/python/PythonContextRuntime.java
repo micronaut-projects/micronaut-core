@@ -333,6 +333,43 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * Resolve a module script for the current asyncio event loop when one is active.
+     * <p>
+     * An explicitly scoped module script (a singleton, rather than the pooled default) lives in the startup
+     * context, but an async route of it is awaited on the event loop: the module is imported in the event-loop
+     * context, which runs its top-level code there, and receives the members injected into the startup module.
+     *
+     * @param fallback The startup-context module
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @return The event-loop-local module, or the fallback when no event-loop context is active
+     * @since 5.2.14
+     */
+    @UsedByGeneratedCode
+    public static Value asyncScript(Value fallback, String packageName, String scriptName) {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        PythonPool pool = runtime == null ? null : runtime.pool();
+        if (pool == null || isReuseContext()) {
+            return fallback;
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop == null) {
+            return fallback;
+        }
+        Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+        if (eventLoopContext.equals(fallback.getContext())) {
+            return fallback;
+        }
+        // the import and the member copies are guest work: run them inside an execution frame of that context
+        // so a close waits for them
+        return PythonContextRegistry.withTrackedExecutionFrame(eventLoopContext, () -> {
+            Value target = findScript(packageName, scriptName, eventLoopContext);
+            copyRememberedAsyncMembers(fallback, target);
+            return target;
+        });
+    }
+
+    /**
      * Resolve an injected Python bean for the context of the object it is assigned to.
      * <p>
      * In an event-loop context this is the bean's instance in that context: an async method of the bean, awaited

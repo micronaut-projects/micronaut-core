@@ -3079,6 +3079,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return methodElement.getName().startsWith("test");
     }
 
+    private static String scriptModuleName(PythonScriptElement scriptElement) {
+        String name = scriptElement.getNativeType().name();
+        if (name.endsWith(".py")) {
+            name = name.substring(0, name.length() - 3);
+        }
+        return name;
+    }
+
     private void visitScript(PythonScriptElement scriptElement, VisitorContext context) {
         try {
             if (classBuilders.containsKey(scriptElement.getName())) {
@@ -3116,10 +3124,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
             builder.addMethod(
                 constructor.build(((aThis, methodParameters) -> {
-                    String name = scriptElement.getNativeType().name();
-                    if (name.endsWith(".py")) {
-                        name = name.substring(0, name.length() - 3);
-                    }
+                    String name = scriptModuleName(scriptElement);
                     ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
                         .invokeStatic("findScript", POLYGLOT_VALUE,
                             List.of(
@@ -3189,13 +3194,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     || (isJunit5TestModule && isScriptTestMethod(methodElement));
                 addBridgeMethod(BridgeMethodSpec.of(methodElement, scriptElement).junit5Test(isJunit5Test).script(true), builder, context, addedMethodNames);
             }
+            boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
             // Find injection fields (script attributes)
             List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
             for (PropertyElement beanProperty : beanProperties) {
                 if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
                     // scripts rely on polyglot value; keep old behavior
-                    addSetterScript(beanProperty, builder, pythonValue);
+                    addSetterScript(beanProperty, builder, pythonValue, hasAsyncBridgeMethod);
                 }
 
                 if (beanProperty.hasStereotype(Bean.class) || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
@@ -4518,7 +4524,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     ExpressionDef targetValueExpression = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
                     ClassElement declaringType = methodElement.getDeclaringType();
-                    if (isAsyncMethod && !declaringType.isAbstract()) {
+                    if (isAsyncMethod && spec.script() && bridgeOwner instanceof PythonScriptElement scriptElement) {
+                        // a module script has no Python class: its async routes run on the module imported in the
+                        // event-loop context
+                        targetValueExpression = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                            "asyncScript",
+                            POLYGLOT_VALUE,
+                            targetValueExpression,
+                            ExpressionDef.constant(scriptElement.getPackageName()),
+                            ExpressionDef.constant(scriptModuleName(scriptElement))
+                        );
+                    } else if (isAsyncMethod && !declaringType.isAbstract()) {
                         targetValueExpression = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                             "asyncInstance",
                             POLYGLOT_VALUE,
@@ -5754,7 +5770,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private static void addSetterScript(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+    private static void addSetterScript(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, boolean adaptAsyncMembers) {
         TypeDef returnType = beanProperty.getWriteMethod()
             .map(MethodElement::getReturnType)
             .map(TypeDef::of).orElse(TypeDef.VOID);
@@ -5768,20 +5784,46 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
             var targetValue = aThis.field(pythonValue);
-            var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
-            List<ExpressionDef> parameters = new ArrayList<>();
-            parameters.add(ExpressionDef.constant(beanProperty.getName()));
-            coerceParameterToPolyglotValue(
-                beanProperty,
-                parameters,
-                methodParameters.getFirst(),
-                targetContext
-            );
-            ExpressionDef.InvokeInstanceMethod result = targetValue.invoke(
-                PUT_MEMBER,
-                TypeDef.VOID,
-                parameters
-            );
+            StatementDef result;
+            if (adaptAsyncMembers) {
+                // the module's async routes run on its import in an event-loop context: the member is
+                // remembered so that import receives it too, adapted for awaiting there
+                result = StatementDef.multi(
+                    targetValue.invoke(
+                        PUT_MEMBER,
+                        TypeDef.VOID,
+                        ExpressionDef.constant(beanProperty.getName()),
+                        PYTHON_COERCION.invokeStatic(
+                            "asyncMemberValue",
+                            TypeDef.OBJECT,
+                            targetValue,
+                            methodParameters.getFirst().cast(TypeDef.OBJECT)
+                        )
+                    ),
+                    PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                        "rememberAsyncMember",
+                        TypeDef.VOID,
+                        targetValue,
+                        ExpressionDef.constant(beanProperty.getName()),
+                        methodParameters.getFirst().cast(TypeDef.OBJECT)
+                    )
+                );
+            } else {
+                var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
+                List<ExpressionDef> parameters = new ArrayList<>();
+                parameters.add(ExpressionDef.constant(beanProperty.getName()));
+                coerceParameterToPolyglotValue(
+                    beanProperty,
+                    parameters,
+                    methodParameters.getFirst(),
+                    targetContext
+                );
+                result = targetValue.invoke(
+                    PUT_MEMBER,
+                    TypeDef.VOID,
+                    parameters
+                );
+            }
             if (returnType.equals(TypeDef.VOID)) {
                 return result;
             } else {
