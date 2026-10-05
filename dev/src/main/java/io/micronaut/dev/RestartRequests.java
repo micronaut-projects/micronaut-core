@@ -35,6 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 
 /**
  * The HTTP requests across a batch and the restart it may make: a request that arrives during a batch waits for it,
@@ -145,15 +146,27 @@ final class RestartRequests {
      * backlog for it rather than being told the application is not running. Once its servers accept, a socket none of
      * them claimed belongs to a listener the configuration dropped, and is released.
      *
+     * <p>The first generation reports itself started from the launching thread while the reload thread may already
+     * restart it: what this changes is only changed while it is still the current generation, under the same monitor
+     * the next generation's servers are handed their sockets under.</p>
+     *
      * @param fresh The generation
+     * @param current Whether it is still the current generation
      */
-    void started(ApplicationContext fresh) {
+    void started(ApplicationContext fresh, BooleanSupplier current) {
         DevServerSockets sockets = serverSockets;
         if (sockets != null) {
-            sockets.stopServingUnavailable();
+            if (!sockets.stopServingUnavailable(current)) {
+                return;
+            }
             if (sockets.isBound()) {
+                // a newer generation can start while this one's servers are awaited, when a change is taken at once:
+                // the sockets handed to it after this mark are its own, and are kept
+                long mark = sockets.handoutMark();
                 awaitServers(fresh);
-                sockets.releaseUnclaimed();
+                if (fresh.isRunning()) {
+                    sockets.releaseUnclaimed(mark, current);
+                }
             }
         }
     }

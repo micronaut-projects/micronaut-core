@@ -287,6 +287,10 @@ public final class DevRuntime implements Closeable {
             thread.start();
             worker = thread;
             first = launch("first start");
+            // as after a restart: the servers bind a moment after the context starts, and the first generation is
+            // only reported started once they accept, when a retained socket was handed to one
+            ApplicationContext launched = first;
+            requests.started(launched, () -> context == launched);
         } catch (RuntimeException e) {
             // nothing of a runtime that failed to start may linger: a retry in the same JVM must be possible
             close();
@@ -1568,7 +1572,7 @@ public final class DevRuntime implements Closeable {
             throw e;
         }
         startFailed = false;
-        requests.started(fresh);
+        requests.started(fresh, () -> context == fresh);
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));

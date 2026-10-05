@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -155,6 +156,30 @@ class DevRestartRequestsTest {
             throw new AssertionError("The port is still bound");
         } catch (IOException expected) {
             // refused
+        }
+    }
+
+    @Test
+    void theFirstGenerationIsReportedStartedOnceItsServerAcceptsAndAnEditStraightAwayRestartsIt() throws Exception {
+        DevRuntime runtime = launch();
+        try {
+            // as after a restart, the first start returns once the server holding the retained socket accepts
+            ApplicationContext first = runtime.awaitGeneration(1, Duration.ofSeconds(1));
+            List<EmbeddedServer> servers = first.getActiveBeanRegistrations(EmbeddedServer.class).stream()
+                .map(io.micronaut.context.BeanRegistration::getBean)
+                .toList();
+            assertEquals(1, servers.size());
+            assertTrue(servers.get(0).isRunning());
+
+            // an edit taken at once must not close the socket under the server: it used to, and the startup
+            // failure then exited the development JVM
+            Files.writeString(src.resolve("Greeter.java"), greeter(1));
+            runtime.reload();
+            assertTrue(runtime.awaitGeneration(2, Duration.ofMinutes(2)).isRunning());
+            assertEquals("200 greeting-1", get("/hello"));
+            assertEquals(List.of(), errorsLogged());
+        } finally {
+            runtime.close();
         }
     }
 

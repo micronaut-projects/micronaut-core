@@ -32,6 +32,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,12 @@ public final class DevServerSockets implements AutoCloseable {
 
     private final Map<String, ServerSocketChannel> sockets = new LinkedHashMap<>();
     private final List<Accepting> accepting = new ArrayList<>();
+    /**
+     * The sockets handed to a server that has not accepted on them yet, with the number of that handout: its
+     * generation is starting, and binds them a moment after its context starts, so they are not a dropped listener's.
+     */
+    private final Map<ServerSocketChannel, Long> handedOut = new HashMap<>();
+    private long handouts;
     private boolean closed;
     private @Nullable Responder responder;
 
@@ -107,6 +114,7 @@ public final class DevServerSockets implements AutoCloseable {
             }
             sockets.put(key, socket);
         }
+        handedOut.put(socket, ++handouts);
         return socket;
     }
 
@@ -121,6 +129,7 @@ public final class DevServerSockets implements AutoCloseable {
         // a server that starts while a batch is processed is the batch's new generation: it accepts at once
         accepting.removeIf(entry -> !entry.open.getAsBoolean());
         accepting.add(new Accepting(socket, autoRead, open));
+        handedOut.remove(socket);
     }
 
     private boolean isAccepting(ServerSocketChannel socket) {
@@ -137,8 +146,9 @@ public final class DevServerSockets implements AutoCloseable {
      */
     public synchronized void pause() {
         if (responder == null) {
-            // a socket the running generation does not accept on belongs to a listener its configuration no longer has
-            releaseUnclaimed();
+            // a socket the running generation does not accept on belongs to a listener its configuration no longer has;
+            // one a server of a generation that is still starting was handed is about to be claimed
+            release(0);
         }
         for (Accepting entry : accepting) {
             if (entry.open.getAsBoolean()) {
@@ -148,14 +158,54 @@ public final class DevServerSockets implements AutoCloseable {
     }
 
     /**
+     * The number of sockets handed out so far, to pass to {@link #releaseUnclaimed(long)} once the generation they
+     * were handed to has started.
+     *
+     * @return The mark
+     */
+    public synchronized long handoutMark() {
+        return handouts;
+    }
+
+    /**
      * Closes the sockets no server accepts on: their listener is gone from the running generation's configuration.
      */
     public synchronized void releaseUnclaimed() {
+        releaseUnclaimed(handouts);
+    }
+
+    /**
+     * Closes the sockets no server accepts on, including those handed out up to a mark and not claimed: the
+     * generation they were handed to has started, and its servers are not going to claim them. A socket handed out
+     * after the mark belongs to a newer generation that is still starting, and is kept.
+     *
+     * @param mark The {@link #handoutMark()} taken before waiting for the generation's servers
+     */
+    public synchronized void releaseUnclaimed(long mark) {
+        release(mark);
+    }
+
+    /**
+     * As {@link #releaseUnclaimed(long)}, only while the generation that was awaited is still the current one: once a
+     * newer generation exists, the sockets are its own.
+     *
+     * @param mark The {@link #handoutMark()} taken before waiting for the generation's servers
+     * @param current Whether the awaited generation is still the current one
+     */
+    public synchronized void releaseUnclaimed(long mark, BooleanSupplier current) {
+        if (current.getAsBoolean()) {
+            release(mark);
+        }
+    }
+
+    private void release(long handedOutUpTo) {
         accepting.removeIf(entry -> !entry.open.getAsBoolean());
         sockets.values().removeIf(socket -> {
-            if (isAccepting(socket)) {
+            Long handout = handedOut.get(socket);
+            if (isAccepting(socket) || handout != null && handout > handedOutUpTo) {
                 return false;
             }
+            handedOut.remove(socket);
             try {
                 socket.close();
             } catch (IOException e) {
@@ -215,6 +265,21 @@ public final class DevServerSockets implements AutoCloseable {
         stopResponder();
     }
 
+    /**
+     * As {@link #stopServingUnavailable()}, only while a started generation is still the current one: a newer one that
+     * failed to start answers with a 503 until the next one runs.
+     *
+     * @param current Whether the started generation is still the current one
+     * @return Whether it is
+     */
+    public synchronized boolean stopServingUnavailable(BooleanSupplier current) {
+        if (!current.getAsBoolean()) {
+            return false;
+        }
+        stopResponder();
+        return true;
+    }
+
     @Override
     public synchronized void close() {
         closed = true;
@@ -228,6 +293,7 @@ public final class DevServerSockets implements AutoCloseable {
         }
         sockets.clear();
         accepting.clear();
+        handedOut.clear();
     }
 
     private void stopResponder() {
