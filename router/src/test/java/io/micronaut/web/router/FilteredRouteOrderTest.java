@@ -74,7 +74,8 @@ class FilteredRouteOrderTest {
             routes.GET("/items/{name}").annotate(version("2")).order(-5).handle(handler("c"));
         });
 
-        DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/items/x").header(VERSION, "1")));
+        var versionOne = HttpRequest.GET("/items/x").header(VERSION, "1");
+        DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(versionOne));
         assertEquals(2, error.getUriRoutes().size());
         assertEquals("c", target(router, HttpRequest.GET("/items/x").header(VERSION, "2")));
     }

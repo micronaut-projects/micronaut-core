@@ -30,8 +30,9 @@ class RespondRoutesTest {
             assertEquals("visit 1", http.retrieve(HttpRequest.GET("/visits")));
             assertEquals("visit 2", http.retrieve(HttpRequest.GET("/visits")));
             assertEquals("Hello World", http.retrieve(HttpRequest.GET("/greetings/World")));
+            var goneRequest = HttpRequest.POST("/legacy/webhook", "{}");
             HttpClientResponseException gone = assertThrows(HttpClientResponseException.class,
-                () -> http.retrieve(HttpRequest.POST("/legacy/webhook", "{}")));
+                () -> http.retrieve(goneRequest));
             assertEquals(HttpStatus.GONE, gone.getStatus());
         }
     }

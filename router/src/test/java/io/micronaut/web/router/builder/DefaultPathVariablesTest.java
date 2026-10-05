@@ -16,7 +16,6 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -39,10 +38,12 @@ class DefaultPathVariablesTest {
         match.put("item", "3");
         DefaultPathVariables pathVariables = new DefaultPathVariables(match, ConversionService.SHARED);
 
-        assertThrows(UnsupportedOperationException.class, () -> pathVariables.names().remove("id"));
-        assertThrows(UnsupportedOperationException.class, () -> pathVariables.names().clear());
-        assertThrows(UnsupportedOperationException.class, () -> pathVariables.values().put("id", "6"));
-        assertThrows(UnsupportedOperationException.class, () -> pathVariables.values().remove("item"));
+        Set<String> names = pathVariables.names();
+        Map<String, Object> values = pathVariables.values();
+        assertThrows(UnsupportedOperationException.class, () -> names.remove("id"));
+        assertThrows(UnsupportedOperationException.class, names::clear);
+        assertThrows(UnsupportedOperationException.class, () -> values.put("id", "6"));
+        assertThrows(UnsupportedOperationException.class, () -> values.remove("item"));
         assertEquals(Map.of("id", "5", "item", "3"), match);
         assertEquals(Set.of("id", "item"), pathVariables.names());
         assertEquals(5L, pathVariables.getLong("id"));

@@ -57,12 +57,14 @@ class NoStageTest {
         HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.ofAsync(ASYNC_BODY, (AsyncBodyRequestHandler<AsyncRequestBody>) (request, pathVariables, body) -> null);
 
         // a body that has nothing to release
-        NullPointerException plain = assertThrows(NullPointerException.class, () -> invoke(method, body(null)));
+        AsyncRequestBody nothingToRelease = body(null);
+        NullPointerException plain = assertThrows(NullPointerException.class, () -> invoke(method, nothingToRelease));
         assertEquals("The asynchronous handler returned no stage", plain.getMessage());
 
         AtomicInteger released = new AtomicInteger();
+        AsyncRequestBody releasable = body(released::incrementAndGet);
         NullPointerException handlerRequest = assertThrows(NullPointerException.class,
-            () -> invoke(method, body(() -> released.incrementAndGet())));
+            () -> invoke(method, releasable));
         assertEquals("The asynchronous handler returned no stage", handlerRequest.getMessage());
         assertEquals(1, released.get());
     }
@@ -72,8 +74,8 @@ class NoStageTest {
         HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.ofAsync(Argument.of(String.class),
             (AsyncBodyRequestHandler<String>) (request, pathVariables, body) -> null);
 
-        NullPointerException noStage = assertThrows(NullPointerException.class,
-            () -> method.invoke(new Object[] {HttpRequest.POST("/x", "text"), pathVariables(), "text"}));
+        Object[] arguments = {HttpRequest.POST("/x", "text"), pathVariables(), "text"};
+        NullPointerException noStage = assertThrows(NullPointerException.class, () -> method.invoke(arguments));
         assertEquals("The asynchronous handler returned no stage", noStage.getMessage());
     }
 
@@ -81,8 +83,8 @@ class NoStageTest {
     void anAsynchronousHandlerWithoutTheBodyThatReturnsNoStageFails() {
         HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncRequestHandler) (request, pathVariables) -> null);
 
-        NullPointerException noStage = assertThrows(NullPointerException.class,
-            () -> method.invoke(new Object[] {HttpRequest.GET("/x"), pathVariables()}));
+        Object[] arguments = {HttpRequest.GET("/x"), pathVariables()};
+        NullPointerException noStage = assertThrows(NullPointerException.class, () -> method.invoke(arguments));
         assertEquals("The asynchronous handler returned no stage", noStage.getMessage());
     }
 
@@ -93,8 +95,9 @@ class NoStageTest {
             throw error;
         });
         AtomicInteger released = new AtomicInteger();
+        AsyncRequestBody releasable = body(released::incrementAndGet);
 
-        StackOverflowError thrown = assertThrows(StackOverflowError.class, () -> invoke(method, body(() -> released.incrementAndGet())));
+        StackOverflowError thrown = assertThrows(StackOverflowError.class, () -> invoke(method, releasable));
         assertSame(error, thrown);
         assertEquals(1, released.get());
     }
@@ -107,15 +110,19 @@ class NoStageTest {
             throw failure;
         });
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> invoke(method, body(() -> {
+        AsyncRequestBody failingRelease = body(() -> {
             throw releaseFailure;
-        })));
+        });
+        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> invoke(method, failingRelease));
         assertSame(failure, thrown);
         assertArrayEquals(new Throwable[] {releaseFailure}, thrown.getSuppressed());
 
-        NullPointerException noStage = assertThrows(NullPointerException.class, () -> invoke(HandlerMethod.ofAsync(ASYNC_BODY, (AsyncBodyRequestHandler<AsyncRequestBody>) (request, pathVariables, body) -> null), body(() -> {
-                throw releaseFailure;
-            })));
+        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> noStageMethod = HandlerMethod.ofAsync(ASYNC_BODY,
+            (AsyncBodyRequestHandler<AsyncRequestBody>) (request, pathVariables, body) -> null);
+        AsyncRequestBody alsoFailingRelease = body(() -> {
+            throw releaseFailure;
+        });
+        NullPointerException noStage = assertThrows(NullPointerException.class, () -> invoke(noStageMethod, alsoFailingRelease));
         assertArrayEquals(new Throwable[] {releaseFailure}, noStage.getSuppressed());
     }
 

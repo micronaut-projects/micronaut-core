@@ -355,7 +355,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <R> ReturnType<R> returnType(Class<?> type, Argument<?>... typeArguments) {
-        return (ReturnType<R>) ReturnType.of((Class) type, typeArguments);
+        return (ReturnType<R>) ReturnType.of(type, typeArguments);
     }
 
     @Override

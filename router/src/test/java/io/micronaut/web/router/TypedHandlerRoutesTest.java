@@ -126,7 +126,8 @@ class TypedHandlerRoutesTest {
         assertEquals(Optional.empty(), pathVariables.find("missing", Argument.listOf(Long.class)));
         assertEquals(4, pathVariables.get("id", Argument.INT));
         assertEquals(4, pathVariables.get("id", Integer.class));
-        ConversionErrorException error = assertThrows(ConversionErrorException.class, () -> pathVariables.get("ids", Argument.of(Integer.class)));
+        Argument<Integer> integer = Argument.of(Integer.class);
+        ConversionErrorException error = assertThrows(ConversionErrorException.class, () -> pathVariables.get("ids", integer));
         assertEquals("ids", error.getArgument().getName());
     }
 

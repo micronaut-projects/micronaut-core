@@ -45,7 +45,8 @@ class MissingTerminalTest {
 
     @Test
     void aRouteWithoutATerminalFailsTheStartupNamingTheRouteAndItsBean() {
-        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(new PetRoutes()));
+        HttpRoutes pets = new PetRoutes();
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(pets));
 
         assertEquals("The route GET /pets/{id} declared by MissingTerminalTest.PetRoutes has no handler: "
             + "end it with handle, handleAsync or respond", failure.getMessage());
@@ -53,8 +54,9 @@ class MissingTerminalTest {
 
     @Test
     void everyRouteWithoutATerminalIsNamedWithItsBean() {
+        HttpRoutes pets = new PetRoutes();
         HttpRoutes items = new ItemRoutes();
-        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(new PetRoutes(), items));
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(pets, items));
 
         assertEquals("The routes GET /pets/{id} declared by MissingTerminalTest.PetRoutes, PUT, PATCH /items/{id} declared by "
             + "MissingTerminalTest.ItemRoutes, PROPFIND /items declared by MissingTerminalTest.ItemRoutes, any /anything declared by "
@@ -63,7 +65,8 @@ class MissingTerminalTest {
 
     @Test
     void aRouteOfAGroupWithoutATerminalFailsWhenTheLambdaOfTheGroupReturns() {
-        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(new GroupRoutes()));
+        HttpRoutes grouped = new GroupRoutes();
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(grouped));
 
         assertEquals("The route POST /api/items declared by MissingTerminalTest.GroupRoutes has no handler: "
             + "end it with handle, handleAsync or respond", failure.getMessage());
@@ -105,7 +108,8 @@ class MissingTerminalTest {
         HttpRouteSpec route = builder.GET("/once");
         route.handle(MissingTerminalTest::ok);
 
-        IllegalStateException again = assertThrows(IllegalStateException.class, () -> route.respond(HttpResponse.ok()));
+        HttpResponse<?> ok = HttpResponse.ok();
+        IllegalStateException again = assertThrows(IllegalStateException.class, () -> route.respond(ok));
         assertEquals("The route GET /once was already ended: give its settings before its one terminal, handle, handleAsync or respond",
             again.getMessage());
         assertThrows(IllegalStateException.class, () -> route.produces(MediaType.TEXT_PLAIN_TYPE));
@@ -120,7 +124,8 @@ class MissingTerminalTest {
 
         NullPointerException handler = assertThrows(NullPointerException.class, () -> builder.GET("/dropped", null));
         assertEquals("handler", handler.getMessage());
-        NullPointerException response = assertThrows(NullPointerException.class, () -> builder.GET("/dropped").respond((HttpResponse<?>) null));
+        HttpRouteSpec dropped = builder.GET("/dropped");
+        NullPointerException response = assertThrows(NullPointerException.class, () -> dropped.respond((HttpResponse<?>) null));
         assertEquals("response", response.getMessage());
 
         // the failed declarations left no route without a terminal
