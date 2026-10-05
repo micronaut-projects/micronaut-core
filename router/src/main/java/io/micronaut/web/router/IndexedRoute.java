@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.Internal;
  * @since 5.3.0
  */
 @Internal
-interface IndexedRoute {
+sealed interface IndexedRoute permits DefaultUrlRouteInfo {
 
     /**
      * @return A literal every path the route matches starts with, or an empty string, see

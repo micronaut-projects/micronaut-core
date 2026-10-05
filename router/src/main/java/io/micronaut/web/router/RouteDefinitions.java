@@ -56,7 +56,7 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Internal
-public final class RouteDefinitions {
+final class RouteDefinitions {
     private static final MediaType[] DEFAULT_MEDIA_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
     /**

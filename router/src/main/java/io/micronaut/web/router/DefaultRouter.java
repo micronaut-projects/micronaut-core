@@ -103,6 +103,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      * @param assembled The routes assembled without a builder
      * @since 5.3.0
      */
+    @Internal
     public DefaultRouter(Collection<RouteBuilder> builders, List<AssembledRoutes> assembled) {
         Set<Integer> exposedPorts = new HashSet<>(5);
         UriRouteSet.Builder uriRoutes = new UriRouteSet.Builder();

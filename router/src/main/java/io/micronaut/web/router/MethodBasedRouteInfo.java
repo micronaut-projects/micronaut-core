@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
@@ -53,6 +54,7 @@ public interface MethodBasedRouteInfo<T, R> extends RouteInfo<R> {
      * by itself or by a group, even one with annotations given with {@code annotate(...)}
      * @since 5.3.0
      */
+    @Experimental
     default Optional<AnnotationMetadataProvider> getAnnotationMetadataProvider() {
         MethodExecutionHandle<T, R> targetMethod = getTargetMethod();
         if (targetMethod instanceof HandlerMethod<?> handlerMethod) {

@@ -102,13 +102,7 @@ record RouteFunctionFilter(
      * @return The filter
      */
     static RouteFunctionFilter request(RouteFilterFunctions.Request filter, @Nullable Supplier<? extends Executor> executor) {
-        return new RouteFunctionFilter(context -> {
-            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
-            MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
-            URI uri = request.getUri();
-            HttpMessage<?> result = filter.filter(request, propagatedContext);
-            return ExecutionFlow.just(next(withChangedContext(context, propagatedContext), request, uri, result));
-        }, null, executor);
+        return new RouteFunctionFilter(new SyncRequestStep(filter), null, executor);
     }
 
     /**
@@ -121,17 +115,7 @@ record RouteFunctionFilter(
      * @return The filter
      */
     static RouteFunctionFilter requestAsync(RouteFilterFunctions.AsyncRequest filter, @Nullable Supplier<? extends Executor> executor) {
-        return new RouteFunctionFilter(context -> {
-            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
-            MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
-            URI uri = request.getUri();
-            CompletionStage<? extends @Nullable HttpMessage<?>> stage = Objects.requireNonNull(filter.filter(request, propagatedContext),
-                "The asynchronous request filter returned no stage");
-            return CompletableFutureExecutionFlow.just(
-                stage.thenApply(result ->
-                    next(withChangedContext(context, propagatedContext), request, uri, result))
-            );
-        }, null, executor);
+        return new RouteFunctionFilter(new AsyncRequestStep(filter), null, executor);
     }
 
     /**
@@ -170,11 +154,7 @@ record RouteFunctionFilter(
      * @return The filter
      */
     static RouteFunctionFilter response(RouteFilterFunctions.Response filter, @Nullable Supplier<? extends Executor> executor) {
-        return new RouteFunctionFilter(null, (context, response) -> {
-            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
-            HttpResponse<?> result = filter.filter(context.request(), response, propagatedContext);
-            return ExecutionFlow.just(next(withChangedContext(context, propagatedContext), response, result));
-        }, executor);
+        return new RouteFunctionFilter(null, new SyncResponseStep(filter), executor);
     }
 
     /**
@@ -187,14 +167,7 @@ record RouteFunctionFilter(
      * @return The filter
      */
     static RouteFunctionFilter responseAsync(RouteFilterFunctions.AsyncResponse filter, @Nullable Supplier<? extends Executor> executor) {
-        return new RouteFunctionFilter(null, (context, response) -> {
-            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
-            CompletionStage<? extends @Nullable HttpResponse<?>> stage = Objects.requireNonNull(filter.filter(context.request(), response, propagatedContext),
-                "The asynchronous response filter returned no stage");
-            return CompletableFutureExecutionFlow.just(
-                stage.thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
-            );
-        }, executor);
+        return new RouteFunctionFilter(null, new AsyncResponseStep(filter), executor);
     }
 
     /**
@@ -310,17 +283,82 @@ record RouteFunctionFilter(
     /**
      * Filters the request.
      */
-    @FunctionalInterface
-    interface RequestStep {
+    sealed interface RequestStep permits SyncRequestStep, AsyncRequestStep {
         ExecutionFlow<FilterContext> apply(FilterContext context) throws Throwable;
+    }
+
+    /**
+     * A synchronous request filter.
+     *
+     * @param filter The filter
+     */
+    private record SyncRequestStep(RouteFilterFunctions.Request filter) implements RequestStep {
+        @Override
+        public ExecutionFlow<FilterContext> apply(FilterContext context) throws Throwable {
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
+            URI uri = request.getUri();
+            HttpMessage<?> result = filter.filter(request, propagatedContext);
+            return ExecutionFlow.just(next(withChangedContext(context, propagatedContext), request, uri, result));
+        }
+    }
+
+    /**
+     * An asynchronous request filter.
+     *
+     * @param filter The filter
+     */
+    private record AsyncRequestStep(RouteFilterFunctions.AsyncRequest filter) implements RequestStep {
+        @Override
+        public ExecutionFlow<FilterContext> apply(FilterContext context) throws Throwable {
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
+            URI uri = request.getUri();
+            CompletionStage<? extends @Nullable HttpMessage<?>> stage = Objects.requireNonNull(filter.filter(request, propagatedContext),
+                "The asynchronous request filter returned no stage");
+            return CompletableFutureExecutionFlow.just(
+                stage.thenApply(result ->
+                    next(withChangedContext(context, propagatedContext), request, uri, result))
+            );
+        }
     }
 
     /**
      * Filters the response.
      */
-    @FunctionalInterface
-    interface ResponseStep {
+    sealed interface ResponseStep permits SyncResponseStep, AsyncResponseStep {
         ExecutionFlow<FilterContext> apply(FilterContext context, MutableHttpResponse<?> response) throws Throwable;
+    }
+
+    /**
+     * A synchronous response filter.
+     *
+     * @param filter The filter
+     */
+    private record SyncResponseStep(RouteFilterFunctions.Response filter) implements ResponseStep {
+        @Override
+        public ExecutionFlow<FilterContext> apply(FilterContext context, MutableHttpResponse<?> response) throws Throwable {
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            HttpResponse<?> result = filter.filter(context.request(), response, propagatedContext);
+            return ExecutionFlow.just(next(withChangedContext(context, propagatedContext), response, result));
+        }
+    }
+
+    /**
+     * An asynchronous response filter.
+     *
+     * @param filter The filter
+     */
+    private record AsyncResponseStep(RouteFilterFunctions.AsyncResponse filter) implements ResponseStep {
+        @Override
+        public ExecutionFlow<FilterContext> apply(FilterContext context, MutableHttpResponse<?> response) throws Throwable {
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            CompletionStage<? extends @Nullable HttpResponse<?>> stage = Objects.requireNonNull(filter.filter(context.request(), response, propagatedContext),
+                "The asynchronous response filter returned no stage");
+            return CompletableFutureExecutionFlow.just(
+                stage.thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
+            );
+        }
     }
 
     /**
