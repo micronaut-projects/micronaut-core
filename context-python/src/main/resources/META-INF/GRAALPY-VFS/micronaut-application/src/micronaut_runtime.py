@@ -352,6 +352,9 @@ class _MicronautInterceptedCall:
             expected = str(maximum) if minimum == maximum else f"from {minimum} to {maximum}"
             raise TypeError(f"{self._function.__qualname__}() takes {expected} positional arguments but {len(args) + 1} were given")
         if kwargs or len(args) < len(parameters):
+            positional_only = [parameter.name for parameter in parameters if parameter.kind == parameter.POSITIONAL_ONLY and parameter.name in kwargs]
+            if positional_only:
+                raise TypeError(f"{self._function.__qualname__}() got some positional-only arguments passed as keyword arguments: '{', '.join(positional_only)}'")
             for parameter in parameters[:len(args)]:
                 if parameter.name in kwargs:
                     raise TypeError(f"{self._function.__qualname__}() got multiple values for argument '{parameter.name}'")
@@ -405,8 +408,9 @@ def _micronaut_positional_layout(function):
     """The parameters after ``self``, or ``None`` when the layout cannot be mapped onto the Java method.
 
     A method taking ``*args`` or ``**kwargs`` has no positional layout, and the generated Java method
-    has no parameter for a keyword-only or positional-only one (``self`` aside); such methods are called
-    with the arguments as given rather than dropping or misplacing arguments.
+    has no parameter for a keyword-only one; such methods are called with the arguments as given rather
+    than dropping or misplacing arguments. A positional-only parameter is a parameter of the Java method
+    like any other, which a caller cannot pass by keyword.
     """
     try:
         return _micronaut_positional_layouts[function]
@@ -420,7 +424,7 @@ def _micronaut_positional_layout(function):
         try:
             parameters = tuple(inspect.signature(function).parameters.values())[1:]
             for parameter in parameters:
-                if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY, parameter.POSITIONAL_ONLY):
+                if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY):
                     parameters = None
                     break
         except (TypeError, ValueError):

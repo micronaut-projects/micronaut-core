@@ -173,6 +173,90 @@ class FormattingCaller:
         context?.close()
     }
 
+    void "positional-only parameters of an advised method are bound positionally"() {
+        given:
+        @Language("python") def pythonCode = INTERCEPTOR + '''
+@Singleton
+class LookupService:
+    @TestAround
+    def lookup(self, key: str, scope: str = "global", /, suffix: str = ".") -> str:
+        return scope + ":" + key + suffix
+
+    @TestAround
+    def outer(self, key: str) -> str:
+        return self.lookup(key, suffix="!")
+
+@Singleton
+class LookupCaller:
+    def __init__(self, service: LookupService):
+        self.service = service
+
+    @Executable
+    def call(self) -> str:
+        return (self.service.lookup("a") + "|" + self.service.lookup("a", "local")
+            + "|" + self.service.lookup("a", suffix="?") + "|" + self.service.lookup("a", "local", "!"))
+
+    @Executable
+    def nested(self) -> str:
+        return self.service.outer("b")
+
+    @Executable
+    def keyword(self) -> str:
+        try:
+            return self.service.lookup(key="a")
+        except TypeError as e:
+            return str(e)
+
+    @Executable
+    def keywords(self) -> str:
+        try:
+            return self.service.lookup("a", key="b", scope="local")
+        except TypeError as e:
+            return str(e)
+'''
+        def context = buildContext(pythonCode)
+        def caller = getBean(context, "python.LookupCaller")
+
+        when:
+        def result = caller.call()
+
+        then: "the positional-only parameters are arguments of the Java method, omitted ones taking their defaults"
+        result == "global:a.|local:a.|global:a?|local:a!"
+        InterceptionLog.methods() == ["lookup(a,global,.)", "lookup(a,local,.)", "lookup(a,global,?)", "lookup(a,local,!)"]
+
+        when: "the method is called through self"
+        InterceptionLog.reset()
+        def nested = caller.nested()
+
+        then:
+        nested == "global:b!"
+        InterceptionLog.methods() == ["outer(b)", "lookup(b,global,!)"]
+
+        when: "Java invokes the method through its executable method"
+        InterceptionLog.reset()
+        def service = getBean(context, "python.LookupService")
+        def method = getBeanDefinition(context, "python.LookupService").findMethod("lookup", String, String, String).get()
+        def invoked = method.invoke(service, "c", "local", "!")
+
+        then: "the positional-only parameters are passed positionally"
+        method.arguments*.name == ["key", "scope", "suffix"]
+        invoked == "local:c!"
+        InterceptionLog.methods() == ["lookup(c,local,!)"]
+
+        when: "a positional-only parameter is passed by keyword"
+        InterceptionLog.reset()
+        def keyword = caller.keyword()
+        def keywords = caller.keywords()
+
+        then: "it fails as the Python call would, before any interceptor runs"
+        keyword.contains("got some positional-only arguments passed as keyword arguments: 'key'")
+        keywords.contains("got some positional-only arguments passed as keyword arguments: 'key, scope'")
+        InterceptionLog.methods().isEmpty()
+
+        cleanup:
+        context?.close()
+    }
+
     void "a Python caller omits defaulted arguments of the methods of an introduction proxy"() {
         given: "a class with introduction advice: its methods are proxied on the introduction target"
         @Language("python") def pythonCode = '''
