@@ -168,6 +168,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
     private static final String HANDLER_PARAMETER = "$handler";
     private static final String FIELD_HANDLER = "$handler";
+    private static final String FIELD_TARGET_TYPE = "$TARGET_TYPE";
     private static final Method HANDLER_BIND = ReflectionUtils.getRequiredInternalMethod(
         ProxyTargetHandler.class, "bind", Argument.class, boolean.class, boolean.class, String[].class, Class[][].class);
     private static final Method HANDLER_INVOKE = ReflectionUtils.getRequiredInternalMethod(
@@ -554,6 +555,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             proxyBuilder.addMethod(getLazyProxyTargetToStringMethod());
         }
 
+        // the type of the target, created once with the definition of the proxy rather than for every proxy
+        FieldDef targetTypeField = proxyBeanDefinitionWriter.addSharedStaticField(
+            FIELD_TARGET_TYPE, TypeDef.of(Argument.class), pushTargetArgument(classTargetType));
+        ExpressionDef targetType = ClassTypeDef.of(proxyBeanDefinitionWriter.getBeanDefinitionName()).getStaticField(targetTypeField);
         int handlerIndex = constructor.findParameterIndex(HANDLER_PARAMETER);
         proxyBuilder.addMethod(MethodDef.constructor()
             .addParameters(Arrays.stream(constructor.getParameters()).map(p -> TypeDef.erasure(p.getType())).toList())
@@ -562,7 +567,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 aThis.field(handlerField).assign(methodParameters.get(handlerIndex)),
                 aThis.field(handlerField).invoke(
                     HANDLER_BIND,
-                    pushTargetArgument(classTargetType),
+                    targetType,
                     TypeDef.Primitive.BOOLEAN.constant(isIntroduction),
                     TypeDef.Primitive.BOOLEAN.constant(interceptorsPerTarget),
                     TypeDef.STRING.array().instantiate(

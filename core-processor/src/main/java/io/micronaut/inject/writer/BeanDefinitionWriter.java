@@ -802,6 +802,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private final List<MethodDefinition<ClassElement, MethodElement>> postConstructMethods = new ArrayList<>();
     private final List<MethodDefinition<ClassElement, MethodElement>> preDestroyMethods = new ArrayList<>();
     private final List<FieldDefinition<ClassElement, FieldElement>> allFields = new ArrayList<>();
+    // static fields other generated classes read from this definition, with the values they are initialized to
+    private final Map<FieldDef, ExpressionDef> sharedStaticFields = new LinkedHashMap<>();
     private boolean inheritedMethodDefinitions;
 
     private final List<InjectCommand> injectCommands = new ArrayList<>();
@@ -1323,6 +1325,21 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      */
     public boolean isInterface() {
         return isInterface;
+    }
+
+    /**
+     * Declares a static field of the definition class, for another class generated in the same package to read.
+     * It is assigned at the end of the static initializer of the definition.
+     *
+     * @param name The name of the field
+     * @param type The type of the field
+     * @param value The value it is initialized to
+     * @return The field
+     */
+    public FieldDef addSharedStaticField(String name, TypeDef type, ExpressionDef value) {
+        FieldDef field = FieldDef.builder(name, type).addModifiers(Modifier.STATIC, Modifier.FINAL).build();
+        sharedStaticFields.put(field, value);
+        return field;
     }
 
     /**
@@ -2701,6 +2718,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         // Defaults can be contributed by other static initializers, it should be at the end
         MutableAnnotationMetadata.contributeDefaults(annotationMetadataDefaults, annotationMetadata);
         AnnotationMetadataGenUtils.addAnnotationDefaults(statements, annotationMetadataDefaults, loadClassValueExpressionFn);
+
+        // last, so that a value can refer to anything the definition initializes
+        ClassTypeDef definitionType = ClassTypeDef.of(beanDefinitionName);
+        sharedStaticFields.forEach((field, value) -> {
+            classDefBuilder.addField(field);
+            statements.add(definitionType.getStaticField(field).put(value));
+        });
 
         return new StaticBlock(
             StatementDef.multi(statements),
