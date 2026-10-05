@@ -26,6 +26,7 @@ import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
@@ -198,6 +199,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String INTERCEPTOR_REGISTRY_PARAMETER = "$interceptorRegistry";
 
     private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
+
+    /** The name of the field that holds the dependencies of a proxy, and of the method that returns it. */
+    private static final String BEAN_DEPENDENCIES = "$beanDependencies";
+    private static final Method GET_PROXY_DEPENDENCIES_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        InterceptedBeanProxy.class, BEAN_DEPENDENCIES);
+    private static final Method DEPENDENCIES_CLOSED_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        BeanDependencyGroup.class, "isClosed");
+
+    private static final Method PREPARE_PROXY_TARGET_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        BeanResolutionContext.class, "prepareProxyTarget", BeanDefinition.class, List.class);
 
     private static final Method COPY_BEAN_CONTEXT_FOR_LAZY_PROXY_TARGET_METHOD = ReflectionUtils.getRequiredMethod(
         BeanResolutionContext.class,
@@ -785,6 +796,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             int beanContextArgumentIndex = constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER);
             int qualifierIndex = constructor.findParameterIndex(QUALIFIER_PARAMETER);
 
+            FieldDef dependenciesField = FieldDef.builder(BEAN_DEPENDENCIES, BeanDependencyGroup.class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
+            proxyBuilder.addField(dependenciesField);
+            bodyBuilders.add((aThis, parameters) -> aThis.field(dependenciesField).assign(
+                parameters.get(beanResolutionContextArgumentIndex).invoke(
+                    ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "getBeanDependencyGroup"))));
+            proxyBuilder.addMethod(MethodDef.builder(BEAN_DEPENDENCIES)
+                .addModifiers(Modifier.PUBLIC).returns(BeanDependencyGroup.class)
+                .build((aThis, parameters) -> aThis.field(dependenciesField).returning()));
+
             FieldDef proxyBeanDefinitionField = fields.proxyBeanDefinition();
             proxyBuilder.addField(proxyBeanDefinitionField);
             bodyBuilders.add((aThis, methodParameters) -> aThis.field(proxyBeanDefinitionField).assign(
@@ -796,6 +817,12 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     methodParameters.get(qualifierIndex)
                 )
             ));
+
+            if (!interceptorsPerTarget) {
+                bodyBuilders.add((aThis, methodParameters) -> methodParameters.get(beanResolutionContextArgumentIndex)
+                    .invoke(PREPARE_PROXY_TARGET_METHOD, aThis.field(proxyBeanDefinitionField),
+                        aThis.field(interceptorRegistrationsField)));
+            }
 
             FieldDef beanQualifierField = fields.beanQualifier();
             proxyBuilder.addField(beanQualifierField);
@@ -814,13 +841,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 proxyBuilder.addField(beanLocatorField);
 
                 if (cacheLazyTarget) {
-                    interceptedTargetMethod = getCacheLazyTargetInterceptedTargetMethod(
-                        targetField,
-                        targetRegistrationField,
-                        beanResolutionContextField,
-                        proxyBeanDefinitionField,
-                        beanQualifierField
-                    );
+                    interceptedTargetMethod = getCacheLazyTargetInterceptedTargetMethod();
                     proxyBuilder.addMethod(
                         getHasCachedInterceptedTargetMethod(targetField)
                     );
@@ -1048,20 +1069,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             );
         }
         return StatementDef.multi(
-            aThis.field(proxyMethodsField).assign(
-                ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
-                    methods.stream().map(methodElement ->
-                        aThis.field(proxyBeanDefinitionField).invoke(
-                            METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD,
-
-                            ExpressionDef.constant(methodElement.getName()),
-                            TypeDef.CLASS.array().instantiate(
-                                Arrays.stream(methodElement.getSuspendParameters()).map(p -> ExpressionDef.constant(TypeDef.erasure(p.getGenericType()))).toList()
-                            )
-                        )
-                    ).toList()
-                )
-            ),
+            proxyMethods,
             aThis.field(interceptorsField).assign(
                 ClassTypeDef.of(Interceptor.class).array(2).instantiate(
                     methods.stream().map(methodElement ->
@@ -1192,58 +1200,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             && targetType.getMethods().stream().noneMatch(method -> method.isFinal() && isToStringMethod(method));
     }
 
-    private MethodDef getCacheLazyTargetInterceptedTargetMethod(FieldDef targetField,
-                                                                @Nullable FieldDef targetRegistrationField,
-                                                                FieldDef beanResolutionContextField,
-                                                                FieldDef proxyBeanDefinitionField,
-                                                                FieldDef beanQualifierField) {
-
+    private MethodDef getCacheLazyTargetInterceptedTargetMethod() {
         return MethodDef.override(METHOD_INTERCEPTED_TARGET)
-            .build((aThis, methodParameters) -> {
-//                            B var1 = this.$target;
-//                            if (var1 == null) {
-//                                synchronized(this) {
-//                                    var1 = this.$target;
-//                                    if (var1 == null) {
-//                                        this.$target = (B)((DefaultBeanContext)this.$beanLocator).getProxyTargetBean(this.$beanResolutionContext, this.$proxyBeanDefinition, Argument.of(B.class, $B$Definition$Intercepted$Definition.$ANNOTATION_METADATA, new Class[0]), this.$beanQualifier);
-//                                        this.$beanResolutionContext = null;
-//                                    }
-//                                }
-//                            }
-//                            return this.$target;
-                if (targetRegistrationField != null) {
-                    // the target of the registration, which is cached with it
-                    return aThis.invoke(METHOD_RESOLVE_TARGET_REGISTRATION, TYPE_BEAN_REGISTRATION)
-                        .invoke(METHOD_REGISTRATION_GET_BEAN)
-                        .returning();
-                }
-                VariableDef.Field targetFieldAccess = aThis.field(targetField);
-                return StatementDef.multi(
-                    targetFieldAccess.newLocal(LOCAL_TARGET, targetVar ->
-                        targetVar.ifNull(
-                            new StatementDef.Synchronized(
-                                aThis,
-                                StatementDef.multi(
-                                    targetVar.assign(targetFieldAccess),
-                                    targetVar.ifNull(
-                                        StatementDef.multi(
-                                            targetFieldAccess.assign(
-                                                pushResolveLazyProxyTargetBean(
-                                                    aThis,
-                                                    beanResolutionContextField,
-                                                    proxyBeanDefinitionField,
-                                                    beanQualifierField)
-                                            ),
-                                            aThis.field(beanResolutionContextField).assign(ExpressionDef.nullValue())
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    targetFieldAccess.returning()
-                );
-            });
+            .build((aThis, methodParameters) -> aThis.invoke(METHOD_RESOLVE_TARGET_REGISTRATION, TYPE_BEAN_REGISTRATION)
+                .invoke(METHOD_REGISTRATION_GET_BEAN).returning());
     }
 
     /**
@@ -1268,6 +1228,12 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 registrationVar.assign(registrationFieldAccess),
                                 registrationVar.ifNull(
                                     StatementDef.multi(
+                                        aThis.invoke(GET_PROXY_DEPENDENCIES_METHOD).newLocal("ownerBeforeCreation", owner ->
+                                            owner.ifNonNull(owner.invoke(DEPENDENCIES_CLOSED_METHOD).ifTrue(
+                                                ClassTypeDef.of(IllegalStateException.class).instantiate(
+                                                    ExpressionDef.constant("Cannot create a target after proxy destruction")
+                                                ).doThrow()
+                                            ))),
                                         registrationVar.assign(resolveProxyTargetRegistration(
                                             aThis.field(beanResolutionContextField),
                                             aThis.field(proxyBeanDefinitionField),
@@ -1275,7 +1241,19 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                         )),
                                         registrationFieldAccess.assign(registrationVar),
                                         aThis.field(targetField).assign(registrationVar.invoke(METHOD_REGISTRATION_GET_BEAN)),
-                                        aThis.field(beanResolutionContextField).assign(ExpressionDef.nullValue())
+                                        aThis.field(beanResolutionContextField).assign(ExpressionDef.nullValue()),
+                                        // Closure can win after resolution attaches the target but before these field
+                                        // writes. Check after publication so either this path or destruction clears it.
+                                        aThis.invoke(GET_PROXY_DEPENDENCIES_METHOD).newLocal("dependencies", dependencies ->
+                                            dependencies.ifNonNull(dependencies.invoke(DEPENDENCIES_CLOSED_METHOD).ifTrue(
+                                                StatementDef.multi(
+                                                    registrationFieldAccess.assign(ExpressionDef.nullValue()),
+                                                    aThis.field(targetField).assign(ExpressionDef.nullValue()),
+                                                    ClassTypeDef.of(IllegalStateException.class).instantiate(
+                                                        ExpressionDef.constant("Cannot publish a target after proxy destruction")
+                                                    ).doThrow()
+                                                )
+                                            )))
                                     )
                                 )
                             )
@@ -1354,16 +1332,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             : null;
         // a lazy proxy resolves its target through the context; a hot-swappable one that selects per target finds the
         // registration of a swapped in target through it
-        FieldDef beanLocator = lazy || (hotswap && interceptorsPerTarget)
+        FieldDef beanLocator = lazy || hotswap
             ? FieldDef.builder(FIELD_BEAN_LOCATOR, BeanLocator.class).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build()
             : null;
         FieldDef targetRegistration = null;
-        if (interceptorsPerTarget) {
+        if (!lazy || cacheLazyTarget) {
             if (!lazy && !hotswap) {
                 targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class)
                     .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
                     .build();
-            } else if (hotswap || cacheLazyTarget) {
+            } else {
                 // written with the target: when it is cached, cleared or swapped
                 targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class)
                     .addModifiers(Modifier.PRIVATE, Modifier.VOLATILE)
