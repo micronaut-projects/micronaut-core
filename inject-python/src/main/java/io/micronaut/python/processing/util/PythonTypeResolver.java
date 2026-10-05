@@ -98,6 +98,10 @@ public final class PythonTypeResolver {
         if (typeRef == null) {
             return ClassElement.of(Object.class);
         }
+        if (typeRef.nativeException()) {
+            // Keep the native Python ancestry at runtime, exposing a Throwable wrapper to Java.
+            return visitorContext.getClassElement(RuntimeException.class).orElse(ClassElement.of(RuntimeException.class));
+        }
 
         String name = typeRef.name();
         List<TypeRef> typeArguments = typeRef.typeArguments();

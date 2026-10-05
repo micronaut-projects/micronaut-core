@@ -1,4 +1,5 @@
 import ast
+import builtins
 import inspect
 import keyword
 import os
@@ -1976,7 +1977,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
         Parse a base class AST node and return a TypeDef.
         Handles simple names like 'str' and subscripted types like 'MyBase[str]'.
         """
-        return self._parse_type(base_node)
+        base = self._parse_type(base_node)
+        if isinstance(base_node, ast.Name) and self._resolve_local_type_name(base_node.id):
+            return base
+        name = base.name()
+        # Resolve imports and local classes first: a user-defined RuntimeError is not a builtin.
+        builtin_name = name.removeprefix("builtins.")
+        if "." not in builtin_name and "$" not in builtin_name:
+            builtin = getattr(builtins, builtin_name, None)
+            if isinstance(builtin, type) and issubclass(builtin, Exception):
+                return TypeRef("builtins." + builtin_name, base.typeArguments(), base.typeUseDecorators(), True)
+        return base
 
     def _current_class_is_protocol(self):
         """
