@@ -183,6 +183,12 @@ class MicronautJavaAddressError(socket.gaierror):
         self.java_exception = java_exception
 
 
+class MicronautPythonFailure(MicronautJavaException):
+    """A Python exception raised in another context (a coroutine of a singleton awaited from an
+    event-loop context): it reaches this context as the Java exception that replaced it, and is raised
+    as this Python exception, which ``except Exception`` handles as it would the original."""
+
+
 _TIMEOUT_FAILURES = (
     "io.netty.channel.ConnectTimeoutException",
     "io.netty.handler.ssl.SslHandshakeTimeoutException",
@@ -212,6 +218,8 @@ def _java_failure_type(throwable):
     ConnectException, its TLS handshake timeout an IOException).
     """
     names = _java_class_names(throwable)
+    if "io.micronaut.context.python.PythonCrossContextException" in names:
+        return MicronautPythonFailure
     if any(name in _TIMEOUT_FAILURES for name in names):
         return MicronautJavaTimeout
     if "java.net.ConnectException" in names:

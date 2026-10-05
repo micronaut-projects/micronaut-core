@@ -86,7 +86,7 @@ final class GraalPyExceptionHandler {
         if (guestObject == null || context.equals(guestObject.getContext())) {
             return failure;
         }
-        RuntimeException replacement = new RuntimeException(polyglotException.getMessage());
+        RuntimeException replacement = new PythonCrossContextException(polyglotException.getMessage());
         replacement.setStackTrace(polyglotException.getStackTrace());
         return replacement;
     }
