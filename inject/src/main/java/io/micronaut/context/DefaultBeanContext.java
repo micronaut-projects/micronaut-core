@@ -259,8 +259,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
+    /**
+     * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
+     * as the context is constructed, or by its environment as it starts (see {@link #isTrackBeanDependenciesOnStart()}),
+     * in both cases before the context creates a bean; it only ever goes from null to a graph.
+     */
     @Nullable
-    private final DefaultBeanDependencyGraph dependencyGraph;
+    private DefaultBeanDependencyGraph dependencyGraph;
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -403,6 +408,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
+                if (dependencyGraph == null && isTrackBeanDependenciesOnStart()) {
+                    // development mode was switched on by configuration rather than by system property: the
+                    // environment is started and no bean has been created yet, so the graph sees every bean
+                    dependencyGraph = new DefaultBeanDependencyGraph();
+                }
                 configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -424,6 +434,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             initializing.set(false);
         }
         return this;
+    }
+
+    /**
+     * Whether the context, which was not configured to track bean dependencies, tracks them after all as it
+     * starts, before it reads its definitions and creates any bean. An application context does so when its
+     * environment switches development mode on by configuration.
+     *
+     * @return True to start recording the dependency graph
+     */
+    boolean isTrackBeanDependenciesOnStart() {
+        return false;
     }
 
     /**

@@ -398,7 +398,8 @@ public interface ApplicationContextBuilder {
     /**
      * Record which bean received which other bean, as a {@link BeanDependencyGraph} the built context
      * exposes through {@link BeanContext#findDependencyGraph()}. A development launcher switches this on;
-     * it defaults to on only in {@link io.micronaut.context.env.DevelopmentMode development mode}.
+     * it defaults to on only in {@link io.micronaut.context.env.DevelopmentMode development mode}, whether switched
+     * on by system property or by the configuration of the context. Switching it off here wins over both.
      *
      * @param enabled True to record the graph
      * @return This builder

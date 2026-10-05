@@ -114,7 +114,10 @@ public interface BeanContextConfiguration {
     /**
      * Whether the context records which bean received which other bean, as a
      * {@link BeanDependencyGraph}. On by default only when {@link DevelopmentMode development mode}
-     * is switched on by system property, since a production run has no use for the graph.
+     * is switched on by system property, since a production run has no use for the graph. An application
+     * context whose configuration switches development mode on ({@value DevelopmentMode#PROPERTY}) tracks
+     * dependencies too, deciding so as it starts and before it creates any bean, unless its builder switched
+     * tracking off with {@link ApplicationContextBuilder#trackBeanDependencies(boolean)}.
      *
      * @return True to record the graph
      * @since 5.3.0

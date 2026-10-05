@@ -23,6 +23,7 @@ import io.micronaut.context.env.BootstrapLocatorMarker;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
@@ -291,6 +292,17 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     public synchronized ApplicationContext start() {
         environment.start();
         return (ApplicationContext) super.start();
+    }
+
+    /**
+     * Development mode switched on by configuration, rather than by the system property the configuration
+     * default reads, tracks bean dependencies too, unless the builder switched tracking off. The environment
+     * has started when this is asked, and no bean has been created yet.
+     */
+    @Override
+    boolean isTrackBeanDependenciesOnStart() {
+        boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isTrackBeanDependenciesSwitchedOff();
+        return !switchedOff && DevelopmentMode.isEnabled(environment);
     }
 
     @Override

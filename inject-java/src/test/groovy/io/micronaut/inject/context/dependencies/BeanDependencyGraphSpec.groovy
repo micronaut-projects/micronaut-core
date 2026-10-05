@@ -33,6 +33,36 @@ class BeanDependencyGraphSpec extends Specification {
         context.close()
     }
 
+    void "development mode switched on by configuration records the graph from the first bean"() {
+        given: "development mode is only in the properties of the context, not a system property"
+        ApplicationContext context = ApplicationContext.run('spec.name': 'BeanDependencyGraphSpec', 'micronaut.dev.enabled': true)
+
+        when:
+        context.getBean(ConstructorService)
+        def dependents = context.findDependencyGraph().get().dependentsOf(context.getBeanDefinition(Repo))
+
+        then:
+        System.getProperty('micronaut.dev.enabled') == null
+        dependents.find { it.dependent().beanType == ConstructorService }.kind() == InjectionKind.CONSTRUCTOR
+
+        cleanup:
+        context.close()
+    }
+
+    void "a builder switching tracking off wins over development mode switched on by configuration"() {
+        given:
+        ApplicationContext context = ApplicationContext.builder()
+            .properties('spec.name': 'BeanDependencyGraphSpec', 'micronaut.dev.enabled': true)
+            .trackBeanDependencies(false)
+            .start()
+
+        expect:
+        context.findDependencyGraph().isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
     void "the graph records how each singleton received the others"() {
         given:
         ApplicationContext context = ApplicationContext.builder()

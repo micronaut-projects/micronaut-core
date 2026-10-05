@@ -236,6 +236,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this;
     }
 
+    /**
+     * @return Whether {@link #trackBeanDependencies(boolean)} switched tracking off, which development mode
+     * switched on by configuration does not override
+     */
+    boolean isTrackBeanDependenciesSwitchedOff() {
+        return Boolean.FALSE.equals(trackBeanDependencies);
+    }
+
     @Override
     @Nullable
     public Predicate<QualifiedBeanType<?>> beansPredicate() {
