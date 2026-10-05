@@ -15,6 +15,10 @@ dependencies {
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
+    // the gate filter tests route requests to the /dev endpoint; the management module stays off the test runtime
+    // classpath, whose endpoints would start with every application the tests launch
+    testImplementation(projects.micronautRouter)
+    testCompileOnly(projects.micronautManagement)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 

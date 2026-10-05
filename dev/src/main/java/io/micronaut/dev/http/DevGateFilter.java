@@ -21,12 +21,15 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.compile.CompileDiagnostic;
+import io.micronaut.dev.management.DevEndpoint;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.web.router.MethodBasedRouteMatch;
+import io.micronaut.web.router.RouteAttributes;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -38,7 +41,8 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Holds requests while a reload is in progress, and answers them with the diagnostics while the last
  * compilation failed: a page for a browser, a structured 503 for anything else. The stale generation
- * keeps serving what compiles.
+ * keeps serving what compiles. The development endpoint is never answered with the failure: reloading through it is
+ * how to recover when the watcher missed the corrected edit.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -79,10 +83,39 @@ public final class DevGateFilter {
      */
     @RequestFilter
     public CompletableFuture<@Nullable HttpResponse<?>> gate(HttpRequest<?> request) {
-        return runtime.whenReady().thenApply(ignored -> runtime.lastFailure().map(failure -> respond(request, failure)).orElse(null));
+        return runtime.whenReady().thenApply(ignored -> answer(request, runtime.lastFailure().orElse(null), errorPage));
     }
 
-    private HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure) {
+    /**
+     * Answers a request with the last compilation failure, or lets it through: always when nothing failed, and for the
+     * routes of the development endpoint even when something did, since its status and its reload are how a developer
+     * recovers when the watcher missed the corrected edit.
+     *
+     * @param request The request
+     * @param failure The last compilation failure, null when the last compilation succeeded
+     * @param errorPage The server's error page, if there is one
+     * @return The failure response, or null to proceed
+     */
+    static @Nullable HttpResponse<?> answer(HttpRequest<?> request, @Nullable CompileFailure failure, @Nullable DevErrorPage errorPage) {
+        if (failure == null || isDevEndpoint(request)) {
+            return null;
+        }
+        return respond(request, failure, errorPage);
+    }
+
+    /**
+     * Whether the request was routed to the development endpoint. The route decides rather than the path, so the
+     * endpoint is recognised wherever {@code endpoints.all.path} or {@code endpoints.dev.path} put it, and an
+     * application route that happens to live under {@code /dev} keeps the gate.
+     */
+    private static boolean isDevEndpoint(HttpRequest<?> request) {
+        return RouteAttributes.getRouteMatch(request)
+            .filter(MethodBasedRouteMatch.class::isInstance)
+            .map(match -> ((MethodBasedRouteMatch<?, ?>) match).getDeclaringType() == DevEndpoint.class)
+            .orElse(false);
+    }
+
+    private static HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure, @Nullable DevErrorPage errorPage) {
         boolean html = request.getHeaders().accept().stream().anyMatch(type -> type.getName().equals(MediaType.TEXT_HTML));
         if (html) {
             HttpResponse<?> unavailable = HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE);
