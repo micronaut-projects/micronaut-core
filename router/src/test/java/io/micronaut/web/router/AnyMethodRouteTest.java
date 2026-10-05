@@ -118,6 +118,31 @@ class AnyMethodRouteTest {
     }
 
     @Test
+    void theRoutesListAnAnyRouteOnce() {
+        Router router = router(routes -> {
+            routes.any("/things", handler("any"));
+            routes.route("PROPFIND", "/props").handle(handler("propfind"));
+            routes.route("LOCK", "/locks").handle(handler("lock"));
+        });
+
+        long anyCustom = router.uriRoutes()
+            .filter(route -> AnyMethodRoutes.CUSTOM_METHODS.equals(route.getHttpMethodName()))
+            .count();
+        assertEquals(1, anyCustom, "the route of the custom methods of any(...) is listed once");
+        assertEquals(router.uriRoutes().count(), router.uriRoutes().distinct().count(), "no route is listed twice");
+    }
+
+    @Test
+    void aCustomMethodFindsTheRouteOfTheCustomMethods() {
+        Router router = router(routes -> routes.any("/any").consumes(MediaType.APPLICATION_JSON_TYPE).handle(handler("any")));
+
+        HttpRequest<?> report = HttpRequest.create(HttpMethod.CUSTOM, "/any", "REPORT");
+        assertTrue(router.findAny(report).stream()
+                .anyMatch(match -> AnyMethodRoutes.CUSTOM_METHODS.equals(match.getRouteInfo().getHttpMethodName())),
+            "a request of a custom method finds the route of the custom methods");
+    }
+
+    @Test
     void theBodyFormAndAsyncVariantsRouteEveryMethod() {
         Router router = router(routes -> {
             routes.any("/body").body(Argument.STRING).handle((request, pathVariables, body) -> HttpResponse.ok(body));

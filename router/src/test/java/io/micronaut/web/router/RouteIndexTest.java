@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -66,6 +68,43 @@ class RouteIndexTest {
             }
             check(templates, paths);
         }
+    }
+
+    @Test
+    void moreThanSixtyFourRandomTemplatesAndPaths() {
+        Random random = new Random(7);
+        String[] pieces = {"/", "a", "b", "ab", "{x}", "{y:\\d+}", "{+p}", "{.e}", "{/s}", "{?q}", "-", "1", "12"};
+        for (int round = 0; round < 20; round++) {
+            String[] templates = new String[65 + random.nextInt(100)];
+            for (int i = 0; i < templates.length; i++) {
+                templates[i] = randomTemplate(random, pieces);
+            }
+            String[] paths = new String[50];
+            for (int i = 0; i < paths.length; i++) {
+                paths[i] = random(random, new String[] {"/", "a", "b", "ab", "1", "12", "-", ".", "?q=1", "x"}, false);
+            }
+            assertFalse(index(templates).isSingleWord());
+            check(templates, paths);
+        }
+    }
+
+    @Test
+    void theMaskOfAtMostSixtyFourRoutesHasTheCandidates() {
+        String[] templates = new String[64];
+        for (int i = 0; i < templates.length; i++) {
+            templates[i] = i % 2 == 0 ? "/r" + i + "/{id}" : "/{name}/r" + i;
+        }
+        RouteIndex index = index(templates);
+        assertTrue(index.isSingleWord());
+        for (String path : new String[] {"/r62/1", "/r1/x", "/x/r63", "/r62/1/?q=1", "/"}) {
+            long mask = index.candidateMask(path);
+            int[] candidates = index.candidates(path);
+            assertEquals(Long.bitCount(mask), candidates.length, path);
+            for (int candidate : candidates) {
+                assertTrue((mask & (1L << candidate)) != 0, path);
+            }
+        }
+        assertTrue((index.candidateMask("/r62/1") & (1L << 62)) != 0, "the last word bit");
     }
 
     @Test

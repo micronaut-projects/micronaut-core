@@ -133,7 +133,31 @@ final class UriRouteSet {
      * @return The routes of the set
      */
     Stream<UriRouteInfo<?, ?>> uriRoutes() {
-        return allRoutesByMethod.values().stream().flatMap(Arrays::stream);
+        // the routes of any custom method are merged into the routes of each custom method: list them once, under their own key
+        return allRoutesByMethod.entrySet().stream()
+            .flatMap(e -> Arrays.stream(e.getValue()).filter(route -> isOwnRoute(e.getKey(), route)));
+    }
+
+    /**
+     * @param methodKey The method key of the routes the route is listed under
+     * @param route     The route
+     * @return Whether the route is a route of that method, rather than a route of any custom
+     * method merged into the routes of the method
+     */
+    private static boolean isOwnRoute(String methodKey, UriRouteInfo<Object, Object> route) {
+        return methodKey.equals(route.getHttpMethodName());
+    }
+
+    /**
+     * @param methodKey The method key of a set of routes
+     * @param request   The request, or {@code null}
+     * @return Whether {@link #findAny} skips the routes of that key: the routes of any custom
+     * method, except for a request of a custom method, since the route of any method has a
+     * route of each standard method too
+     */
+    private static boolean skipForAny(String methodKey, @Nullable HttpRequest<?> request) {
+        return AnyMethodRoutes.CUSTOM_METHODS.equals(methodKey)
+            && (request == null || request.getMethod() != HttpMethod.CUSTOM);
     }
 
     /**
@@ -334,13 +358,15 @@ final class UriRouteSet {
     <T, R> List<UriRouteMatch<T, R>> findAny(String uri, @Nullable HttpRequest<?> request, @Nullable Set<Integer> ports) {
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
-            if (AnyMethodRoutes.CUSTOM_METHODS.equals(entry.getKey())) {
-                // the route of any method has a route of each standard method too
+            if (skipForAny(entry.getKey(), request)) {
                 continue;
             }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
             for (int candidate : index(entry.getKey()).candidates(uri)) {
                 UriRouteInfo<Object, Object> route = routes[candidate];
+                if (!isOwnRoute(entry.getKey(), route)) {
+                    continue;
+                }
                 if (request != null) {
                     if (shouldSkipForPort(request, route, ports)) {
                         continue;
@@ -372,13 +398,15 @@ final class UriRouteSet {
         String path = request.getPath();
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
-            if (AnyMethodRoutes.CUSTOM_METHODS.equals(entry.getKey())) {
-                // the route of any method has a route of each standard method too
+            if (skipForAny(entry.getKey(), request)) {
                 continue;
             }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
             for (int candidate : index(entry.getKey()).candidates(path)) {
                 UriRouteInfo<Object, Object> route = routes[candidate];
+                if (!isOwnRoute(entry.getKey(), route)) {
+                    continue;
+                }
                 if (shouldSkipForPort(request, route, ports)) {
                     continue;
                 }
@@ -442,37 +470,39 @@ final class UriRouteSet {
         if (routes == null || routes.length == 0) {
             return Collections.emptyList();
         }
-        String path = request.getPath();
-        int[] candidates = index(methodKey).candidates(path);
-        if (candidates.length == 0) {
-            return Collections.emptyList();
-        }
+        // the candidates as bits of their positions: a single word, without an allocation, for up to 64 routes
+        RouteIndex index = index(methodKey);
+        long[] words = index.isSingleWord() ? null : index.candidateBits(uri);
+        long singleWord = words == null ? index.candidateMask(uri) : 0;
+        int wordCount = words == null ? 1 : words.length;
         boolean permitsBody = httpMethod.permitsRequestBody();
         MediaType contentType = null;
         Collection<MediaType> acceptedProducedTypes = null;
         // most requests match a single route: keep it in a local and only allocate a list once a second match shows up
         UriRouteMatch<T, R> first = null;
         List<UriRouteMatch<T, R>> matches = null;
-        for (int candidate : candidates) {
-            UriRouteInfo<Object, Object> route = routes[candidate];
-            if (permitsBody && contentType == null && !route.consumesAll()) {
-                contentType = request.getContentType().orElse(null);
-            }
-            if (acceptedProducedTypes == null && !route.producesAll()) {
-                acceptedProducedTypes = request.accept();
-            }
-            UriRouteMatch match = matchRoute(request, route, path, uri, ports, permitsBody, contentType, acceptedProducedTypes);
-            if (match == null) {
-                continue;
-            }
-            if (first == null) {
-                first = match;
-            } else {
-                if (matches == null) {
-                    matches = new ArrayList<>(4);
-                    matches.add(first);
+        for (int w = 0; w < wordCount; w++) {
+            for (long word = words == null ? singleWord : words[w]; word != 0; word &= word - 1) {
+                UriRouteInfo<Object, Object> route = routes[(w << 6) + Long.numberOfTrailingZeros(word)];
+                if (permitsBody && contentType == null && !route.consumesAll()) {
+                    contentType = request.getContentType().orElse(null);
                 }
-                matches.add(match);
+                if (acceptedProducedTypes == null && !route.producesAll()) {
+                    acceptedProducedTypes = request.accept();
+                }
+                UriRouteMatch match = matchRoute(request, route, uri, ports, permitsBody, contentType, acceptedProducedTypes);
+                if (match == null) {
+                    continue;
+                }
+                if (first == null) {
+                    first = match;
+                } else {
+                    if (matches == null) {
+                        matches = new ArrayList<>(4);
+                        matches.add(first);
+                    }
+                    matches.add(match);
+                }
             }
         }
         if (matches != null) {
@@ -489,7 +519,6 @@ final class UriRouteSet {
      */
     private static @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request,
                                                                       UriRouteInfo<Object, Object> route,
-                                                                      String path,
                                                                       String uri,
                                                                       @Nullable Set<Integer> ports,
                                                                       boolean permitsBody,
@@ -500,13 +529,9 @@ final class UriRouteSet {
         }
         UriRouteMatch<Object, Object> constrainedMatch = null;
         if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.isConstrained()) {
-            UriRouteMatch<Object, Object> pathMatch = info.tryMatch(path);
-            if (pathMatch == null || !info.acceptsVariables(pathMatch.getVariableValues())) {
+            constrainedMatch = info.tryMatch(uri);
+            if (constrainedMatch == null || !info.acceptsVariables(constrainedMatch.getVariableValues())) {
                 return null;
-            }
-            if (path.equals(uri)) {
-                // reuse the match of the constraint check
-                constrainedMatch = pathMatch;
             }
         }
         if (permitsBody) {

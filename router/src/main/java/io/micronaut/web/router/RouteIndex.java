@@ -84,34 +84,100 @@ final class RouteIndex {
         if (size == 0) {
             return NONE;
         }
-        String normalized = UriTemplateMatcher.normalizeForMatching(path);
-        long[] bits = new long[(size + 63) >>> 6];
-        int count = mark(bits, unprefixed);
-        @Nullable Node node = root;
-        for (int i = 0; i < normalized.length() && node != null; i++) {
-            node = node.child(normalized.charAt(i));
-            if (node != null) {
-                count += mark(bits, node.ranks);
-            }
+        long[] bits = isSingleWord() ? new long[] {candidateMask(path)} : candidateBits(path);
+        int count = 0;
+        for (long word : bits) {
+            count += Long.bitCount(word);
         }
         int[] result = new int[count];
         int n = 0;
         for (int w = 0; w < bits.length; w++) {
             long word = bits[w];
             while (word != 0) {
-                int bit = Long.numberOfTrailingZeros(word);
-                result[n++] = (w << 6) + bit;
+                result[n++] = (w << 6) + Long.numberOfTrailingZeros(word);
                 word &= word - 1;
             }
         }
         return result;
     }
 
-    private static int mark(long[] bits, int[] ranks) {
+    /**
+     * @return Whether the index has at most 64 routes, so that {@link #candidateMask(String)}
+     * gives the candidates without an allocation
+     */
+    boolean isSingleWord() {
+        return size <= 64;
+    }
+
+    /**
+     * The routes that can match the path, as a mask of their positions: bit {@code i} is set for
+     * the route at position {@code i}. Only for an index with at most 64 routes, see
+     * {@link #isSingleWord()}.
+     *
+     * @param path The request path
+     * @return The mask of the route positions
+     */
+    long candidateMask(String path) {
+        long mask = 0;
+        for (int rank : unprefixed) {
+            mask |= 1L << rank;
+        }
+        @Nullable Node node = root;
+        int end = matchedLength(path);
+        for (int i = 0; i < end && node != null; i++) {
+            node = node.child(path.charAt(i));
+            if (node != null) {
+                for (int rank : node.ranks) {
+                    mask |= 1L << rank;
+                }
+            }
+        }
+        return mask;
+    }
+
+    /**
+     * The routes that can match the path, as the bits of their positions in words of 64: bit
+     * {@code i % 64} of word {@code i / 64} is set for the route at position {@code i}.
+     *
+     * @param path The request path
+     * @return The bits of the route positions
+     */
+    long[] candidateBits(String path) {
+        long[] bits = new long[(size + 63) >>> 6];
+        mark(bits, unprefixed);
+        @Nullable Node node = root;
+        int end = matchedLength(path);
+        for (int i = 0; i < end && node != null; i++) {
+            node = node.child(path.charAt(i));
+            if (node != null) {
+                mark(bits, node.ranks);
+            }
+        }
+        return bits;
+    }
+
+    /**
+     * The length of the path that is matched, like {@link UriTemplateMatcher#normalizeForMatching(String)}
+     * without a copy: up to the query, without a trailing slash.
+     *
+     * @param path The request path
+     * @return The length
+     */
+    private static int matchedLength(String path) {
+        int end = path.indexOf('?');
+        if (end < 0) {
+            end = path.length();
+        }
+        if (end > 1 && path.charAt(end - 1) == '/') {
+            end--;
+        }
+        return end;
+    }
+
+    private static void mark(long[] bits, int[] ranks) {
         for (int rank : ranks) {
             bits[rank >>> 6] |= 1L << rank;
         }
-        return ranks.length;
     }
 
     /**

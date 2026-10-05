@@ -49,6 +49,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonSyntaxException;
+import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
@@ -569,7 +570,10 @@ public class RequestLifecycle {
         Class<?> declaringType = null;
         for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
             final String routeMethod = anyRoute.getRouteInfo().getHttpMethodName();
-            if (!requestMethodName.equals(routeMethod)) {
+            // the route of any custom method is a route of the method of a custom request
+            boolean sameMethod = requestMethodName.equals(routeMethod)
+                || httpMethod == HttpMethod.CUSTOM && AnyMethodRoutes.CUSTOM_METHODS.equals(routeMethod);
+            if (!sameMethod) {
                 allowedMethods.add(routeMethod);
             } else {
                 if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
