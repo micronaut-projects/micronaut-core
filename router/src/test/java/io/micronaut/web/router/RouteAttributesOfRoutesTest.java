@@ -16,7 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;

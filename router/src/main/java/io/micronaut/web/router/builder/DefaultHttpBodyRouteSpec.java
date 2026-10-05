@@ -36,6 +36,7 @@ import java.util.function.Predicate;
  */
 @Internal
 final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements HttpBodyRouteSpec<B>, ContextFilterSpec<HttpBodyRouteSpec<B>> {
+    private static final String HANDLER = "handler";
 
     private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
 
@@ -146,7 +147,10 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
      * @return The handler
      */
     <H> H checked(@Nullable H handler) {
-        return route.terminal(handler, "handler");
+        if (handler == null) {
+            throw route.missing(HANDLER);
+        }
+        return handler;
     }
 
     @Override
@@ -158,7 +162,7 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
     @SuppressWarnings("unchecked")
     @Override
     public void handle(BodyRequestHandler<B> handler) {
-        BodyRequestHandler<B> checked = route.terminal(handler, "handler");
+        BodyRequestHandler<B> checked = route.terminal(handler, HANDLER);
         Argument<B> type = bodyType;
         if (type == null) {
             BodyRequestHandler<FormData> form = (BodyRequestHandler<FormData>) checked;
@@ -172,7 +176,7 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
     @SuppressWarnings("unchecked")
     @Override
     public void handleAsync(AsyncBodyRequestHandler<B> handler) {
-        AsyncBodyRequestHandler<B> checked = route.terminal(handler, "handler");
+        AsyncBodyRequestHandler<B> checked = route.terminal(handler, HANDLER);
         Argument<B> type = bodyType;
         if (type == null) {
             AsyncBodyRequestHandler<FormData> form = (AsyncBodyRequestHandler<FormData>) checked;

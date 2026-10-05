@@ -103,13 +103,24 @@ final class PendingRoute {
      * @throws NullPointerException if it is {@code null}
      */
     <T> T terminal(@Nullable T terminal, String name) {
-        checkPending();
         if (terminal == null) {
-            ended = true;
-            builder.dropPending(this);
-            throw new NullPointerException(name);
+            throw missing(name);
         }
+        checkPending();
         return terminal;
+    }
+
+    /**
+     * Drop the route that was given no handler or response.
+     *
+     * @param name The name of the missing handler or response, for the message
+     * @return The error to throw
+     */
+    NullPointerException missing(String name) {
+        checkPending();
+        ended = true;
+        builder.dropPending(this);
+        return new NullPointerException(name);
     }
 
     private void addSetting(Consumer<HandlerRoutes> setting) {

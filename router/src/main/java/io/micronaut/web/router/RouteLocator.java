@@ -36,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -75,7 +76,7 @@ public final class RouteLocator implements DynamicRouteTarget {
      * The request attribute of the targets that asynchronous locators located for the request.
      */
     private static final String LOCATED_ATTRIBUTE = "micronaut.router.located";
-    private static final String LOCATOR = "locator";
+    private static final String LOCATOR_NAME = "locator";
 
     private final @Nullable LocatorHandler<?> locator;
     private final @Nullable AsyncLocatorHandler<?> asyncLocator;
@@ -90,7 +91,7 @@ public final class RouteLocator implements DynamicRouteTarget {
      */
     public <T> RouteLocator(LocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf,
                             RouteTableFactory tables) {
-        this.locator = Objects.requireNonNull(locator, LOCATOR);
+        this.locator = Objects.requireNonNull(locator, LOCATOR_NAME);
         this.asyncLocator = null;
         this.routesOf = routesOf(routesOf);
         this.tables = Objects.requireNonNull(tables, "tables");
@@ -105,7 +106,7 @@ public final class RouteLocator implements DynamicRouteTarget {
     public <T> RouteLocator(AsyncLocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf,
                             RouteTableFactory tables) {
         this.locator = null;
-        this.asyncLocator = Objects.requireNonNull(locator, LOCATOR);
+        this.asyncLocator = Objects.requireNonNull(locator, LOCATOR_NAME);
         this.routesOf = routesOf(routesOf);
         this.tables = Objects.requireNonNull(tables, "tables");
     }
@@ -301,7 +302,7 @@ public final class RouteLocator implements DynamicRouteTarget {
         Outcome outcome = outcomes.get(key);
         if (outcome == null) {
             try {
-                outcome = new Outcome(Objects.requireNonNull(locator, LOCATOR).locate(original, pathVariables), null, null, null, location);
+                outcome = new Outcome(Objects.requireNonNull(locator, LOCATOR_NAME).locate(original, pathVariables), null, null, null, location);
             } catch (Exception e) {
                 outcome = new Outcome(null, e, null, null, location);
             }
@@ -327,10 +328,8 @@ public final class RouteLocator implements DynamicRouteTarget {
         LocationKey key = new LocationKey(this, levelPath);
         Outcome outcome = outcomes.get(key);
         if (outcome == null) {
-            CompletionStage<?> stage = Objects.requireNonNull(asyncLocator, "asyncLocator").locate(original, pathVariables);
-            if (stage == null) {
-                throw new NullPointerException("The locator returned no stage: " + this);
-            }
+            CompletionStage<?> stage = Optional.ofNullable((CompletionStage<?>) Objects.requireNonNull(asyncLocator, "asyncLocator").locate(original, pathVariables))
+                .orElseThrow(() -> new NullPointerException("The locator returned no stage: " + this));
             // completed when the outcome is known: by the stage, or when the location is cancelled
             CompletableFuture<Boolean> located = new CompletableFuture<>();
             Outcome pending = new Outcome(null, null, located, stage, location);
