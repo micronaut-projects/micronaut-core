@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -111,6 +112,38 @@ public interface BeanDependencyResolver {
      * @return The registration
      */
     <T> BeanRegistration<T> getBeanRegistration(Argument<T> type, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the bean of an exact definition as the given type, using the same scope and ownership rules as
+     * {@link #getBean(Argument, Qualifier)}: a newly created dependent is owned like one a lookup by type creates.
+     * The caller has already chosen the definition, so no candidate lookup takes place, see
+     * {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)}.
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param <T> The bean type
+     * @return The dependency
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @since 5.3.0
+     */
+    default <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> type) {
+        return getBeanRegistration(definition, type).getBean();
+    }
+
+    /**
+     * Resolves the registration of an exact definition as the given type, using the same ownership rules as
+     * {@link #getBean(BeanDefinition, Argument)}. Shared registrations remain scope-owned.
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param <T> The bean type
+     * @return The registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type);
 
     /**
      * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.
