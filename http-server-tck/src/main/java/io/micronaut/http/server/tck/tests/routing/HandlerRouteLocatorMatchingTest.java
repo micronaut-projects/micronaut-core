@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -60,6 +61,7 @@ public class HandlerRouteLocatorMatchingTest {
     public static final String SPEC_NAME = "HandlerRouteLocatorMatchingTest";
     private static final AtomicInteger CUSTOM_LOCATED = new AtomicInteger();
     private static final AtomicInteger ASYNC_CUSTOM_LOCATED = new AtomicInteger();
+    private static final AtomicInteger THROWING_LOCATED = new AtomicInteger();
 
     @Test
     void theGroupErrorRouteAnswersAFailedSynchronousLocator() throws IOException {
@@ -156,6 +158,67 @@ public class HandlerRouteLocatorMatchingTest {
         }
     }
 
+    @Test
+    void aConstraintOfALocatedRouteSeesTheDecodedPathVariablesOfThePrefix() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/matching/shops/north%20shop/items"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("items of north shop")
+                .build());
+        }
+    }
+
+    @Test
+    void theGroupErrorRouteAnswersAnAsynchronousLocatorThatThrowsOnce() throws IOException {
+        try (ServerUnderTest server = server()) {
+            int located = THROWING_LOCATED.get();
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/matching/fails/async-throws/1/items"), HttpResponseAssertion.builder()
+                .status(HttpStatus.CONFLICT)
+                .body("group: no order")
+                .build());
+            assertEquals(located + 1, THROWING_LOCATED.get(), "the locator is called once");
+        }
+    }
+
+    @Test
+    void theGroupErrorRouteAnswersTheFailureToSelectTheRoutesOfASynchronousLocator() throws IOException {
+        assertGroupAnswers("/matching/fails/sync-routes/1/items");
+    }
+
+    @Test
+    void theGroupErrorRouteAnswersTheFailureToSelectTheRoutesOfAnAsynchronousLocator() throws IOException {
+        assertGroupAnswers("/matching/fails/async-routes/1/items");
+    }
+
+    @Test
+    void theGroupErrorRouteAnswersTheFailureToBuildTheTableOfASynchronousLocator() throws IOException {
+        assertGroupAnswers("/matching/fails/sync-table/1/items");
+    }
+
+    @Test
+    void theGroupErrorRouteAnswersTheFailureToBuildTheTableOfAnAsynchronousLocator() throws IOException {
+        assertGroupAnswers("/matching/fails/async-table/1/items");
+    }
+
+    @Test
+    void theGroupStatusRouteAnswersTheStatusOfASynchronousLocator() throws IOException {
+        assertGroupStatusAnswers("/matching/missing/sync/1/items");
+    }
+
+    @Test
+    void theGroupStatusRouteAnswersTheStatusOfAnAsynchronousLocator() throws IOException {
+        assertGroupStatusAnswers("/matching/missing/async/1/items");
+    }
+
+    private static void assertGroupStatusAnswers(String path) throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.GET(path), HttpResponseAssertion.builder()
+                .status(HttpStatus.GONE)
+                .body("group: not found")
+                .build());
+        }
+    }
+
     private static Set<String> allowed(HttpResponse<?> response) {
         return response.getHeaders().getAll(HttpHeaders.ALLOW).stream()
             .flatMap(value -> Arrays.stream(value.split(",")))
@@ -212,8 +275,35 @@ public class HandlerRouteLocatorMatchingTest {
                         sleep();
                         throw new NoOrder();
                     }, executor), order -> items);
+                group.locateAsync("/async-throws/{id}", (request, pathVariables) -> {
+                    THROWING_LOCATED.incrementAndGet();
+                    throw new NoOrder();
+                }, order -> items);
+                group.locate("/sync-routes/{id}", (request, pathVariables) -> "order", order -> {
+                    throw new NoOrder();
+                });
+                group.locateAsync("/async-routes/{id}", (request, pathVariables) -> CompletableFuture.completedFuture("order"), order -> {
+                    throw new NoOrder();
+                });
+                LocatedRoutes<?> broken = TckLocatedRoutes.of(located -> {
+                    throw new NoOrder();
+                });
+                group.locate("/sync-table/{id}", (request, pathVariables) -> "order", order -> broken);
+                group.locateAsync("/async-table/{id}", (request, pathVariables) -> CompletableFuture.completedFuture("order"), order -> broken);
                 group.error(NoOrder.class, (request, error) -> text(HttpStatus.CONFLICT, "group: " + error.getMessage()));
             });
+            routes.path("/matching/missing", group -> {
+                group.locate("/sync/{id}", (request, pathVariables) -> {
+                    throw new HttpStatusException(HttpStatus.NOT_FOUND, "no order");
+                }, order -> items);
+                group.locateAsync("/async/{id}", (request, pathVariables) ->
+                    CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.NOT_FOUND, "no order")), order -> items);
+                group.status(HttpStatus.NOT_FOUND, request -> text(HttpStatus.GONE, "group: not found"));
+            });
+            LocatedRoutes<?> shopItems = TckLocatedRoutes.of(located -> located.GET("/items")
+                .constrain(pathVariables -> "north shop".equals(pathVariables.get("id", String.class)))
+                .handle((request, pathVariables) -> text(HttpStatus.OK, "items of " + pathVariables.get("id", String.class))));
+            routes.locate("/matching/shops/{id}", (request, pathVariables) -> "shop", shop -> shopItems);
             LocatedRoutes<?> constrained = TckLocatedRoutes.of(located -> located.GET("/items")
                 .constrain(pathVariables -> "1".equals(pathVariables.get("id", String.class)))
                 .handle((request, pathVariables) -> text(HttpStatus.OK, "items of " + pathVariables.get("id", String.class))));

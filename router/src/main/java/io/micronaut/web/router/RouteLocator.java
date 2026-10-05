@@ -167,7 +167,12 @@ public final class RouteLocator implements DynamicRouteTarget {
         if (located == null) {
             return null;
         }
-        UriRouteMatch<T, R> target = located.routes().findClosest(located.request(), null);
+        UriRouteMatch<T, R> target;
+        try {
+            target = located.routes().findClosest(located.request(), null);
+        } catch (RuntimeException e) {
+            throw located.failed(e);
+        }
         return target == null ? null : located.wrap(target);
     }
 
@@ -178,10 +183,15 @@ public final class RouteLocator implements DynamicRouteTarget {
         if (located == null) {
             return List.of();
         }
-        List<UriRouteMatch<T, R>> targetMatches = filter == null
-            ? located.routes().findAllClosest(located.request(), null, null)
-            // the filter sees the match of the request, as it does for the other routes
-            : located.routes().findAllClosest(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)), null);
+        List<UriRouteMatch<T, R>> targetMatches;
+        try {
+            targetMatches = filter == null
+                ? located.routes().findAllClosest(located.request(), null, null)
+                // the filter sees the match of the request, as it does for the other routes
+                : located.routes().findAllClosest(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)), null);
+        } catch (RuntimeException e) {
+            throw located.failed(e);
+        }
         return located.wrap(targetMatches);
     }
 
@@ -200,7 +210,17 @@ public final class RouteLocator implements DynamicRouteTarget {
         if (located == null) {
             return List.of();
         }
-        return located.wrap(located.routes().<T, R>findAny(located.request(), null));
+        List<UriRouteMatch<T, R>> targetMatches;
+        try {
+            targetMatches = located.routes().findAny(located.request(), null);
+        } catch (RuntimeException e) {
+            if (pendingLocation(e) == null) {
+                throw located.failed(e);
+            }
+            // a nested asynchronous locator that has not located its target
+            return List.of();
+        }
+        return located.wrap(targetMatches);
     }
 
     /**
@@ -215,12 +235,13 @@ public final class RouteLocator implements DynamicRouteTarget {
             return null;
         }
         Location location = Location.of(request, locatorMatch);
+        LocationKey key = new LocationKey(this, request.getPath());
         Object target;
         DefaultPathVariables pathVariables = new DefaultPathVariables(location.decodedValues(), locatorMatch.conversionService, location.owner());
         try {
             target = locator != null
-                ? locateSync(location, request.getPath(), pathVariables)
-                : locateAsync(location, request.getPath(), pathVariables);
+                ? locateSync(location, key, pathVariables)
+                : locateAsync(location, key, pathVariables);
         } catch (Exception e) {
             // like a controller method: the error routes see the exception the locator threw
             return ExceptionUtils.sneakyThrow(e);
@@ -228,6 +249,21 @@ public final class RouteLocator implements DynamicRouteTarget {
         if (target == null) {
             return null;
         }
+        UriRouteSet routes;
+        try {
+            routes = routesOf(target);
+        } catch (RuntimeException e) {
+            // answered by the error scopes of the location, like the failure of the locator
+            throw failed(location, key, e);
+        }
+        return new Located(routes, new LocatedRequest<>(location, target), target, key);
+    }
+
+    /**
+     * @param target The located target
+     * @return The routes of the table of the target
+     */
+    private UriRouteSet routesOf(Object target) {
         LocatedRoutes<?> routes = routesOf.apply(target);
         if (routes == null) {
             throw new IllegalStateException("No located routes for the located target: " + target);
@@ -239,7 +275,33 @@ public final class RouteLocator implements DynamicRouteTarget {
             throw new IllegalStateException("The located routes for targets of type " + targetType.getTypeName()
                 + " cannot route the located target " + target + " of type " + target.getClass().getName());
         }
-        return new Located(defaultTable.routes(), new LocatedRequest<>(location, target), target);
+        return defaultTable.routes();
+    }
+
+    /**
+     * Record that a location failed after its locator located the target: selecting the table of
+     * the target, or matching the rest of the path with it. The location fails with the error for
+     * the rest of the request, and the error is answered by its error and status scopes, unless a
+     * location nested in it already failed with the error.
+     *
+     * @param location The location
+     * @param key      The key of the outcome of the location
+     * @param error    The error
+     * @return The error, to throw
+     */
+    private static RuntimeException failed(Location location, LocationKey key, RuntimeException error) {
+        if (pendingLocation(error) != null) {
+            return error;
+        }
+        Map<LocationKey, Outcome> outcomes = outcomes(location.original());
+        for (Outcome outcome : outcomes.values()) {
+            if (failedWith(outcome, error)) {
+                // the closest location that failed answers the error
+                return error;
+            }
+        }
+        outcomes.put(key, new Outcome(null, error, null, null, location));
+        return error;
     }
 
     /**
@@ -290,15 +352,14 @@ public final class RouteLocator implements DynamicRouteTarget {
      * e.g. to find the allowed methods of a {@code 405}, does not run the locator again.
      *
      * @param location      What the locator route matched
-     * @param levelPath     The path matched by the locator route, which tells the levels of nested locators apart
+     * @param key           The locator and the path its route matched, which tells the levels of nested locators apart
      * @param pathVariables The path variables of the locator
      * @return The target, or {@code null}
      * @throws Exception The error of the locator
      */
-    private @Nullable Object locateSync(Location location, String levelPath, PathVariables pathVariables) throws Exception {
+    private @Nullable Object locateSync(Location location, LocationKey key, PathVariables pathVariables) throws Exception {
         HttpRequest<?> original = location.original();
         Map<LocationKey, Outcome> outcomes = outcomes(original);
-        LocationKey key = new LocationKey(this, levelPath);
         Outcome outcome = outcomes.get(key);
         if (outcome == null) {
             try {
@@ -317,19 +378,26 @@ public final class RouteLocator implements DynamicRouteTarget {
      * the router cannot match the request yet, see {@link #pendingLocation(Throwable)}.
      *
      * @param location      What the locator route matched
-     * @param levelPath     The path matched by the locator route, which tells the levels of nested locators apart
+     * @param key           The locator and the path its route matched, which tells the levels of nested locators apart
      * @param pathVariables The path variables of the locator
      * @return The target, or {@code null}
      * @throws Exception The error of the locator
      */
-    private @Nullable Object locateAsync(Location location, String levelPath, PathVariables pathVariables) throws Exception {
+    private @Nullable Object locateAsync(Location location, LocationKey key, PathVariables pathVariables) throws Exception {
         HttpRequest<?> original = location.original();
         Map<LocationKey, Outcome> outcomes = outcomes(original);
-        LocationKey key = new LocationKey(this, levelPath);
         Outcome outcome = outcomes.get(key);
         if (outcome == null) {
-            CompletionStage<?> stage = Optional.ofNullable((CompletionStage<?>) Objects.requireNonNull(asyncLocator, "asyncLocator").locate(original, pathVariables))
-                .orElseThrow(() -> new NullPointerException("The locator returned no stage: " + this));
+            CompletionStage<?> stage;
+            try {
+                stage = Optional.ofNullable((CompletionStage<?>) Objects.requireNonNull(asyncLocator, "asyncLocator").locate(original, pathVariables))
+                    .orElseThrow(() -> new NullPointerException("The locator returned no stage: " + this));
+            } catch (Exception e) {
+                // failed before returning a stage: an outcome, like a stage that failed
+                outcome = new Outcome(null, e, null, null, location);
+                outcomes.put(key, outcome);
+                return outcome.located();
+            }
             // completed when the outcome is known: by the stage, or when the location is cancelled
             CompletableFuture<Boolean> located = new CompletableFuture<>();
             Outcome pending = new Outcome(null, null, located, stage, location);
@@ -479,8 +547,19 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @param routes  The routes of the target's table
      * @param request The request to match the rest of the path with
      * @param target  The target
+     * @param key     The key of the outcome of the location
      */
-    record Located(UriRouteSet routes, LocatedRequest<?> request, Object target) {
+    record Located(UriRouteSet routes, LocatedRequest<?> request, Object target, LocationKey key) {
+
+        /**
+         * Record that matching the rest of the path with the routes of the target failed.
+         *
+         * @param error The error
+         * @return The error, to throw
+         */
+        RuntimeException failed(RuntimeException error) {
+            return RouteLocator.failed(request.location(), key, error);
+        }
 
         /**
          * The match of a route of the target's table, with the path variables of the prefixes and
@@ -609,6 +688,19 @@ public final class RouteLocator implements DynamicRouteTarget {
          */
         Map<String, Object> withPrefixValues(Map<String, Object> values) {
             Map<String, Object> all = new LinkedHashMap<>(rawValues);
+            all.putAll(values);
+            return all;
+        }
+
+        /**
+         * The variables the constraints of a located route see: the decoded values of the
+         * prefixes, the values the handler gets, with the variables of the match.
+         *
+         * @param values The values of the variables of the match of the rest of the path
+         * @return The decoded values of the variables of the prefixes, then of the match
+         */
+        Map<String, Object> withDecodedPrefixValues(Map<String, Object> values) {
+            Map<String, Object> all = new LinkedHashMap<>(decodedValues);
             all.putAll(values);
             return all;
         }

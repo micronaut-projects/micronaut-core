@@ -626,14 +626,14 @@ final class UriRouteSet {
 
     /**
      * The variables the constraints of a route see: those its handler gets, with the variables of
-     * the prefixes of the locator routes for a route of a located target.
+     * the decoded prefixes of the locator routes for a route of a located target.
      *
      * @param request The request, a {@link RouteLocator.LocatedRequest} for a route of a located target
      * @param values  The raw values of the variables of the match
      * @return The values
      */
     private static Map<String, Object> constrainedValues(HttpRequest<?> request, Map<String, Object> values) {
-        return request instanceof RouteLocator.LocatedRequest<?> located ? located.location().withPrefixValues(values) : values;
+        return request instanceof RouteLocator.LocatedRequest<?> located ? located.location().withDecodedPrefixValues(values) : values;
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {

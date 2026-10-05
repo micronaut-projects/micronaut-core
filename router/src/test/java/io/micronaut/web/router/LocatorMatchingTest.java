@@ -19,6 +19,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
@@ -113,6 +115,98 @@ class LocatorMatchingTest {
             assertSame(failure, assertThrows(IllegalStateException.class, () -> router.findClosest(request)));
             assertNotNull(GroupErrorRoutes.findErrorRoute(request, null, failure), path);
             assertNull(GroupErrorRoutes.findErrorRoute(request, null, new IllegalStateException("another")), path);
+        }
+    }
+
+    @Test
+    void aConstraintOfALocatedRouteSeesTheDecodedPrefixVariables() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items")
+            .constrain(pathVariables -> "north shop".equals(pathVariables.get("id", String.class)))
+            .handle((request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items));
+
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.GET("/orders/north%20shop/items"));
+        assertNotNull(match);
+        assertEquals("north shop", match.getVariableValues().get("id"));
+    }
+
+    @Test
+    void anAsynchronousLocatorThatThrowsIsCalledOnceAndAnsweredByItsGroup() {
+        IllegalStateException failure = new IllegalStateException("no order");
+        AtomicInteger calls = new AtomicInteger();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.path("/shop", shop -> {
+            shop.locateAsync("/async/{id}", (request, pathVariables) -> {
+                calls.incrementAndGet();
+                throw failure;
+            }, target -> items);
+            shop.error(IllegalStateException.class, (request, error) -> HttpResponse.ok());
+        }));
+
+        HttpRequest<?> request = HttpRequest.GET("/shop/async/1/items");
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> router.findClosest(request)));
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> router.findClosest(request)));
+        assertEquals(1, calls.get(), "the locator is called once per request");
+        assertNotNull(GroupErrorRoutes.findErrorRoute(request, null, failure));
+    }
+
+    @Test
+    void theFailureToSelectTheRoutesOfATargetIsAnsweredByTheGroupOfTheLocator() {
+        IllegalStateException failure = new IllegalStateException("no routes");
+        Router router = router(routes -> routes.path("/shop", shop -> {
+            shop.locate("/sync/{id}", (request, pathVariables) -> "order", target -> {
+                throw failure;
+            });
+            shop.locateAsync("/async/{id}", (request, pathVariables) -> CompletableFuture.completedFuture("order"), target -> {
+                throw failure;
+            });
+            shop.error(IllegalStateException.class, (request, error) -> HttpResponse.ok());
+        }));
+
+        for (String path : List.of("/shop/sync/1/items", "/shop/async/1/items")) {
+            HttpRequest<?> request = HttpRequest.GET(path);
+            assertSame(failure, assertThrows(IllegalStateException.class, () -> router.findClosest(request)));
+            assertNotNull(GroupErrorRoutes.findErrorRoute(request, null, failure), path);
+        }
+    }
+
+    @Test
+    void theFailureToBuildTheTableOfATargetIsAnsweredByTheGroupOfTheLocator() {
+        IllegalStateException failure = new IllegalStateException("no table");
+        LocatedRoutes<?> broken = TestLocatedRoutes.of(located -> {
+            throw failure;
+        });
+        Router router = router(routes -> routes.path("/shop", shop -> {
+            shop.locate("/sync/{id}", (request, pathVariables) -> "order", target -> broken);
+            shop.locateAsync("/async/{id}", (request, pathVariables) -> CompletableFuture.completedFuture("order"), target -> broken);
+            shop.error(IllegalStateException.class, (request, error) -> HttpResponse.ok());
+        }));
+
+        for (String path : List.of("/shop/sync/1/items", "/shop/async/1/items")) {
+            HttpRequest<?> request = HttpRequest.GET(path);
+            Throwable thrown = assertThrows(RuntimeException.class, () -> router.findClosest(request));
+            assertNotNull(GroupErrorRoutes.findErrorRoute(request, null, thrown), path);
+        }
+    }
+
+    @Test
+    void theStatusOfAFailedLocatorIsAnsweredByTheStatusRouteOfItsGroup() {
+        HttpStatusException failure = new HttpStatusException(HttpStatus.NOT_FOUND, "no order");
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.path("/shop", shop -> {
+            shop.locate("/sync/{id}", (request, pathVariables) -> {
+                throw failure;
+            }, target -> items);
+            shop.locateAsync("/async/{id}", (request, pathVariables) -> CompletableFuture.failedFuture(failure), target -> items);
+            shop.status(HttpStatus.NOT_FOUND, request -> HttpResponse.ok());
+        }));
+
+        for (String path : List.of("/shop/sync/1/items", "/shop/async/1/items")) {
+            HttpRequest<?> request = HttpRequest.GET(path);
+            assertSame(failure, assertThrows(HttpStatusException.class, () -> router.findClosest(request)));
+            assertNotNull(GroupErrorRoutes.findStatusRoute(request, null, HttpStatus.NOT_FOUND.getCode(), failure), path);
+            assertNull(GroupErrorRoutes.findStatusRoute(request, null, HttpStatus.NOT_FOUND.getCode(),
+                new HttpStatusException(HttpStatus.NOT_FOUND, "another")), path);
         }
     }
 
