@@ -551,7 +551,8 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * The number of path variables constrained by a regular expression, e.g. {@code {id:.+}}: the
      * third key of the order of templates, see {@link #compareTo(UriTemplateMatcher)}. Among
      * templates with the same literal length and number of variables, the one with fewer such
-     * variables is more specific, so {@code /t/{id}} is selected over {@code /t/{id:.+}}. A
+     * variables sorts first, so {@code /t/{id}} is ordered before {@code /t/{id:.+}}. It only
+     * orders templates: a request that both match stays ambiguous. A
      * numeric modifier, e.g. {@code {id:3}}, limits the length of the value and is not a
      * regular expression: it is not counted.
      *
@@ -561,7 +562,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     public int getPatternVariableCount() {
         int count = patternVariableCount;
         if (count < 0) {
-            // computed once: the router reads it to break the ties of ambiguous requests
+            // computed once: the router reads it to order its routes
             PathEvaluator evaluator = new PathEvaluator();
             visitParts(parts, evaluator);
             count = evaluator.patternVariableCount;

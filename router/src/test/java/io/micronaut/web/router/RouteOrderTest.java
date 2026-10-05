@@ -73,12 +73,20 @@ class RouteOrderTest {
         Router router = router(routes -> {
             routes.GET("/reports/latest").order(10).handle(handler("literal"));
             routes.GET("/reports/{id}").order(-10).handle(handler("variable"));
+        });
+
+        assertEquals("literal", target(router, HttpRequest.GET("/reports/latest")));
+    }
+
+    @Test
+    void theOrderDecidesBetweenAPlainAndAPatternVariable() {
+        // equally specific: without an order a request both match is ambiguous
+        Router router = router(routes -> {
             routes.GET("/files/{name}").order(10).handle(handler("plain"));
             routes.GET("/files/{name:.+}").order(-10).handle(handler("pattern"));
         });
 
-        assertEquals("literal", target(router, HttpRequest.GET("/reports/latest")));
-        assertEquals("plain", target(router, HttpRequest.GET("/files/a")));
+        assertEquals("pattern", target(router, HttpRequest.GET("/files/a")));
     }
 
     @Test

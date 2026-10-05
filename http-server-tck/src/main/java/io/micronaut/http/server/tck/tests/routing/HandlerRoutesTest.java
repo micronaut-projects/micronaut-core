@@ -197,13 +197,15 @@ public class HandlerRoutesTest {
     }
 
     @Test
-    void fewerVariablesWithARegularExpressionIsMoreSpecific() throws IOException {
+    void aPlainAndARegexVariableAreEquallySpecific() throws IOException {
         try (ServerUnderTest server = server()) {
+            // both match: ambiguous
+            for (String path : new String[] {"/fn/sel/1", "/fn/sel2/1/2", "/fn/dsel/1"}) {
+                AssertionUtils.assertThrows(server, HttpRequest.GET(path), HttpResponseAssertion.builder()
+                    .status(HttpStatus.BAD_REQUEST)
+                    .build());
+            }
             Map<String, String> expected = new LinkedHashMap<>();
-            // both match: the variable without a regular expression wins
-            expected.put("/fn/sel/1", "plain 1");
-            expected.put("/fn/sel2/1/2", "plain pair 1 2");
-            expected.put("/fn/dsel/1", "declared plain 1");
             // only the constrained route matches
             expected.put("/fn/sel/1/2", "pattern 1/2");
             expected.put("/fn/sel2/1/2/3", "pattern pair 1 2/3");

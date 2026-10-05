@@ -31,8 +31,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.io.IOException;
 
 /**
- * Among controller routes with the same literal length and number of variables, the route with
- * fewer variables constrained by a regular expression is more specific.
+ * A plain variable and a variable constrained by a regular expression at the same position are
+ * equally specific: a request both match is ambiguous and answered with {@code 400}; a request
+ * only the constrained route matches is routed to it.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -43,15 +44,22 @@ public class PatternVariableSpecificityTest {
     public static final String SPEC_NAME = "PatternVariableSpecificityTest";
 
     @ParameterizedTest
+    @CsvSource({"/sel/1", "/sel2/1/2"})
+    void bothMatchingIsAmbiguous(String path) throws IOException {
+        TestScenario.asserts(SPEC_NAME,
+            HttpRequest.GET(path),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build()));
+    }
+
+    @ParameterizedTest
     @CsvSource({
-        // both match: the variable without a regular expression wins
-        "/sel/1, plain 1",
-        "/sel2/1/2, plain pair 1 2",
         // only the constrained route matches
         "/sel/1/2, pattern 1/2",
         "/sel2/1/2/3, pattern pair 1 2/3"
     })
-    void theUnconstrainedVariableIsMoreSpecific(String path, String body) throws IOException {
+    void onlyTheConstrainedRouteMatches(String path, String body) throws IOException {
         TestScenario.asserts(SPEC_NAME,
             HttpRequest.GET(path),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()

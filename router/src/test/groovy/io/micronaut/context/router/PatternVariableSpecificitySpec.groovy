@@ -30,8 +30,9 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 /**
- * Among routes with the same literal length and number of variables, the route with fewer
- * variables constrained by a regular expression is more specific.
+ * A variable without a regular expression and one constrained by a regular expression at the same
+ * position are equally specific: a request both match is ambiguous, as before 5.3. The order of
+ * the routes only decides when one of them does not match.
  */
 class PatternVariableSpecificitySpec extends Specification {
 
@@ -41,6 +42,24 @@ class PatternVariableSpecificitySpec extends Specification {
 
     @Shared
     Router router = context.getBean(Router)
+
+    @Unroll
+    void "#path matched by a plain and a regex-constrained variable is ambiguous"() {
+        when:
+        router.findClosest(HttpRequest.GET(path))
+
+        then:
+        thrown(DuplicateRouteException)
+
+        when:
+        def all = router.findAllClosest(HttpRequest.GET(path))
+
+        then:
+        all.size() == 2
+
+        where:
+        path << ["/sel/1", "/sel2/1/2", "/sel3/1/2", "/things/123"]
+    }
 
     @Unroll
     void "#path is routed to #method"() {
@@ -54,12 +73,13 @@ class PatternVariableSpecificitySpec extends Specification {
         router.findAllClosest(HttpRequest.GET(path)).collect { methodName(it) } == [method]
 
         where:
-        path          | method
-        "/sel/1"      | "plain"
-        "/sel/a/b"    | "anyPath"
-        "/sel2/1/2"   | "plainPair"
-        "/sel2/1/2/3" | "patternPair"
-        "/sel3/1/2"   | "onePattern"
+        path            | method
+        "/sel/a/b"      | "anyPath"
+        "/sel2/1/2/3"   | "patternPair"
+        "/things/abc"   | "thing"
+        "/things/123/x" | "thingDetail"
+        "/lit/me"       | "literal"
+        "/lit/other"    | "variable"
     }
 
     void "routes that tie on all three keys stay ambiguous"() {
@@ -94,6 +114,21 @@ class PatternVariableSpecificitySpec extends Specification {
 
         @Get("/sel3/{a}/{b:.+}")
         String onePattern(String a, String b) { a + b }
+
+        @Get("/things/{id}")
+        String thing(String id) { id }
+
+        @Get("/things/{id:[0-9]+}")
+        String numericThing(String id) { id }
+
+        @Get("/things/{id:[0-9]+}/x")
+        String thingDetail(String id) { id }
+
+        @Get("/lit/me")
+        String literal() { "me" }
+
+        @Get("/lit/{name}")
+        String variable(String name) { name }
 
         @Get("/tie/{id:.+}")
         String tieA(String id) { id }
