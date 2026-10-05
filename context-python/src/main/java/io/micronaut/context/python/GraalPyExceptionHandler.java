@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Internal;
+import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
@@ -25,6 +26,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 /**
@@ -63,6 +66,41 @@ final class GraalPyExceptionHandler {
      * @param exception The exception value
      * @return The throwable to report to Java
      */
+    /**
+     * The failure of a Java stage as it may be handed to Python code of a context.
+     * <p>
+     * A Python exception raised in another context (a coroutine of a singleton awaited from an
+     * event-loop context) cannot be handed over as it is: Python code reading its {@code __cause__}
+     * fails with an internal GraalPy error that no {@code except} clause catches. It is replaced by a
+     * Java exception with its message and stack trace; its Python type does not exist in the
+     * receiving context anyway, as a synchronous call between contexts shows.
+     *
+     * @param context The context the failure is handed to
+     * @param failure The failure
+     * @return The failure, or its replacement
+     */
+    static @Nullable Throwable forContext(Context context, @Nullable Throwable failure) {
+        Throwable unwrapped = failure;
+        while ((unwrapped instanceof CompletionException || unwrapped instanceof ExecutionException) && unwrapped.getCause() != null) {
+            unwrapped = unwrapped.getCause();
+        }
+        if (!(unwrapped instanceof PolyglotException polyglotException) || !polyglotException.isGuestException()) {
+            return failure;
+        }
+        Value guestObject;
+        try {
+            guestObject = polyglotException.getGuestObject();
+        } catch (IllegalStateException | UnsupportedOperationException e) {
+            return failure;
+        }
+        if (guestObject == null || context.equals(guestObject.getContext())) {
+            return failure;
+        }
+        RuntimeException replacement = new RuntimeException(polyglotException.getMessage());
+        replacement.setStackTrace(polyglotException.getStackTrace());
+        return replacement;
+    }
+
     static Throwable toHostThrowable(Value exception) {
         if (exception.isHostObject() && exception.asHostObject() instanceof Throwable throwable) {
             return throwable;

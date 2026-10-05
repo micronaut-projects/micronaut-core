@@ -391,6 +391,58 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void aFailureOfAnAwaitedPythonSingletonCanBeHandledInTheCallersContext() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+            Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+            Value service = primary.eval(PYTHON, """
+                class Rejected(Exception):
+                    pass
+                class Failing:
+                    async def fail(self):
+                        try:
+                            raise KeyError("inner")
+                        except KeyError as e:
+                            raise Rejected("no schedule") from e
+                Failing()
+                """);
+            ValueCoercible wrapper = () -> service;
+            // walks the cause chain the way application code unwrapping a wrapped failure does: an exception of the
+            // singleton's context read here failed with an internal GraalPy error no except clause catches
+            eventLoopContext.eval(PYTHON, """
+                async def call_failing(failing):
+                    try:
+                        await failing.fail()
+                    except Exception as e:
+                        current, seen = e, []
+                        for _ in range(5):
+                            if current is None:
+                                break
+                            seen.append(type(current).__name__)
+                            current = getattr(current, "__cause__", None)
+                        java = getattr(e, "java_exception", None)
+                        return f"{e}|{seen}|{java.getCause() if java is not None else None}"
+                """);
+            Value call = eventLoopContext.getBindings(PYTHON).getMember("call_failing");
+
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(call.execute(wrapper));
+            eventLoop.runUntilComplete(stage);
+
+            String result = stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString();
+            assertTrue(result.contains("Rejected: no schedule|"), result);
+            assertTrue(result.endsWith("|None"), result);
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
     void containersCrossTheContextsOfAnAwaitedPythonSingleton() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
