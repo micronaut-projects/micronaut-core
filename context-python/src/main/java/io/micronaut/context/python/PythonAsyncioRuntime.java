@@ -29,6 +29,8 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.scheduler.NonBlocking;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Collection;
 import java.util.List;
@@ -41,6 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
@@ -57,6 +60,7 @@ public final class PythonAsyncioRuntime {
     private static final String LOOP_INSTALLER_NAME = "__micronaut_install_asyncio_event_loop";
     private static final String ITERATOR_PUBLISHER_NAME = "__micronaut_async_iterator_publisher";
     private static final String PUBLISHER_AWAITABLE_NAME = "__micronaut_publisher_awaitable";
+    private static final String REACTIVE_CONTEXT_NAME = "__micronaut_current_reactive_context";
     private static final String JAVA_STAGE_MEMBER = "_micronaut_java_stage";
     private static final AtomicReference<RuntimeState> STATE = new AtomicReference<>(new RuntimeState(true, List.of(), null, null, 0, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet()));
     private static final ExecutorAdapter EXECUTOR_ADAPTER = new ExecutorAdapter();
@@ -65,6 +69,7 @@ public final class PythonAsyncioRuntime {
     private static final String ASYNCIO_MODULE_SOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_asyncio.py";
     private static final ExceptionCompleter EXCEPTION_COMPLETER = new ExceptionCompleter();
     private static final AtomicReference<@Nullable String> ASYNCIO_FALLBACK_SOURCE = new AtomicReference<>();
+    private static final AtomicBoolean OFFLOAD_WARNED = new AtomicBoolean();
     private static final Source IMPORT_ASYNCIO_MODULE_SOURCE = Source.newBuilder(
         PythonContextRuntime.PYTHON,
         "import importlib as __micronaut_importlib\n"
@@ -160,10 +165,56 @@ public final class PythonAsyncioRuntime {
                     future.completeExceptionally(e);
                 }
             }
+        } else if (NonBlockingThreads.isNonBlockingThread() && offload(context, future, scheduler)) {
+            return future;
         } else {
             scheduler.run();
         }
         return future;
+    }
+
+    /**
+     * Run the coroutine of a non-blocking thread that has no Micronaut event loop (a Netty event loop
+     * without {@code micronaut-context-python-netty}, or beyond {@code max-event-loop-contexts}) on the
+     * blocking executor. Without an event loop
+     * the coroutine is driven to completion by a loop on the calling thread, which would block that
+     * Netty event loop, and with it every awaited client call needing a connection on it, until the
+     * call times out.
+     *
+     * @param context The context of the coroutine
+     * @param future The future of the coroutine
+     * @param scheduler The scheduling of the coroutine
+     * @return Whether the blocking executor took the coroutine
+     */
+    private static boolean offload(Context context, PythonCompletableFuture future, Runnable scheduler) {
+        ExecutorService executor = ExecutorAdapter.blockingExecutor();
+        if (executor == null) {
+            return false;
+        }
+        if (OFFLOAD_WARNED.compareAndSet(false, true)) {
+            LOG.warn("A Python coroutine was started on the non-blocking thread [{}], which has no Micronaut asyncio event loop: "
+                + "it runs on the blocking executor instead. Coroutines run on the Netty event loop when "
+                + "io.micronaut:micronaut-context-python-netty is on the runtime classpath and the event loop is within "
+                + "micronaut.python.pool.max-event-loop-contexts.", Thread.currentThread().getName());
+        }
+        try {
+            // the worker runs guest code of its own: host calls of the coroutine resolve this context
+            Runnable tracked = () -> {
+                try {
+                    PythonContextRegistry.withTrackedExecutionFrame(context, () -> {
+                        scheduler.run();
+                        return null;
+                    });
+                } catch (Throwable e) { // NOSONAR nothing else observes this worker: any failure must complete the future
+                    future.completeExceptionally(e);
+                }
+            };
+            executor.execute(PropagatedContext.wrapCurrent(tracked));
+            return true;
+        } catch (RuntimeException e) {
+            LOG.debug("The blocking executor refused a Python coroutine; it runs on the calling thread", e);
+            return false;
+        }
     }
 
     /**
@@ -220,6 +271,29 @@ public final class PythonAsyncioRuntime {
             throw new IllegalArgumentException("Not a publisher: " + publisher);
         }
         return toAwaitable(Context.getCurrent(), stage);
+    }
+
+    /**
+     * Python entry point of {@code await} on a Java object: the asyncio future of a
+     * {@link CompletionStage}, or of the first item of a publisher (subscribed within the reactive
+     * context of the awaiting coroutine), so a {@code CompletableFuture} or {@code Mono} a Java call
+     * returned is awaitable like the value of an injected client.
+     *
+     * @param value The Java object
+     * @return The future
+     */
+    @Internal
+    public static Value awaitJava(Value value) {
+        Context context = Context.getCurrent();
+        Object hostObject = value.isHostObject() ? value.asHostObject() : null;
+        if (hostObject instanceof CompletionStage<?> stage) {
+            return toAwaitable(context, stage);
+        }
+        Value reactiveContext = asyncioHelper(context, REACTIVE_CONTEXT_NAME).execute();
+        PythonReactiveContext subscriberContext = reactiveContext.isHostObject() && reactiveContext.asHostObject() instanceof PythonReactiveContext current
+            ? current
+            : null;
+        return awaitPublisher(value, subscriberContext);
     }
 
     /**
@@ -590,9 +664,10 @@ public final class PythonAsyncioRuntime {
          *
          * @param future The Python asyncio future.
          * @param callback The Python callback.
-         * @param eventLoop The current event loop.
+         * @param eventLoop The current event loop, or {@code null} for a Python loop running on another
+         *                  thread, which the completion of the future hands the result to.
          */
-        public void run(Value future, Value callback, PythonEventLoop eventLoop) {
+        public void run(Value future, Value callback, @Nullable PythonEventLoop eventLoop) {
             Context context = callback.getContext();
             ExecutorService executor = blockingExecutor();
             if (executor == null) {
@@ -611,6 +686,10 @@ public final class PythonAsyncioRuntime {
                     }
                     @Nullable Object completedResult = result;
                     @Nullable Throwable completedFailure = failure;
+                    if (eventLoop == null) {
+                        completeAwaitable(context, future, completedResult, completedFailure);
+                        return;
+                    }
                     try {
                         eventLoop.execute(() -> completeAwaitable(context, future, completedResult, completedFailure));
                     } catch (Throwable e) {
@@ -641,7 +720,16 @@ public final class PythonAsyncioRuntime {
             return value;
         }
 
-        private static @Nullable ExecutorService blockingExecutor() {
+        /**
+         * Whether a Micronaut blocking executor is available to {@link #run}.
+         *
+         * @return {@code true} when {@code run_in_executor(None, ...)} can use the blocking executor
+         */
+        public boolean isAvailable() {
+            return blockingExecutor() != null;
+        }
+
+        static @Nullable ExecutorService blockingExecutor() {
             RuntimeState runtimeState = state();
             ExecutorService executor = runtimeState.executorService();
             if (executor != null) {
@@ -696,6 +784,29 @@ public final class PythonAsyncioRuntime {
     private static final class CancelledCallback implements Runnable {
         @Override
         public void run() {
+        }
+    }
+
+    /**
+     * Detects the non-blocking threads (Netty event loops) Micronaut marks with Reactor's
+     * {@link NonBlocking}; Reactor is optional, and without it no thread is detected.
+     */
+    private static final class NonBlockingThreads {
+        private static volatile boolean reactorAvailable = true;
+
+        private NonBlockingThreads() {
+        }
+
+        static boolean isNonBlockingThread() {
+            if (!reactorAvailable) {
+                return false;
+            }
+            try {
+                return Thread.currentThread() instanceof NonBlocking || Schedulers.isInNonBlockingThread();
+            } catch (LinkageError e) {
+                reactorAvailable = false;
+                return false;
+            }
         }
     }
 
