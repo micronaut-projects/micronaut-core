@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -169,6 +170,24 @@ class BeanDefinitionPrefetchStartupTest {
         assertTrue(on.output().contains("at " + TASK + ".convert("), on.output());
         assertFalse(off.output().contains("at " + TASK + "."), off.output());
         assertFalse(on.output().contains("The bean definition prefetch ("), on.output());
+    }
+
+    /**
+     * The same, when the main thread builds the shared conversion service first, because the pool
+     * is busy, and the task meets that class while the main thread initializes it: the main
+     * thread's own error stops the application, not the one the task met.
+     */
+    @Test
+    void aTypeConverterRegistrarThatFailsOnTheMainThreadStopsTheApplicationAsItDoesWithoutThePrefetch() throws IOException {
+        List<Path> classPath = List.of(services(Map.of(TypeConverterRegistrar.class, MainFirstRegistrar.class)));
+        ChildJvm on = run(classPath, ON, THREE_THREADS, "-Dprefetch-test.busy-pool=true");
+        ChildJvm off = run(classPath, THREE_THREADS, "-Dprefetch-test.busy-pool=true");
+
+        assertNotEquals(0, off.exitCode(), off.output());
+        assertTrue(off.causes().stream().anyMatch(cause -> cause.contains(MainFirstRegistrar.MESSAGE)), off.output());
+        assertEquals("true", on.value("TASK_IN_CONVERT"), on.output());
+        assertEquals(off.exitCode(), on.exitCode(), on.output());
+        assertEquals(off.causes(), on.causes(), on.output());
     }
 
     @Test
@@ -475,6 +494,46 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     /**
+     * Fails to register its converters. On the main thread, it first frees the pool that
+     * {@link Main} keeps busy and, with the prefetch on, waits until a pool thread is in the task's
+     * step that builds the shared conversion service, which then waits for this initialization.
+     */
+    public static final class MainFirstRegistrar implements TypeConverterRegistrar {
+        static final String MESSAGE = "main thread failure of " + MainFirstRegistrar.class.getName();
+
+        @Override
+        public void register(MutableConversionService conversionService) {
+            if ("main".equals(Thread.currentThread().getName())) {
+                Main.FREE_POOL.countDown();
+                if (Boolean.getBoolean(BeanDefinitionPrefetch.PROPERTY)) {
+                    System.out.println("TASK_IN_CONVERT=" + awaitTaskInConvert());
+                }
+            }
+            throw new IllegalStateException(MESSAGE);
+        }
+
+        private static boolean awaitTaskInConvert() {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (System.nanoTime() < deadline) {
+                for (StackTraceElement[] stack : Thread.getAllStackTraces().values()) {
+                    for (StackTraceElement frame : stack) {
+                        if (frame.getClassName().equals(BeanDefinitionPrefetch.class.getName()) && frame.getMethodName().equals("convert")) {
+                            return true;
+                        }
+                    }
+                }
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
      * Holds the configuration of logging back until the common pool has done what it was given,
      * so that whatever the prefetch starts before {@link Micronaut} creates its logger runs while
      * logging is being configured. It then loads {@link ConfiguringLogging}, which marks that point
@@ -513,6 +572,8 @@ class BeanDefinitionPrefetchStartupTest {
      * context class loader that a test asks for.
      */
     static final class Main {
+        // Counted down by MainFirstRegistrar, to free the pool that prefetch-test.busy-pool keeps busy
+        static final CountDownLatch FREE_POOL = new CountDownLatch(1);
         static volatile ClassLoader contextClassLoader;
         static volatile String registrarLogger;
 
@@ -521,6 +582,18 @@ class BeanDefinitionPrefetchStartupTest {
             if (path != null) {
                 contextClassLoader = new URLClassLoader(new URL[] {Path.of(path).toUri().toURL()}, Main.class.getClassLoader());
                 Thread.currentThread().setContextClassLoader(contextClassLoader);
+            }
+            if (Boolean.getBoolean("prefetch-test.busy-pool")) {
+                // Every pool thread waits, so the task starts only once MainFirstRegistrar runs on this thread
+                for (int i = 0; i < ForkJoinPool.getCommonPoolParallelism(); i++) {
+                    ForkJoinPool.commonPool().execute(() -> {
+                        try {
+                            FREE_POOL.await(30, TimeUnit.SECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    });
+                }
             }
             Class.forName(Micronaut.class.getName(), true, Main.class.getClassLoader());
             if ("init".equals(System.getProperty("prefetch-test.mode"))) {

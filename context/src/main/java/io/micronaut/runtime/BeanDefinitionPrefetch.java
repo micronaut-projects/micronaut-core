@@ -17,6 +17,7 @@ package io.micronaut.runtime;
 
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -57,6 +58,7 @@ import java.util.concurrent.RecursiveAction;
  *
  * @since 5.3.0
  */
+@Experimental
 @NullMarked
 @SuppressWarnings({"serial", "java:S1948"}) // A task that is never serialized
 final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefinitionsProvider {
@@ -136,19 +138,6 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     }
 
     /**
-     * Submits a task to the common pool and returns without waiting for it.
-     *
-     * @param contextClassLoader The context class loader of the thread that starts the prefetch
-     * @param classLoader The class loader to read the references with
-     * @return The running task
-     */
-    static BeanDefinitionPrefetch launch(@Nullable ClassLoader contextClassLoader, ClassLoader classLoader) {
-        BeanDefinitionPrefetch task = new BeanDefinitionPrefetch(contextClassLoader, classLoader);
-        ForkJoinPool.commonPool().execute(task);
-        return task;
-    }
-
-    /**
      * Builds {@link ConversionService#SHARED}, which the context needs before the references, and
      * then runs Micronaut's provider. Both run with the context class loader of the thread that
      * started the prefetch, which code that names no class loader uses, such as
@@ -183,8 +172,8 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     /**
      * Builds {@link ConversionService#SHARED}. A failure, such as a {@code TypeConverterRegistrar}
      * that throws, leaves the class of the conversion service erroneous: the context then fails
-     * on it before it asks for the references, and {@link #conversionFailure()} keeps what
-     * building it threw, for {@link Micronaut} to rethrow. The provider does not run.
+     * on it before it asks for the references, and {@link #conversionFailure(Throwable)} returns
+     * what building it threw, for {@link Micronaut} to rethrow. The provider does not run.
      *
      * @return Whether the shared conversion service was built
      */
@@ -203,16 +192,22 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     }
 
     /**
-     * What building {@link ConversionService#SHARED} threw on the task's thread, for the thread
-     * whose context failed. When the task has started building it, this waits until it is done:
-     * a thread that met the class of the conversion service erroneous can get there first.
+     * What building {@link ConversionService#SHARED} threw on the task's thread, when the context
+     * failed on the class that this left erroneous. When the task has started building it, this
+     * waits until it is done: a thread that met the class of the conversion service erroneous can
+     * get there first.
      *
-     * @return What building the shared conversion service threw, or {@code null}
+     * @param thrown What building the context threw
+     * @return What building the shared conversion service threw on the task's thread, or
+     * {@code null} when the context failed otherwise, including when the calling thread ran the
+     * initializer of the conversion service itself
      */
     @Nullable
-    Throwable conversionFailure() {
-        if (!converting) {
-            // The task has not read the conversion service: the context failed on its own
+    Throwable conversionFailure(Throwable thrown) {
+        if (!converting
+            || !(thrown instanceof NoClassDefFoundError)
+            || !("Could not initialize class " + ConversionService.class.getName()).equals(thrown.getMessage())) {
+            // The task has not read the conversion service, or the context failed on its own
             return null;
         }
         try {

@@ -52,6 +52,20 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 /**
  * <p>Main entry point for running a Micronaut application.</p>
  *
+ * <p><b>Experimental:</b> starting the JVM with the system property
+ * {@code micronaut.bean-definitions.prefetch=true} makes {@link #start()} use bean definitions
+ * that the common {@link java.util.concurrent.ForkJoinPool} loaded while the main thread
+ * configured logging, and read while it created the builder. It is off by default and may change
+ * or be removed. It is read when this class is initialized, so only a JVM system property switches
+ * it on, not the application's configuration. It stands down in a native image and when the common
+ * pool has fewer than three threads. A context gets it only through {@code Micronaut.run(...)} or
+ * {@code Micronaut.build(...).start()} with the default bean definitions provider. With it on,
+ * {@code TypeConverterRegistrar} services and the static initializers of bean definitions can run
+ * on a pool thread before {@link #start()}. Code that runs in between must not construct
+ * {@code DefaultMutableConversionService} directly (use {@code MutableConversionService.create()})
+ * or call {@code StaticOptimizations.set(...)}. Measure startup with and without it: it helps
+ * mostly without a JDK AOT cache.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -252,7 +266,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      *
      * <p>When the prefetch failed to build the shared conversion service, the context fails on
      * the class that this left erroneous, with a {@link NoClassDefFoundError}. What the prefetch
-     * met, which the context would have met without it, is rethrown instead.</p>
+     * met, which the context would have met without it, is rethrown instead. When this thread
+     * ran the initializer of the conversion service itself, its own error is kept.</p>
      *
      * @return The application context, not started
      */
@@ -268,7 +283,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         try {
             return super.build();
         } catch (Throwable t) {
-            Throwable conversionFailure = prefetch.conversionFailure();
+            Throwable conversionFailure = prefetch.conversionFailure(t);
             if (conversionFailure != null) {
                 return ExceptionUtils.sneakyThrow(conversionFailure);
             }

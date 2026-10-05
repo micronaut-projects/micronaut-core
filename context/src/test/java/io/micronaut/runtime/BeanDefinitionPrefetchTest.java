@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.TimeUnit;
 
@@ -93,7 +94,7 @@ class BeanDefinitionPrefetchTest {
     void handsOverWhatTheDefaultProviderReturnsOnceAndThenDelegatesToIt() throws Exception {
         URLClassLoader loader = loader(FIRST, SECOND);
         URLClassLoader other = loader(FIRST, SECOND);
-        BeanDefinitionPrefetch task = done(BeanDefinitionPrefetch.launch(loader, loader));
+        BeanDefinitionPrefetch task = done(launch(loader, loader));
         List<PrefetchProbe.Event> initialized = PrefetchProbe.events(PrefetchProbe.INITIALIZED, FIRST);
         assertEquals(1, initialized.size());
         assertTrue(initialized.getFirst().thread().getName().startsWith(WORKER_PREFIX), initialized::toString);
@@ -122,7 +123,7 @@ class BeanDefinitionPrefetchTest {
     void aContextReadsItsReferencesAgainFromTheDefaultProviderAfterAReset() throws Exception {
         ApplicationContextBuilder builder = ApplicationContext.builder();
         ClassLoader loader = ((BeanContextConfiguration) builder).getClassLoader();
-        BeanDefinitionPrefetch task = done(BeanDefinitionPrefetch.launch(loader, loader));
+        BeanDefinitionPrefetch task = done(launch(loader, loader));
         builder.beanDefinitionsProvider(task);
 
         try (ApplicationContext context = builder.build(); ApplicationContext plain = ApplicationContext.builder().build()) {
@@ -146,7 +147,7 @@ class BeanDefinitionPrefetchTest {
     @Test
     void rethrowsTheVeryExceptionOfAFailingInitializer() throws Exception {
         URLClassLoader loader = loader(FIRST, FAILS_AT_RUNTIME);
-        BeanDefinitionPrefetch task = done(BeanDefinitionPrefetch.launch(loader, loader));
+        BeanDefinitionPrefetch task = done(launch(loader, loader));
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> task.provide(loader));
 
@@ -166,7 +167,7 @@ class BeanDefinitionPrefetchTest {
     @Test
     void rethrowsTheErrorOfAFailingInitializer() throws Exception {
         URLClassLoader loader = loader(FIRST, FAILS_WITH_NO_SUCH_FIELD);
-        BeanDefinitionPrefetch task = done(BeanDefinitionPrefetch.launch(loader, loader));
+        BeanDefinitionPrefetch task = done(launch(loader, loader));
 
         Throwable thrown = assertThrows(Throwable.class, () -> task.provide(loader));
 
@@ -183,7 +184,7 @@ class BeanDefinitionPrefetchTest {
     @Test
     void skipsAReferenceThatTheDefaultProviderSkips() throws Exception {
         URLClassLoader loader = loader(FIRST, FAILS_TO_LINK, SECOND);
-        BeanDefinitionPrefetch task = done(BeanDefinitionPrefetch.launch(loader, loader));
+        BeanDefinitionPrefetch task = done(launch(loader, loader));
 
         List<String> handedOver = names(task.provide(loader));
 
@@ -220,7 +221,7 @@ class BeanDefinitionPrefetchTest {
     @Test
     void aFailedTaskThatWasGivenUpReportsItsFailureOnce() throws Exception {
         URLClassLoader loader = loader(FIRST, FAILS_AT_RUNTIME);
-        BeanDefinitionPrefetch task = done(BeanDefinitionPrefetch.launch(loader, loader));
+        BeanDefinitionPrefetch task = done(launch(loader, loader));
 
         Throwable failure = task.giveUp();
 
@@ -234,7 +235,7 @@ class BeanDefinitionPrefetchTest {
     @Test
     void aTaskThatWasGivenUpLeavesTheReferencesToTheDefaultProvider() throws Exception {
         URLClassLoader loader = loader(FIRST);
-        BeanDefinitionPrefetch task = done(BeanDefinitionPrefetch.launch(loader, loader));
+        BeanDefinitionPrefetch task = done(launch(loader, loader));
 
         assertNull(task.giveUp());
 
@@ -251,7 +252,7 @@ class BeanDefinitionPrefetchTest {
     @Test
     void aRunningTaskThatWasGivenUpDropsItsResult() throws Exception {
         URLClassLoader loader = loader(FIRST, BLOCKS);
-        BeanDefinitionPrefetch task = BeanDefinitionPrefetch.launch(loader, loader);
+        BeanDefinitionPrefetch task = launch(loader, loader);
         assertTrue(PrefetchProbe.awaitEntered(), "the task never reached the blocking fixture");
 
         assertNull(task.giveUp());
@@ -263,6 +264,15 @@ class BeanDefinitionPrefetchTest {
         assertNull(task.giveUp());
         assertTrue(names(task.provide(loader)).contains(FIRST));
         assertEquals(2, PrefetchProbe.events(PrefetchProbe.CONSTRUCTED, FIRST).size());
+    }
+
+    /**
+     * Submits a task to the common pool and returns without waiting for it.
+     */
+    private static BeanDefinitionPrefetch launch(ClassLoader contextClassLoader, ClassLoader classLoader) {
+        BeanDefinitionPrefetch task = new BeanDefinitionPrefetch(contextClassLoader, classLoader);
+        ForkJoinPool.commonPool().execute(task);
+        return task;
     }
 
     /**
