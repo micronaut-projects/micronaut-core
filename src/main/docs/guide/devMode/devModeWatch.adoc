@@ -1,5 +1,7 @@
 A bean that derives state from other beans, from configuration or from files registers a watch for the specific things it needs, on api:context.WatchableBeanContext[], and receives one batched change whenever they change. The state at startup is the first batch, so a watcher has no separate startup path, and a watch registered while a bean is being created belongs to that bean and closes with it.
 
+NOTE: api:context.WatchableBeanContext[] and the types of the `io.micronaut.context.watch` package are public API for modules, marked `@Experimental`: a module that derives state from the context watches it here rather than listening for events, and the API may still change in a minor release. The default context is the only implementation; a module tests for it with `instanceof` and watches nothing when given another context.
+
 [source,java]
 ----
 @Singleton
@@ -39,6 +41,35 @@ HikariDataSource dataSource(DatasourceConfiguration configuration, WatchableBean
     });
     return dataSource;
 }
+----
+
+A configuration watch has no first batch unless it asks for one: `watchConfiguration(prefix, watcher, true)` calls the watcher once with a change whose `initial()` holds, so that the bean reads its configuration inside the watch: at once when the context is running, or when it starts for a watch registered before, as every first batch is delivered. What it answers to that call is not acted on.
+
+A bean that reads the definitions or configuration it derives state from, and only then registers a watch, can miss a change made in between. The first batch closes that gap: it is read after the watch is registered, so a bean that builds its state from the first batch, instead of from a read of its own, misses nothing.
+
+* Batches reach a watcher one at a time, the first batch first, then the changes in the order they were made; no change is delivered before the first batch or alongside another, and no lock is held while a watcher runs.
+* A change applied before the first batch began to be read shows in it and is not delivered again; one applied after it was read is delivered after it.
+* Only a change applied while the first batch was being read can show in it and be delivered after it too, so a watcher treats an addition it already has, or a removal of something it never had, as nothing to do.
+
+[source,java]
+----
+@Singleton
+final class SerializerRegistry {
+
+    private volatile List<BeanDefinition<Serializer>> serializers = List.of();
+
+    SerializerRegistry(WatchableBeanContext context) {
+        // no read of its own: the first batch is the read, and every change after it follows
+        context.watchDefinitions(Serializer.class, null, change -> serializers = sort(change.current()));
+    }
+}
+----
+
+A cache keyed by class is not a set of beans: it forgets what a reload retires. `watchClassChanges` gives the watcher every api:context.reload.ClassChangeEvent[] the launcher publishes, ahead of the listeners of the event, with the same ownership as the other watches. Classes only change in development mode, so outside it the call registers nothing and returns an inactive watch, and the module needs no listener bean gated on development mode.
+
+[source,java]
+----
+context.watchClassChanges(change -> cache.keySet().removeIf(change::isStale));
 ----
 
 Resources are watched the same way: a template engine registers `watchResources(ResourceSelector.of(ResourceKind.VIEWS, "**/*.html"), change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
