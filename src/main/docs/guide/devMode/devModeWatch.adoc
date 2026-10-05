@@ -72,6 +72,17 @@ A cache keyed by class is not a set of beans: it forgets what a reload retires. 
 context.watchClassChanges(change -> cache.keySet().removeIf(change::isStale));
 ----
 
+When a change cannot be applied to a bean in place, the watcher asks the context to recreate it: `recreate(bean)`, or `recreate(Type.class, qualifier)` for the singleton of a type, destroys the beans that received it, as the dependency graph records them, destroys the bean and creates it again, and the dependents are created again when next requested, on top of the new instance. Both return whether anything was recreated, which a prototype, a bean of a custom scope or a singleton registered at runtime never is. They are meant for development-time watches: the dependents are known only when the context tracks bean dependencies, which by default only a context in development mode does (`ApplicationContextBuilder.trackBeanDependencies(true)` turns it on elsewhere), and a context that does not recreates nothing and returns false, rather than leave dependents holding the destroyed instance.
+
+[source,java]
+----
+context.watchClassChanges(change -> {
+    if (serializers.stream().anyMatch(change::isStale)) {
+        context.recreate(SerializerRegistry.class, null);
+    }
+});
+----
+
 Resources are watched the same way: a template engine registers `watchResources(ResourceSelector.of(ResourceKind.VIEWS, "**/*.html"), change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
 
 NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context.processor.BeanDefinitionProcessor[] beans keep working. The context feeds them what is added after startup, through an adapter that sees additions only, which is also how the launcher tells that such a processor cannot follow a reload.
