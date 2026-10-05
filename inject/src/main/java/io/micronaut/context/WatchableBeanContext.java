@@ -23,7 +23,6 @@ import io.micronaut.context.watch.ExecutableMethodWatcher;
 import io.micronaut.context.watch.ResourceSelector;
 import io.micronaut.context.watch.ResourceWatcher;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
@@ -37,10 +36,16 @@ import java.lang.annotation.Annotation;
  * <p>Implemented by the default context, which is injectable as this type. A watch registered while a
  * bean is being created belongs to that bean and is closed when the bean is destroyed.</p>
  *
+ * <p>This is public API for modules, and experimental: a module that derives state from the context,
+ * such as a registry built from beans or a cache of what configuration says, watches it here rather
+ * than listening for events, so that it follows a development reload, a definition registered at
+ * runtime and a configuration refresh alike. Being experimental, it may still change in a minor
+ * release. The context is the only implementation; a module tests for it with {@code instanceof}
+ * and watches nothing when the context it is given is another one.</p>
+ *
  * @author graemerocher
  * @since 5.3.0
  */
-@Internal
 @Experimental
 public sealed interface WatchableBeanContext extends BeanContext permits DefaultBeanContext {
 
