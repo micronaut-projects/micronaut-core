@@ -183,7 +183,60 @@ class DevRestartRequestsTest {
         }
     }
 
+    @Test
+    void aFirstGenerationWhoseServerIsCreatedLateIsNotReportedStartedBeforeItAccepts() throws Exception {
+        // the server is created after the context started, and this one takes a while: no socket is bound in the meantime
+        DevRuntime runtime = launch(Map.of("SlowServer.java", """
+            package app;
+            @jakarta.inject.Singleton
+            public class SlowServer implements io.micronaut.context.event.BeanCreatedEventListener<io.micronaut.runtime.server.EmbeddedServer> {
+                @Override
+                public io.micronaut.runtime.server.EmbeddedServer onCreated(io.micronaut.context.event.BeanCreatedEvent<io.micronaut.runtime.server.EmbeddedServer> event) {
+                    try { Thread.sleep(1500); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                    return event.getBean();
+                }
+            }
+            """));
+        try {
+            ApplicationContext first = runtime.awaitGeneration(1, Duration.ofSeconds(1));
+            List<EmbeddedServer> servers = first.getActiveBeanRegistrations(EmbeddedServer.class).stream()
+                .map(io.micronaut.context.BeanRegistration::getBean)
+                .toList();
+            assertEquals(1, servers.size());
+            assertTrue(servers.get(0).isRunning());
+            assertEquals("200 greeting-0", get("/hello"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void anApplicationThatDefinesAServerButNeverStartsOneIsNotHeldWaitingForIt() throws Exception {
+        // a command line application with the server on its classpath: its main runs a context and returns
+        long start = System.nanoTime();
+        DevRuntime runtime = launch(Map.of("Application.java", """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.context.ApplicationContext.builder(Application.class).properties(java.util.Map.of("spec.name", "DevRestartRequestsTest")).start();
+                }
+            }
+            """));
+        try {
+            ApplicationContext first = runtime.awaitGeneration(1, Duration.ofSeconds(1));
+            assertTrue(first.getActiveBeanRegistrations(EmbeddedServer.class).isEmpty());
+            // well within the 10 s a server is waited for
+            assertTrue(Duration.ofNanos(System.nanoTime() - start).compareTo(Duration.ofSeconds(8)) < 0, "held waiting for a server never started");
+        } finally {
+            runtime.close();
+        }
+    }
+
     private DevRuntime launch() throws IOException {
+        return launch(Map.of());
+    }
+
+    private DevRuntime launch(Map<String, String> sources) throws IOException {
         src = Files.createDirectories(project.resolve("src/main/java/app"));
         Files.writeString(src.resolve("Application.java"), """
             package app;
@@ -210,6 +263,9 @@ class DevRestartRequestsTest {
             }
             """);
         Files.writeString(src.resolve("Greeter.java"), greeter(0));
+        for (Map.Entry<String, String> source : sources.entrySet()) {
+            Files.writeString(src.resolve(source.getKey()), source.getValue());
+        }
         Path manifestFile = project.resolve("dev.properties");
         List<String> classpath = List.of(System.getProperty("java.class.path").split(File.pathSeparator));
         Files.write(project.resolve("cp.argfile"), classpath);

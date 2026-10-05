@@ -143,8 +143,10 @@ final class RestartRequests {
 
     /**
      * A generation started: its server binds a moment after its context starts, and until then a request waits in the
-     * backlog for it rather than being told the application is not running. Once its servers accept, a socket none of
-     * them claimed belongs to a listener the configuration dropped, and is released.
+     * backlog for it rather than being told the application is not running. A generation whose context defines a server is
+     * only reported started once its servers accept, the first included, whose server has bound no retained socket yet;
+     * an application without a server does not wait, nor one whose main returned without creating the server it defines. Once its servers accept, a socket none of them claimed belongs to a
+     * listener the configuration dropped, and is released.
      *
      * <p>The first generation reports itself started from the launching thread while the reload thread may already
      * restart it: what this changes is only changed while it is still the current generation, under the same monitor
@@ -152,22 +154,39 @@ final class RestartRequests {
      *
      * @param fresh The generation
      * @param current Whether it is still the current generation
+     * @param launching Whether the application's main is still running, and may yet create a server
      */
-    void started(ApplicationContext fresh, BooleanSupplier current) {
+    void started(ApplicationContext fresh, BooleanSupplier current, BooleanSupplier launching) {
         DevServerSockets sockets = serverSockets;
-        if (sockets != null) {
-            if (!sockets.stopServingUnavailable(current)) {
-                return;
+        if (sockets != null && !sockets.stopServingUnavailable(current)) {
+            return;
+        }
+        // the servers are created after the context starts: the definition says one is coming before any is registered,
+        // and a retained socket is bound only once a server claimed it
+        boolean definesServer = definesServer(fresh);
+        if (sockets != null && (definesServer || sockets.isBound())) {
+            // a newer generation can start while this one's servers are awaited, when a change is taken at once:
+            // the sockets handed to it after this mark are its own, and are kept
+            long mark = sockets.handoutMark();
+            awaitServers(fresh, launching);
+            if (fresh.isRunning()) {
+                sockets.releaseUnclaimed(mark, current);
             }
-            if (sockets.isBound()) {
-                // a newer generation can start while this one's servers are awaited, when a change is taken at once:
-                // the sockets handed to it after this mark are its own, and are kept
-                long mark = sockets.handoutMark();
-                awaitServers(fresh);
-                if (fresh.isRunning()) {
-                    sockets.releaseUnclaimed(mark, current);
-                }
-            }
+        } else if (definesServer) {
+            awaitServers(fresh, launching);
+        }
+    }
+
+    /**
+     * Whether a generation's context defines an HTTP server, looked up without creating anything.
+     */
+    private static boolean definesServer(ApplicationContext generation) {
+        try {
+            return !generation.getBeanDefinitions(EmbeddedServer.class).isEmpty();
+        } catch (RuntimeException e) {
+            // a context stopped meanwhile has nothing to wait for
+            LOG.debug("Cannot look up the servers of a generation", e);
+            return false;
         }
     }
 
@@ -217,12 +236,17 @@ final class RestartRequests {
      * Waits, briefly, for the HTTP servers of a generation that just started: the application starts them after its
      * context, on its own thread.
      */
-    private static void awaitServers(ApplicationContext generation) {
+    private static void awaitServers(ApplicationContext generation, BooleanSupplier launching) {
         long deadline = System.nanoTime() + SERVER_START_WAIT.toNanos();
         while (System.nanoTime() < deadline && generation.isRunning()) {
             Collection<BeanRegistration<EmbeddedServer>> servers = generation.getActiveBeanRegistrations(EmbeddedServer.class);
             // every server created so far: one that starts later than the first must not lose the socket it is about to claim
             if (!servers.isEmpty() && servers.stream().allMatch(registration -> registration.getBean().isRunning())) {
+                return;
+            }
+            if (!launching.getAsBoolean()) {
+                // main returned: the servers it started run by now, and one it did not create, as a command line application
+                // with a server on its classpath does not, or one that failed to start, never will
                 return;
             }
             try {
