@@ -80,16 +80,10 @@ import java.util.Objects;
  */
 @Internal
 final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.Output {
-    private enum State {
-        PENDING,
-        OPEN,
-        DONE
-    }
-
     private final EventLoopFlow flow;
     private final PieceAccumulator accumulator;
     private final Sink sink;
-    private State state = State.PENDING;
+    private State state = Pending.NONE;
     private BufferConsumer.@Nullable Upstream upstream;
     private boolean started;
     /**
@@ -101,14 +95,6 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
      * {@code true} iff {@link Sink#responseWritten()} has been called.
      */
     private boolean responseWritten;
-    /**
-     * Pieces that arrived while pending. They are written after the response head.
-     */
-    @Nullable
-    private List<ReadBuffer> earlyData;
-    private boolean earlyComplete;
-    @Nullable
-    private Throwable earlyError;
 
     /**
      * @param loop The event loop of the channel
@@ -162,7 +148,7 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
      * discarded
      */
     boolean isDone() {
-        return state == State.DONE;
+        return state == Done.INSTANCE;
     }
 
     /**
@@ -173,33 +159,42 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
      * Only the first call does anything.
      */
     void open() {
-        if (state != State.PENDING) {
-            return;
+        switch (state) {
+            case Pending(var data, Failed(var cause)) -> fail(cause);
+            case Pending(var data, Completed completed) -> {
+                openSink(data);
+                if (state == Open.INSTANCE) {
+                    finish(Unpooled.EMPTY_BUFFER);
+                }
+            }
+            case Pending(var data, var none) -> {
+                openSink(data);
+                reportIfWritable();
+            }
+            case Open.INSTANCE, Done.INSTANCE -> {
+                // only the first call opens the response
+            }
         }
-        Throwable t = earlyError;
-        if (t != null) {
-            earlyError = null;
-            fail(t);
-            return;
-        }
-        state = State.OPEN;
+    }
+
+    /**
+     * Open the response: the sink writes the head, the pieces that arrived early follow, and
+     * the upstream is started.
+     *
+     * @param data The pieces that arrived while pending, or {@code null}
+     */
+    private void openSink(@Nullable List<ReadBuffer> data) {
+        state = Open.INSTANCE;
         sink.open();
-        List<ReadBuffer> data = earlyData;
         if (data != null) {
-            earlyData = null;
             for (ReadBuffer buf : data) {
+                // a piece that follows a dispose from within a write is released by the accumulator
                 accumulator.add(NettyReadBufferFactory.toByteBuf(buf));
             }
         }
         if (!started) {
             started = true;
             requiredUpstream().start();
-        }
-        if (earlyComplete) {
-            earlyComplete = false;
-            finish(Unpooled.EMPTY_BUFFER);
-        } else {
-            reportIfWritable();
         }
     }
 
@@ -208,7 +203,7 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
      * upstream as consumed, if the response is still open.
      */
     void onWritable() {
-        if (state == State.OPEN) {
+        if (state == Open.INSTANCE) {
             report();
         }
     }
@@ -252,11 +247,8 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
      * Safe to call in any state.
      */
     void dispose() {
-        state = State.DONE;
-        releaseEarlyData();
+        toDone();
         accumulator.release();
-        earlyComplete = false;
-        earlyError = null;
         markResponseWritten();
     }
 
@@ -288,14 +280,13 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
     }
 
     private void finish(ByteBuf last) {
-        state = State.DONE;
+        state = Done.INSTANCE;
         accumulator.addLast(last, sink.canMergeLast());
         markResponseWritten();
     }
 
     private void fail(Throwable t) {
-        state = State.DONE;
-        releaseEarlyData();
+        toDone();
         // Preserve the protocol's failure behavior for bytes already received: HTTP/1 flushes
         // them before closing, while HTTP/2 can release its held frame when resetting.
         accumulator.drain();
@@ -313,15 +304,18 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
 
     @Override
     public void turnEnded() {
-        if (state == State.OPEN) {
+        if (state == Open.INSTANCE) {
             reportIfWritable();
         }
     }
 
-    private void releaseEarlyData() {
-        List<ReadBuffer> data = earlyData;
-        if (data != null) {
-            earlyData = null;
+    /**
+     * Make the writer done, releasing the pieces that arrived while pending, if any.
+     */
+    private void toDone() {
+        State previous = state;
+        state = Done.INSTANCE;
+        if (previous instanceof Pending(var data, var terminal) && data != null) {
             for (ReadBuffer buf : data) {
                 buf.close();
             }
@@ -336,16 +330,18 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
     }
 
     private void add0(ReadBuffer buf) {
-        if (state == State.PENDING) {
-            if (earlyData == null) {
-                earlyData = new ArrayList<>(1);
+        switch (state) {
+            case Pending(var data, var terminal) when data == null -> {
+                List<ReadBuffer> early = new ArrayList<>(1);
+                early.add(buf);
+                state = new Pending(early, terminal);
             }
-            earlyData.add(buf);
-        } else if (state == State.OPEN) {
-            accumulator.add(NettyReadBufferFactory.toByteBuf(buf));
-            reportIfWritable();
-        } else {
-            buf.close();
+            case Pending(var data, var terminal) -> data.add(buf);
+            case Open.INSTANCE -> {
+                accumulator.add(NettyReadBufferFactory.toByteBuf(buf));
+                reportIfWritable();
+            }
+            case Done.INSTANCE -> buf.close();
         }
     }
 
@@ -357,7 +353,7 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
     }
 
     private void addAndComplete0(ReadBuffer buf) {
-        if (state == State.OPEN) {
+        if (state == Open.INSTANCE) {
             // the final bytes go out as the message that terminates the response, instead of a
             // message of their own followed by an empty terminator
             finish(NettyReadBufferFactory.toByteBuf(buf));
@@ -375,12 +371,16 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
     }
 
     private void complete0() {
-        if (state == State.PENDING) {
-            earlyComplete = true;
-        } else if (state == State.OPEN) {
-            finish(Unpooled.EMPTY_BUFFER);
+        switch (state) {
+            case Pending(var data, Failed failed) -> {
+                // an early failure takes precedence over a completion, whichever arrived first
+            }
+            case Pending(var data, var terminal) -> state = new Pending(data, Completed.INSTANCE);
+            case Open.INSTANCE -> finish(Unpooled.EMPTY_BUFFER);
+            case Done.INSTANCE -> {
+                // already terminated, failed or disposed
+            }
         }
-        // else: already terminated, failed or disposed
     }
 
     @Override
@@ -391,12 +391,66 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
     }
 
     private void error0(Throwable e) {
-        if (state == State.PENDING) {
-            earlyError = e;
-        } else if (state == State.OPEN) {
-            fail(e);
+        switch (state) {
+            case Pending(var data, var terminal) -> state = new Pending(data, new Failed(e));
+            case Open.INSTANCE -> fail(e);
+            case Done.INSTANCE -> {
+                // already terminated, failed or disposed
+            }
         }
-        // else: already terminated, failed or disposed
+    }
+
+    /**
+     * The lifecycle of the writer: {@link Pending}, then {@link Open}, then {@link Done}, or
+     * from {@link Pending} straight to {@link Done}.
+     */
+    private sealed interface State permits Pending, Open, Done {
+    }
+
+    /**
+     * The response is not up for writing yet. Holds the signals that arrived so far. The data
+     * list is owned by the writer and is released or replayed exactly once.
+     *
+     * @param data     The pieces that arrived, in order, or {@code null} for none
+     * @param terminal The completion or failure that arrived, or {@code null} for none
+     */
+    private record Pending(@Nullable List<ReadBuffer> data, @Nullable Terminal terminal) implements State {
+        static final Pending NONE = new Pending(null, null);
+    }
+
+    /**
+     * The end of the body that arrived while pending.
+     */
+    private sealed interface Terminal permits Completed, Failed {
+    }
+
+    /**
+     * The body completed.
+     */
+    private record Completed() implements Terminal {
+        static final Completed INSTANCE = new Completed();
+    }
+
+    /**
+     * The body failed.
+     *
+     * @param cause The failure
+     */
+    private record Failed(Throwable cause) implements Terminal {
+    }
+
+    /**
+     * The response is up for writing.
+     */
+    private enum Open implements State {
+        INSTANCE
+    }
+
+    /**
+     * The response is done: it has been terminated, has failed or was discarded.
+     */
+    private enum Done implements State {
+        INSTANCE
     }
 
     /**

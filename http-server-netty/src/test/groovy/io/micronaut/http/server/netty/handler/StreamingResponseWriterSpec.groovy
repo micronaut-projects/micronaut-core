@@ -228,6 +228,116 @@ class StreamingResponseWriterSpec extends Specification {
         writer.done
     }
 
+    def 'an early error without data fails the response without opening it or starting the upstream'() {
+        given:
+        def sink = new RecordingSink()
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def writer = new StreamingResponseWriter(loop, sink)
+        writer.attach(upstream)
+        def failure = new RuntimeException("failed")
+
+        when:
+        onLoop { writer.error(failure) }
+        then:
+        sink.events.empty
+        !writer.done
+
+        when:
+        onLoop {
+            writer.open()
+            writer.open()
+        }
+        then:
+        sink.events == ["fail", "responseWritten"]
+        sink.failure.is(failure)
+        upstream.starts == 0
+        writer.done
+    }
+
+    def 'an early completion without data opens and terminates the response'() {
+        given:
+        def sink = new RecordingSink()
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def writer = new StreamingResponseWriter(loop, sink)
+        writer.attach(upstream)
+
+        when:
+        onLoop { writer.complete() }
+        then:
+        sink.events.empty
+        !writer.done
+
+        when:
+        onLoop {
+            writer.open()
+            writer.open()
+        }
+        then:
+        sink.events == ["open", "last()", "responseWritten"]
+        upstream.starts == 1
+        writer.done
+    }
+
+    def 'an early failure takes precedence over an early completion in either order'() {
+        given:
+        def sink = new RecordingSink()
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def writer = new StreamingResponseWriter(loop, sink)
+        writer.attach(upstream)
+        def data = Unpooled.copiedBuffer("a", StandardCharsets.UTF_8)
+        def failure = new RuntimeException("failed")
+
+        when:
+        onLoop {
+            writer.add(piece(data))
+            if (errorFirst) {
+                writer.error(failure)
+                writer.complete()
+            } else {
+                writer.complete()
+                writer.error(failure)
+            }
+            writer.open()
+        }
+
+        then:
+        sink.events == ["fail", "responseWritten"]
+        sink.failure.is(failure)
+        data.refCnt() == 0
+        upstream.starts == 0
+
+        where:
+        errorFirst << [true, false]
+    }
+
+    def 'a dispose from within the replay of early data skips the early completion and releases the rest'() {
+        given:
+        def sink = new RecordingSink()
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def writer = new StreamingResponseWriter(loop, sink)
+        writer.attach(upstream)
+        sink.afterWrite = { writer.dispose() }
+        def rest = Unpooled.copiedBuffer("r", StandardCharsets.UTF_8)
+
+        when:
+        onLoop {
+            // eight pieces fill the accumulator, so the replay writes them before the last one
+            8.times { writer.add(piece("p" * 1024)) }
+            writer.add(piece(rest))
+            writer.complete()
+            writer.open()
+        }
+
+        then:
+        sink.events.size() == 3
+        sink.events[0] == "open"
+        sink.events[1].startsWith("write(")
+        sink.events[2] == "responseWritten"
+        sink.responseWritten == 1
+        rest.refCnt() == 0
+        writer.done
+    }
+
     def 'an error after completion is ignored, and data after completion is released'() {
         given:
         def sink = new RecordingSink()
