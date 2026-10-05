@@ -31,16 +31,20 @@ class EndpointSensitivityWatchSpec extends Specification {
         when: "the setting goes again"
         values.remove("endpoints.default-sensitive.sensitive")
         context.getBean(ConfigurationRefresher).refresh()
+        // the entry went: the refresh destroyed its EndpointConfiguration, and with it the processor that received the
+        // list of them in its constructor; the processor the context holds now is a new one
+        def recreated = context.getBean(EndpointSensitivityProcessor)
 
         then: "the endpoint is sensitive again, the destroyed entry not consulted"
-        processor.endpointMethods.get(method)
+        !recreated.is(processor)
+        recreated.endpointMethods.get(method)
 
         when: "the endpoint goes"
         def definition = context.getBeanDefinition(EndpointSensitivitySpec.DefaultSensitive)
         ((DefaultBeanContext) context).notifyDefinitionChange([definition], [])
 
         then:
-        !processor.endpointMethods.containsKey(method)
+        !recreated.endpointMethods.containsKey(method)
 
         cleanup:
         context.close()
