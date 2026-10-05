@@ -82,6 +82,22 @@ class MicronautDevelopmentModeSpec extends Specification {
         e.cause.message == "start failed"
     }
 
+    void "a startup failure that stopped the context is still reported instead of exiting the JVM in development mode"() {
+        when: "the failing application stops the context first, which drops the environment's properties"
+        Micronaut.build()
+            .deduceEnvironment(false)
+            .properties(
+                'spec.name': 'MicronautDevelopmentModeSpec',
+                'spec.failing': true,
+                'spec.stop-context': true,
+                (DevelopmentMode.PROPERTY): true)
+            .start()
+
+        then: "the decision to exit was taken while the environment ran, so the JVM is still here to see this"
+        def e = thrown(ApplicationStartupException)
+        e.cause.message == "start failed"
+    }
+
     void "the file watch restart listener is not active in development mode"() {
         given:
         ApplicationContext context = ApplicationContext.run(
@@ -168,6 +184,10 @@ class MicronautDevelopmentModeSpec extends Specification {
 
         @Override
         FailingApplication start() {
+            if (applicationContext.getProperty('spec.stop-context', Boolean).orElse(false)) {
+                // as the Netty server does when it cannot bind: it stops the context, and with it the environment
+                applicationContext.stop()
+            }
             throw new IllegalStateException("start failed")
         }
 

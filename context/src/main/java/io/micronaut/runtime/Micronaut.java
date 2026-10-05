@@ -63,6 +63,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
+    /**
+     * Whether this launcher may exit the JVM, decided once the environment started: a server that fails to start, or
+     * an application that stops, stops the context and with it the environment, whose properties are then gone.
+     */
+    private @Nullable Boolean exitAllowed;
 
     /**
      * The default constructor.
@@ -77,6 +82,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @SuppressWarnings({"java:S1181", "java:S3776", "java:S1141"})
     public ApplicationContext start() {
         long start = System.nanoTime();
+        // a launcher started again decides again: until its environment starts, a failure is judged by that environment
+        exitAllowed = null;
         printBanner();
         ApplicationContext applicationContext = super.build();
 
@@ -89,6 +96,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             // already known disables it first
             boolean trainingRunBeforeStart = isTrainingRunBeforeStart(environment);
             startEnvironment(environment, trainingRunBeforeStart);
+            exitAllowed = isExitAllowed(environment);
             boolean trainingRun = isTrainingRun(environment);
             if (trainingRun) {
                 TrainingTestResources.checkDisabled(environment, trainingRunBeforeStart);
@@ -215,7 +223,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         removeShutdownHook(shutdownHook);
                     }
 
-                    if (embeddedApplication.isForceExit() && isExitAllowed(applicationContext.getEnvironment())) {
+                    if (embeddedApplication.isForceExit() && mayExit(applicationContext.getEnvironment())) {
                         System.exit(0);
                     }
 
@@ -566,7 +574,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     protected void handleStartupException(Environment environment, Throwable exception) {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         int code = exitCodeMapper.apply(exception);
-        if (code > 0 && isExitAllowed(environment)) {
+        if (code > 0 && mayExit(environment)) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
             }
@@ -587,6 +595,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     protected boolean isExitAllowed(Environment environment) {
         return !environment.getActiveNames().contains(Environment.TEST) && !DevelopmentMode.isEnabled(environment);
+    }
+
+    private boolean mayExit(Environment environment) {
+        Boolean decided = exitAllowed;
+        return decided != null ? decided : isExitAllowed(environment);
     }
 
     private static void removeShutdownHook(@Nullable Thread shutdownHook) {
