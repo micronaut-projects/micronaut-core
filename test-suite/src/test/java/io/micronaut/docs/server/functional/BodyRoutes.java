@@ -40,9 +40,9 @@ public class BodyRoutes implements HttpRoutes {
                 .thenApply(done -> HttpResponse.accepted()));
 
         routes.POST("/async/notes")
-            .consumes(MediaType.TEXT_PLAIN_TYPE) // <3>
+            .consumes(MediaType.TEXT_PLAIN_TYPE)
             .body().handleAsync((request, pathVariables, body) ->
-                body.text(1024)
+                body.text(1024) // <3>
                     .thenApply(text -> HttpResponse.ok("received " + text.length() + " characters")));
 
         routes.PUT("/async/files").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync((request, pathVariables, body) -> {

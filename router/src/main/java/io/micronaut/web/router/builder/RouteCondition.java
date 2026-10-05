@@ -44,7 +44,7 @@ import java.util.function.Predicate;
  *     .where(header("X-Beta").or(query("beta", equalTo("true"))))
  *     .order(-1)
  *     .handle(betaHandler);
- * routes.path("/admin", admin -> admin.where(remoteAddress("10.0.0.0/8")));
+ * routes.path("/admin", admin -> admin.where(peerAddress("10.0.0.0/8")));
  * }</pre>
  *
  * <p>A condition is also a {@link Predicate} of a request, so it combines with lambdas, e.g.

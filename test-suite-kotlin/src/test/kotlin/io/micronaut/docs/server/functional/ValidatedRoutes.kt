@@ -17,7 +17,7 @@ class ValidatedRoutes(private val products: ProductService) : HttpRoutes {
     override fun routes(routes: HttpRouteBuilder) {
         // tag::route[]
         routes.POST("/products").body(Product::class.java).handle { request, pathVariables, product ->
-            HttpResponse.created(products.save(product)) // <2>
+            HttpResponse.created(products.save(product)) // <1>
         }
         // end::route[]
     }

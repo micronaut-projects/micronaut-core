@@ -53,9 +53,8 @@ class ConditionRoutes(HttpRoutes):
         # end::constrain[]
         # tag::matchers[]
         (routes.GET("/downloads/{file}")
-            .where(RouteCondition.any(
-                RouteCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase()),  # <1>
-                RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
+            .where(RouteCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase())  # <1>
+                .or_(RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
             .where(RouteCondition.peerAddress("127.0.0.0/8", "::1"))  # <2>
             .where(RouteCondition.after(Instant.parse("2026-01-01T00:00:00Z")))  # <3>
             .constrain("file", ValueMatcher.endsWith(".zip"))  # <4>

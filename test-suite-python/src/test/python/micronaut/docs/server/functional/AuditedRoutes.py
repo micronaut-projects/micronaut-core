@@ -51,8 +51,8 @@ class AuditedRoutes(HttpRoutes):
     def routes(self, routes: HttpRouteBuilder) -> None:
         # tag::annotationRoutes[]
         def admin_routes(admin):
-            (admin.executeOn(TaskExecutors.BLOCKING)  # <4>
-                .annotate(Audited)  # <5>
+            (admin.executeOn(TaskExecutors.BLOCKING)  # <1>
+                .annotate(Audited)  # <2>
                 .annotate(Version, lambda version: version.value("2")))
             admin.GET("/users", lambda request, path_variables:
                       HttpResponse.ok("users on " + Thread.currentThread().getName()).contentType(MediaType.TEXT_PLAIN_TYPE))
@@ -61,19 +61,19 @@ class AuditedRoutes(HttpRoutes):
 
         routes.path("/admin", admin_routes)
         (routes.POST("/payments/{amount}")
-            .annotationMetadata(self.bean_context.getBeanDefinition(Payments).getRequiredMethod("pay", Integer.TYPE))  # <6>
+            .annotationMetadata(self.bean_context.getBeanDefinition(Payments).getRequiredMethod("pay", Integer.TYPE))  # <3>
             .handle(lambda request, path_variables:
                     HttpResponse.ok(self.payments.pay(path_variables.getLong("amount"))).contentType(MediaType.TEXT_PLAIN_TYPE)))
         (routes.POST("/refunds/{amount}")
-            .annotate(Audited)  # <7>
+            .annotate(Audited)  # <4>
             .handle(lambda request, path_variables:
                     HttpResponse.ok(f"refunded {path_variables.getLong('amount')}").contentType(MediaType.TEXT_PLAIN_TYPE)))
         (routes.GET("/receipts/{id}")
-            .annotate(AnnotationValue.builder(Version).value("1").build())  # <8>
+            .annotate(AnnotationValue.builder(Version).value("1").build())  # <5>
             .handle(lambda request, path_variables:
                    HttpResponse.ok(f"receipt v1 {path_variables.getLong('id')}").contentType(MediaType.TEXT_PLAIN_TYPE)))
         (routes.GET("/receipts/{id}")
-            .annotate(Version, lambda version: version.value("2"))  # <9>
+            .annotate(Version, lambda version: version.value("2"))  # <6>
             .annotate(Audited)
             .handle(lambda request, path_variables:
                     HttpResponse.ok(f"receipt v2 {path_variables.getLong('id')}").contentType(MediaType.TEXT_PLAIN_TYPE)))

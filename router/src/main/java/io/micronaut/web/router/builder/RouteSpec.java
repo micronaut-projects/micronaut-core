@@ -265,7 +265,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *     String role = RouteAttributes.getRouteInfo(request)
      *         .flatMap(route -> route.getAttribute("role", String.class))
      *         .orElseThrow();
-     *     return hasRole(request, role) ? null : HttpResponse.forbidden();
+     *     return hasRole(request, role) ? null : HttpResponse.status(HttpStatus.FORBIDDEN);
      * });
      * }</pre>
      *
@@ -332,7 +332,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * <pre>{@code
      * routes.path("/shops/{shop}", shop -> shop
      *     .constrain("shop", SHOPS)
-     *     .route(locator));
+     *     .GET("/stock", stockHandler));
      * routes.GET("/orders/{id}")
      *     .constrain("id", Long.class, id -> id > 0)
      *     .handle(ordersHandler);
@@ -487,10 +487,13 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
 
     /**
      * Break a tie with other routes that are equally good for a request: the route with the
-     * lowest order answers it. The router selects the most specific route by its URI template,
-     * then by the media types, then prefers an explicit {@code HEAD} route over an implicit one;
-     * only the routes still left after that are compared by their order. So the order never
-     * makes a less specific route win over a more specific one: it chooses among routes of the
+     * lowest order answers it. The router keeps the routes that explicitly produce the media type
+     * the request accepts first, then, for a request with a body, the routes that explicitly
+     * consume its content type, then the routes with the most specific URI template; it then
+     * prefers a route of the request's method over a route of any method, and an explicit
+     * {@code HEAD} route over an implicit one; only the routes still left after that are compared
+     * by their order. So the order never makes a less specific route, or a route of any method
+     * over a route of the request's method, win: it chooses among routes of the
      * same URI template whose {@link #where(RouteCondition) conditions} a request both meets, e.g. a
      * specialized route and a fallback. Two routes left with the same order still make the
      * request ambiguous, answered with {@code 400}.

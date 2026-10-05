@@ -47,6 +47,8 @@ snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="filterExecutor", 
 <2> The filter runs on the blocking executor, and the filter chain continues on it. `nonBlocking()` keeps the filter on the thread of the filter chain, the default; the last of the two called wins. An asynchronous filter given an executor is called on it, and the chain continues where its stage completes.
 <3> `and()` returns the route, to declare its next filters, its settings and its terminal.
 
+NOTE: In Python, a Java method named after a Python keyword takes a trailing underscore: `and()` is `and_()`, and `or(...)` of a condition is `or_(...)`.
+
 A filter chooses its thread with the same methods as a route and a group, from api:web.router.builder.ExecutionSpec[]. Group filters and server filters have them too. The executor of a filter is fixed once the routes are built, or when the lambda of the group that declares the filter returns.
 
 === Changing the request and the response

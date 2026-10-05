@@ -198,8 +198,9 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * <p>The route consumes any content type, as it never reads the body, and produces the
      * content type of the response if it has one, unless the route declares what it consumes or
      * produces itself. It runs on the event loop, see {@link RouteSpec#nonBlocking()}, unless
-     * {@link RouteSpec#executeOn(String)} is set on the route: the executor and the media types
-     * of its group do not apply to it.</p>
+     * {@link RouteSpec#executeOn(String)} is set on the route: the executor and the consumed
+     * media types of its group do not apply to it. The produced media types of its group apply
+     * when the response has no content type.</p>
      *
      * @param response The response
      * @throws IllegalStateException if the route was already ended

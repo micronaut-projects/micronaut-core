@@ -6,14 +6,14 @@ snippet::io.micronaut.docs.server.functional.BodyRoutes[tags="imports,clazz", in
 
 <1> `body(Class)` or `body(Argument)` decodes the whole body like a `@Body` argument of a controller: the same readers, content negotiation, errors and limits. Reactive and asynchronous types and `InputStream` are rejected, use `elements` or `takeBody()` instead.
 <2> `elements(Class)` reads a JSON array, or a stream of JSON documents, one element at a time: `forEach` calls the consumer for each element and waits for the stage it returns before reading the next one. `BodyElements.next()` is the pull alternative.
-<3> `text()` and `bytes(int)` read the whole body into memory. `text()` is bounded by `micronaut.server.max-request-buffer-size`, and `text(int)` and `bytes(int)` by the given number of bytes: a larger body is answered with `413`.
+<3> `text()` and `bytes(int)` read the whole body into memory. `text()` is bounded by `micronaut.server.max-request-buffer-size`, and `text(int)` and `bytes(int)` by the smaller of the given number of bytes and `micronaut.server.max-request-buffer-size`: a larger body is answered with `413`.
 <4> `transferTo(Path)` streams the body into a new file, without holding it in memory. An existing file is never replaced.
 <5> A handler that answers without reading the body never receives it: when the client asked for `Expect: 100-continue`, the `100 Continue` answer is only sent on the first read.
 
 The rules of an `AsyncRequestBody`:
 
 * *One read.* The first of `body`, `text`, `bytes`, `elements`, `transferTo`, `form`, `parts`, `takeBody` and `discardBody` owns the body. A second one fails with an `IllegalStateException` that names the first.
-* *Limits apply to what is held in memory.* `body` and `text()` have `micronaut.server.max-request-buffer-size`; `text(int)` and `bytes(int)` the given limit. `transferTo`, `elements`, `parts` and `takeBody` stream the body: only what is decoded in memory at once, one element or one text field, is limited.
+* *Limits apply to what is held in memory.* `body` and `text()` have `micronaut.server.max-request-buffer-size`; `text(int)` and `bytes(int)` the smaller of the given limit and `micronaut.server.max-request-buffer-size`. `transferTo`, `elements`, `parts` and `takeBody` stream the body: only what is decoded in memory at once, one element or one text field, is held to the buffer limit, and the whole body, like any request body, to `micronaut.server.max-request-size`.
 * *The unread body is discarded* when the request ends. What a read leaves open, such as form parts, body elements or a running transfer, is released when the stage returned by the handler completes.
 * `takeBody()` moves the body, unread and undecoded, to the caller, e.g. to forward it to another server with the raw HTTP client. The caller must close it. `discardBody()` drops it.
 * It reads the body of the request as the filters left it. Reading it decodes no body for the request: `getBody()` of the request does not change, and `byteBody()` keeps its `ServerHttpRequest` contract, see <<byteBody, Advanced body access>>.

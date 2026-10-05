@@ -29,7 +29,7 @@ import io.micronaut.http.MediaType;
  *     api.GET("/orders", (request, pathVariables) -> HttpResponse.ok(orders.all()));
  *     api.path("/admin", admin -> {
  *         admin.GET("/users", (request, pathVariables) -> HttpResponse.ok(users.all()));
- *         admin.beforeReplacing(request -> isAdmin(request) ? null : HttpResponse.forbidden());
+ *         admin.beforeReplacing(request -> isAdmin(request) ? null : HttpResponse.status(HttpStatus.FORBIDDEN));
  *     });
  *     api.beforeReplacing((request, propagatedContext) -> {
  *         propagatedContext.add(new MdcPropagationContext(Map.of("tenant", tenantOf(request))));

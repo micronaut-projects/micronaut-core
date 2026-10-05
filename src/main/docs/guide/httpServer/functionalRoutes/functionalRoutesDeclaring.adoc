@@ -1,4 +1,9 @@
-A route is declared in stages. A *creator* of the api:web.router.builder.HttpRouteBuilder[] gives the pending route, an api:web.router.builder.HttpRouteSpec[]; its *settings* come next, e.g. the media types or the executor; an optional *body stage* declares the body the handler receives; a *terminal*, the handler or the response of the route, ends the declaration and adds the route, e.g. `POST("/items")`, then `.body(Item.class)`, then `.handle(...)` in the example below.
+A route is declared in four steps, in this order:
+
+. a *creator* of the api:web.router.builder.HttpRouteBuilder[], e.g. `POST("/items")`, starts the route and returns an api:web.router.builder.HttpRouteSpec[];
+. *settings*, e.g. the media types or the executor;
+. optionally, a *body stage*, e.g. `.body(Item.class)`, declares the body the handler receives;
+. a *terminal*, e.g. `.handle(...)`, gives the handler or the response, and adds the route.
 
 * The creators: `GET(uri)`, `POST(uri)`, `PUT(uri)`, `PATCH(uri)` and `DELETE(uri)`, `route(HttpMethod, uri)` for any standard method, `route(Set<HttpMethod>, uri)` for several methods, `route(String, uri)` for a method by its name, custom methods included, and `any(uri)` for every method.
 * The body stages: `body(Class)` or `body(Argument)` for the decoded body, `form()` for a submitted form and `body()` for the body the handler reads itself.

@@ -58,8 +58,8 @@ class AuditedRoutes(
     override fun routes(routes: HttpRouteBuilder) {
         // tag::annotationRoutes[]
         routes.path("/admin") { admin ->
-            admin.executeOn(TaskExecutors.BLOCKING) // <4>
-                .annotate(Audited::class.java) // <5>
+            admin.executeOn(TaskExecutors.BLOCKING) // <1>
+                .annotate(Audited::class.java) // <2>
                 .annotate(Version::class.java) { version -> version.value("2") }
             admin.GET("/users") { request, pathVariables ->
                 HttpResponse.ok("users on " + Thread.currentThread().name).contentType(MediaType.TEXT_PLAIN_TYPE)
@@ -69,22 +69,22 @@ class AuditedRoutes(
             }
         }
         routes.POST("/payments/{amount}")
-            .annotationMetadata(beanContext.getBeanDefinition(Payments::class.java).getRequiredMethod<Any>("pay", Long::class.java)) // <6>
+            .annotationMetadata(beanContext.getBeanDefinition(Payments::class.java).getRequiredMethod<Any>("pay", Long::class.java)) // <3>
             .handle { request, pathVariables ->
                 HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))).contentType(MediaType.TEXT_PLAIN_TYPE)
             }
         routes.POST("/refunds/{amount}")
-            .annotate(Audited::class.java) // <7>
+            .annotate(Audited::class.java) // <4>
             .handle { request, pathVariables ->
                 HttpResponse.ok("refunded " + pathVariables.getLong("amount")).contentType(MediaType.TEXT_PLAIN_TYPE)
             }
         routes.GET("/receipts/{id}")
-            .annotate(AnnotationValue.builder(Version::class.java).value("1").build()) // <8>
+            .annotate(AnnotationValue.builder(Version::class.java).value("1").build()) // <5>
             .handle { request, pathVariables ->
                 HttpResponse.ok("receipt v1 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE)
             }
         routes.GET("/receipts/{id}")
-            .annotate(Version::class.java) { version -> version.value("2") } // <9>
+            .annotate(Version::class.java) { version -> version.value("2") } // <6>
             .annotate(Audited::class.java)
             .handle { request, pathVariables ->
                 HttpResponse.ok("receipt v2 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE)

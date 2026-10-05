@@ -49,7 +49,8 @@ public interface MethodBasedRouteInfo<T, R> extends RouteInfo<R> {
      * An integration that routes the methods of its own resources with handler functions finds
      * the bean method of the matched route with {@code instanceof ExecutableMethod}.
      *
-     * @return The element, or empty for a route to a handler function that was given no annotations
+     * @return The element, or empty for a route to a handler function that was given no element,
+     * by itself or by a group, even one with annotations given with {@code annotate(...)}
      * @since 5.3.0
      */
     default Optional<AnnotationMetadataProvider> getAnnotationMetadataProvider() {

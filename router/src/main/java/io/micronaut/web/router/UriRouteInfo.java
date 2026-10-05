@@ -121,8 +121,9 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      * The order of the route among the routes that are equally good for a request, e.g. two
      * routes of the same URI template whose conditions a request both meets: the one with the
      * lowest order answers it. The order only breaks such a tie: it is consulted after the
-     * specificity of the URI templates, the media types and the preference of an explicit
-     * {@code HEAD} route over an implicit one, and two routes with the same order still make the
+     * produced and consumed media types, the specificity of the URI templates, the preference of a
+     * route of the request's method over a route of any method and of an explicit {@code HEAD}
+     * route over an implicit one, and two routes with the same order still make the
      * request ambiguous. A controller route has the order {@code 0}.
      *
      * @return The order of the route, {@code 0} by default

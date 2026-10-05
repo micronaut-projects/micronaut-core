@@ -32,7 +32,7 @@ Beans compiled with an earlier version keep the previous order until they are re
 
 Routes are ordered by the length of the literal parts of their URI templates, then by the number of path variables. Since Micronaut 5.3 a third key follows: among routes that tie on both, the route with fewer path variables constrained by a regular expression is more specific. For example, a `GET /items/1` request matched by both `@Get("/items/{id}")` and `@Get("/items/{id:.+}")` previously failed with a api:web.router.exceptions.DuplicateRouteException[] (answered with `400 Bad Request`), and is now routed to `/items/{id}`. A numeric modifier such as `{id:3}` limits the length of the value and is not a regular expression: it is not counted. Routes that tie on all three keys stay ambiguous.
 
-The change is in `UriTemplateMatcher.compareTo`, and with it in the natural order (`compareTo`) of api:web.router.UriRouteInfo[] and its default implementation `DefaultUrlRouteInfo`, so the order of routes sorted with it changes too. Routes also have a new `UriRouteInfo.getOrder()` (`0` by default and for every controller route): it is consulted after the specificity of the templates, the media types and the preference of an explicit `HEAD` route over an implicit one, and only decides between routes that would otherwise be ambiguous.
+The change is in `UriTemplateMatcher.compareTo`, and with it in the natural order (`compareTo`) of api:web.router.UriRouteInfo[] and its default implementation `DefaultUrlRouteInfo`, so the order of routes sorted with it changes too. Routes also have a new `UriRouteInfo.getOrder()` (`0` by default and for every controller route): it is consulted after the produced and consumed media types, the specificity of the templates, the preference of a route of the request's method over a route of any method and of an explicit `HEAD` route over an implicit one, and only decides between routes that would otherwise be ambiguous.
 
 === A filter method that changes the URI of its `MutableHttpRequest` parameter changes the request (5.3)
 
@@ -50,6 +50,10 @@ Since Micronaut 5.3, when the method changes the URI of the copy and returns not
 Changes to the query parameters or the body of the copy are still only kept when the method returns the copy.
 
 If an earlier filter continued with a request that cannot be copied this way, for example an `HttpRequestWrapper`, the parameter is now a mutable wrapper of that request. Previously the method failed with an `UnsupportedOperationException`.
+
+=== The response filters of a failed write are those of the route that answered (5.3)
+
+When writing a response fails before it is committed, the error is handled by the error routes and the error response is filtered again by the response filters. Since Micronaut 5.3 those filters are selected with the route that answered the request, as for the response of that route, and include the filters of that route, rather than with the error route that handled the failure. A filter bound to a route with a ann:http.annotation.FilterMatcher[] annotation, or by its route attributes, filters the error response of its route when the write fails.
 
 === The name condition of `SoftServiceLoader.load` is tested on every service entry (5.3)
 

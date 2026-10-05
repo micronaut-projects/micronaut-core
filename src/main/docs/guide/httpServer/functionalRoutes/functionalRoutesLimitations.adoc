@@ -1,4 +1,4 @@
-WARNING: A route specification, group or builder kept after `HttpRoutes.routes(...)` returned has no effect: the router reads the routes, their configuration and their filters when it is created. The routes cannot change while the application runs.
+WARNING: The router reads the routes, their configuration and their filters when it is created: the routes cannot change while the application runs. A builder, group or route specification kept after `HttpRoutes.routes(...)`, or after the lambda of its group, returned throws an `IllegalStateException` when it is used, and so does a filter of a group. The other specifications are not checked: a change to a filter declared with `filter(...)` on the builder, or to an error or status route, after `HttpRoutes.routes(...)` returned is ignored.
 
 Functional routes are experimental and have these known limitations:
 
@@ -14,4 +14,4 @@ snippet::io.micronaut.docs.server.functional.ValidatedRoutes[tags="service", ind
 
 snippet::io.micronaut.docs.server.functional.ValidatedRoutes[tags="route", indent=0, title="A handler route that validates its body through the bean"]
 
-<2> The handler passes the body to the validated method.
+<1> The handler passes the body to the validated method.

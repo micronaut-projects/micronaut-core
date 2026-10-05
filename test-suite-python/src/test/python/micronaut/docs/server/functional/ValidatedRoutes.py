@@ -35,5 +35,5 @@ class ValidatedRoutes(HttpRoutes):
     def routes(self, routes: HttpRouteBuilder) -> None:
         # tag::route[]
         routes.POST("/products").body(Product).handle(lambda request, path_variables, product:
-                    HttpResponse.created(self.products.save(product)))  # <2>
+                    HttpResponse.created(self.products.save(product)))  # <1>
         # end::route[]
