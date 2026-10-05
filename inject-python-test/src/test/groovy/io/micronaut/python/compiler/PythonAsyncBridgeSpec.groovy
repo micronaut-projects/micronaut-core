@@ -166,7 +166,7 @@ PythonPooledRuntime.invokePooledScriptPublisher(
 ''')
     }
 
-    void "explicitly scoped module script bridges async routes through the event-loop module"() {
+    void "explicitly scoped module script bridges async routes on the module itself"() {
         expect: "the generated Java compiles: a module script has no Python class reference"
         assertGeneratedSourceContains('''
 from typing import Annotated, AsyncIterator
@@ -187,7 +187,7 @@ async def message() -> str:
 async def numbers() -> AsyncIterator[str]:
     yield "one"
 ''', '''
-PythonContextRuntime.asyncScript(this.asPolyglotValue(), "python", "Unnamed")
+Value pythonCoroutine = PythonInvocation.invokePythonMethod(this.asPolyglotValue(), "message", new Object[]{});
 ''')
     }
 

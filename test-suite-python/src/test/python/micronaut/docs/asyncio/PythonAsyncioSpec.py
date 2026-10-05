@@ -97,12 +97,12 @@ class PythonAsyncioSpec:
         assert "None" == response, response
 
     @Test
-    def singletonModuleStateFlowsFromStartupModuleOnly(self):
-        # the startup module owns module state: a global an async route assigns is replaced on the next async call
+    def singletonModuleStateIsSharedBySyncAndAsyncRoutes(self):
+        # the module is one object: a global an async route assigns is the one every later route reads
         self.client.toBlocking().retrieve("/singleton-async-routes/greeting/from-sync")
         assert "from-async" == self.client.toBlocking().retrieve("/singleton-async-routes/async-greeting/from-async")
         response = self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
-        assert "from-sync" == response, response
+        assert "from-async" == response, response
 
     @Test
     def asyncRequestsAreConcurrentOnSingleEventLoop(self):
@@ -137,10 +137,12 @@ class PythonAsyncioSpec:
         assert 3 == response.priority
 
     @Test
-    def asyncControllerUsesEventLoopContext(self):
+    def asyncSingletonControllerRunsInItsOwnContext(self):
+        # a singleton is one object in one context: its coroutines are not run on a copy in the event-loop
+        # context, which would be a second controller (see PythonAsyncSingletonSpec)
         context_id = self.client.toBlocking().retrieve("/async-demo/context-id")
 
-        assert context_id != builtins.__MN_CTX_ID__
+        assert context_id == builtins.__MN_CTX_ID__
 
     @Test
     def constructorInjectedAsyncControllerRunsInEventLoopContext(self):

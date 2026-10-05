@@ -207,17 +207,19 @@ final class PythonAsyncioStreamsTest {
     }
 
     @Test
-    void publisherErrorSurfacesAsAPythonExceptionCarryingTheJavaCause() throws Exception {
+    void publisherErrorSurfacesAsTheJavaException() throws Exception {
         context.getBindings(PYTHON).putMember("source", Flux.concat(Flux.just("one"), Flux.error(new IllegalStateException("upstream failed"))));
         Object result = run("""
-            from micronaut_asyncio import as_async_iterable, MicronautJavaException
+            import java
+            from micronaut_asyncio import as_async_iterable
+            IllegalStateException = java.type("java.lang.IllegalStateException")
             async def consume():
                 seen = []
                 try:
                     async for item in as_async_iterable(source):
                         seen.append(item)
-                except MicronautJavaException as failure:
-                    seen.append(failure.java_exception.getMessage())
+                except IllegalStateException as failure:
+                    seen.append(failure.getMessage())
                 return seen
             consume()
             """);
@@ -319,14 +321,16 @@ final class PythonAsyncioStreamsTest {
         });
         context.getBindings(PYTHON).putMember("source", misbehaving);
         return run("""
+            import java
             from micronaut_asyncio import as_async_iterable
+            IllegalStateException = java.type("java.lang.IllegalStateException")
             async def consume():
                 seen = []
                 try:
                     async for item in as_async_iterable(source):
                         seen.append(item)
-                except RuntimeError as failure:
-                    seen.append(str(failure))
+                except IllegalStateException as failure:
+                    seen.append(failure.getMessage())
                 return seen
             consume()
             """);

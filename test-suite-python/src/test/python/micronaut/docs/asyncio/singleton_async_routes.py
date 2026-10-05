@@ -8,8 +8,8 @@ from micronaut.http.annotation import Controller, Get
 
 from .BackendClient import BackendClient
 
-# An explicit scope replaces the ContextPooled scope route modules get by default: the module is a
-# singleton of the startup context and its async routes run on its import in an event-loop context
+# An explicit scope replaces the ContextPooled scope route modules get by default: the module is one
+# singleton, in one context, for its sync and async routes alike
 Controller("/singleton-async-routes")
 Singleton()
 Requires(property="spec.name", value="PythonAsyncioSpec")

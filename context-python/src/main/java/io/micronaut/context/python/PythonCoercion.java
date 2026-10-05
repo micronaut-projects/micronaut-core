@@ -976,10 +976,10 @@ public final class PythonCoercion {
     }
 
     /**
-     * Convert a constructor argument of a startup-context object for the replayed constructor in an event-loop
-     * context: Python beans and host beans as async members, other values as a constructor call converts them.
+     * Convert a constructor argument of an instance whose class declares coroutine methods: Python beans and host
+     * beans as async members, other values as a constructor call converts them.
      *
-     * @param context The event-loop context
+     * @param context The context the instance is created in
      * @param value The Java constructor argument
      * @return The context-local argument
      */
@@ -1054,39 +1054,6 @@ public final class PythonCoercion {
                 continue;
             }
             Value member = source.getMember(key);
-            Object transferable = transferableMember(member, target.getContext());
-            if (transferable != null) {
-                putMember(target, key, transferable);
-            }
-        }
-    }
-
-    /**
-     * Copy the module-level state of a module script into its import in another context: the members
-     * {@link #copyTransferableMembers(Value, Value)} copies, and globals set back to {@code None}, except Java
-     * types, which the importing context bound itself (with {@code java.type} or an import) and which are not
-     * state.
-     *
-     * @param source The source module.
-     * @param target The target module.
-     */
-    static void copyTransferableModuleMembers(Value source, Value target) {
-        if (PythonConversion.isNone(source) || PythonConversion.isNone(target) || !source.hasMembers()) {
-            return;
-        }
-        for (String key : transferableMemberNames(source)) {
-            if (key.startsWith("__")) {
-                continue;
-            }
-            Value member = source.getMember(key);
-            if (member == null || member.isMetaObject() || member.isHostObject() && member.asHostObject() instanceof Class<?>) {
-                continue;
-            }
-            if (PythonConversion.isNone(member)) {
-                // a global reset to None is state too
-                putMember(target, key, null);
-                continue;
-            }
             Object transferable = transferableMember(member, target.getContext());
             if (transferable != null) {
                 putMember(target, key, transferable);
