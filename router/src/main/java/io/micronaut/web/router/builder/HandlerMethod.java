@@ -385,17 +385,21 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     /**
      * A route to a handler function has no Java method: the router, the binding and the
-     * execution of the route never need one. A route that implements a bean method, see
-     * {@link HttpRouteSpec#annotationMetadata}, gives that bean method, which has the target
-     * method, as the element of the route, see
+     * execution of the route never need one. Only a route that implements a bean method, see
+     * {@link HttpRouteSpec#annotationMetadata}, has the target method of that bean method. That
+     * bean method is also the element of the route, see
      * {@link io.micronaut.web.router.MethodBasedRouteInfo#getAnnotationMetadataProvider()}.
      *
-     * @return Never
-     * @throws UnsupportedOperationException always
+     * @return The target method of the bean method the route implements
+     * @throws UnsupportedOperationException if the route implements no bean method
      */
     @Override
     public Method getTargetMethod() {
-        throw new UnsupportedOperationException("The route to " + this + " calls a handler function, which has no Java method");
+        ExecutableMethod<?, ?> target = implemented();
+        if (target == null) {
+            throw new UnsupportedOperationException("The route to " + this + " calls a handler function, which has no Java method");
+        }
+        return target.getTargetMethod();
     }
 
     @Override
