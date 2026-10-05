@@ -18,12 +18,14 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.BeanChange;
 import io.micronaut.context.watch.BeanDefinitionChange;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
 import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.context.watch.BeanWatcher;
+import io.micronaut.context.watch.ClassChangeWatcher;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ConfigurationWatcher;
 import io.micronaut.context.watch.ExecutableMethodChange;
@@ -77,6 +79,20 @@ final class BeanWatchRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(BeanWatchRegistry.class);
 
+    /**
+     * The watch returned where nothing is registered: it was never active.
+     */
+    static final BeanWatch INACTIVE = new BeanWatch() {
+        @Override
+        public void close() {
+        }
+
+        @Override
+        public boolean isActive() {
+            return false;
+        }
+    };
+
     private final DefaultBeanContext context;
     private final List<Registration> registrations = new CopyOnWriteArrayList<>();
     private final ThreadLocal<Deque<Owner>> creating = ThreadLocal.withInitial(ArrayDeque::new);
@@ -108,6 +124,10 @@ final class BeanWatchRegistry {
 
     BeanWatch watchResources(ResourceSelector selector, ResourceWatcher watcher) {
         return register(new ResourceRegistration(selector, watcher));
+    }
+
+    BeanWatch watchClassChanges(ClassChangeWatcher watcher) {
+        return register(new ClassChangeRegistration(watcher));
     }
 
     /**
@@ -347,6 +367,22 @@ final class BeanWatchRegistry {
             }
             try {
                 resourceRegistration.watcher.onChange(selected);
+            } catch (Throwable e) {
+                report(registration, e);
+            }
+        }
+    }
+
+    /**
+     * Delivers a class change to the class change watches, in order, failures isolated.
+     */
+    void classesChanged(ClassChangeEvent change) {
+        for (Registration registration : ordered()) {
+            if (registration.closed.get() || !(registration instanceof ClassChangeRegistration classChangeRegistration)) {
+                continue;
+            }
+            try {
+                classChangeRegistration.watcher.onChange(change);
             } catch (Throwable e) {
                 report(registration, e);
             }
@@ -736,6 +772,29 @@ final class BeanWatchRegistry {
             if (state != null) {
                 watcher.onChange(state.select(selector));
             }
+        }
+
+        @Override
+        void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+        }
+    }
+
+    private final class ClassChangeRegistration extends Registration {
+        private final ClassChangeWatcher watcher;
+
+        ClassChangeRegistration(ClassChangeWatcher watcher) {
+            super(false);
+            this.watcher = watcher;
+        }
+
+        @Override
+        Object watcher() {
+            return watcher;
+        }
+
+        @Override
+        void deliverInitial() {
+            // classes have no startup batch: nothing changed yet
         }
 
         @Override

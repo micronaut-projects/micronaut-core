@@ -29,6 +29,7 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -52,10 +53,12 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.exceptions.NonUniqueBeanException;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
 import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.context.watch.BeanWatcher;
+import io.micronaut.context.watch.ClassChangeWatcher;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ConfigurationWatcher;
 import io.micronaut.context.watch.ExecutableMethodWatcher;
@@ -673,6 +676,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
         ArgumentUtils.requireNonNull("selector", selector);
         ArgumentUtils.requireNonNull("watcher", watcher);
         return watches.watchResources(selector, watcher);
+    }
+
+    @Override
+    public BeanWatch watchClassChanges(ClassChangeWatcher watcher) {
+        ArgumentUtils.requireNonNull("watcher", watcher);
+        if (!isDevelopmentMode()) {
+            // classes change only under a development launcher: nothing to register, nothing to keep
+            return BeanWatchRegistry.INACTIVE;
+        }
+        return watches.watchClassChanges(watcher);
+    }
+
+    /**
+     * @return Whether the context runs in development mode, the only mode in which classes change
+     */
+    private boolean isDevelopmentMode() {
+        if (this instanceof PropertyResolver propertyResolver) {
+            return DevelopmentMode.isEnabled(propertyResolver);
+        }
+        return DevelopmentMode.isEnabledBySystemProperty();
     }
 
     /**
@@ -2527,6 +2550,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     public void publishEvent(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
+            if (event instanceof ClassChangeEvent classChange) {
+                // the class change watches come first, then the listeners of the event
+                watches.classesChanged(classChange);
+            }
             getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEvent(event);
         }
     }
@@ -2535,6 +2562,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     public Future<Void> publishEventAsync(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
+            if (event instanceof ClassChangeEvent classChange) {
+                watches.classesChanged(classChange);
+            }
             return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
         }
         return CompletableFuture.completedFuture(null);

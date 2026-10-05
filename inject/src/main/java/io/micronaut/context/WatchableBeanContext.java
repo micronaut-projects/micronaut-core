@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
 import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.context.watch.BeanWatcher;
+import io.micronaut.context.watch.ClassChangeWatcher;
 import io.micronaut.context.watch.ConfigurationWatcher;
 import io.micronaut.context.watch.ExecutableMethodWatcher;
 import io.micronaut.context.watch.ResourceSelector;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 
 /**
- * A bean context whose definitions, beans, methods, configuration and resources can be watched: a
+ * A bean context whose definitions, beans, methods, configuration, resources and classes can be watched: a
  * watcher registers for the specific things it derives state from and receives one batched change
  * whenever they change, the startup state being the first batch.
  *
@@ -137,4 +138,19 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
      * @return The watch
      */
     BeanWatch watchResources(ResourceSelector selector, ResourceWatcher watcher);
+
+    /**
+     * Watches the class changes of a development reload: the watch for a cache keyed by class, which
+     * evicts what {@link io.micronaut.context.reload.ClassChangeEvent#isStale(Class)} says belongs to a
+     * retired generation. The watcher is called with each {@link io.micronaut.context.reload.ClassChangeEvent}
+     * the launcher publishes, before the listeners of the event, and has no startup batch.
+     *
+     * <p>Classes change only in {@link io.micronaut.context.env.DevelopmentMode development mode}. In a
+     * context that is not in development mode nothing is registered: the watch returned is already
+     * inactive, and the watcher is never called nor kept.</p>
+     *
+     * @param watcher The watcher
+     * @return The watch
+     */
+    BeanWatch watchClassChanges(ClassChangeWatcher watcher);
 }

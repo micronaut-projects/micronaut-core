@@ -5,7 +5,11 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.WatchableBeanContext;
+import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.reload.ClassChange;
+import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ResourceKind;
+import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.watch.BeanChange;
 import io.micronaut.context.watch.BeanDefinitionChange;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
@@ -37,9 +41,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BeanWatchTest {
 
     private static final Map<String, Object> PROPERTIES = Map.of("spec.name", "BeanWatchTest");
+    private static final Map<String, Object> DEVELOPMENT = Map.of("spec.name", "BeanWatchTest", DevelopmentMode.PROPERTY, true);
 
     private static RuntimeBeanDefinition<Rule> rule(String name) {
         return RuntimeBeanDefinition.builder(Rule.class, () -> (Rule) () -> name).named(name).singleton(true).build();
+    }
+
+    private static ClassChangeEvent classChange(int generation) {
+        return new ClassChangeEvent(BeanWatchTest.class, generation, Set.of(), BeanWatchTest.class.getClassLoader(),
+            List.of(new ClassChange("app.Greeter", ClassChange.Kind.MODIFIED)), ReloadStrategy.RELOAD);
     }
 
     private static Set<Class<?>> beanTypes(List<BeanDefinition<Rule>> definitions) {
@@ -309,6 +319,54 @@ class BeanWatchTest {
             context.getBean(RecreatingPrototype.class);
 
             assertEquals(List.of(Outcome.APPLIED, Outcome.IGNORED), beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.main.url"))));
+        }
+    }
+
+    @Test
+    void aClassChangeWatchIsCalledForEachClassChangeBeforeTheListenersAndClosesWithItsBean() {
+        try (ApplicationContext context = ApplicationContext.run(DEVELOPMENT)) {
+            ClassCache cache = context.getBean(ClassCache.class);
+            context.getBean(ClassChangeOrder.class);
+            ClassChangeOrder.SEEN.clear();
+
+            // registered, with no startup batch: nothing changed yet
+            assertTrue(cache.watch.isActive());
+            assertTrue(cache.evicted.isEmpty());
+
+            // each class change the launcher publishes reaches the watch, ahead of the listeners of the event
+            ((WatchableBeanContext) context).watchClassChanges(change -> ClassChangeOrder.SEEN.add("watch"));
+            ClassChangeEvent first = classChange(1);
+            context.publishEvent(first);
+            assertEquals(List.of(first), cache.evicted);
+            assertEquals(List.of("watch", "listener"), ClassChangeOrder.SEEN);
+            ClassChangeEvent second = classChange(2);
+            context.publishEvent(second);
+            assertEquals(List.of(first, second), cache.evicted);
+
+            // the cache is destroyed: the watch it registered while it was created goes with it
+            context.destroyBean(cache);
+            assertFalse(cache.watch.isActive());
+            context.publishEvent(classChange(3));
+            assertEquals(List.of(first, second), cache.evicted);
+        } finally {
+            ClassChangeOrder.SEEN.clear();
+        }
+    }
+
+    @Test
+    void aClassChangeWatchOutsideDevelopmentModeRegistersNothing() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            List<ClassChangeEvent> seen = new ArrayList<>();
+            BeanWatch watch = ((WatchableBeanContext) context).watchClassChanges(seen::add);
+
+            // classes never change outside development mode: the watch is inactive from the start
+            assertFalse(watch.isActive());
+            context.publishEvent(classChange(1));
+            assertTrue(seen.isEmpty());
+            assertFalse(context.getBean(ClassCache.class).watch.isActive());
+            watch.close();
+        } finally {
+            ClassChangeOrder.SEEN.clear();
         }
     }
 
