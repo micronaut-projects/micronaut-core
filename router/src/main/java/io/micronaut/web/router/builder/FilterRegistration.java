@@ -37,6 +37,8 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class FilterRegistration {
+
+    private static final String FILTER = "filter";
     private final boolean requestFilter;
     private final Function<@Nullable Supplier<Executor>, GenericHttpFilter> factory;
     private @Nullable String executorName;
@@ -54,7 +56,7 @@ public final class FilterRegistration {
      * @return The registration
      */
     public static FilterRegistration before(ContextReplacingRouteRequestFilter filter) {
-        Objects.requireNonNull(filter, "filter");
+        Objects.requireNonNull(filter, FILTER);
         return new FilterRegistration(true, executor -> GenericHttpFilter.createRouteRequestFilter(filter::filter, executor));
     }
 
@@ -63,7 +65,7 @@ public final class FilterRegistration {
      * @return The registration
      */
     public static FilterRegistration beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
-        Objects.requireNonNull(filter, "filter");
+        Objects.requireNonNull(filter, FILTER);
         return new FilterRegistration(true, executor -> GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter, executor));
     }
 
@@ -72,7 +74,7 @@ public final class FilterRegistration {
      * @return The registration
      */
     public static FilterRegistration after(ContextReplacingRouteResponseFilter filter) {
-        Objects.requireNonNull(filter, "filter");
+        Objects.requireNonNull(filter, FILTER);
         return new FilterRegistration(false, executor -> GenericHttpFilter.createRouteResponseFilter(filter::filter, executor));
     }
 
@@ -81,7 +83,7 @@ public final class FilterRegistration {
      * @return The registration
      */
     public static FilterRegistration afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
-        Objects.requireNonNull(filter, "filter");
+        Objects.requireNonNull(filter, FILTER);
         return new FilterRegistration(false, executor -> GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter, executor));
     }
 

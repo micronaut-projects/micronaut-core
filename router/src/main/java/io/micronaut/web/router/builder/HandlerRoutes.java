@@ -40,21 +40,21 @@ import java.util.function.Predicate;
 record HandlerRoutes(List<RouteSettings> routes, RouteGroupDefaults.@Nullable Inheriting inherited) {
 
     void consumes(MediaType[] mediaTypes) {
-        own(RouteGroupDefaults.CONSUMES);
+        own(RouteGroupDefaults.CONSUMES_SETTING);
         for (RouteSettings route : routes) {
             route.consumes(mediaTypes);
         }
     }
 
     void consumesAll() {
-        own(RouteGroupDefaults.CONSUMES);
+        own(RouteGroupDefaults.CONSUMES_SETTING);
         for (RouteSettings route : routes) {
             route.consumesAll();
         }
     }
 
     void produces(MediaType[] mediaTypes) {
-        own(RouteGroupDefaults.PRODUCES);
+        own(RouteGroupDefaults.PRODUCES_SETTING);
         for (RouteSettings route : routes) {
             route.produces(mediaTypes);
         }
@@ -79,14 +79,14 @@ record HandlerRoutes(List<RouteSettings> routes, RouteGroupDefaults.@Nullable In
     }
 
     void executeOn(String executorName) {
-        own(RouteGroupDefaults.EXECUTOR);
+        own(RouteGroupDefaults.EXECUTOR_SETTING);
         for (RouteSettings route : routes) {
             route.executeOn(executorName);
         }
     }
 
     void nonBlocking() {
-        own(RouteGroupDefaults.EXECUTOR);
+        own(RouteGroupDefaults.EXECUTOR_SETTING);
         for (RouteSettings route : routes) {
             route.nonBlocking();
         }

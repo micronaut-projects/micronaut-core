@@ -105,16 +105,23 @@ final class RouteIndex {
     }
 
     /**
-     * A node of the frozen trie.
-     *
-     * @param keys       The characters of the children, sorted
-     * @param children   The children, by key position
-     * @param candidates The positions of the routes whose prefix ends at this node or at one of
-     *                   its ancestors, the root and its routes without a prefix included, in
-     *                   ascending order: the candidates of a path whose walk ends here. The array
-     *                   of the parent when no prefix ends here
+     * A node of the frozen trie: the characters of the children, sorted, the children, by key
+     * position, and the candidates, the positions of the routes whose prefix ends at this node or
+     * at one of its ancestors, the root and its routes without a prefix included, in ascending
+     * order: the candidates of a path whose walk ends here. The array of the parent when no
+     * prefix ends here.
      */
-    private record Node(char[] keys, Node[] children, int[] candidates) {
+    private static final class Node {
+        private final char[] keys;
+        private final Node[] children;
+        private final int[] candidates;
+
+        Node(char[] keys, Node[] children, int[] candidates) {
+            this.keys = keys;
+            this.children = children;
+            this.candidates = candidates;
+        }
+
         @Nullable Node child(char c) {
             int i = Arrays.binarySearch(keys, c);
             return i < 0 ? null : children[i];

@@ -43,15 +43,15 @@ final class RouteGroupDefaults {
     /**
      * The media types the routes consume.
      */
-    static final int CONSUMES = 1;
+    static final int CONSUMES_SETTING = 1;
     /**
      * The media types the routes produce.
      */
-    static final int PRODUCES = 1 << 1;
+    static final int PRODUCES_SETTING = 1 << 1;
     /**
      * The executor the routes run on, or the event loop.
      */
-    static final int EXECUTOR = 1 << 2;
+    static final int EXECUTOR_SETTING = 1 << 2;
 
     private final @Nullable RouteGroupDefaults enclosing;
     /**
@@ -122,7 +122,7 @@ final class RouteGroupDefaults {
      * Declare routes of a handler in the group.
      *
      * @param handlerRoutes The routes of the handler
-     * @param own           The settings the routes have of their own, e.g. {@link #CONSUMES} for a
+     * @param own           The settings the routes have of their own, e.g. {@link #CONSUMES_SETTING} for a
      *                      form handler, which consumes forms: they do not inherit them
      * @return The routes, whose settings the spec of the routes marks as their own
      */
@@ -153,15 +153,15 @@ final class RouteGroupDefaults {
     }
 
     /**
-     * @param setting A setting, e.g. {@link #CONSUMES}
+     * @param setting A setting, e.g. {@link #CONSUMES_SETTING}
      * @return The setting of this group, or of the closest enclosing group that has it, or {@code null}
      */
     private @Nullable Consumer<RouteSettings> resolve(int setting) {
         RouteGroupDefaults group = this;
         while (group != null) {
             Consumer<RouteSettings> value = switch (setting) {
-                case CONSUMES -> group.consumes;
-                case PRODUCES -> group.produces;
+                case CONSUMES_SETTING -> group.consumes;
+                case PRODUCES_SETTING -> group.produces;
                 default -> group.executor;
             };
             if (value != null) {
@@ -189,16 +189,16 @@ final class RouteGroupDefaults {
         /**
          * The routes set a setting of their own: they do not inherit it.
          *
-         * @param setting The setting, e.g. {@link #CONSUMES}
+         * @param setting The setting, e.g. {@link #CONSUMES_SETTING}
          */
         void own(int setting) {
             own |= setting;
         }
 
         private void inherit() {
-            inherit(CONSUMES);
-            inherit(PRODUCES);
-            inherit(EXECUTOR);
+            inherit(CONSUMES_SETTING);
+            inherit(PRODUCES_SETTING);
+            inherit(EXECUTOR_SETTING);
         }
 
         private void inherit(int setting) {

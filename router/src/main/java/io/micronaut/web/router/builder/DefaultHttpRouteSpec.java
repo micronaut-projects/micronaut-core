@@ -41,6 +41,8 @@ import java.util.function.Supplier;
 @Internal
 final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
 
+    private static final String RESPONSE = "response";
+
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class);
 
     private final PendingRoute route;
@@ -172,19 +174,19 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
 
     @Override
     public void respond(HttpResponse<?> response) {
-        ResponseTemplate template = ResponseTemplate.of(route.terminal(response, "response"));
+        ResponseTemplate template = ResponseTemplate.of(route.terminal(response, RESPONSE));
         respond(() -> HandlerMethod.respond(template), template.contentType(), true);
     }
 
     @Override
     public void respond(Supplier<? extends @Nullable HttpResponse<?>> response) {
-        Supplier<? extends HttpResponse<?>> checked = route.terminal(response, "response");
+        Supplier<? extends HttpResponse<?>> checked = route.terminal(response, RESPONSE);
         respond(() -> HandlerMethod.respond(checked), null, false);
     }
 
     @Override
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
-        Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, "response");
+        Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, RESPONSE);
         respond(() -> HandlerMethod.respond(checked), null, false);
     }
 
@@ -199,12 +201,12 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
      * @param constant Whether the response is a constant
      */
     private void respond(Supplier<HandlerMethod<?>> handler, @Nullable MediaType produces, boolean constant) {
-        int own = RouteGroupDefaults.CONSUMES;
+        int own = RouteGroupDefaults.CONSUMES_SETTING;
         if (constant) {
-            own |= RouteGroupDefaults.EXECUTOR;
+            own |= RouteGroupDefaults.EXECUTOR_SETTING;
         }
         if (produces != null) {
-            own |= RouteGroupDefaults.PRODUCES;
+            own |= RouteGroupDefaults.PRODUCES_SETTING;
         }
         route.end(handler, settings -> {
             settings.consumesAll();

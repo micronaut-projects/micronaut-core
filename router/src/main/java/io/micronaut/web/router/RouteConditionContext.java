@@ -100,7 +100,8 @@ public interface RouteConditionContext {
      * @return The address, or {@code null} if it has none
      */
     static @Nullable String peerAddress(HttpRequest<?> request) {
-        InetSocketAddress remote = request.getRemoteAddress();
+        // a request may have no peer, e.g. one built in memory, whatever the declared nullness
+        @Nullable InetSocketAddress remote = request.getRemoteAddress();
         if (remote == null) {
             return null;
         }

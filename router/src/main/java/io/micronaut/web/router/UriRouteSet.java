@@ -79,7 +79,7 @@ final class UriRouteSet {
      * Whether a route has constraints on its path variables.
      */
     private final boolean constrained;
-    private final boolean empty;
+    private final boolean noRoutes;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
                         Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod,
@@ -113,7 +113,7 @@ final class UriRouteSet {
         this.hasDynamicTargets = hasDynamicTargets;
         this.constrained = customMethodMap.values().stream().flatMap(Arrays::stream)
             .anyMatch(route -> route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained());
-        this.empty = customMethodMap.isEmpty();
+        this.noRoutes = customMethodMap.isEmpty();
     }
 
     /**
@@ -135,7 +135,7 @@ final class UriRouteSet {
      * @return Whether the set has no routes
      */
     boolean isEmpty() {
-        return empty;
+        return noRoutes;
     }
 
     /**

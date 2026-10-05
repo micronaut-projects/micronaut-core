@@ -349,6 +349,17 @@ public sealed interface RouteCondition {
     }
 
     /**
+     * Checks the components of a condition on a named value.
+     *
+     * @param name  The name
+     * @param value The matcher of the value
+     */
+    private static void requireNameAndValue(String name, ValueMatcher value) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(value, "value");
+    }
+
+    /**
      * A request with a header whose value the matcher matches, one of its values if the header
      * is repeated. A request without the header is given to the matcher as an absent value.
      *
@@ -357,8 +368,7 @@ public sealed interface RouteCondition {
      */
     record Header(String name, ValueMatcher value) implements RouteCondition {
         public Header {
-            Objects.requireNonNull(name, "name");
-            Objects.requireNonNull(value, "value");
+            requireNameAndValue(name, value);
         }
     }
 
@@ -372,8 +382,7 @@ public sealed interface RouteCondition {
      */
     record Query(String name, ValueMatcher value) implements RouteCondition {
         public Query {
-            Objects.requireNonNull(name, "name");
-            Objects.requireNonNull(value, "value");
+            requireNameAndValue(name, value);
         }
     }
 
@@ -386,8 +395,7 @@ public sealed interface RouteCondition {
      */
     record Cookie(String name, ValueMatcher value) implements RouteCondition {
         public Cookie {
-            Objects.requireNonNull(name, "name");
-            Objects.requireNonNull(value, "value");
+            requireNameAndValue(name, value);
         }
     }
 

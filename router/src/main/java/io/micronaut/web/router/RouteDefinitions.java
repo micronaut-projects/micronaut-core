@@ -41,8 +41,10 @@ import io.micronaut.http.uri.UriTemplate;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -211,5 +213,37 @@ final class RouteDefinitions {
                             boolean implicitHead,
                             int port,
                             boolean declaringTypeTarget) {
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof RouteSpec that
+                && implicitHead == that.implicitHead
+                && port == that.port
+                && declaringTypeTarget == that.declaringTypeTarget
+                && httpMethodName.equals(that.httpMethodName)
+                && httpMethod == that.httpMethod
+                && uri.equals(that.uri)
+                && Arrays.equals(consumes, that.consumes)
+                && Arrays.equals(produces, that.produces);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(httpMethodName, httpMethod, uri, implicitHead, port, declaringTypeTarget);
+            result = 31 * result + Arrays.hashCode(consumes);
+            return 31 * result + Arrays.hashCode(produces);
+        }
+
+        @Override
+        public String toString() {
+            return "RouteSpec[httpMethodName=" + httpMethodName
+                + ", httpMethod=" + httpMethod
+                + ", uri=" + uri
+                + ", consumes=" + Arrays.toString(consumes)
+                + ", produces=" + Arrays.toString(produces)
+                + ", implicitHead=" + implicitHead
+                + ", port=" + port
+                + ", declaringTypeTarget=" + declaringTypeTarget + "]";
+        }
     }
 }

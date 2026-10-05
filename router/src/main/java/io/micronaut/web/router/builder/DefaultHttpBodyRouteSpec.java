@@ -151,7 +151,7 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
         Argument<B> type = bodyType;
         if (type == null) {
             BodyRequestHandler<FormData> form = (BodyRequestHandler<FormData>) checked;
-            route.end(() -> HandlerMethod.form(form), DefaultHttpBodyRouteSpec::consumesForms, RouteGroupDefaults.CONSUMES);
+            route.end(() -> HandlerMethod.form(form), DefaultHttpBodyRouteSpec::consumesForms, RouteGroupDefaults.CONSUMES_SETTING);
         } else {
             // the body argument is annotated @Body
             route.end(() -> HandlerMethod.of(type, checked), null, 0);
@@ -165,7 +165,7 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
         Argument<B> type = bodyType;
         if (type == null) {
             AsyncBodyRequestHandler<FormData> form = (AsyncBodyRequestHandler<FormData>) checked;
-            route.end(() -> HandlerMethod.formAsync(form), DefaultHttpBodyRouteSpec::consumesForms, RouteGroupDefaults.CONSUMES);
+            route.end(() -> HandlerMethod.formAsync(form), DefaultHttpBodyRouteSpec::consumesForms, RouteGroupDefaults.CONSUMES_SETTING);
         } else {
             route.end(() -> HandlerMethod.ofAsync(type, checked), null, 0);
         }

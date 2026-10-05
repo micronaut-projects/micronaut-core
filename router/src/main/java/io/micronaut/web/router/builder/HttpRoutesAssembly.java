@@ -56,7 +56,7 @@ import java.util.List;
 @Order(Ordered.LOWEST_PRECEDENCE)
 final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledRoutes {
 
-    private final RouteAssembly assembly;
+    private final RouteAssembly routeAssembly;
     private final List<FilterRoute> filterRoutes;
 
     /**
@@ -79,7 +79,7 @@ final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledR
                                List<HttpRoutes> routes,
                                RouteAssembly assembly) {
         super(executionHandleLocator, conversionService, assembly);
-        this.assembly = assembly;
+        this.routeAssembly = assembly;
         // the ports given as strings are resolved like the port of a @Controller
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly,
             executionHandleLocator instanceof ApplicationContext context ? context.getEnvironment().getPlaceholderResolver() : null);
@@ -109,6 +109,6 @@ final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledR
 
     @Override
     public RouteAssembly routes() {
-        return assembly;
+        return routeAssembly;
     }
 }

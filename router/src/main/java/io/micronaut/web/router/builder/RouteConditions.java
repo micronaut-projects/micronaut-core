@@ -456,7 +456,8 @@ public final class RouteConditions {
      * The peer of the connection only: never a resolver, nor a forwarded header.
      */
     private static boolean peerAddress(PeerAddress peerAddress, HttpRequest<?> request) {
-        InetSocketAddress remote = request.getRemoteAddress();
+        // a request may have no peer, e.g. one built in memory, whatever the declared nullness
+        @Nullable InetSocketAddress remote = request.getRemoteAddress();
         InetAddress address = remote == null ? null : remote.getAddress();
         return address != null && inRanges(peerAddress.ranges(), Cidr.address(address));
     }

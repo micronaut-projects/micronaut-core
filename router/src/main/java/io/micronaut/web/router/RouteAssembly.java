@@ -87,6 +87,8 @@ import java.util.function.UnaryOperator;
 @Internal
 public final class RouteAssembly {
 
+    private static final String NO_EXECUTOR = "No executor configured for name: ";
+
     final ConversionService conversionService;
     final Charset defaultCharset;
     final List<UriRoute> uriRoutes = new ArrayList<>();
@@ -363,7 +365,7 @@ public final class RouteAssembly {
      */
     public RouteFilters groupFilters(@Nullable RouteFilters enclosing) {
         return new RouteFilters(enclosing, executorName -> new ConfigurationException(
-            "No executor configured for name: " + executorName + ", of a filter of a route group"));
+            NO_EXECUTOR + executorName + ", of a filter of a route group"));
     }
 
     /**
@@ -701,7 +703,7 @@ public final class RouteAssembly {
     public final class ServerFilters {
         private final List<String> patterns;
         private final RouteFilters filters = new RouteFilters(null, executorName -> new ConfigurationException(
-            "No executor configured for name: " + executorName + ", of a server filter"));
+            NO_EXECUTOR + executorName + ", of a server filter"));
         private HttpMethod @Nullable [] methods;
         private int order;
         private FilterPatternStyle patternStyle = FilterPatternStyle.ANT;
@@ -1493,7 +1495,7 @@ public final class RouteAssembly {
          */
         List<GenericHttpFilter> routeFilters() {
             RouteFilters filters = new RouteFilters(settings.getGroupFilters(), executorName -> new SchedulerConfigurationException(
-                targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
+                targetMethod.getExecutableMethod(), NO_EXECUTOR + executorName));
             for (FilterRegistration filter : settings.getFilters()) {
                 filters.add(filter);
             }
@@ -1589,7 +1591,7 @@ public final class RouteAssembly {
                 String name = executorName;
                 if (name != null) {
                     return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
-                        targetMethod.getExecutableMethod(), "No executor configured for name: " + name)));
+                        targetMethod.getExecutableMethod(), NO_EXECUTOR + name)));
                 }
                 if (eventLoop && threadSelection == ThreadSelection.AUTO) {
                     return Optional.empty();

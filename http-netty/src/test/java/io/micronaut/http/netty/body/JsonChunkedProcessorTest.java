@@ -45,10 +45,12 @@ class JsonChunkedProcessorTest {
 
             @Override
             public void onError(Throwable t) {
+                // not expected: the input is valid JSON
             }
 
             @Override
             public void onComplete() {
+                // not expected: the subscription is cancelled on the first value
             }
         });
         assertEquals(List.of("{\"a\":1}"), received);

@@ -45,6 +45,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -65,8 +66,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final StatusRouteInfo<Object, Object>[] statusRoutes;
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
     private final Set<Integer> exposedPorts;
-    @Nullable
-    private volatile Set<Integer> ports;
+    /**
+     * The default ports: an unmodifiable snapshot, replaced as a whole.
+     */
+    private final AtomicReference<@Nullable Set<Integer>> ports = new AtomicReference<>();
     private final List<FilterRoute> alwaysMatchesFilterRoutes;
     private final List<FilterRoute> preconditionFilterRoutes;
     private final List<FilterRoute> preMatchingAlwaysMatchesFilterRoutes;
@@ -216,17 +219,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public void applyDefaultPorts(List<Integer> ports) {
-        this.ports = new HashSet<>(ports);
+        this.ports.set(Collections.unmodifiableSet(new HashSet<>(ports)));
     }
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
-        return routes.<T, R>find(request, uri.toString(), ports).stream();
+        return routes.<T, R>find(request, uri.toString(), ports.get()).stream();
     }
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
-        return routes.<T, R>find(request, request.getPath(), ports).stream();
+        return routes.<T, R>find(request, request.getPath(), ports.get()).stream();
     }
 
     @Override
@@ -241,12 +244,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
-        return routes.findClosest(request, ports);
+        return routes.findClosest(request, ports.get());
     }
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-        return routes.findAllClosest(request, ports);
+        return routes.findAllClosest(request, ports.get());
     }
 
     /**
@@ -638,12 +641,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(CharSequence uri, @Nullable HttpRequest<?> request) {
-        return routes.<T, R>findAny(uri.toString(), request, ports).stream();
+        return routes.<T, R>findAny(uri.toString(), request, ports.get()).stream();
     }
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
-        return routes.findAny(request, ports);
+        return routes.findAny(request, ports.get());
     }
 
     private static <T> Optional<RouteMatch<T>> findRouteMatch(List<RouteMatch<T>> matchedRoutes, Throwable error) {
