@@ -39,13 +39,15 @@ class HandlerMethodTargetMethodTest {
     }
 
     @Test
-    void aRouteThatImplementsABeanMethodHasItsTargetMethod() throws NoSuchMethodException {
+    void aRouteThatImplementsABeanMethodGivesTheBeanMethod() throws NoSuchMethodException {
         Method status = Service.class.getMethod("status");
         HandlerMethod<HttpResponse<?>> handler = HandlerMethod.of((RequestHandler) (request, pathVariables) -> HttpResponse.ok());
 
         handler.annotationMetadata(new ServiceStatus(status));
 
-        assertEquals(status, handler.getTargetMethod());
+        assertThrows(UnsupportedOperationException.class, handler::getTargetMethod, "a handler function has no Java method");
+        assertEquals(status, ((ExecutableMethod<?, ?>) handler.getAnnotationMetadataProvider()).getTargetMethod(),
+            "the bean method the route implements has it");
         assertEquals(Service.class, handler.getDeclaringType());
         assertEquals("status", handler.getMethodName());
     }
