@@ -20,7 +20,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -29,10 +28,10 @@ import java.util.function.Predicate;
 /**
  * Shorthands of {@link RouteCondition} for {@link HttpRouteSpec#where} and
  * {@link HttpRouteGroup#where}: conditions on the headers, query parameters, accepted media
- * types, content type and method of a request. Each returns a {@link RouteCondition}, which is
- * a {@link Predicate} too, so they combine with {@link RouteCondition#and},
- * {@link RouteCondition#or} and {@link RouteCondition#negate}, with lambdas, or with
- * {@link #all} and {@link #any}.
+ * types, content type and method of a request. Each returns a {@link RouteCondition}, so they
+ * combine with {@link RouteCondition#and}, {@link RouteCondition#or} and
+ * {@link RouteCondition#negate}, with lambdas made conditions with
+ * {@link RouteCondition#custom(Predicate)}, or with {@link #all} and {@link #any}.
  *
  * <pre>{@code
  * import static io.micronaut.web.router.builder.RequestPredicates.*;
@@ -189,32 +188,22 @@ public final class RequestPredicates {
      * A request that meets every condition. The router evaluates them cheapest first until one
      * is not met, the lambdas last, in order.
      *
-     * @param conditions The conditions, a lambda becomes a {@link RouteCondition.Custom} condition
+     * @param conditions The conditions, see {@link RouteCondition#custom(Predicate)} for a lambda
      * @return The condition, met by every request if there are none
      */
-    @SafeVarargs
-    public static RouteCondition all(Predicate<HttpRequest<?>>... conditions) {
-        return new RouteCondition.AllOf(conditions(conditions));
+    public static RouteCondition all(RouteCondition... conditions) {
+        return new RouteCondition.AllOf(List.of(conditions));
     }
 
     /**
      * A request that meets one of the conditions. The router evaluates them cheapest first
      * until one is met, the lambdas last, in order.
      *
-     * @param conditions The conditions, a lambda becomes a {@link RouteCondition.Custom} condition
+     * @param conditions The conditions, see {@link RouteCondition#custom(Predicate)} for a lambda
      * @return The condition, met by no request if there are none
      */
-    @SafeVarargs
-    public static RouteCondition any(Predicate<HttpRequest<?>>... conditions) {
-        return new RouteCondition.AnyOf(conditions(conditions));
-    }
-
-    private static List<RouteCondition> conditions(Predicate<HttpRequest<?>>[] conditions) {
-        List<RouteCondition> result = new ArrayList<>(conditions.length);
-        for (Predicate<HttpRequest<?>> condition : conditions) {
-            result.add(RouteCondition.custom(condition));
-        }
-        return result;
+    public static RouteCondition any(RouteCondition... conditions) {
+        return new RouteCondition.AnyOf(List.of(conditions));
     }
 
     private static List<MediaType> mediaTypes(MediaType[] mediaTypes) {

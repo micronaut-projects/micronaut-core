@@ -187,9 +187,9 @@ public class HandlerRouteConditionsTest {
             routes.GET("/conditions/variant")
                 .where(request -> !"b".equals(request.getHeaders().get("X-Variant")))
                 .handle((request, pathVariables) -> text("a"));
-            Predicate<HttpRequest<?>> csv = RequestPredicates.queryParam("format", "csv")
+            io.micronaut.web.router.builder.RouteCondition csv = RequestPredicates.queryParam("format", "csv")
                 .or(RequestPredicates.all(RequestPredicates.accept(MediaType.TEXT_CSV_TYPE), RequestPredicates.header(HttpHeaders.ACCEPT)));
-            Predicate<HttpRequest<?>> debug = RequestPredicates.header("X-Mode", value -> value.startsWith("debug"));
+            io.micronaut.web.router.builder.RouteCondition debug = RequestPredicates.header("X-Mode", value -> value.startsWith("debug"));
             routes.GET("/conditions/export").where(csv).handle((request, pathVariables) -> text("csv export"));
             routes.GET("/conditions/export").where(debug.and(csv.negate())).handle((request, pathVariables) -> text("debug export"));
             routes.GET("/conditions/export").where(RequestPredicates.any(csv, debug).negate()).handle((request, pathVariables) -> text("default export"));

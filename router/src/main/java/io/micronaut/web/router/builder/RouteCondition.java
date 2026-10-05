@@ -18,7 +18,6 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.web.router.RouteConditionContext;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
@@ -47,17 +46,17 @@ import java.util.function.Predicate;
  * routes.path("/admin", admin -> admin.where(peerAddress("10.0.0.0/8")));
  * }</pre>
  *
- * <p>A condition is also a {@link Predicate} of a request, so it combines with lambdas, e.g.
- * {@code header("X-Beta").and(request -> ...)}, and a condition built by
- * {@link RequestPredicates} is one. As a predicate, a condition on the host or the client
- * address reads the {@code Host} header and the peer of the connection: a route reads them as
- * the server resolves them, see {@link Host} and {@link RemoteAddress}.</p>
+ * <p>A condition is data, not a predicate: only the router evaluates it, with the host and the
+ * client address as the server resolves them, see {@link Host} and {@link RemoteAddress}, and
+ * the clock of the application. Conditions combine with {@link #and(RouteCondition)},
+ * {@link #or(RouteCondition)} and {@link #negate()}; a lambda is a {@link #custom(Predicate)}
+ * condition.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public sealed interface RouteCondition extends Predicate<HttpRequest<?>> {
+public sealed interface RouteCondition {
 
     /**
      * A request with a header of the name, e.g. {@code header("X-Beta")}.
@@ -320,48 +319,31 @@ public sealed interface RouteCondition extends Predicate<HttpRequest<?>> {
      * evaluates it after the others it is combined with, and cannot read it.
      *
      * @param predicate The predicate, which must be fast, must not block and must not read the body
-     * @return The condition, the predicate itself if it is a condition
+     * @return The condition
      */
     static RouteCondition custom(Predicate<? super HttpRequest<?>> predicate) {
-        Objects.requireNonNull(predicate, "predicate");
-        return predicate instanceof RouteCondition condition ? condition : new Custom(predicate);
+        return new Custom(Objects.requireNonNull(predicate, "predicate"));
     }
 
     /**
-     * Whether a request meets the condition. A condition on the host or the client address
-     * reads the {@code Host} header and the peer of the connection here; a route reads them as
-     * the server resolves them.
-     *
-     * @param request The request
-     * @return Whether the request meets the condition
-     */
-    @Override
-    default boolean test(HttpRequest<?> request) {
-        return RouteConditions.matches(this, request, RouteConditionContext.fallback());
-    }
-
-    /**
-     * @param other Another condition, a lambda becomes a {@link Custom} condition
+     * @param other Another condition, see {@link #custom(Predicate)} for a lambda
      * @return A condition met when both are
      */
-    @Override
-    default RouteCondition and(Predicate<? super HttpRequest<?>> other) {
-        return new AllOf(List.of(this, custom(other)));
+    default RouteCondition and(RouteCondition other) {
+        return new AllOf(List.of(this, Objects.requireNonNull(other, "other")));
     }
 
     /**
-     * @param other Another condition, a lambda becomes a {@link Custom} condition
+     * @param other Another condition, see {@link #custom(Predicate)} for a lambda
      * @return A condition met when one of them is
      */
-    @Override
-    default RouteCondition or(Predicate<? super HttpRequest<?>> other) {
-        return new AnyOf(List.of(this, custom(other)));
+    default RouteCondition or(RouteCondition other) {
+        return new AnyOf(List.of(this, Objects.requireNonNull(other, "other")));
     }
 
     /**
      * @return A condition met when this one is not
      */
-    @Override
     default RouteCondition negate() {
         return this instanceof Not not ? not.condition() : new Not(this);
     }

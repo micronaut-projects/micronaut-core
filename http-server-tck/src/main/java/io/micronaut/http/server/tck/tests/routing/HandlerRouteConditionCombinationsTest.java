@@ -241,7 +241,7 @@ public class HandlerRouteConditionCombinationsTest {
                 .handle((request, pathVariables) -> text("pending"));
             // a lambda combined with the declarative conditions
             routes.GET("/combinations/launch")
-                .where(header("X-Never").and(request -> request.getPath().startsWith("/combinations")))
+                .where(header("X-Never").and(RouteCondition.custom(request -> request.getPath().startsWith("/combinations"))))
                 .handle((request, pathVariables) -> text("never"));
             routes.GET("/combinations/prefixed/{name}")
                 .constrain("name", startsWith("item-"))

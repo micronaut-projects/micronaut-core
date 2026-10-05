@@ -57,20 +57,20 @@ class PeerAddressConditionTest {
     @Test
     void thePeerOfTheConnectionMatches() {
         RouteCondition internal = peerAddress("10.0.0.0/8", "fd00::/8");
-        assertTrue(internal.test(from("10.1.2.3")));
-        assertFalse(internal.test(from("11.0.0.1")));
-        assertTrue(internal.test(from("fd12::1")));
-        assertFalse(internal.test(from("2001:db8::1")));
-        assertTrue(internal.test(from("::ffff:10.0.0.1")), "an IPv4 address mapped to IPv6");
-        assertTrue(peerAddress("192.168.1.7").test(from("192.168.1.7")), "a single address");
+        assertTrue(meets(internal, from("10.1.2.3")));
+        assertFalse(meets(internal, from("11.0.0.1")));
+        assertTrue(meets(internal, from("fd12::1")));
+        assertFalse(meets(internal, from("2001:db8::1")));
+        assertTrue(meets(internal, from("::ffff:10.0.0.1")), "an IPv4 address mapped to IPv6");
+        assertTrue(meets(peerAddress("192.168.1.7"), from("192.168.1.7")), "a single address");
     }
 
     @Test
     void noPeerOrAnUnresolvedPeerMatchesNothing() {
-        assertFalse(peerAddress("0.0.0.0/0", "::/0").test(new RemoteRequest(HttpRequest.GET("/x"), null)), "no peer address");
+        assertFalse(meets(peerAddress("0.0.0.0/0", "::/0"), new RemoteRequest(HttpRequest.GET("/x"), null)), "no peer address");
         HttpRequest<?> unresolved = new RemoteRequest(HttpRequest.GET("/x"), InetSocketAddress.createUnresolved("10.0.0.1", 50000));
-        assertFalse(peerAddress("10.0.0.0/8").test(unresolved), "an unresolved peer is never looked up");
-        assertTrue(not(peerAddress("10.0.0.0/8")).test(new RemoteRequest(HttpRequest.GET("/x"), null)), "negated, no peer meets the condition");
+        assertFalse(meets(peerAddress("10.0.0.0/8"), unresolved), "an unresolved peer is never looked up");
+        assertTrue(meets(not(peerAddress("10.0.0.0/8")), new RemoteRequest(HttpRequest.GET("/x"), null)), "negated, no peer meets the condition");
     }
 
     @Test
@@ -183,5 +183,9 @@ class PeerAddressConditionTest {
         public @Nullable InetSocketAddress getRemoteAddress() {
             return remote;
         }
+    }
+
+    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }

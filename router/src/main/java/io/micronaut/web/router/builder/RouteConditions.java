@@ -137,7 +137,7 @@ public final class RouteConditions {
             case RemoteAddress remoteAddress -> remoteAddress;
             case PeerAddress peerAddress -> peerAddress;
             case TimeWindow timeWindow -> timeWindow;
-            case Custom custom -> custom.predicate() instanceof RouteCondition wrapped ? normalize(wrapped) : custom;
+            case Custom custom -> custom;
         };
     }
 

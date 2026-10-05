@@ -312,8 +312,10 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
     /**
      * Match the requests that meet a condition of a lambda only, see
      * {@link #where(RouteCondition)}: a {@link RouteCondition#custom custom} condition, which the
-     * router cannot read and evaluates after the others. A {@link RouteCondition} given as a
-     * predicate is that condition.
+     * router cannot read and evaluates after the others. The lambda is given the request as it
+     * is: it reads the {@code Host} header and the peer of the connection, not the host and the
+     * client address the server resolves, which only the conditions of {@link RouteCondition}
+     * read.
      *
      * @param condition The condition
      * @return The route or the group

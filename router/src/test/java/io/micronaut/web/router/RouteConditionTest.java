@@ -81,13 +81,13 @@ class RouteConditionTest {
     void headerConditions() {
         MutableHttpRequest<?> request = HttpRequest.GET("/x").header("X-Channel", "stable").header("X-Channel", "Beta-2");
 
-        assertTrue(header("x-channel").test(request), "the name is case-insensitive");
-        assertFalse(header("X-Other").test(request));
-        assertTrue(header("X-Channel", "stable").test(request));
-        assertTrue(header("X-Channel", startsWith("beta").ignoringCase()).test(request), "any of the values");
-        assertFalse(header("X-Channel", oneOf("alpha", "gamma")).test(request));
-        assertTrue(header("X-Other", present().negate()).test(request), "an absent header is an absent value");
-        assertFalse(header("X-Other", equalTo("a")).test(request));
+        assertTrue(meets(header("x-channel"), request), "the name is case-insensitive");
+        assertFalse(meets(header("X-Other"), request));
+        assertTrue(meets(header("X-Channel", "stable"), request));
+        assertTrue(meets(header("X-Channel", startsWith("beta").ignoringCase()), request), "any of the values");
+        assertFalse(meets(header("X-Channel", oneOf("alpha", "gamma")), request));
+        assertTrue(meets(header("X-Other", present().negate()), request), "an absent header is an absent value");
+        assertFalse(meets(header("X-Other", equalTo("a")), request));
     }
 
     @Test
@@ -95,12 +95,12 @@ class RouteConditionTest {
         MutableHttpRequest<?> request = HttpRequest.GET("/x");
         request.getParameters().add("format", List.of("csv", "json")).add("debug", List.of(""));
 
-        assertTrue(query("debug").test(request), "a parameter without a value");
-        assertTrue(query("debug", equalTo("")).test(request));
-        assertFalse(query("Format").test(request), "the name is case-sensitive");
-        assertTrue(query("format", "json").test(request), "any of the values");
-        assertTrue(query("format", regex("[a-z]{3}")).test(request));
-        assertFalse(query("format", "xml").test(request));
+        assertTrue(meets(query("debug"), request), "a parameter without a value");
+        assertTrue(meets(query("debug", equalTo("")), request));
+        assertFalse(meets(query("Format"), request), "the name is case-sensitive");
+        assertTrue(meets(query("format", "json"), request), "any of the values");
+        assertTrue(meets(query("format", regex("[a-z]{3}")), request));
+        assertFalse(meets(query("format", "xml"), request));
     }
 
     @Test
@@ -109,43 +109,43 @@ class RouteConditionTest {
             .header(HttpHeaders.COOKIE, "SESSION=abc123; variant=\"b\";flag; empty=")
             .header(HttpHeaders.COOKIE, "late = x ");
 
-        assertTrue(cookie("variant").test(request));
-        assertTrue(cookie("variant", equalTo("b")).test(request), "without the quotes of a quoted value");
-        assertTrue(cookie("SESSION", regex("[a-z]+\\d+")).test(request));
-        assertFalse(cookie("SESSION", regex("[a-z]+")).test(request), "the whole value");
-        assertFalse(cookie("session").test(request), "the name is case-sensitive");
-        assertFalse(cookie("SESS").test(request), "the whole name");
-        assertTrue(cookie("flag", equalTo("")).test(request), "a cookie without a value");
-        assertTrue(cookie("empty", equalTo("")).test(request));
-        assertTrue(cookie("late", equalTo("x")).test(request), "another Cookie header, trimmed");
-        assertTrue(cookie("missing", present().negate()).test(request));
-        assertFalse(cookie("missing").test(request));
+        assertTrue(meets(cookie("variant"), request));
+        assertTrue(meets(cookie("variant", equalTo("b")), request), "without the quotes of a quoted value");
+        assertTrue(meets(cookie("SESSION", regex("[a-z]+\\d+")), request));
+        assertFalse(meets(cookie("SESSION", regex("[a-z]+")), request), "the whole value");
+        assertFalse(meets(cookie("session"), request), "the name is case-sensitive");
+        assertFalse(meets(cookie("SESS"), request), "the whole name");
+        assertTrue(meets(cookie("flag", equalTo("")), request), "a cookie without a value");
+        assertTrue(meets(cookie("empty", equalTo("")), request));
+        assertTrue(meets(cookie("late", equalTo("x")), request), "another Cookie header, trimmed");
+        assertTrue(meets(cookie("missing", present().negate()), request));
+        assertFalse(meets(cookie("missing"), request));
 
         HttpRequest<?> built = HttpRequest.GET("/x").cookie(Cookie.of("variant", "c"));
-        assertTrue(cookie("variant", oneOf("b", "c")).test(built), "the cookies of a request built in code");
-        assertFalse(cookie("variant").test(HttpRequest.GET("/x")));
+        assertTrue(meets(cookie("variant", oneOf("b", "c")), built), "the cookies of a request built in code");
+        assertFalse(meets(cookie("variant"), HttpRequest.GET("/x")));
     }
 
     @Test
     void methodConditions() {
-        assertTrue(method(HttpMethod.GET, HttpMethod.HEAD).test(HttpRequest.HEAD("/x")));
-        assertFalse(method(HttpMethod.GET).test(HttpRequest.POST("/x", "")));
-        assertTrue(method("PURGE").test(HttpRequest.create(HttpMethod.CUSTOM, "/x", "PURGE")), "a custom method by name");
-        assertTrue(method(HttpMethod.CUSTOM).test(HttpRequest.create(HttpMethod.CUSTOM, "/x", "PURGE")), "every custom method");
-        assertFalse(method("PURGE").test(HttpRequest.create(HttpMethod.CUSTOM, "/x", "LOCK")));
+        assertTrue(meets(method(HttpMethod.GET, HttpMethod.HEAD), HttpRequest.HEAD("/x")));
+        assertFalse(meets(method(HttpMethod.GET), HttpRequest.POST("/x", "")));
+        assertTrue(meets(method("PURGE"), HttpRequest.create(HttpMethod.CUSTOM, "/x", "PURGE")), "a custom method by name");
+        assertTrue(meets(method(HttpMethod.CUSTOM), HttpRequest.create(HttpMethod.CUSTOM, "/x", "PURGE")), "every custom method");
+        assertFalse(meets(method("PURGE"), HttpRequest.create(HttpMethod.CUSTOM, "/x", "LOCK")));
         assertThrows(IllegalArgumentException.class, () -> method(new String[0]));
     }
 
     @Test
     void hostConditionsReadTheHostAsTheServerResolvesIt() {
-        assertTrue(host("api.example.com").test(withHost("API.Example.COM:8443")), "ignoring case and the port");
-        assertTrue(host("api.example.com").test(withHost("api.example.com.")), "the final dot of a fully qualified name");
-        assertTrue(host(endsWith(".example.com")).test(withHost("eu.api.example.com")));
-        assertFalse(host(endsWith(".example.com")).test(withHost("example.com")));
-        assertTrue(host("[::1]").test(withHost("[::1]:8080")), "an IPv6 address in brackets");
-        assertTrue(host("one.test", "two.test").test(withHost("two.test")));
-        assertFalse(host(present()).test(HttpRequest.GET("/x")), "no Host header and a relative URI");
-        assertTrue(host("example.com").test(HttpRequest.GET("https://example.com/x")), "the host of an absolute URI");
+        assertTrue(meets(host("api.example.com"), withHost("API.Example.COM:8443")), "ignoring case and the port");
+        assertTrue(meets(host("api.example.com"), withHost("api.example.com.")), "the final dot of a fully qualified name");
+        assertTrue(meets(host(endsWith(".example.com")), withHost("eu.api.example.com")));
+        assertFalse(meets(host(endsWith(".example.com")), withHost("example.com")));
+        assertTrue(meets(host("[::1]"), withHost("[::1]:8080")), "an IPv6 address in brackets");
+        assertTrue(meets(host("one.test", "two.test"), withHost("two.test")));
+        assertFalse(meets(host(present()), HttpRequest.GET("/x")), "no Host header and a relative URI");
+        assertTrue(meets(host("example.com"), HttpRequest.GET("https://example.com/x")), "the host of an absolute URI");
 
         // the server resolves the host, e.g. from a forwarded header, as a URI
         RouteConditionContext resolving = context(request -> "https://API.example.com.:8443", null, null);
@@ -158,11 +158,11 @@ class RouteConditionTest {
     @Test
     void remoteAddressConditionsReadTheAddressAsTheServerResolvesIt() {
         RouteCondition privateNetworks = remoteAddress("10.0.0.0/8", "192.168.0.0/16", "fd00::/8");
-        assertTrue(privateNetworks.test(from("10.1.2.3")), "the peer of the connection");
-        assertFalse(privateNetworks.test(from("11.0.0.1")));
-        assertTrue(privateNetworks.test(from("fd12:3456::1")));
-        assertTrue(privateNetworks.test(from("::ffff:10.0.0.1")), "an IPv4 address mapped to IPv6");
-        assertFalse(privateNetworks.test(HttpRequest.GET("/x")), "no address");
+        assertTrue(meets(privateNetworks, from("10.1.2.3")), "the peer of the connection");
+        assertFalse(meets(privateNetworks, from("11.0.0.1")));
+        assertTrue(meets(privateNetworks, from("fd12:3456::1")));
+        assertTrue(meets(privateNetworks, from("::ffff:10.0.0.1")), "an IPv4 address mapped to IPv6");
+        assertFalse(meets(privateNetworks, HttpRequest.GET("/x")), "no address");
 
         RouteConditionContext resolving = context(null, request -> request.getHeaders().get("X-Client"), null);
         assertTrue(RouteConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "10.0.0.1:4711"), resolving));
@@ -191,31 +191,30 @@ class RouteConditionTest {
         assertThrows(IllegalArgumentException.class, () -> between(NOON, NOON.minusSeconds(1)));
         assertThrows(IllegalArgumentException.class, () -> new RouteCondition.TimeWindow(null, null));
 
-        assertTrue(after(Instant.EPOCH).test(request), "the system clock");
+        assertTrue(meets(after(Instant.EPOCH), request), "the system clock");
     }
 
     @Test
     void combinationsAndLambdas() {
         MutableHttpRequest<?> request = HttpRequest.GET("/x").header("X-A", "1");
 
-        assertTrue(all().test(request));
-        assertFalse(any().test(request));
-        assertTrue(all(header("X-A"), method(HttpMethod.GET)).test(request));
-        assertTrue(any(header("X-B"), header("X-A")).test(request));
-        assertTrue(not(header("X-B")).test(request));
-        assertTrue(header("X-A").and(r -> r.getPath().equals("/x")).test(request), "with a lambda");
-        assertTrue(header("X-B").or(r -> true).test(request));
+        assertTrue(meets(all(), request));
+        assertFalse(meets(any(), request));
+        assertTrue(meets(all(header("X-A"), method(HttpMethod.GET)), request));
+        assertTrue(meets(any(header("X-B"), header("X-A")), request));
+        assertTrue(meets(not(header("X-B")), request));
+        assertTrue(meets(header("X-A").and(custom(r -> r.getPath().equals("/x"))), request), "with a lambda");
+        assertTrue(meets(header("X-B").or(custom(r -> true)), request));
         assertInstanceOf(RouteCondition.AllOf.class, header("X-A").and(header("X-B")));
-        RouteCondition withLambda = header("X-A").or(r -> true);
+        RouteCondition withLambda = header("X-A").or(custom(r -> true));
         assertInstanceOf(RouteCondition.Custom.class, assertInstanceOf(RouteCondition.AnyOf.class, withLambda).conditions().get(1), "a lambda is a custom condition");
         RouteCondition condition = header("X-A");
-        assertSame(condition, custom(condition), "a condition given as a predicate is that condition");
         assertSame(condition, condition.negate().negate());
 
-        // a condition is a predicate: the RequestPredicates of before compose as they did
-        Predicate<HttpRequest<?>> composed = RequestPredicates.header("X-A").and(RequestPredicates.header("X-B").negate())
+        // the conditions of RequestPredicates compose as conditions
+        RouteCondition composed = RequestPredicates.header("X-A").and(RequestPredicates.header("X-B").negate())
             .or(RequestPredicates.queryParam("force"));
-        assertTrue(composed.test(request));
+        assertTrue(meets(composed, request));
         assertInstanceOf(RouteCondition.class, composed);
         assertInstanceOf(RouteCondition.Custom.class, RequestPredicates.accept(MediaType.TEXT_CSV_TYPE));
         assertEquals(header("X-A"), RequestPredicates.header("X-A"));
@@ -321,5 +320,9 @@ class RouteConditionTest {
         public InetSocketAddress getRemoteAddress() {
             return remote;
         }
+    }
+
+    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }

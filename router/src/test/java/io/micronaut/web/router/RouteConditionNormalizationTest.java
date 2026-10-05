@@ -127,14 +127,14 @@ class RouteConditionNormalizationTest {
         List<String> evaluated = new ArrayList<>();
         RouteCondition condition = RouteConditions.normalize(all(record(evaluated, "lambda"), header("X-A"), method(HttpMethod.POST)));
 
-        assertFalse(condition.test(HttpRequest.GET("/x").header("X-A", "1")));
+        assertFalse(meets(condition, HttpRequest.GET("/x").header("X-A", "1")));
         assertEquals(List.of(), evaluated, "the method decides before the lambda runs");
-        assertTrue(condition.test(HttpRequest.POST("/x", "").header("X-A", "1")));
+        assertTrue(meets(condition, HttpRequest.POST("/x", "").header("X-A", "1")));
         assertEquals(List.of("lambda"), evaluated);
 
         evaluated.clear();
         RouteCondition either = RouteConditions.normalize(any(record(evaluated, "lambda"), header("X-A")));
-        assertTrue(either.test(HttpRequest.GET("/x").header("X-A", "1")));
+        assertTrue(meets(either, HttpRequest.GET("/x").header("X-A", "1")));
         assertEquals(List.of(), evaluated, "the header decides before the lambda runs");
     }
 
@@ -143,5 +143,9 @@ class RouteConditionNormalizationTest {
             evaluated.add(name);
             return true;
         });
+    }
+
+    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }

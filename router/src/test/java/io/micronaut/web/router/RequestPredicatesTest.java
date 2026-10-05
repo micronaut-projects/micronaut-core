@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.web.router.builder.RouteCondition;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -51,12 +52,12 @@ class RequestPredicatesTest {
     void headerConditions() {
         MutableHttpRequest<?> request = HttpRequest.GET("/x").header("X-Mode", "a").header("X-Mode", "b");
 
-        assertTrue(header("x-mode").test(request), "the name is case-insensitive");
-        assertFalse(header("X-Other").test(request));
-        assertTrue(header("X-Mode", "b").test(request), "any of the values");
-        assertFalse(header("X-Mode", "B").test(request), "the value is case-sensitive");
-        assertTrue(header("X-Mode", value -> value.startsWith("a")).test(request));
-        assertFalse(header("X-Other", value -> true).test(request));
+        assertTrue(meets(header("x-mode"), request), "the name is case-insensitive");
+        assertFalse(meets(header("X-Other"), request));
+        assertTrue(meets(header("X-Mode", "b"), request), "any of the values");
+        assertFalse(meets(header("X-Mode", "B"), request), "the value is case-sensitive");
+        assertTrue(meets(header("X-Mode", value -> value.startsWith("a")), request));
+        assertFalse(meets(header("X-Other", value -> true), request));
     }
 
     @Test
@@ -64,26 +65,26 @@ class RequestPredicatesTest {
         MutableHttpRequest<?> request = HttpRequest.GET("/x");
         request.getParameters().add("format", List.of("csv", "json")).add("debug", List.of(""));
 
-        assertTrue(queryParam("debug").test(request));
-        assertFalse(queryParam("Format").test(request), "the name is case-sensitive");
-        assertTrue(queryParam("format", "json").test(request), "any of the values");
-        assertFalse(queryParam("format", "xml").test(request));
-        assertTrue(queryParam("format", value -> value.length() == 3).test(request));
+        assertTrue(meets(queryParam("debug"), request));
+        assertFalse(meets(queryParam("Format"), request), "the name is case-sensitive");
+        assertTrue(meets(queryParam("format", "json"), request), "any of the values");
+        assertFalse(meets(queryParam("format", "xml"), request));
+        assertTrue(meets(queryParam("format", value -> value.length() == 3), request));
     }
 
     @Test
     void mediaTypeConditions() {
-        assertTrue(accept(MediaType.TEXT_CSV_TYPE).test(HttpRequest.GET("/x")), "no Accept header accepts every type");
-        assertTrue(accept(MediaType.TEXT_CSV_TYPE).test(HttpRequest.GET("/x").accept(MediaType.of("text/*"))));
-        assertTrue(accept(MediaType.of("text/*")).test(HttpRequest.GET("/x").accept(MediaType.TEXT_CSV_TYPE)));
-        assertTrue(accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_CSV_TYPE).test(HttpRequest.GET("/x").accept(MediaType.TEXT_CSV_TYPE)));
-        assertFalse(accept(MediaType.APPLICATION_JSON_TYPE).test(HttpRequest.GET("/x").accept(MediaType.TEXT_CSV_TYPE)));
+        assertTrue(meets(accept(MediaType.TEXT_CSV_TYPE), HttpRequest.GET("/x")), "no Accept header accepts every type");
+        assertTrue(meets(accept(MediaType.TEXT_CSV_TYPE), HttpRequest.GET("/x").accept(MediaType.of("text/*"))));
+        assertTrue(meets(accept(MediaType.of("text/*")), HttpRequest.GET("/x").accept(MediaType.TEXT_CSV_TYPE)));
+        assertTrue(meets(accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_CSV_TYPE), HttpRequest.GET("/x").accept(MediaType.TEXT_CSV_TYPE)));
+        assertFalse(meets(accept(MediaType.APPLICATION_JSON_TYPE), HttpRequest.GET("/x").accept(MediaType.TEXT_CSV_TYPE)));
 
-        assertTrue(contentType(MediaType.APPLICATION_JSON_TYPE).test(HttpRequest.POST("/x", "{}").contentType(MediaType.APPLICATION_JSON_TYPE)));
-        assertTrue(contentType(MediaType.of("application/*")).test(HttpRequest.POST("/x", "{}")
+        assertTrue(meets(contentType(MediaType.APPLICATION_JSON_TYPE), HttpRequest.POST("/x", "{}").contentType(MediaType.APPLICATION_JSON_TYPE)));
+        assertTrue(meets(contentType(MediaType.of("application/*")), HttpRequest.POST("/x", "{}")
             .header(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")));
-        assertFalse(contentType(MediaType.TEXT_PLAIN_TYPE).test(HttpRequest.POST("/x", "{}").contentType(MediaType.APPLICATION_JSON_TYPE)));
-        assertFalse(contentType(MediaType.ALL_TYPE).test(HttpRequest.POST("/x", "")), "no content type");
+        assertFalse(meets(contentType(MediaType.TEXT_PLAIN_TYPE), HttpRequest.POST("/x", "{}").contentType(MediaType.APPLICATION_JSON_TYPE)));
+        assertFalse(meets(contentType(MediaType.ALL_TYPE), HttpRequest.POST("/x", "")), "no content type");
 
         assertThrows(IllegalArgumentException.class, RequestPredicates::accept);
         assertThrows(IllegalArgumentException.class, RequestPredicates::contentType);
@@ -91,8 +92,8 @@ class RequestPredicatesTest {
 
     @Test
     void methodCondition() {
-        assertTrue(method(HttpMethod.GET, HttpMethod.HEAD).test(HttpRequest.HEAD("/x")));
-        assertFalse(method(HttpMethod.GET).test(HttpRequest.POST("/x", "")));
+        assertTrue(meets(method(HttpMethod.GET, HttpMethod.HEAD), HttpRequest.HEAD("/x")));
+        assertFalse(meets(method(HttpMethod.GET), HttpRequest.POST("/x", "")));
         assertThrows(IllegalArgumentException.class, RequestPredicates::method);
     }
 
@@ -100,13 +101,13 @@ class RequestPredicatesTest {
     void combinedConditions() {
         MutableHttpRequest<?> request = HttpRequest.GET("/x").header("X-A", "1");
 
-        assertTrue(all().test(request));
-        assertFalse(any().test(request));
-        assertTrue(all(header("X-A"), method(HttpMethod.GET)).test(request));
-        assertFalse(all(header("X-A"), header("X-B")).test(request));
-        assertTrue(any(header("X-B"), header("X-A")).test(request));
-        Predicate<HttpRequest<?>> composed = header("X-A").and(header("X-B").negate()).or(queryParam("force"));
-        assertTrue(composed.test(request));
+        assertTrue(meets(all(), request));
+        assertFalse(meets(any(), request));
+        assertTrue(meets(all(header("X-A"), method(HttpMethod.GET)), request));
+        assertFalse(meets(all(header("X-A"), header("X-B")), request));
+        assertTrue(meets(any(header("X-B"), header("X-A")), request));
+        RouteCondition composed = header("X-A").and(header("X-B").negate()).or(queryParam("force"));
+        assertTrue(meets(composed, request));
     }
 
     @Test
@@ -122,5 +123,9 @@ class RequestPredicatesTest {
         assertNotNull(router.findClosest(HttpRequest.GET("/reports").header("X-Export", "1").accept(MediaType.TEXT_CSV_TYPE)));
         assertNull(router.findClosest(HttpRequest.GET("/reports").header("X-Export", "1").accept(MediaType.APPLICATION_JSON_TYPE)));
         assertNull(router.findClosest(HttpRequest.GET("/reports").accept(MediaType.TEXT_CSV_TYPE)));
+    }
+
+    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }
