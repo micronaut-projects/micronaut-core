@@ -558,10 +558,6 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         scope.scopeMap.isEmpty()
     }
 
-    /**
-     * A scope map that puts one more entry in the first time its keys are read, standing for a bean created by
-     * another thread while the scope is being destroyed.
-     */
     void "under a lock per scope map creations of one identifier into different maps do not block each other"() {
         given: "two maps standing for two requests, each owning the locks of its creations"
         def scope = new PerMapLockScope()
@@ -591,8 +587,10 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         first.get(id).bean().is(beans[0])
         second.get(id).bean().is(beans[1])
 
-        cleanup:
+        cleanup: "a creation left waiting by a failed assertion is let go, and the workers are joined"
+        releaseAll(bothCreating, bothCreating)
         executor.shutdownNow()
+        executor.awaitTermination(5, TimeUnit.SECONDS)
     }
 
     void "creations of one identifier are serialized within one map and by default across maps"() {
@@ -627,6 +625,10 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         !secondThread.alive
         firstContext.created.size() == 1
         secondContext.created.size() == (sameMap ? 0 : 1)
+
+        cleanup:
+        releaseAll(release)
+        joinAll(firstThread, secondThread)
 
         where:
         scope                  | sameMap
@@ -683,6 +685,151 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         !secondThread.alive
         !secondContext.created[0].closed
         second.get(id).is(secondContext.created[0])
+
+        cleanup:
+        releaseAll(releaseFirst, releaseSecond)
+        joinAll(firstThread, secondThread, destroyer)
+    }
+
+    void "under a lock per scope map a removal #removal waits for the creation into its own map only"() {
+        given:
+        def scope = new PerMapLockScope()
+        def first = new LockOwningScopeMap()
+        def second = new LockOwningScopeMap()
+        def id = BeanIdentifier.of("myBean")
+        def definition = Stub(BeanDefinition)
+        def firstCreating = new CountDownLatch(1)
+        def secondCreating = new CountDownLatch(1)
+        def releaseFirst = new CountDownLatch(1)
+        def releaseSecond = new CountDownLatch(1)
+        def firstContext = new TestCreationContext(id, {
+            firstCreating.countDown()
+            assert releaseFirst.await(5, TimeUnit.SECONDS)
+        }, definition)
+        def secondContext = new TestCreationContext(id, {
+            secondCreating.countDown()
+            assert releaseSecond.await(5, TimeUnit.SECONDS)
+        }, definition)
+        def removeFrom = { Map<BeanIdentifier, CreatedBean<?>> map ->
+            scope.withScopeMap(map) { byIdentifier ? scope.remove(id) : scope.remove(definition) }
+        }
+        def removed = new AtomicReference<Optional<Object>>()
+
+        when: "only the second map has a creation in flight"
+        def secondThread = Thread.start { scope.withScopeMap(second) { scope.getOrCreate(secondContext) } }
+        assert secondCreating.await(5, TimeUnit.SECONDS)
+        def nothingToRemove = removeFrom(first)
+
+        then: "a removal from the first map neither waits for it nor takes its bean"
+        !nothingToRemove.present
+        secondThread.alive
+
+        when: "the first map has a creation in flight too, and is removed from"
+        def firstThread = Thread.start { scope.withScopeMap(first) { scope.getOrCreate(firstContext) } }
+        assert firstCreating.await(5, TimeUnit.SECONDS)
+        def remover = Thread.start { removed.set(removeFrom(first)) }
+
+        then: "the removal waits for the creation into its own map"
+        awaitBlocked(remover)
+        removed.get() == null
+
+        when:
+        releaseFirst.countDown()
+        firstThread.join(5000)
+        remover.join(5000)
+
+        then: "it removes and destroys the bean of the first map, while the second map is still creating its own"
+        !remover.alive
+        removed.get().present
+        removed.get().get().is(firstContext.created[0].bean)
+        firstContext.created[0].closed
+        first.isEmpty()
+        secondThread.alive
+
+        when:
+        releaseSecond.countDown()
+        secondThread.join(5000)
+
+        then: "the bean of the second map is published and left alone"
+        !secondThread.alive
+        !secondContext.created[0].closed
+        second.get(id).is(secondContext.created[0])
+
+        cleanup:
+        releaseAll(releaseFirst, releaseSecond)
+        joinAll(firstThread, secondThread, remover)
+
+        where:
+        removal               | byIdentifier
+        "by identifier"       | true
+        "by definition"       | false
+    }
+
+    void "under a lock per scope map a failed creation leaves its map clean while another map creates the same identifier"() {
+        given:
+        def scope = new PerMapLockScope()
+        def first = new LockOwningScopeMap()
+        def second = new LockOwningScopeMap()
+        def id = BeanIdentifier.of("myBean")
+        def secondCreating = new CountDownLatch(1)
+        def releaseSecond = new CountDownLatch(1)
+        def failing = new TestCreationContext(id, { throw new IllegalStateException("Bad things") })
+        def secondContext = new TestCreationContext(id, {
+            secondCreating.countDown()
+            assert releaseSecond.await(5, TimeUnit.SECONDS)
+        })
+        def retry = new TestCreationContext(id)
+
+        when: "the creation into the first map fails while the second map is creating the same identifier"
+        def secondThread = Thread.start { scope.withScopeMap(second) { scope.getOrCreate(secondContext) } }
+        assert secondCreating.await(5, TimeUnit.SECONDS)
+        scope.withScopeMap(first) { scope.getOrCreate(failing) }
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "Bad things"
+        first.isEmpty()
+        secondThread.alive
+
+        when: "the first map is destroyed and created into again"
+        scope.destroyScope(first)
+        def bean = scope.withScopeMap(first) { scope.getOrCreate(retry) }
+
+        then: "nothing of the failed creation is left in flight, so neither waits for the second map"
+        retry.created.size() == 1
+        first.get(id).bean().is(bean)
+        secondThread.alive
+
+        when:
+        releaseSecond.countDown()
+        secondThread.join(5000)
+
+        then:
+        !secondThread.alive
+        second.get(id).is(secondContext.created[0])
+        !retry.created[0].closed
+
+        cleanup:
+        releaseAll(releaseSecond)
+        joinAll(secondThread)
+    }
+
+    /**
+     * Counts down every given latch, so that no thread a test started is left waiting on one when it fails.
+     */
+    private static void releaseAll(CountDownLatch... latches) {
+        for (CountDownLatch latch : latches) {
+            latch?.countDown()
+        }
+    }
+
+    /**
+     * Joins every given thread a test started, those it never got to start included.
+     */
+    private static void joinAll(Thread... threads) {
+        for (Thread thread : threads) {
+            thread?.join(5000)
+        }
     }
 
     /**
@@ -720,6 +867,10 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         }
     }
 
+    /**
+     * A scope map that puts one more entry in the first time its keys are read, standing for a bean created by
+     * another thread while the scope is being destroyed.
+     */
     static class LatecomerMap implements ConcurrentMap<BeanIdentifier, CreatedBean<?>> {
 
         @Delegate
