@@ -130,7 +130,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
      * the runtime annotations of the Python class ({@code @Entity}, ...) for reflection-based frameworks, and
      * such an annotation may carry the {@link Introspected} stereotype: the introspection is not generated a
      * second time from the Java class. A Java class is never skipped, so that a class recompiled next to a
-     * stale introspection of it on the classpath gets a fresh one.
+     * stale introspection of it on the classpath gets a fresh one. The Java round spares the generated class
+     * only the visitors selected by an annotation; this visitor visits every class, as it also introspects the
+     * generated class the Python compiler annotates with {@link Introspected} itself, so it checks here.
      *
      * @param element The class element
      * @param context The visitor context
