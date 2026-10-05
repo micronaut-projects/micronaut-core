@@ -157,7 +157,19 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            transitionToState(ctx, this, AfterContent.INSTANCE);
+            fail(ctx, this, cause);
+        }
+
+        /**
+         * Fail the response from the current state, which is this state or the state discarding
+         * the content of an interim response that returns to it.
+         *
+         * @param ctx          The channel context
+         * @param currentState The current state
+         * @param cause        The failure
+         */
+        void fail(ChannelHandlerContext ctx, ReaderState<?> currentState, Throwable cause) {
+            transitionToState(ctx, currentState, AfterContent.INSTANCE);
             listener.fail(ctx, cause);
             listener.finish(ctx);
         }
@@ -459,7 +471,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            this.beforeResponse.exceptionCaught(ctx, cause);
+            this.beforeResponse.fail(ctx, this, cause);
         }
     }
 
