@@ -109,9 +109,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.security.cert.Certificate;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -211,8 +209,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
-    @Nullable
-    private List<Runnable> disposalResources;
+    private final RequestResourceScope disposalResources = new RequestResourceScope();
     @Nullable
     private ParsedFormType parsedFormType;
 
@@ -535,15 +532,21 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Internal
     public void release() {
-        body.close();
-        if (attributes != null) {
-            attributes.forEach(NettyHttpRequest::cleanup);
+        Throwable failure = null;
+        try {
+            body.close();
+        } catch (Throwable t) {
+            failure = t;
         }
-        if (disposalResources != null) {
-            for (Runnable r : disposalResources) {
-                r.run();
+        if (attributes != null) {
+            try {
+                attributes.forEach(NettyHttpRequest::cleanup);
+            } catch (Throwable t) {
+                failure = RequestResourceScope.addFailure(failure, t);
             }
         }
+        // releases every disposal resource once, then rethrows the first failure
+        disposalResources.release(failure);
     }
 
     private static void cleanup(String k, Object v) {
@@ -924,11 +927,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A resource added after this request was {@link #release() released} is released
+     * immediately, on the calling thread.</p>
+     */
     @Override
-    public synchronized void addDisposalResource(Runnable dispose) {
-        if (disposalResources == null) {
-            disposalResources = new ArrayList<>(1);
-        }
+    public void addDisposalResource(Runnable dispose) {
         disposalResources.add(dispose);
     }
 
