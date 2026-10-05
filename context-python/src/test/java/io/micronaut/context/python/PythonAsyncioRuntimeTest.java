@@ -419,7 +419,8 @@ final class PythonAsyncioRuntimeTest {
                 async def call_failing(failing):
                     try:
                         await failing.fail()
-                    except Exception as e:
+                    # the replacement is a Java exception, which `except Exception` does not catch (as for a blocking call)
+                    except BaseException as e:
                         current, seen = e, []
                         for _ in range(5):
                             if current is None:
