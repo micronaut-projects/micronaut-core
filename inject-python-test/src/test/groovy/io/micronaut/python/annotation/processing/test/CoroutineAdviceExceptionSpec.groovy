@@ -42,6 +42,7 @@ import java
 MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 InterceptionLog = java.type("io.micronaut.python.aop.InterceptionLog")
 CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
+IllegalStateException = java.type("java.lang.IllegalStateException")
 TimeUnit = java.type("java.util.concurrent.TimeUnit")
 Function = java.type("java.util.function.Function")
 
@@ -75,6 +76,11 @@ class ScheduleCache:
         ScheduleCache.last_rejection = RejectedSchedule("delayed response for " + key)
         raise ScheduleCache.last_rejection
 
+    @TestAround
+    async def backend(self, key: str) -> str:
+        await asyncio.sleep(0)
+        raise IllegalStateException("backend down for " + key)
+
 @Singleton
 class ScheduleController:
     def __init__(self, cache: ScheduleCache):
@@ -93,6 +99,13 @@ class ScheduleController:
             return await self.cache.delayed_schedule(key)
         except RejectedSchedule as rejected:
             return rejected.response + (" (same)" if rejected is ScheduleCache.last_rejection else " (copy)")
+
+    @Executable
+    async def backend(self, key: str) -> str:
+        try:
+            return await self.cache.backend(key)
+        except IllegalStateException as failure:
+            return "java: " + str(failure.getMessage())
 '''
 
     def setup() {
@@ -118,6 +131,22 @@ class ScheduleController:
         then:
         delayedStage.toCompletableFuture().get(10, TimeUnit.SECONDS) == "delayed response for devoxx (same)"
         InterceptionLog.methods() == ["delayed_schedule"]
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a Java exception raised by an intercepted coroutine method is caught by its Java type in an awaiting Python caller"() {
+        given:
+        def context = buildContext(PYTHON_CODE)
+        def controller = getBean(context, "python.ScheduleController")
+
+        when:
+        CompletionStage<String> stage = controller.backend("devoxx")
+
+        then:
+        stage.toCompletableFuture().get(10, TimeUnit.SECONDS) == "java: backend down for devoxx"
+        InterceptionLog.methods() == ["backend"]
 
         cleanup:
         context?.close()

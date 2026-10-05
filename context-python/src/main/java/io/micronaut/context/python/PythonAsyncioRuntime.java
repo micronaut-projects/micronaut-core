@@ -514,12 +514,12 @@ public final class PythonAsyncioRuntime {
      * {@code async def} fails with the Python exception of the coroutine, wrapped by the interceptor
      * chain in a {@link CompletionException} around the {@link PolyglotException} (or the generated
      * Java exception) that carried it through Java: the awaiting code gets the Python exception object
-     * back, so {@code except MyError} matches. A Java failure is handed over as it is: the awaiting
-     * code receives it as a {@code MicronautJavaException} carrying the throwable.
+     * back, so {@code except MyError} matches. A Java failure is unwrapped from the completion
+     * wrappers, so the awaiting code sees the exception the Java code threw.
      *
      * @param context The context of the awaiting code
      * @param throwable The failure of the stage
-     * @return The Python exception of this context, or the throwable of the stage
+     * @return The Python exception of this context, or the Java throwable
      */
     static Object awaitedFailure(Context context, Throwable throwable) {
         Throwable failure = throwable;
@@ -543,7 +543,7 @@ public final class PythonAsyncioRuntime {
         if (guest != null && guest.isException() && PythonCoercion.isValueInContext(guest, context)) {
             return guest;
         }
-        return throwable;
+        return failure;
     }
 
     /**
