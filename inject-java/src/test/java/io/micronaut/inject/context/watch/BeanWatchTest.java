@@ -287,6 +287,24 @@ class BeanWatchTest {
     }
 
     @Test
+    void aContextInDevelopmentModeByConfigurationRecreatesABeanAndItsDependents() {
+        Pool.CREATED.set(0);
+        // development mode only in the properties of the context: no system property, no builder switch
+        try (ApplicationContext context = ApplicationContext.builder(DEVELOPMENT).start()) {
+            WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            assertTrue(context.findDependencyGraph().isPresent());
+            PoolUser user = context.getBean(PoolUser.class);
+            Pool pool = user.pool;
+            assertTrue(beanContext.recreate(pool));
+            assertEquals(2, Pool.CREATED.get());
+            PoolUser recreatedUser = context.getBean(PoolUser.class);
+            assertNotSame(user, recreatedUser);
+            assertNotSame(pool, recreatedUser.pool);
+            assertSame(context.getBean(Pool.class), recreatedUser.pool);
+        }
+    }
+
+    @Test
     void aResourceStateReportedBeforeTheContextStartsIsTheFirstBatchDeliveredOnce() {
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).build()) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
