@@ -35,7 +35,6 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.function.Predicate;
 
 /**
  * The conditions of handler routes, {@link io.micronaut.web.router.builder.HttpRouteSpec#where}

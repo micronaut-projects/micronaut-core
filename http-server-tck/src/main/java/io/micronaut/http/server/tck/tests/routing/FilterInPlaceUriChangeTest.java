@@ -41,6 +41,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
@@ -48,6 +49,8 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -219,6 +222,18 @@ public class FilterInPlaceUriChangeTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class InPlaceFilters {
 
+        /**
+         * The scheduler of the delay, owned by this test: Reactor's shared parallel scheduler
+         * would start its threads here, and they would keep the leak detection resource scope
+         * of this test class for every later test that runs on them.
+         */
+        private final Scheduler delayScheduler = Schedulers.newSingle("filter-in-place-uri-change", true);
+
+        @PreDestroy
+        void close() {
+            delayScheduler.dispose();
+        }
+
         @RequestFilter
         @PreMatching
         void preMatching(MutableHttpRequest<?> request) {
@@ -236,7 +251,7 @@ public class FilterInPlaceUriChangeTest {
                 return Mono.empty();
             }
             // the URI is changed once the filter looked something up
-            return Mono.delay(Duration.ofMillis(10))
+            return Mono.delay(Duration.ofMillis(10), delayScheduler)
                 .then(Mono.fromRunnable(() -> request.uri(URI.create(moved(path, "/ipc/async/")))));
         }
 
