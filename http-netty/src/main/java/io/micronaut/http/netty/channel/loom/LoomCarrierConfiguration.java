@@ -30,8 +30,12 @@ import java.time.Duration;
  * @param fifoSwitchTime          Number of nanoseconds between switching between continuation FILO and FIFO modes.
  * @param taskFifoThreshold       Oldest enqueued continuation must be this old before execution can switch to FIFO mode.
  * @param blockTime               Maximum blocking wait time.
- * @param throughputModeThreshold Maximum number of queued tasks before entering throughput mode.
- * @param workSpillThreshold      Maximum number of threads per event loop before work spilling should kick in.
+ * @param throughputModeThreshold Maximum number of queued tasks before entering throughput mode. The default of
+ *                                0 enters throughput mode whenever a continuation is queued, so a virtual thread
+ *                                that hands a write to its event loop does not yield to it on every write.
+ * @param workSpillThreshold      Maximum number of threads per event loop before work spilling should kick in. Spilling
+ *                                to another event loop costs a cross-thread wakeup, so it only starts once an event
+ *                                loop is clearly busier than the others.
  * @param normalWarmupTasks       Number of tasks that should run on the normal FJP to initialize e.g. the Poller before
  *                                switching to the netty scheduler
  * @since 4.9.0
@@ -50,9 +54,9 @@ public record LoomCarrierConfiguration(
     Duration taskFifoThreshold,
     @Bindable(defaultValue = "1s")
     Duration blockTime,
-    @Bindable(defaultValue = "10")
+    @Bindable(defaultValue = "0")
     int throughputModeThreshold,
-    @Bindable(defaultValue = "2")
+    @Bindable(defaultValue = "64")
     int workSpillThreshold,
     @Bindable(defaultValue = "100")
     int normalWarmupTasks
