@@ -28,7 +28,8 @@ import java.util.Optional;
  * the non-global {@code @Error} methods of a controller are local to its routes. The error route
  * of a request is looked up in the innermost group of its route first, then in the groups around
  * it, and for a route resolved by a {@link DynamicRouteTarget}, then in the error scopes of the
- * resolution. Within a group, the error route of the closest exception type answers.
+ * resolution. The error of a route locator that failed, before any route matched, is looked up in
+ * the error scopes of its locator routes. Within a group, the error route of the closest exception type answers.
  * The server looks the local error routes of the declaring type up before, and the global error
  * routes after them.
  *
@@ -52,6 +53,16 @@ public final class GroupErrorRoutes {
      */
     public static <R> @Nullable RouteMatch<R> findErrorRoute(HttpRequest<?> request, @Nullable RouteInfo<?> routeInfo, Throwable error) {
         if (!(routeInfo instanceof DefaultUrlRouteInfo<?, ?> route)) {
+            if (routeInfo != null) {
+                return null;
+            }
+            // no route matched: a route locator that failed, answered by the groups of its locator routes
+            for (RouteAssembly.RouteGroup scope : RouteLocator.failedLocationScopes(request, error)) {
+                RouteMatch<R> match = findErrorRoute(scope, request, error);
+                if (match != null) {
+                    return match;
+                }
+            }
             return null;
         }
         RouteMatch<R> match = findErrorRoute(route.errorScope, request, error);

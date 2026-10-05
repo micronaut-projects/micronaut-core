@@ -212,58 +212,13 @@ public final class RouteLocator implements DynamicRouteTarget {
         if (!(match instanceof DefaultUriRouteMatch<?, ?> locatorMatch)) {
             return null;
         }
-        UriMatchInfo matchInfo = locatorMatch.matchInfo();
-        Object remainderValue = matchInfo.getVariableValues().get(REMAINDER);
-        String remainder = remainderValue == null ? "/" : "/" + remainderValue;
-
-        // the variables of the prefixes of the locators that located this one, then of this prefix
-        Map<String, Object> rawValues = new LinkedHashMap<>();
-        List<UriMatchVariable> variables = new ArrayList<>();
-        Object owner = null;
-        if (request instanceof LocatedRequest<?> located) {
-            rawValues.putAll(located.rawValues);
-            variables.addAll(located.variables);
-            owner = located.target;
-        }
-        matchInfo.getVariableValues().forEach((name, value) -> {
-            if (!REMAINDER.equals(name)) {
-                rawValues.put(name, value);
-            }
-        });
-        for (UriMatchVariable variable : matchInfo.getVariables()) {
-            if (!REMAINDER.equals(variable.getName())) {
-                variables.add(variable);
-            }
-        }
-        Map<String, Object> decoded = new LinkedHashMap<>(locatorMatch.getVariableValues());
-        decoded.remove(REMAINDER);
-        if (request instanceof LocatedRequest<?> located) {
-            Map<String, Object> all = new LinkedHashMap<>(located.decodedValues);
-            all.putAll(decoded);
-            decoded = all;
-        }
-        HttpRequest<?> original = request instanceof LocatedRequest<?> located ? located.original : request;
-        // the filters of the groups of the locator routes that located this one, then of this locator route
-        List<GenericHttpFilter> filters = new ArrayList<>();
-        if (request instanceof LocatedRequest<?> located) {
-            filters.addAll(located.filters);
-        }
-        // the groups with error routes of this locator route, then of the locator routes that located it
-        List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
-        if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
-            filters.addAll(locatorRoute.routeFilters);
-            RouteAssembly.RouteGroup errorScope = locatorRoute.errorScope;
-            if (errorScope != null) {
-                errorScopes.add(errorScope);
-            }
-        }
-        if (request instanceof LocatedRequest<?> located) {
-            errorScopes.addAll(located.errorScopes);
-        }
+        Location location = Location.of(request, locatorMatch);
         Object target;
-        DefaultPathVariables pathVariables = new DefaultPathVariables(decoded, locatorMatch.conversionService, owner);
+        DefaultPathVariables pathVariables = new DefaultPathVariables(location.decodedValues(), locatorMatch.conversionService, location.owner());
         try {
-            target = locator != null ? locateSync(original, request.getPath(), pathVariables) : locateAsync(original, request.getPath(), pathVariables);
+            target = locator != null
+                ? locateSync(location, request.getPath(), pathVariables)
+                : locateAsync(location, request.getPath(), pathVariables);
         } catch (Exception e) {
             // like a controller method: the error routes see the exception the locator threw
             return ExceptionUtils.sneakyThrow(e);
@@ -282,8 +237,49 @@ public final class RouteLocator implements DynamicRouteTarget {
             throw new IllegalStateException("The located routes for targets of type " + targetType.getTypeName()
                 + " cannot route the located target " + target + " of type " + target.getClass().getName());
         }
-        return new Located(defaultTable.routes(), new LocatedRequest<>(original, remainder, target, rawValues, decoded, variables,
-            List.copyOf(filters), List.copyOf(errorScopes)), target);
+        return new Located(defaultTable.routes(), new LocatedRequest<>(location, target), target);
+    }
+
+    /**
+     * The error scopes of the locator whose location failed with an error for the request, see
+     * {@link GroupErrorRoutes}: the request matched no route, and the groups of the locator routes
+     * answer the error, as they answer the errors of the routes the locators locate.
+     *
+     * @param request The request
+     * @param error   The error
+     * @return The groups with error or status routes of the locator routes, the closest first, or
+     * an empty list if no locator of the request failed with the error
+     */
+    static List<RouteAssembly.RouteGroup> failedLocationScopes(HttpRequest<?> request, Throwable error) {
+        Map<LocationKey, Outcome> outcomes = existingOutcomes(request);
+        if (outcomes == null) {
+            return List.of();
+        }
+        for (Outcome outcome : outcomes.values()) {
+            Location location = outcome.location();
+            if (location != null && failedWith(outcome, error)) {
+                return location.errorScopes();
+            }
+        }
+        return List.of();
+    }
+
+    /**
+     * @param outcome The outcome of a locator
+     * @param error   An error, the error of the locator or an error that wraps it
+     * @return Whether the locator failed with the error
+     */
+    private static boolean failedWith(Outcome outcome, Throwable error) {
+        Throwable failure = outcome.error();
+        if (failure == null) {
+            return false;
+        }
+        for (Throwable e = error; e != null; e = e.getCause() == e ? null : e.getCause()) {
+            if (e == failure) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -291,21 +287,22 @@ public final class RouteLocator implements DynamicRouteTarget {
      * the locator is kept in an attribute of the request, so that matching the request again,
      * e.g. to find the allowed methods of a {@code 405}, does not run the locator again.
      *
-     * @param original      The original request
+     * @param location      What the locator route matched
      * @param levelPath     The path matched by the locator route, which tells the levels of nested locators apart
      * @param pathVariables The path variables of the locator
      * @return The target, or {@code null}
      * @throws Exception The error of the locator
      */
-    private @Nullable Object locateSync(HttpRequest<?> original, String levelPath, PathVariables pathVariables) throws Exception {
+    private @Nullable Object locateSync(Location location, String levelPath, PathVariables pathVariables) throws Exception {
+        HttpRequest<?> original = location.original();
         Map<LocationKey, Outcome> outcomes = outcomes(original);
         LocationKey key = new LocationKey(this, levelPath);
         Outcome outcome = outcomes.get(key);
         if (outcome == null) {
             try {
-                outcome = new Outcome(Objects.requireNonNull(locator, "locator").locate(original, pathVariables), null, null, null);
+                outcome = new Outcome(Objects.requireNonNull(locator, "locator").locate(original, pathVariables), null, null, null, location);
             } catch (Exception e) {
-                outcome = new Outcome(null, e, null, null);
+                outcome = new Outcome(null, e, null, null, location);
             }
             outcomes.put(key, outcome);
         }
@@ -317,13 +314,14 @@ public final class RouteLocator implements DynamicRouteTarget {
      * of the stage is kept in an attribute of the request. If the stage does not complete now,
      * the router cannot match the request yet, see {@link #pendingLocation(Throwable)}.
      *
-     * @param original      The original request
+     * @param location      What the locator route matched
      * @param levelPath     The path matched by the locator route, which tells the levels of nested locators apart
      * @param pathVariables The path variables of the locator
      * @return The target, or {@code null}
      * @throws Exception The error of the locator
      */
-    private @Nullable Object locateAsync(HttpRequest<?> original, String levelPath, PathVariables pathVariables) throws Exception {
+    private @Nullable Object locateAsync(Location location, String levelPath, PathVariables pathVariables) throws Exception {
+        HttpRequest<?> original = location.original();
         Map<LocationKey, Outcome> outcomes = outcomes(original);
         LocationKey key = new LocationKey(this, levelPath);
         Outcome outcome = outcomes.get(key);
@@ -334,11 +332,11 @@ public final class RouteLocator implements DynamicRouteTarget {
             }
             // completed when the outcome is known: by the stage, or when the location is cancelled
             CompletableFuture<Boolean> located = new CompletableFuture<>();
-            Outcome pending = new Outcome(null, null, located, stage);
+            Outcome pending = new Outcome(null, null, located, stage, location);
             // the locator is not called again until the stage completes
             outcomes.put(key, pending);
             stage.whenComplete((value, error) -> {
-                outcomes.replace(key, pending, new Outcome(value, error instanceof CompletionException && error.getCause() != null ? error.getCause() : error, null, null));
+                outcomes.replace(key, pending, new Outcome(value, error instanceof CompletionException && error.getCause() != null ? error.getCause() : error, null, null, location));
                 located.complete(Boolean.TRUE);
             });
             // the stage may have completed already
@@ -392,7 +390,7 @@ public final class RouteLocator implements DynamicRouteTarget {
             Outcome outcome = entry.getValue();
             CompletableFuture<Boolean> pending = outcome.pending();
             if (pending == null
-                || !outcomes.replace(entry.getKey(), outcome, new Outcome(null, new CancellationException("The route locator was cancelled"), null, null))) {
+                || !outcomes.replace(entry.getKey(), outcome, new Outcome(null, new CancellationException("The route locator was cancelled"), null, null, outcome.location()))) {
                 continue;
             }
             CompletionStage<?> stage = outcome.stage();
@@ -444,10 +442,11 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @param target  The target, or {@code null}
      * @param error   The error, or {@code null}
      * @param pending Completes when the target is located, or {@code null} if it is
-     * @param stage   The stage the asynchronous locator returned, while it is pending
+     * @param stage    The stage the asynchronous locator returned, while it is pending
+     * @param location What the locator route matched, whose error scopes answer the error
      */
     private record Outcome(@Nullable Object target, @Nullable Throwable error, @Nullable CompletableFuture<Boolean> pending,
-                           @Nullable CompletionStage<?> stage) {
+                           @Nullable CompletionStage<?> stage, @Nullable Location location) {
 
         /**
          * @return The target, or {@code null}
@@ -502,11 +501,12 @@ public final class RouteLocator implements DynamicRouteTarget {
                 // located again by a locator of the target's table: it has the variables of every prefix
                 return match;
             }
-            Map<String, Object> values = new LinkedHashMap<>(request.rawValues);
-            values.putAll(inner.getVariableValues());
-            List<UriMatchVariable> variables = new ArrayList<>(request.variables);
+            Location location = request.location();
+            Map<String, Object> values = location.withPrefixValues(inner.getVariableValues());
+            List<UriMatchVariable> variables = new ArrayList<>(location.variables());
             variables.addAll(inner.getVariables());
-            LocatedUriMatchInfo info = new LocatedUriMatchInfo(request.original.getPath(), values, variables, target, request.filters, request.errorScopes);
+            LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
+                location.filters(), location.errorScopes());
             return (UriRouteMatch<T, R>) route.resolvedMatch(info);
         }
 
@@ -526,46 +526,129 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     /**
+     * What a locator route matched, created before its locator runs: the rest of the path, and
+     * what the routes it locates inherit from the locator routes, its own and those that located
+     * it. The routes of the target are matched and answered with it, and the failures of the
+     * locator are answered with its error scopes.
+     *
+     * @param original      The original request
+     * @param remainder     The rest of the path
+     * @param owner         The target of the locator route that located this one, or {@code null}
+     * @param rawValues     The raw values of the variables of the prefixes, outer prefix first
+     * @param decodedValues The decoded values of the variables of the prefixes
+     * @param variables     The variables of the prefixes
+     * @param filters       The filters of the groups of the locator routes, outer first
+     * @param errorScopes   The groups with error or status routes of the locator routes, the closest first
+     */
+    record Location(HttpRequest<?> original, String remainder, @Nullable Object owner, Map<String, Object> rawValues,
+                    Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
+                    List<RouteAssembly.RouteGroup> errorScopes) {
+
+        /**
+         * @param request      The request, a {@link LocatedRequest} for a locator route of a located table
+         * @param locatorMatch The match of the locator route
+         * @return The location
+         */
+        static Location of(HttpRequest<?> request, DefaultUriRouteMatch<?, ?> locatorMatch) {
+            LocatedRequest<?> parent = request instanceof LocatedRequest<?> located ? located : null;
+            UriMatchInfo matchInfo = locatorMatch.matchInfo();
+            Object remainderValue = matchInfo.getVariableValues().get(REMAINDER);
+            String remainder = remainderValue == null ? "/" : "/" + remainderValue;
+
+            // the variables of the prefixes of the locators that located this one, then of this prefix
+            Map<String, Object> rawValues = new LinkedHashMap<>();
+            List<UriMatchVariable> variables = new ArrayList<>();
+            Map<String, Object> decoded = new LinkedHashMap<>();
+            // the filters of the groups of the locator routes that located this one, then of this locator route
+            List<GenericHttpFilter> filters = new ArrayList<>();
+            if (parent != null) {
+                Location outer = parent.location;
+                rawValues.putAll(outer.rawValues);
+                variables.addAll(outer.variables);
+                decoded.putAll(outer.decodedValues);
+                filters.addAll(outer.filters);
+            }
+            matchInfo.getVariableValues().forEach((name, value) -> {
+                if (!REMAINDER.equals(name)) {
+                    rawValues.put(name, value);
+                }
+            });
+            for (UriMatchVariable variable : matchInfo.getVariables()) {
+                if (!REMAINDER.equals(variable.getName())) {
+                    variables.add(variable);
+                }
+            }
+            locatorMatch.getVariableValues().forEach((name, value) -> {
+                if (!REMAINDER.equals(name)) {
+                    decoded.put(name, value);
+                }
+            });
+            // the groups with error routes of this locator route, then of the locator routes that located it
+            List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
+            if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
+                filters.addAll(locatorRoute.routeFilters);
+                RouteAssembly.RouteGroup errorScope = locatorRoute.errorScope;
+                if (errorScope != null) {
+                    errorScopes.add(errorScope);
+                }
+            }
+            if (parent != null) {
+                errorScopes.addAll(parent.location.errorScopes);
+                return new Location(parent.location.original, remainder, parent.target, rawValues, decoded, variables,
+                    List.copyOf(filters), List.copyOf(errorScopes));
+            }
+            return new Location(request, remainder, null, rawValues, decoded, variables, List.copyOf(filters), List.copyOf(errorScopes));
+        }
+
+        /**
+         * The variables of a match of the rest of the path, with those of the prefixes: the
+         * variables the handler of a located route gets, and its constraints see.
+         *
+         * @param values The raw values of the variables of the match of the rest of the path
+         * @return The raw values of the variables of the prefixes, then of the match
+         */
+        Map<String, Object> withPrefixValues(Map<String, Object> values) {
+            Map<String, Object> all = new LinkedHashMap<>(rawValues);
+            all.putAll(values);
+            return all;
+        }
+    }
+
+    /**
      * The request with the rest of the path, matched with the router of a located target.
      *
      * @param <B> The body type
      */
     static final class LocatedRequest<B> extends HttpRequestWrapper<B> {
-        private final HttpRequest<B> original;
-        private final String path;
+        private final Location location;
         private final Object target;
-        private final Map<String, Object> rawValues;
-        private final Map<String, Object> decodedValues;
-        private final List<UriMatchVariable> variables;
-        private final List<GenericHttpFilter> filters;
-        private final List<RouteAssembly.RouteGroup> errorScopes;
         private @Nullable URI uri;
 
-        @SuppressWarnings("ParameterNumber")
-        LocatedRequest(HttpRequest<B> original, String path, Object target, Map<String, Object> rawValues,
-                       Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
-                       List<RouteAssembly.RouteGroup> errorScopes) {
-            super(original);
-            this.original = original;
-            this.path = path;
+        @SuppressWarnings("unchecked")
+        LocatedRequest(Location location, Object target) {
+            super((HttpRequest<B>) location.original());
+            this.location = location;
             this.target = target;
-            this.rawValues = rawValues;
-            this.decodedValues = decodedValues;
-            this.variables = variables;
-            this.filters = filters;
-            this.errorScopes = errorScopes;
+        }
+
+        /**
+         * @return What the locator route matched
+         */
+        Location location() {
+            return location;
         }
 
         @Override
         public String getPath() {
-            return path;
+            return location.remainder();
         }
 
         @Override
         public URI getUri() {
             URI result = uri;
             if (result == null) {
-                String query = original.getUri().getRawQuery();
+                String path = location.remainder();
+                String query = location.original().getUri().getRawQuery();
                 result = URI.create(query == null ? path : path + '?' + query);
                 uri = result;
             }

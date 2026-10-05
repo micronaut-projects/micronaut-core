@@ -470,7 +470,7 @@ final class UriRouteSet {
                     continue;
                 }
                 UriRouteMatch match = route.tryMatch(path);
-                if (match != null && acceptsVariables(route, match)) {
+                if (match != null && acceptsVariables(request, route, match)) {
                     matchedRoutes.add(match);
                 }
             }
@@ -496,6 +496,11 @@ final class UriRouteSet {
             }
         }
         if (dynamicTarget == null || dynamicMatch == null) {
+            return matches;
+        }
+        if (request.getMethod() == HttpMethod.CUSTOM) {
+            // a request with a custom method is not located, see RouteLocator: the routes it may
+            // be allowed are the locator routes
             return matches;
         }
         result.addAll(dynamicTarget.findAny(request, dynamicMatch));
@@ -582,7 +587,7 @@ final class UriRouteSet {
         UriRouteMatch<Object, Object> constrainedMatch = null;
         if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.isConstrained()) {
             constrainedMatch = info.tryMatch(uri);
-            if (constrainedMatch == null || !info.acceptsVariables(constrainedMatch.getVariableValues())) {
+            if (constrainedMatch == null || !info.acceptsVariables(constrainedValues(request, constrainedMatch.getVariableValues()))) {
                 return null;
             }
         }
@@ -611,6 +616,29 @@ final class UriRouteSet {
     private static boolean acceptsVariables(UriRouteInfo<?, ?> route, UriMatchInfo match) {
         return !(route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained())
             || info.acceptsVariables(match.getVariableValues());
+    }
+
+    /**
+     * @param request The request
+     * @param route   The route
+     * @param match   A match of the route
+     * @return Whether the constraints of the route, if any, accept the variables of the match
+     */
+    private static boolean acceptsVariables(HttpRequest<?> request, UriRouteInfo<?, ?> route, UriMatchInfo match) {
+        return !(route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained())
+            || info.acceptsVariables(constrainedValues(request, match.getVariableValues()));
+    }
+
+    /**
+     * The variables the constraints of a route see: those its handler gets, with the variables of
+     * the prefixes of the locator routes for a route of a located target.
+     *
+     * @param request The request, a {@link RouteLocator.LocatedRequest} for a route of a located target
+     * @param values  The raw values of the variables of the match
+     * @return The values
+     */
+    private static Map<String, Object> constrainedValues(HttpRequest<?> request, Map<String, Object> values) {
+        return request instanceof RouteLocator.LocatedRequest<?> located ? located.location().withPrefixValues(values) : values;
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {
