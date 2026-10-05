@@ -134,9 +134,11 @@ final class ServiceScanner<S> {
      *
      * <p>The names of one file come from a {@link HashSet}, as in the scan, so they are in the order that the hash
      * codes of the names give them, not in the order of the file. An index built from this method has the order of
-     * the scan only because both iterate the same set of the same names. The tests that compare the two rely on
-     * that: they do not show that the order is guaranteed, and this has to be revisited if the scan ever keeps the
-     * order of the file.</p>
+     * the scan only because both iterate the same set of the same names, when the lookup has no name condition. With
+     * a condition, the scan builds a set of the accepted names alone, while the index filters the names of the whole
+     * set. Once a file lists more than 12 names, the smaller set can have a smaller table and another order. The tests
+     * that compare the two rely on that: they do not show that the order is guaranteed, and this has to be revisited
+     * if the scan ever keeps the order of the file. The order of services is not a contract.</p>
      *
      * @param classLoader The class loader
      * @param serviceName The name of the service type
