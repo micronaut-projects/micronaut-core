@@ -399,7 +399,7 @@ class StreamingResponseWriterSpec extends Specification {
             writer.open()
             writer.add(piece(a))
             writer.add(piece(b))
-            aggregate = writer.pending
+            aggregate = writer.accumulator.held
             writer.dispose()
         }
 
@@ -498,12 +498,290 @@ class StreamingResponseWriterSpec extends Specification {
         b.refCnt() == 0
     }
 
+    def 'the HTTP/2 held frame: an aggregate is reported once the batch is confirmed when the stream is not writable'() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def sink = new HoldingSink(loop)
+        def writer = new StreamingResponseWriter(loop, sink)
+        sink.writer = writer
+        writer.attach(upstream)
+        onLoop { writer.open() }
+
+        when: 'small pieces arrive in one turn while the stream is not writable'
+        onLoop {
+            writer.add(piece("a"))
+            writer.add(piece("b"))
+            writer.add(piece("c"))
+        }
+        settle()
+
+        then: 'the aggregate became the held frame, was written with the batch, and nothing is reported yet'
+        sink.transport == ["abc"]
+        sink.unconfirmed == 3
+        upstream.consumed == 0
+
+        when: 'the transport confirms the batch'
+        onLoop { sink.confirm() }
+
+        then:
+        upstream.consumed == 3
+        upstream.consumptions == 1
+    }
+
+    def 'the HTTP/2 held frame: bytes accepted while writable are not reported again by the batch'() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def sink = new HoldingSink(loop)
+        def writer = new StreamingResponseWriter(loop, sink)
+        sink.writer = writer
+        writer.attach(upstream)
+        onLoop { writer.open() }
+
+        when: 'two pieces are accepted while the stream is writable, then the window fills and two more arrive in the same turn'
+        long acceptedInTurn = -1
+        onLoop {
+            sink.writable = true
+            writer.add(piece("ab"))
+            writer.add(piece("cd"))
+            sink.writable = false
+            writer.add(piece("ef"))
+            writer.add(piece("gh"))
+            acceptedInTurn = upstream.consumed
+        }
+        settle()
+
+        then: 'the accepted bytes are reported on arrival, and the aggregate drained into the held frame carries them'
+        acceptedInTurn == 4
+        sink.transport == ["abcdefgh"]
+        sink.unconfirmed == 4
+        upstream.consumed == 4
+
+        when: 'the batch is confirmed'
+        onLoop { sink.confirm() }
+
+        then: 'only the bytes that were not accepted are reported, so every byte is reported once'
+        upstream.consumed == 8
+
+        when: 'the stream becomes writable again'
+        onLoop {
+            sink.writable = true
+            writer.onWritable()
+        }
+
+        then:
+        upstream.consumed == 8
+    }
+
+    def 'the HTTP/2 held frame: a large piece held behind an accepted aggregate keeps the credits apart'() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def sink = new HoldingSink(loop)
+        def writer = new StreamingResponseWriter(loop, sink)
+        sink.writer = writer
+        writer.attach(upstream)
+        onLoop { writer.open() }
+
+        when:
+        onLoop {
+            sink.writable = true
+            writer.add(piece("a" * 100))
+            sink.writable = false
+            // drains the accepted aggregate into the held frame, then is held itself
+            writer.add(piece("L" * 2048))
+            writer.add(piece("b" * 100))
+        }
+        settle()
+
+        then: 'the aggregate goes out first, the large piece next, and the last aggregate is the held frame of the batch'
+        sink.transport.collect { it.length() } == [100, 2048, 100]
+        sink.transport*.charAt(0) == ['a' as char, 'L' as char, 'b' as char]
+        upstream.consumed == 100
+        sink.unconfirmed == 2148
+
+        when:
+        onLoop { sink.confirm() }
+
+        then:
+        upstream.consumed == 2248
+    }
+
+    def 'the HTTP/2 held frame: the completion merges the aggregate into the final frame after the held frame'() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def sink = new HoldingSink(loop)
+        def writer = new StreamingResponseWriter(loop, sink)
+        sink.writer = writer
+        writer.attach(upstream)
+        onLoop { writer.open() }
+
+        when:
+        onLoop {
+            writer.add(piece("L" * 2048))
+            writer.add(piece("x"))
+            writer.add(piece("y"))
+            writer.addAndComplete(piece("z"))
+        }
+        settle()
+
+        then:
+        sink.transport.collect { it.length() } == [2048, 3]
+        sink.transport[1] == "xyz"
+        sink.ended
+        sink.responseWritten == 1
+        writer.done
+    }
+
+    def 'every byte is reported exactly once across writability changes, drains and confirmed batches'() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def sink = new HoldingSink(loop)
+        def writer = new StreamingResponseWriter(loop, sink)
+        sink.writer = writer
+        writer.attach(upstream)
+        onLoop { writer.open() }
+        def random = new Random(42)
+        long added = 0
+
+        when:
+        100.times { turn ->
+            onLoop {
+                (1 + random.nextInt(12)).times {
+                    if (random.nextInt(4) == 0) {
+                        sink.writable = !sink.writable
+                        if (sink.writable) {
+                            writer.onWritable()
+                        }
+                    }
+                    int size = random.nextInt(5) == 0 ? 1025 + random.nextInt(3000) : 1 + random.nextInt(1024)
+                    added += size
+                    writer.add(piece("p" * size))
+                }
+            }
+            settle()
+            if (random.nextBoolean()) {
+                onLoop { sink.confirm() }
+            }
+            assert upstream.consumed <= added
+        }
+        settle()
+        onLoop {
+            sink.confirm()
+            sink.writable = true
+            writer.onWritable()
+        }
+
+        then:
+        upstream.consumed == added
+        sink.transport.sum { it.length() } == added
+        sink.transport.every { it.length() <= 8192 }
+    }
+
     private static ReadBuffer piece(String s) {
         return piece(Unpooled.copiedBuffer(s, StandardCharsets.UTF_8))
     }
 
     private static ReadBuffer piece(ByteBuf buf) {
         return NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(buf)
+    }
+
+    /**
+     * Runs the tasks the event loop has queued, including tasks those tasks queue.
+     */
+    private void settle() {
+        3.times { loop.submit({} as Runnable).get(10, TimeUnit.SECONDS) }
+    }
+
+    /**
+     * Mirrors the HTTP/2 ResponseStreamer: it holds the last piece written in a turn and writes
+     * it at the end of the turn, together with the earlier pieces of the batch. While the stream
+     * is not writable, the batch's written bytes are taken at the end of the turn and reported
+     * only when the transport confirms the batch ({@link #confirm()}).
+     */
+    static class HoldingSink implements StreamingResponseWriter.Sink {
+        final EventLoop loop
+        StreamingResponseWriter writer
+        boolean writable = false
+        ByteBuf held
+        boolean batchScheduled
+        /** What reached the transport, in order. */
+        List<String> transport = []
+        /** Bytes taken by ended batches, reported on confirm. */
+        long unconfirmed
+        boolean ended
+        int responseWritten
+
+        HoldingSink(EventLoop loop) {
+            this.loop = loop
+        }
+
+        @Override
+        void open() {
+        }
+
+        @Override
+        void write(ByteBuf data, boolean last) {
+            ByteBuf previous = held
+            held = null
+            if (!last) {
+                held = data
+                if (previous != null) {
+                    send(previous)
+                }
+                if (!batchScheduled) {
+                    batchScheduled = true
+                    loop.execute { endBatch() }
+                }
+            } else {
+                if (previous != null) {
+                    if (data.isReadable()) {
+                        send(previous)
+                    } else {
+                        data.release()
+                        data = previous
+                    }
+                }
+                send(data)
+                ended = true
+            }
+        }
+
+        private void send(ByteBuf data) {
+            transport.add(data.toString(StandardCharsets.UTF_8))
+            data.release()
+        }
+
+        void endBatch() {
+            batchScheduled = false
+            unconfirmed += writer.takeUnconsumedBytes()
+            if (held != null) {
+                send(held)
+                held = null
+            }
+        }
+
+        void confirm() {
+            long n = unconfirmed
+            unconfirmed = 0
+            writer.bytesConsumed(n)
+        }
+
+        @Override
+        boolean isWritable() {
+            return writable
+        }
+
+        @Override
+        void fail(Throwable t) {
+            if (held != null) {
+                held.release()
+                held = null
+            }
+        }
+
+        @Override
+        void responseWritten() {
+            responseWritten++
+        }
     }
 
     static class RecordingSink implements StreamingResponseWriter.Sink {
