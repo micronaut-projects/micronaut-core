@@ -205,8 +205,7 @@ public final class PythonAsyncioRuntime {
                         scheduler.run();
                         return null;
                     });
-                } catch (RuntimeException e) {
-                    // the context is closing: schedule() completes the future on any other failure
+                } catch (Throwable e) { // NOSONAR nothing else observes this worker: any failure must complete the future
                     future.completeExceptionally(e);
                 }
             };
