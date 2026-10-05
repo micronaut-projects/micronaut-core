@@ -28,8 +28,6 @@ import java.io.RandomAccessFile;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -76,6 +74,14 @@ public final class MicronautMetaServiceLoaderUtils {
     private static final int ZIP64_MAGIC_COUNT = 0xFFFF;
     private static final long ZIP64_MAGIC_VALUE = 0xFFFFFFFFL;
     private static final int MAX_VARIABLE_LENGTH = 0xFFFF;
+    // What ZipFile.Source.initCEN and checkAndAddEntry (JDK 25, 27) accept: a central directory of at most
+    // ArraysSupport.SOFT_MAX_ARRAY_LENGTH bytes, entries that are stored or deflated and not encrypted, and the ZIP64
+    // extra block, which the scan leaves to ZipFile
+    private static final long MAX_CEN_LENGTH = Integer.MAX_VALUE - 8;
+    private static final int STORED = 0;
+    private static final int DEFLATED = 8;
+    private static final int ENCRYPTED_FLAG = 1;
+    private static final int ZIP64_EXTRA_TAG = 0x0001;
     // Holds the end of any zip file without ZIP64 (a ZIP64 locator, the end record, the longest comment), and any
     // central directory header with its name
     private static final int SCAN_BUFFER_SIZE = Math.max(ZIP64_LOCATOR_SIZE + END_SIZE, CEN_SIZE) + MAX_VARIABLE_LENGTH;
@@ -309,10 +315,13 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * <p>Like {@link ZipFile}, the scan finds the central directory from the end record, so a zip file may have data
      * before its first entry (a launcher script, for example). It only reads a zip file whose last end record
-     * signature is followed by exactly the comment it declares, with no ZIP64 records, and whose central directory
-     * holds exactly the entries the end record counts. For any other file (ZIP64, bytes after the end record, a damaged
-     * central directory, a matching name that is not valid UTF-8) it returns {@code null}, and the caller lists the
-     * file as a {@link ZipFile}.</p>
+     * signature is followed by exactly the comment it declares, with no ZIP64 records or values, whose central
+     * directory holds exactly the entries the end record counts, and whose every header passes the checks that
+     * {@link ZipFile} makes when it opens the file: an entry that is stored or deflated and not encrypted, a header of
+     * at most 65535 bytes, extra field blocks that end within the field, and a name and a comment that are valid
+     * UTF-8. For any other file (ZIP64, bytes after the end record, a damaged central directory, a header that
+     * {@link ZipFile} rejects) it returns {@code null}, and the caller lists the file as a {@link ZipFile}. So the scan
+     * reads no file that {@link ZipFile} rejects, whichever class loader returned its URL.</p>
      *
      * @param file   The zip file
      * @param prefix The prefix of the names, as UTF-8 bytes
@@ -348,7 +357,7 @@ public final class MicronautMetaServiceLoaderUtils {
             long cenEnd = tailStart + end;
             long cenStart = cenEnd - cenSize;
             if (total == ZIP64_MAGIC_COUNT || cenSize == ZIP64_MAGIC_VALUE || cenOffset == ZIP64_MAGIC_VALUE
-                || cenStart < 0 || cenStart < cenOffset) {
+                || cenStart < 0 || cenStart < cenOffset || cenSize > MAX_CEN_LENGTH) {
                 return null;
             }
             List<String> names = new ArrayList<>();
@@ -368,26 +377,37 @@ public final class MicronautMetaServiceLoaderUtils {
                 if (int32(buffer, offset) != CEN_SIGNATURE) {
                     return null;
                 }
+                int method = uint16(buffer, offset + 10);
                 int nameLength = uint16(buffer, offset + 28);
-                long nameEnd = position + CEN_SIZE + nameLength;
-                if (nameEnd > cenEnd) {
+                int extraLength = uint16(buffer, offset + 30);
+                int commentLength = uint16(buffer, offset + 32);
+                int headerSize = CEN_SIZE + nameLength + extraLength + commentLength;
+                // checkAndAddEntry rejects an encrypted entry, another method, a header longer than 65535 bytes or
+                // past the directory, and ZIP64 values its extra field does not hold; any ZIP64 value is left to it
+                if ((uint16(buffer, offset + 8) & ENCRYPTED_FLAG) != 0
+                    || method != STORED && method != DEFLATED
+                    || headerSize > MAX_VARIABLE_LENGTH || position + headerSize > cenEnd
+                    || int32(buffer, offset + 20) == -1 || int32(buffer, offset + 24) == -1
+                    || int32(buffer, offset + 42) == -1 || uint16(buffer, offset + 34) == ZIP64_MAGIC_COUNT) {
                     return null;
                 }
-                if (nameEnd > windowEnd) {
-                    // the buffer holds any header with its name, so the name is in the window read from here
+                if (position + headerSize > windowEnd) {
+                    // the buffer holds any header of at most 65535 bytes, so the header is in the window read from here
                     windowStart = position;
                     windowEnd = position + read(zip, buffer, position, (int) Math.min(buffer.length, cenEnd - position));
                     offset = 0;
                 }
                 int nameStart = offset + CEN_SIZE;
-                if (startsWith(buffer, nameStart, nameLength, prefix)) {
-                    String name = decodeName(buffer, nameStart, nameLength);
-                    if (name == null) {
-                        return null;
-                    }
-                    names.add(name);
+                int extraStart = nameStart + nameLength;
+                // ZipFile decodes every name and comment as UTF-8: check them as bytes, and create only the names kept
+                if (!isUtf8(buffer, nameStart, nameLength) || !isValidExtra(buffer, extraStart, extraLength)
+                    || !isUtf8(buffer, extraStart + extraLength, commentLength)) {
+                    return null;
                 }
-                position = nameEnd + uint16(buffer, offset + 30) + uint16(buffer, offset + 32);
+                if (startsWith(buffer, nameStart, nameLength, prefix)) {
+                    names.add(new String(buffer, nameStart, nameLength, StandardCharsets.UTF_8));
+                }
+                position += headerSize;
                 count++;
             }
             return position == cenEnd && count == total ? names : null;
@@ -420,6 +440,75 @@ public final class MicronautMetaServiceLoaderUtils {
         return uint16(bytes, offset) | uint16(bytes, offset + 2) << 16;
     }
 
+    /**
+     * Checks the extra field of a central directory header as {@code ZipFile.Source.checkExtraFields} does: the data
+     * of each block ends within the field. A ZIP64 block is left to {@link ZipFile}.
+     */
+    private static boolean isValidExtra(byte[] bytes, int offset, int length) {
+        int end = offset + length;
+        while (offset + 4 <= end) {
+            int tag = uint16(bytes, offset);
+            offset += 4 + uint16(bytes, offset + 2);
+            if (tag == ZIP64_EXTRA_TAG || offset > end) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Checks that bytes are well-formed UTF-8 (Unicode table 3-7), which is what decoding a name or comment with
+     * {@link StandardCharsets#UTF_8}, as {@link ZipFile} does, accepts. Creates nothing.
+     */
+    private static boolean isUtf8(byte[] bytes, int offset, int length) {
+        int end = offset + length;
+        int i = offset;
+        while (i < end) {
+            int b = bytes[i];
+            if (b >= 0) {
+                i++;
+                continue;
+            }
+            b &= 0xFF;
+            int continuations;
+            int min = 0x80;
+            int max = 0xBF;
+            if (b >= 0xC2 && b <= 0xDF) {
+                continuations = 1;
+            } else if (b >= 0xE0 && b <= 0xEF) {
+                continuations = 2;
+                if (b == 0xE0) {
+                    min = 0xA0;
+                } else if (b == 0xED) {
+                    max = 0x9F;
+                }
+            } else if (b >= 0xF0 && b <= 0xF4) {
+                continuations = 3;
+                if (b == 0xF0) {
+                    min = 0x90;
+                } else if (b == 0xF4) {
+                    max = 0x8F;
+                }
+            } else {
+                return false;
+            }
+            if (end - i <= continuations) {
+                return false;
+            }
+            int second = bytes[i + 1] & 0xFF;
+            if (second < min || second > max) {
+                return false;
+            }
+            for (int k = 2; k <= continuations; k++) {
+                if ((bytes[i + k] & 0xC0) != 0x80) {
+                    return false;
+                }
+            }
+            i += continuations + 1;
+        }
+        return true;
+    }
+
     private static boolean startsWith(byte[] bytes, int offset, int length, byte[] prefix) {
         if (length < prefix.length) {
             return false;
@@ -430,28 +519,6 @@ public final class MicronautMetaServiceLoaderUtils {
             }
         }
         return true;
-    }
-
-    /**
-     * Decodes an entry name as {@link ZipFile} does for a zip file opened with UTF-8, the default.
-     *
-     * @param bytes  The bytes
-     * @param offset The offset of the name
-     * @param length The length of the name
-     * @return The name, or {@code null} if it is not valid UTF-8, which {@link ZipFile} rejects
-     */
-    @Nullable
-    private static String decodeName(byte[] bytes, int offset, int length) {
-        for (int i = offset; i < offset + length; i++) {
-            if (bytes[i] < 0) {
-                try {
-                    return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes, offset, length)).toString();
-                } catch (CharacterCodingException e) {
-                    return null;
-                }
-            }
-        }
-        return new String(bytes, offset, length, StandardCharsets.ISO_8859_1);
     }
 
     /**

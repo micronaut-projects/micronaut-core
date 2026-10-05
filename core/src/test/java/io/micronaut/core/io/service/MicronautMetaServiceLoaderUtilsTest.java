@@ -3,6 +3,7 @@ package io.micronaut.core.io.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -11,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
@@ -23,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,11 +36,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class MicronautMetaServiceLoaderUtilsTest {
 
@@ -250,6 +256,43 @@ class MicronautMetaServiceLoaderUtilsTest {
         }
     }
 
+    @ParameterizedTest
+    @EnumSource
+    void leavesAJarThatZipFileRejectsToZipFile(Rejected rejected) throws IOException {
+        // one entry outside META-INF/micronaut/ makes ZipFile reject the jar; a class loader may still return its URL
+        // without having opened it, and the services are then those the zip file system gives, as before
+        Path jar = rejectedJar(rejected);
+        assertThrows(ZipException.class, () -> new ZipFile(jar.toFile()).close());
+        assertNull(scan(jar, SERVICES_PREFIX));
+        assertEquals(asLists(walkZipFileSystemIfItOpens(jar)), asLists(findAllThroughUnopenedUrl(jar)));
+    }
+
+    @Test
+    void readsAJarWithTheExtraFieldsAndCommentsZipFileAccepts() throws IOException {
+        Path jar = zip("accepted headers.jar", zip -> {
+            // the jar tool gives its first entry an empty block 0xCAFE, and a modification time adds a block 0x5455
+            ZipEntry manifest = new ZipEntry("META-INF/MANIFEST.MF");
+            manifest.setExtra(extraBlock(0xCAFE, 0));
+            manifest.setLastModifiedTime(FileTime.fromMillis(1_700_000_000_000L));
+            zip.putNextEntry(manifest);
+            zip.closeEntry();
+            for (String name : serviceEntries()) {
+                put(zip, name);
+            }
+            ZipEntry commented = new ZipEntry("c/Commented.class");
+            commented.setComment("an entry comment");
+            zip.putNextEntry(commented);
+            zip.closeEntry();
+            put(zip, "ä/Ö€😀.class");
+        });
+        try (ZipFile zipFile = new ZipFile(jar.toFile())) {
+            assertEquals(13, zipFile.getEntry("META-INF/MANIFEST.MF").getExtra().length, "blocks 0x5455 and 0xCAFE");
+        }
+        assertNotNull(scan(jar, ALL_NAMES));
+        assertScanMatchesZipFile(jar);
+        assertSameAsZipFileSystem(jar);
+    }
+
     @Test
     void createsNoNameForTheOtherEntriesOfAJar() throws IOException {
         assumeTrue(ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean);
@@ -320,6 +363,29 @@ class MicronautMetaServiceLoaderUtilsTest {
     private static Map<String, Set<String>> findAll(Path jar) throws IOException {
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, null)) {
             return MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
+        }
+    }
+
+    /**
+     * Finds the services through a class loader that returns the {@code jar:file:} URL of a jar without opening it.
+     */
+    private static Map<String, Set<String>> findAllThroughUnopenedUrl(Path jar) throws IOException {
+        URL url = URI.create("jar:" + jar.toUri() + "!/" + SERVICES).toURL();
+        ClassLoader classLoader = new ClassLoader(null) {
+            @Override
+            public Enumeration<URL> getResources(String name) {
+                return SERVICES.equals(name) ? Collections.enumeration(List.of(url)) : Collections.emptyEnumeration();
+            }
+        };
+        return MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
+    }
+
+    private static Map<String, Set<String>> walkZipFileSystemIfItOpens(Path jar) throws IOException {
+        try {
+            return walkZipFileSystem(jar);
+        } catch (ZipException e) {
+            // the zip file system rejects the jar too, which ends the scan before it finds a service
+            return Map.of();
         }
     }
 
@@ -408,8 +474,12 @@ class MicronautMetaServiceLoaderUtilsTest {
 
     private static byte[] extraField(int dataLength) {
         // an unknown header ID, which ZipEntry keeps as it is
+        return extraBlock(0x6D6E, dataLength);
+    }
+
+    private static byte[] extraBlock(int tag, int dataLength) {
         byte[] extra = new byte[4 + dataLength];
-        littleEndian(extra).putShort(0, (short) 0x6D6E).putShort(2, (short) dataLength);
+        littleEndian(extra).putShort(0, (short) tag).putShort(2, (short) dataLength);
         return extra;
     }
 
@@ -420,6 +490,85 @@ class MicronautMetaServiceLoaderUtilsTest {
     private static byte[] concat(byte[] first, byte[] second) {
         byte[] bytes = Arrays.copyOf(first, first.length + second.length);
         System.arraycopy(second, 0, bytes, first.length, second.length);
+        return bytes;
+    }
+
+    /**
+     * A central directory header that {@link ZipFile} rejects, for each check {@code ZipFile.Source.checkAndAddEntry}
+     * makes of a header (JDK 25 and later).
+     */
+    enum Rejected {
+        ENCRYPTED_ENTRY,
+        BZIP2_METHOD,
+        NAME_WITH_BYTE_FF,
+        NAME_WITH_OVERLONG_SLASH,
+        NAME_WITH_SURROGATE,
+        COMMENT_WITH_BYTE_FF,
+        EXTRA_BLOCK_PAST_THE_FIELD,
+        ZIP64_BLOCK_WITHOUT_ZIP64_VALUES,
+        ZIP64_SIZE_WITHOUT_EXTRA_FIELD,
+        ZIP64_DISK_WITHOUT_EXTRA_FIELD,
+        HEADER_OF_70046_BYTES
+    }
+
+    /**
+     * Writes a jar with the services and, last, an entry outside {@code META-INF/micronaut/} whose central directory
+     * header {@link ZipFile} rejects.
+     */
+    private Path rejectedJar(Rejected rejected) throws IOException {
+        String name = rejected == Rejected.HEADER_OF_70046_BYTES ? "c/" + "n".repeat(59_998) : "com/example/Other.class";
+        Path jar = zip(rejected + ".jar", zip -> {
+            for (String service : serviceEntries()) {
+                put(zip, service);
+            }
+            ZipEntry entry = new ZipEntry(name);
+            entry.setMethod(ZipEntry.STORED);
+            entry.setSize(0);
+            entry.setCrc(0);
+            switch (rejected) {
+                case COMMENT_WITH_BYTE_FF -> entry.setComment("comment");
+                case EXTRA_BLOCK_PAST_THE_FIELD -> entry.setExtra(extraBlock(0xCAFE, 4));
+                case ZIP64_BLOCK_WITHOUT_ZIP64_VALUES -> entry.setExtra(extraBlock(0xCAFE, 8));
+                default -> { }
+            }
+            zip.putNextEntry(entry);
+            zip.closeEntry();
+        });
+        byte[] bytes = Files.readAllBytes(jar);
+        ByteBuffer view = littleEndian(bytes);
+        int end = bytes.length - 22;
+        int header = lastCentralHeader(bytes, end - view.getInt(end + 12), end);
+        int nameAt = header + 46;
+        int extraAt = nameAt + name.length();
+        // bytes 13 to 15 of the name are "the" of "Other"
+        switch (rejected) {
+            case ENCRYPTED_ENTRY -> view.putShort(header + 8, (short) (view.getShort(header + 8) | 1));
+            case BZIP2_METHOD -> view.putShort(header + 10, (short) 12);
+            case NAME_WITH_BYTE_FF -> view.put(nameAt + 13, (byte) 0xFF);
+            case NAME_WITH_OVERLONG_SLASH -> view.put(nameAt + 13, (byte) 0xC0).put(nameAt + 14, (byte) 0xAF);
+            case NAME_WITH_SURROGATE -> view.put(nameAt + 13, (byte) 0xED).put(nameAt + 14, (byte) 0xA0).put(nameAt + 15, (byte) 0x80);
+            case COMMENT_WITH_BYTE_FF -> view.put(extraAt + 3, (byte) 0xFF);
+            case EXTRA_BLOCK_PAST_THE_FIELD -> view.putShort(extraAt + 2, (short) 8);
+            case ZIP64_BLOCK_WITHOUT_ZIP64_VALUES -> view.putShort(extraAt, (short) 0x0001);
+            case ZIP64_SIZE_WITHOUT_EXTRA_FIELD -> view.putInt(header + 20, -1);
+            case ZIP64_DISK_WITHOUT_EXTRA_FIELD -> view.putShort(header + 34, (short) -1);
+            // ZipEntry refuses a header longer than 65535 bytes, so the comment is added to the written header
+            case HEADER_OF_70046_BYTES -> bytes = addComment(bytes, header, 10_000);
+        }
+        return write(rejected + ".jar", bytes);
+    }
+
+    private static byte[] addComment(byte[] zip, int header, int length) {
+        ByteBuffer view = littleEndian(zip);
+        int at = header + 46 + Short.toUnsignedInt(view.getShort(header + 28)) + Short.toUnsignedInt(view.getShort(header + 30));
+        byte[] bytes = new byte[zip.length + length];
+        System.arraycopy(zip, 0, bytes, 0, at);
+        Arrays.fill(bytes, at, at + length, (byte) 'c');
+        System.arraycopy(zip, at, bytes, at + length, zip.length - at);
+        ByteBuffer commented = littleEndian(bytes);
+        commented.putShort(header + 32, (short) length);
+        int end = bytes.length - 22;
+        commented.putInt(end + 12, commented.getInt(end + 12) + length);
         return bytes;
     }
 
