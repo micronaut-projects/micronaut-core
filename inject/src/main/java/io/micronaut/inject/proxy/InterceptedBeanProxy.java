@@ -79,6 +79,8 @@ public interface InterceptedBeanProxy<T> extends InterceptedBean, Qualified<T> {
      * @return The dependency group, or {@code null} for previously generated proxies
      * @since 5.3.0
      */
+    // The $ prefix marks this as generated-code infrastructure and keeps it clear of any method on the proxied type.
+    @SuppressWarnings({"checkstyle:MethodName", "java:S100"})
     default @Nullable BeanDependencyGroup $beanDependencies() {
         return null;
     }

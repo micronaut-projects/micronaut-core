@@ -200,8 +200,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
 
+    /** The name of the field that holds the dependencies of a proxy, and of the method that returns it. */
+    private static final String BEAN_DEPENDENCIES = "$beanDependencies";
     private static final Method GET_PROXY_DEPENDENCIES_METHOD = ReflectionUtils.getRequiredInternalMethod(
-        InterceptedBeanProxy.class, "$beanDependencies");
+        InterceptedBeanProxy.class, BEAN_DEPENDENCIES);
     private static final Method DEPENDENCIES_CLOSED_METHOD = ReflectionUtils.getRequiredInternalMethod(
         BeanDependencyGroup.class, "isClosed");
 
@@ -794,13 +796,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             int beanContextArgumentIndex = constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER);
             int qualifierIndex = constructor.findParameterIndex(QUALIFIER_PARAMETER);
 
-            FieldDef dependenciesField = FieldDef.builder("$beanDependencies", BeanDependencyGroup.class)
+            FieldDef dependenciesField = FieldDef.builder(BEAN_DEPENDENCIES, BeanDependencyGroup.class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
             proxyBuilder.addField(dependenciesField);
             bodyBuilders.add((aThis, parameters) -> aThis.field(dependenciesField).assign(
                 parameters.get(beanResolutionContextArgumentIndex).invoke(
                     ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "getBeanDependencyGroup"))));
-            proxyBuilder.addMethod(MethodDef.builder("$beanDependencies")
+            proxyBuilder.addMethod(MethodDef.builder(BEAN_DEPENDENCIES)
                 .addModifiers(Modifier.PUBLIC).returns(BeanDependencyGroup.class)
                 .build((aThis, parameters) -> aThis.field(dependenciesField).returning()));
 
