@@ -15,89 +15,23 @@
  */
 package io.micronaut.jackson.core.env;
 
-import org.jspecify.annotations.Nullable;
-import tools.jackson.core.json.JsonFactory;
-import tools.jackson.core.JsonParser;
-import io.micronaut.context.env.AbstractPropertySourceLoader;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
-import io.micronaut.json.tree.JsonNode;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 
 /**
- * <p>A {@link io.micronaut.context.env.PropertySourceLoader} that reads {@code application.json} files if they exist.</p>
+ * Compatibility wrapper for the JSON property source loader.
  *
- * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.json.env.JsonPropertySourceLoader} instead.
  */
 @Experimental
-public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
-
-    /**
-     * File extension for property source loader.
-     */
-    public static final String FILE_EXTENSION = "json";
+@Deprecated(forRemoval = true)
+public class JsonPropertySourceLoader extends io.micronaut.json.env.JsonPropertySourceLoader {
 
     public JsonPropertySourceLoader() {
+        super();
     }
 
     public JsonPropertySourceLoader(boolean logEnabled) {
         super(logEnabled);
-    }
-
-    @Override
-    public Set<String> getExtensions() {
-        return Collections.singleton(FILE_EXTENSION);
-    }
-
-    @Override
-    protected void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException {
-        Map<String, Object> map = readJsonAsMap(input);
-        processMap(finalMap, map, "");
-    }
-
-    /**
-     * @param input The input stream
-     * @return map representation of the json
-     * @throws IOException If the input stream doesn't exist
-     */
-    @SuppressWarnings("unchecked")
-    protected Map<String, Object> readJsonAsMap(InputStream input) throws IOException {
-        return (Map<String, Object>) Objects.requireNonNull(unwrap(readJsonAsObject(input)));
-    }
-
-    private JsonNode readJsonAsObject(InputStream input) throws IOException {
-        try (JsonParser parser = new JsonFactory().createParser(input)) {
-            return JsonNodeTreeCodec.getInstance().readTree(parser);
-        }
-    }
-
-    @Nullable
-    private Object unwrap(JsonNode value) {
-        if (value.isNumber()) {
-            return value.getNumberValue();
-        } else if (value.isNull()) {
-            return null;
-        } else if (value.isBoolean()) {
-            return value.getBooleanValue();
-        } else if (value.isArray()) {
-            var unwrapped = new ArrayList<>();
-            value.values().forEach(v -> unwrapped.add(unwrap(v)));
-            return unwrapped;
-        } else if (value.isObject()) {
-            var unwrapped = new LinkedHashMap<String, Object>();
-            value.entries().forEach(e -> unwrapped.put(e.getKey(), unwrap(e.getValue())));
-            return unwrapped;
-        } else {
-            return value.getStringValue();
-        }
     }
 }

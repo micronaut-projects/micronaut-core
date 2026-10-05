@@ -34,7 +34,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
+public class EnvJsonPropertySourceLoader extends io.micronaut.json.env.JsonPropertySourceLoader {
 
     /**
      * Position for the system property source loader in the chain.
