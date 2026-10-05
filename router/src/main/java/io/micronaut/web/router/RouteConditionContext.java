@@ -22,7 +22,7 @@ import io.micronaut.http.HttpRequest;
 import org.jspecify.annotations.Nullable;
 
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.util.Optional;
 import java.time.Clock;
 import java.util.function.Supplier;
 
@@ -101,12 +101,12 @@ public interface RouteConditionContext {
      */
     static @Nullable String peerAddress(HttpRequest<?> request) {
         // a request may have no peer, e.g. one built in memory, whatever the declared nullness
-        @Nullable InetSocketAddress remote = request.getRemoteAddress();
-        if (remote == null) {
-            return null;
-        }
-        InetAddress address = remote.getAddress();
-        return address != null ? address.getHostAddress() : remote.getHostString();
+        return Optional.ofNullable(request.getRemoteAddress())
+            .map(remote -> {
+                InetAddress address = remote.getAddress();
+                return address != null ? address.getHostAddress() : remote.getHostString();
+            })
+            .orElse(null);
     }
 
     /**

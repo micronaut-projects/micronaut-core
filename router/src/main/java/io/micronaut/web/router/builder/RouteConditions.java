@@ -33,13 +33,13 @@ import io.micronaut.web.router.builder.RouteCondition.RemoteAddress;
 import io.micronaut.web.router.builder.RouteCondition.TimeWindow;
 import org.jspecify.annotations.Nullable;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
@@ -457,9 +457,10 @@ public final class RouteConditions {
      */
     private static boolean peerAddress(PeerAddress peerAddress, HttpRequest<?> request) {
         // a request may have no peer, e.g. one built in memory, whatever the declared nullness
-        @Nullable InetSocketAddress remote = request.getRemoteAddress();
-        InetAddress address = remote == null ? null : remote.getAddress();
-        return address != null && inRanges(peerAddress.ranges(), Cidr.address(address));
+        return Optional.ofNullable(request.getRemoteAddress())
+            .map(InetSocketAddress::getAddress)
+            .map(address -> inRanges(peerAddress.ranges(), Cidr.address(address)))
+            .orElse(false);
     }
 
     private static boolean inRanges(List<Cidr> ranges, byte @Nullable [] address) {
