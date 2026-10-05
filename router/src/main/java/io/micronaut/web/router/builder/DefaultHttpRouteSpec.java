@@ -173,30 +173,36 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     @Override
     public void respond(HttpResponse<?> response) {
         ResponseTemplate template = ResponseTemplate.of(route.terminal(response, "response"));
-        respond(() -> HandlerMethod.respond(template), template.contentType());
+        respond(() -> HandlerMethod.respond(template), template.contentType(), true);
     }
 
     @Override
     public void respond(Supplier<? extends HttpResponse<?>> response) {
         Supplier<? extends HttpResponse<?>> checked = route.terminal(response, "response");
-        respond(() -> HandlerMethod.respond(checked), null);
+        respond(() -> HandlerMethod.respond(checked), null, false);
     }
 
     @Override
     public void respond(Function<? super PathVariables, ? extends HttpResponse<?>> response) {
         Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, "response");
-        respond(() -> HandlerMethod.respond(checked), null);
+        respond(() -> HandlerMethod.respond(checked), null, false);
     }
 
     /**
-     * The route of a response: it never reads the body, so it consumes any content type, and
-     * it runs on the event loop, unless the route says otherwise.
+     * The route of a response: it never reads the body, so it consumes any content type. A
+     * constant response runs no code of the application: it is answered on the event loop, unless
+     * the route says otherwise. A supplier or a function runs on the executor of the route or of
+     * its group, and on the event loop when neither has one.
      *
      * @param handler  Creates the response
      * @param produces The content type of the response, or {@code null} if it is not known
+     * @param constant Whether the response is a constant
      */
-    private void respond(Supplier<HandlerMethod<?>> handler, @Nullable MediaType produces) {
-        int own = RouteGroupDefaults.CONSUMES | RouteGroupDefaults.EXECUTOR;
+    private void respond(Supplier<HandlerMethod<?>> handler, @Nullable MediaType produces, boolean constant) {
+        int own = RouteGroupDefaults.CONSUMES;
+        if (constant) {
+            own |= RouteGroupDefaults.EXECUTOR;
+        }
         if (produces != null) {
             own |= RouteGroupDefaults.PRODUCES;
         }

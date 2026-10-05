@@ -197,10 +197,10 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      *
      * <p>The route consumes any content type, as it never reads the body, and produces the
      * content type of the response if it has one, unless the route declares what it consumes or
-     * produces itself. It runs on the event loop, see {@link RouteSpec#nonBlocking()}, unless
-     * {@link RouteSpec#executeOn(String)} is set on the route: the executor and the consumed
-     * media types of its group do not apply to it. The produced media types of its group apply
-     * when the response has no content type.</p>
+     * produces itself. It runs no code of the application, so it is answered on the event loop,
+     * see {@link RouteSpec#nonBlocking()}, unless {@link RouteSpec#executeOn(String)} is set on the
+     * route: the executor and the consumed media types of its group do not apply to it. The
+     * produced media types of its group apply when the response has no content type.</p>
      *
      * @param response The response
      * @throws IllegalStateException if the route was already ended
@@ -216,9 +216,9 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * routes.GET("/time").respond(() -> HttpResponse.ok(clock.instant().toString()));
      * }</pre>
      *
-     * <p>The supplier must return a new response for each request. It is called on the event
-     * loop, so it must not block, unless {@link RouteSpec#executeOn(String)} is set on the
-     * route. A supplier that throws is answered by the error routes, like a handler that throws,
+     * <p>The supplier must return a new response for each request. It is called on the executor
+     * of the route, see {@link RouteSpec#executeOn(String)}, or else of its group, and on the
+     * event loop when neither has one: then it must not block. A supplier that throws is answered by the error routes, like a handler that throws,
      * and one that returns {@code null} like a handler that returns {@code null}.</p>
      *
      * @param response Creates the response of a request
@@ -235,9 +235,9 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * routes.GET("/docs/{page}").respond(pathVariables -> HttpResponse.permanentRedirect(URI.create("/guide/" + pathVariables.getString("page"))));
      * }</pre>
      *
-     * <p>The function must return a new response for each request. It is called on the event
-     * loop, so it must not block, unless {@link RouteSpec#executeOn(String)} is set on the
-     * route.</p>
+     * <p>The function must return a new response for each request. It is called on the executor
+     * of the route, see {@link RouteSpec#executeOn(String)}, or else of its group, and on the
+     * event loop when neither has one: then it must not block.</p>
      *
      * @param response Creates the response of a request from its path variables
      * @throws IllegalStateException if the route was already ended
