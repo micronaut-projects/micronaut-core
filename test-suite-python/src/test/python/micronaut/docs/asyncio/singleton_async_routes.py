@@ -16,6 +16,8 @@ Requires(property="spec.name", value="PythonAsyncioSpec")
 
 backend_client: Annotated[BackendClient, Inject]
 
+greeting = "initial"
+
 
 @Get("/message")
 async def singleton_message() -> str:
@@ -27,3 +29,16 @@ async def singleton_stream() -> AsyncIterator[str]:
     yield "first"
     await asyncio.sleep(0)
     yield await backend_client.message()
+
+
+@Get("/greeting/{value}")
+def set_greeting(value: str) -> str:
+    global greeting
+    greeting = value
+    return greeting
+
+
+@Get("/greeting")
+async def async_greeting() -> str:
+    await asyncio.sleep(0)
+    return greeting

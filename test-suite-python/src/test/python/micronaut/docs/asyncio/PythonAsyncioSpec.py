@@ -83,6 +83,12 @@ class PythonAsyncioSpec:
         assert list(values) == ["first", "backend"], values
 
     @Test
+    def singletonModuleAsyncRouteSeesModuleStateChangedBySyncRoute(self):
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting/changed")
+        response = self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        assert "changed" == response, response
+
+    @Test
     def asyncRequestsAreConcurrentOnSingleEventLoop(self):
         self.client.toBlocking().retrieve("/async-backend/reset-stats")
         elapsed_millis = AsyncioConcurrentClientRunner.retrieveConcurrently(

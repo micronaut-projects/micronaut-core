@@ -337,7 +337,8 @@ public final class PythonContextRuntime {
      * <p>
      * An explicitly scoped module script (a singleton, rather than the pooled default) lives in the startup
      * context, but an async route of it is awaited on the event loop: the module is imported in the event-loop
-     * context, which runs its top-level code there, and receives the members injected into the startup module.
+     * context, which runs its top-level code there, and receives the module state and the members injected into
+     * the startup module, as an event-loop instance of a class bean does.
      *
      * @param fallback The startup-context module
      * @param packageName The Python package, or {@code python} for top-level scripts
@@ -364,6 +365,9 @@ public final class PythonContextRuntime {
         // so a close waits for them
         return PythonContextRegistry.withTrackedExecutionFrame(eventLoopContext, () -> {
             Value target = findScript(packageName, scriptName, eventLoopContext);
+            // module state the startup module changed after its import, then the injected members, adapted
+            // for awaiting in the event-loop context
+            PythonCoercion.copyTransferableModuleMembers(fallback, target);
             copyRememberedAsyncMembers(fallback, target);
             return target;
         });

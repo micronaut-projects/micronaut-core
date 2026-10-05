@@ -1061,6 +1061,33 @@ public final class PythonCoercion {
         }
     }
 
+    /**
+     * Copy the module-level state of a module script into its import in another context: the members
+     * {@link #copyTransferableMembers(Value, Value)} copies, except Java types, which the importing context
+     * bound itself (with {@code java.type} or an import) and which are not state.
+     *
+     * @param source The source module.
+     * @param target The target module.
+     */
+    static void copyTransferableModuleMembers(Value source, Value target) {
+        if (PythonConversion.isNone(source) || PythonConversion.isNone(target) || !source.hasMembers()) {
+            return;
+        }
+        for (String key : transferableMemberNames(source)) {
+            if (key.startsWith("__")) {
+                continue;
+            }
+            Value member = source.getMember(key);
+            if (member == null || member.isMetaObject() || member.isHostObject() && member.asHostObject() instanceof Class<?>) {
+                continue;
+            }
+            Object transferable = transferableMember(member, target.getContext());
+            if (transferable != null) {
+                putMember(target, key, transferable);
+            }
+        }
+    }
+
     static List<String> transferableMemberNames(Value source) {
         Value names = PythonContextRuntime.helper(source.getContext(), TRANSFERABLE_MEMBER_NAMES);
         Value result = names.execute(source);
