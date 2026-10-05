@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Internal
-public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder {
+public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder implements HttpRouteBuilder {
 
     /**
      * @param assembly The assembly the routes are added to
@@ -46,6 +46,13 @@ public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder {
      */
     public DefaultHttpRouteBuilder(RouteAssembly assembly, @Nullable PropertyPlaceholderResolver placeholderResolver) {
         super(assembly, null, null, null, placeholderResolver);
+    }
+
+    @Override
+    public ServerFilterSpec serverFilter(String... patterns) {
+        checkOpen();
+        // global: the filters of the groups do not apply
+        return new DefaultServerFilterSpec(assembly.addServerFilter(patterns));
     }
 
     /**

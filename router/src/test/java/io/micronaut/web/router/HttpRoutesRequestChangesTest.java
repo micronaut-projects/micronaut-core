@@ -57,7 +57,7 @@ class HttpRoutesRequestChangesTest {
     void aPreMatchingServerFilterThatChangesTheUriChangesTheMatchedRoute() {
         Router router = router(routes -> {
             routes.GET("/new", OK);
-            routes.filter("/**").preMatching().before(request -> {
+            routes.serverFilter("/**").preMatching().before(request -> {
                 if (request.getPath().equals("/old")) {
                     request.uri(URI.create("/new?q=1"));
                 }
@@ -74,7 +74,7 @@ class HttpRoutesRequestChangesTest {
         Router router = router(routes -> {
             routes.POST("/item", OK);
             routes.PUT("/item", OK);
-            routes.filter("/**").preMatching().beforeReplacing(request -> {
+            routes.serverFilter("/**").preMatching().beforeReplacing(request -> {
                 String override = request.getHeaders().get("X-Method");
                 return override == null ? null : withMethod(request, HttpMethod.parse(override));
             });
@@ -89,7 +89,7 @@ class HttpRoutesRequestChangesTest {
         Router router = router(routes -> {
             routes.GET("/old", OK);
             routes.GET("/new", OK);
-            routes.filter("/**").before(request -> {
+            routes.serverFilter("/**").before(request -> {
                 request.uri(URI.create("/new"));
             });
         });
@@ -102,10 +102,10 @@ class HttpRoutesRequestChangesTest {
     void aPreMatchingServerFilterIsSelectedByTheRequestAsItWasReceived() {
         Router router = router(routes -> {
             routes.GET("/b", OK);
-            routes.filter("/a").preMatching().before(request -> {
+            routes.serverFilter("/a").preMatching().before(request -> {
                 request.uri(URI.create("/b"));
             });
-            routes.filter("/b").preMatching().before(request -> trace(request, "b"));
+            routes.serverFilter("/b").preMatching().before(request -> trace(request, "b"));
         });
 
         Run run = run(router, HttpRequest.GET("/a"));
@@ -116,7 +116,7 @@ class HttpRoutesRequestChangesTest {
     @Test
     void theRouteTheGroupAndTheServerFiltersChangeTheHeadersOfTheRequest() {
         Router router = router(routes -> {
-            routes.filter("/**").beforeReplacing(request -> request.header("X-Server", "server"));
+            routes.serverFilter("/**").beforeReplacing(request -> request.header("X-Server", "server"));
             routes.group(group -> {
                 group.before(request -> {
                     request.getHeaders().set("X-Client", "group");

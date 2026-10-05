@@ -214,7 +214,7 @@ public class HandlerRouteRespondTest {
             routes.GET("/respond/count").respond(() -> text(String.valueOf(count.incrementAndGet())));
             routes.GET("/respond/hello/{name}").respond(pathVariables -> text("Hello " + pathVariables.getString("name")));
 
-            routes.filter("/respond/filtered/**").after((request, response) -> response.header("X-Server-Filter", "server"));
+            routes.serverFilter("/respond/filtered/**").after((request, response) -> response.header("X-Server-Filter", "server"));
             routes.path("/respond/filtered", group -> {
                 group.beforeReplacing(request -> request.getHeaders().contains("X-Allowed") ? null : HttpResponse.status(HttpStatus.FORBIDDEN));
                 group.after((request, response) -> response.header("X-Group-Filter", "group"));

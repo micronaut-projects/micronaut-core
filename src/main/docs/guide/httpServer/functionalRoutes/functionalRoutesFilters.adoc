@@ -1,15 +1,15 @@
 Functional routes declare filters at three levels, with the same methods, from api:web.router.builder.RouteFilterSpec[]:
 
 * *route filters*, on the api:web.router.builder.HttpRouteSpec[] of a route, before its terminal: `routes.GET(uri).before(...).and().handle(...)`;
-* *group filters*, on an api:web.router.builder.HttpRouteGroup[], for every route of the group;
-* *server filters*, declared with `routes.filter(patterns...)`: the functional form of a `@ServerFilter` bean, see api:web.router.builder.ServerFilterSpec[].
+* *group filters*, on an api:web.router.builder.HttpRouteGroup[], for the routes of the group only;
+* *server filters*, declared with `routes.serverFilter(patterns...)` on the api:web.router.builder.HttpRouteBuilder[] of an `HttpRoutes` bean only, never on a group: the functional form of a `@ServerFilter` bean, see api:web.router.builder.ServerFilterSpec[].
 
 snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="serverFilters", indent=0, title="Server filters"]
 
-<1> A server filter filters every request whose path matches one of its patterns, whatever answers it: a controller, a handler route, a static resource, or no route at all (`404`, `405`, ...). `methods(...)`, `order(int)`, `patternStyle(...)` and `appendContextPath(boolean)` correspond to the members of `@ServerFilter` and to `@Order`. A server filter is global wherever it is declared, also in a group: the prefix and the filters of the group do not apply to it.
+<1> A server filter filters every request whose path matches one of its patterns, whatever answers it: a controller, a handler route, a static resource, or no route at all (`404`, `405`, ...). `methods(...)`, `order(int)`, `patternStyle(...)` and `appendContextPath(boolean)` correspond to the members of `@ServerFilter` and to `@Order`. A server filter is global: only the builder declares one, and a group has no `serverFilter` method.
 <2> A pre-matching server filter, like a `@PreMatching` filter bean, runs before the route is matched, and the route is matched with the request it continues with: here a URI rewritten in place.
 
-The filters of a route and of its groups are route filters: as with the filter methods of a controller, they need a matched route. A request under the prefix of a group that no route answers (`404`), or that a route of the group would answer with another method or media type (`405`, `415`, `406`), runs the server filters only: the `@ServerFilter` beans and the filters declared with `routes.filter(patterns...)`, pre-matching ones (`routes.filter(patterns...).preMatching()`) included.
+The filters of a route and of its groups are route filters: as with the filter methods of a controller, they need a matched route. A request under the prefix of a group that no route answers (`404`), or that a route of the group would answer with another method or media type (`405`, `415`, `406`), runs the server filters only: the `@ServerFilter` beans and the filters declared with `routes.serverFilter(patterns...)`, pre-matching ones (`routes.serverFilter(patterns...).preMatching()`) included.
 
 === Filter methods
 
@@ -65,7 +65,7 @@ A response filter declared with `after` changes the response in place; one decla
 
 Request filters run in this order, and response filters in the reverse order:
 
-. the server filters: `@ServerFilter` beans and the filters declared with `routes.filter(...)`, sorted together by their order (`0` by default); pre-matching filters run before the route is matched;
+. the server filters: `@ServerFilter` beans and the filters declared with `routes.serverFilter(...)`, sorted together by their order (`0` by default); pre-matching filters run before the route is matched;
 . the filters of the outer group, then those of the inner groups;
 . the filters of the route;
 . the handler.

@@ -94,9 +94,9 @@ class GroupRoutes(HttpRoutes):
         routes.path("/notes", notes_routes)
         # end::groupSettings[]
         # tag::serverFilters[]
-        (routes.filter("/api/**").order(100)  # <1>
+        (routes.serverFilter("/api/**").order(100)  # <1>
             .after(lambda request, response: response.header("X-Served-By", "api")))
-        (routes.filter("/v1/**").preMatching()  # <2>
+        (routes.serverFilter("/v1/**").preMatching()  # <2>
             .before(lambda request: request.uri(URI.create(re.sub("^/v1", "/api", str(request.getUri()))))))
         # end::serverFilters[]
         # tag::filterExecutor[]

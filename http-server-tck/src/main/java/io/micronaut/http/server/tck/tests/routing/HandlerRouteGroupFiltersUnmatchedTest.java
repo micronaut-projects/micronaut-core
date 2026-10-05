@@ -112,11 +112,11 @@ public class HandlerRouteGroupFiltersUnmatchedTest {
     static class GroupRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.filter("/unmatched/**").preMatching()
+            routes.serverFilter("/unmatched/**").preMatching()
                 .before(request -> trace(request, "pre"))
                 .and()
                 .after((request, response) -> response.header("X-Pre-Matching", "true"));
-            routes.filter("/unmatched/**")
+            routes.serverFilter("/unmatched/**")
                 .before(request -> trace(request, "server"))
                 .and()
                 .after((request, response) -> {

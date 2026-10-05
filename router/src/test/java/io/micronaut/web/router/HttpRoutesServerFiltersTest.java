@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Server filters declared with {@link HttpRouteBuilder#filter(String...)}: filter routes like
+ * Server filters declared with {@link HttpRouteBuilder#serverFilter(String...)}: filter routes like
  * those of a {@code @ServerFilter} bean, with patterns, methods and an order.
  */
 class HttpRoutesServerFiltersTest {
@@ -50,15 +50,15 @@ class HttpRoutesServerFiltersTest {
     void serverFiltersRunByOrderThenInTheOrderDeclared() {
         List<String> trace = new ArrayList<>();
         Router router = router(null, routes -> {
-            routes.filter("/**").before(request -> record(trace, "a0"));
-            routes.filter("/**").order(10)
+            routes.serverFilter("/**").before(request -> record(trace, "a0"));
+            routes.serverFilter("/**").order(10)
                 .before(request -> record(trace, "b10-1"))
                 .and()
                 .after((request, response) -> trace.add("b10-after"))
                 .and()
                 .before(request -> record(trace, "b10-2"));
-            routes.filter("/**").order(-10).before(request -> record(trace, "c-10")).and().after((request, response) -> trace.add("c-10-after"));
-            routes.filter("/**").before(request -> record(trace, "d0"));
+            routes.serverFilter("/**").order(-10).before(request -> record(trace, "c-10")).and().after((request, response) -> trace.add("c-10-after"));
+            routes.serverFilter("/**").before(request -> record(trace, "d0"));
         });
 
         run(router, HttpRequest.GET("/anything"), trace);
@@ -69,9 +69,9 @@ class HttpRoutesServerFiltersTest {
     void aServerFilterFiltersItsPatternsAndMethodsOnly() {
         List<String> trace = new ArrayList<>();
         Router router = router(null, routes -> {
-            routes.filter("/api/**", "/admin").before(request -> record(trace, "api"));
-            routes.filter("/**").methods(HttpMethod.POST, HttpMethod.PUT).before(request -> record(trace, "writes"));
-            routes.filter("^/regex/[0-9]+$").patternStyle(FilterPatternStyle.REGEX).before(request -> record(trace, "regex"));
+            routes.serverFilter("/api/**", "/admin").before(request -> record(trace, "api"));
+            routes.serverFilter("/**").methods(HttpMethod.POST, HttpMethod.PUT).before(request -> record(trace, "writes"));
+            routes.serverFilter("^/regex/[0-9]+$").patternStyle(FilterPatternStyle.REGEX).before(request -> record(trace, "regex"));
         });
 
         assertEquals(List.of("api", "handler"), run(router, HttpRequest.GET("/api/orders"), trace));
@@ -86,9 +86,9 @@ class HttpRoutesServerFiltersTest {
     void thePatternsAreUnderTheContextPathLikeThoseOfAServerFilterBean() {
         List<String> trace = new ArrayList<>();
         Router router = router("/ctx", routes -> {
-            routes.filter("/api/**").before(request -> record(trace, "under"));
-            routes.filter("/ctx/already/**").before(request -> record(trace, "already"));
-            routes.filter("/raw/**").appendContextPath(false).before(request -> record(trace, "raw"));
+            routes.serverFilter("/api/**").before(request -> record(trace, "under"));
+            routes.serverFilter("/ctx/already/**").before(request -> record(trace, "already"));
+            routes.serverFilter("/raw/**").appendContextPath(false).before(request -> record(trace, "raw"));
         });
 
         assertEquals(List.of("under", "handler"), run(router, HttpRequest.GET("/ctx/api/x"), trace));
@@ -98,13 +98,12 @@ class HttpRoutesServerFiltersTest {
     }
 
     @Test
-    void aServerFilterOfAGroupIsGlobal() {
+    void aServerFilterIsDeclaredOnTheBuilderOnly() {
         List<String> trace = new ArrayList<>();
-        Router router = router(null, routes -> routes.path("/api", api -> {
-            api.before(request -> record(trace, "group"));
-            ServerFilterSpec filter = api.filter("/other/**");
-            filter.before(request -> record(trace, "server"));
-        }));
+        Router router = router(null, routes -> {
+            routes.path("/api", api -> api.before(request -> record(trace, "group")));
+            routes.serverFilter("/other/**").before(request -> record(trace, "server"));
+        });
 
         // not under the prefix of the group, and without the filters of the group
         assertEquals(List.of("server", "handler"), run(router, HttpRequest.GET("/other/x"), trace));
@@ -114,7 +113,7 @@ class HttpRoutesServerFiltersTest {
     void everyFilterVariantCompilesOnAServerFilter() {
         List<String> trace = new ArrayList<>();
         Router router = router(null, routes -> {
-            ServerFilterSpec same = routes.filter("/**")
+            ServerFilterSpec same = routes.serverFilter("/**")
                 .before(request -> record(trace, "before"))
                 .and()
                 .before((request, propagatedContext) -> record(trace, "context-before"))
@@ -144,11 +143,11 @@ class HttpRoutesServerFiltersTest {
 
     @Test
     void aServerFilterNeedsAPatternAndAnOpenBuilder() {
-        assertThrows(IllegalArgumentException.class, () -> router(null, routes -> routes.filter()));
-        assertThrows(IllegalArgumentException.class, () -> router(null, routes -> routes.filter("")));
+        assertThrows(IllegalArgumentException.class, () -> router(null, routes -> routes.serverFilter()));
+        assertThrows(IllegalArgumentException.class, () -> router(null, routes -> routes.serverFilter("")));
         AtomicReference<HttpRouteGroup> leaked = new AtomicReference<>();
         router(null, routes -> routes.group(leaked::set));
-        assertThrows(IllegalStateException.class, () -> leaked.get().filter("/**"));
+        assertThrows(IllegalStateException.class, () -> leaked.get().before(request -> { }));
     }
 
     /**

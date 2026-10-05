@@ -231,7 +231,7 @@ public class HandlerRouteFilterExecutorTest {
                     HttpResponse.ok("status route").contentType(MediaType.TEXT_PLAIN_TYPE));
             });
 
-            routes.filter("/fe/server/**")
+            routes.serverFilter("/fe/server/**")
                 .before(HandlerRouteFilterExecutorTest::before).executeOn(EXECUTOR)
                 .and()
                 .after((request, response) -> after(response)).executeOn(EXECUTOR)

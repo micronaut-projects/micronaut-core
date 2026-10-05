@@ -76,7 +76,7 @@ public class ClosedRouteBuilderTest {
         assertClosed(() -> routes.GET("/late").handle(ClosedRouteBuilderTest::ok));
         assertClosed(() -> routes.error(IllegalStateException.class, (request, error) -> HttpResponse.ok()));
         assertClosed(() -> routes.status(HttpStatus.NOT_FOUND, request -> HttpResponse.ok()));
-        assertClosed(() -> routes.filter("/**"));
+        assertClosed(() -> routes.serverFilter("/**"));
         assertClosed(() -> routes.group(group -> group.GET("/late", ClosedRouteBuilderTest::ok)));
         assertClosed(() -> routes.path("/late", group -> group.GET("/x", ClosedRouteBuilderTest::ok)));
     }

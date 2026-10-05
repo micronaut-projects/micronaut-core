@@ -42,7 +42,7 @@
  *                 .thenApply(done -> HttpResponse.accepted()));
  *             group.error(NoSuchOrderException.class, (request, error) -> HttpResponse.notFound());
  *         });
- *         routes.filter("/**").after((request, response) -> response.header("X-Served-By", "orders"));
+ *         routes.serverFilter("/**").after((request, response) -> response.header("X-Served-By", "orders"));
  *     }
  * }
  * }</pre>

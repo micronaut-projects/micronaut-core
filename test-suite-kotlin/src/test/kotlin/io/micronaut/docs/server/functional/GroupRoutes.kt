@@ -83,9 +83,9 @@ class GroupRoutes : HttpRoutes {
         }
         // end::groupSettings[]
         // tag::serverFilters[]
-        routes.filter("/api/**").order(100) // <1>
+        routes.serverFilter("/api/**").order(100) // <1>
             .after { request: HttpRequest<*>, response: MutableHttpResponse<*> -> response.header("X-Served-By", "api") }
-        routes.filter("/v1/**").preMatching() // <2>
+        routes.serverFilter("/v1/**").preMatching() // <2>
             .before { request: MutableHttpRequest<*> ->
                 request.uri(URI.create(request.uri.toString().replaceFirst(Regex("^/v1"), "/api")))
             }

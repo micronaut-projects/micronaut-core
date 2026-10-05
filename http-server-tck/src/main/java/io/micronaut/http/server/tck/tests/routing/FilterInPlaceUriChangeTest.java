@@ -262,7 +262,7 @@ public class FilterInPlaceUriChangeTest {
     static class Routes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.filter("/ipc/fn/**").preMatching().before(request -> {
+            routes.serverFilter("/ipc/fn/**").preMatching().before(request -> {
                 request.uri(URI.create(moved(request.getPath(), "/ipc/fn/")));
             });
             routes.POST("/ipc/target/form-handler-pojo").consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE).body(Argument.of(Person.class)).handle((request, pathVariables, person) ->

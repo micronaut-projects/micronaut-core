@@ -65,7 +65,7 @@ class FilterSpecTest {
             assertSame(body, body.before(request -> { }).executeOn(EXECUTOR).and());
             body.handle((request, pathVariables, text) -> HttpResponse.ok());
             route.handle(FilterSpecTest::ok);
-            ServerFilterSpec server = routes.filter("/**");
+            ServerFilterSpec server = routes.serverFilter("/**");
             assertSame(server, server.beforeReplacing(request -> null).executeOn(EXECUTOR).nonBlocking().and());
             routes.group(group -> {
                 assertSame(group, group.afterReplacing((request, response) -> null).and());
@@ -119,8 +119,8 @@ class FilterSpecTest {
     @Test
     void aServerFilterRunsOnTheExecutorItIsGiven() {
         Router router = router(routes -> {
-            routes.filter("/executor/**").before(request -> { }).executeOn(EXECUTOR).and().order(5);
-            routes.filter("/non-blocking/**").after((request, response) -> { }).executeOn(EXECUTOR).nonBlocking();
+            routes.serverFilter("/executor/**").before(request -> { }).executeOn(EXECUTOR).and().order(5);
+            routes.serverFilter("/non-blocking/**").after((request, response) -> { }).executeOn(EXECUTOR).nonBlocking();
         });
 
         assertEquals(NO_EXECUTOR, failure(router, "/executor/x"));

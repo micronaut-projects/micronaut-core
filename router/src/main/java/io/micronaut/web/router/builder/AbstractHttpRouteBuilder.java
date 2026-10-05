@@ -45,7 +45,7 @@ import java.util.function.Supplier;
  * @since 5.3.0
  */
 @Internal
-abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
+abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
 
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
 
@@ -299,13 +299,6 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final ServerFilterSpec filter(String... patterns) {
-        checkOpen();
-        // global: the prefix and the filters of a group do not apply
-        return new DefaultServerFilterSpec(assembly.addServerFilter(patterns));
-    }
-
-    @Override
     public final void group(Consumer<HttpRouteGroup> routes) {
         Objects.requireNonNull(routes, "routes");
         declareGroup(prefix, routes);
@@ -339,7 +332,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         closed = true;
     }
 
-    private void checkOpen() {
+    final void checkOpen() {
         if (closed) {
             throw new IllegalStateException("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
                 + "not after it returned");

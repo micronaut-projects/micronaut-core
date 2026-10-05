@@ -163,7 +163,7 @@ public class HandlerRoutesConcurrencyTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.filter("/conc/**").before((request, propagatedContext) -> {
+            routes.serverFilter("/conc/**").before((request, propagatedContext) -> {
                 propagatedContext.add(new RequestId(id(request)));
             }).and().after((request, response) -> response.header("X-Server-Filter", PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
             routes.path("/conc", group -> {

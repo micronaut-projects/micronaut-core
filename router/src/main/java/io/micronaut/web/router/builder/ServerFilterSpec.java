@@ -20,12 +20,12 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
 
 /**
- * A server filter declared with {@link HttpRouteBuilder#filter(String...)}: the functional form of
+ * A server filter declared with {@link HttpRouteBuilder#serverFilter(String...)}: the functional form of
  * a {@code @ServerFilter} bean, whose {@code before} and {@code after} filters are its
  * {@code @RequestFilter} and {@code @ResponseFilter} methods.
  *
  * <pre>{@code
- * routes.filter("/**").order(100).beforeReplacing((request, propagatedContext) -> {
+ * routes.serverFilter("/**").order(100).beforeReplacing((request, propagatedContext) -> {
  *     propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
  *     return null;
  * });
@@ -53,7 +53,7 @@ import io.micronaut.http.filter.FilterPatternStyle;
  * <p>Like the patterns of a {@code @ServerFilter}, the patterns are under
  * {@code micronaut.server.context-path}, unless they start with it or
  * {@link #appendContextPath(boolean)} says otherwise. Each call of
- * {@link HttpRouteBuilder#filter(String...)} declares a new server filter: declaring the same one
+ * {@link HttpRouteBuilder#serverFilter(String...)} declares a new server filter: declaring the same one
  * twice filters the requests twice.</p>
  *
  * @author Denis Stepanov
@@ -106,7 +106,7 @@ public sealed interface ServerFilterSpec extends RouteFilterSpec<ServerFilterSpe
      * matches. The patterns and methods select the filter before the request filters run.
      *
      * <pre>{@code
-     * routes.filter("/legacy/**").preMatching().beforeReplacing(request -> {
+     * routes.serverFilter("/legacy/**").preMatching().beforeReplacing(request -> {
      *     request.uri(URI.create(request.getPath().replaceFirst("/legacy", "/api")));
      *     return null;
      * });

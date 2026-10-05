@@ -71,7 +71,7 @@ class HttpRoutesResponseReplacementTest {
     void theResponseFiltersAfterAReplacementSeeTheReplacement() {
         List<String> trace = new ArrayList<>();
         Router router = router(routes -> {
-            routes.filter("/**").order(-10).after((request, response) -> trace.add("server " + response.code() + " " + response.body()));
+            routes.serverFilter("/**").order(-10).after((request, response) -> trace.add("server " + response.code() + " " + response.body()));
             routes.group(group -> {
                 group.after((request, response) -> trace.add("group " + response.code() + " " + response.body()));
                 group.GET("/x")
@@ -178,7 +178,7 @@ class HttpRoutesResponseReplacementTest {
     @Test
     void theFiltersOfAGroupAndOfAServerFilterReplaceTheResponse() {
         Router router = router(routes -> {
-            routes.filter("/**").afterReplacing((request, response) ->
+            routes.serverFilter("/**").afterReplacing((request, response) ->
                 HttpResponse.status(HttpStatus.CREATED).header("X-Server", response.getHeaders().get("X-Group")));
             routes.group(group -> {
                 group.afterReplacing((request, response) -> HttpResponse.status(HttpStatus.ACCEPTED).header("X-Group", "group-" + response.body()));
@@ -195,7 +195,7 @@ class HttpRoutesResponseReplacementTest {
     void aPreMatchingServerFilterReplacesTheResponseItsRequestFilterAnsweredWith() {
         Router router = router(routes -> {
             routes.GET("/ok", OK);
-            routes.filter("/**").preMatching()
+            routes.serverFilter("/**").preMatching()
                 .beforeReplacing(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
                 .and()
                 .afterReplacing((request, response) -> response.code() == HttpStatus.OK.getCode()

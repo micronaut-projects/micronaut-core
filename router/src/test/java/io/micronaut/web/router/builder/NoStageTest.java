@@ -122,17 +122,17 @@ class NoStageTest {
     @Test
     void anAsynchronousFilterThatReturnsNoStageFailsWithAMessage() {
         assertFilterFails("The asynchronous request filter returned no stage",
-            routes -> routes.filter("/**").beforeReplacingAsync((AsyncReplacingRouteRequestFilter) request -> null));
+            routes -> routes.serverFilter("/**").beforeReplacingAsync((AsyncReplacingRouteRequestFilter) request -> null));
         assertFilterFails("The asynchronous request filter returned no stage",
-            routes -> routes.filter("/**").beforeAsync((AsyncRouteRequestFilter) request -> null));
+            routes -> routes.serverFilter("/**").beforeAsync((AsyncRouteRequestFilter) request -> null));
         assertFilterFails("The asynchronous request filter returned no stage",
-            routes -> routes.filter("/**").beforeAsync((AsyncContextRouteRequestFilter) (request, context) -> null));
+            routes -> routes.serverFilter("/**").beforeAsync((AsyncContextRouteRequestFilter) (request, context) -> null));
         assertFilterFails("The asynchronous response filter returned no stage",
-            routes -> routes.filter("/**").afterReplacingAsync((AsyncReplacingRouteResponseFilter) (request, response) -> null));
+            routes -> routes.serverFilter("/**").afterReplacingAsync((AsyncReplacingRouteResponseFilter) (request, response) -> null));
         assertFilterFails("The asynchronous response filter returned no stage",
-            routes -> routes.filter("/**").afterAsync((AsyncRouteResponseFilter) (request, response) -> null));
+            routes -> routes.serverFilter("/**").afterAsync((AsyncRouteResponseFilter) (request, response) -> null));
         assertFilterFails("The asynchronous response filter returned no stage",
-            routes -> routes.filter("/**").afterAsync((AsyncContextRouteResponseFilter) (request, response, context) -> null));
+            routes -> routes.serverFilter("/**").afterAsync((AsyncContextRouteResponseFilter) (request, response, context) -> null));
     }
 
     private static void assertFilterFails(String message, Consumer<HttpRouteBuilder> routes) {

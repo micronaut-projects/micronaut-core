@@ -50,9 +50,9 @@ class HttpRoutesPreMatchingTest {
     void preMatchingServerFiltersRunByOrderBeforeTheMatch() {
         Router router = router(routes -> {
             routes.GET("/x").before(request -> trace(request, "route")).and().handle(OK);
-            routes.filter("/**").order(10).preMatching().before(request -> trace(request, "pre10"));
-            routes.filter("/**").before(request -> trace(request, "server0"));
-            routes.filter("/**").preMatching().order(-5)
+            routes.serverFilter("/**").order(10).preMatching().before(request -> trace(request, "pre10"));
+            routes.serverFilter("/**").before(request -> trace(request, "server0"));
+            routes.serverFilter("/**").preMatching().order(-5)
                 .before(request -> trace(request, "pre-5"))
                 .and()
                 .before((request, propagatedContext) -> trace(request, "pre-5-context"))
@@ -71,7 +71,7 @@ class HttpRoutesPreMatchingTest {
     void theResponseFiltersOfAPreMatchingServerFilterFilterEveryResponseOnce() {
         Router router = router(routes -> {
             routes.GET("/ok", OK);
-            routes.filter("/**").preMatching()
+            routes.serverFilter("/**").preMatching()
                 .beforeReplacing(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
                 .and()
                 .after((request, response) -> response.header("X-After", response.getHeaders().get("X-After") == null ? "1" : "2"));

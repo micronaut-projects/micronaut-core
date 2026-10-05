@@ -49,7 +49,7 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <pre>{@code
- * routes.filter("/**").preMatching().beforeReplacing(request -> {
+ * routes.serverFilter("/**").preMatching().beforeReplacing(request -> {
  *     String override = request.getHeaders().get("X-HTTP-Method-Override");
  *     if (override == null) {
  *         return null;

@@ -44,7 +44,7 @@ import io.micronaut.http.MediaType;
  * returns: declaring a route or a filter on it afterwards fails.</p>
  *
  * <p><b>Order.</b> The server filters, the {@code @ServerFilter} beans and the filters declared
- * with {@link #filter(String...)}, run first. Then the
+ * with {@link HttpRouteBuilder#serverFilter(String...)}, run first. Then the
  * filters of the outer group, then those of the inner groups, then those of the route, then the
  * handler. Response filters run the other way: the filters of the route, then those of the inner
  * groups, then those of the outer group, then the application's response filters. Within a group
@@ -57,9 +57,9 @@ import io.micronaut.http.MediaType;
  * {@code 404}, or one that a route of the group would answer with another method or media type, a
  * {@code 405}, {@code 415} or {@code 406}, does not run the filters of the group; a
  * {@code @ServerFilter("/api/**")} bean, or a server filter declared with
- * {@code filter("/api/**")}, pre-matching or not, filters every request under a prefix, those
- * responses included. A server filter declared on a
- * group is global: the prefix and the filters of the group do not apply to it.</p>
+ * {@code serverFilter("/api/**")} on the builder, pre-matching or not, filters every request under
+ * a prefix, those responses included. A group declares no server filter: its filters are route
+ * filters, which apply to the routes of the group only.</p>
  *
  * <p><b>Errors.</b> An exception of a route of the group is answered by the error routes, and the
  * response filters of the group, like those of the route, filter the response of the error route.
@@ -89,5 +89,5 @@ import io.micronaut.http.MediaType;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteSpec<HttpRouteGroup> permits DefaultHttpRouteGroup {
+public sealed interface HttpRouteGroup extends HttpRouteScope, RouteSpec<HttpRouteGroup> permits DefaultHttpRouteGroup {
 }

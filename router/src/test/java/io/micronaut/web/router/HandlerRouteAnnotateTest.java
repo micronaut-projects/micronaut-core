@@ -242,9 +242,9 @@ class HandlerRouteAnnotateTest {
     @Test
     void aGroupIsAnnotatedInItsLambdaOnly() {
         assertThrows(IllegalStateException.class, () -> router(routes -> {
-            HttpRouteBuilder[] escaped = new HttpRouteBuilder[1];
+            io.micronaut.web.router.builder.HttpRouteGroup[] escaped = new io.micronaut.web.router.builder.HttpRouteGroup[1];
             routes.group(group -> escaped[0] = group);
-            ((io.micronaut.web.router.builder.HttpRouteGroup) escaped[0]).annotate(Marker.class);
+            escaped[0].annotate(Marker.class);
         }));
     }
 

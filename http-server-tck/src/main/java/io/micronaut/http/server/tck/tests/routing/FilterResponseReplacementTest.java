@@ -188,14 +188,14 @@ public class FilterResponseReplacementTest {
                     .after((request, response) -> response.header("X-Route-After", seen(response))).and()
                     .handle(ROUTE);
             });
-            routes.filter("/rr/outer/**").after((request, response) -> response.header("X-Server-After", seen(response)));
+            routes.serverFilter("/rr/outer/**").after((request, response) -> response.header("X-Server-After", seen(response)));
             routes.path("/rr/group", group -> {
                 group.afterReplacing((request, response) -> replacement(HttpStatus.ACCEPTED, "group replaced " + response.body())
                     .header("X-Replaced", "group"));
                 group.GET("/x", ROUTE);
             });
             routes.GET("/rr/server/x", ROUTE);
-            routes.filter("/rr/server/**").afterReplacing((request, response) -> replacement(HttpStatus.ACCEPTED, "server replaced " + response.body())
+            routes.serverFilter("/rr/server/**").afterReplacing((request, response) -> replacement(HttpStatus.ACCEPTED, "server replaced " + response.body())
                 .header("X-Replaced", "server"));
             routes.GET("/rr/async")
                 .afterReplacingAsync((request, response) -> CompletableFuture.completedFuture(replacement(HttpStatus.CREATED, "async replaced")))
@@ -229,7 +229,7 @@ public class FilterResponseReplacementTest {
                     PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none"))).and()
                     .handle(ROUTE);
             routes.GET("/rr/pre/ok", ROUTE);
-            routes.filter("/rr/pre/**").preMatching()
+            routes.serverFilter("/rr/pre/**").preMatching()
                 .beforeReplacing(request -> request.getPath().equals("/rr/pre/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
                 .and()
                 .afterReplacing((request, response) -> response.code() == HttpStatus.FORBIDDEN.getCode()

@@ -130,7 +130,7 @@ class HandlerRouteArgumentsTest {
                 assertMissing("name", () -> group.attribute(null, "value"));
                 assertMissing("value", () -> group.attribute("name", null));
             });
-            var filter = routes.filter("/**");
+            var filter = routes.serverFilter("/**");
             assertMissing("methods", () -> filter.methods((HttpMethod[]) null));
             assertMissing("methods must not contain null", () -> filter.methods(HttpMethod.GET, null));
             assertMissing("patternStyle", () -> filter.patternStyle(null));
