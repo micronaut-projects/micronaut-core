@@ -194,32 +194,6 @@ class InterceptorChainFactorySpec extends Specification {
         where:
         entry << ['factory', 'chain']
     }
-    void 'factory execution accepts independent lifecycle and constructor implementations'() {
-        given:
-        def lifecycle = Mock(LifecycleInvocation)
-        def construction = Mock(ConstructorInvocation)
-        def factory = new CustomInvocations(lifecycle: lifecycle, construction: construction)
-        def resolution = Mock(BeanResolutionContext)
-        def definition = Mock(BeanDefinition)
-        def method = Mock(ExecutableMethod)
-        def constructor = Mock(BeanConstructor)
-        def bean = new Object()
-
-        when:
-        def initialized = factory.initialize(resolution, definition, method, bean, [])
-        def disposed = factory.dispose(resolution, definition, method, bean, [])
-        def instantiated = factory.instantiate(resolution, definition, constructor, [], 0)
-
-        then:
-        2 * lifecycle.proceedLifecycle() >> bean
-        1 * construction.instantiate() >> bean
-        0 * lifecycle.proceed()
-        0 * construction.proceed()
-        initialized.is(bean)
-        disposed.is(bean)
-        instantiated.is(bean)
-    }
-
     void 'lifecycle chains carry their kind and method chains derive it from their target'() {
         given:
         def registry = Mock(InterceptorRegistry)
@@ -241,36 +215,6 @@ class InterceptorChainFactorySpec extends Specification {
         0 * registry._
         [resolved, initialized, disposed]*.kind == [InterceptorKind.AROUND, InterceptorKind.POST_CONSTRUCT, InterceptorKind.PRE_DESTROY]
         resolved.parameterValues == ['argument']
-    }
-
-    private static class CustomInvocations implements InterceptorChainFactory {
-        LifecycleInvocation lifecycle
-        ConstructorInvocation construction
-
-        @Override
-        InterceptorCandidateResolver candidateResolver() {
-            throw new UnsupportedOperationException()
-        }
-
-        @Override
-        <T, R> LifecycleInvocation<T, R> buildLifecycleChain(BeanResolutionContext resolution,
-                BeanDefinition<T> definition, ExecutableMethod<T, R> method, T bean, InterceptorKind kind,
-                Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
-            return lifecycle
-        }
-
-        @Override
-        <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
-                Interceptor<T, R>[] interceptors, Object... arguments) {
-            throw new UnsupportedOperationException()
-        }
-
-        @Override
-        <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
-                BeanDefinition<T> definition, BeanConstructor<T> constructor,
-                Collection<BeanRegistration<Interceptor<T, T>>> candidates, int additionalArguments, Object... arguments) {
-            return construction
-        }
     }
 
 }

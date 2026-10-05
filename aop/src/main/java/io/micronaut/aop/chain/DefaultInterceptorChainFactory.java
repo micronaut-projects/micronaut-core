@@ -32,14 +32,13 @@ import java.util.Arrays;
 import java.util.Collection;
 
 /**
- * Default chain factory. Candidates the caller does not supply are acquired through its
+ * The chain factory. Candidates the caller does not supply are acquired through its
  * {@link #candidateResolver() candidate resolver} and selected by the interceptor registry.
- * Subclasses override a build method to decorate or replace the invocation it returns.
  *
  * @since 5.3.0
  */
 @Internal
-public class DefaultInterceptorChainFactory implements InterceptorChainFactory {
+public final class DefaultInterceptorChainFactory implements InterceptorChainFactory {
     private final InterceptorRegistry registry;
     private final InterceptorCandidateResolver candidateResolver;
 

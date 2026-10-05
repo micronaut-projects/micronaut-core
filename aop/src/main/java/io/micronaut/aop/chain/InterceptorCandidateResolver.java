@@ -47,13 +47,13 @@ import java.util.List;
 
 /**
  * Acquires interceptor candidates through their dependency owner and selects from them, independently of
- * invocation construction. An {@link InterceptorChainFactory} returns a subclass from
- * {@link InterceptorChainFactory#candidateResolver()} to customize acquisition.
+ * invocation construction. It is reached through {@link InterceptorChainFactory#candidateResolver()}; it is public
+ * because generated proxies and bean definitions call it.
  *
  * @since 5.3.0
  */
 @Internal
-public class InterceptorCandidateResolver {
+public final class InterceptorCandidateResolver {
     private final InterceptorRegistry registry;
     // asked in order: what creation retained first, then discovery for definitions that retained nothing
     private final List<LifecycleCandidateSource> lifecycleSources = List.of(

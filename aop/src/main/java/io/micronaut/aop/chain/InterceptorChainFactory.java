@@ -31,13 +31,13 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collection;
 
 /**
- * Builds and executes method, lifecycle and constructor interceptor chains. It is a bean of the context, so
- * replacing the bean customizes invocation construction. Each build returns independent invocation state.
+ * Builds and executes method, lifecycle and constructor interceptor chains. It is a bean of the context, which
+ * generated code looks up through {@link #ARGUMENT}. Each build returns independent invocation state.
  *
  * @since 5.3.0
  */
 @Internal
-public interface InterceptorChainFactory {
+public sealed interface InterceptorChainFactory permits DefaultInterceptorChainFactory {
     /** Constant for bean lookup. */
     @UsedByGeneratedCode
     Argument<InterceptorChainFactory> ARGUMENT = Argument.of(InterceptorChainFactory.class);

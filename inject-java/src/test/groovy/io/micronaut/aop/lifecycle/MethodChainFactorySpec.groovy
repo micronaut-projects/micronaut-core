@@ -3,7 +3,6 @@ package io.micronaut.aop.lifecycle
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.InterceptorRegistry
 import io.micronaut.aop.HotSwappableInterceptedProxy
-import io.micronaut.aop.chain.InterceptorChainFactory
 import io.micronaut.inject.qualifiers.Qualifiers
 
 class MethodChainFactorySpec extends AbstractTypeElementSpec {
@@ -29,9 +28,6 @@ import java.util.*;
 @Singleton @Bean(typed = InterceptorRegistry.class) @Replaces(InterceptorRegistry.class)
 class CountingRegistry implements InterceptorRegistry {
     int selections;
-    int methodSelections;
-    final List<Object> targetLookups = new ArrayList<>();
-    final List<BeanRegistration<?>> targetRegistrations = new ArrayList<>();
     final InterceptorRegistry delegate;
     CountingRegistry(BeanContext context) { delegate = new DefaultInterceptorRegistry(context); }
     public <T> Interceptor<T, ?>[] resolveInterceptors(Executable<T, ?> method,
@@ -44,69 +40,13 @@ class CountingRegistry implements InterceptorRegistry {
         return delegate.resolveConstructorInterceptors(constructor, candidates);
     }
 }
-@Singleton @Bean(typed = InterceptorChainFactory.class) @Replaces(InterceptorChainFactory.class)
-class CustomFactory implements InterceptorChainFactory {
-    final List<MethodInvocationContext<?, ?>> invocations = new ArrayList<>();
-    final InterceptorChainFactory delegate;
-    final InterceptorCandidateResolver resolver;
-    CustomFactory(InterceptorRegistry registry) {
-        CountingRegistry counting = (CountingRegistry) registry;
-        resolver = new InterceptorCandidateResolver(registry) {
-            public BeanRegistration<?> findProxyTargetRegistration(BeanLocator locator, Object bean) {
-                counting.targetLookups.add(bean);
-                BeanRegistration<?> registration = super.findProxyTargetRegistration(locator, bean);
-                counting.targetRegistrations.add(registration);
-                return registration;
-            }
-            public <T> Interceptor<T, ?>[] selectMethodInterceptors(ExecutableMethod<T, ?> method,
-                    Collection<BeanRegistration<Interceptor<T, ?>>> candidates, InterceptorKind kind) {
-                counting.methodSelections++;
-                return super.selectMethodInterceptors(method, candidates, kind);
-            }
-        };
-        delegate = new DefaultInterceptorChainFactory(registry, resolver);
-    }
-    public InterceptorCandidateResolver candidateResolver() { return resolver; }
-    public <T, R> MethodInvocationContext<T, R> buildMethodChain(T bean, ExecutableMethod<T, R> method,
-            Interceptor<T, R>[] interceptors, Object... arguments) {
-        MethodInvocationContext<T, R> chain = new RecordingInvocation<>(
-            delegate.buildMethodChain(bean, method, interceptors, arguments));
-        invocations.add(chain);
-        return chain;
-    }
-    public <T, R> LifecycleInvocation<T, R> buildLifecycleChain(BeanResolutionContext resolution,
-            BeanDefinition<T> definition, ExecutableMethod<T, R> method, T bean, InterceptorKind kind,
-            Collection<BeanRegistration<Interceptor<?, ?>>> candidates) {
-        return delegate.buildLifecycleChain(resolution, definition, method, bean, kind, candidates);
-    }
-    public <T> ConstructorInvocation<T> buildConstructorChain(BeanResolutionContext resolution,
-            BeanDefinition<T> definition, BeanConstructor<T> constructor,
-            Collection<BeanRegistration<Interceptor<T, T>>> candidates, int additionalArguments, Object... arguments) {
-        return delegate.buildConstructorChain(resolution, definition, constructor, candidates, additionalArguments, arguments);
-    }
-}
-class RecordingInvocation<T, R> implements MethodInvocationContext<T, R> {
-    final MethodInvocationContext<T, R> delegate;
-    int executions;
-    RecordingInvocation(MethodInvocationContext<T, R> delegate) { this.delegate = delegate; }
-    public R proceed() { executions++; return delegate.proceed(); }
-    public R proceed(Interceptor from) { return delegate.proceed(from); }
-    public R invoke(T bean, Object... arguments) { return delegate.invoke(bean, arguments); }
-    public T getTarget() { return delegate.getTarget(); }
-    public InterceptorKind getKind() { return delegate.getKind(); }
-    public ExecutableMethod<T, R> getExecutableMethod() { return delegate.getExecutableMethod(); }
-    public String getMethodName() { return delegate.getMethodName(); }
-    public Method getTargetMethod() { return delegate.getTargetMethod(); }
-    public ReturnType<R> getReturnType() { return delegate.getReturnType(); }
-    public Argument<?>[] getArguments() { return delegate.getArguments(); }
-    public Object[] getParameterValues() { return delegate.getParameterValues(); }
-    public Map<String, MutableArgumentValue<?>> getParameters() { return delegate.getParameters(); }
-    public AnnotationMetadata getAnnotationMetadata() { return delegate.getAnnotationMetadata(); }
-    public MutableConvertibleValues<Object> getAttributes() { return delegate.getAttributes(); }
+@Singleton
+class Invocations {
+    final List<MethodInvocationContext<?, ?>> recorded = new ArrayList<>();
 }
 '''
 
-    void 'replacement factory builds independent method calls for #description'() {
+    void 'generated proxies build an independent method call each time for #description'() {
         given:
         def context = buildContext(infrastructure + """
 @Retention(RetentionPolicy.RUNTIME) @Target({ElementType.TYPE, ElementType.METHOD})
@@ -115,7 +55,12 @@ class RecordingInvocation<T, R> implements MethodInvocationContext<T, R> {
 @interface Tracked {}
 @Singleton @InterceptorBean(Tracked.class)
 class Advice implements MethodInterceptor<Object, Object> {
-    public Object intercept(MethodInvocationContext<Object, Object> invocation) { return invocation.proceed(); }
+    private final Invocations invocations;
+    Advice(Invocations invocations) { this.invocations = invocations; }
+    public Object intercept(MethodInvocationContext<Object, Object> invocation) {
+        invocations.recorded.add(invocation);
+        return invocation.proceed();
+    }
 }
 @Singleton @Tracked class Subject {
     public String echo(String value) { return value + "!"; }
@@ -123,13 +68,12 @@ class Advice implements MethodInterceptor<Object, Object> {
 }
 """)
         def bean = context.getBean(context.classLoader.loadClass('method.factory.Subject'))
-        def factory = context.getBean(InterceptorChainFactory)
+        def invocations = context.getBean(context.classLoader.loadClass('method.factory.Invocations')).recorded
         def registry = context.getBean(InterceptorRegistry)
 
         when:
         def first = bean.echo('first')
         def selections = registry.selections
-        def methodSelections = registry.methodSelections
         def second = bean.echo('second')
         def answer = bean.answer()
 
@@ -137,13 +81,11 @@ class Advice implements MethodInterceptor<Object, Object> {
         first == 'first!'
         second == 'second!'
         answer == 42
-        factory.invocations.size() == 3
-        !factory.invocations[0].is(factory.invocations[1])
-        factory.invocations*.methodName == ['echo', 'echo', 'answer']
+        invocations.size() == 3
+        !invocations[0].is(invocations[1])
+        invocations*.methodName == ['echo', 'echo', 'answer']
+        selections > 0
         registry.selections == selections
-        methodSelections > 0
-        registry.methodSelections == methodSelections
-        factory.invocations*.executions == [1, 1, 1]
 
         cleanup:
         context.close()
@@ -161,7 +103,7 @@ class Advice implements MethodInterceptor<Object, Object> {
         'per-target hot swap'   | true        | false | false  | true    | true
     }
 
-    void 'hot swapping uses the context registry for managed and unmanaged targets (perTarget=#perTarget)'() {
+    void 'hot swapping replaces managed and unmanaged targets (perTarget=#perTarget)'() {
         given:
         def context = buildContext(infrastructure + """
 @Singleton @Around(proxyTarget = true, hotswap = true, lazyInterceptorsPerTarget = $perTarget)
@@ -176,24 +118,22 @@ class Subject {
         def replacement = type.unmanaged()
         def managed = type.unmanaged()
         context.registerSingleton(type, managed, Qualifiers.byName('managed'), false)
-        def registry = context.getBean(InterceptorRegistry)
 
         when:
         def swapped = proxy.swap(replacement)
 
         then:
         swapped.is(original)
-        registry.targetLookups == [replacement]
-        registry.targetRegistrations == [null]
+        proxy.interceptedTarget().is(replacement)
         proxy.echo('unmanaged') == 'unmanaged!'
 
         when:
-        proxy.swap(managed)
+        swapped = proxy.swap(managed)
 
         then:
-        registry.targetLookups == [replacement, managed]
+        swapped.is(replacement)
+        proxy.interceptedTarget().is(managed)
         proxy.echo('managed') == 'managed!'
-        registry.targetRegistrations[1].bean.is(managed)
 
         cleanup:
         context.close()
@@ -202,7 +142,7 @@ class Subject {
         perTarget << [false, true]
     }
 
-    void 'replacement factory preserves introduction and around ordering'() {
+    void 'generated introductions run around advice before introduction advice'() {
         given:
         def context = buildContext(infrastructure + '''
 @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.TYPE) @Introduction
@@ -211,7 +151,12 @@ class Subject {
 @interface Wrap {}
 @Singleton @InterceptorBean(Wrap.class)
 class AroundAdvice implements MethodInterceptor<Object, Object> {
-    public Object intercept(MethodInvocationContext<Object, Object> invocation) { return "around:" + invocation.proceed(); }
+    private final Invocations invocations;
+    AroundAdvice(Invocations invocations) { this.invocations = invocations; }
+    public Object intercept(MethodInvocationContext<Object, Object> invocation) {
+        invocations.recorded.add(invocation);
+        return "around:" + invocation.proceed();
+    }
 }
 @Singleton @InterceptorBean(Introduce.class)
 class IntroductionAdvice implements MethodInterceptor<Object, Object> {
@@ -222,13 +167,12 @@ class IntroductionAdvice implements MethodInterceptor<Object, Object> {
 @Singleton @Introduce @Wrap interface Subject { String echo(String value); }
 ''')
         def bean = context.getBean(context.classLoader.loadClass('method.factory.Subject'))
-        def factory = context.getBean(InterceptorChainFactory)
+        def invocations = context.getBean(context.classLoader.loadClass('method.factory.Invocations')).recorded
 
         expect:
         bean.echo('value') == 'around:introduced:value'
-        factory.invocations.size() == 1
-        factory.invocations[0].kind.name() == 'INTRODUCTION'
-        factory.invocations[0].executions == 1
+        invocations.size() == 1
+        invocations[0].kind.name() == 'INTRODUCTION'
 
         cleanup:
         context.close()
