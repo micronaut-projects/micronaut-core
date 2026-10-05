@@ -772,6 +772,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
         return watches.adaptedProcessors();
     }
 
+    @Override
+    public boolean recreate(Object bean) {
+        Objects.requireNonNull(bean, "bean");
+        // without the graph the dependents are unknown, and would keep the destroyed instance
+        return dependencyGraph != null && isRecreatable(singletonScope.findBeanRegistration(bean)) && recreateBean(bean);
+    }
+
+    @Override
+    public <T> boolean recreate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Objects.requireNonNull(beanType, "beanType");
+        if (dependencyGraph == null) {
+            return false;
+        }
+        BeanDefinition<T> definition = findBeanDefinition(beanType, qualifier).orElse(null);
+        if (definition == null) {
+            return false;
+        }
+        BeanRegistration<T> held = singletonScope.findBeanRegistration(definition);
+        if (held == null || !isRecreatable(held)) {
+            return false;
+        }
+        return recreateBean(held.bean);
+    }
+
+    /**
+     * Whether a registration is a singleton of the singleton scope that its definition can create anew: a bean of a
+     * custom scope stays with its scope, and the definition of a singleton registered at runtime may only hand back the
+     * instance it was given, which would be destroyed and returned again.
+     */
+    private static boolean isRecreatable(@Nullable BeanRegistration<?> registration) {
+        return registration != null && registration.bean != null && !(registration.getBeanDefinition() instanceof RuntimeBeanDefinition<?>);
+    }
+
     /**
      * Replaces a singleton with a new instance of its definition, destroying first the beans that received
      * it, as the dependency graph records, so that they are created again on top of the new instance.

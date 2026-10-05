@@ -232,6 +232,61 @@ class BeanWatchTest {
     }
 
     @Test
+    void aModuleRecreatesABeanAndItsDependentsThroughThePublicApi() {
+        Pool.CREATED.set(0);
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).trackBeanDependencies(true).start()) {
+            WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            // a singleton not created yet is left alone
+            assertFalse(beanContext.recreate(Pool.class, null));
+            assertEquals(0, Pool.CREATED.get());
+
+            // by instance: the pool is created again, and the bean that received it is destroyed and created again on top
+            PoolUser user = context.getBean(PoolUser.class);
+            Pool pool = user.pool;
+            assertTrue(beanContext.recreate(pool));
+            assertEquals(2, Pool.CREATED.get());
+            assertFalse(pool.watch.isActive());
+            Pool second = context.getBean(Pool.class);
+            assertNotSame(pool, second);
+            PoolUser recreatedUser = context.getBean(PoolUser.class);
+            assertNotSame(user, recreatedUser);
+            assertSame(second, recreatedUser.pool);
+
+            // by type, for a singleton the context holds
+            assertTrue(beanContext.recreate(Argument.of(Pool.class), null));
+            assertEquals(3, Pool.CREATED.get());
+            Pool third = context.getBean(Pool.class);
+            assertNotSame(second, third);
+            assertSame(third, context.getBean(PoolUser.class).pool);
+
+            // a prototype, or an object the context does not hold, is nobody's to recreate
+            assertFalse(beanContext.recreate(context.getBean(RecreatingPrototype.class)));
+            assertFalse(beanContext.recreate(new Object()));
+            // nor is a singleton registered at runtime, whose definition hands back the instance it was given
+            StringBuilder registered = new StringBuilder("registered");
+            context.registerSingleton(StringBuilder.class, registered);
+            assertFalse(beanContext.recreate(registered));
+            assertFalse(beanContext.recreate(StringBuilder.class, null));
+            assertSame(registered, context.getBean(StringBuilder.class));
+        }
+    }
+
+    @Test
+    void aContextThatDoesNotTrackDependenciesRecreatesNothing() {
+        Pool.CREATED.set(0);
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).trackBeanDependencies(false).start()) {
+            WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            PoolUser user = context.getBean(PoolUser.class);
+            // its dependents unknown, the pool is kept rather than leave the user holding a destroyed instance
+            assertFalse(beanContext.recreate(user.pool));
+            assertFalse(beanContext.recreate(Pool.class, null));
+            assertEquals(1, Pool.CREATED.get());
+            assertSame(user.pool, context.getBean(Pool.class));
+            assertTrue(user.pool.watch.isActive());
+        }
+    }
+
+    @Test
     void aResourceStateReportedBeforeTheContextStartsIsTheFirstBatchDeliveredOnce() {
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).build()) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;

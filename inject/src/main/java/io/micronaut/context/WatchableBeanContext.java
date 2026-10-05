@@ -193,4 +193,52 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
      * @return The watch
      */
     BeanWatch watchClassChanges(ClassChangeWatcher watcher);
+
+    /**
+     * Recreates a singleton the context holds, and the beans that depend on it: the transitive dependents the
+     * {@link BeanDependencyGraph} records are destroyed first, the bean is destroyed and created again from its
+     * definition, and the dependents are created again when they are next requested, on top of the new instance. This
+     * is what a watcher does when a change it is told about cannot be applied to a bean in place, such as a cache of
+     * serializers or validators built from classes that a development reload replaced.
+     *
+     * <p>Meant for development-time watches. The dependents are known only when the context
+     * {@link BeanContextConfiguration#isTrackBeanDependencies() tracks bean dependencies}, which by default only a
+     * context in {@link io.micronaut.context.env.DevelopmentMode development mode} does; any other context recreates
+     * nothing and returns false, rather than leave dependents holding the instance it destroyed.</p>
+     *
+     * @param bean The bean to recreate
+     * @return Whether the context held the bean as a singleton and recreated it; false for a prototype, a bean of a
+     * custom scope, a singleton registered at runtime, whose definition may only hand back the same instance, an
+     * object the context does not hold, or a context that does not track bean dependencies
+     * @since 5.3.0
+     */
+    boolean recreate(Object bean);
+
+    /**
+     * Recreates the singleton of a type and qualifier, and the beans that depend on it, as {@link #recreate(Object)}
+     * does, when the context has created it. A singleton not created yet is left alone: it is created from the
+     * current state when first requested.
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier, null for none
+     * @param <T> The bean type
+     * @return Whether a singleton of the type was held and recreated
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException if the type and qualifier match several beans
+     * @since 5.3.0
+     */
+    <T> boolean recreate(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Recreates the singleton of a type and qualifier, and the beans that depend on it, as
+     * {@link #recreate(Argument, Qualifier)} does.
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier, null for none
+     * @param <T> The bean type
+     * @return Whether a singleton of the type was held and recreated
+     * @since 5.3.0
+     */
+    default <T> boolean recreate(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return recreate(Argument.of(beanType), qualifier);
+    }
 }
