@@ -319,11 +319,11 @@ class LoomCarrierGroupTest {
         }
     }
 
-    private static void awaitState(Thread thread, Thread.State state) throws InterruptedException {
+    private static void awaitState(Thread thread, Thread.State state) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (thread.getState() != state) {
             assertTrue(System.nanoTime() < deadline, thread + " did not reach " + state + ", is " + thread.getState());
-            Thread.sleep(1);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
         }
     }
 }
