@@ -87,7 +87,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         if (spec.declaringTypeTarget()) {
             route = GET(spec.uri(), method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
         } else {
-            route = buildBeanRoute(spec.httpMethodName(), spec.httpMethod(), spec.uri(), beanDefinition, method);
+            route = beanRoute(spec, beanDefinition, method);
         }
         if (spec.consumes() != null) {
             route = route.consumes(spec.consumes());
@@ -107,6 +107,27 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route: {}", route);
         }
+    }
+
+    /**
+     * The route of a bean method, built with the verb method of the route builder like before
+     * 5.3.0, so a subclass that overrides one of them, or {@link #buildBeanRoute}, still builds
+     * the routes of the controllers.
+     */
+    private UriRoute beanRoute(RouteDefinitions.RouteSpec spec, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        String uri = spec.uri();
+        return switch (spec.httpMethod()) {
+            case GET -> GET(uri, beanDefinition, method);
+            case POST -> POST(uri, beanDefinition, method);
+            case PUT -> PUT(uri, beanDefinition, method);
+            case PATCH -> PATCH(uri, beanDefinition, method);
+            case QUERY -> QUERY(uri, beanDefinition, method);
+            case DELETE -> DELETE(uri, beanDefinition, method);
+            case HEAD -> HEAD(uri, beanDefinition, method);
+            case OPTIONS -> OPTIONS(uri, beanDefinition, method);
+            case TRACE -> TRACE(uri, beanDefinition, method);
+            default -> buildBeanRoute(spec.httpMethodName(), spec.httpMethod(), uri, beanDefinition, method);
+        };
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
