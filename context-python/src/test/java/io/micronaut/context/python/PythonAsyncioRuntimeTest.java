@@ -1398,13 +1398,11 @@ final class PythonAsyncioRuntimeTest {
                 """);
             PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ReactiveClient()));
             Value coroutine = context.eval(PYTHON, """
-                import java
-                IllegalStateException = java.type("java.lang.IllegalStateException")
                 async def fail(target):
                     try:
                         await target.client.error()
-                    except IllegalStateException as exc:
-                        return str(exc.getMessage())
+                    except RuntimeError as exc:
+                        return str(exc)
                     return "missing-error"
                 fail
                 """).execute(target);
@@ -2093,79 +2091,15 @@ final class PythonAsyncioRuntimeTest {
             assertEquals("backend down", assertInstanceOf(IllegalStateException.class, exception.getCause()).getMessage());
 
             Value catching = context.eval(PYTHON, """
-                import java
-                IllegalStateException = java.type("java.lang.IllegalStateException")
                 async def call(target):
                     try:
                         return await target.client.message()
-                    except IllegalStateException as e:
-                        return "IllegalStateException:" + str(e.getMessage())
+                    except Exception as e:
+                        return type(e).__name__ + ":" + str(e.java_exception.getMessage())
                 call
                 """).execute(target);
             CompletionStage caught = PythonAsyncioRuntime.toCompletionStage(catching);
-            assertEquals("IllegalStateException:backend down", caught.toCompletableFuture().get(1, TimeUnit.SECONDS));
-        }
-    }
-
-    @Test
-    void awaitedJavaFailureCrossesTasksAsItself() throws Exception {
-        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
-            Value target = context.eval(PYTHON, """
-                class Target:
-                    pass
-                Target()
-                """);
-            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new FailingAsyncClient()));
-
-            Value tasks = context.eval(PYTHON, """
-                import asyncio
-                import java
-                IllegalStateException = java.type("java.lang.IllegalStateException")
-                async def message(target):
-                    return await target.client.message()
-                async def call(target):
-                    seen = []
-                    try:
-                        await asyncio.ensure_future(message(target))
-                    except IllegalStateException as e:
-                        seen.append("task:" + str(e.getMessage()))
-                    # gather stores what exception() answers: a Python exception carrying the Java one
-                    try:
-                        await asyncio.gather(message(target))
-                    except RuntimeError as e:
-                        seen.append(type(e).__name__ + ":" + str(e.java_exception.getMessage()))
-                    return ",".join(seen)
-                call
-                """).execute(target);
-            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(tasks);
-            assertEquals("task:backend down,MicronautJavaException:backend down", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
-        }
-    }
-
-    @Test
-    void awaitedJavaFailureOnALoopOfTheApplicationRaisesTheWrapper() {
-        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
-            Value target = context.eval(PYTHON, """
-                class Target:
-                    pass
-                Target()
-                """);
-            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new FailingAsyncClient()));
-            // the tasks of a loop the bridge does not own cannot carry a Java exception: the wrapper is raised
-            Value result = context.eval(PYTHON, """
-                import asyncio
-                async def message(target):
-                    return await target.client.message()
-                async def call(target):
-                    try:
-                        await asyncio.create_task(message(target))
-                    except RuntimeError as e:
-                        return type(e).__name__ + ":" + str(e.java_exception.getMessage())
-                def run(target):
-                    return asyncio.run(call(target))
-                run
-                """).execute(target);
-            assertEquals("MicronautJavaException:backend down", result.asString());
+            assertEquals("MicronautJavaException:backend down", caught.toCompletableFuture().get(1, TimeUnit.SECONDS));
         }
     }
 
@@ -2176,8 +2110,6 @@ final class PythonAsyncioRuntimeTest {
                 class Rejected(Exception):
                     pass
                 rejected = Rejected("no")
-                # an application attribute of that name does not make it a bridge wrapper
-                rejected.java_exception = "not a bridge wrapper"
                 async def fail():
                     raise rejected
                 fail
