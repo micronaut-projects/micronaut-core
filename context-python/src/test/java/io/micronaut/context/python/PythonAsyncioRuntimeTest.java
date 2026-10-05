@@ -419,7 +419,8 @@ final class PythonAsyncioRuntimeTest {
                 async def call_failing(failing):
                     try:
                         await failing.fail()
-                    except Exception as e:
+                    # the replacement is a Java exception, which `except Exception` does not catch (as for a blocking call)
+                    except BaseException as e:
                         current, seen = e, []
                         for _ in range(5):
                             if current is None:
@@ -2332,6 +2333,53 @@ final class PythonAsyncioRuntimeTest {
 
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
             assertEquals("caught:NumberFormatException", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void awaitedStageFailingWithAPythonExceptionRaisesThatException() throws Exception {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value failing = context.eval(PYTHON, """
+                class Rejected(Exception):
+                    pass
+                rejected = Rejected("no")
+                async def fail():
+                    raise rejected
+                fail
+                """);
+            // the stage of a coroutine fails with the PolyglotException of its Python exception, which an
+            // interceptor chain wraps in a CompletionException
+            CompletableFuture<Object> wrapped = new CompletableFuture<>();
+            PythonAsyncioRuntime.toCompletionStage(failing.execute()).whenComplete((value, failure) ->
+                wrapped.completeExceptionally(new CompletionException((Throwable) failure)));
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new StageClient(wrapped)));
+            Value catching = context.eval(PYTHON, """
+                async def call(target):
+                    try:
+                        await target.client.stage()
+                    except Rejected as e:
+                        return "same" if e is rejected else "copy"
+                call
+                """).execute(target);
+            CompletionStage caught = PythonAsyncioRuntime.toCompletionStage(catching);
+            assertEquals("same", caught.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    public static final class StageClient {
+        private final CompletionStage<Object> stage;
+
+        StageClient(CompletionStage<Object> stage) {
+            this.stage = stage;
+        }
+
+        public CompletionStage<Object> stage() {
+            return stage;
         }
     }
 

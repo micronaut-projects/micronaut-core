@@ -1276,7 +1276,9 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
 
     Java calls this when Python code awaits a Java async value. The future is
     created on the running Micronaut loop if one exists, otherwise the helper
-    falls back to the current Python event loop. If the Python future is
+    falls back to the current Python event loop. A stage that failed with the
+    Python exception of the coroutine behind it fails the future with that
+    exception object. If the Python future is
     cancelled, cancellation is propagated back to the Java future when Java
     supplied one.
     """
@@ -1336,8 +1338,11 @@ def _micronaut_complete_future(future, value, throwable):
         return
     if throwable is None:
         future.set_result(value)
-    else:
+    elif _is_java_throwable(throwable):
         future.set_exception(_micronaut_java_failure(throwable))
+    else:
+        # the Python exception of the coroutine behind the stage (PythonAsyncioRuntime.awaitedFailure)
+        future.set_exception(throwable)
 
 
 # ---------------------------------------------------------------------------
