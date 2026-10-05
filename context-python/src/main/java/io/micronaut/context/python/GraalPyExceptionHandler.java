@@ -120,6 +120,12 @@ final class GraalPyExceptionHandler {
                 }
                 RuntimeException generated = toGeneratedRuntimeException(polyglotException);
                 return generated != null ? generated : polyglotException;
+            } catch (RuntimeException generatedException) {
+                // The context's exception handler may already have mapped the guest exception.
+                if (generatedException instanceof ValueCoercible) {
+                    return generatedException;
+                }
+                throw generatedException;
             }
         }
         return new RuntimeException(exception.toString());
