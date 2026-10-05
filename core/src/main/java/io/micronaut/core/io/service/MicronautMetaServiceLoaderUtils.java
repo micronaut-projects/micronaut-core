@@ -374,21 +374,8 @@ public final class MicronautMetaServiceLoaderUtils {
                     windowEnd = position + read(zip, buffer, position, (int) Math.min(buffer.length, cenEnd - position));
                 }
                 int offset = (int) (position - windowStart);
-                if (int32(buffer, offset) != CEN_SIGNATURE) {
-                    return null;
-                }
-                int method = uint16(buffer, offset + 10);
-                int nameLength = uint16(buffer, offset + 28);
-                int extraLength = uint16(buffer, offset + 30);
-                int commentLength = uint16(buffer, offset + 32);
-                int headerSize = CEN_SIZE + nameLength + extraLength + commentLength;
-                // checkAndAddEntry rejects an encrypted entry, another method, a header longer than 65535 bytes or
-                // past the directory, and ZIP64 values its extra field does not hold; any ZIP64 value is left to it
-                if ((uint16(buffer, offset + 8) & ENCRYPTED_FLAG) != 0
-                    || method != STORED && method != DEFLATED
-                    || headerSize > MAX_VARIABLE_LENGTH || position + headerSize > cenEnd
-                    || int32(buffer, offset + 20) == -1 || int32(buffer, offset + 24) == -1
-                    || int32(buffer, offset + 42) == -1 || uint16(buffer, offset + 34) == ZIP64_MAGIC_COUNT) {
+                int headerSize = headerSize(buffer, offset);
+                if (headerSize < 0 || position + headerSize > cenEnd) {
                     return null;
                 }
                 if (position + headerSize > windowEnd) {
@@ -397,15 +384,8 @@ public final class MicronautMetaServiceLoaderUtils {
                     windowEnd = position + read(zip, buffer, position, (int) Math.min(buffer.length, cenEnd - position));
                     offset = 0;
                 }
-                int nameStart = offset + CEN_SIZE;
-                int extraStart = nameStart + nameLength;
-                // ZipFile decodes every name and comment as UTF-8: check them as bytes, and create only the names kept
-                if (!isUtf8(buffer, nameStart, nameLength) || !isValidExtra(buffer, extraStart, extraLength)
-                    || !isUtf8(buffer, extraStart + extraLength, commentLength)) {
+                if (!addName(buffer, offset, prefix, names)) {
                     return null;
-                }
-                if (startsWith(buffer, nameStart, nameLength, prefix)) {
-                    names.add(new String(buffer, nameStart, nameLength, StandardCharsets.UTF_8));
                 }
                 position += headerSize;
                 count++;
@@ -441,6 +421,58 @@ public final class MicronautMetaServiceLoaderUtils {
     }
 
     /**
+     * Checks the fixed part of a central directory header as {@code ZipFile.Source.checkAndAddEntry} does.
+     *
+     * <p>This and {@code addName} hold the work done for each entry: the loop of {@code scanCentralDirectory} runs
+     * once per jar, too few iterations for it to be compiled, while a method called for every entry is compiled after
+     * a few hundred calls.</p>
+     *
+     * @param buffer The buffer
+     * @param offset The offset of the header
+     * @return The size of the header with its name, extra field and comment, or {@code -1} if {@link ZipFile} rejects
+     * the header or it holds a ZIP64 value, which the scan leaves to {@link ZipFile}
+     */
+    private static int headerSize(byte[] buffer, int offset) {
+        int method = uint16(buffer, offset + 10);
+        int size = CEN_SIZE + uint16(buffer, offset + 28) + uint16(buffer, offset + 30) + uint16(buffer, offset + 32);
+        if (int32(buffer, offset) != CEN_SIGNATURE
+            || (uint16(buffer, offset + 8) & ENCRYPTED_FLAG) != 0
+            || method != STORED && method != DEFLATED
+            || size > MAX_VARIABLE_LENGTH
+            || int32(buffer, offset + 20) == -1 || int32(buffer, offset + 24) == -1 || int32(buffer, offset + 42) == -1
+            || uint16(buffer, offset + 34) == ZIP64_MAGIC_COUNT) {
+            return -1;
+        }
+        return size;
+    }
+
+    /**
+     * Checks the name, the extra field and the comment of a central directory header as
+     * {@code ZipFile.Source.checkAndAddEntry} does, and adds the name if it starts with the prefix.
+     *
+     * @param buffer The buffer, which holds the whole header
+     * @param offset The offset of the header
+     * @param prefix The prefix
+     * @param names  The names to add to
+     * @return {@code false} if {@link ZipFile} rejects the header or its extra field holds a ZIP64 block
+     */
+    private static boolean addName(byte[] buffer, int offset, byte[] prefix, List<String> names) {
+        int nameStart = offset + CEN_SIZE;
+        int nameLength = uint16(buffer, offset + 28);
+        int extraStart = nameStart + nameLength;
+        int extraLength = uint16(buffer, offset + 30);
+        if (!isUtf8(buffer, nameStart, nameLength) || !isValidExtra(buffer, extraStart, extraLength)
+            || !isUtf8(buffer, extraStart + extraLength, uint16(buffer, offset + 32))) {
+            return false;
+        }
+        if (startsWith(buffer, nameStart, nameLength, prefix)) {
+            // ZipFile decodes every name as UTF-8; only the names kept become strings
+            names.add(new String(buffer, nameStart, nameLength, StandardCharsets.UTF_8));
+        }
+        return true;
+    }
+
+    /**
      * Checks the extra field of a central directory header as {@code ZipFile.Source.checkExtraFields} does: the data
      * of each block ends within the field. A ZIP64 block is left to {@link ZipFile}.
      */
@@ -463,6 +495,21 @@ public final class MicronautMetaServiceLoaderUtils {
     private static boolean isUtf8(byte[] bytes, int offset, int length) {
         int end = offset + length;
         int i = offset;
+        // names are almost always ASCII: OR the bytes eight at a time, and check the sequences only if a byte is not
+        int bits = 0;
+        while (end - i >= 8) {
+            bits |= bytes[i] | bytes[i + 1] | bytes[i + 2] | bytes[i + 3]
+                | bytes[i + 4] | bytes[i + 5] | bytes[i + 6] | bytes[i + 7];
+            i += 8;
+        }
+        while (i < end) {
+            bits |= bytes[i];
+            i++;
+        }
+        if (bits >= 0) {
+            return true;
+        }
+        i = offset;
         while (i < end) {
             int b = bytes[i];
             if (b >= 0) {
