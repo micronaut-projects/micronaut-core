@@ -754,16 +754,7 @@ class StreamingResponseWriterSpec extends Specification {
 
         when:
         100.times { turn ->
-            onLoop {
-                (1 + random.nextInt(12)).times {
-                    if (random.nextInt(4) == 0) {
-                        toggleWritable(sink, writer)
-                    }
-                    int size = random.nextInt(5) == 0 ? 1025 + random.nextInt(3000) : 1 + random.nextInt(1024)
-                    added += size
-                    writer.add(piece("p" * size))
-                }
-            }
+            added += onLoop { addRandomTurn(random, sink, writer) }
             settle()
             if (random.nextBoolean()) {
                 onLoop { sink.confirm() }
@@ -781,6 +772,26 @@ class StreamingResponseWriterSpec extends Specification {
         upstream.consumed == added
         sink.transport.sum { it.length() } == added
         sink.transport.every { it.length() <= 8192 }
+    }
+
+    /**
+     * One event loop turn of the random credit test: up to twelve pieces, mostly small, with the
+     * writability of the sink flipped now and then.
+     *
+     * @return The bytes added
+     */
+    private static long addRandomTurn(Random random, HoldingSink sink, StreamingResponseWriter writer) {
+        long added = 0
+        int pieces = 1 + random.nextInt(12)
+        for (int i = 0; i < pieces; i++) {
+            if (random.nextInt(4) == 0) {
+                toggleWritable(sink, writer)
+            }
+            int size = random.nextInt(5) == 0 ? 1025 + random.nextInt(3000) : 1 + random.nextInt(1024)
+            added += size
+            writer.add(piece("p" * size))
+        }
+        return added
     }
 
     /**
