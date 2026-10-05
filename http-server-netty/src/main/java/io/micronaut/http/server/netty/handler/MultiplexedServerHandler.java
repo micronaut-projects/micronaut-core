@@ -643,6 +643,10 @@ abstract class MultiplexedServerHandler {
 
             InputStreamer(boolean sendContinue) {
                 this.sendContinue = sendContinue;
+                // what arrives before the route reads the body is bounded by the flow control
+                // window, not by the buffer limit, for a reader that streams the body without
+                // holding it
+                dest.setKeepInitialBytes();
             }
 
             @Override

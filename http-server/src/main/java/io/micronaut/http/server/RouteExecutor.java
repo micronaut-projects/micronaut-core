@@ -41,6 +41,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
@@ -51,6 +52,8 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
@@ -85,6 +88,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -501,15 +505,166 @@ public final class RouteExecutor {
                 if (isKotlinCoroutine && contextView != null) {
                     coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
                 }
-                requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
-                Object body = routeMatch.execute();
-                if (body instanceof Optional optional) {
-                    body = optional.orElse(null);
+                ExecutionFlow<?> waitsFor = fulfillArgumentsAfterFilters(routeMatch, httpRequest);
+                if (waitsFor != null) {
+                    // e.g. the form of a request bean, which is still arriving
+                    ExecutorService routeExecutor = routeMatch.getRouteInfo().getExecutor(serverConfiguration.getThreadSelection());
+                    return releaseRouteBodies(httpRequest, waitsFor.then(() -> {
+                        FormRouteCompleter completer = FormFactory.getCompleterOrNull(httpRequest);
+                        if (completer != null) {
+                            completer.stopDeadlockDetection();
+                        }
+                        // the wait completed on the thread that read the body: the route runs
+                        // on its executor, as it would without the wait
+                        Supplier<ExecutionFlow<HttpResponse<?>>> execution = () -> routePropagatedContext.propagate(() -> {
+                            try {
+                                return executeFulfilledRoute(propagatedContext, routeMatch, httpRequest);
+                            } catch (Throwable e) {
+                                return ExecutionFlow.error(e);
+                            }
+                        });
+                        return routeExecutor == null ? execution.get() : ExecutionFlow.async(routeExecutor, execution);
+                    }));
                 }
-                return createResponseForBody(propagatedContext, httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
+                return releaseRouteBodies(httpRequest, executeFulfilledRoute(propagatedContext, routeMatch, httpRequest));
             } catch (Throwable e) {
-                return ExecutionFlow.error(e);
+                return releaseRouteBodies(httpRequest, ExecutionFlow.error(e));
             }
+        });
+    }
+
+    private ExecutionFlow<HttpResponse<?>> executeFulfilledRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
+        Object body = routeMatch.execute();
+        if (body instanceof Optional optional) {
+            body = optional.orElse(null);
+        }
+        return createResponseForBody(propagatedContext, httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
+    }
+
+    /**
+     * Bind the arguments of the route that are bound after the filters, e.g. a request bean, and
+     * tell what they wait for: a member of a request bean that is taken from the body, e.g. a
+     * form, waits for a body that is still arriving, like an argument of the route does. The
+     * route waited for its other arguments before, see {@link RequestLifecycle#fulfillArguments}.
+     *
+     * @param routeMatch  The route
+     * @param httpRequest The request
+     * @return What the arguments wait for, or {@code null} if the route can be executed
+     */
+    private @Nullable ExecutionFlow<?> fulfillArgumentsAfterFilters(RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
+        if (routeMatch.isFulfilled()) {
+            // nothing is bound after the filters
+            return null;
+        }
+        // what the route waited for before: it is done, or, for an error route, not waited for
+        BasicHttpAttributes.takeRouteWaitsFor(httpRequest);
+        requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
+        ExecutionFlow<?> waitsFor = BasicHttpAttributes.takeRouteWaitsFor(httpRequest);
+        if (waitsFor == null) {
+            return null;
+        }
+        FormRouteCompleter completer = FormFactory.getCompleterOrNull(httpRequest);
+        if (completer != null && !completer.isStarted()) {
+            // a field an argument reads by name, e.g. the CompletedFileUpload of a request bean
+            completer.start();
+        }
+        return waitsFor;
+    }
+
+    /**
+     * Release what the reads of the {@link io.micronaut.http.body.AsyncRequestBody} the route was
+     * invoked with left open, e.g. a read the route started and did not wait for, once the route
+     * completed: when the value or the stage it returned completed, or it failed, before the
+     * response is written. A failure to release fails a successful route, and is added as
+     * suppressed to the failure of the route; either is answered by the error handling.
+     *
+     * <p>The bodies are taken when the route completed: a streamed response took them before,
+     * see {@link #releaseWhenStreamEnds}, and releases them when its stream ends.</p>
+     *
+     * @param request The request the route was invoked with
+     * @param flow    The response of the route
+     * @return The response, once the bodies were released
+     */
+    private static ExecutionFlow<HttpResponse<?>> releaseRouteBodies(HttpRequest<?> request, ExecutionFlow<HttpResponse<?>> flow) {
+        if (!BasicHttpAttributes.hasRouteBodies(request)) {
+            return flow;
+        }
+        return ReleasableRequestBody.releaseAfter(flow, () -> {
+            ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+            return bodies == null ? CompletableFuture.completedStage(null) : bodies.releaseBody();
+        });
+    }
+
+    /**
+     * Release the bodies the route of the request was invoked with when the stream of its
+     * response ends, instead of when the route completed: the stream may be made of the reads
+     * of the body, e.g. of its elements. The stream releases them when it completes, before its
+     * completion is delivered, when it fails, or when it is cancelled, e.g. the client
+     * disconnected. The response is committed by then: a failure to release is logged. A stream
+     * that is never subscribed to leaves the bodies to the release when the request ends.
+     *
+     * @param request The request of the route
+     * @param stream  The stream of the response body
+     * @return The stream, which releases the bodies when it ends
+     */
+    private static Publisher<Object> releaseWhenStreamEnds(HttpRequest<?> request, Publisher<Object> stream) {
+        ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+        if (bodies == null) {
+            return stream;
+        }
+        return Flux.defer(() -> {
+            AtomicBoolean released = new AtomicBoolean();
+            Supplier<Mono<Void>> release = () -> released.compareAndSet(false, true)
+                ? Mono.fromCompletionStage(() -> releaseLogged(request, bodies)) : Mono.empty();
+            return Flux.from(stream)
+                .onErrorResume(error -> release.get().then(Mono.error(error)))
+                .concatWith(Mono.defer(release).then(Mono.empty()))
+                .doOnCancel(() -> release.get().subscribe());
+        });
+    }
+
+    /**
+     * Release the bodies the route of the request was invoked with when the single-valued
+     * publisher of its response ends, like {@link #releaseWhenStreamEnds} does for a stream: the
+     * publisher may read the bodies when it is subscribed to, after the route completed. The
+     * bodies are released before the value or the completion is delivered, when the publisher
+     * fails, or when it is cancelled.
+     *
+     * @param request The request of the route
+     * @param single  The single-valued publisher of the response body
+     * @return The publisher, single-valued, which releases the bodies when it ends
+     */
+    private static Publisher<Object> releaseWhenSingleEnds(HttpRequest<?> request, Publisher<Object> single) {
+        ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+        if (bodies == null) {
+            return single;
+        }
+        return Mono.usingWhen(
+            Mono.just(bodies),
+            owned -> Mono.from(single),
+            owned -> Mono.fromCompletionStage(() -> releaseLogged(request, owned))
+        );
+    }
+
+    /**
+     * Release the bodies of a streamed response, and log a failure: the response is committed.
+     *
+     * @param request The request of the route
+     * @param bodies  The bodies
+     * @return Completes when released, normally even when releasing failed
+     */
+    private static CompletionStage<Void> releaseLogged(HttpRequest<?> request, ReleasableRequestBody bodies) {
+        CompletionStage<Void> released;
+        try {
+            released = bodies.releaseBody();
+        } catch (Throwable e) {
+            released = CompletableFuture.failedStage(e);
+        }
+        return released.handle((ignored, error) -> {
+            if (error != null && LOG.isWarnEnabled()) {
+                LOG.warn("Failed to release what the reads of the body of {} left open when its streamed response ended", request, error);
+            }
+            return null;
         });
     }
 
@@ -557,9 +712,38 @@ public final class RouteExecutor {
         }
         response = outgoingResponse.tryCompleteValue();
         if (response != null) {
-            return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
+            return ExecutionFlow.just(keepRouteBodiesForStream(request, finaliseResponse(request, routeInfo, routeMatch, response)));
         }
-        return outgoingResponse.map(res -> finaliseResponse(request, routeInfo, routeMatch, res));
+        return outgoingResponse.map(res -> keepRouteBodiesForStream(request, finaliseResponse(request, routeInfo, routeMatch, res)));
+    }
+
+    /**
+     * Keep the bodies the route was invoked with for the publisher of a response the route did not
+     * return directly, see {@link #releaseWhenStreamEnds}: the publisher inside the stage, the
+     * {@link ExecutionFlow}, or the result of the suspend function the route returned, with or
+     * without a response around it. Such a publisher is subscribed to when the response is
+     * written, after the route completed, and would find the bodies released: a stream, or a
+     * single-valued publisher, e.g. a {@code CompletionStage<Mono<T>>}, which stays single-valued.
+     * A publisher the route returned directly, or in the response it returned, took the bodies
+     * already, or was resolved before the route completed.
+     *
+     * @param request  The request of the route
+     * @param response The response of the route
+     * @return The response, its publisher body releasing the bodies when it ends
+     */
+    private MutableHttpResponse<?> keepRouteBodiesForStream(HttpRequest<?> request, MutableHttpResponse<?> response) {
+        if (!BasicHttpAttributes.hasRouteBodies(request)) {
+            return response;
+        }
+        Object body = response.body();
+        if (body == null || body instanceof HttpResponse<?> || !Publishers.isConvertibleToPublisher(body)) {
+            return response;
+        }
+        Publisher<Object> publisher = Publishers.convertToPublisher(conversionService, body);
+        if (Publishers.isSingle(body.getClass())) {
+            return response.body(releaseWhenSingleEnds(request, publisher));
+        }
+        return response.body(releaseWhenStreamEnds(request, publisher));
     }
 
     private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
@@ -677,7 +861,8 @@ public final class RouteExecutor {
             response = response.contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
             return ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(propagatedContext, response));
         }
-        return processPublisherBody(propagatedContext, request, forStatus(routeInfo, null), false, publisher, routeInfo);
+        // a streamed response keeps the bodies of the route until its stream ends
+        return processPublisherBody(propagatedContext, request, forStatus(routeInfo, null), false, releaseWhenStreamEnds(request, publisher), routeInfo);
     }
 
     /**
@@ -793,7 +978,12 @@ public final class RouteExecutor {
             return ExecutionFlow.just(response);
         }
         Publisher<Object> bodyPublisher = Publishers.convertToPublisher(conversionService, body);
-        return processPublisherBody(propagatedContext, request, response, Publishers.isSingle(body.getClass()), bodyPublisher, routeInfo);
+        boolean isSinglePublisher = Publishers.isSingle(body.getClass());
+        if (!isSinglePublisher) {
+            // a streamed response keeps the bodies of the route until its stream ends
+            bodyPublisher = releaseWhenStreamEnds(request, bodyPublisher);
+        }
+        return processPublisherBody(propagatedContext, request, response, isSinglePublisher, bodyPublisher, routeInfo);
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
