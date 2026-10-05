@@ -17,9 +17,14 @@ package io.micronaut.inject.context
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanContext
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
+
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 
 class CreateBeanFromDefinitionSpec extends AbstractTypeElementSpec {
 
@@ -156,6 +161,39 @@ public class Beans {
         then:
         upperText.value == 'MIXED'
         lowerText.value == 'mixed'
+
+        cleanup:
+        context.close()
+    }
+
+    void "a bean context that does not override the method creates the bean by the type and declared qualifier of the definition"() {
+        given:
+        ApplicationContext context = buildContext('test.Beans', BEANS)
+        BeanDefinition<?> lower = context.getBeanDefinition(type(context, 'Text'), Qualifiers.byName('lower'))
+        List<List<Object>> lookups = []
+        // Calls the default method and passes every other call to the real context
+        BeanContext beanContext = (BeanContext) Proxy.newProxyInstance(
+            BeanContext.classLoader,
+            [BeanContext] as Class[],
+            { Object proxy, Method method, Object[] args ->
+                if (method.isDefault() && method.name == 'createBean' && method.parameterTypes[0] == BeanDefinition) {
+                    return InvocationHandler.invokeDefault(proxy, method, args)
+                }
+                if (method.name == 'createBean') {
+                    lookups << (args as List)
+                }
+                return method.invoke(context, args)
+            } as InvocationHandler
+        )
+
+        when:
+        def text = beanContext.createBean(lower, 'MiXeD')
+
+        then:
+        text.value == 'mixed'
+        lookups.size() == 1
+        lookups[0][0] == type(context, 'Text')
+        lookups[0][1] == Qualifiers.byName('lower')
 
         cleanup:
         context.close()
