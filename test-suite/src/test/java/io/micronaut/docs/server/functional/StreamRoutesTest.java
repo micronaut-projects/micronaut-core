@@ -29,7 +29,8 @@ class StreamRoutesTest {
             assertEquals("[1,2,3]", http.retrieve(HttpRequest.GET("/numbers")));
             // an error before the first event is answered by the error routes
             assertEquals("data: order 1 shipped\n\n", http.retrieve(HttpRequest.GET("/orders/1/updates")));
-            HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class, () -> http.retrieve(HttpRequest.GET("/orders/2/updates")));
+            HttpRequest<?> missing = HttpRequest.GET("/orders/2/updates");
+            HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class, () -> http.retrieve(missing));
             assertEquals(HttpStatus.NOT_FOUND, notFound.getStatus());
             // after it, as an event
             assertEquals("data: started\n\ndata: done\n\n", http.retrieve(HttpRequest.GET("/jobs/1")));

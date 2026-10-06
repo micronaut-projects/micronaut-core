@@ -448,7 +448,7 @@ class DefaultSseEmitterTest {
         return consumer;
     }
 
-    private static boolean awaitTrue(BooleanSupplier condition) throws InterruptedException {
+    private static boolean awaitTrue(BooleanSupplier condition) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (!condition.getAsBoolean()) {
             if (System.nanoTime() > deadline) {
