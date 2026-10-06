@@ -28,26 +28,26 @@ import java.util.concurrent.CompletionStage;
  * handled once the subscriber requested it. The handler subscribes before it is done.
  *
  * <pre>{@code
- * ws.onMessages(String.class, (messages, session) -> session.sendAllAsync(Flux.from(messages).map(String::toUpperCase)));
+ * ws.onMessageStream(String.class, (session, messages) -> session.sendAllAsync(Flux.from(messages).map(String::toUpperCase)));
  * }</pre>
  *
  * @param <T> The type of the messages
  * @author Denis Stepanov
  * @since 5.3.0
- * @see WebSocketRouteSpec#onMessages(io.micronaut.core.type.Argument, WebSocketMessagesHandler)
+ * @see WebSocketEndpointSpec#onMessageStream(io.micronaut.core.type.Argument, WebSocketMessageStreamHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface WebSocketMessagesHandler<T> {
+public interface WebSocketMessageStreamHandler<T> {
 
     /**
      * Handle the messages of a connection.
      *
+     * @param session  The session of the connection
      * @param messages The messages of the connection, which completes when the connection closes,
      *                 and has a single subscriber
-     * @param session  The session of the connection
      * @return A stage that completes when the handler is done, or {@code null} if it is done
-     * @throws Exception An error, passed to the {@link WebSocketRouteSpec#onError(WebSocketErrorHandler) error handler}
+     * @throws Exception An error, passed to the {@link WebSocketEndpointSpec#onError(WebSocketErrorHandler) error handler}
      */
-    @Nullable CompletionStage<?> onMessages(Publisher<T> messages, WebSocketSession session) throws Exception;
+    @Nullable CompletionStage<?> onMessageStream(WebSocketSession session, Publisher<T> messages) throws Exception;
 }

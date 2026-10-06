@@ -57,6 +57,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -298,7 +299,7 @@ class HandlerRouteWebSocketTest {
         assertEquals("tick 1", client.next());
         assertEquals("tick 2", client.next());
         assertEquals("tick 3", client.next());
-        assertEquals("sent 3 ticks", event());
+        assertEquals("sent 3 ticks true", event());
         client.close(1000, "done");
     }
 
@@ -320,7 +321,8 @@ class HandlerRouteWebSocketTest {
         client.ws.sendText("still read", true).get(TIMEOUT, TimeUnit.SECONDS);
         assertEquals("echo still read", client.next());
         client.close(1000, "done");
-        assertEquals("endless cancelled", event());
+        // the session closed before the stream ended
+        assertEquals(Set.of("endless cancelled", "endless sent all false"), Set.of(event(), event()));
     }
 
     @Test
@@ -878,36 +880,36 @@ class HandlerRouteWebSocketTest {
                     .subprotocols("chat.v1", "chat.v2")
                     .onOpen((session, request) -> session.sendAsync("open " + room(session) + " " + request.getPath()
                         + " " + ServerRequestContext.currentRequest().isPresent()))
-                    .onMessage(String.class, (message, session) -> session.sendAsync("echo " + room(session) + " " + message
+                    .onMessage(String.class, (session, message) -> session.sendAsync("echo " + room(session) + " " + message
                         + " " + ServerRequestContext.currentRequest().isPresent()))
-                    .onClose((reason, session) -> {
+                    .onClose((session, reason) -> {
                         log.add("close " + room(session) + " " + reason.getCode() + " " + reason.getReason());
                         return null;
                     }));
 
                 routes.GET("/ws/json").webSocket(ws -> ws
-                    .onMessage(Argument.of(Msg.class), (message, session) ->
+                    .onMessage(Argument.of(Msg.class), (session, message) ->
                         session.sendAsync(new Msg(message.text().toUpperCase(Locale.ROOT), message.count() + 1))));
 
                 routes.GET("/ws/binary").webSocket(ws -> ws
-                    .onMessage(byte[].class, (bytes, session) -> session.sendAsync(reverse(bytes))));
+                    .onMessage(byte[].class, (session, bytes) -> session.sendAsync(reverse(bytes))));
 
                 routes.GET("/ws/async").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> CompletableFuture
+                    .onMessage(String.class, (session, message) -> CompletableFuture
                         .supplyAsync(() -> message.toUpperCase(Locale.ROOT), CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS))
                         .thenCompose(session::sendAsync)
                         .thenRun(() -> log.add("handled " + message))));
 
                 routes.GET("/ws/failing").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> switch (message) {
+                    .onMessage(String.class, (session, message) -> switch (message) {
                         case "throw" -> throw new IllegalStateException("thrown " + message);
                         case "stage" -> CompletableFuture.failedFuture(new IllegalStateException("failed " + message));
                         default -> session.sendAsync("ok " + message);
                     })
-                    .onError((error, session) -> session.sendAsync("error " + error.getMessage())));
+                    .onError((session, error) -> session.sendAsync("error " + error.getMessage())));
 
                 routes.GET("/ws/unhandled").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         throw new IllegalStateException("unhandled " + message);
                     }));
 
@@ -915,26 +917,26 @@ class HandlerRouteWebSocketTest {
                     .onOpen((session, request) -> {
                         throw new IllegalStateException("open failed");
                     })
-                    .onError((error, session) -> {
+                    .onError((session, error) -> {
                         log.add("open error " + error.getMessage());
                         return null;
                     }));
 
                 routes.GET("/ws/close").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         session.close(new CloseReason(4000, "done " + message));
                         return null;
                     }));
 
                 routes.GET("/ws/small").webSocket(ws -> ws
                     .maxPayloadLength(8)
-                    .onMessage(String.class, (message, session) -> session.sendAsync(message)));
+                    .onMessage(String.class, (session, message) -> session.sendAsync(message)));
 
                 routes.GET("/ws/push").webSocket(ws -> ws
                     .onOpen((session, request) -> session.sendAsync("pushed")));
 
                 routes.GET("/ws/pong").webSocket(ws -> ws
-                    .onPong((pong, session) -> session.sendAsync("pong " + pong.getContent().toString(StandardCharsets.UTF_8))));
+                    .onPong((session, pong) -> session.sendAsync("pong " + pong.getContent().toString(StandardCharsets.UTF_8))));
 
                 routes.GET("/ws/guarded")
                     .beforeReplacing(request -> request.getHeaders().contains("X-Allow") ? null : HttpResponse.status(HttpStatus.FORBIDDEN)).and()
@@ -973,59 +975,60 @@ class HandlerRouteWebSocketTest {
                     .onOpen((session, request) -> {
                         int count = session.getUriVariables().get("count", Integer.class).orElseThrow();
                         return session.sendAllAsync(new Ticks("tick", count, true, log))
-                            .thenRun(() -> log.add("sent " + count + " ticks"));
+                            .thenAccept(all -> log.add("sent " + count + " ticks " + all));
                     }));
                 routes.GET("/ws/replies").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> session.sendAllAsync(new Ticks(message, 3, true, log))));
+                    .onMessage(String.class, (session, message) -> session.sendAllAsync(new Ticks(message, 3, true, log))));
                 routes.GET("/ws/endless").webSocket(ws -> ws
                     .onOpen((session, request) -> {
                         // not returned, so that it does not hold the messages back
-                        session.sendAllAsync(new Ticks("endless", 1, false, log));
+                        session.sendAllAsync(new Ticks("endless", 1, false, log))
+                            .thenAccept(all -> log.add("endless sent all " + all));
                         return null;
                     })
-                    .onMessage(String.class, (message, session) -> session.sendAsync("echo " + message)));
+                    .onMessage(String.class, (session, message) -> session.sendAsync("echo " + message)));
                 routes.GET("/ws/upper").webSocket(ws -> ws
-                    .onMessages(String.class, (messages, session) -> {
+                    .onMessageStream(String.class, (session, messages) -> {
                         messages.subscribe(new Upper(session, log));
                         return null;
                     }));
                 routes.GET("/ws/first").webSocket(ws -> ws
-                    .onMessages(String.class, (messages, session) -> {
+                    .onMessageStream(String.class, (session, messages) -> {
                         messages.subscribe(new First(session));
                         return null;
                     })
-                    .onPing((ping, session) -> session.sendAsync("ping " + ping.getContent().toString(StandardCharsets.UTF_8))));
+                    .onPing((session, ping) -> session.sendAsync("ping " + ping.getContent().toString(StandardCharsets.UTF_8))));
                 routes.GET("/ws/messages-failing").webSocket(ws -> ws
-                    .onMessages(String.class, (messages, session) -> CompletableFuture.failedFuture(new IllegalStateException("messages failed")))
-                    .onError((error, session) -> {
+                    .onMessageStream(String.class, (session, messages) -> CompletableFuture.failedFuture(new IllegalStateException("messages failed")))
+                    .onError((session, error) -> {
                         log.add("error " + error.getMessage());
                         return null;
                     }));
                 routes.GET("/ws/held").webSocket(ws -> ws
                     // returned: it holds the messages back, but not the pings and the close
                     .onOpen((session, request) -> session.sendAllAsync(new Ticks("held", 1, false, log)))
-                    .onMessage(String.class, (message, session) -> null));
+                    .onMessage(String.class, (session, message) -> null));
                 routes.GET("/ws/stuck").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         log.add(message);
                         return new CompletableFuture<>();
                     }));
                 routes.GET("/ws/unbounded").webSocket(ws -> ws
                     .maxPendingMessages(0)
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         log.add("unbounded " + message);
                         return new CompletableFuture<>();
                     })
-                    .onClose((reason, session) -> {
+                    .onClose((session, reason) -> {
                         log.add("unbounded close " + reason.getCode());
                         return null;
                     }));
                 routes.GET("/ws/close-discards").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         log.add("start " + message);
                         return new CompletableFuture<>();
                     })
-                    .onClose((reason, session) -> {
+                    .onClose((session, reason) -> {
                         log.add("close " + reason.getCode());
                         return null;
                     }));
@@ -1036,7 +1039,7 @@ class HandlerRouteWebSocketTest {
                     }
                     route.webSocket(ws -> ws
                         .onOpen((session, request) -> CompletableFuture.runAsync(() -> { }, CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS)))
-                        .onMessages(String.class, (messages, session) -> {
+                        .onMessageStream(String.class, (session, messages) -> {
                             messages.subscribe(new Threads(session));
                             return session.sendAsync(Thread.currentThread().getName() + " " + ServerRequestContext.currentRequest().isPresent());
                         }));
@@ -1044,31 +1047,30 @@ class HandlerRouteWebSocketTest {
                 routes.GET("/ws/open-first-concurrent").webSocket(ws -> ws
                     .maxConcurrentMessages(2)
                     .onOpen((session, request) -> CompletableFuture.runAsync(() -> log.add("opened"), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)))
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         log.add("message " + message);
                         return session.sendAsync("got " + message);
                     }));
                 routes.GET("/ws/upper-blocking")
                     .executeOn(TaskExecutors.BLOCKING)
                     .webSocket(ws -> ws
-                        .maxConcurrentMessages(4)
-                        .onMessages(String.class, (messages, session) -> {
+                        .onMessageStream(String.class, (session, messages) -> {
                             messages.subscribe(new Upper(session, log));
                             return null;
                         }));
                 routes.GET("/ws/ping").webSocket(ws -> ws
-                    .onPing((ping, session) -> session.sendAsync("ping " + ping.getContent().toString(StandardCharsets.UTF_8))));
+                    .onPing((session, ping) -> session.sendAsync("ping " + ping.getContent().toString(StandardCharsets.UTF_8))));
 
                 // one message after the other, or concurrently
                 routes.GET("/ws/serial").webSocket(ws -> ws
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         log.add("start " + message);
                         return CompletableFuture.runAsync(() -> log.add("end " + message), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS))
                             .thenCompose(ignored -> session.sendAsync("done " + message));
                     }));
                 routes.GET("/ws/concurrent").webSocket(ws -> ws
                     .maxConcurrentMessages(2)
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         if (message.equals("first")) {
                             CompletableFuture<Object> second = new CompletableFuture<>();
                             session.put("second", second);
@@ -1079,7 +1081,7 @@ class HandlerRouteWebSocketTest {
                     }));
                 routes.GET("/ws/open-first").webSocket(ws -> ws
                     .onOpen((session, request) -> CompletableFuture.runAsync(() -> log.add("opened"), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)))
-                    .onMessage(String.class, (message, session) -> {
+                    .onMessage(String.class, (session, message) -> {
                         log.add("message " + message);
                         return session.sendAsync("got " + message);
                     }));
@@ -1088,7 +1090,7 @@ class HandlerRouteWebSocketTest {
                     .executeOn(TaskExecutors.BLOCKING)
                     .webSocket(ws -> ws
                         .onOpen((session, request) -> session.sendAsync("open on " + Thread.currentThread().getName()))
-                        .onMessage(String.class, (message, session) -> session.sendAsync(message + " on " + Thread.currentThread().getName())));
+                        .onMessage(String.class, (session, message) -> session.sendAsync(message + " on " + Thread.currentThread().getName())));
 
                 routes.GET("/ws/event-loop").webSocket(ws -> ws
                     .onOpen((session, request) -> session.sendAsync(Thread.currentThread().getName())));
@@ -1098,7 +1100,7 @@ class HandlerRouteWebSocketTest {
                         long open = session.getOpenSessions().stream().filter(sameRoom(session)).count();
                         return session.sendAsync("open sessions " + open + " " + room(session));
                     })
-                    .onMessage(String.class, (message, session) -> broadcaster.get().broadcastAsync(message, sameRoom(session))));
+                    .onMessage(String.class, (session, message) -> broadcaster.get().broadcastAsync(message, sameRoom(session))));
             };
         }
     }

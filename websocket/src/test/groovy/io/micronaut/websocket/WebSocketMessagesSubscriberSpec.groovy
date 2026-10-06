@@ -23,11 +23,10 @@ class WebSocketMessagesSubscriberSpec extends Specification {
         Messages messages = new Messages((1..100_000).toList(), true)
 
         when:
-        CompletableFuture<Void> future = sendAll(session, messages)
+        CompletableFuture<Boolean> future = sendAll(session, messages)
 
         then:
-        future.isDone()
-        !future.isCompletedExceptionally()
+        future.get()
         sent == (1..100_000).toList()
     }
 
@@ -42,7 +41,7 @@ class WebSocketMessagesSubscriberSpec extends Specification {
         Messages messages = new Messages(['a', 'b'], true)
 
         when:
-        CompletableFuture<Void> future = sendAll(session, messages)
+        CompletableFuture<Boolean> future = sendAll(session, messages)
 
         then:
         writes.size() == 1
@@ -60,8 +59,7 @@ class WebSocketMessagesSubscriberSpec extends Specification {
         writes[1].complete('b')
 
         then:
-        future.isDone()
-        !future.isCompletedExceptionally()
+        future.get()
     }
 
     void "the future fails when the publisher or a send fails, and completes when the session closed"() {
@@ -72,21 +70,21 @@ class WebSocketMessagesSubscriberSpec extends Specification {
         }
 
         when:
-        CompletableFuture<Void> failedSend = sendAll(failing, new Messages(['a'], true))
+        CompletableFuture<Boolean> failedSend = sendAll(failing, new Messages(['a'], true))
 
         then:
         failedSend.isCompletedExceptionally()
 
         when:
         open = false
-        CompletableFuture<Void> closed = sendAll(failing, new Messages(['a'], true))
+        CompletableFuture<Boolean> closed = sendAll(failing, new Messages(['a'], true))
 
-        then:
+        then: 'the session closed before the messages were sent'
         closed.isDone()
-        !closed.isCompletedExceptionally()
+        !closed.get()
 
         when:
-        CompletableFuture<Void> failedPublisher = sendAll(session(true) { CompletableFuture.completedFuture(it) }, new Messages([], true, new IllegalStateException("publisher failed")))
+        CompletableFuture<Boolean> failedPublisher = sendAll(session(true) { CompletableFuture.completedFuture(it) }, new Messages([], true, new IllegalStateException("publisher failed")))
 
         then:
         failedPublisher.isCompletedExceptionally()
@@ -98,7 +96,7 @@ class WebSocketMessagesSubscriberSpec extends Specification {
         Messages messages = new Messages(['a', 'b'], true)
 
         when:
-        CompletableFuture<Void> future = sendAll(session, messages)
+        CompletableFuture<Boolean> future = sendAll(session, messages)
         future.cancel(false)
 
         then:
@@ -115,7 +113,7 @@ class WebSocketMessagesSubscriberSpec extends Specification {
         Messages completing = new Messages(['a'], true)
 
         when:
-        CompletableFuture<Void> future = sendAll(session, completing)
+        CompletableFuture<Boolean> future = sendAll(session, completing)
 
         then: 'rule 2.3'
         future.isDone()
@@ -135,7 +133,7 @@ class WebSocketMessagesSubscriberSpec extends Specification {
                 }
             })
         } as Publisher<Object>
-        CompletableFuture<Void> cancelled = sendAll(session, late)
+        CompletableFuture<Boolean> cancelled = sendAll(session, late)
         cancelled.cancel(false)
         subscriber.onNext('late')
 
@@ -143,8 +141,8 @@ class WebSocketMessagesSubscriberSpec extends Specification {
         sent == ['a']
     }
 
-    private static CompletableFuture<Void> sendAll(WebSocketSession session, Publisher<?> messages) {
-        CompletableFuture<Void> sent = new CompletableFuture<>()
+    private static CompletableFuture<Boolean> sendAll(WebSocketSession session, Publisher<?> messages) {
+        CompletableFuture<Boolean> sent = new CompletableFuture<>()
         messages.subscribe(new WebSocketMessagesSubscriber(session, MediaType.TEXT_PLAIN_TYPE, sent))
         sent
     }

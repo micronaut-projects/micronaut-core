@@ -26,10 +26,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Sends the messages of a publisher through a session, in order, one after the other, see
+ * Sends the messages of a publisher through a session, in order, see
  * {@link WebSocketSession#sendAllAsync(org.reactivestreams.Publisher, MediaType)}: the next message
  * is requested once the previous one was written, so the publisher produces no faster than the
- * connection writes.
+ * connection writes, and not once the session is closed.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -38,7 +38,7 @@ final class WebSocketMessagesSubscriber implements Subscriber<Object> {
 
     private final WebSocketSession session;
     private final MediaType mediaType;
-    private final CompletableFuture<Void> sent;
+    private final CompletableFuture<Boolean> sent;
     /**
      * Turns the calls to the subscription into a loop, so that they are made one at a time
      * (rule 2.7), and a request made while a request is being made, e.g. by a publisher that emits
@@ -59,10 +59,11 @@ final class WebSocketMessagesSubscriber implements Subscriber<Object> {
     /**
      * @param session   The session
      * @param mediaType The media type of the messages
-     * @param sent      Completes when all the messages were sent: completing it before, e.g.
+     * @param sent      Completes with {@code true} when all the messages were sent, with
+     *                  {@code false} when the session closed first: completing it before, e.g.
      *                  cancelling it, cancels the publisher
      */
-    WebSocketMessagesSubscriber(WebSocketSession session, MediaType mediaType, CompletableFuture<Void> sent) {
+    WebSocketMessagesSubscriber(WebSocketSession session, MediaType mediaType, CompletableFuture<Boolean> sent) {
         this.session = session;
         this.mediaType = mediaType;
         this.sent = sent;
@@ -113,7 +114,7 @@ final class WebSocketMessagesSubscriber implements Subscriber<Object> {
         // a publisher may complete while its last message is being written
         Objects.requireNonNull(lastSend.get()).whenComplete((ignored, error) -> {
             if (error == null) {
-                sent.complete(null);
+                sent.complete(true);
             }
         });
     }
@@ -123,7 +124,7 @@ final class WebSocketMessagesSubscriber implements Subscriber<Object> {
             sent.completeExceptionally(error);
         } else {
             // the session closed: there is no one to send the rest to
-            sent.complete(null);
+            sent.complete(false);
         }
     }
 
@@ -137,6 +138,10 @@ final class WebSocketMessagesSubscriber implements Subscriber<Object> {
         do {
             Subscription s = subscription.get();
             if (s != null && !cancelled) {
+                if (!sent.isDone() && !session.isOpen()) {
+                    // the session closed: there is no one to send the rest to
+                    sent.complete(false);
+                }
                 if (!sent.isDone()) {
                     s.request(1);
                 } else if (!terminated) {

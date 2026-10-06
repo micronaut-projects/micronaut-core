@@ -15,7 +15,7 @@
  */
 /**
  * WebSocket endpoints declared as routes of handler functions, see
- * {@link io.micronaut.web.router.websocket.WebSocketRouteSpec}.
+ * {@link io.micronaut.web.router.websocket.WebSocketEndpointSpec}.
  *
  * <p>The types of this package use {@code micronaut-websocket}, which the router has as an optional
  * dependency: they are only loaded by an application that declares a WebSocket route, and no

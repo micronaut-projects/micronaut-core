@@ -28,13 +28,13 @@ import java.util.concurrent.CompletionStage;
  * {@code String} and {@code byte[]} as they are, other types from JSON.
  *
  * <pre>{@code
- * ws.onMessage(Argument.of(ChatMessage.class), (message, session) -> session.sendAsync(reply(message)));
+ * ws.onMessage(Argument.of(ChatMessage.class), (session, message) -> session.sendAsync(reply(message)));
  * }</pre>
  *
  * @param <T> The type of the message
  * @author Denis Stepanov
  * @since 5.3.0
- * @see WebSocketRouteSpec#onMessage(io.micronaut.core.type.Argument, WebSocketMessageHandler)
+ * @see WebSocketEndpointSpec#onMessage(io.micronaut.core.type.Argument, WebSocketMessageHandler)
  */
 @Experimental
 @FunctionalInterface
@@ -43,10 +43,10 @@ public interface WebSocketMessageHandler<T> {
     /**
      * Handle a message.
      *
-     * @param message The message
      * @param session The session of the connection
+     * @param message The message
      * @return A stage that completes when the message is handled, or {@code null} if it is handled
-     * @throws Exception An error, passed to the {@link WebSocketRouteSpec#onError(WebSocketErrorHandler) error handler}
+     * @throws Exception An error, passed to the {@link WebSocketEndpointSpec#onError(WebSocketErrorHandler) error handler}
      */
-    @Nullable CompletionStage<?> onMessage(T message, WebSocketSession session) throws Exception;
+    @Nullable CompletionStage<?> onMessage(WebSocketSession session, T message) throws Exception;
 }

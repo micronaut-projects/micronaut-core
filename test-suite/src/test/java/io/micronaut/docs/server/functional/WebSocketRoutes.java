@@ -23,8 +23,9 @@ public class WebSocketRoutes implements HttpRoutes {
         routes.GET("/echo/{name}").webSocket(ws -> ws // <1>
             .onOpen((session, request) -> // <2>
                 session.sendAsync("Hello " + session.getUriVariables().get("name", String.class).orElseThrow()))
-            .onMessage(String.class, (message, session) -> session.sendAsync("echo " + message)) // <3>
-            .onError((error, session) -> session.sendAsync("error " + error.getMessage()))); // <4>
+            .onMessage(String.class, (session, message) -> session.sendAsync("echo " + message)) // <3>
+            .onError((session, error) -> session.sendAsync("error " + error.getMessage())) // <4>
+            .onClose((session, reason) -> null)); // <5>
         // end::echo[]
 
         // tag::filter[]
@@ -41,7 +42,7 @@ public class WebSocketRoutes implements HttpRoutes {
         routes.GET("/ticks").webSocket(ws -> ws
             .onOpen((session, request) -> session.sendAllAsync(Flux.range(1, 3).map(i -> "tick " + i)))); // <1>
         routes.GET("/upper").webSocket(ws -> ws
-            .onMessages(String.class, (messages, session) -> // <2>
+            .onMessageStream(String.class, (session, messages) -> // <2>
                 session.sendAllAsync(Flux.from(messages).map(message -> message.toUpperCase(Locale.ROOT))))); // <3>
         // end::streams[]
 
@@ -51,7 +52,7 @@ public class WebSocketRoutes implements HttpRoutes {
             .webSocket(ws -> ws
                 .maxConcurrentMessages(4) // <2>
                 .maxPendingMessages(32) // <3>
-                .onMessage(String.class, (job, session) -> session.sendAsync("done " + job)));
+                .onMessage(String.class, (session, job) -> session.sendAsync("done " + job)));
         // end::delivery[]
     }
 }

@@ -132,13 +132,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private final Argument<?> pingArgument;
     /**
      * The most messages of a connection to a WebSocket route that are handled at the same time,
-     * see {@link io.micronaut.web.router.websocket.WebSocketRouteSpec#maxConcurrentMessages(int)}.
+     * see {@link io.micronaut.web.router.websocket.WebSocketEndpointSpec#maxConcurrentMessages(int)}.
      * {@code 0} for a bean, whose messages are handled as they are read.
      */
     private final int maxConcurrentMessages;
     /**
      * Whether the endpoint of a WebSocket route receives the messages as a stream, see
-     * {@link io.micronaut.web.router.websocket.WebSocketRouteSpec#onMessages}.
+     * {@link io.micronaut.web.router.websocket.WebSocketEndpointSpec#onMessageStream}.
      */
     private final boolean streamsMessages;
     /**

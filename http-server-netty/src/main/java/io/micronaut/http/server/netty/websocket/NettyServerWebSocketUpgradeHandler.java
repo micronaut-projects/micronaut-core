@@ -353,7 +353,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         int maxFramePayloadLength = webSocketBean.messageMethod()
                 .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
-        String subprotocols = webSocketBean.getSubprotocols().orElse(null);
+        List<String> supported = webSocketBean.getSubprotocols();
+        String subprotocols = supported.isEmpty() ? null : String.join(",", supported);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),

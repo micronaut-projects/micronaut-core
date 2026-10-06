@@ -166,10 +166,11 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     }
 
     /**
-     * Send the messages of a publisher to the remote peer, in order, one after the other: the next
-     * message is requested once the previous one was written, so the publisher produces no faster
-     * than the connection writes. Cancelling the returned future cancels the publisher, and so
-     * does the session closing.
+     * Send the messages of a publisher to the remote peer, in order, no faster than the connection
+     * writes them: the publisher produces only as the connection asks for more. The session
+     * closing stops the publisher: an implementation that observes the close cancels it then, and
+     * any other when the next message would be sent. Cancelling the returned future cancels the
+     * publisher too.
      *
      * <pre>{@code
      * routes.GET("/ticks").webSocket(ws -> ws
@@ -177,11 +178,12 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * }</pre>
      *
      * @param messages The messages
-     * @return A future that completes when the publisher completed and its messages were sent, or
-     * the session closed, and fails when the publisher or a send fails
+     * @return A future that completes with {@code true} when the publisher completed and its
+     * messages were sent, with {@code false} when the session closed first, and fails when the
+     * publisher or a send fails
      * @since 5.3.0
      */
-    default CompletableFuture<Void> sendAllAsync(Publisher<?> messages) {
+    default CompletableFuture<Boolean> sendAllAsync(Publisher<?> messages) {
         return sendAllAsync(messages, MediaType.APPLICATION_JSON_TYPE);
     }
 
@@ -190,14 +192,15 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      *
      * @param messages  The messages
      * @param mediaType The media type of the messages
-     * @return A future that completes when the publisher completed and its messages were sent, or
-     * the session closed, and fails when the publisher or a send fails
+     * @return A future that completes with {@code true} when the publisher completed and its
+     * messages were sent, with {@code false} when the session closed first, and fails when the
+     * publisher or a send fails
      * @since 5.3.0
      */
-    default CompletableFuture<Void> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
+    default CompletableFuture<Boolean> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(mediaType, "mediaType");
-        CompletableFuture<Void> sent = new CompletableFuture<>();
+        CompletableFuture<Boolean> sent = new CompletableFuture<>();
         messages.subscribe(new WebSocketMessagesSubscriber(this, mediaType, sent));
         return sent;
     }

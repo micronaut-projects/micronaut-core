@@ -29,7 +29,7 @@ import java.util.concurrent.CompletionStage;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see WebSocketRouteSpec#onError(WebSocketErrorHandler)
+ * @see WebSocketEndpointSpec#onError(WebSocketErrorHandler)
  */
 @Experimental
 @FunctionalInterface
@@ -38,10 +38,10 @@ public interface WebSocketErrorHandler {
     /**
      * Handle an error.
      *
-     * @param error   The error
      * @param session The session of the connection
+     * @param error   The error
      * @return A stage that completes when the handler is done, or {@code null} if it is done
      * @throws Exception An error, which is logged, and closes the connection
      */
-    @Nullable CompletionStage<?> onError(Throwable error, WebSocketSession session) throws Exception;
+    @Nullable CompletionStage<?> onError(WebSocketSession session, Throwable error) throws Exception;
 }

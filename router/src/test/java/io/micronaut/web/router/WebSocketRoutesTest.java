@@ -28,8 +28,10 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
+import io.micronaut.web.router.websocket.WebSocketMessageHandler;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
-import io.micronaut.web.router.websocket.WebSocketRouteSpec;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPingMessage;
 import io.micronaut.websocket.WebSocketPongMessage;
@@ -40,7 +42,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -67,7 +68,7 @@ class WebSocketRoutesTest {
         Router router = router(routes -> routes.GET("/chat/{room}").webSocket(ws -> ws
             .subprotocols("chat.v1", "chat.v2")
             .maxPayloadLength(1024)
-            .onMessage(String.class, (message, session) -> null)));
+            .onMessage(String.class, (session, message) -> null)));
 
         UriRouteInfo<?, ?> route = route(router, HttpRequest.GET("/chat/lobby"));
         assertTrue(route.isWebSocketRoute());
@@ -77,12 +78,12 @@ class WebSocketRoutesTest {
         WebSocketRouteEndpoint endpoint = endpoint(route);
         assertEquals("WebSocket route /chat/{room}", endpoint.toString());
         assertSame(endpoint, endpoint.getTarget());
-        assertEquals(Optional.of("chat.v1,chat.v2"), endpoint.getSubprotocols());
+        assertEquals(List.of("chat.v1", "chat.v2"), endpoint.getSubprotocols());
         MethodExecutionHandle<Object, ?> message = endpoint.messageMethod().orElseThrow();
         assertEquals(OptionalInt.of(1024), message.intValue(OnMessage.class, "maxPayloadLength"));
         assertTrue(message.getReturnType().isAsync());
         // the message type is not bound from the request
-        assertSame(message.getArguments()[0], endpoint.messageArgument());
+        assertSame(message.getArguments()[1], endpoint.messageArgument());
         assertEquals(String.class, endpoint.messageArgument().getType());
         assertTrue(endpoint.openMethod().isEmpty());
         assertTrue(endpoint.closeMethod().isEmpty());
@@ -105,16 +106,16 @@ class WebSocketRoutesTest {
                 seen.set(request);
                 return null;
             })
-            .onMessage(Argument.listOf(Integer.class), (message, session) -> CompletableFuture.completedFuture(message))
-            .onPong((pong, session) -> {
+            .onMessage(Argument.listOf(Integer.class), (session, message) -> CompletableFuture.completedFuture(message))
+            .onPong((session, pong) -> {
                 seen.set(pong);
                 return null;
             })
-            .onClose((reason, session) -> {
+            .onClose((session, reason) -> {
                 seen.set(reason);
                 return null;
             })
-            .onError((error, session) -> {
+            .onError((session, error) -> {
                 throw new IllegalStateException("from the error handler", error);
             })));
         WebSocketRouteEndpoint endpoint = endpoint(route(router, HttpRequest.GET("/ws")));
@@ -126,17 +127,17 @@ class WebSocketRoutesTest {
         assertSame(request, seen.get());
 
         assertEquals(List.of(Integer.class), List.of(endpoint.messageArgument().getTypeParameters()[0].getType()));
-        CompletionStage<?> message = (CompletionStage<?>) endpoint.messageMethod().orElseThrow().invoke(List.of(1, 2), null);
+        CompletionStage<?> message = (CompletionStage<?>) endpoint.messageMethod().orElseThrow().invoke(null, List.of(1, 2));
         assertEquals(List.of(1, 2), message.toCompletableFuture().join());
 
         assertEquals(WebSocketPongMessage.class, endpoint.pongArgument().getType());
         CloseReason reason = new CloseReason(4000, "done");
-        endpoint.closeMethod().orElseThrow().invoke(reason, null);
+        endpoint.closeMethod().orElseThrow().invoke(null, reason);
         assertSame(reason, seen.get());
 
         // a handler throws like a method
         IllegalStateException error = assertThrows(IllegalStateException.class,
-            () -> endpoint.errorMethod().orElseThrow().invoke(new RuntimeException("cause"), null));
+            () -> endpoint.errorMethod().orElseThrow().invoke(null, new RuntimeException("cause")));
         assertEquals("from the error handler", error.getMessage());
         assertEquals(Object.class, endpoint.errorMethod().orElseThrow().getReturnType().getTypeParameters()[0].getType());
     }
@@ -206,37 +207,41 @@ class WebSocketRoutesTest {
     @Test
     void theHandlersAreDeclaredOnceAndInTheLambda() {
         assertThrows(IllegalStateException.class, () -> router(routes -> routes.GET("/twice").webSocket(ws -> ws
-            .onMessage(String.class, (message, session) -> null)
-            .onMessage(String.class, (message, session) -> null))));
+            .onMessage(String.class, (session, message) -> null)
+            .onMessage(String.class, (session, message) -> null))));
         assertThrows(IllegalArgumentException.class, () -> router(routes -> routes.GET("/bad").webSocket(ws -> ws.subprotocols("a,b"))));
         assertThrows(IllegalArgumentException.class, () -> router(routes -> routes.GET("/bad").webSocket(ws -> ws.maxPayloadLength(0))));
 
-        AtomicReference<WebSocketRouteSpec> escaped = new AtomicReference<>();
+        AtomicReference<WebSocketEndpointSpec> escaped = new AtomicReference<>();
         router(routes -> routes.GET("/escaped").webSocket(escaped::set));
         assertThrows(IllegalStateException.class, () -> escaped.get().onOpen((session, request) -> null));
     }
 
     @Test
-    void aRouteHasAMessageHandlerOrAMessagesHandler() {
+    void aRouteHasAMessageHandlerOrAMessageStreamHandler() {
         assertThrows(IllegalStateException.class, () -> router(routes -> routes.GET("/both").webSocket(ws -> ws
-            .onMessage(String.class, (message, session) -> null)
-            .onMessages(String.class, (messages, session) -> null))));
+            .onMessage(String.class, (session, message) -> null)
+            .onMessageStream(String.class, (session, messages) -> null))));
         assertThrows(IllegalStateException.class, () -> router(routes -> routes.GET("/both").webSocket(ws -> ws
-            .onMessages(String.class, (messages, session) -> null)
-            .onMessage(String.class, (message, session) -> null))));
+            .onMessageStream(String.class, (session, messages) -> null)
+            .onMessage(String.class, (session, message) -> null))));
         assertThrows(IllegalArgumentException.class, () -> router(routes -> routes.GET("/bad").webSocket(ws -> ws.maxConcurrentMessages(0))));
+        // a message stream receives its messages one after the other
+        IllegalStateException concurrent = assertThrows(IllegalStateException.class, () -> router(routes -> routes.GET("/stream").webSocket(ws -> ws
+            .maxConcurrentMessages(4)
+            .onMessageStream(String.class, (session, messages) -> null))));
+        assertTrue(concurrent.getMessage().contains("maxConcurrentMessages"), concurrent.getMessage());
 
         Router router = router(routes -> routes.GET("/stream").webSocket(ws -> ws
             .maxPayloadLength(1024)
-            .maxConcurrentMessages(4)
-            .onMessages(Argument.listOf(Integer.class), (messages, session) -> null)
-            .onPing((ping, session) -> null)));
+            .onMessageStream(Argument.listOf(Integer.class), (session, messages) -> null)
+            .onPing((session, ping) -> null)));
         WebSocketRouteEndpoint endpoint = endpoint(route(router, HttpRequest.GET("/stream")));
-        assertEquals(4, endpoint.maxConcurrentMessages());
+        assertEquals(1, endpoint.maxConcurrentMessages());
         // the messages are decoded like for a message handler, and the stream starts on the opening
         MethodExecutionHandle<Object, ?> message = endpoint.messageMethod().orElseThrow();
         assertEquals(OptionalInt.of(1024), message.intValue(OnMessage.class, "maxPayloadLength"));
-        assertSame(message.getArguments()[0], endpoint.messageArgument());
+        assertSame(message.getArguments()[1], endpoint.messageArgument());
         assertEquals(Integer.class, endpoint.messageArgument().getTypeParameters()[0].getType());
         assertTrue(endpoint.openMethod().isPresent());
         assertEquals(WebSocketPingMessage.class, endpoint.pingArgument().getType());
@@ -251,10 +256,40 @@ class WebSocketRoutesTest {
     }
 
     @Test
+    void aWebSocketRouteHasNoMediaTypesAndNoResponseType() {
+        for (Consumer<HttpRouteSpec> setting : List.<Consumer<HttpRouteSpec>>of(
+            route -> route.produces(MediaType.TEXT_PLAIN_TYPE),
+            route -> route.consumes(MediaType.APPLICATION_XML_TYPE),
+            route -> route.consumesAll(),
+            route -> route.responseType(String.class))) {
+            AtomicReference<IllegalStateException> error = new AtomicReference<>();
+            Router router = router(routes -> {
+                HttpRouteSpec route = routes.GET("/typed");
+                setting.accept(route);
+                error.set(assertThrows(IllegalStateException.class, () -> route.webSocket(ws -> ws.onOpen((session, request) -> null))));
+            });
+            assertTrue(error.get().getMessage().contains("no media types or response type"), error.get().getMessage());
+            // the route is dropped
+            assertNull(router.findClosest(HttpRequest.GET("/typed")));
+        }
+    }
+
+    @Test
+    void aHandlerOfASupertypeHandlesTheMessages() {
+        WebSocketMessageHandler<Object> any = (session, message) -> null;
+        Router router = router(routes -> routes.GET("/any").webSocket(ws -> ws
+            .onMessage(String.class, any)
+            .onPing(any)
+            .onPong(any)));
+        WebSocketRouteEndpoint endpoint = endpoint(route(router, HttpRequest.GET("/any")));
+        assertEquals(String.class, endpoint.messageArgument().getType());
+    }
+
+    @Test
     void theMostPendingMessagesAreBoundedByDefault() {
         Router router = router(routes -> {
-            routes.GET("/default").webSocket(ws -> ws.onMessage(String.class, (message, session) -> null));
-            routes.GET("/unbounded").webSocket(ws -> ws.maxPendingMessages(0).onMessage(String.class, (message, session) -> null));
+            routes.GET("/default").webSocket(ws -> ws.onMessage(String.class, (session, message) -> null));
+            routes.GET("/unbounded").webSocket(ws -> ws.maxPendingMessages(0).onMessage(String.class, (session, message) -> null));
         });
         assertEquals(16, endpoint(route(router, HttpRequest.GET("/default"))).maxPendingMessages());
         assertEquals(0, endpoint(route(router, HttpRequest.GET("/unbounded"))).maxPendingMessages());

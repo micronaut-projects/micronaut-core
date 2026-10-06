@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
- * The messages of a connection to a WebSocket route with a {@link WebSocketMessagesHandler}: each
+ * The messages of a connection to a WebSocket route with a {@link WebSocketMessageStreamHandler}: each
  * message is offered once it is read, in order, and its stage completes when the subscriber
  * received it, which is when the connection handles the next. A subscriber that requests no more
  * holds the messages back; one that cancels discards the messages that follow. The subscriber is

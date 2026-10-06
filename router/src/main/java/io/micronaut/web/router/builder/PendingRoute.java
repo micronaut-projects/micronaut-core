@@ -54,6 +54,11 @@ final class PendingRoute {
      */
     private final @Nullable String getTemplate;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
+    /**
+     * The first setting of the route about its bodies, e.g. {@code produces}, which a WebSocket
+     * route does not have, or {@code null}.
+     */
+    private @Nullable String bodySetting;
     private boolean ended;
 
     /**
@@ -92,6 +97,12 @@ final class PendingRoute {
             drop();
             throw new IllegalStateException("The route " + description
                 + " is not a WebSocket route: a WebSocket route is a GET route, e.g. GET(uri).webSocket(...)");
+        }
+        String setting = bodySetting;
+        if (setting != null) {
+            drop();
+            throw new IllegalStateException("The WebSocket route " + description + " has " + setting
+                + ": the upgrade request and the messages of a WebSocket route have no media types or response type");
         }
         return template;
     }
@@ -159,6 +170,13 @@ final class PendingRoute {
         settings.add(setting);
     }
 
+    private void recordBody(String name, Consumer<HandlerRoutes> setting) {
+        record(setting);
+        if (bodySetting == null) {
+            bodySetting = name;
+        }
+    }
+
     private void checkPending() {
         if (ended) {
             throw new IllegalStateException("The route " + description
@@ -168,16 +186,16 @@ final class PendingRoute {
 
     void consumes(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        record(routes -> routes.consumes(checked));
+        recordBody("consumes", routes -> routes.consumes(checked));
     }
 
     void consumesAll() {
-        record(HandlerRoutes::consumesAll);
+        recordBody("consumesAll", HandlerRoutes::consumesAll);
     }
 
     void produces(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        record(routes -> routes.produces(checked));
+        recordBody("produces", routes -> routes.produces(checked));
     }
 
     void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
@@ -192,7 +210,7 @@ final class PendingRoute {
 
     void responseType(Argument<?> responseType) {
         Objects.requireNonNull(responseType, "responseType");
-        record(routes -> routes.responseType(responseType));
+        recordBody("responseType", routes -> routes.responseType(responseType));
     }
 
     void executeOn(String executorName) {

@@ -28,7 +28,7 @@ import java.util.concurrent.CompletionStage;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see WebSocketRouteSpec#onClose(WebSocketCloseHandler)
+ * @see WebSocketEndpointSpec#onClose(WebSocketCloseHandler)
  */
 @Experimental
 @FunctionalInterface
@@ -37,10 +37,10 @@ public interface WebSocketCloseHandler {
     /**
      * The connection closed.
      *
-     * @param reason  The reason the connection closed
      * @param session The session of the connection
+     * @param reason  The reason the connection closed
      * @return A stage that completes when the handler is done, or {@code null} if it is done
      * @throws Exception An error, which is logged
      */
-    @Nullable CompletionStage<?> onClose(CloseReason reason, WebSocketSession session) throws Exception;
+    @Nullable CompletionStage<?> onClose(WebSocketSession session, CloseReason reason) throws Exception;
 }

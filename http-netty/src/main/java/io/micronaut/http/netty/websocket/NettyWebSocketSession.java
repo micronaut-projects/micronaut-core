@@ -229,10 +229,10 @@ public class NettyWebSocketSession implements WebSocketSession {
     }
 
     @Override
-    public CompletableFuture<Void> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
-        CompletableFuture<Void> sent = WebSocketSession.super.sendAllAsync(messages, mediaType);
-        // the session closing cancels the publisher, e.g. a stream that never completes
-        ChannelFutureListener closed = future -> sent.complete(null);
+    public CompletableFuture<Boolean> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
+        CompletableFuture<Boolean> sent = WebSocketSession.super.sendAllAsync(messages, mediaType);
+        // the session closing cancels the publisher at once, e.g. a stream that never completes
+        ChannelFutureListener closed = future -> sent.complete(false);
         channel.closeFuture().addListener(closed);
         sent.whenComplete((ignored, error) -> channel.closeFuture().removeListener(closed));
         return sent;

@@ -21,7 +21,9 @@ import java.util.Objects;
 
 /**
  * A ping a WebSocket received, the counterpart of a {@link WebSocketPongMessage}. The server
- * answers each ping with a pong itself.
+ * answers each ping with a pong itself. Only the ping handler of a WebSocket route of the route
+ * builder receives pings for now ({@code WebSocketEndpointSpec#onPing}), not the methods of a
+ * {@link io.micronaut.websocket.annotation.ServerWebSocket} bean or a client.
  *
  * @author Denis Stepanov
  * @since 5.3.0

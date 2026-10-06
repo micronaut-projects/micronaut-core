@@ -44,7 +44,7 @@ import java.util.function.Consumer;
 
 /**
  * The endpoint of a WebSocket route: a {@link WebSocketBean} whose methods are the handler
- * functions a {@link WebSocketRouteSpec} declared. The route builder adds a {@code GET} route
+ * functions a {@link WebSocketEndpointSpec} declared. The route builder adds a {@code GET} route
  * that carries it as the attribute {@link #ROUTE_ATTRIBUTE} and has the annotations
  * {@link #ROUTE_METADATA}, which make it a WebSocket route: the server upgrades a request to it
  * and hands the connection to this endpoint instead of to a bean looked up by type.
@@ -75,7 +75,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     private static final String HANDLER = "handler";
     private static final String ON_OPEN = "onOpen";
     private static final String ON_MESSAGE = "onMessage";
-    private static final String ON_MESSAGES = "onMessages";
+    private static final String ON_MESSAGE_STREAM = "onMessageStream";
 
     private static final Argument<WebSocketSession> SESSION = Argument.of(WebSocketSession.class, "session");
     @SuppressWarnings("rawtypes")
@@ -93,16 +93,16 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     private @Nullable WebSocketRouteMethod onPing;
     private @Nullable WebSocketRouteMethod onClose;
     private @Nullable WebSocketRouteMethod onError;
-    private @Nullable String subprotocols;
+    private List<String> subprotocols = List.of();
     private int maxConcurrentMessages = 1;
     private int maxPendingMessages = DEFAULT_MAX_PENDING_MESSAGES;
     /**
-     * Whether the endpoint has a {@link WebSocketMessagesHandler}, which receives the messages of
+     * Whether the endpoint has a {@link WebSocketMessageStreamHandler}, which receives the messages of
      * each connection as a stream, see {@link #connected(WebSocketSession, Consumer)}.
      */
     private boolean streaming;
     /**
-     * The open connections of an endpoint with a {@link WebSocketMessagesHandler}.
+     * The open connections of an endpoint with a {@link WebSocketMessageStreamHandler}.
      */
     private final Map<WebSocketSession, Connection> connections = new ConcurrentHashMap<>();
 
@@ -117,7 +117,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      * @param declaration Declares the handlers of the endpoint
      * @return The endpoint
      */
-    public static WebSocketRouteEndpoint of(String uri, Consumer<? super WebSocketRouteSpec> declaration) {
+    public static WebSocketRouteEndpoint of(String uri, Consumer<? super WebSocketEndpointSpec> declaration) {
         Objects.requireNonNull(declaration, "declaration");
         WebSocketRouteEndpoint endpoint = new WebSocketRouteEndpoint(Objects.requireNonNull(uri, "uri"));
         Spec spec = endpoint.new Spec();
@@ -169,7 +169,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
 
     /**
      * @return The most messages of a connection that are handled at the same time, see
-     * {@link WebSocketRouteSpec#maxConcurrentMessages(int)}
+     * {@link WebSocketEndpointSpec#maxConcurrentMessages(int)}
      */
     public int maxConcurrentMessages() {
         return maxConcurrentMessages;
@@ -177,7 +177,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
 
     /**
      * @return The most messages of a connection read ahead of its handlers, or {@code 0} for no
-     * limit, see {@link WebSocketRouteSpec#maxPendingMessages(int)}
+     * limit, see {@link WebSocketEndpointSpec#maxPendingMessages(int)}
      */
     public int maxPendingMessages() {
         return maxPendingMessages;
@@ -185,7 +185,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
 
     /**
      * @return Whether the endpoint receives the messages of a connection as a stream, see
-     * {@link WebSocketRouteSpec#onMessages(Argument, WebSocketMessagesHandler)}: its message
+     * {@link WebSocketEndpointSpec#onMessageStream(Argument, WebSocketMessageStreamHandler)}: its message
      * method only offers them to the stream, in the order they are read
      */
     public boolean streamsMessages() {
@@ -201,7 +201,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      *                 asynchronous open handler is done, and the signals to the subscriber of the
      *                 stream of the messages
      * @param errors   Handles an error of the connection outside of its handlers, e.g. of the
-     *                 stage of its {@link WebSocketMessagesHandler}, like the error of a handler
+     *                 stage of its {@link WebSocketMessageStreamHandler}, like the error of a handler
      */
     public void connected(WebSocketSession session, Executor executor, Consumer<Throwable> errors) {
         if (streaming) {
@@ -232,8 +232,8 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     }
 
     @Override
-    public Optional<String> getSubprotocols() {
-        return Optional.ofNullable(subprotocols);
+    public List<String> getSubprotocols() {
+        return subprotocols;
     }
 
     @Override
@@ -267,15 +267,15 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     }
 
     /**
-     * The open handler of an endpoint with a {@link WebSocketMessagesHandler}: once the open
+     * The open handler of an endpoint with a {@link WebSocketMessageStreamHandler}: once the open
      * handler of the route is done, the messages handler starts on the stream of the connection.
      */
     @SuppressWarnings("unchecked")
-    private @Nullable CompletionStage<?> open(@Nullable WebSocketOpenHandler open, WebSocketMessagesHandler<?> handler,
+    private @Nullable CompletionStage<?> open(@Nullable WebSocketOpenHandler open, WebSocketMessageStreamHandler<?> handler,
                                               WebSocketSession session, HttpRequest<?> request) throws Exception {
         CompletionStage<?> opened = open == null ? null : open.onOpen(session, request);
         if (opened == null) {
-            startMessages((WebSocketMessagesHandler<Object>) handler, session);
+            startMessages((WebSocketMessageStreamHandler<Object>) handler, session);
             return null;
         }
         Connection connection = connections.get(session);
@@ -284,10 +284,10 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
             return opened;
         }
         // like a handler: on the executor of the route, not on the thread that completed the stage
-        return opened.thenRunAsync(() -> startMessages((WebSocketMessagesHandler<Object>) handler, session), connection.executor());
+        return opened.thenRunAsync(() -> startMessages((WebSocketMessageStreamHandler<Object>) handler, session), connection.executor());
     }
 
-    private void startMessages(WebSocketMessagesHandler<Object> handler, WebSocketSession session) {
+    private void startMessages(WebSocketMessageStreamHandler<Object> handler, WebSocketSession session) {
         Connection connection = connections.get(session);
         if (connection == null) {
             // closed before it opened
@@ -295,7 +295,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
         }
         CompletionStage<?> handled;
         try {
-            handled = handler.onMessages(connection.messages, session);
+            handled = handler.onMessageStream(session, connection.messages);
         } catch (Exception e) {
             // like a method: the open handler fails, and no one receives the messages
             connection.messages.discard();
@@ -328,7 +328,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     }
 
     /**
-     * The message handler of an endpoint with a {@link WebSocketMessagesHandler}: it is done when
+     * The message handler of an endpoint with a {@link WebSocketMessageStreamHandler}: it is done when
      * the subscriber of the stream received the message, which is when the connection reads on.
      */
     private CompletionStage<?> offer(Object message, WebSocketSession session) {
@@ -341,7 +341,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     }
 
     /**
-     * An open connection of an endpoint with a {@link WebSocketMessagesHandler}.
+     * An open connection of an endpoint with a {@link WebSocketMessageStreamHandler}.
      *
      * @param messages The stream of its messages
      * @param executor Runs its handlers
@@ -353,31 +353,31 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     /**
      * Declares the handlers of the endpoint.
      */
-    final class Spec implements WebSocketRouteSpec {
+    final class Spec implements WebSocketEndpointSpec {
 
         private boolean closed;
         private @Nullable WebSocketOpenHandler openHandler;
         private @Nullable Argument<?> messageType;
         private @Nullable WebSocketMessageHandler<?> messageHandler;
-        private @Nullable WebSocketMessagesHandler<?> messagesHandler;
-        private @Nullable WebSocketMessageHandler<WebSocketPongMessage> pongHandler;
-        private @Nullable WebSocketMessageHandler<WebSocketPingMessage> pingHandler;
+        private @Nullable WebSocketMessageStreamHandler<?> messagesHandler;
+        private @Nullable WebSocketMessageHandler<? super WebSocketPongMessage> pongHandler;
+        private @Nullable WebSocketMessageHandler<? super WebSocketPingMessage> pingHandler;
         private @Nullable WebSocketCloseHandler closeHandler;
         private @Nullable WebSocketErrorHandler errorHandler;
         private @Nullable List<String> protocols;
         private int maxPayloadLength = DEFAULT_MAX_PAYLOAD_LENGTH;
-        private int maxConcurrent = 1;
+        private @Nullable Integer maxConcurrent;
         private int maxPending = DEFAULT_MAX_PENDING_MESSAGES;
 
         @Override
-        public WebSocketRouteSpec onOpen(WebSocketOpenHandler handler) {
+        public WebSocketEndpointSpec onOpen(WebSocketOpenHandler handler) {
             checkOpen(ON_OPEN, openHandler);
             openHandler = Objects.requireNonNull(handler, HANDLER);
             return this;
         }
 
         @Override
-        public <T> WebSocketRouteSpec onMessage(Argument<T> messageType, WebSocketMessageHandler<T> handler) {
+        public <T> WebSocketEndpointSpec onMessage(Argument<T> messageType, WebSocketMessageHandler<? super T> handler) {
             checkMessages(ON_MESSAGE);
             this.messageType = Objects.requireNonNull(messageType, "messageType");
             messageHandler = Objects.requireNonNull(handler, HANDLER);
@@ -385,43 +385,43 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
         }
 
         @Override
-        public <T> WebSocketRouteSpec onMessages(Argument<T> messageType, WebSocketMessagesHandler<T> handler) {
-            checkMessages(ON_MESSAGES);
+        public <T> WebSocketEndpointSpec onMessageStream(Argument<T> messageType, WebSocketMessageStreamHandler<T> handler) {
+            checkMessages(ON_MESSAGE_STREAM);
             this.messageType = Objects.requireNonNull(messageType, "messageType");
             messagesHandler = Objects.requireNonNull(handler, HANDLER);
             return this;
         }
 
         @Override
-        public WebSocketRouteSpec onPing(WebSocketMessageHandler<WebSocketPingMessage> handler) {
+        public WebSocketEndpointSpec onPing(WebSocketMessageHandler<? super WebSocketPingMessage> handler) {
             checkOpen("onPing", pingHandler);
             pingHandler = Objects.requireNonNull(handler, HANDLER);
             return this;
         }
 
         @Override
-        public WebSocketRouteSpec onPong(WebSocketMessageHandler<WebSocketPongMessage> handler) {
+        public WebSocketEndpointSpec onPong(WebSocketMessageHandler<? super WebSocketPongMessage> handler) {
             checkOpen("onPong", pongHandler);
             pongHandler = Objects.requireNonNull(handler, HANDLER);
             return this;
         }
 
         @Override
-        public WebSocketRouteSpec onClose(WebSocketCloseHandler handler) {
+        public WebSocketEndpointSpec onClose(WebSocketCloseHandler handler) {
             checkOpen("onClose", closeHandler);
             closeHandler = Objects.requireNonNull(handler, HANDLER);
             return this;
         }
 
         @Override
-        public WebSocketRouteSpec onError(WebSocketErrorHandler handler) {
+        public WebSocketEndpointSpec onError(WebSocketErrorHandler handler) {
             checkOpen("onError", errorHandler);
             errorHandler = Objects.requireNonNull(handler, HANDLER);
             return this;
         }
 
         @Override
-        public WebSocketRouteSpec subprotocols(String... subprotocols) {
+        public WebSocketEndpointSpec subprotocols(String... subprotocols) {
             checkOpen("subprotocols", protocols);
             Objects.requireNonNull(subprotocols, "subprotocols");
             for (String subprotocol : subprotocols) {
@@ -434,7 +434,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
         }
 
         @Override
-        public WebSocketRouteSpec maxPayloadLength(int maxPayloadLength) {
+        public WebSocketEndpointSpec maxPayloadLength(int maxPayloadLength) {
             checkOpen(MAX_PAYLOAD_LENGTH, null);
             if (maxPayloadLength <= 0) {
                 throw new IllegalArgumentException("The maximum payload length of the WebSocket route " + uri + " must be positive: " + maxPayloadLength);
@@ -444,7 +444,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
         }
 
         @Override
-        public WebSocketRouteSpec maxConcurrentMessages(int maxConcurrentMessages) {
+        public WebSocketEndpointSpec maxConcurrentMessages(int maxConcurrentMessages) {
             checkOpen("maxConcurrentMessages", null);
             if (maxConcurrentMessages <= 0) {
                 throw new IllegalArgumentException("The most concurrent messages of the WebSocket route " + uri + " must be positive: " + maxConcurrentMessages);
@@ -454,7 +454,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
         }
 
         @Override
-        public WebSocketRouteSpec maxPendingMessages(int maxPendingMessages) {
+        public WebSocketEndpointSpec maxPendingMessages(int maxPendingMessages) {
             checkOpen("maxPendingMessages", null);
             if (maxPendingMessages < 0) {
                 throw new IllegalArgumentException("The most pending messages of the WebSocket route " + uri + " must not be negative: " + maxPendingMessages);
@@ -479,7 +479,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
             checkOpen(what, null);
             if (messageHandler != null || messagesHandler != null) {
                 throw new IllegalStateException("The WebSocket route " + uri + " already has "
-                    + (messageHandler != null ? ON_MESSAGE : ON_MESSAGES) + ", it cannot have " + what + " too");
+                    + (messageHandler != null ? ON_MESSAGE : ON_MESSAGE_STREAM) + ", it cannot have " + what + " too");
             }
         }
 
@@ -496,53 +496,57 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
             Argument<?> argument = type == null ? null : Argument.of(type.getType(), "message", type.getAnnotationMetadata(), type.getTypeParameters());
             AnnotationMetadata messageMetadata = metadata(Map.of(OnMessage.class.getName(), Map.<CharSequence, Object>of(MAX_PAYLOAD_LENGTH, maxPayloadLength)));
             WebSocketMessageHandler message = messageHandler;
-            WebSocketMessagesHandler<?> messages = messagesHandler;
+            WebSocketMessageStreamHandler<?> messages = messagesHandler;
             if (message != null && argument != null) {
                 messageArgument = argument;
                 onMessage = new WebSocketRouteMethod(endpoint, ON_MESSAGE, messageMetadata,
-                    args -> message.onMessage(args[0], (WebSocketSession) args[1]),
-                    argument, SESSION);
+                    args -> message.onMessage((WebSocketSession) args[0], args[1]),
+                    SESSION, argument);
             } else if (messages != null && argument != null) {
+                if (maxConcurrent != null) {
+                    throw new IllegalStateException("The WebSocket route " + uri + " has onMessageStream, which receives its messages one after the other: it has no maxConcurrentMessages");
+                }
                 messageArgument = argument;
                 streaming = true;
                 // a message is done once the subscriber of the stream of the connection received it
-                onMessage = new WebSocketRouteMethod(endpoint, ON_MESSAGES, messageMetadata,
-                    args -> endpoint.offer(args[0], (WebSocketSession) args[1]),
-                    argument, SESSION);
+                onMessage = new WebSocketRouteMethod(endpoint, ON_MESSAGE_STREAM, messageMetadata,
+                    args -> endpoint.offer(args[1], (WebSocketSession) args[0]),
+                    SESSION, argument);
                 // the messages handler starts once the open handler is done
                 onOpen = new WebSocketRouteMethod(endpoint, ON_OPEN, AnnotationMetadata.EMPTY_METADATA,
                     args -> endpoint.open(open, messages, (WebSocketSession) args[0], (HttpRequest<?>) args[1]),
                     SESSION, REQUEST);
             }
-            WebSocketMessageHandler<WebSocketPongMessage> pong = pongHandler;
+            WebSocketMessageHandler<? super WebSocketPongMessage> pong = pongHandler;
             if (pong != null) {
                 onPong = new WebSocketRouteMethod(endpoint, "onPong", metadata(Map.of(OnMessage.class.getName(), Map.of())),
-                    args -> pong.onMessage((WebSocketPongMessage) args[0], (WebSocketSession) args[1]),
-                    PONG, SESSION);
+                    args -> pong.onMessage((WebSocketSession) args[0], (WebSocketPongMessage) args[1]),
+                    SESSION, PONG);
             }
-            WebSocketMessageHandler<WebSocketPingMessage> ping = pingHandler;
+            WebSocketMessageHandler<? super WebSocketPingMessage> ping = pingHandler;
             if (ping != null) {
                 onPing = new WebSocketRouteMethod(endpoint, "onPing", AnnotationMetadata.EMPTY_METADATA,
-                    args -> ping.onMessage((WebSocketPingMessage) args[0], (WebSocketSession) args[1]),
-                    PING, SESSION);
+                    args -> ping.onMessage((WebSocketSession) args[0], (WebSocketPingMessage) args[1]),
+                    SESSION, PING);
             }
             WebSocketCloseHandler close = closeHandler;
             if (close != null) {
                 onClose = new WebSocketRouteMethod(endpoint, "onClose", AnnotationMetadata.EMPTY_METADATA,
-                    args -> close.onClose((CloseReason) args[0], (WebSocketSession) args[1]),
-                    REASON, SESSION);
+                    args -> close.onClose((WebSocketSession) args[0], (CloseReason) args[1]),
+                    SESSION, REASON);
             }
             WebSocketErrorHandler error = errorHandler;
             if (error != null) {
                 onError = new WebSocketRouteMethod(endpoint, "onError", AnnotationMetadata.EMPTY_METADATA,
-                    args -> error.onError((Throwable) args[0], (WebSocketSession) args[1]),
-                    ERROR, SESSION);
+                    args -> error.onError((WebSocketSession) args[0], (Throwable) args[1]),
+                    SESSION, ERROR);
             }
             List<String> supported = protocols;
-            if (supported != null && !supported.isEmpty()) {
-                subprotocols = String.join(",", supported);
+            if (supported != null) {
+                subprotocols = supported;
             }
-            maxConcurrentMessages = maxConcurrent;
+            Integer concurrent = maxConcurrent;
+            maxConcurrentMessages = concurrent == null ? 1 : concurrent;
             maxPendingMessages = maxPending;
         }
     }

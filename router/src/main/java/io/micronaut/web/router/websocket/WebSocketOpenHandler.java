@@ -32,7 +32,7 @@ import java.util.concurrent.CompletionStage;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see WebSocketRouteSpec#onOpen(WebSocketOpenHandler)
+ * @see WebSocketEndpointSpec#onOpen(WebSocketOpenHandler)
  */
 @Experimental
 @FunctionalInterface
@@ -45,7 +45,7 @@ public interface WebSocketOpenHandler {
      * @param request The upgrade request
      * @return A stage that completes when the handler is done, or {@code null} if it is done
      * @throws Exception An error, which closes the connection and is passed to the
-     *                   {@link WebSocketRouteSpec#onError(WebSocketErrorHandler) error handler}
+     *                   {@link WebSocketEndpointSpec#onError(WebSocketErrorHandler) error handler}
      */
     @Nullable CompletionStage<?> onOpen(WebSocketSession session, HttpRequest<?> request) throws Exception;
 }

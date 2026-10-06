@@ -26,7 +26,7 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
-import io.micronaut.web.router.websocket.WebSocketRouteSpec;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -195,8 +195,8 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
-    public void webSocket(Consumer<WebSocketRouteSpec> endpoint) {
-        Consumer<WebSocketRouteSpec> checked = route.terminal(endpoint, "endpoint");
+    public void webSocket(Consumer<WebSocketEndpointSpec> endpoint) {
+        Consumer<WebSocketEndpointSpec> checked = route.terminal(endpoint, "endpoint");
         String template = route.webSocketTemplate();
         AnnotationMetadata metadata;
         try {
