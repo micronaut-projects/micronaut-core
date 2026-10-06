@@ -1616,7 +1616,9 @@ public final class RouteAssembly {
                     return Optional.empty();
                 }
                 if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
+                    // the handler of a located route has the annotations it inherits, e.g. an @ExecuteOn of a group of its locator route
+                    MethodReference<?, ?> annotated = method instanceof HandlerMethod<?> handler ? handler : targetMethod.getExecutableMethod();
+                    return RouteAssembly.this.executorSelector.select(annotated, threadSelection);
                 } else {
                     return Optional.empty();
                 }

@@ -511,6 +511,30 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * The same handler with annotations it inherits, e.g. a located route with the annotations
+     * of the groups of its locator routes: the annotations of this method override them, like the
+     * annotations of a route override the ones of its groups.
+     *
+     * @param inherited The inherited annotations
+     * @return The method with the annotations of both, or this method if it inherits none
+     */
+    @Internal
+    public HandlerMethod<R> inheriting(AnnotationMetadata inherited) {
+        if (inherited.isEmpty()) {
+            return this;
+        }
+        AnnotationMetadata own = annotationMetadata;
+        AnnotationMetadata metadata = own.isEmpty() ? inherited : new AnnotationMetadataHierarchy(true, inherited, own);
+        HandlerMethod<R> method = new HandlerMethod<>(handler, handlerType, arguments, returnType, invoker);
+        method.annotationMetadataProvider = annotationMetadataProvider;
+        method.groupAnnotations = groupAnnotations;
+        method.annotationMetadata = metadata;
+        // like the return type of a method, it has the annotations of the method
+        method.annotatedReturnType = new AnnotatedReturnType<>(returnType, metadata);
+        return method;
+    }
+
+    /**
      * The element the route to the handler has the annotations of, see
      * {@link HttpRouteSpec#annotationMetadata}.
      *

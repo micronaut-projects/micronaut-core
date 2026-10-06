@@ -46,6 +46,16 @@ import org.jspecify.annotations.Nullable;
  * the same instance share its routes. Declare the routes of a type once and reuse the instance,
  * e.g. in a field, rather than creating an instance per target.</p>
  *
+ * <p>A located route inherits the annotations of the groups enclosing its locator route, see
+ * {@link HttpRouteGroup#annotate(io.micronaut.core.annotation.AnnotationValue)}, like a route
+ * declared in those groups, and its own annotations take precedence: e.g. a filter bound to a
+ * {@code @FilterMatcher} annotation of such a group runs for it, and the {@code @Produces},
+ * {@code @Consumes}, {@code @Status} and {@code @ExecuteOn} of the group apply to it. The routes
+ * a locator route locates decide which media types the request may have and accept: the
+ * annotations of the groups of the locator route do so through them, not through the locator
+ * route. Builder settings of the groups, such as {@code produces(...)}, are not
+ * inherited.</p>
+ *
  * <p>Error and status routes declared in a group of the builder are local to its routes and
  * supported; global ones, declared on the builder itself, and ports are not: they belong to
  * the application routes, and declaring them fails the request that located the first target.

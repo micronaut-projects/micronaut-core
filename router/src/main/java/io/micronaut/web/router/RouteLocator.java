@@ -498,6 +498,37 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     /**
+     * @param inherited The annotations a route inherits
+     * @param own       The annotations of the route, which override the inherited ones
+     * @return The annotations of both
+     */
+    static AnnotationMetadata layered(AnnotationMetadata inherited, AnnotationMetadata own) {
+        if (inherited.isEmpty()) {
+            return own;
+        }
+        if (own.isEmpty()) {
+            return inherited;
+        }
+        return new AnnotationMetadataHierarchy(true, inherited, own);
+    }
+
+    /**
+     * The route the media type checks of a request see: for a request a locator route located,
+     * the route with the annotations of the location, so that, e.g., a {@code @Produces} of a group
+     * of the locator route selects a located route like a route declared in that group.
+     *
+     * @param request The request
+     * @param route   A route of the table the request is matched with
+     * @return The route at the location of the request, or the route for any other request
+     */
+    static UriRouteInfo<Object, Object> atLocation(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
+        if (request instanceof LocatedRequest<?> located && route instanceof DefaultUrlRouteInfo<Object, Object> info) {
+            return info.inheriting(located.location.annotationMetadata);
+        }
+        return route;
+    }
+
+    /**
      * An asynchronous locator of a level of the located path.
      *
      * @param locator   The locator
@@ -586,9 +617,11 @@ public final class RouteLocator implements DynamicRouteTarget {
             Map<String, Object> values = location.withPrefixValues(inner.getVariableValues());
             List<UriMatchVariable> variables = new ArrayList<>(location.variables());
             variables.addAll(inner.getVariables());
+            // the route with the annotations of the location, built once per location like the route of a group
+            DefaultUrlRouteInfo<?, ?> located = route.inheriting(location.annotationMetadata());
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
-                location.filters(), location.errorScopes(), location.annotationMetadata());
-            return (UriRouteMatch<T, R>) route.resolvedMatch(info);
+                location.filters(), location.errorScopes(), located == route ? location.annotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
+            return (UriRouteMatch<T, R>) located.resolvedMatch(info);
         }
 
         /**
@@ -668,8 +701,7 @@ public final class RouteLocator implements DynamicRouteTarget {
             // the groups with error routes of this locator route, then of the locator routes that located it
             List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
             // the annotations of the locator routes that located this one, overridden by the ones of this locator route
-            AnnotationMetadata annotationMetadata = layered(parent == null ? AnnotationMetadata.EMPTY_METADATA : parent.location.annotationMetadata,
-                locatorMatch.getExecutableMethod().getAnnotationMetadata());
+            AnnotationMetadata annotationMetadata = annotationMetadata(parent, locatorMatch);
             if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
                 filters.addAll(locatorRoute.routeFilters);
                 RouteAssembly.RouteGroup errorScope = locatorRoute.errorScope;
@@ -684,6 +716,29 @@ public final class RouteLocator implements DynamicRouteTarget {
             }
             return new Location(request, remainder, null, rawValues, decoded, variables, List.copyOf(filters), List.copyOf(errorScopes),
                 annotationMetadata);
+        }
+
+        /**
+         * The annotations the routes a locator route locates inherit: of the groups of the
+         * locator route, overridden by its own, over the ones of the locator routes that located
+         * it. They are the same for every request of the location, so the located routes with
+         * them are built once, see {@link DefaultUrlRouteInfo#inheriting(AnnotationMetadata)}.
+         *
+         * @param parent       The request located by the locator route that located this one, or {@code null}
+         * @param locatorMatch The match of the locator route
+         * @return The annotations
+         */
+        private static AnnotationMetadata annotationMetadata(@Nullable LocatedRequest<?> parent, DefaultUriRouteMatch<?, ?> locatorMatch) {
+            AnnotationMetadata own = locatorMatch.getExecutableMethod().getAnnotationMetadata();
+            if (parent == null) {
+                return own;
+            }
+            AnnotationMetadata inherited = parent.location.annotationMetadata;
+            if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
+                // built once for the annotations of the outer location
+                return locatorRoute.inheriting(inherited).getAnnotationMetadata();
+            }
+            return layered(inherited, own);
         }
 
         /**
@@ -711,21 +766,6 @@ public final class RouteLocator implements DynamicRouteTarget {
             all.putAll(values);
             return all;
         }
-    }
-
-    /**
-     * @param inherited The annotations a route inherits
-     * @param own       The annotations of the route, which override the inherited ones
-     * @return The annotations of both
-     */
-    static AnnotationMetadata layered(AnnotationMetadata inherited, AnnotationMetadata own) {
-        if (inherited.isEmpty()) {
-            return own;
-        }
-        if (own.isEmpty()) {
-            return inherited;
-        }
-        return new AnnotationMetadataHierarchy(true, inherited, own);
     }
 
     /**

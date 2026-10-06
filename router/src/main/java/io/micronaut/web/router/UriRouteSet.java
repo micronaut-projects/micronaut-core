@@ -537,13 +537,16 @@ final class UriRouteSet {
         List<UriRouteMatch<T, R>> matches = null;
         for (int i = 0; i < count; i++) {
             UriRouteInfo<Object, Object> route = routes[candidates == null ? i : candidates[i]];
-            if (permitsBody && contentType == null && !route.consumesAll()) {
-                contentType = request.getContentType().orElse(null);
+            UriRouteInfo<Object, Object> mediaTypes = mediaTypes(request, route);
+            if (mediaTypes != null) {
+                if (permitsBody && contentType == null && !mediaTypes.consumesAll()) {
+                    contentType = request.getContentType().orElse(null);
+                }
+                if (acceptedProducedTypes == null && !mediaTypes.producesAll()) {
+                    acceptedProducedTypes = request.accept();
+                }
             }
-            if (acceptedProducedTypes == null && !route.producesAll()) {
-                acceptedProducedTypes = request.accept();
-            }
-            UriRouteMatch match = matchRoute(request, route, uri, ports, permitsBody, contentType, acceptedProducedTypes);
+            UriRouteMatch match = matchRoute(request, route, mediaTypes, uri, ports, permitsBody, contentType, acceptedProducedTypes);
             if (match == null) {
                 continue;
             }
@@ -564,6 +567,23 @@ final class UriRouteSet {
     }
 
     /**
+     * The route whose media types a request must have and accept to match a route.
+     *
+     * @param request The request
+     * @param route   The route
+     * @return The route itself; for a request a locator route located, the route with the
+     * annotations of the location, see {@link RouteLocator#atLocation}; or {@code null} for a
+     * locator route, whose located routes decide which media types they consume and produce,
+     * not the annotations of the groups of the locator route, which they inherit
+     */
+    private static @Nullable UriRouteInfo<Object, Object> mediaTypes(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
+        if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.hasDynamicTarget()) {
+            return null;
+        }
+        return RouteLocator.atLocation(request, route);
+    }
+
+    /**
      * Applies the port, path variable constraint, body, Content-Type, Accept and request matcher
      * checks and then matches the URI.
      *
@@ -571,6 +591,7 @@ final class UriRouteSet {
      */
     private static @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request,
                                                                       UriRouteInfo<Object, Object> route,
+                                                                      @Nullable UriRouteInfo<Object, Object> mediaTypes,
                                                                       String uri,
                                                                       @Nullable Set<Integer> ports,
                                                                       boolean permitsBody,
@@ -586,16 +607,16 @@ final class UriRouteSet {
                 return null;
             }
         }
-        if (permitsBody) {
-            if (!route.isPermitsRequestBody()) {
-                return null;
-            }
-            if (!route.consumesAll() && !route.doesConsume(contentType)) {
-                return null;
-            }
-        }
-        if (!route.producesAll() && !route.doesProduce(acceptedProducedTypes)) {
+        if (permitsBody && !route.isPermitsRequestBody()) {
             return null;
+        }
+        if (mediaTypes != null) {
+            if (permitsBody && !mediaTypes.consumesAll() && !mediaTypes.doesConsume(contentType)) {
+                return null;
+            }
+            if (!mediaTypes.producesAll() && !mediaTypes.doesProduce(acceptedProducedTypes)) {
+                return null;
+            }
         }
         if (!route.matching(request)) {
             return null;
