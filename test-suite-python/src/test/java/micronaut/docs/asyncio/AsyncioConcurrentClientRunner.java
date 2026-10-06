@@ -15,6 +15,7 @@
  */
 package micronaut.docs.asyncio;
 
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 
 import java.util.ArrayList;
@@ -51,6 +52,21 @@ public final class AsyncioConcurrentClientRunner {
 
     public static int maxActive() {
         return MAX_ACTIVE.get();
+    }
+
+    public static void postConcurrently(HttpClient client, String path, int requestCount) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(requestCount);
+        try {
+            List<Callable<String>> requests = new ArrayList<>(requestCount);
+            for (int i = 0; i < requestCount; i++) {
+                requests.add(() -> client.toBlocking().retrieve(HttpRequest.POST(path, "")));
+            }
+            for (Future<String> future : executor.invokeAll(requests)) {
+                get(future);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     public static long retrieveConcurrently(HttpClient client, String path, String expected, int requestCount) throws Exception {

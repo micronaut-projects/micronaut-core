@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.ByteBody;
@@ -13,6 +14,9 @@ import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.contrib.multipart.DecoderQuirk;
 import io.netty.contrib.multipart.FormDecoderException;
@@ -122,6 +126,48 @@ public class FormDemuxerTest {
         assertEquals("file", field.metadata().name());
         assertEquals(MediaType.of("application/pdf"), field.metadata().mediaType());
         content(field.byteBody()).noBackpressure();
+    }
+
+    @Test
+    public void decodingASplitLeavesTheBytesOfTheOtherReadersIntact() {
+        // a filter decodes a copy of the form as it arrives, and the route decodes the form: the
+        // decoder of the copy must not write into the bytes that are buffered for the route
+        String boundary = "boundary1234";
+        String body = "--" + boundary + "\r\n" +
+            "Content-Disposition: form-data; name=\"name\"\r\n" +
+            "\r\n" +
+            "Fred\r\n" +
+            "--" + boundary + "\r\n" +
+            "Content-Disposition: form-data; name=\"avatar\"; filename=\"avatar.txt\"\r\n" +
+            "Content-Type: text/plain\r\n" +
+            "\r\n" +
+            "picture\r\n" +
+            "--" + boundary + "--\r\n";
+        for (int split = 1; split < body.length(); split++) {
+            MockUpstream upstream = new MockUpstream();
+            ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+            CloseableByteBody copy = streamingBody.rootBody().split(ByteBody.SplitBackpressureMode.FASTEST);
+            StringBuilder copied = new StringBuilder();
+            Flux.from(createMultipart(copy, boundary).fields()).subscribe(field -> {
+                copied.append(field.metadata().name()).append(';');
+                field.close();
+            });
+
+            // like the contents the HTTP codec reads: slices of what the connection received
+            ByteBuf received = Unpooled.copiedBuffer(body, StandardCharsets.UTF_8);
+            streamingBody.sharedBuffer().add(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(received.retainedSlice(0, split)));
+            streamingBody.sharedBuffer().add(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(received.retainedSlice(split, body.length() - split)));
+            received.release();
+            streamingBody.sharedBuffer().complete();
+            assertEquals("name;avatar;", copied.toString(), "the copy, split at " + split);
+
+            StringBuilder read = new StringBuilder();
+            Flux.from(createMultipart(streamingBody.rootBody(), boundary).fields()).subscribe(field -> {
+                read.append(field.metadata().name()).append(';');
+                field.close();
+            });
+            assertEquals("name;avatar;", read.toString(), "the body, split at " + split);
+        }
     }
 
     @Test

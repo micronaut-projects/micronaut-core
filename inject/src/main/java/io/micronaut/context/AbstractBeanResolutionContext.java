@@ -69,6 +69,83 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
+    /** The ownership of the bean this context is creating at the moment, or null outside a creation. */
+    @Nullable
+    BeanCreationState creationState;
+    /** The owner of the proxy whose lazy target this context creates, so that the target is released with the proxy. */
+    @Nullable
+    DefaultBeanDependencies lazyProxyDependencies;
+    /** The attribute a {@link ProxyInterceptors} waits under between {@link #prepareProxyTarget} and the creation of the target. */
+    private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
+
+    /**
+     * The interceptors a proxy selected, handed to the creation of its unscoped target so that the target is
+     * destroyed with the advice of the proxy.
+     *
+     * @param definition The target definition the registrations are meant for
+     * @param registrations The interceptor registrations of the proxy
+     */
+    record ProxyInterceptors(BeanDefinition<?> definition, List<BeanRegistration<?>> registrations) {
+    }
+
+    /**
+     * Starts the creation of a bean. The state it returns owns what is resolved for the bean before its instance
+     * exists and becomes the owner held by the registration. Interceptors a proxy prepared for this definition
+     * are taken over. The caller restores the previous state when the creation ends.
+     *
+     * @param definition The definition being created
+     * @return The creation state, which is also current on this context
+     */
+    BeanCreationState beginCreation(BeanDefinition<?> definition) {
+        List<BeanRegistration<?>> borrowed = getAttribute(PROXY_INTERCEPTORS) instanceof ProxyInterceptors shared
+            && shared.definition().equals(definition) ? shared.registrations() : List.of();
+        if (!borrowed.isEmpty()) {
+            removeAttribute(PROXY_INTERCEPTORS);
+        }
+        BeanCreationState state = new BeanCreationState(definition, borrowed);
+        creationState = state;
+        return state;
+    }
+
+    @Override
+    public @Nullable BeanDependencyGroup getBeanDependencyGroup() {
+        return creationState == null ? null : new DefaultBeanDependencyResolver(context, creationState.dependencies);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked") // Adapt the existing resolution-context contract at its boundary.
+    public void setBeanInterceptors(BeanDefinition<?> definition, List<?> registrations) {
+        if (creationState != null && creationState.definition.equals(definition)) {
+            creationState.dependencies.retainInterceptorCandidates((List<BeanRegistration<?>>) registrations);
+        } else {
+            BeanResolutionContext.super.setBeanInterceptors(definition, registrations);
+        }
+    }
+
+    @Override
+    public @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
+        // Older AOP callers store candidates in the attributes, even while a creation frame is active.
+        List<?> legacy = BeanResolutionContext.super.getBeanInterceptors(definition);
+        if (legacy != null) {
+            return legacy;
+        }
+        return creationState != null && creationState.definition.equals(definition) ? creationState.dependencies.interceptorRegistrations() : null;
+    }
+
+    @Override
+    public @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
+        return creationState != null && creationState.definition.equals(definition)
+            ? creationState.lifecycleInterceptorCandidates().legacyRegistrations() : BeanResolutionContext.super.getBeanDestructionInterceptors(definition);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void prepareProxyTarget(BeanDefinition<?> definition, List<?> registrations) {
+        if (context.isUnscoped(definition)) {
+            setAttribute(PROXY_INTERCEPTORS,
+                new ProxyInterceptors(definition, (List<BeanRegistration<?>>) List.copyOf(registrations)));
+        }
+    }
     @Nullable
     @SuppressWarnings("java:S3077") // the list is only ever replaced, never mutated after it is published
     private volatile List<BeanRegistration<?>> cachedProxyTargetDependents;
@@ -77,7 +154,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
     @Nullable
-    private Deque<List<BeanRegistration<?>>> dependentBeansToDestroyAfterResolutionStack;
+    private Deque<ParentDependents> parentDependentsStack;
     @Nullable
     private BeanRegistration<?> dependentFactory;
     @Nullable
@@ -224,12 +301,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             if (value.isPresent()) {
                 return value.get();
             } else {
+                Optional<?> defaultValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument);
+                if (defaultValue.isPresent()) {
+                    return defaultValue.get();
+                }
                 if (argument.isDeclaredNullable()) {
                     return null;
                 }
-                String finalStringValue = stringValue;
-                return argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument)
-                    .orElseThrow(() -> DependencyInjectionException.missingProperty(this, conversionContext, finalStringValue));
+                throw DependencyInjectionException.missingProperty(this, conversionContext, stringValue);
             }
         }
     }
@@ -417,6 +496,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         copy.removeAttribute(INTERCEPTOR_REGISTRATIONS);
         if (copy instanceof AbstractBeanResolutionContext abstractCopy) {
             abstractCopy.lazyProxyTarget = true;
+            if (creationState != null) {
+                abstractCopy.lazyProxyDependencies = creationState.dependencies;
+            }
             // taken by the creation of the proxy once the proxy is instantiated, for its registration
             if (lazyProxyTargetCopies == null) {
                 lazyProxyTargetCopies = new HashMap<>(2);
@@ -562,13 +644,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public List<BeanRegistration<?>> popDependentBeans() {
         List<BeanRegistration<?>> result = this.dependentBeans;
         this.dependentBeans = null;
-        if (dependentBeansToDestroyAfterResolutionStack == null) {
-            dependentBeansToDestroyAfterResolutionStack = new ArrayDeque<>(3);
+        if (parentDependentsStack == null) {
+            parentDependentsStack = new ArrayDeque<>(3);
         }
-        dependentBeansToDestroyAfterResolutionStack.push(
-            dependentBeansToDestroyAfterResolution == null ? Collections.emptyList() : dependentBeansToDestroyAfterResolution
-        );
+        // the factory of the parent bean is destroyed once the parent bean is created, the nested creation must
+        // neither take it for its own factory nor destroy it
+        parentDependentsStack.push(new ParentDependents(dependentBeansToDestroyAfterResolution, dependentFactory));
         dependentBeansToDestroyAfterResolution = null;
+        dependentFactory = null;
         return result;
     }
 
@@ -578,9 +661,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             throw new IllegalStateException("Found existing dependent beans!");
         }
         this.dependentBeans = dependentBeans;
-        if (dependentBeansToDestroyAfterResolutionStack != null && !dependentBeansToDestroyAfterResolutionStack.isEmpty()) {
-            List<BeanRegistration<?>> beansToDestroyAfterResolution = dependentBeansToDestroyAfterResolutionStack.pop();
-            dependentBeansToDestroyAfterResolution = beansToDestroyAfterResolution.isEmpty() ? null : beansToDestroyAfterResolution;
+        if (parentDependentsStack != null && !parentDependentsStack.isEmpty()) {
+            ParentDependents parentDependents = parentDependentsStack.pop();
+            dependentBeansToDestroyAfterResolution = parentDependents.beansToDestroyAfterResolution();
+            dependentFactory = parentDependents.factory();
         }
     }
 
@@ -1684,5 +1768,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             baseString.append(ansiSupported ? AnsiColour.brightCyan(")") : ")");
 
         }
+    }
+
+    /**
+     * The dependents of a parent bean kept aside by {@link #popDependentBeans()} while a nested bean is created.
+     *
+     * @param beansToDestroyAfterResolution The dependents to destroy once the parent bean is resolved
+     * @param factory                       The factory bean of the parent bean to destroy once it is created
+     */
+    private record ParentDependents(@Nullable List<BeanRegistration<?>> beansToDestroyAfterResolution,
+                                    @Nullable BeanRegistration<?> factory) {
     }
 }

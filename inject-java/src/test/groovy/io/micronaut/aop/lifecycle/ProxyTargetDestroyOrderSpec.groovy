@@ -153,9 +153,9 @@ class Holder {
         events.take(4) == ['2:POST_CONSTRUCT', '1:AROUND', '1:PRE_DESTROY', 'target:CLOSED']
         events.count('1:DESTROYED') == 1
 
-        and: 'the instance created with a target the context tracks is destroyed once too'
-        events.drop(4) as Set == (injected ? ['1:DESTROYED', '2:DESTROYED'] : ['1:DESTROYED']) as Set
-        events.size() == (injected ? 6 : 5)
+        and: 'the target interceptor is destroyed once whether destruction uses the instance or its owner'
+        events.drop(4) as Set == ['1:DESTROYED', '2:DESTROYED'] as Set
+        events.size() == 6
 
         cleanup:
         context.close()

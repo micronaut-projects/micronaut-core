@@ -82,6 +82,11 @@ public final class TrailingByteBody extends InternalByteBody implements Closeabl
     }
 
     @Override
+    public Publisher<ReadBuffer> toUnbufferedReadBufferPublisher() {
+        return InternalByteBody.toUnbufferedReadBufferPublisher(delegate);
+    }
+
+    @Override
     public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         return InternalByteBody.bufferFlow(delegate);
     }

@@ -48,6 +48,7 @@ import io.netty.handler.codec.http2.Http2Flags;
 import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2RemoteFlowController;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
@@ -126,6 +127,13 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 if (stream != null) {
                     stream.discardBufferedContent();
                 }
+            }
+        });
+        Http2RemoteFlowController remoteFlowController = connectionHandler.encoder().flowController();
+        remoteFlowController.listener(s -> {
+            Http2Stream stream = s.getProperty(key);
+            if (stream != null && remoteFlowController.isWritable(s)) {
+                stream.onOutboundWritable();
             }
         });
     }
@@ -518,6 +526,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.INTERNAL_ERROR.code(), requiredCtx().voidPromise());
                 return false;
             }
+        }
+
+        @Override
+        boolean isOutboundWritable() {
+            return requiredConnectionHandler().encoder().flowController().isWritable(stream);
         }
 
         @Override

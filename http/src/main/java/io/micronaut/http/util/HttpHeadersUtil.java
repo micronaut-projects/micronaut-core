@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -132,6 +133,17 @@ public final class HttpHeadersUtil {
             }
         }
         return false;
+    }
+
+    /**
+     * Trace HTTP headers using the named logger and the standard masking policy.
+     *
+     * @param loggerName Logger name
+     * @param httpHeaders HTTP headers
+     * @since 5.2.14
+     */
+    public static void trace(String loggerName, HttpHeaders httpHeaders) {
+        trace(LoggerFactory.getLogger(loggerName), httpHeaders);
     }
 
     /**

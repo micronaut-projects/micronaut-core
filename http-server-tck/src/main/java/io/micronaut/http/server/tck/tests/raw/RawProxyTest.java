@@ -39,12 +39,15 @@ import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -392,9 +395,20 @@ public class RawProxyTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Upstream {
         private final UpstreamEvents events;
+        /**
+         * The scheduler of the delay, owned by this test: Reactor's shared parallel scheduler
+         * would start its threads here, and they would keep the leak detection resource scope
+         * of this test class for every later test that runs on them.
+         */
+        private final Scheduler delayScheduler = Schedulers.newSingle("raw-proxy-upstream", true);
 
         Upstream(UpstreamEvents events) {
             this.events = events;
+        }
+
+        @PreDestroy
+        void close() {
+            delayScheduler.dispose();
         }
 
         @Get(value = "/stream", produces = MediaType.APPLICATION_OCTET_STREAM)
@@ -420,7 +434,7 @@ public class RawProxyTest {
         Publisher<byte[]> broken() {
             return Flux.range(0, BrokenUpstream.CHUNKS_BEFORE_FAILURE)
                 .map(i -> content((long) i * CHUNK_SIZE, CHUNK_SIZE))
-                .concatWith(Mono.delay(Duration.ofMillis(200)).then(Mono.error(new IllegalStateException("Upstream failure"))));
+                .concatWith(Mono.delay(Duration.ofMillis(200), delayScheduler).then(Mono.error(new IllegalStateException("Upstream failure"))));
         }
 
         @Get(value = "/inspect", produces = MediaType.TEXT_PLAIN)

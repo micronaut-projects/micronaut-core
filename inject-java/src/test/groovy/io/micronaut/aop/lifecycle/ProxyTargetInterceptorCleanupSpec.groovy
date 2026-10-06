@@ -260,12 +260,12 @@ class MyBean {
         events.DESTROYED.get() == 2
     }
 
-    void 'test the interceptors of a selection for an unmanaged target that another thread made first are destroyed'() {
+    void 'test two threads making the first call of an unmanaged target at once select its interceptors once'() {
         given:
         ApplicationContext context = buildContext('unmanaged.MyBean', unmanaged('''
         CyclicBarrier barrier = Events.barrier;
         if (barrier != null) {
-            // both threads are selecting before either keeps its selection
+            // holds the selection open until the test has seen it, while the other thread makes its call
             barrier.await(30, TimeUnit.SECONDS);
         }
 '''), true)
@@ -275,23 +275,26 @@ class MyBean {
 
         when: 'two threads make the first call of an unmanaged target at once'
         ((HotSwappableInterceptedProxy) proxy).swap(newTarget(context))
-        events.barrier = new CyclicBarrier(2)
+        def barrier = new CyclicBarrier(2)
+        events.barrier = barrier
         def calls = (1..2).collect { executor.submit({ proxy.work() } as java.util.concurrent.Callable) }
-        def results = calls.collect { it.get(60, TimeUnit.SECONDS) }
+        new spock.util.concurrent.PollingConditions(timeout: 30).eventually { assert barrier.numberWaiting == 1 }
         events.barrier = null
+        barrier.await(30, TimeUnit.SECONDS)
+        def results = calls.collect { it.get(60, TimeUnit.SECONDS) }
 
-        then: 'each created an interceptor, and the one of the selection that was not kept is destroyed'
+        then: 'the selection is made once: the proxy keeps it, and the other call uses the same interceptor'
         results == ['worked', 'worked']
-        events.CREATED.get() == 2
-        events.DESTROYED.get() == 1
+        events.CREATED.get() == 1
+        events.DESTROYED.get() == 0
 
         when:
         proxy.work()
         context.close()
 
-        then: 'the kept one is destroyed with the context'
-        events.CREATED.get() == 2
-        events.DESTROYED.get() == 2
+        then: 'the interceptor is destroyed with the proxy as the context closes'
+        events.CREATED.get() == 1
+        events.DESTROYED.get() == 1
 
         cleanup:
         executor.shutdownNow()

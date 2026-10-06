@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.aop.chain.InterceptorCandidateResolver;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.beandefinition.DisposableIntercepted;
 import io.micronaut.aop.beandefinition.InitializableIntercepted;
 import io.micronaut.aop.beandefinition.ParameterizedInterceptedBeanDefinition;
@@ -62,6 +64,7 @@ import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.MapOfB
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.OptionalBeanInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.ParameterInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.PropertyInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.ProviderInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.ValueInjectionPoint;
 import io.micronaut.context.beans.definition.ConstructorDefinition;
@@ -165,7 +168,6 @@ import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
-import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
@@ -246,6 +248,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final String BUILDER_VARIABLE_PREFIX = "builder";
     private static final String ARGUMENT_MEMBER = "argument";
 
+    private static final Method GET_BEAN_BY_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
+        BeanLocator.class, "getBean", Argument.class);
+    private static final Method GET_CANDIDATE_RESOLVER = ReflectionUtils.getRequiredInternalMethod(
+        InterceptorChainFactory.class, "candidateResolver");
+    private static final Method CAPTURE_LIFECYCLE_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
+        InterceptorCandidateResolver.class, "captureLifecycleCandidates", BeanResolutionContext.class, BeanDefinition.class, Object.class, boolean.class);
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method INJECT_BEAN_METHOD =
@@ -361,6 +369,44 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         "getEvaluatedExpressionValueForMethodArgument",
         int.class,
         int.class);
+
+    private static final Method GET_BEAN_FROM_PROVIDER_FOR_CONSTRUCTOR_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanDefinition.class,
+        "getBeanFromProviderForConstructorArgument",
+        BeanResolutionContext.class,
+        BeanContext.class,
+        int.class,
+        Class.class,
+        Qualifier.class);
+
+    private static final Method GET_BEAN_FROM_PROVIDER_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanDefinition.class,
+        "getBeanFromProviderForMethodArgument",
+        BeanResolutionContext.class,
+        BeanContext.class,
+        int.class,
+        int.class,
+        Class.class,
+        Qualifier.class);
+
+    private static final Method GET_BEAN_FROM_PROVIDER_FOR_SETTER = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanDefinition.class,
+        "getBeanFromProviderForSetter",
+        BeanResolutionContext.class,
+        BeanContext.class,
+        String.class,
+        Argument.class,
+        Class.class,
+        Qualifier.class);
+
+    private static final Method GET_BEAN_FROM_PROVIDER_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanDefinition.class,
+        "getBeanFromProviderForField",
+        BeanResolutionContext.class,
+        BeanContext.class,
+        int.class,
+        Class.class,
+        Qualifier.class);
 
     private static final Method GET_BEAN_FOR_SETTER = ReflectionUtils.getRequiredInternalMethod(
         AbstractInitializableBeanDefinition.class,
@@ -740,7 +786,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private String proxyBeanDefinitionName, proxyBeanTypeName;
 
-    private final OriginatingElements originatingElements;
+    private OriginatingElements originatingElements;
 
     private ClassDef.ClassDefBuilder classDefBuilder;
 
@@ -1077,7 +1123,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (!injectionPoint.annotationMetadata().hasDeclaredAnnotation(RequiresValidation.class)) {
             return false;
         }
-        if (injectionPoint instanceof BeanInjectionPoint<?> && !injectionPoint.type().isNullable()) {
+        if ((injectionPoint instanceof BeanInjectionPoint<?> || injectionPoint instanceof ProviderInjectionPoint<?>) && !injectionPoint.type().isNullable()) {
             return false;
         }
         return true;
@@ -1092,7 +1138,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      */
     private boolean needsPostConstructBeanValidation(List<BeanDefinitionInjectionPoint<ClassElement>> validatedPoints) {
         return validatedPoints.stream().anyMatch(ip ->
-            ip instanceof BeanInjectionPoint<?> || ip instanceof OptionalBeanInjectionPoint<?>
+            ip instanceof BeanInjectionPoint<?> || ip instanceof OptionalBeanInjectionPoint<?> || ip instanceof ProviderInjectionPoint<?>
                 || !isValueType(ip.annotationMetadata())
         );
     }
@@ -1748,7 +1794,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             Method resolveValuesMethod;
             Method defaultInstantiateMethod;
             ClassTypeDef interceptedInterface;
-            boolean isAopProxy = StringUtils.isNotEmpty(interceptedType);
+            // Runtime proxy creators receive only user arguments, without the generated proxy constructor tail.
+            boolean isAopProxy = StringUtils.isNotEmpty(interceptedType) && customInitializerBuilder == null;
             if (isParametrized) {
                 resolveValuesMethod = RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD;
                 if (isAopProxy) {
@@ -1773,7 +1820,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             // The interceptor chain runs in the default method of the intercepted interface, which returns as soon
             // as the chain has: members are injected and post-construct run here, on the instance it returned, so that
             // neither happens before an outer construction interceptor has completed or at all when one throws
-            boolean injectsMembers = needsInjectMethod() || needsPostConstruct();
+            boolean injectsMembers = needsInjectMethod() || needsPostConstruct() || hasInterceptedLifecycle();
 
             // Remove after AbstractInitializableBeanDefinition#doInstantiate is removed
             classDefBuilder.addMethod(MethodDef.override(PARAMETRIZED_DO_INSTANTIATE_METHOD)
@@ -2081,7 +2128,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         boolean needsInjectMethod = needsInjectMethod();
         boolean needsInjectScope = destroyInjectScopeBeans && hasInjectScope();
         boolean needsPostConstruct = needsPostConstruct();
-        if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct) {
+        boolean needsInterceptorCandidates = hasInterceptedLifecycle();
+        if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct && !needsInterceptorCandidates) {
             return beanInstance.returning();
         }
         // The instance is held as the bean type: an intercepted construction returns what the erased interface method
@@ -2089,6 +2137,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         ExpressionDef typedInstance = beanTypeDef.equals(beanInstance.type()) ? beanInstance : beanInstance.cast(beanTypeDef);
         return typedInstance.newLocal("instance", instanceVar -> {
             List<StatementDef> statements = new ArrayList<>();
+            if (needsInterceptorCandidates) {
+                statements.add(methodParameters.get(1).invoke(GET_BEAN_BY_ARGUMENT,
+                    ClassTypeDef.of(InterceptorChainFactory.class).getStaticField("ARGUMENT", TypeDef.of(Argument.class)))
+                    .cast(InterceptorChainFactory.class).invoke(GET_CANDIDATE_RESOLVER).invoke(CAPTURE_LIFECYCLE_INTERCEPTORS,
+                        methodParameters.get(0), aThis, instanceVar, ExpressionDef.constant(isPostConstructIntercepted())));
+            }
             if (needsInjectMethod) {
                 statements.add(
                     aThis.invoke(INJECT_BEAN_METHOD, methodParameters.get(0), methodParameters.get(1), instanceVar)
@@ -3222,12 +3276,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     /**
      * Whether this bean definition generates intercepted post-construct or pre-destroy handling.
      *
-     * <p>Proxy generation uses this to decide whether to give the proxy a field holding its interceptor
-     * registrations. The decision belongs here rather than in the proxy writer because it must agree exactly with
-     * the decision to generate the lifecycle methods: the same proxy-target, factory-method and interceptor-bean
-     * rules apply. A proxy that retained registrations without intercepting its lifecycle would carry a field
-     * nothing reads, and one that intercepted its lifecycle without retaining them would resolve a second
-     * interceptor for the same target.</p>
+     * <p>Proxy generation uses this to include lifecycle bindings in the retained interceptor candidates.
+     * Instantiation also uses it to capture candidates before initializing the bean. Both decisions must agree
+     * with lifecycle method generation, including its proxy-target, factory-method and interceptor-bean rules.</p>
      *
      * @return {@code true} if this definition intercepts either lifecycle phase
      * @since 5.2.0
@@ -3303,6 +3354,15 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
                 case StreamOfBeansInjectionPoint<ClassElement> ignore ->
                     resolveFieldValue(injectMethodSignature, fieldElement, GET_STREAM_OF_TYPE_FOR_FIELD, isArray, true, fieldIndex);
+
+                case ProviderInjectionPoint<ClassElement> v -> injectMethodSignature.aThis.invoke(
+                    GET_BEAN_FROM_PROVIDER_FOR_FIELD,
+                    injectMethodSignature.beanResolutionContext,
+                    injectMethodSignature.beanContext,
+                    ExpressionDef.constant(fieldIndex),
+                    ExpressionDef.constant(TypeDef.erasure(v.providerType())),
+                    getQualifier(fieldElement, resolveFieldArgument(fieldIndex))
+                ).cast(TypeDef.erasure(fieldElement.getType()));
 
                 case ParameterInjectionPoint<ClassElement> ignore -> {
                     throw new IllegalArgumentException("Field injection doesn't support @Parameter");
@@ -4005,6 +4065,27 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         ).cast(TypeDef.erasure(entry.getType()));
     }
 
+    private ExpressionDef getInvokeGetBeanFromProviderForSetter(VariableDef.This aThis,
+                                                                List<VariableDef.MethodParameter> methodParameters,
+                                                                String setterName,
+                                                                ParameterElement entry,
+                                                                ProviderInjectionPoint<ClassElement> injectionPoint,
+                                                                int methodIndex) {
+
+        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(injectionPoint.annotationMetadata());
+        removeAnnotations(annotationMetadata, PropertySource.class.getName(), Property.class.getName());
+
+        return aThis.invoke(
+            GET_BEAN_FROM_PROVIDER_FOR_SETTER,
+            methodParameters.get(0),
+            methodParameters.get(1),
+            ExpressionDef.constant(setterName),
+            getMethodArgument(entry, annotationMetadata, methodIndex),
+            ExpressionDef.constant(TypeDef.erasure(injectionPoint.providerType())),
+            getQualifier(entry.getGenericType(), getMethodArgument(entry, annotationMetadata, methodIndex))
+        ).cast(TypeDef.erasure(entry.getType()));
+    }
+
     private ExpressionDef getInvokeGetBeansOfTypeForSetter(VariableDef.This aThis,
                                                            List<VariableDef.MethodParameter> methodParameters,
                                                            String setterName,
@@ -4335,6 +4416,14 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 injectConstructorParameter(FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case StreamOfBeansInjectionPoint<ClassElement> v ->
                 injectConstructorParameter(GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
+            case ProviderInjectionPoint<ClassElement> v -> aThis.superRef().invoke(
+                GET_BEAN_FROM_PROVIDER_FOR_CONSTRUCTOR_ARGUMENT,
+                methodParameters.get(0),
+                methodParameters.get(1),
+                ExpressionDef.constant(index),
+                ExpressionDef.constant(TypeDef.erasure(v.providerType())),
+                getQualifier(v.annotationMetadata(), () -> resolveConstructorArgument(index, constructorMethodVarSupplier.get()))
+            ).cast(TypeDef.erasure(v.type()));
             case ParameterInjectionPoint<ClassElement> v -> {
                 if (!isParametrized) {
                     throw new IllegalArgumentException("Cannot resolve constructor argument for parameter [" + v.name() + "] of type [" + v.type() + "] because it is not parametrized");
@@ -4385,6 +4474,15 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 injectMethodParameter(FIND_BEAN_FOR_METHOD_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
             case StreamOfBeansInjectionPoint<ClassElement> v ->
                 injectMethodParameter(GET_STREAM_OF_TYPE_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
+            case ProviderInjectionPoint<ClassElement> v -> aThis.invoke(
+                GET_BEAN_FROM_PROVIDER_FOR_METHOD_ARGUMENT,
+                methodParameters.get(0),
+                methodParameters.get(1),
+                ExpressionDef.constant(methodIndex),
+                ExpressionDef.constant(parameterIndex),
+                ExpressionDef.constant(TypeDef.erasure(v.providerType())),
+                getQualifier(v.annotationMetadata(), () -> resolveMethodArgument(methodIndex, parameterIndex))
+            ).cast(TypeDef.erasure(v.type()));
             case ParameterInjectionPoint<ClassElement> ignore ->
                 throw new IllegalStateException("Methods cannot have @Parameter");
             case PropertyInjectionPoint<ClassElement> v ->
@@ -4415,6 +4513,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return switch (injectionPoint) {
             case BeanInjectionPoint<ClassElement> v ->
                 getInvokeGetBeanForSetter(aThis, methodParameters, setterName, parameter, v.annotationMetadata(), methodIndex);
+            case ProviderInjectionPoint<ClassElement> v ->
+                getInvokeGetBeanFromProviderForSetter(aThis, methodParameters, setterName, parameter, v, methodIndex);
 
 //            case BeanRegistrationInjectionPoint<ClassElement> v ->
 //                injectMethodParameter(GET_BEAN_REGISTRATION_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
@@ -5235,6 +5335,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     @Override
     public void addOriginatingElement(Element element) {
         originatingElements.addOriginatingElement(element);
+    }
+
+    /**
+     * Makes the given element the only originating element of the definition. The executable methods and the proxies
+     * of the definition take the originating elements when they are created, so this has to be called before.
+     *
+     * @param element The originating element
+     */
+    void setOriginatingElement(Element element) {
+        originatingElements = OriginatingElements.of(element);
     }
 
     /**

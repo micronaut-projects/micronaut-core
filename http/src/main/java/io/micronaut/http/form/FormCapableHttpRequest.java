@@ -18,6 +18,7 @@ package io.micronaut.http.form;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.multipart.RawFormField;
 import org.reactivestreams.Publisher;
 
@@ -36,6 +37,20 @@ public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B>, Lifecyc
      * @throws IllegalStateException If this request does not contain a form body
      */
     Publisher<RawFormField> getRawFormFields() throws IllegalStateException;
+
+    /**
+     * Get the raw form field publisher of other bytes than those of this request, decoded like the
+     * form of this request, e.g. from a split of its bytes. Can only be subscribed to once.
+     *
+     * @param byteBody The bytes of the form, which the publisher owns
+     * @return The raw form fields
+     * @throws IllegalStateException         If this request does not contain a form body
+     * @throws UnsupportedOperationException If this request cannot decode other bytes
+     * @since 5.3.0
+     */
+    default Publisher<RawFormField> getRawFormFields(ByteBody byteBody) throws IllegalStateException {
+        throw new UnsupportedOperationException("This request cannot decode the form fields of other bytes than its own");
+    }
 
     /**
      * Check whether this request contains a form body (url encoded or multipart).

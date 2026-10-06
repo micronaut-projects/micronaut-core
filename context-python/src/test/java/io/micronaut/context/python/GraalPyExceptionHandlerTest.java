@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +25,8 @@ import java.util.Arrays;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -196,6 +199,57 @@ class GraalPyExceptionHandlerTest {
             Throwable[] suppressed = PythonExceptions.suppressed(exception);
             assertEquals(1, suppressed.length, "reported suppressed exceptions: " + Arrays.toString(suppressed));
             assertEquals("closed badly", suppressed[0].getMessage());
+        }
+    }
+
+    @Test
+    void returnsAnExceptionAlreadyMappedByTheContextHandler() {
+        PythonBoom[] mapped = new PythonBoom[1];
+        try (Context context = Context.newBuilder(PYTHON)
+            .exceptionHandler(exception -> {
+                throw mapped[0];
+            })
+            .build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('native')");
+            mapped[0] = new PythonBoom(guest);
+
+            assertSame(mapped[0], GraalPyExceptionHandler.toHostThrowable(guest));
+            assertSame(guest, mapped[0].asPolyglotValue());
+        }
+    }
+
+    @Test
+    void preservesOperationalFailuresFromTheContextHandler() {
+        IllegalStateException failure = new IllegalStateException("mapping failed");
+        try (Context context = Context.newBuilder(PYTHON)
+            .exceptionHandler(exception -> {
+                throw failure;
+            })
+            .build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('native')");
+
+            assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> GraalPyExceptionHandler.toHostThrowable(guest)));
+        }
+    }
+
+    @Test
+    void preservesHostThrowableIdentity() {
+        IllegalArgumentException host = new IllegalArgumentException("host");
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            assertSame(host, GraalPyExceptionHandler.toHostThrowable(context.asValue(host)));
+        }
+    }
+
+    @Test
+    void retainsPolyglotExceptionsForUnmappedNativeBuiltins() {
+        try (Context context = Context.newBuilder(PYTHON).build()) {
+            Value guest = context.eval(PYTHON, "ValueError('native')");
+
+            PolyglotException exception = assertInstanceOf(PolyglotException.class,
+                GraalPyExceptionHandler.toHostThrowable(guest));
+            assertTrue(exception.isGuestException());
+            assertTrue(exception.getMessage().contains("native"));
         }
     }
 

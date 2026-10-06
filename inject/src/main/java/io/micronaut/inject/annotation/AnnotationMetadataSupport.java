@@ -45,6 +45,8 @@ import io.micronaut.context.annotation.Type;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.condition.TrueCondition;
 import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.AnnotationBuilder;
+import io.micronaut.core.annotation.AnnotationBuilderRegistry;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -556,8 +558,33 @@ public final class AnnotationMetadataSupport {
      * @return The annotation
      */
     @Internal
-    @SuppressWarnings("unchecked")
     public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
+        // a generated builder creates the annotation without a proxy, from the values read and converted once;
+        // an annotation value with expressions to evaluate stays lazy, so it goes through the proxy
+        if (annotationValue == null || !annotationValue.hasEvaluatedExpressions()) {
+            AnnotationBuilder<T> builder = AnnotationBuilderRegistry.shared().find(annotationClass).orElse(null);
+            if (builder != null) {
+                AnnotationValue<T> builderValue = removeInternalAnnotationValues(annotationValue);
+                try {
+                    return builderValue == null ? builder.build(Map.of()) : builder.build(builderValue);
+                } catch (Exception e) {
+                    throw new AnnotationMetadataException("Failed to build annotation for type: " + annotationClass.getName(), e);
+                }
+            }
+        }
+        return buildProxyAnnotation(annotationClass, annotationValue);
+    }
+
+    /**
+     * Builds the annotation with a proxy, whether or not a generated builder exists for the type.
+     *
+     * @param annotationClass The annotation class
+     * @param annotationValue The annotation value
+     * @param <T>             The type
+     * @return The annotation
+     */
+    @SuppressWarnings("unchecked")
+    static <T extends Annotation> T buildProxyAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         AnnotationValue<T> proxyAnnotationValue = removeInternalAnnotationValues(annotationValue);
         try {
             return (T) getProxyFactory(annotationClass)

@@ -29,7 +29,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -121,6 +120,22 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * buffer, see {@link #setReaderBufferLimit(long)}.
      */
     private long readerBufferLimit = -1;
+    /**
+     * Whether the bytes that arrive before the first reader subscribes are kept past the buffer
+     * limit for a reader that streams them, see {@link #setKeepInitialBytes()}.
+     */
+    private boolean keepInitialBytes;
+    /**
+     * Whether a reader subscribed, or a reservation was released without one.
+     */
+    private boolean subscribed;
+    /**
+     * The buffer limit failure of the bytes that arrived before the first reader subscribed,
+     * see {@link #setKeepInitialBytes()}, or {@code null}. While it is set, the {@link #buffer}
+     * holds these bytes and they are not charged to the buffered size.
+     */
+    @Nullable
+    private Exception initialBytesOverLimit;
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
         this.readBufferFactory = readBufferFactory;
@@ -200,6 +215,21 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         this.readerBufferLimit = limit;
     }
 
+    /**
+     * Keep the bytes that arrive before the first reader subscribes even past the buffer limit,
+     * for a reader that streams the body without holding it, see
+     * {@link BufferConsumer#isUnbuffered()}. Only for an upstream that bounds what it
+     * sends before a reader asks for more, e.g. the initial window of a connection: the bytes a
+     * server reads with the headers can be more than the limit before the route reads the body.
+     * Any other reader fails with the buffer limit, as it would without this, and the bytes are
+     * dropped when it subscribes. Must be called before the first bytes are added.
+     *
+     * @since 5.3.0
+     */
+    public final void setKeepInitialBytes() {
+        this.keepInitialBytes = true;
+    }
+
     public final void setExpectedLengthFrom(@Nullable String contentLength) {
         if (contentLength == null) {
             return;
@@ -242,14 +272,17 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     }
 
     /**
-     * Forward any already-buffered data to the given new subscriber.
+     * Take the already-buffered data for the given new subscriber, which the caller forwards to
+     * it once this buffer is done working.
      *
      * @param subscriber The new subscriber, or {@code null} if the reservation has been cancelled
      *                   and the data can just be discarded
      * @param last {@code true} iff this was the last reservation and the buffer can be discarded
      *                         after this call
+     * @return The data to forward, or {@code null} if there is none
      */
-    private void forwardInitialBuffer(@Nullable BufferConsumer subscriber, boolean last) {
+    @Nullable
+    private ReadBuffer takeInitialBuffer(@Nullable BufferConsumer subscriber, boolean last) {
         if (subscriber != null) {
             if (buffer != null) {
                 if (last) {
@@ -271,13 +304,14 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     }
                     sizeLimitTrackers.bufferedSize().subtract(n);
                 }
-                subscriber.add(getBufferedData(last));
+                return getBufferedData(last);
             }
         } else {
             if (last) {
                 discardBuffer();
             }
         }
+        return null;
     }
 
     /**
@@ -293,7 +327,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * data: a subscriber that asked for the full body ({@link #subscribeFull0}) keeps the data, so
      * it is still held, and for a form field that charge is shared with the form-wide limit and
      * must survive the field's completion. Only the hand-off to a streaming subscriber releases
-     * it, see {@link #forwardInitialBuffer}.
+     * it, see {@link #takeInitialBuffer}.
      *
      * @param discardBuffer {@code true} iff the buffer can and should be discarded after this call
      * @return The buffered data
@@ -330,26 +364,97 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         working = true;
         boolean last = --reserved == 0;
+        subscribed = true;
+        ReadBuffer initial;
+        Throwable failure = null;
+        boolean discard = false;
+        if (initialBytesOverLimit != null && subscriber != null && subscriber.isUnbuffered()) {
+            initial = subscribeKeeping(subscriber, last);
+            failure = error;
+        } else {
+            dropInitialBytes();
+            // the buffered bytes are kept for the subscribers that wait for the full body, which
+            // hold no reservation: they are given them when the body completes
+            initial = takeInitialBuffer(subscriber, last && fullSubscribers == null);
+            if (subscriber != null) {
+                if (subscribers == null) {
+                    subscribers = new ArrayList<>(1);
+                }
+                subscribers.add(subscriber);
+                if (error != null) {
+                    failure = error;
+                } else if (bufferSizeExceeded != null) {
+                    failure = bufferSizeExceeded;
+                    discard = true;
+                }
+            }
+        }
+        boolean completed = complete;
+        // the subscriber is called once this buffer is done working: it can subscribe another
+        // split reentrantly, e.g. the reader of a copy of the body whose completion runs the
+        // reader of the body, which then finds the bytes buffered for it
+        working = false;
         if (subscriber != null) {
-            if (subscribers == null) {
-                subscribers = new ArrayList<>(1);
+            if (initial != null) {
+                subscriber.add(initial);
             }
-            subscribers.add(subscriber);
-            forwardInitialBuffer(subscriber, last);
-            if (error != null) {
-                subscriber.error(error);
-            } else if (bufferSizeExceeded != null) {
-                subscriber.error(bufferSizeExceeded);
-                specificUpstream.allowDiscard();
+            if (failure != null) {
+                subscriber.error(failure);
+                if (discard) {
+                    specificUpstream.allowDiscard();
+                }
             }
-            if (complete) {
+            if (completed) {
                 subscriber.complete();
             }
-        } else {
-            forwardInitialBuffer(null, last);
         }
         afterSubscribe(last);
-        working = false;
+    }
+
+    /**
+     * Subscribe a reader that streams the body without holding it to the bytes kept past the
+     * buffer limit before it subscribed, see {@link #setKeepInitialBytes()}. The readers still
+     * reserved are held to the limit: the kept bytes are dropped for them.
+     *
+     * @param subscriber The reader
+     * @param last       Whether this was the last reservation
+     * @return The kept bytes, which the caller forwards to the reader
+     */
+    private ReadBuffer subscribeKeeping(BufferConsumer subscriber, boolean last) {
+        if (subscribers == null) {
+            subscribers = new ArrayList<>(1);
+        }
+        subscribers.add(subscriber);
+        // the kept bytes are not charged: the reader is not charged for them either
+        ReadBuffer kept = getBufferedData(last);
+        if (!last) {
+            dropInitialBytes();
+        }
+        initialBytesOverLimit = null;
+        return kept;
+    }
+
+    /**
+     * Drop the bytes kept past the buffer limit before the first reader subscribed, see
+     * {@link #setKeepInitialBytes()}: the readers that subscribe from now on fail with the limit.
+     */
+    private void dropInitialBytes() {
+        Exception exceeded = initialBytesOverLimit;
+        if (exceeded == null) {
+            return;
+        }
+        initialBytesOverLimit = null;
+        if (buffer != null) {
+            // not charged, see add0
+            for (ReadBuffer rb : buffer) {
+                rb.close();
+            }
+            buffer = null;
+        }
+        if (bufferSizeExceeded == null) {
+            bufferSizeExceeded = exceeded;
+            bufferLimitExceeded = true;
+        }
     }
 
     /**
@@ -374,9 +479,16 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         ExecutionFlow<ReadBuffer> ret = targetFlow;
+        // the target flow is completed once this buffer is done working: its completion can run
+        // another operation on this buffer, e.g. a reader that closes the other reservation
+        Throwable failTarget = null;
+        ReadBuffer completeTarget = null;
 
         working = true;
         boolean last = --reserved == 0;
+        subscribed = true;
+        // a reader that buffers the body is held to the limit
+        dropInitialBytes();
         Throwable error = this.error;
         if (error == null && bufferSizeExceeded != null) {
             error = bufferSizeExceeded;
@@ -386,14 +498,14 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             if (canReturnImmediate) {
                 ret = ExecutionFlow.error(error);
             } else {
-                targetFlow.completeExceptionally(error);
+                failTarget = error;
             }
         } else if (complete) {
             ReadBuffer buf = getBufferedData(last);
             if (canReturnImmediate) {
                 ret = ExecutionFlow.just(buf);
             } else {
-                targetFlow.complete(buf);
+                completeTarget = buf;
             }
         } else {
             if (fullSubscribers == null) {
@@ -404,6 +516,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         afterSubscribe(last);
         working = false;
 
+        if (failTarget != null) {
+            targetFlow.completeExceptionally(failTarget);
+        } else if (completeTarget != null) {
+            targetFlow.complete(completeTarget);
+        }
         return ret;
     }
 
@@ -418,6 +535,19 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 rb.close();
             }
             buffer = null;
+            sizeLimitTrackers.bufferedSize().subtract(n);
+        }
+    }
+
+    /**
+     * Release the buffered size charge of the buffered bytes, which this buffer keeps.
+     */
+    private void releaseBufferCharge() {
+        if (buffer != null) {
+            long n = 0;
+            for (ReadBuffer rb : buffer) {
+                n += rb.readable();
+            }
             sizeLimitTrackers.bufferedSize().subtract(n);
         }
     }
@@ -516,22 +646,46 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             } // else, already checked the Content-Length
 
             working = true;
-            if (subscribers != null) {
+            // the copies for the subscribers there are now, delivered once the state below is
+            // final: a subscriber can subscribe another split reentrantly, which then finds these
+            // bytes buffered for it, and is not given them twice
+            List<BufferConsumer> targets = subscribers;
+            int n = targets == null ? 0 : targets.size();
+            ReadBuffer single = null;
+            List<ReadBuffer> copies = null;
+            if (n > 0) {
                 if (completeAfter) {
-                    // delivered by addAndComplete once the state below is final
-                    deferred = new ArrayList<>(subscribers.size());
-                    for (int i = 0; i < subscribers.size(); i++) {
+                    // delivered by addAndComplete
+                    deferred = new ArrayList<>(n);
+                    for (int i = 0; i < n; i++) {
                         deferred.add(rb.duplicate());
                     }
+                } else if (n == 1) {
+                    single = rb.duplicate();
                 } else {
-                    for (BufferConsumer consumer : subscribers) {
-                        consumer.add(rb.duplicate());
+                    copies = new ArrayList<>(n);
+                    for (int i = 0; i < n; i++) {
+                        copies.add(rb.duplicate());
                     }
                 }
             }
-            if (reserved > 0 || fullSubscribers != null) {
+            if (initialBytesOverLimit != null) {
+                // kept past the limit for a reader that streams them, see setKeepInitialBytes
+                if (buffer == null) {
+                    buffer = new ArrayList<>();
+                }
+                buffer.add(rb.move());
+            } else if (reserved > 0 || fullSubscribers != null) {
                 if (bufferSizeExceeded == null) {
                     bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
+                    if (bufferSizeExceeded != null && keepInitialBytes && !subscribed && fullSubscribers == null) {
+                        // no reader yet: the upstream only sends what it sends before a reader
+                        // asks for more. Keep the bytes, not charged, for a reader that streams
+                        // them; any other reader fails with the limit when it subscribes
+                        initialBytesOverLimit = bufferSizeExceeded;
+                        bufferSizeExceeded = null;
+                        releaseBufferCharge();
+                    }
                     if (bufferSizeExceeded != null) {
                         bufferLimitExceeded = true;
                         discardBuffer();
@@ -553,8 +707,34 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
             }
             working = false;
+            if (single != null) {
+                Objects.requireNonNull(targets).get(0).add(single);
+            } else if (copies != null) {
+                deliver(Objects.requireNonNull(targets), copies);
+            }
         }
         return deferred;
+    }
+
+    /**
+     * Deliver a copy of the added bytes to each of the given subscribers. The copies not yet
+     * delivered are closed if a delivery throws.
+     *
+     * @param targets The subscribers
+     * @param copies  The copies, one per subscriber in order
+     */
+    private static void deliver(List<BufferConsumer> targets, List<ReadBuffer> copies) {
+        int delivered = 0;
+        try {
+            for (ReadBuffer copy : copies) {
+                // ownership of the copy passes to the consumer with the call, even if it throws
+                targets.get(delivered++).add(copy);
+            }
+        } finally {
+            for (int i = delivered; i < copies.size(); i++) {
+                copies.get(i).close();
+            }
+        }
     }
 
     /**
@@ -619,17 +799,37 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         complete = true;
         expectedLength = lengthSoFar;
         if (notifySubscribers && subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.complete();
+            // by index, only the subscribers there are now: the completion of one can subscribe
+            // another split reentrantly, which subscribe0 completes itself
+            List<BufferConsumer> current = subscribers;
+            for (int i = 0, n = current.size(); i < n; i++) {
+                current.get(i).complete();
             }
         }
-        if (fullSubscribers != null && bufferSizeExceeded == null) {
-            boolean last = reserved <= 0;
-            for (Iterator<DelayedExecutionFlow<ReadBuffer>> iterator = fullSubscribers.iterator(); iterator.hasNext(); ) {
-                DelayedExecutionFlow<ReadBuffer> fullSubscriber = iterator.next();
-                fullSubscriber.complete(getBufferedData(last && !iterator.hasNext()));
-            }
+        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
+        if (full != null && bufferSizeExceeded == null) {
             fullSubscribers = null;
+            // the body of every subscriber is taken before the first one is completed: its
+            // completion can run another operation on this buffer, e.g. a reader that closes the
+            // last reservation, which discards the buffered bytes the others are still to be given
+            boolean last = reserved <= 0;
+            int n = full.size();
+            List<ReadBuffer> bodies = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                bodies.add(getBufferedData(last && i == n - 1));
+            }
+            int completed = 0;
+            try {
+                while (completed < n) {
+                    // ownership of the body passes to the subscriber with the call
+                    ReadBuffer body = bodies.get(completed);
+                    full.get(completed++).complete(body);
+                }
+            } finally {
+                for (int i = completed; i < n; i++) {
+                    bodies.get(i).close();
+                }
+            }
         }
     }
 
@@ -651,10 +851,14 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         error = e;
         failed = true;
         trailers.completeExceptionally(e);
+        dropInitialBytes();
         discardBuffer();
         if (subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.error(e);
+            // by index, only the subscribers there are now: the error of one can subscribe
+            // another split reentrantly, which subscribe0 fails itself
+            List<BufferConsumer> current = subscribers;
+            for (int i = 0, n = current.size(); i < n; i++) {
+                current.get(i).error(e);
             }
         }
         if (fullSubscribers != null && bufferSizeExceeded == null) {
@@ -679,16 +883,46 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          */
         @Nullable
         private final SizeLimitTracker ownTracker;
+        /**
+         * Whether this reader is not charged for the bytes it has not delivered yet, see
+         * {@link #AsFlux(BaseSharedBuffer, boolean)}.
+         */
+        private final boolean unbuffered;
         private boolean first = true;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
+            this(sharedBuffer, false);
+        }
+
+        /**
+         * @param sharedBuffer The buffer to read
+         * @param unbuffered   Whether the reader streams the bytes without holding them, e.g. to
+         *                     decode them piece by piece: it is not charged for the bytes it has
+         *                     not delivered yet, which the backpressure of the upstream bounds,
+         *                     and it receives the bytes kept past the buffer limit before it
+         *                     subscribed, see {@link #setKeepInitialBytes()}
+         * @since 5.3.0
+         */
+        public AsFlux(BaseSharedBuffer sharedBuffer, boolean unbuffered) {
             this.sharedBuffer = sharedBuffer;
+            this.unbuffered = unbuffered;
             long readerBufferLimit = sharedBuffer.readerBufferLimit;
-            this.ownTracker = readerBufferLimit < 0 ? null : NotThreadSafe.create(readerBufferLimit, true).makeAtomic();
+            this.ownTracker = unbuffered || readerBufferLimit < 0 ? null : NotThreadSafe.create(readerBufferLimit, true).makeAtomic();
+        }
+
+        @Override
+        public boolean isUnbuffered() {
+            return unbuffered;
         }
 
         @Override
         public void add(ReadBuffer buf) {
+            if (unbuffered) {
+                if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                    buf.close();
+                }
+                return;
+            }
             SizeLimitTracker readerTracker = ownTracker;
             if (readerTracker != null) {
                 int size = buf.readable();
@@ -729,6 +963,21 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         public Flux<ReadBuffer> asFlux(Upstream upstream) {
+            if (unbuffered) {
+                return sink.asFlux()
+                    .doOnSubscribe(s -> upstream.start())
+                    .doOnNext(bb -> upstream.onBytesConsumed(bb.readable()))
+                    .doOnCancel(() -> {
+                        upstream.allowDiscard();
+                        upstream.disregardBackpressure();
+                    })
+                    .doOnError(e -> {
+                        // a reader that failed, e.g. over its limit, reads nothing more
+                        upstream.allowDiscard();
+                        upstream.disregardBackpressure();
+                    })
+                    .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
+            }
             SizeLimitTracker readerTracker = ownTracker;
             if (readerTracker != null) {
                 return sink.asFlux()
@@ -739,6 +988,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                         upstream.onBytesConsumed(size);
                     })
                     .doOnCancel(() -> {
+                        upstream.allowDiscard();
+                        upstream.disregardBackpressure();
+                    })
+                    .doOnError(e -> {
+                        // a reader that failed, e.g. over its limit, reads nothing more
                         upstream.allowDiscard();
                         upstream.disregardBackpressure();
                     })
@@ -755,6 +1009,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     upstream.onBytesConsumed(size);
                 })
                 .doOnCancel(() -> {
+                    upstream.allowDiscard();
+                    upstream.disregardBackpressure();
+                })
+                .doOnError(e -> {
+                    // a reader that failed, e.g. over its limit, reads nothing more
                     upstream.allowDiscard();
                     upstream.disregardBackpressure();
                 })

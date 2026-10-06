@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer
 
 import groovy.transform.PackageScope
+import io.micronaut.aop.internal.InterceptorChainFactoryBean
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanDefinitionsProvider
@@ -447,7 +448,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
      */
     @PackageScope
     List<BeanDefinitionReference<?>> runtimeReferences(ClassLoader classLoader) {
-        return [new InterceptorRegistryBean(), new BeanProviderDefinition(), new JakartaProviderBeanDefinition(), new ApplicationEventPublisherFactory<>()]
+        return [new InterceptorChainFactoryBean(), new InterceptorRegistryBean(), new BeanProviderDefinition(), new JakartaProviderBeanDefinition(), new ApplicationEventPublisherFactory<>()]
     }
 
     /**

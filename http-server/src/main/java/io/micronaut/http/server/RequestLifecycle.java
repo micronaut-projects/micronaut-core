@@ -49,6 +49,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonSyntaxException;
+import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
@@ -251,12 +252,15 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> onWriteError(HttpRequest<?> request, Throwable throwable) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         try {
+            // the route that answered, whose own filters filter the response: an error route
+            // replaces the route match of the request
+            RouteMatch<?> routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
             return onErrorNoFilter(request, throwable, propagatedContext)
                 .flatMap(response -> {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
                     return handleStatusException(request, response, routeInfo, propagatedContext);
                 })
-                .flatMap(response -> runResponseFilters(request, response, propagatedContext))
+                .flatMap(response -> runResponseFilters(request, routeMatch, response, propagatedContext))
                 .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
         } catch (Throwable e) {
             return createDefaultErrorResponseFlow(request, e, propagatedContext);
@@ -409,11 +413,13 @@ public class RequestLifecycle {
     }
 
     private ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
+                                                              @Nullable RouteMatch<?> routeMatch,
                                                               HttpResponse<?> response,
                                                               PropagatedContext propagatedContext) {
         FilterRunner filterRunner = new FilterRunner(
             routeExecutor.router.findPreMatchingFilters(request),
-            routeExecutor.router.findFilters(request),
+            // the filters of the route too, like the filters that ran for the request
+            routeExecutor.router.findFilters(request, routeMatch),
             (httpRequest, context) -> {
                 throw new IllegalStateException("Should not be called");
             }) {
@@ -448,7 +454,8 @@ public class RequestLifecycle {
 
                 @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
-                    return routeExecutor.router.findFilters(request);
+                    // the matched route selects the filters that apply to it, and brings its own route filters
+                    return routeExecutor.router.findFilters(request, routeMatch);
                 }
 
                 @Override
@@ -563,7 +570,10 @@ public class RequestLifecycle {
         Class<?> declaringType = null;
         for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
             final String routeMethod = anyRoute.getRouteInfo().getHttpMethodName();
-            if (!requestMethodName.equals(routeMethod)) {
+            // the route of any custom method is a route of the method of a custom request
+            boolean sameMethod = requestMethodName.equals(routeMethod)
+                || httpMethod == HttpMethod.CUSTOM && AnyMethodRoutes.CUSTOM_METHODS.equals(routeMethod);
+            if (!sameMethod) {
                 allowedMethods.add(routeMethod);
             } else {
                 if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {

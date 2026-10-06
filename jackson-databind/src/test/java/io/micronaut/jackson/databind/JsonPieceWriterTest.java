@@ -99,6 +99,44 @@ class JsonPieceWriterTest {
     }
 
     @Test
+    void largePiecesAndTheSmallPiecesAroundThemKeepTheirBytes() {
+        String large = "x".repeat(20_000);
+        String larger = "y".repeat(70_000);
+        try (PieceWriter<String> writer = open(Argument.STRING)) {
+            assertEquals("[\"a\"", text(writer.writePiece(beforeFirst, "a")));
+            assertEquals(",\"" + large + "\"", text(writer.writePiece(between, large)));
+            assertEquals(",\"b\"", text(writer.writePiece(between, "b")));
+            assertEquals(",\"" + larger + "\"", text(writer.writePiece(between, larger)));
+            assertEquals(",\"" + large + "\"", text(writer.writePiece(between, large)));
+            assertEquals(",\"c\"", text(writer.writePiece(between, "c")));
+        }
+    }
+
+    @Test
+    void piecesAreIndependentOfTheLaterPieces() {
+        try (PieceWriter<String> writer = open(Argument.STRING)) {
+            CloseableByteBody first = writer.writePiece(beforeFirst, "first");
+            CloseableByteBody second = writer.writePiece(between, "z".repeat(5_000));
+            CloseableByteBody third = writer.writePiece(between, "third");
+            assertEquals(",\"third\"", text(third));
+            assertEquals(",\"" + "z".repeat(5_000) + "\"", text(second));
+            assertEquals("[\"first\"", text(first));
+        }
+    }
+
+    @Test
+    void consecutiveLargePiecesAreIndependent() {
+        try (PieceWriter<String> writer = open(Argument.STRING)) {
+            CloseableByteBody first = writer.writePiece(beforeFirst, "a".repeat(3_000));
+            CloseableByteBody second = writer.writePiece(between, "b".repeat(3_000));
+            CloseableByteBody third = writer.writePiece(between, "c".repeat(2_000));
+            assertEquals(",\"" + "c".repeat(2_000) + "\"", text(third));
+            assertEquals(",\"" + "b".repeat(3_000) + "\"", text(second));
+            assertEquals("[\"" + "a".repeat(3_000) + "\"", text(first));
+        }
+    }
+
+    @Test
     void failingPieceIsReportedAsCodecException() {
         try (PieceWriter<JsonMessageHandlerWriteFailureTest.Failing> writer = open(Argument.of(JsonMessageHandlerWriteFailureTest.Failing.class))) {
             CodecException e = assertThrows(CodecException.class, () -> writer.writePiece(beforeFirst, new JsonMessageHandlerWriteFailureTest.Failing()));

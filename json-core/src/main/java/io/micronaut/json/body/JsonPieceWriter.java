@@ -29,12 +29,15 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * {@link PieceWriter} for JSON. Keeps one {@link JsonStreamWriter} of the mapper open across the
- * pieces of a response, writing into a stream whose buffer is cut off after each piece and handed
+ * pieces of a response, writing into a stream whose bytes are cut off after each piece and handed
  * downstream as the body of that piece. The separator in front of a piece goes into the same
- * buffer, so the bytes of a piece are never copied or composed.
+ * buffer, so a piece is never composed of several buffers.
  *
  * @param <T> The type of the pieces
  * @author Jonas Konrad
@@ -101,9 +104,12 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
     }
 
     /**
-     * The stream the JSON writer writes to for the whole response. The bytes go into a buffer of
-     * the {@link ReadBufferFactory}, opened when the first byte of a piece arrives and cut off
-     * when the piece is done, at which point it becomes the body of the piece.
+     * The stream the JSON writer writes to for the whole response. The bytes of a piece go into a
+     * heap array that is kept across the pieces. A small piece is copied out at its exact size,
+     * which is cheaper than taking a buffer of the {@link ReadBufferFactory} for every piece: the
+     * transport combines adjacent small pieces anyway. A larger piece is copied into a buffer of
+     * the factory, so it reaches the transport without leaving garbage behind, and the array is
+     * kept for the next piece.
      *
      * <p>Closing the stream does nothing: a mapper may close the stream it was given after every
      * value, as {@link JsonMapper#writeValue(OutputStream, Argument, Object)} implementations
@@ -111,60 +117,75 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
      * stream itself when it is closed.
      */
     private static final class BufferStream extends OutputStream {
+        private static final int INITIAL_CAPACITY = 512;
+        private static final int SMALL_PIECE_LIMIT = 1024;
+        private static final int MAX_RETAINED_CAPACITY = 64 * 1024;
+
         private final ReadBufferFactory factory;
-        private ReadBufferFactory.@Nullable BufferingOutputStream buffer;
+        private byte[] scratch = new byte[INITIAL_CAPACITY];
+        private int count;
 
         BufferStream(ReadBufferFactory factory) {
             this.factory = factory;
         }
 
-        private OutputStream target() {
-            ReadBufferFactory.BufferingOutputStream current = this.buffer;
-            if (current == null) {
-                current = factory.outputStreamBuffer();
-                this.buffer = current;
+        private void ensureCapacity(int extra) {
+            int needed = count + extra;
+            if (needed < 0) {
+                throw new OutOfMemoryError("Piece too large");
             }
-            return current.stream();
+            if (needed > scratch.length) {
+                scratch = Arrays.copyOf(scratch, Math.max(needed, scratch.length << 1));
+            }
         }
 
         @Override
-        public void write(int b) throws IOException {
-            target().write(b);
+        public void write(int b) {
+            ensureCapacity(1);
+            scratch[count++] = (byte) b;
         }
 
         @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            target().write(b, off, len);
+        public void write(byte[] b, int off, int len) {
+            Objects.checkFromIndexSize(off, len, b.length);
+            ensureCapacity(len);
+            System.arraycopy(b, off, scratch, count, len);
+            count += len;
         }
 
         /**
          * Take the bytes written since the last cut as a buffer.
          *
          * @return The bytes
-         * @throws IOException If the buffer cannot be finished
          */
-        ReadBuffer cut() throws IOException {
-            ReadBufferFactory.BufferingOutputStream current = this.buffer;
-            if (current == null) {
+        ReadBuffer cut() {
+            int n = count;
+            if (n == 0) {
                 return factory.createEmpty();
             }
-            this.buffer = null;
-            return current.finishBuffer();
+            count = 0;
+            byte[] current = scratch;
+            ReadBuffer piece;
+            if (n <= SMALL_PIECE_LIMIT) {
+                // the transport combines adjacent small pieces, so an exact heap copy is cheapest
+                piece = factory.adapt(Arrays.copyOf(current, n));
+            } else {
+                // a larger piece goes out on its own: copy it into a buffer of the factory, which
+                // the transport writes without another copy, and keep the array for the next piece
+                piece = factory.copyOf(ByteBuffer.wrap(current, 0, n));
+            }
+            if (current.length > MAX_RETAINED_CAPACITY) {
+                // do not keep an array that one very large piece grew for the pieces after it
+                scratch = new byte[INITIAL_CAPACITY];
+            }
+            return piece;
         }
 
         /**
          * Drop the bytes written since the last cut.
          */
         void discard() {
-            ReadBufferFactory.BufferingOutputStream current = this.buffer;
-            if (current != null) {
-                this.buffer = null;
-                try {
-                    current.close();
-                } catch (IOException e) {
-                    // the buffer is released either way
-                }
-            }
+            count = 0;
         }
 
         @Override

@@ -148,8 +148,11 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
      * <p>A wrapper that cannot have replaced the body is never asked for it: a plain
      * {@link HttpRequestWrapper}, a {@link MutableHttpRequestWrapper} whose body was not set and
      * a {@link BodyPreservingRequestWrapper}. Asking a wrapper for its body decodes the body of
-     * the request it wraps, and a request may decode a new body on each call. Any other wrapper
-     * replaced the body if its body is not, by identity, the body of the request it wraps.</p>
+     * the request it wraps, and that decoding may consume the bytes of the request, e.g. the input
+     * stream of a servlet request, or produce a new object on each call. Any other wrapper replaced
+     * the body if its body is not, by identity, the body of the request it wraps: a subclass is
+     * asked for its body even when it does not override {@code getBody()}, as that is not looked
+     * up, without reflection.</p>
      *
      * @param request The request
      * @return Whether it is a wrapper that replaced the body of the request it wraps

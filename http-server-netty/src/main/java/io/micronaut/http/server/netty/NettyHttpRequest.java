@@ -109,9 +109,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.security.cert.Certificate;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -211,8 +209,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
-    @Nullable
-    private List<Runnable> disposalResources;
+    private final RequestResourceScope disposalResources = new RequestResourceScope();
     @Nullable
     private ParsedFormType parsedFormType;
 
@@ -337,6 +334,15 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     public Optional<Object> getAttribute(CharSequence name) {
         String key = Objects.requireNonNull(name, "Name cannot be null").toString();
         return RouteMetadataAttributes.getAttribute(this, attributes, key);
+    }
+
+    @Override
+    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        if (RouteMetadataAttributes.isAbsent(attributes, name)) {
+            // answered without creating the attribute map
+            return Optional.empty();
+        }
+        return getAttributes().get(name.toString(), type);
     }
 
     @Override
@@ -526,15 +532,21 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Internal
     public void release() {
-        body.close();
-        if (attributes != null) {
-            attributes.forEach(NettyHttpRequest::cleanup);
+        Throwable failure = null;
+        try {
+            body.close();
+        } catch (Throwable t) {
+            failure = t;
         }
-        if (disposalResources != null) {
-            for (Runnable r : disposalResources) {
-                r.run();
+        if (attributes != null) {
+            try {
+                attributes.forEach(NettyHttpRequest::cleanup);
+            } catch (Throwable t) {
+                failure = RequestResourceScope.addFailure(failure, t);
             }
         }
+        // releases every disposal resource once, then rethrows the first failure
+        disposalResources.release(failure);
     }
 
     private static void cleanup(String k, Object v) {
@@ -841,6 +853,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return getRawFormFields(byteBody());
     }
 
+    @Override
     public @NonNull Flux<RawFormField> getRawFormFields(ByteBody byteBody) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
@@ -914,11 +927,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A resource added after this request was {@link #release() released} is released
+     * immediately, on the calling thread.</p>
+     */
     @Override
-    public synchronized void addDisposalResource(Runnable dispose) {
-        if (disposalResources == null) {
-            disposalResources = new ArrayList<>(1);
-        }
+    public void addDisposalResource(Runnable dispose) {
         disposalResources.add(dispose);
     }
 
@@ -944,7 +960,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T> {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
 
         @Nullable
         private URI uri;
@@ -979,6 +995,37 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
          */
         NettyHttpRequest<T> request() {
             return NettyHttpRequest.this;
+        }
+
+        /**
+         * The form of the request, unless the body was set: then the body is that object.
+         *
+         * @return Whether the request has a form body
+         */
+        @Override
+        public boolean hasFormBody() {
+            return !bodySet && NettyHttpRequest.this.hasFormBody();
+        }
+
+        @Override
+        public Publisher<RawFormField> getRawFormFields() {
+            if (bodySet) {
+                throw new IllegalStateException("The body of the request was set: it has no form fields to read");
+            }
+            return NettyHttpRequest.this.getRawFormFields();
+        }
+
+        @Override
+        public Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
+            if (bodySet) {
+                throw new IllegalStateException("The body of the request was set: it has no form fields to read");
+            }
+            return NettyHttpRequest.this.getRawFormFields(byteBody);
+        }
+
+        @Override
+        public void addDisposalResource(Runnable dispose) {
+            NettyHttpRequest.this.addDisposalResource(dispose);
         }
 
         @Override

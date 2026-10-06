@@ -235,10 +235,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public static boolean canHaveBody(HttpResponseStatus status) {
         // All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
-        // responses do not include a message body
-        return !(status == HttpResponseStatus.CONTINUE || status == HttpResponseStatus.SWITCHING_PROTOCOLS ||
-            status == HttpResponseStatus.PROCESSING || status == HttpResponseStatus.NO_CONTENT ||
-            status == HttpResponseStatus.NOT_MODIFIED);
+        // responses do not include a message body. Compare codes: a status with a custom reason
+        // phrase is not the canonical HttpResponseStatus constant.
+        int code = status.code();
+        return !(code >= 100 && code < 200 || code == 204 || code == 304);
     }
 
     /**
@@ -855,6 +855,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.outboundAccess = outboundAccess;
             this.sendContinue = sendContinue;
             this.dest = byteBodyFactory().createStreamingBuffer(bodySizeLimits, this);
+            // what arrives before the route reads the body is bounded by requested, not by the
+            // buffer limit, for a reader that streams the body without holding it
+            this.dest.setKeepInitialBytes();
         }
 
         @Override
@@ -1531,7 +1534,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * messages, and reports consumption while the channel is writable.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements StreamingResponseWriter.Sink {
-        final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this);
+        final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this, requiredCtx().alloc());
         @Nullable
         private HttpResponse initialMessage;
         /**
@@ -1587,6 +1590,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             writeCompressing(content, true, true);
             writer.markResponseWritten();
             PipeliningServerHandler.this.writeSome();
+        }
+
+        @Override
+        public boolean canMergeLast() {
+            // Keep QUIC's separate data and trailer writes: its HTTP object codec may complete
+            // the data promise before it has submitted the trailing headers.
+            return !quic;
         }
 
         @Override

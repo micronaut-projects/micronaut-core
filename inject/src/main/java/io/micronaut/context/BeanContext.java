@@ -16,11 +16,14 @@
 package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
@@ -28,6 +31,7 @@ import io.micronaut.inject.validation.BeanDefinitionValidator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -56,6 +60,48 @@ public interface BeanContext extends
      * @since 3.0.0
      */
     BeanContextConfiguration getContextConfiguration();
+
+    /**
+     * Creates a fresh instance of the exact definition, bypassing its scope, and retains its complete
+     * dependency tree in the returned registration. Dependencies still obey their own scope rules.
+     * For a contextual target behind a proxy, supply the target definition. The caller owns the result.
+     * @param definition The definition to instantiate
+     * @param <T> The bean type
+     * @return The created instance and its lifecycle
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
+        throw new UnsupportedOperationException("Fresh registrations are not supported by this context");
+    }
+
+    /**
+     * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
+     * New lookups are rejected during shutdown. A destruction listener that needs temporary dependencies uses
+     * {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     * @return The group
+     * @since 5.3.0
+     */
+    @Experimental
+    default BeanDependencyGroup createDependencyGroup() {
+        throw new UnsupportedOperationException("Dependency groups are not supported by this context");
+    }
+
+    /**
+     * Resolves dependencies for a synchronous invocation and always releases them afterwards. Cleanup failures
+     * are suppressed on an invocation failure. New groups and lookups are rejected once shutdown begins;
+     * a destruction listener uses {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result (which must not retain an owned dependency)
+     * @since 5.3.0
+     */
+    @Experimental
+    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+        try (BeanDependencyGroup group = createDependencyGroup()) {
+            return action.apply(group);
+        }
+    }
 
     /**
      * The predicate the context was built with, as passed to
@@ -185,6 +231,29 @@ public interface BeanContext extends
      */
     default <T> T createBean(Class<T> beanType, @Nullable Map<String, Object> argumentValues) {
         return createBean(beanType, null, argumentValues);
+    }
+
+    /**
+     * <p>Creates a new instance of the bean of the given definition performing dependency injection and returning a new instance.</p>
+     *
+     * <p>The definition is not looked up again, so a caller that already holds it, for example from
+     * {@link #getBeanDefinitions(Class)}, can create instances repeatedly without resolving the bean type and qualifier
+     * on every call. The instance is otherwise created as by {@link #createBean(Class, Qualifier, Object...)}, including
+     * the {@link io.micronaut.context.event.BeanCreatedEventListener} callbacks.</p>
+     *
+     * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
+     * the {@code args} parameter will be used</p>
+     *
+     * <p>Note that the instance returned is not saved as a singleton in the context.</p>
+     *
+     * @param definition The bean definition, which must be one of this context
+     * @param args       The argument values
+     * @param <T>        The bean generic type
+     * @return The instance
+     * @since 5.3.0
+     */
+    default <T> T createBean(BeanDefinition<T> definition, @Nullable Object... args) {
+        return createBean(definition.getBeanType(), definition.getDeclaredQualifier(), args);
     }
 
     /**

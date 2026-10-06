@@ -380,7 +380,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             while (!delegate.isTerminated()) {
                 boolean ioContinuationScheduled = this.ioContinuationScheduled;
-                if (!ioContinuationScheduled) {
+                // Only park when there is no other work: continuations left over from the last
+                // time slice, or queued without an unpark (e.g. by a virtual thread mounted on this
+                // carrier), would otherwise wait for the IO thread. If the IO thread is itself
+                // blocked on a monitor that one of those continuations has to release, nothing
+                // would ever unpark the carrier.
+                if (!ioContinuationScheduled && localLoomQueue.isEmpty() && globalLoomQueue.isEmpty()) {
                     LockSupport.park();
                     ioContinuationScheduled = this.ioContinuationScheduled;
                 }

@@ -145,7 +145,13 @@ public interface Router {
     default <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
         List<UriRouteMatch<T, R>> uriRoutes = findAllClosest(request);
         if (uriRoutes.size() > 1) {
+            uriRoutes = AnyMethodRoutes.preferSpecificMethod(uriRoutes);
+        }
+        if (uriRoutes.size() > 1) {
             uriRoutes = ImplicitHeadRoutes.preferExplicit(uriRoutes);
+        }
+        if (uriRoutes.size() > 1) {
+            uriRoutes = RouteOrders.preferLowest(uriRoutes);
         }
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(request.getPath(), (List) uriRoutes);
