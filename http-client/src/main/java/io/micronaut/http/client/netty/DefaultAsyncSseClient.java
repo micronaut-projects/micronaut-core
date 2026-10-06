@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -24,8 +23,6 @@ import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.sse.Event;
 
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -50,25 +47,7 @@ final class DefaultAsyncSseClient implements AsyncSseClient {
 
     @Override
     public <I, B> CompletionStage<HttpResponse<BodyElements<Event<B>>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> flow = nettyHttpClient.exchangeEventStreamFlow(request, eventType, errorType);
-        CompletableFuture<HttpResponse<BodyElements<Event<B>>>> future = new CompletableFuture<>();
-        future.whenComplete((response, error) -> {
-            if (error instanceof CancellationException) {
-                flow.cancel();
-            }
-        });
-        flow.onComplete((response, error) -> {
-            if (error != null) {
-                future.completeExceptionally(error);
-            } else if (!future.complete(response)) {
-                // cancelled before the response arrived: nobody reads the events
-                BodyElements<Event<B>> events = response.body();
-                if (events != null) {
-                    events.close();
-                }
-            }
-        });
-        return future;
+        return ElementsFutures.response(nettyHttpClient.exchangeEventStreamFlow(request, eventType, errorType));
     }
 
     @Override

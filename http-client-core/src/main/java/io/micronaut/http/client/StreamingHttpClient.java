@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -32,6 +33,20 @@ import java.util.Map;
  * @since 1.0
  */
 public interface StreamingHttpClient extends HttpClient {
+
+    /**
+     * The {@link AsyncStreamingHttpClient} view of this client, with
+     * {@link java.util.concurrent.CompletionStage} results and response bodies pulled one element at
+     * a time instead of Reactive Streams. The default implementation adapts the reactive methods.
+     *
+     * @return An {@link AsyncStreamingHttpClient} backed by this client
+     * @since 5.3.0
+     */
+    @Experimental
+    @Override
+    default AsyncStreamingHttpClient toAsync() {
+        return new DefaultAsyncOverReactiveStreamingHttpClient(this);
+    }
 
     /**
      * Request a stream of data where each emitted item is a {@link ByteBuffer} instance.

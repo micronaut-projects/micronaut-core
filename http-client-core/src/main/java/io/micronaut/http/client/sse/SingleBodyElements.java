@@ -18,6 +18,7 @@ package io.micronaut.http.client.sse;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.client.PulledBodyElements;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.sse.Event;
 
@@ -60,7 +61,7 @@ final class SingleBodyElements<B> extends PulledBodyElements<Event<B>> {
         // bounded by the buffer limit of the body
         InternalByteBody.bufferFlow(body).onComplete((available, error) -> {
             if (error != null) {
-                fail(ByteBodyEventElements.wrap(error));
+                fail(EventStreams.wrap(error));
                 return;
             }
             try (CloseableAvailableByteBody bytes = available) {
@@ -69,7 +70,7 @@ final class SingleBodyElements<B> extends PulledBodyElements<Event<B>> {
                 }
                 end();
             } catch (Throwable e) {
-                fail(ByteBodyEventElements.wrap(e));
+                fail(EventStreams.wrap(e));
             }
         });
     }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.sse;
+package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.BodyElements;
@@ -39,7 +39,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-abstract class PulledBodyElements<T> implements BodyElements<T> {
+public abstract class PulledBodyElements<T> implements BodyElements<T> {
 
     private static final String CLOSED = "The elements of the body were closed";
 

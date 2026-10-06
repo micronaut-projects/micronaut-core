@@ -95,9 +95,14 @@ import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.ByteBodyElements;
+import io.micronaut.http.client.ElementsResponse;
+import io.micronaut.http.client.SubscriberBodyElements;
 import io.micronaut.http.client.sse.AsyncSseClient;
-import io.micronaut.http.client.sse.EventStreamResponse;
+import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
@@ -857,6 +862,11 @@ final class NettyHttpClient implements
         return new DefaultAsyncSseClient(this);
     }
 
+    @Override
+    public AsyncStreamingHttpClient toAsync() {
+        return new DefaultAsyncHttpClient(this);
+    }
+
     /**
      * The exchange of {@link DefaultAsyncSseClient}: {@link #exchangeEventStream} without Reactor.
      * The flow completes with the status and the headers of the response, and its events are read
@@ -870,10 +880,81 @@ final class NettyHttpClient implements
      * @return The flow of the response, whose body is the events
      */
     <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+        return exchangeElementsFlow(request, errorType, true,
+            response -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize()));
+    }
+
+    /**
+     * The {@link #exchangeStream} of {@link DefaultAsyncHttpClient}, without Reactor: the pieces of
+     * the response body are read as they are pulled.
+     *
+     * @param request   The request
+     * @param errorType The error type
+     * @param <I>       The request body type
+     * @return The flow of the response, whose body is the pieces of the response body
+     */
+    <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
+        return exchangeElementsFlow(request, errorType, false,
+            response -> ElementsResponse.of(response, ByteBodyElements.pieces(response.byteBody().move())));
+    }
+
+    /**
+     * The {@link #jsonStream} of {@link DefaultAsyncHttpClient}: the exchange runs without Reactor,
+     * and the elements are decoded by the chunked JSON reader as they are pulled.
+     *
+     * @param request   The request
+     * @param type      The type of an element
+     * @param errorType The error type
+     * @param <I>       The request body type
+     * @param <O>       The type of an element
+     * @return The flow of the response, whose body is the elements
+     */
+    <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+        return exchangeElementsFlow(request, errorType, false, response -> {
+            // could also be application/json, in which case the elements of an array are read
+            MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
+            if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
+                throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
+            }
+            CloseableByteBody body = response.byteBody().move();
+            io.micronaut.http.HttpHeaders headers = response.getHeaders();
+            long maxElementSize = sizeLimits().maxBufferSize();
+            return ElementsResponse.of(response, SubscriberBodyElements.of(() -> {
+                // an element is decoded in memory: it is limited like buffered content
+                Publisher<ByteBuffer<?>> bytes = Flux.from(InternalByteBody.toUnbufferedReadBufferPublisher(body))
+                    .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
+                    .map(rb -> {
+                        try (rb) {
+                            return rb.toByteBuffer();
+                        }
+                    });
+                return reader.readChunked(type, mediaType, headers, bytes, maxElementSize);
+            }, body::close));
+        });
+    }
+
+    /**
+     * An exchange whose response body is read as elements as they are pulled, without Reactor.
+     * The flow completes with the status and the headers of the response. An error status fails
+     * it with the error body decoded into the error type, as for {@link #exchange}.
+     *
+     * @param request      The request
+     * @param errorType    The error type
+     * @param acceptEvents Whether the request accepts an event stream, besides what the caller
+     *                     accepts
+     * @param elements     The response with the elements of the body, taking over the body
+     * @param <I>          The request body type
+     * @param <T>          The type of an element
+     * @return The flow of the response, whose body is the elements
+     */
+    private <I, T> ExecutionFlow<HttpResponse<BodyElements<T>>> exchangeElementsFlow(io.micronaut.http.HttpRequest<I> request,
+                                                                                   Argument<?> errorType,
+                                                                                   boolean acceptEvents,
+                                                                                   Function<NettyClientByteBodyResponse, HttpResponse<BodyElements<T>>> elements) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
-        if (!acceptsEvents(mutableRequest)) {
+        if (acceptEvents && !acceptsEvents(mutableRequest)) {
             // keep what the caller accepts, such as application/json, and accept an event stream too
             mutableRequest.getHeaders().add(io.micronaut.http.HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
         }
@@ -889,15 +970,20 @@ final class NettyHttpClient implements
                         .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
                         .flatMap(av -> handleExchangeResponse(null, errorType, resp, av));
                 }
-                return ExecutionFlow.just(EventStreamResponse.of(resp, handlerRegistry, eventType, sizeLimits().maxBufferSize()));
+                try {
+                    return ExecutionFlow.just(elements.apply(resp));
+                } catch (RuntimeException e) {
+                    resp.close();
+                    return ExecutionFlow.error(e);
+                }
             }
         )).flatMap(response -> {
             if (!(response.getBody().orElse(null) instanceof BodyElements<?>)) {
-                return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without events. Do not replace the response in client filters for event stream requests"));
+                return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without elements. Do not replace the response in client filters for streaming requests"));
             }
             @SuppressWarnings("unchecked")
-            HttpResponse<BodyElements<Event<B>>> events = (HttpResponse<BodyElements<Event<B>>>) response;
-            return ExecutionFlow.just(events);
+            HttpResponse<BodyElements<T>> result = (HttpResponse<BodyElements<T>>) response;
+            return ExecutionFlow.just(result);
         });
     }
 
