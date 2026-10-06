@@ -22,8 +22,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.BodyPreservingRequestWrapper;
@@ -44,6 +42,7 @@ import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.ByteBodyElements;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormPart;
@@ -55,7 +54,6 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -695,31 +693,26 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     }
 
     /**
-     * The elements of the body: read through the piece reader of the chunked reader, without
-     * Reactor, or through its publisher. A body that cannot be read as elements fails the first
-     * read, like a failure to decode it.
+     * The elements of the body, read through the piece reader of the chunked reader, without
+     * Reactor. A body that cannot be read as elements fails the first read, like a failure to
+     * decode it.
      */
     @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
     private <T> BodyElements<T> bodyElements(Argument<T> type, CloseableByteBody body) {
-        @Nullable MediaType contentType;
-        ChunkedMessageBodyReader<T> chunked;
         PieceReader<T> pieceReader;
         try {
-            contentType = request.getContentType().orElse(null);
-            chunked = chunkedReader(type, contentType);
+            MediaType contentType = request.getContentType().orElse(null);
+            ChunkedMessageBodyReader<T> chunked = chunkedReader(type, contentType);
             // an element is decoded in memory: it is limited like buffered content. The body is
             // streamed without being held, so the body is not, nor the bytes that arrived before
             // it is read
-            pieceReader = chunked.openPieceReader(type, contentType, request.getHeaders(), uploadContext().maxBufferSize());
+            pieceReader = PieceReaders.open(chunked, type, contentType, request.getHeaders(), uploadContext().maxBufferSize());
         } catch (RuntimeException e) {
             return new PublisherBodyElements<>(() -> {
                 throw e;
             }, body::close);
         }
-        if (pieceReader != null) {
-            return new ByteBodyElements<>(body, pieceReader, Function.identity());
-        }
-        return new PublisherBodyElements<>(() -> elementPublisher(type, contentType, chunked, body), body::close);
+        return new ByteBodyElements<>(body, pieceReader, Function.identity());
     }
 
     private <T> ChunkedMessageBodyReader<T> chunkedReader(Argument<T> type, @Nullable MediaType contentType) {
@@ -734,20 +727,6 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                 + "] needs a chunked JSON message body reader, which micronaut-http-netty provides: add it to the runtime classpath");
         }
         return chunked;
-    }
-
-    /**
-     * The elements of a chunked reader that only reads a publisher.
-     */
-    private <T> Publisher<? extends T> elementPublisher(Argument<T> type, @Nullable MediaType contentType, ChunkedMessageBodyReader<T> chunked, CloseableByteBody body) {
-        Publisher<ByteBuffer<?>> bytes = Flux.from(InternalByteBody.toUnbufferedReadBufferPublisher(body))
-            .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
-            .map(rb -> {
-                try (rb) {
-                    return rb.toByteBuffer();
-                }
-            });
-        return chunked.readChunked(type, contentType, request.getHeaders(), bytes, uploadContext().maxBufferSize());
     }
 
     /**

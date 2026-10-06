@@ -28,6 +28,8 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
@@ -67,6 +69,11 @@ public final class NettyByteBufMessageBodyHandler implements TypedMessageBodyHan
     @Override
     public Publisher<ByteBuf> readChunked(Argument<ByteBuf> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return Flux.from(input).map(bb -> (ByteBuf) bb.asNativeBuffer());
+    }
+
+    @Override
+    public PieceReader<ByteBuf> openPieceReader(Argument<ByteBuf> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        return PieceReaders.eachPiece(bb -> (ByteBuf) bb.asNativeBuffer());
     }
 
     @Override

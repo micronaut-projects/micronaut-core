@@ -22,6 +22,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.codec.CodecException;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -39,6 +40,8 @@ import java.util.function.Function;
 @Internal
 final class JsonPieceReader<T> implements PieceReader<T> {
 
+    private static final NettyReadBufferFactory READ_BUFFERS = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
+
     private final JsonChunkedProcessor processor;
     private final Function<ByteBuffer<?>, @Nullable T> valueReader;
     /**
@@ -55,6 +58,17 @@ final class JsonPieceReader<T> implements PieceReader<T> {
     JsonPieceReader(JsonChunkedProcessor processor, Function<ByteBuffer<?>, @Nullable T> valueReader) {
         this.processor = processor;
         this.valueReader = valueReader;
+    }
+
+    /**
+     * The read buffer of a buffer of the input of a chunked reader, without copying a Netty
+     * buffer.
+     *
+     * @param buffer The buffer, which the read buffer takes over
+     * @return The read buffer
+     */
+    static ReadBuffer adapt(ByteBuffer<?> buffer) {
+        return READ_BUFFERS.adapt(buffer);
     }
 
     @Override

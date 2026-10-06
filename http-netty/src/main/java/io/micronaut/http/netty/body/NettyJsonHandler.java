@@ -35,6 +35,7 @@ import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -45,7 +46,6 @@ import io.micronaut.json.body.JsonMessageHandler;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -89,7 +89,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
             // Publisher<T> is unwrapped
             processor.counter.unwrapTopLevelArray();
         }
-        return read(processor, type, mediaType, httpHeaders, input);
+        return PieceReaders.publisherOfBuffers(input, new JsonPieceReader<>(processor, value -> read(type, mediaType, httpHeaders, value)), JsonPieceReader::adapt);
     }
 
     /**
@@ -100,9 +100,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
      */
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
-        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
-        processor.counter.unwrapTopLevelArray();
-        return read(processor, type, mediaType, httpHeaders, input);
+        return PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), JsonPieceReader::adapt);
     }
 
     /**
@@ -116,11 +114,6 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
         JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         processor.counter.unwrapTopLevelArray();
         return new JsonPieceReader<>(processor, value -> read(type, mediaType, httpHeaders, value));
-    }
-
-    private Flux<T> read(JsonChunkedProcessor processor, Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return processor.process(Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))
-            .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> read(type, mediaType, httpHeaders, value)));
     }
 
     @Override

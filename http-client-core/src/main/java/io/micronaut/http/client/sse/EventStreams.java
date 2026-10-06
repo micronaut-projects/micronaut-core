@@ -116,8 +116,7 @@ public final class EventStreams {
             BodyElements<Event<B>> elements;
             if (contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType)) {
                 // the data of each event is JSON
-                Function<byte[], B> reader = dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers);
-                elements = new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), reader), wrap);
+                elements = new ByteBodyElements<>(body, reader(handlerRegistry, eventType, headers, maxBufferSize), EventStreams::wrap);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
@@ -131,66 +130,21 @@ public final class EventStreams {
     }
 
     /**
-     * Accept an event stream: the {@code Accept} header of the request is kept when it accepts
-     * {@code text/event-stream}, otherwise {@code text/event-stream} is added to it.
+     * The reader of the events of an event stream: the lines are split as the pieces are read,
+     * and the data of an event is decoded as JSON when the event is polled.
      *
-     * @param request The request, changed when it is mutable
+     * @param handlerRegistry The readers of the event data
+     * @param eventType       The event data type
+     * @param headers         The headers of the response
+     * @param maxBufferSize   The maximum size of a line, and of the data of one event
+     * @param <B>             The event data type
+     * @return The reader
      */
-    public static void acceptEvents(HttpRequest<?> request) {
-        if (!(request instanceof MutableHttpRequest<?> mutableRequest)) {
-            return;
-        }
-        for (MediaType accepted : mutableRequest.getHeaders().accept()) {
-            if (accepted.matches(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                return;
-            }
-        }
-        // keep what the caller accepts, such as application/json, and accept an event stream too
-        mutableRequest.getHeaders().add(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
-    }
-
-    /**
-     * The response of an exchange whose body is read as its pieces: the events of an event
-     * stream, decoded as the pieces are read, or a body of another type, decoded whole as one
-     * event. The data is decoded with the default {@link JsonMapper}; a {@code String} or a
-     * {@code byte[]} is taken as it is. The events take over the pieces of the response.
-     *
-     * @param response      The response, with a status that is not an error
-     * @param eventType     The event data type
-     * @param maxBufferSize The maximum size of a line, of the data of one event, and of a body
-     *                      that is not an event stream
-     * @param <B>           The event data type
-     * @return The response, whose body is the events
-     */
-    public static <B> HttpResponse<BodyElements<Event<B>>> response(HttpResponse<BodyElements<ByteBuffer<?>>> response,
-                                                                   Argument<B> eventType,
-                                                                   long maxBufferSize) {
-        BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no elements");
-        MediaType contentType = response.getContentType().orElse(null);
-        boolean events = contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType);
-        return ElementsResponse.of(response, new PieceEvents<>(pieces, events ? new EventStreamDecoder(maxBufferSize) : null, defaultReader(eventType), maxBufferSize));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <B> Function<byte[], B> defaultReader(Argument<B> eventType) {
-        if (eventType.getType() == String.class) {
-            return data -> (B) new String(data, StandardCharsets.UTF_8);
-        }
-        if (eventType.getType() == byte[].class) {
-            return data -> (B) data;
-        }
-        return data -> {
-            B decoded;
-            try {
-                decoded = DefaultJsonMapper.INSTANCE.readValue(data, eventType);
-            } catch (IOException e) {
-                throw new HttpClientException("Error decoding the data of an event: " + e.getMessage(), e);
-            }
-            if (decoded == null) {
-                throw new HttpClientException("Event data decoded to null for type " + eventType);
-            }
-            return decoded;
-        };
+    public static <B> PieceReader<Event<B>> reader(MessageBodyHandlerRegistry handlerRegistry,
+                                                   Argument<B> eventType,
+                                                   Headers headers,
+                                                   long maxBufferSize) {
+        return new EventReader<>(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers));
     }
 
     /**
