@@ -27,19 +27,13 @@ import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Retains across a restart the beans whose type the manifest names under
  * {@code micronaut.dev.retain}: a connection pool, a client, an engine the application's classes do
- * not define. The {@link DevManifest#DEFAULT_RETAIN connection pools} are retained without being named,
- * unless {@code micronaut.dev.retain-defaults=false}: a JDBC {@code DataSource} is dropped, and opened
- * again, when the configuration under {@code datasources} changes, an R2DBC {@code ConnectionFactory}
- * when the configuration under {@code r2dbc} does.
+ * not define. A module declares its own with {@link io.micronaut.context.annotation.Retain} instead.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -52,17 +46,9 @@ final class ManifestRetentionPolicy implements BeanRetentionPolicy {
 
     private static final Logger LOG = LoggerFactory.getLogger(ManifestRetentionPolicy.class);
     /**
-     * The configuration a default type is created from, a change under which drops the retained bean.
+     * The retained types.
      */
-    private static final Map<String, Set<String>> DEFAULT_PREFIXES = Map.of(
-        "javax.sql.DataSource", Set.of("datasources"),
-        "io.r2dbc.spi.ConnectionFactory", Set.of("r2dbc")
-    );
-
-    /**
-     * The retained types, with the configuration prefixes that invalidate their beans.
-     */
-    private final Map<Class<?>, Set<String>> retainedTypes = new LinkedHashMap<>();
+    private final List<Class<?>> retainedTypes = new ArrayList<>();
 
     @Inject
     ManifestRetentionPolicy(DevRuntime runtime) {
@@ -71,35 +57,19 @@ final class ManifestRetentionPolicy implements BeanRetentionPolicy {
 
     ManifestRetentionPolicy(DevManifest manifest, ClassLoader parent) {
         for (String name : manifest.retain()) {
-            ClassUtils.forName(name, parent).ifPresentOrElse(type -> retainedTypes.put(type, DEFAULT_PREFIXES.getOrDefault(name, Set.of())),
+            ClassUtils.forName(name, parent).ifPresentOrElse(retainedTypes::add,
                 () -> LOG.warn("The type [{}] named by micronaut.dev.retain is not on the runtime classpath; nothing of that type is retained", name));
-        }
-        if (manifest.retainDefaults()) {
-            for (String name : DevManifest.DEFAULT_RETAIN) {
-                // a default absent from the classpath is a library the application does not use
-                ClassUtils.forName(name, parent).ifPresent(type -> retainedTypes.putIfAbsent(type, DEFAULT_PREFIXES.getOrDefault(name, Set.of())));
-            }
         }
     }
 
     @Override
     public boolean retain(BeanRegistration<?> registration) {
-        return !retainingTypes(registration).isEmpty();
-    }
-
-    @Override
-    public Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
-        Set<String> prefixes = new LinkedHashSet<>();
-        for (Class<?> type : retainingTypes(registration)) {
-            prefixes.addAll(retainedTypes.get(type));
-        }
-        return prefixes;
-    }
-
-    private List<Class<?>> retainingTypes(BeanRegistration<?> registration) {
         Object bean = registration.getBean();
-        return retainedTypes.keySet().stream()
-            .filter(type -> type.isAssignableFrom(registration.getBeanType()) || type.isInstance(bean))
-            .toList();
+        for (Class<?> type : retainedTypes) {
+            if (type.isAssignableFrom(registration.getBeanType()) || type.isInstance(bean)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

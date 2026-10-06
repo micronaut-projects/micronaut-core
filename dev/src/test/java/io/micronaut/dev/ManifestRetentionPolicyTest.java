@@ -22,42 +22,23 @@ class ManifestRetentionPolicyTest {
     Path project;
 
     @Test
-    void aDataSourceIsRetainedWithoutBeingNamedAndDroppedWhenItsConfigurationChanges() {
+    void anUnnamedDataSourceIsNotRetained() {
         try (ApplicationContext context = ApplicationContext.run()) {
             context.registerSingleton(DataSource.class, dataSource());
             context.registerSingleton(RetainedPool.class, new RetainedPool());
             BeanRegistration<DataSource> dataSource = context.getBeanRegistration(DataSource.class, null);
             BeanRegistration<RetainedPool> pool = context.getBeanRegistration(RetainedPool.class, null);
 
-            // nothing named: the data source is retained by default, under the configuration it is made from
-            ManifestRetentionPolicy defaults = new ManifestRetentionPolicy(manifest(null), getClass().getClassLoader());
-            assertTrue(defaults.retain(dataSource));
-            assertEquals(Set.of("datasources"), defaults.observedConfigurationPrefixes(dataSource));
-            assertFalse(defaults.retain(pool));
+            // nothing named: nothing is retained, a data source no more than anything else, whatever the module declares
+            ManifestRetentionPolicy none = new ManifestRetentionPolicy(manifest(null), getClass().getClassLoader());
+            assertFalse(none.retain(dataSource));
+            assertFalse(none.retain(pool));
 
-            // a named type is retained along with the defaults
-            ManifestRetentionPolicy named = new ManifestRetentionPolicy(manifest(RetainedPool.class.getName()), getClass().getClassLoader());
+            // a named type is retained, and no configuration prefix of its own releases it
+            ManifestRetentionPolicy named = new ManifestRetentionPolicy(manifest(DataSource.class.getName()), getClass().getClassLoader());
             assertTrue(named.retain(dataSource));
-            assertTrue(named.retain(pool));
-            assertEquals(Set.of(), named.observedConfigurationPrefixes(pool));
-        }
-    }
-
-    @Test
-    void theDefaultsCanBeTurnedOff() {
-        try (ApplicationContext context = ApplicationContext.run()) {
-            context.registerSingleton(DataSource.class, dataSource());
-            BeanRegistration<DataSource> dataSource = context.getBeanRegistration(DataSource.class, null);
-            Properties properties = properties(null);
-            properties.setProperty("micronaut.dev.retain-defaults", "false");
-            ManifestRetentionPolicy policy = new ManifestRetentionPolicy(DevManifest.of(project, properties), getClass().getClassLoader());
-            assertFalse(policy.retain(dataSource));
-
-            // named explicitly, it is retained, and still dropped when its configuration changes
-            properties.setProperty("micronaut.dev.retain", DataSource.class.getName());
-            policy = new ManifestRetentionPolicy(DevManifest.of(project, properties), getClass().getClassLoader());
-            assertTrue(policy.retain(dataSource));
-            assertEquals(Set.of("datasources"), policy.observedConfigurationPrefixes(dataSource));
+            assertFalse(named.retain(pool));
+            assertEquals(Set.of(), named.observedConfigurationPrefixes(dataSource));
         }
     }
 

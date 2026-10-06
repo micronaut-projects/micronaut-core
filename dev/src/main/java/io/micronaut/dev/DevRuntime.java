@@ -18,6 +18,7 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy;
 import io.micronaut.context.reload.BeanRetentionPolicy;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ReloadCompletedEvent;
@@ -726,6 +727,10 @@ public final class DevRuntime implements Closeable {
 
     private Predicate<BeanRegistration<?>> retentionPredicate(ApplicationContext old, boolean retentionAllowed) {
         List<BeanRetentionPolicy> policies = new ArrayList<>(old.getBeansOfType(BeanRetentionPolicy.class));
+        if (manifest.retainAnnotated()) {
+            // what the modules declare with @Retain, read from the definitions
+            policies.add(AnnotatedBeanRetentionPolicy.INSTANCE);
+        }
         OrderUtil.sort(policies);
         return registration -> {
             if (isStale(registration)) {
