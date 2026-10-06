@@ -1103,6 +1103,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.attachment = attachment;
         }
 
+        @Override
+        public Runnable whenAbandoned(Runnable callback) {
+            // an HTTP/1.1 request is abandoned with its connection
+            ChannelFuture closeFuture = requiredCtx().channel().closeFuture();
+            ChannelFutureListener listener = future -> callback.run();
+            closeFuture.addListener(listener);
+            return () -> closeFuture.removeListener(listener);
+        }
+
         /**
          * Mark this channel to be closed after this response has been written.
          */

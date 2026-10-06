@@ -32,8 +32,6 @@ import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import org.slf4j.Logger;
@@ -136,15 +134,13 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
 
     @Override
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
-        NettyHttpRequest<?> pendingRequest = this.nettyRequest;
-        if (pendingRequest == null) {
+        if (this.nettyRequest == null) {
             return;
         }
-        // the client closes the connection: no one waits for the target any more
-        ChannelFuture closeFuture = pendingRequest.getChannelHandlerContext().channel().closeFuture();
-        ChannelFutureListener cancel = future -> RouteLocator.cancelPendingLocations(request);
-        closeFuture.addListener(cancel);
-        located.whenComplete((ignored, error) -> closeFuture.removeListener(cancel));
+        // the client abandons the request, closing the HTTP/1.1 connection or resetting the
+        // HTTP/2 stream: no one waits for the target any more
+        Runnable remove = outboundAccess.whenAbandoned(() -> RouteLocator.cancelPendingLocations(request));
+        located.whenComplete((ignored, error) -> remove.run());
     }
 
     @Nullable
