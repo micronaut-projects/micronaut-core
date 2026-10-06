@@ -49,6 +49,11 @@ final class PendingRoute {
      */
     private final Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes;
     private final String description;
+    /**
+     * The URI template of a route of {@code GET} only, or {@code null}: only such a route may end
+     * with a terminal of a {@code GET} request, e.g. {@link HttpRouteSpec#sse(SseHandler)}.
+     */
+    private final @Nullable String getTemplate;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
     private boolean ended;
 
@@ -58,9 +63,39 @@ final class PendingRoute {
      * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
      */
     PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes, String description) {
+        this(builder, routes, description, null);
+    }
+
+    /**
+     * @param builder     The builder that declared the route
+     * @param routes      Adds the routes of the handler
+     * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
+     * @param getTemplate The URI template of a route of {@code GET} only, or {@code null}
+     */
+    PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
+                 String description, @Nullable String getTemplate) {
         this.builder = builder;
         this.routes = routes;
         this.description = description;
+        this.getTemplate = getTemplate;
+    }
+
+    /**
+     * Check that a terminal of a {@code GET} request ends a route of {@code GET} only. Any other
+     * route is dropped and the terminal fails.
+     *
+     * @param terminal The name of the terminal, for the message
+     * @return The URI template of the route, under the prefix
+     * @throws IllegalStateException if the route is not a route of {@code GET} only
+     */
+    String getOnly(String terminal) {
+        String template = getTemplate;
+        if (template == null) {
+            drop();
+            throw new IllegalStateException("The route " + description + " cannot end with " + terminal
+                + ": it is a terminal of a GET route, e.g. GET(uri)." + terminal + "(...)");
+        }
+        return template;
     }
 
     /**
@@ -121,6 +156,15 @@ final class PendingRoute {
         ended = true;
         builder.dropPending(this);
         return new NullPointerException(name);
+    }
+
+    /**
+     * Drop the route: its terminal failed, so the startup does not fail again for a route with
+     * no terminal.
+     */
+    void drop() {
+        ended = true;
+        builder.dropPending(this);
     }
 
     private void addSetting(Consumer<HandlerRoutes> setting) {

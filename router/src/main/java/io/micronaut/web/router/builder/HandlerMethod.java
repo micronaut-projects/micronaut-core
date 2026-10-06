@@ -28,7 +28,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.ChunkSource;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -37,16 +39,20 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.http.form.FormData;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -73,9 +79,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private static final String HANDLE = "handle";
 
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
+    private static final Logger LOG = LoggerFactory.getLogger(HandlerMethod.class);
     private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class, BODY_ARGUMENT);
     private static final Argument<FormData> FORM = Argument.of(FormData.class, "form");
+    private static final Argument<SseResponder> SSE_RESPONDER = Argument.of(SseResponder.class, "events");
 
     /**
      * The metadata of a {@code @Body} parameter, which selects the body binder.
@@ -337,6 +345,24 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             new Argument<?>[]{REQUEST},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
             args -> stage(handler.handle((HttpRequest<?>) args[0]))
+        );
+    }
+
+    /**
+     * The method of a server-sent events route: the server binds the {@link SseResponder}, which
+     * creates the emitter, and the result completes with the response when the first event is
+     * sent.
+     *
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(SseHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            SseHandler.class,
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, SSE_RESPONDER},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> ((SseResponder) args[2]).respond(events -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], events))
         );
     }
 
@@ -700,6 +726,13 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         }
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
+            if (error == null && response instanceof MutableHttpResponse<?> mutable
+                && mutable.body() instanceof ChunkSource<?> source) {
+                // the elements may be reads of the body: it is released when the source is closed
+                mutable.body(releaseWhenClosed(source, handlerRequest));
+                result.complete(response);
+                return;
+            }
             CompletionStage<Void> released;
             try {
                 released = handlerRequest.releaseBody();
@@ -721,6 +754,50 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             });
         });
         return result;
+    }
+
+    /**
+     * A {@link ChunkSource} body of the response of the handler that releases what the handler's
+     * read of the body left open when the server closes it: when the response ends, fails, or the
+     * client disconnects. The response is committed by then: a failure to release is logged. A
+     * source that is never written, e.g. replaced by a filter, leaves the body to the release
+     * when the request ends.
+     *
+     * @param source  The source
+     * @param request The body of the handler
+     * @param <T>     The type of an element
+     * @return The source that releases the body when it is closed
+     */
+    private static <T> ChunkSource<T> releaseWhenClosed(ChunkSource<T> source, ReleasableRequestBody request) {
+        AtomicBoolean closed = new AtomicBoolean();
+        return new ChunkSource<>() {
+            @Override
+            public CompletionStage<Optional<T>> next() {
+                return source.next();
+            }
+
+            @Override
+            public void close() {
+                if (!closed.compareAndSet(false, true)) {
+                    return;
+                }
+                try {
+                    source.close();
+                } finally {
+                    CompletionStage<Void> released;
+                    try {
+                        released = request.releaseBody();
+                    } catch (Throwable e) {
+                        released = CompletableFuture.failedFuture(e);
+                    }
+                    released.whenComplete((ignored, error) -> {
+                        if (error != null && LOG.isWarnEnabled()) {
+                            LOG.warn("Failed to release what the reads of the body left open when the streamed response of {} ended", source, error);
+                        }
+                    });
+                }
+            }
+        };
     }
 
     /**

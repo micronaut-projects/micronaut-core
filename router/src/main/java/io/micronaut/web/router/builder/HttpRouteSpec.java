@@ -245,4 +245,24 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @since 5.3.0
      */
     void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response);
+
+    /**
+     * End a {@code GET} route with a server-sent events handler: the response is a
+     * {@code text/event-stream} of the events the handler pushes to its
+     * {@link io.micronaut.http.sse.SseEmitter}. The route produces {@code text/event-stream}, not
+     * the media types its group produces.
+     *
+     * <pre>{@code
+     * routes.GET("/ticks").sse((request, pathVariables, events) -> {
+     *     events.heartbeat(Duration.ofSeconds(15));
+     *     ticker.onTick(tick -> events.send(Event.of(tick).id(String.valueOf(tick.sequence()))));
+     * });
+     * }</pre>
+     *
+     * @param handler The handler
+     * @throws IllegalStateException if the route was already ended, or is not a route of {@code GET} only
+     * @see SseHandler
+     * @since 5.3.0
+     */
+    void sse(SseHandler handler);
 }

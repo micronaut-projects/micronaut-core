@@ -44,6 +44,8 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
 
     private static final String RESPONSE = "response";
 
+    private static final MediaType[] EVENT_STREAM = {MediaType.TEXT_EVENT_STREAM_TYPE};
+
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class);
 
     private final PendingRoute route;
@@ -203,6 +205,14 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, RESPONSE);
         respond(() -> HandlerMethod.respond(checked), null, false);
+    }
+
+    @Override
+    public void sse(SseHandler handler) {
+        SseHandler checked = route.terminal(handler, "handler");
+        route.getOnly("sse");
+        // the event stream is the route's own type, not the type the group produces
+        route.end(() -> HandlerMethod.of(checked), settings -> settings.produces(EVENT_STREAM), RouteGroupDefaults.PRODUCES_SETTING);
     }
 
     /**
