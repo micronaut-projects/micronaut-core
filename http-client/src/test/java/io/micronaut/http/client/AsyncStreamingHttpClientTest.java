@@ -214,6 +214,16 @@ class AsyncStreamingHttpClientTest {
 
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("clients")
+    void anElementIsDecodedWhenItIsRead(AsyncStreamingHttpClient client) throws Exception {
+        // the body arrives in one piece, and its second element does not decode as a book
+        BodyElements<Book> books = await(client.jsonStream(HttpRequest.GET("/async-stream/invalid-second"), Book.class));
+
+        assertEquals(new Book("It", 1138), await(books.next()).orElseThrow());
+        assertThrows(Exception.class, () -> await(books.next()));
+    }
+
+    @ParameterizedTest(autoCloseArguments = false)
+    @MethodSource("clients")
     void jsonStreamAsMaps(AsyncStreamingHttpClient client) throws Exception {
         BodyElements<Map<String, Object>> books = await(client.jsonStream(HttpRequest.GET("/async-stream/books")));
 
@@ -323,6 +333,11 @@ class AsyncStreamingHttpClientTest {
         @Get(value = "/books-array", produces = MediaType.APPLICATION_JSON)
         Publisher<Book> booksArray() {
             return books();
+        }
+
+        @Get(value = "/invalid-second", produces = MediaType.APPLICATION_JSON)
+        String invalidSecond() {
+            return "[{\"title\":\"It\",\"pages\":1138},{\"title\":\"The Stand\",\"pages\":\"many\"}]";
         }
 
         @Get(value = "/many", produces = MediaType.APPLICATION_JSON_STREAM)

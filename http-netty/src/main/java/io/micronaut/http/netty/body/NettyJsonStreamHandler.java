@@ -33,6 +33,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
+import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -40,15 +41,17 @@ import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
+import io.netty.buffer.ByteBuf;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Netty json stream implementation for MessageBodyHandler.
@@ -92,11 +95,33 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
         if (!type.getType().isAssignableFrom(List.class)) {
             throw new IllegalArgumentException("Can only read json-stream to a Publisher or list type");
         }
+        Argument<?> elementType = type.getFirstTypeVariable().orElse(type);
+        // the values of the whole stream, without Reactive Streams
+        List<ByteBuffer<?>> values = new ArrayList<>();
+        JsonChunkedProcessor processor = new JsonChunkedProcessor();
+        ByteBuf content = JsonChunkedProcessor.nettyBuffer(byteBuffer);
+        try {
+            processor.feed(content, values::add);
+            processor.finish(values::add);
+        } catch (IOException e) {
+            values.forEach(JsonChunkedProcessor::release);
+            throw new CodecException("Error decoding JSON stream for type [" + elementType.getName() + "]: " + e.getMessage(), e);
+        } finally {
+            content.release();
+            processor.discard();
+        }
+        List<Object> elements = new ArrayList<>(values.size());
+        for (int i = 0; i < values.size(); i++) {
+            try {
+                //noinspection unchecked
+                elements.add(JsonChunkedProcessor.readReleasing(values.get(i), value -> jsonMessageHandler.read((Argument<T>) elementType, mediaType, httpHeaders, value)));
+            } catch (RuntimeException e) {
+                values.subList(i + 1, values.size()).forEach(JsonChunkedProcessor::release);
+                throw e;
+            }
+        }
         //noinspection unchecked
-        return (T) Objects.requireNonNull(
-            readChunked((Argument<T>) type.getFirstTypeVariable().orElse(type), mediaType, httpHeaders, Flux.just(byteBuffer)).collectList().block(),
-            "The JSON stream reader returned no result"
-        );
+        return (T) elements;
     }
 
     @Override
@@ -114,6 +139,11 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
         JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         return processor.process(Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))
             .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> jsonMessageHandler.read(type, mediaType, httpHeaders, value)));
+    }
+
+    @Override
+    public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        return new JsonPieceReader<>(new JsonChunkedProcessor(maxElementSize), value -> jsonMessageHandler.read(type, mediaType, httpHeaders, value));
     }
 
     @Override

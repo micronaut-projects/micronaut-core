@@ -40,8 +40,10 @@ import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormPart;
@@ -326,7 +328,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         synchronized (lock) {
             claimBytes("elements");
             CloseableByteBody body = readBytes("elements");
-            PublisherBodyElements<T> elements = new PublisherBodyElements<>(() -> elementPublisher(type, body), body::close);
+            BodyElements<T> elements = bodyElements(type, body);
             owned(elements::closeAsync);
             return elements;
         }
@@ -692,9 +694,35 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         throw new UnsupportedMediaException(String.valueOf(request.getContentType().orElse(null)), FORM_MEDIA_TYPES);
     }
 
-    private <T> Publisher<? extends T> elementPublisher(Argument<T> type, CloseableByteBody body) {
-        MediaType contentType = request.getContentType().orElse(null);
-        if (!isJson(contentType)) {
+    /**
+     * The elements of the body: read through the piece reader of the chunked reader, without
+     * Reactor, or through its publisher. A body that cannot be read as elements fails the first
+     * read, like a failure to decode it.
+     */
+    private <T> BodyElements<T> bodyElements(Argument<T> type, CloseableByteBody body) {
+        @Nullable MediaType contentType;
+        ChunkedMessageBodyReader<T> chunked;
+        PieceReader<T> pieceReader;
+        try {
+            contentType = request.getContentType().orElse(null);
+            chunked = chunkedReader(type, contentType);
+            // an element is decoded in memory: it is limited like buffered content. The body is
+            // streamed without being held, so the body is not, nor the bytes that arrived before
+            // it is read
+            pieceReader = chunked.openPieceReader(type, contentType, request.getHeaders(), uploadContext().maxBufferSize());
+        } catch (RuntimeException e) {
+            return new PublisherBodyElements<>(() -> {
+                throw e;
+            }, body::close);
+        }
+        if (pieceReader != null) {
+            return new ByteBodyElements<>(body, pieceReader, Function.identity());
+        }
+        return new PublisherBodyElements<>(() -> elementPublisher(type, contentType, chunked, body), body::close);
+    }
+
+    private <T> ChunkedMessageBodyReader<T> chunkedReader(Argument<T> type, @Nullable MediaType contentType) {
+        if (contentType == null || !isJson(contentType)) {
             throw new UnsupportedMediaException(String.valueOf(contentType), ELEMENT_MEDIA_TYPES);
         }
         MessageBodyReader<T> elementReader = binder.bodyHandlerRegistry().findReader(type, List.of(contentType)).orElse(null);
@@ -704,9 +732,13 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             throw new UnsupportedOperationException("Reading the elements of a JSON body [" + contentType
                 + "] needs a chunked JSON message body reader, which micronaut-http-netty provides: add it to the runtime classpath");
         }
-        // an element is decoded in memory: it is limited like buffered content. The body is
-        // streamed without being held, so the body is not, nor the bytes that arrived before it
-        // is read
+        return chunked;
+    }
+
+    /**
+     * The elements of a chunked reader that only reads a publisher.
+     */
+    private <T> Publisher<? extends T> elementPublisher(Argument<T> type, @Nullable MediaType contentType, ChunkedMessageBodyReader<T> chunked, CloseableByteBody body) {
         Publisher<ByteBuffer<?>> bytes = Flux.from(InternalByteBody.toUnbufferedReadBufferPublisher(body))
             .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
             .map(rb -> {
