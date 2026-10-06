@@ -28,6 +28,7 @@ class RetainedRegistrationsSpec extends Specification {
         Expensive.DESTROYED.set(0)
         Consumer.DESTROYED.set(0)
         Scratch.DESTROYED.set(0)
+        FeedReader.DESTROYED.set(0)
     }
 
     void "a retained singleton survives a restart and the beans that need it are rebuilt on top of it"() {
@@ -269,6 +270,36 @@ class RetainedRegistrationsSpec extends Specification {
         retained.size() == 2
         second.getBean(Runnable).is(task)
         second.getBean(java.util.concurrent.Callable).is(task)
+
+        cleanup:
+        second.close()
+    }
+
+    void "a retained @EachBean member of a retained registered singleton is adopted with it"() {
+        given: "a member of an @EachBean set whose origin is a registered instance"
+        def feed = new Feed("x")
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .trackBeanDependencies(true)
+            .start()
+        first.registerSingleton(Feed, feed, io.micronaut.inject.qualifiers.Qualifiers.byName("x"))
+        FeedReader reader = first.getBean(FeedReader, io.micronaut.inject.qualifiers.Qualifiers.byName("x"))
+
+        when: "both are retained, the member first, as the destruction order puts a bean before what it holds"
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.bean.is(reader) || it.bean.is(feed) }
+            .sort(false) { it.bean instanceof FeedReader ? 0 : 1 }
+        ApplicationContext second = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .trackBeanDependencies(true)
+            .retainedRegistrations(retained)
+            .start()
+
+        then: "both are adopted: the member is the same instance, on the same origin"
+        retained*.bean*.getClass() == [FeedReader, Feed]
+        FeedReader.DESTROYED.get() == 0
+        second.getBean(Feed, io.micronaut.inject.qualifiers.Qualifiers.byName("x")).is(feed)
+        second.getBean(FeedReader, io.micronaut.inject.qualifiers.Qualifiers.byName("x")).is(reader)
+        second.getBeansOfType(FeedReader).size() == 1
 
         cleanup:
         second.close()

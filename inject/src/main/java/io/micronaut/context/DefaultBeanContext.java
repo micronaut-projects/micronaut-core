@@ -4268,6 +4268,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Collection<BeanRegistration<?>> registrations = registrationsToAdopt;
         // adopted once: a later restart of this context must not register instances it has destroyed since
         registrationsToAdopt = List.of();
+        // a registered instance first: an @EachBean member of it, which comes before it in the destruction order the
+        // registrations follow, is only found once this context has the instance's definition
+        for (BeanRegistration<?> registration : registrations) {
+            if (originalOf(registration).getBeanDefinition() instanceof RuntimeBeanDefinition<?> runtime) {
+                resolveAdoptedDefinition(runtime);
+            }
+        }
         // decided for all before any is registered: a bean whose held dependency cannot be adopted is not
         // adopted either, since it would keep holding a bean this context destroys
         Map<BeanRegistration<?>, BeanDefinition<?>> adoptable = new LinkedHashMap<>();
