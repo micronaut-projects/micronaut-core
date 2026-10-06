@@ -355,6 +355,45 @@ class BeanWatchTest {
     }
 
     @Test
+    void aRecreatedDeprecatedProcessorIsGivenTheMethodsTheLegacyListenerDoesNotGiveItOnce() {
+        Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "buzz-processor.enabled", true);
+        try (ApplicationContext context = ApplicationContext.builder(properties).trackBeanDependencies(true).start()) {
+            WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            // its annotation is not processed on startup, so the legacy listener feeds it too, by the class only
+            assertTrue(context.getBeanDefinition(BuzzProcessor.class).hasAnnotation(Deprecated.class));
+            BuzzProcessor processor = context.getBean(BuzzProcessor.class);
+            int startup = processor.processed.size();
+
+            assertTrue(beanContext.recreate(processor));
+            BuzzProcessor recreated = context.getBean(BuzzProcessor.class);
+            assertNotSame(processor, recreated);
+            // the methods annotated in a class that is not, which only the startup pass gives, and the method of the
+            // annotated class, which the listener gives as the processor is created, each once
+            assertEquals(List.of("first", "second", "third"), recreated.processed.stream().sorted().toList());
+            assertEquals(startup, processor.processed.size());
+        }
+    }
+
+    @Test
+    void aDeprecatedProcessorRecreatedAsADependentIsGivenEachMethodOnce() {
+        Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "buzz-processor.enabled", true);
+        try (ApplicationContext context = ApplicationContext.builder(properties).trackBeanDependencies(true).start()) {
+            WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            BuzzProcessor processor = context.getBean(BuzzProcessor.class);
+            int startup = processor.processed.size();
+
+            assertTrue(beanContext.recreate(processor.pool));
+            Collection<BeanRegistration<BuzzProcessor>> active = context.getActiveBeanRegistrations(BuzzProcessor.class);
+            assertEquals(1, active.size());
+            BuzzProcessor recreated = active.iterator().next().bean();
+            assertNotSame(processor, recreated);
+            assertSame(context.getBean(Pool.class), recreated.pool);
+            assertEquals(List.of("first", "second", "third"), recreated.processed.stream().sorted().toList());
+            assertEquals(startup, processor.processed.size());
+        }
+    }
+
+    @Test
     void aResourceStateReportedBeforeTheContextStartsIsTheFirstBatchDeliveredOnce() {
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).build()) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;

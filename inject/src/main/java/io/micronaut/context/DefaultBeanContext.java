@@ -859,15 +859,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     /**
      * Gives a processor created again by {@link #recreateBean(Object)} the methods the startup pass gives a
      * processor of its annotation: those of the processed definitions whose executable stereotypes include it. The
-     * adapter the processor was given as it was created sees later additions only, so nothing is given twice; a
-     * deprecated processor was given every method as it was created, by the legacy listener.
+     * adapter the processor was given as it was created sees later additions only, so nothing is given twice.
+     *
+     * <p>A deprecated processor, one whose annotation is not processed on startup, was also given, as it was created,
+     * every method of the definitions whose class carries its annotation, by the legacy
+     * {@link ExecutableMethodProcessorListener}. Those definitions, selected as the listener selects them, are skipped
+     * here, so that the processor is given only what the listener did not give it, such as methods carrying the
+     * annotation in a class that does not.</p>
      *
      * @param processorDefinition The definition of the processor
      * @param processor The new processor
      */
-    @SuppressWarnings("java:S3776")
+    @SuppressWarnings({"java:S3776", "unchecked", "rawtypes"})
     private void processRecreated(BeanDefinition<?> processorDefinition, ExecutableMethodProcessor<?> processor) {
-        if (!startupMethodsProcessed || processorDefinition.hasAnnotation(Deprecated.class)) {
+        if (!startupMethodsProcessed) {
             // the startup pass has not run yet, and gives the processor its methods when it does, or never runs, without
             // eager beans
             return;
@@ -877,9 +882,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             return;
         }
         Class<?> annotationType = typeArguments.get(0).getType();
+        Set<BeanDefinition<?>> givenAsCreated = processorDefinition.hasAnnotation(Deprecated.class)
+            ? new HashSet<>(getBeanDefinitions(Qualifiers.byStereotype((Class) annotationType)))
+            : Set.of();
         boolean started = false;
         try {
             for (BeanDefinition<Object> processed : processedBeanDefinitions()) {
+                if (givenAsCreated.contains(processed)) {
+                    // the legacy listener gave the new processor every method of this definition as it created it
+                    continue;
+                }
                 for (ExecutableMethod<Object, ?> method : processed.getExecutableMethodsForProcessing()) {
                     if (!method.getAnnotationMetadata().getAnnotationTypesByStereotype(Executable.class).contains(annotationType)) {
                         continue;
