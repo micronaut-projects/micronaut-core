@@ -1,0 +1,51 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.context.reload;
+
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.annotation.Retain;
+import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * Retains the singletons whose definition is annotated with {@link Retain}: on the bean's class,
+ * or on the factory method that produces it. The annotation is read from the definition's declared
+ * annotation metadata, so the bean's class is not loaded, and a factory class annotated with
+ * {@link Retain} retains the factory itself, not every bean it produces.
+ *
+ * <p>A development launcher consults it along with the {@link BeanRetentionPolicy} beans of the
+ * context it stops; the context still refuses a bean that holds state bound to it.</p>
+ *
+ * @author graemerocher
+ * @since 5.3.0
+ */
+@Experimental
+@NullMarked
+public final class AnnotatedBeanRetentionPolicy implements BeanRetentionPolicy {
+
+    /**
+     * The policy.
+     */
+    public static final AnnotatedBeanRetentionPolicy INSTANCE = new AnnotatedBeanRetentionPolicy();
+
+    private AnnotatedBeanRetentionPolicy() {
+    }
+
+    @Override
+    public boolean retain(BeanRegistration<?> registration) {
+        return registration.getBeanDefinition().getAnnotationMetadata().getDeclaredMetadata().hasStereotype(Retain.class);
+    }
+}
