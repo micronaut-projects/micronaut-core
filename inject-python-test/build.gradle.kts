@@ -28,6 +28,10 @@ dependencies {
     testImplementation(platform(libs.test.boms.micronaut.serde))
     testImplementation(libs.managed.reactor)
     testImplementation("io.micronaut.email:micronaut-email:3.2.0")
+    // @Cacheable advice on Python beans, keyed by a subset of the parameters
+    testImplementation("io.micronaut.cache:micronaut-cache-caffeine:6.1.1") {
+        exclude(group = "io.micronaut")
+    }
     testImplementation(projects.micronautInjectJavaHelper)
     testImplementation(projects.micronautInjectTestUtils)
     testImplementation(projects.micronautRetry)

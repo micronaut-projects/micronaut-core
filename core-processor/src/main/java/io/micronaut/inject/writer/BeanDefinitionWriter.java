@@ -783,7 +783,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private String proxyBeanDefinitionName, proxyBeanTypeName;
 
-    private final OriginatingElements originatingElements;
+    private OriginatingElements originatingElements;
 
     private ClassDef.ClassDefBuilder classDefBuilder;
 
@@ -5254,6 +5254,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     @Override
     public void addOriginatingElement(Element element) {
         originatingElements.addOriginatingElement(element);
+    }
+
+    /**
+     * Makes the given element the only originating element of the definition. The executable methods and the proxies
+     * of the definition take the originating elements when they are created, so this has to be called before.
+     *
+     * @param element The originating element
+     */
+    void setOriginatingElement(Element element) {
+        originatingElements = OriginatingElements.of(element);
     }
 
     /**

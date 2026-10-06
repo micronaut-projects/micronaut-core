@@ -114,8 +114,19 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
     private static List<ClassElement> assignableTargetTypes(ClassElement element) {
         Map<String, ClassElement> targetTypes = new LinkedHashMap<>();
         collectInterfaces(element, targetTypes);
-        element.getSuperType().ifPresent(superType -> collectSuperTypes(superType, targetTypes));
+        collectSuperType(element, targetTypes);
         return new ArrayList<>(targetTypes.values());
+    }
+
+    /**
+     * Collects the superclass of a class and its supertypes, except for the generated superclass holding the
+     * bridge state of a stub, which is no type to convert to.
+     */
+    private static void collectSuperType(ClassElement element, Map<String, ClassElement> targetTypes) {
+        String stateClassName = PythonStubGenerator.stateClassName(element.getName());
+        element.getSuperType()
+            .filter(superType -> !superType.getName().equals(stateClassName))
+            .ifPresent(superType -> collectSuperTypes(superType, targetTypes));
     }
 
     private static void collectSuperTypes(ClassElement element, Map<String, ClassElement> targetTypes) {
@@ -124,7 +135,7 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
             return;
         }
         collectInterfaces(rawElement, targetTypes);
-        rawElement.getSuperType().ifPresent(superType -> collectSuperTypes(superType, targetTypes));
+        collectSuperType(rawElement, targetTypes);
     }
 
     private static void collectInterfaces(ClassElement element, Map<String, ClassElement> targetTypes) {

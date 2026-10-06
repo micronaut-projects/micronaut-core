@@ -32,7 +32,8 @@ class Pooled:
      * Compiles and returns what the processor reported. Compile only: these features are about
      * what is reported, which happens whether or not a context is ever started.
      */
-    private String warningsFrom(String python, String ignoreOption = null) {
+    private String warningsFrom(String python, String ignoreOption = null,
+                                String optionName = "micronaut.python.pool.ignoreDependencies") {
         // The compiler collects its diagnostics and prints the processor's notes and warnings to
         // stderr, so that is where a `VisitorContext.warn` ends up here.
         def captured = new ByteArrayOutputStream()
@@ -41,7 +42,7 @@ class Pooled:
         try {
             def options = ignoreOption == null
                 ? []
-                : ["-Amicronaut.python.pooled.ignoreDependencies=" + ignoreOption]
+                : ["-A" + optionName + "=" + ignoreOption]
             def compiler = PyronautCompiler.builder()
                 .pythonCode(python)
                 .options(options)
@@ -240,5 +241,23 @@ class Pooled:
         then:
         !reported.contains("singleton Python bean [Accepted]")
         reported.contains("singleton Python bean [NotAccepted]")
+    }
+
+    void "listing * turns the warning off, as configuration validation accepts it"() {
+        given: "the list of names PythonPoolConfiguration declares, which a boolean would not satisfy"
+        when:
+        def reported = warningsFrom(SINGLETON_DEPENDENCY, "*")
+
+        then:
+        !reported.contains("depends on the singleton Python bean")
+    }
+
+    void "the name the option was released under is still read"() {
+        given: "a build configured before the option moved under the pool configuration"
+        when:
+        def reported = warningsFrom(SINGLETON_DEPENDENCY, "false", "micronaut.python.pooled.ignoreDependencies")
+
+        then:
+        !reported.contains("depends on the singleton Python bean")
     }
 }

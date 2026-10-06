@@ -40,6 +40,7 @@ import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
@@ -58,7 +59,7 @@ import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_
 import static io.micronaut.python.processing.PythonStubGenerator.addReferencedPythonClassReferenceFields;
 import static io.micronaut.python.processing.PythonStubGenerator.convertedElementPublisher;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
-import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
+import static io.micronaut.python.processing.PythonStubGenerator.returnConvertedValue;
 import static io.micronaut.python.processing.PythonStubGenerator.PUBLISHER;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncGeneratorPythonMethod;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncPythonMethod;
@@ -71,9 +72,13 @@ final class PythonPooledStubGenerator {
     /**
      * The option naming the dependencies whose pooling cost this compilation already accepts, or
      * {@code false} to report none of them. Camel case in the tail because javac accepts only a
-     * dot-separated sequence of identifiers as the key of a {@code -A} option.
+     * dot-separated sequence of identifiers as the key of a {@code -A} option. Under the prefix of
+     * {@code PythonPoolConfiguration}, which declares it, so the configuration validation of an
+     * application that sets it in its own configuration knows the property.
      */
-    static final String IGNORE_OPTION = "micronaut.python.pooled.ignoreDependencies";
+    static final String IGNORE_OPTION = "micronaut.python.pool.ignoreDependencies";
+    /** The name {@link #IGNORE_OPTION} was released under (5.2.11), still read when it is not set. */
+    static final String LEGACY_IGNORE_OPTION = "micronaut.python.pooled.ignoreDependencies";
 
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
@@ -153,15 +158,16 @@ final class PythonPooledStubGenerator {
      * dependency types to leave unreported, by simple or qualified name. The value {@code false}
      * turns the warning off altogether. Following {@code PythonReflectionGate}, the same name is
      * accepted as a system property of the compiler JVM, so a build that cannot pass {@code -A}
-     * options has a way in.
+     * options has a way in. The name it was released under, {@value #LEGACY_IGNORE_OPTION}, is read
+     * the same ways when the current one is not set.
      *
      * @param context The visitor context
      * @return The dependency names to skip, or a set containing {@link #ALL}
      */
     private static Set<String> ignoredPooledDependencies(VisitorContext context) {
-        String value = context.getOptions().get(IGNORE_OPTION);
+        String value = ignoreOptionValue(context, IGNORE_OPTION);
         if (StringUtils.isEmpty(value)) {
-            value = System.getProperty(IGNORE_OPTION);
+            value = ignoreOptionValue(context, LEGACY_IGNORE_OPTION);
         }
         if (StringUtils.isEmpty(value)) {
             return Set.of();
@@ -177,6 +183,11 @@ final class PythonPooledStubGenerator {
             }
         }
         return names;
+    }
+
+    private static @Nullable String ignoreOptionValue(VisitorContext context, String option) {
+        String value = context.getOptions().get(option);
+        return StringUtils.isEmpty(value) ? System.getProperty(option) : value;
     }
 
     /**
@@ -591,7 +602,7 @@ final class PythonPooledStubGenerator {
                 ).cast(TypeDef.of(CompletionStage.class)).cast(TypeDef.of(methodElement.getGenericReturnType())).returning()
             );
         }
-        return handleReturnType(allClasses, methodElement.getGenericReturnType(), invoked).returning();
+        return returnConvertedValue(allClasses, methodElement.getGenericReturnType(), invoked);
     }
 
     private static void addGetterScriptPooled(PropertyElement beanProperty,
@@ -611,7 +622,7 @@ final class PythonPooledStubGenerator {
             // module attribute goes through the pool's module cache, as it did before holders existed
             var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
                 List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(beanProperty.getName())));
-            return handleReturnType(allClasses, beanProperty.getGenericType(), invoked).returning();
+            return returnConvertedValue(allClasses, beanProperty.getGenericType(), invoked);
         })));
     }
 

@@ -2485,11 +2485,14 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 if (value.isPresent()) {
                     return value.get();
                 } else {
+                    Optional<?> defaultValue = argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument);
+                    if (defaultValue.isPresent()) {
+                        return defaultValue.get();
+                    }
                     if (argument.isDeclaredNullable()) {
                         return null;
                     }
-                    return argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument)
-                            .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString));
+                    throw DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString);
                 }
             }
         }
