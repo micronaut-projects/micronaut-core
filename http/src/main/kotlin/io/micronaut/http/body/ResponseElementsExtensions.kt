@@ -60,7 +60,8 @@ fun <T : Any> Flow<T>.asResponseElements(context: CoroutineContext = Dispatchers
         } catch (e: CancellationException) {
             channel.cancel(e)
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // an error too: the server waits for the next element
             channel.close(e)
         }
     }

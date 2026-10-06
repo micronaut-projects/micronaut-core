@@ -26,6 +26,9 @@ class StreamRoutesTest {
                 assertEquals("s-1", notified.headers.get("Session-Id"))
                 assertEquals("{\"result\":\"pong\"}", http.retrieve(message("ping")))
                 assertEquals("data: received hello\n\n", http.retrieve(message("hello")))
+                // a client that accepts only JSON
+                assertEquals("{\"result\":\"pong\"}", http.retrieve(HttpRequest.POST("/messages", "ping")
+                    .contentType(MediaType.TEXT_PLAIN_TYPE).accept(MediaType.APPLICATION_JSON_TYPE)))
             }
         }
     }

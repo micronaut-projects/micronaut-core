@@ -25,6 +25,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -183,18 +184,34 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
             if (HttpResponse.class.isAssignableFrom(unwrappedType.getType())) {
                 unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return appendAnnotations(returnType, unwrappedType);
+            return appendAnnotations(returnType, elementType(unwrappedType));
         } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
             Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             if (unwrappedType.isAsyncOrReactive()) {
                 unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return appendAnnotations(returnType, unwrappedType);
+            return appendAnnotations(returnType, elementType(unwrappedType));
         } else if (returnType.isOptional()) {
             Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             return appendAnnotations(returnType, unwrappedType);
+        } else if (ResponseElements.class.isAssignableFrom(returnType.getType())) {
+            return appendAnnotations(returnType, elementType(returnType.asArgument()));
         }
         return returnType.asArgument();
+    }
+
+    /**
+     * The type of the elements of a {@link ResponseElements} body, which are written like the
+     * items of a publisher body, or the type itself.
+     *
+     * @param type The type of the body
+     * @return The type of an element, or the type
+     */
+    private static Argument<?> elementType(Argument<?> type) {
+        if (ResponseElements.class.isAssignableFrom(type.getType())) {
+            return type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        }
+        return type;
     }
 
     private static Argument<?> appendAnnotations(ReturnType<?> returnType, Argument<?> unwrappedType) {

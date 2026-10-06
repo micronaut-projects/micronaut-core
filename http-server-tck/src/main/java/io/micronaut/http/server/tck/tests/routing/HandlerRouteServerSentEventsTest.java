@@ -378,6 +378,27 @@ public class HandlerRouteServerSentEventsTest {
     }
 
     @Test
+    void anotherResponseForAClientThatAcceptsOnlyIt() throws Exception {
+        try (ServerUnderTest server = server()) {
+            // the route produces JSON too: a client that accepts only JSON reaches the handler
+            HttpResponse<String> json = server.exchange(HttpRequest.POST("/sse/messages", "ping")
+                .contentType(MediaType.TEXT_PLAIN_TYPE)
+                .accept(MediaType.APPLICATION_JSON_TYPE), String.class);
+            assertEquals(HttpStatus.OK, json.getStatus());
+            assertEquals("{\"result\":\"pong\"}", json.body());
+        }
+    }
+
+    @Test
+    void sendAfterTheHandlerReturnedWithoutKeepOpenFails() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertEquals("", server.exchange(HttpRequest.GET("/sse/forgot-keep-open"), String.class).getBody(String.class).orElse(""));
+            Throwable late = recorder(server).lateSend.get(20, TimeUnit.SECONDS);
+            assertTrue(late.getMessage().contains("call keepOpen()"), late.getMessage());
+        }
+    }
+
+    @Test
     void anotherResponseAfterTheFirstEventFails() throws Exception {
         try (ServerUnderTest server = server()) {
             assertEquals("data: one\n\n", server.exchange(HttpRequest.GET("/sse/late-respond"), String.class).body());
@@ -537,6 +558,7 @@ public class HandlerRouteServerSentEventsTest {
         final CompletableFuture<IllegalStateException> lateKeepOpen = new CompletableFuture<>();
         final CompletableFuture<IllegalStateException> lateHeader = new CompletableFuture<>();
         final CompletableFuture<IllegalStateException> lateRespond = new CompletableFuture<>();
+        final CompletableFuture<Throwable> lateSend = new CompletableFuture<>();
         final AtomicInteger sent = new AtomicInteger();
 
         CompletableFuture<@Nullable Throwable> closed(String key) {
@@ -722,7 +744,9 @@ public class HandlerRouteServerSentEventsTest {
                             }
                         });
                 });
-                routes.POST("/sse/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String.class).sse((request, pathVariables, message, events) -> {
+                routes.POST("/sse/messages").consumes(MediaType.TEXT_PLAIN_TYPE)
+                    .produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE)
+                    .body(String.class).sse((request, pathVariables, message, events) -> {
                     events.header("Mcp-Session-Id", "abc-123");
                     switch (message) {
                         case "notify" -> events.respond(HttpResponse.accepted());
@@ -733,6 +757,12 @@ public class HandlerRouteServerSentEventsTest {
                         }
                     }
                 });
+                routes.GET("/sse/forgot-keep-open").sse((request, pathVariables, events) ->
+                    recorder.scheduler.schedule(() -> events.send("late").whenComplete((ignored, error) -> {
+                        if (error != null) {
+                            recorder.lateSend.complete(error);
+                        }
+                    }), 50, TimeUnit.MILLISECONDS));
                 routes.GET("/sse/late-respond").sse((request, pathVariables, events) -> {
                     events.send("one");
                     try {

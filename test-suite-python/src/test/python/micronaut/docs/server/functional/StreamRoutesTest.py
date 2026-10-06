@@ -29,6 +29,10 @@ class StreamRoutesTest:
         assert notified.getHeaders().get("Session-Id") == "s-1"
         assert http.retrieve(message("ping")) == '{"result":"pong"}'
         assert http.retrieve(message("hello")) == "data: received hello\n\n"
+        # a client that accepts only JSON
+        assert http.retrieve(HttpRequest.POST("/messages", "ping")
+                             .contentType(MediaType.TEXT_PLAIN_TYPE)
+                             .accept(MediaType.APPLICATION_JSON_TYPE)) == '{"result":"pong"}'
 
 
 def message(message):

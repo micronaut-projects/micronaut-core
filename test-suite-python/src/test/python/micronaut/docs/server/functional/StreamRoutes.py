@@ -65,7 +65,9 @@ class StreamRoutes(HttpRoutes):
             else:
                 events.send(f"received {message}")
 
-        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String).sse(messages)
+        (routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE)
+            .produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE)  # <11>
+            .body(String).sse(messages))
 
         def numbers(request, path_variables):
             remaining = iter([1, 2, 3])

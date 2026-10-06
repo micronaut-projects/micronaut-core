@@ -52,9 +52,10 @@ suspend fun SseEmitter.sendAwait(data: Any) {
 
 /**
  * Run the stream in a coroutine: the stream is kept open while [block] runs, completes when it
- * returns, and fails with the exception it throws. The coroutine is cancelled when the stream
- * closes, e.g. when the client disconnects, and runs with the propagated context of the caller,
- * the route handler.
+ * returns, and fails with the exception or error it throws, or with the cancellation of the
+ * coroutine while the stream is open, e.g. a timeout of `withTimeout`. The coroutine is cancelled
+ * when the stream closes, e.g. when the client disconnects, and runs with the propagated context
+ * of the caller, the route handler.
  *
  * ```
  * routes.GET("/ticks").sse { _, _, events ->
@@ -82,10 +83,13 @@ fun SseEmitter.launch(context: CoroutineContext = Dispatchers.Default, block: su
             emitter.block()
             emitter.complete()
         } catch (e: CancellationException) {
-            // the stream closed, or the coroutine was cancelled: end the stream if it is open
-            emitter.complete()
+            // cancelled because the stream closed, or else, e.g. by withTimeout: a stream that is
+            // still open did not end normally
+            if (emitter.isOpen) {
+                emitter.fail(e)
+            }
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             emitter.fail(e)
         }
     }

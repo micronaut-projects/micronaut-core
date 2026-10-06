@@ -129,26 +129,28 @@ final class PendingRoute {
     }
 
     /**
-     * Check that the route produces nothing but the media type its terminal writes, e.g. the
-     * {@code text/event-stream} of {@link HttpRouteSpec#sse}: a route that declared another one
-     * would negotiate a type it does not write. Such a route is dropped and the terminal fails.
+     * Check that the media types the route declared include the one its terminal writes, e.g. the
+     * {@code text/event-stream} of {@link HttpRouteSpec#sse}: a route that declared only others
+     * would negotiate types it does not write. It may declare others besides, for the other
+     * responses of its handler. Such a route is dropped and the terminal fails.
      *
      * @param mediaType The media type the terminal writes
      * @param terminal  The name of the terminal, for the message
-     * @throws IllegalStateException if the route declared another media type
+     * @throws IllegalStateException if the route declared media types without this one
      */
-    void producesOnly(MediaType mediaType, String terminal) {
+    void producesIncluding(MediaType mediaType, String terminal) {
         MediaType[] declared = produces;
         if (declared == null) {
             return;
         }
         for (MediaType type : declared) {
-            if (!type.getName().equals(mediaType.getName())) {
-                drop();
-                throw new IllegalStateException("The route " + description + " produces " + Arrays.toString(declared)
-                    + ", but " + terminal + " writes " + mediaType + ": remove produces(...)");
+            if (type.getName().equals(mediaType.getName())) {
+                return;
             }
         }
+        drop();
+        throw new IllegalStateException("The route " + description + " produces " + Arrays.toString(declared)
+            + ", but " + terminal + " writes " + mediaType + ": add it to produces(...), or remove produces(...)");
     }
 
     /**

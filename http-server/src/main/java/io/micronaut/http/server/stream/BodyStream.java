@@ -214,13 +214,23 @@ final class BodyStream implements BufferConsumer.Upstream {
      * @return Whether this closed the stream
      */
     boolean complete() {
+        return complete("The stream is complete");
+    }
+
+    /**
+     * End the body. The pending writes complete.
+     *
+     * @param reason Why the stream ended, the message of the failure of a later write
+     * @return Whether this closed the stream
+     */
+    boolean complete(String reason) {
         Effects effects = new Effects();
         lock.lock();
         try {
             if (state != State.OPEN) {
                 return false;
             }
-            closeLocked(State.COMPLETED, new IllegalStateException("The stream is complete"), null, effects);
+            closeLocked(State.COMPLETED, new IllegalStateException(reason), null, effects);
             submitLocked(buffer::complete, effects);
         } finally {
             lock.unlock();

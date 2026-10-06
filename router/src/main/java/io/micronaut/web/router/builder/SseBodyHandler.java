@@ -30,11 +30,11 @@ import org.jspecify.annotations.Nullable;
  * stage bound is released when the stream ends, not when the response is sent.
  *
  * <pre>{@code
- * routes.POST("/completions").body(Prompt.class).sse((request, pathVariables, prompt, events) -> {
+ * routes.POST("/completions").body(Prompt.class).executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, prompt, events) -> {
  *     for (String token : model.generate(prompt)) {
  *         events.sendAndAwait(token);
  *     }
- * }).executeOn(TaskExecutors.BLOCKING);
+ * });
  * }</pre>
  *
  * @param <B> The type of the body the handler receives

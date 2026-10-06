@@ -32,6 +32,9 @@ class StreamRoutesSpec extends Specification {
         notified.headers.get("Session-Id") == "s-1"
         client.toBlocking().retrieve(message("ping")) == '{"result":"pong"}'
         client.toBlocking().retrieve(message("hello")) == "data: received hello\n\n"
+        // a client that accepts only JSON
+        client.toBlocking().retrieve(HttpRequest.POST("/messages", "ping")
+            .contentType(MediaType.TEXT_PLAIN_TYPE).accept(MediaType.APPLICATION_JSON_TYPE)) == '{"result":"pong"}'
     }
 
     private static MutableHttpRequest<String> message(String message) {

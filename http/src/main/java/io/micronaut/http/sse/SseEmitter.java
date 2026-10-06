@@ -34,7 +34,8 @@ import java.util.function.Consumer;
  * exception the handler threw. A handler that sends its events later, from callbacks or another
  * thread, calls {@link #keepOpen()} before it returns, and ends the stream with
  * {@link #complete()} or {@link #fail(Throwable)}. The stream also ends when the client
- * disconnects.</p>
+ * disconnects. A send after the handler returned without {@link #keepOpen()} fails, and the first
+ * one is logged as a warning.</p>
  *
  * <h2>The response</h2>
  * <p>The response ({@code 200}, {@code text/event-stream}, {@code Cache-Control: no-cache}, never
@@ -194,8 +195,10 @@ public interface SseEmitter {
     /**
      * Send a comment line when no event was sent for the given period, to keep the connection
      * and the proxies on the way from timing it out as idle. The first heartbeat sends the
-     * response if no event was sent yet. Heartbeats are skipped while the stream is not writable.
-     * The default is {@code micronaut.server.responses.stream.sse-heartbeat}, none if not set.
+     * response if no event was sent yet: an error or {@link #respond another response} after it
+     * can no longer be answered. Heartbeats are skipped while the stream is not writable. The
+     * default is {@code micronaut.server.responses.stream.sse-heartbeat}, none if not set, which
+     * starts once the response is sent, so that it never sends the response itself.
      *
      * @param period The period, {@link Duration#ZERO} to stop the heartbeat
      * @return This emitter

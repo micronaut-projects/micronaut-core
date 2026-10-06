@@ -59,7 +59,9 @@ public class StreamRoutes implements HttpRoutes {
                 events.send(word);
             }
         });
-        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String.class).sse((request, pathVariables, message, events) -> {
+        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE)
+            .produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE) // <11>
+            .body(String.class).sse((request, pathVariables, message, events) -> {
             events.header("Session-Id", "s-1"); // <9>
             switch (message) {
                 case "notify" -> events.respond(HttpResponse.accepted()); // <10>

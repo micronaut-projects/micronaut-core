@@ -74,6 +74,15 @@ class SseRouteDeclarationTest {
         assertEquals(List.of(MediaType.TEXT_EVENT_STREAM_TYPE), route(router, HttpRequest.GET("/events")).getProduces());
     }
 
+    @Test
+    void anEventStreamRouteMayProduceOtherTypesForItsOtherResponses() {
+        Router router = router(routes -> routes.POST("/messages")
+            .produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE)
+            .sse((request, pathVariables, events) -> events.send("one")));
+        assertEquals(List.of(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE),
+            route(router, HttpRequest.POST("/messages", "")).getProduces());
+    }
+
     private static UriRouteInfo<?, ?> route(Router router, HttpRequest<?> request) {
         UriRouteMatch<Object, Object> match = router.findClosest(request);
         assertNotNull(match, request.getPath());

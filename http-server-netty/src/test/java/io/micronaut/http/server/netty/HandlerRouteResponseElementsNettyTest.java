@@ -41,6 +41,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -58,7 +60,9 @@ class HandlerRouteResponseElementsNettyTest {
             server.start();
             String response = get(server, "/netty-elements/blocking");
             assertTrue(response.startsWith("HTTP/1.1 200"), response);
-            assertTrue(response.contains("worker,worker"), response);
+            // each element in its own chunk or not: both were written on a worker
+            assertEquals(2, response.split("worker,", -1).length - 1, response);
+            assertFalse(response.contains("event-loop"), response);
         }
     }
 

@@ -23,6 +23,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -233,6 +235,16 @@ public class HandlerRouteResponseElementsTest {
     }
 
     @Test
+    void controllerReturningElements() throws Exception {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/controller-elements"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("[{\"n\":1},{\"n\":2}]")
+                .build());
+        }
+    }
+
+    @Test
     void byteBodyElementsAreWrittenAsTheyAre() throws Exception {
         try (ServerUnderTest server = server()) {
             HttpResponse<String> response = server.exchange(HttpRequest.GET("/elements/bytes"), String.class);
@@ -287,6 +299,17 @@ public class HandlerRouteResponseElementsTest {
 
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+    }
+
+    @Controller("/controller-elements")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class ElementsController {
+        @Get(produces = MediaType.APPLICATION_JSON)
+        ResponseElements<Map<String, Integer>> numbers() {
+            Iterator<Map<String, Integer>> numbers = List.of(Map.of("n", 1), Map.of("n", 2)).iterator();
+            return ResponseElements.of(() ->
+                CompletableFuture.completedFuture(numbers.hasNext() ? Optional.of(numbers.next()) : Optional.<Map<String, Integer>>empty()));
+        }
     }
 
     static final class Refused extends RuntimeException {

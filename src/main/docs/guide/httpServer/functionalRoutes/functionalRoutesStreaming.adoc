@@ -13,18 +13,20 @@ snippet::io.micronaut.docs.server.functional.StreamRoutes[tags="imports,clazz", 
 <7> A route with a body stage streams events back, e.g. the answer to a prompt. What the body stage bound, here a decoded `String`, is released when the stream ends, not when the response is sent.
 <8> A api:http.body.ResponseElements[] body is pulled one element at a time while the client keeps up, and written like the elements of a `Publisher` body: a JSON array for JSON. `ResponseElements.of(next, close)` also releases resources, e.g. closes a cursor.
 <9> `header(...)` adds a header to the response before the first event, whichever response is sent: the event stream, or the response given to `respond(...)`.
-<10> `respond(...)` answers with another response instead of the event stream, before the first event: here `202 Accepted` without a body for a notification, and a single JSON message for a request. This is how a protocol in which the server decides per request whether to stream works, such as the https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http[MCP Streamable HTTP transport], whose client accepts both `application/json` and `text/event-stream`. A body without a content type is written as JSON, and the stream ends normally.
+<10> `respond(...)` answers with another response instead of the event stream, before the first event: here `202 Accepted` without a body for a notification, and a single JSON message for a request. This is how a protocol in which the server decides per request whether to stream works, such as the https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http[MCP Streamable HTTP transport]. A body without a content type is written as JSON, and the stream ends normally.
+<11> An event stream route produces `text/event-stream`. It may declare other media types besides, for the responses given to `respond(...)`, so that a client that accepts only JSON reaches the handler. A route that declares media types without `text/event-stream` fails.
 
 The rules of a stream:
 
 * *Backpressure.* The stream counts the bytes the connection has not taken yet. A send completes, and the next element is pulled, once they are below the high-water mark, 64 KiB by default. An event stream with sixteen times as many queued fails with a `StreamOverflowException`, a `ConnectionClosedException`: a sender that waits never reaches it.
+* *The end of the handler.* A send after the handler returned without `keepOpen()` fails, since the stream ended, and the first one is logged as a warning: an event-driven handler that forgot `keepOpen()` answers with an empty stream.
 * *Disconnects.* When the client disconnects, the pending and the later sends fail with a `ConnectionClosedException`, and `onClose` runs with it. Before the response is sent, a disconnect is noticed only by the next send: a stream that waits for its first event sends a comment or a heartbeat first.
 * *Threads.* The stages complete, and `onClose` runs, on a thread of the server, usually an event loop, with the propagated context of the handler: a continuation must not block.
 * *Reconnections.* `events.lastEventId()` is the `Last-Event-ID` header of a reconnecting client.
 * *HEAD.* A `HEAD` request runs the handler, and sends the headers of the stream without its events.
 * *Elements.* `next()` is called again only once the stage it returned completed, and only while the connection keeps up. An element is written like the element of a `Publisher` body: with the writer of its type, on a worker thread if the writer is blocking, and the bytes of a `ByteBody` element as they arrive. `close()` is called once: at the end, on a failure, on a disconnect, for a `HEAD` request, and when a filter replaces the response or its body. A failure of the first element is answered by the error routes.
 
-The high-water mark, and a heartbeat for every event stream, are configured for the server:
+The high-water mark, and a heartbeat for every event stream, are configured for the server. The configured heartbeat starts once the response is sent, so that the handler can still answer with an error or `respond(...)`, however long it takes; a stream that needs bytes on the wire before its first event sends a comment or sets its own heartbeat:
 
 [configuration]
 ----

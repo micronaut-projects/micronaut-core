@@ -49,6 +49,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -88,9 +89,19 @@ final class DefaultSseEmitter implements SseEmitter {
      */
     private volatile boolean active;
     /**
+     * Whether the stream ended because the handler returned without {@link #keepOpen()}.
+     */
+    private volatile boolean endedOnReturn;
+    private final AtomicBoolean lateSendWarned = new AtomicBoolean();
+    /**
      * Guarded by this emitter.
      */
     private @Nullable ScheduledFuture<?> heartbeatTask;
+    /**
+     * Whether the handler set the heartbeat, which replaces the configured one. Guarded by this
+     * emitter.
+     */
+    private boolean heartbeatSet;
 
     /**
      * @param request     The request
@@ -123,10 +134,6 @@ final class DefaultSseEmitter implements SseEmitter {
         ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
         if (bodies != null) {
             stream.onClose(ignored -> release(bodies));
-        }
-        Duration heartbeat = factory.heartbeat();
-        if (heartbeat != null) {
-            heartbeat(heartbeat);
         }
         Runnable run = () -> {
             Throwable failure = null;
@@ -165,7 +172,10 @@ final class DefaultSseEmitter implements SseEmitter {
                 LOG.warn("The server-sent events handler of {} {} failed after its stream ended", request.getMethodName(), request.getPath(), failure);
             }
         } else if (!keptOpen) {
-            complete();
+            endedOnReturn = true;
+            if (stream.complete("The stream ended when the handler returned: call keepOpen() to send events after the handler returns")) {
+                sendResponse();
+            }
         } else if (head) {
             // the response of a HEAD request has no body: no need to wait for an event
             sendResponse();
@@ -211,6 +221,11 @@ final class DefaultSseEmitter implements SseEmitter {
 
     private CompletionStage<Void> write(ReadBuffer data) {
         CompletionStage<Void> result = stream.write(data);
+        if (endedOnReturn && lateSendWarned.compareAndSet(false, true)) {
+            // most likely a handler that sends from a callback and forgot keepOpen(): the failed
+            // stage of the send is usually not looked at
+            LOG.warn("An event was sent to the stream of {} {} after its handler returned, but the stream ended when the handler returned: call keepOpen() to send events after the handler returns", request.getMethodName(), request.getPath());
+        }
         // after the write: the first event is in the body when the response goes out
         sendResponse();
         return result;
@@ -309,6 +324,24 @@ final class DefaultSseEmitter implements SseEmitter {
         if (period.isNegative()) {
             throw new IllegalArgumentException("The heartbeat period must not be negative: " + period);
         }
+        heartbeatSet = true;
+        scheduleHeartbeat(period);
+        return this;
+    }
+
+    /**
+     * Start the configured heartbeat, once the response was sent, unless the handler set its own:
+     * before, it would send the response, and take away the chance to answer with an error or
+     * another response.
+     */
+    private synchronized void startConfiguredHeartbeat() {
+        Duration period = factory.heartbeat();
+        if (period != null && !heartbeatSet) {
+            scheduleHeartbeat(period);
+        }
+    }
+
+    private synchronized void scheduleHeartbeat(Duration period) {
         stopHeartbeat();
         if (!period.isZero() && stream.isOpen()) {
             heartbeatTask = factory.scheduler().scheduleAtFixedRate(period, period, this::heartbeatTick);
@@ -317,7 +350,6 @@ final class DefaultSseEmitter implements SseEmitter {
                 stopHeartbeat();
             }
         }
-        return this;
     }
 
     private void heartbeatTick() {
@@ -401,6 +433,7 @@ final class DefaultSseEmitter implements SseEmitter {
             sseResponse = MutableByteBodyHttpResponse.of(headers, stream.body());
         }
         context.propagate(() -> response.complete(sseResponse));
+        startConfiguredHeartbeat();
     }
 
     private void release(ReleasableRequestBody bodies) {

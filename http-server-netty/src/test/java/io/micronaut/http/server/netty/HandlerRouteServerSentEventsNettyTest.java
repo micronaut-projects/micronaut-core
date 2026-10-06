@@ -113,6 +113,17 @@ class HandlerRouteServerSentEventsNettyTest {
     }
 
     @Test
+    void configuredHeartbeatDoesNotSendTheResponse() throws IOException {
+        try (ApplicationContext ctx = run(Map.of("micronaut.server.responses.stream.sse-heartbeat", "50ms"))) {
+            // the handler answers with another response after several heartbeat periods
+            String response = exchange(ctx.getBean(EmbeddedServer.class), "GET /netty-sse/late-respond HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+            assertTrue(response.startsWith("HTTP/1.1 200"), response);
+            assertTrue(head(response).contains("content-type: application/json"), response);
+            assertTrue(response.contains("{\"result\":\"late\"}"), response);
+        }
+    }
+
+    @Test
     void eventsReachAnHttp2ClientOneByOne() {
         try (ApplicationContext ctx = run(Map.of(
             "micronaut.server.ssl.enabled", true,
@@ -226,11 +237,16 @@ class HandlerRouteServerSentEventsNettyTest {
                     }, 1500, TimeUnit.MILLISECONDS);
                 });
                 routes.GET("/netty-sse/configured-heartbeat").sse((request, pathVariables, events) -> {
-                    events.keepOpen();
+                    // the configured heartbeat starts once the response is sent
+                    events.keepOpen().comment("started");
                     recorder.scheduler.schedule(() -> {
                         events.send("done");
                         events.complete();
                     }, 1500, TimeUnit.MILLISECONDS);
+                });
+                routes.GET("/netty-sse/late-respond").sse((request, pathVariables, events) -> {
+                    events.keepOpen();
+                    recorder.scheduler.schedule(() -> events.respond(HttpResponse.ok(Map.of("result", "late"))), 300, TimeUnit.MILLISECONDS);
                 });
                 routes.GET("/netty-sse/steps").sse((request, pathVariables, events) -> {
                     events.keepOpen();

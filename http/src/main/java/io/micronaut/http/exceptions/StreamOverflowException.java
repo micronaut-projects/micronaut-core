@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.exceptions;
 
+import io.micronaut.core.annotation.Experimental;
+
 /**
  * A streamed response queued more bytes than its limit, because the client reads slower than the
  * server sends, so the server closed the connection. The client did not close it: a sender that
@@ -23,6 +25,7 @@ package io.micronaut.http.exceptions;
  * @author Denis Stepanov
  * @since 5.3.0
  */
+@Experimental
 public final class StreamOverflowException extends ConnectionClosedException {
 
     /**

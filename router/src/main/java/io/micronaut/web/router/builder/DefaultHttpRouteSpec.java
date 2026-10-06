@@ -216,7 +216,7 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
 
     /**
      * End a server-sent events route: it produces {@code text/event-stream}, its own type and not
-     * the type its group produces, and nothing else.
+     * the type its group produces, or the types it declared, which must include it.
      *
      * @param route   The route
      * @param handler Creates the handler method of a route
@@ -224,7 +224,7 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
      * @param own     The other settings of the terminal, which the routes do not inherit from their groups
      */
     static void endSse(PendingRoute route, Supplier<HandlerMethod<?>> handler, @Nullable Consumer<RouteSettings> init, int own) {
-        route.producesOnly(MediaType.TEXT_EVENT_STREAM_TYPE, "sse");
+        route.producesIncluding(MediaType.TEXT_EVENT_STREAM_TYPE, "sse");
         route.end(handler, settings -> {
             settings.produces(EVENT_STREAM);
             if (init != null) {

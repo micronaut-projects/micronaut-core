@@ -87,15 +87,15 @@ public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends Ro
      * released when the stream ends.
      *
      * <pre>{@code
-     * routes.POST("/completions").body(Prompt.class).sse((request, pathVariables, prompt, events) -> {
+     * routes.POST("/completions").body(Prompt.class).executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, prompt, events) -> {
      *     for (String token : model.generate(prompt)) {
      *         events.sendAndAwait(token);
      *     }
-     * }).executeOn(TaskExecutors.BLOCKING);
+     * });
      * }</pre>
      *
      * @param handler The handler
-     * @throws IllegalStateException if the route was already ended, or declared another media type with {@code produces}
+     * @throws IllegalStateException if the route was already ended, or declared media types without {@code text/event-stream} with {@code produces}
      * @see SseBodyHandler
      * @since 5.3.0
      */

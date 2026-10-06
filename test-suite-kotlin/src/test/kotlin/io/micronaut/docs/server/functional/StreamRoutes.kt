@@ -47,7 +47,9 @@ class StreamRoutes(@Named(TaskExecutors.SCHEDULED) private val scheduler: TaskSc
                 events.send(word)
             }
         }
-        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String::class.java).sse { request, pathVariables, message, events ->
+        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE)
+            .produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE) // <11>
+            .body(String::class.java).sse { request, pathVariables, message, events ->
             events.header("Session-Id", "s-1") // <9>
             when (message) {
                 "notify" -> events.respond(HttpResponse.accepted<Any>()) // <10>

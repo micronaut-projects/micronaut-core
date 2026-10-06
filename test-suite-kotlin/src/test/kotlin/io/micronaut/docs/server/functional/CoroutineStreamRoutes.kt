@@ -13,6 +13,7 @@ import jakarta.inject.Singleton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CompletableFuture
 
 @Requires(property = "spec.name", value = "CoroutineStreamRoutesTest")
@@ -48,6 +49,22 @@ class CoroutineStreamRoutes : HttpRoutes {
                     delay(5)
                 }
             }
+        }
+        routes.GET("/coroutine/error").sse { _, _, events ->
+            events.launch {
+                delay(5)
+                throw AssertionError("an error, not an exception")
+            }
+        }
+        routes.GET("/coroutine/timeout").sse { _, _, events ->
+            events.launch {
+                withTimeout(10) {
+                    delay(5_000)
+                }
+            }
+        }
+        routes.GET("/coroutine/error-numbers") { _, _ ->
+            HttpResponse.ok(flow<Int> { throw AssertionError("an error, not an exception") }.asResponseElements())
         }
         routes.GET("/coroutine/numbers") { _, _ ->
             HttpResponse.ok(flowOf(1, 2, 3).asResponseElements())

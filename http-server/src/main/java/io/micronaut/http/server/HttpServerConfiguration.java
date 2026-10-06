@@ -1518,8 +1518,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
 
         /**
          * The period of the heartbeat of a server-sent events stream: a comment sent when no event
-         * was sent for the period, see {@link io.micronaut.http.sse.SseEmitter#heartbeat}. A stream
-         * can change it. Default value: none.
+         * was sent for the period, see {@link io.micronaut.http.sse.SseEmitter#heartbeat}. It
+         * starts once the response of the stream is sent, and a stream can change it. Default
+         * value: none.
          *
          * @param sseHeartbeat The period, or {@code null} for no heartbeat
          */

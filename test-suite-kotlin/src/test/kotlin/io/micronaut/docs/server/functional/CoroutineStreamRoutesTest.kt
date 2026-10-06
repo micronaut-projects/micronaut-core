@@ -37,6 +37,13 @@ class CoroutineStreamRoutesTest {
                     http.retrieve(HttpRequest.GET<Any>("/coroutine/refused-numbers"))
                 }
                 assertEquals(HttpStatus.CONFLICT, conflict.status)
+                // an error, and a cancellation while the stream is open, fail the stream
+                for (path in listOf("/coroutine/error", "/coroutine/timeout", "/coroutine/error-numbers")) {
+                    val failed = assertThrows(HttpClientResponseException::class.java) {
+                        http.retrieve(HttpRequest.GET<Any>(path))
+                    }
+                    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, failed.status, path)
+                }
             }
             // the coroutine is cancelled when the client disconnects
             Socket("localhost", server.port).use { socket ->

@@ -321,9 +321,11 @@ public abstract class ResponseLifecycle {
             response.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, Boolean.TRUE);
         }
         List<MediaType> mediaTypes = List.of(mediaType);
-        // like a publisher body without a route: a JSON array unless the first element is raw bytes
+        // like a publisher body: with a route, a JSON array if the declared type of the elements
+        // can be one, and the writer of the route; else decided on the first element
+        boolean routeJson = routeInfo != null && jsonMediaType && routeInfo.isResponseBodyJsonFormattable();
         AtomicBoolean jsonFormattable = new AtomicBoolean(true);
-        BooleanSupplier isJson = () -> jsonMediaType && jsonFormattable.get();
+        BooleanSupplier isJson = routeInfo != null ? () -> routeJson : () -> jsonMediaType && jsonFormattable.get();
         PieceStream pieces = new PieceStream(request, response, isJson);
         ResponseStreams.ElementEncoder encoder = new ResponseStreams.ElementEncoder() {
             /**
@@ -332,7 +334,18 @@ public abstract class ResponseLifecycle {
             private boolean first = true;
 
             @Override
+            @SuppressWarnings("unchecked")
             public ExecutionFlow<CloseableByteBody> encode(Object element) {
+                if (routeInfo != null) {
+                    // like mapToHttpContent: the writer of the route, for the declared type
+                    MessageBodyWriter<Object> writer = routeInfo.getMessageBodyWriter();
+                    Argument<Object> type = (Argument<Object>) routeInfo.getResponseBodyType();
+                    if (writer == null || !type.isInstance(element) || !writer.isWriteable(type, finalMediaType)) {
+                        type = Argument.ofInstance(element);
+                        writer = wrap(messageBodyHandlerRegistry.getWriter(type, mediaTypes));
+                    }
+                    return pieces.write(writer, type, finalMediaType, element);
+                }
                 Argument<Object> type = Argument.ofInstance(element);
                 if (first) {
                     first = false;
