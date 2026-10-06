@@ -15,95 +15,52 @@
  */
 package io.micronaut.http.server.stream;
 
-import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.server.binding.ServerRequestBody;
-import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.TaskScheduler;
-import io.micronaut.web.router.RouteAttributes;
-import io.micronaut.web.router.RouteInfo;
-import io.micronaut.web.router.builder.SseResponder;
-import jakarta.inject.Named;
+import io.micronaut.web.router.builder.HandlerMethod;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
-import java.util.concurrent.Executor;
 
 /**
- * Binds the {@link SseResponder} of a server-sent events route, which creates its emitter. Bound
- * after the filters, so the emitter sees the request the filters continued with.
+ * Binds the {@link HandlerMethod.SseResponder} of a server-sent events route, which starts its
+ * stream. Bound after the filters, so the stream sees the request the filters continued with.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 @Singleton
-final class SseResponderArgumentBinder implements TypedRequestArgumentBinder<SseResponder>, PostponedRequestArgumentBinder<SseResponder> {
+final class SseResponderArgumentBinder implements TypedRequestArgumentBinder<HandlerMethod.SseResponder>, PostponedRequestArgumentBinder<HandlerMethod.SseResponder> {
 
-    private static final Argument<SseResponder> ARGUMENT = Argument.of(SseResponder.class);
+    private static final Argument<HandlerMethod.SseResponder> ARGUMENT = Argument.of(HandlerMethod.SseResponder.class);
 
-    private final BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry;
-    private final BeanProvider<TaskScheduler> scheduler;
-    private final HttpServerConfiguration serverConfiguration;
-    private final ConversionService conversionService;
+    private final SseEmitterFactory emitters;
 
-    SseResponderArgumentBinder(BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry,
-                               @Named(TaskExecutors.SCHEDULED) BeanProvider<TaskScheduler> scheduler,
-                               HttpServerConfiguration serverConfiguration,
-                               ConversionService conversionService) {
-        this.bodyHandlerRegistry = bodyHandlerRegistry;
-        this.scheduler = scheduler;
-        this.serverConfiguration = serverConfiguration;
-        this.conversionService = conversionService;
+    SseResponderArgumentBinder(SseEmitterFactory emitters) {
+        this.emitters = emitters;
     }
 
     @Override
-    public Argument<SseResponder> argumentType() {
+    public Argument<HandlerMethod.SseResponder> argumentType() {
         return ARGUMENT;
     }
 
     @Override
-    public BindingResult<SseResponder> bind(ArgumentConversionContext<SseResponder> context, HttpRequest<?> source) {
+    public BindingResult<HandlerMethod.SseResponder> bind(ArgumentConversionContext<HandlerMethod.SseResponder> context, HttpRequest<?> source) {
         ServerHttpRequest<?> server = ServerRequestBody.of(source);
         if (server == null) {
             return BindingResult.unsatisfied();
         }
-        // the route ran on this executor: a blocking handler runs as a new task on it, so that
-        // the response is sent while the handler still runs
-        RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(source).orElse(null);
-        Executor executor = routeInfo == null ? null : routeInfo.getExecutor(serverConfiguration.getThreadSelection());
-        // the emitter is the body of the response: it is closed when the stream ends
-        SseResponder responder = new DefaultSseEmitter(source, server.byteBodyFactory(), this, executor); // NOSONAR
+        ByteBodyFactory bodyFactory = server.byteBodyFactory();
+        HandlerMethod.SseResponder responder = handler -> emitters.start(source, bodyFactory, handler);
         return () -> Optional.of(responder);
-    }
-
-    /**
-     * @return The message body writers, which encode the data of the events
-     */
-    MessageBodyHandlerRegistry bodyHandlerRegistry() {
-        return bodyHandlerRegistry.get();
-    }
-
-    /**
-     * @return The scheduler of the heartbeats
-     */
-    TaskScheduler scheduler() {
-        return scheduler.get();
-    }
-
-    /**
-     * @return The conversion service
-     */
-    ConversionService conversionService() {
-        return conversionService;
     }
 }

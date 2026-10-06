@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -210,9 +211,26 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     @Override
     public void sse(SseHandler handler) {
         SseHandler checked = route.terminal(handler, "handler");
-        route.getOnly("sse");
-        // the event stream is the route's own type, not the type the group produces
-        route.end(() -> HandlerMethod.of(checked), settings -> settings.produces(EVENT_STREAM), RouteGroupDefaults.PRODUCES_SETTING);
+        endSse(route, () -> HandlerMethod.of(checked), null, 0);
+    }
+
+    /**
+     * End a server-sent events route: it produces {@code text/event-stream}, its own type and not
+     * the type its group produces, and nothing else.
+     *
+     * @param route   The route
+     * @param handler Creates the handler method of a route
+     * @param init    Gives a route the other settings of the terminal, or {@code null}
+     * @param own     The other settings of the terminal, which the routes do not inherit from their groups
+     */
+    static void endSse(PendingRoute route, Supplier<HandlerMethod<?>> handler, @Nullable Consumer<RouteSettings> init, int own) {
+        route.producesOnly(MediaType.TEXT_EVENT_STREAM_TYPE, "sse");
+        route.end(handler, settings -> {
+            settings.produces(EVENT_STREAM);
+            if (init != null) {
+                init.accept(settings);
+            }
+        }, own | RouteGroupDefaults.PRODUCES_SETTING);
     }
 
     /**

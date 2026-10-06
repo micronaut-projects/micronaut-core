@@ -40,9 +40,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
-import io.micronaut.http.body.ChunkSource;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ReleasableRequestBody;
+import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
@@ -759,8 +759,8 @@ public final class RouteExecutor {
             return response;
         }
         Object body = response.body();
-        if (body instanceof ChunkSource<?> source) {
-            return response.body(releaseWhenSourceCloses(request, source));
+        if (body instanceof ResponseElements<?> elements) {
+            return response.body(releaseWhenClosed(request, elements));
         }
         if (body == null || body instanceof HttpResponse<?> || !Publishers.isConvertibleToPublisher(body)) {
             return response;
@@ -773,41 +773,29 @@ public final class RouteExecutor {
     }
 
     /**
-     * Release the bodies the route of the request was invoked with when the {@link ChunkSource}
-     * body of its response is closed, like {@link #releaseWhenStreamEnds} does for a stream: the
-     * source may be made of the reads of the body. The server closes the source once when the
-     * response ends, fails, or the client disconnects. A source that is never written, e.g.
-     * replaced by a filter, leaves the bodies to the release when the request ends.
+     * Release the bodies the route of the request was invoked with when the
+     * {@link ResponseElements} body of its response is closed, like {@link #releaseWhenStreamEnds}
+     * does for a stream: the elements may be made of the reads of the body. The server closes
+     * them once: when the response ends, fails, or the client disconnects, or when a filter
+     * replaces the response.
      *
-     * @param request The request of the route
-     * @param source  The source of the response body
-     * @param <T>     The type of an element
-     * @return The source, which releases the bodies when it is closed
+     * @param request  The request of the route
+     * @param elements The elements of the response body
+     * @param <T>      The type of an element
+     * @return The elements, which release the bodies when they are closed
      */
-    private static <T> ChunkSource<T> releaseWhenSourceCloses(HttpRequest<?> request, ChunkSource<T> source) {
+    private static <T> ResponseElements<T> releaseWhenClosed(HttpRequest<?> request, ResponseElements<T> elements) {
         ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
         if (bodies == null) {
-            return source;
+            return elements;
         }
-        return new ChunkSource<>() {
-            private final AtomicBoolean closed = new AtomicBoolean();
-
-            @Override
-            public CompletionStage<Optional<T>> next() {
-                return source.next();
+        return ResponseElements.of(elements::next, () -> {
+            try {
+                elements.close();
+            } finally {
+                releaseLogged(request, bodies);
             }
-
-            @Override
-            public void close() {
-                if (closed.compareAndSet(false, true)) {
-                    try {
-                        source.close();
-                    } finally {
-                        releaseLogged(request, bodies);
-                    }
-                }
-            }
-        };
+        });
     }
 
     private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
@@ -816,9 +804,9 @@ public final class RouteExecutor {
             final Object o = response.getBody().orElse(null);
             if (o instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
-            } else if (o instanceof ChunkSource<?> source) {
-                // its elements are never pulled
-                ResponseStreams.discard(source);
+            } else if (o instanceof ResponseElements<?> elements) {
+                // they are never pulled
+                ResponseStreams.discard(elements);
             }
             response.body(null);
             if (o != null) {

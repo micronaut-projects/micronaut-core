@@ -38,7 +38,6 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
-import io.micronaut.http.body.ChunkSource;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ConcatenatingSubscriber;
 import io.micronaut.http.body.MediaTypeProvider;
@@ -46,6 +45,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
+import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -197,10 +197,10 @@ public abstract class ResponseLifecycle {
                 ((MutableHttpResponse<Object>) response).body(headBody);
                 return encodeBody(nettyRequest, response, headBody).map(this::discardContent);
             }
-            if (body instanceof ChunkSource<?> source) {
+            if (body instanceof ResponseElements<?> elements) {
                 // the response of a HEAD request: the elements are not written; the route
                 // executor discarded the body it moved aside already
-                ResponseStreams.discard(source);
+                ResponseStreams.discard(elements);
             }
             return encodeNoBody(response);
         } else if (body != null) {
@@ -246,9 +246,9 @@ public abstract class ResponseLifecycle {
             return encodeNoBody(response);
         }
 
-        if (body instanceof ChunkSource<?> source) {
+        if (body instanceof ResponseElements<?> elements) {
             response.body(null);
-            return encodeChunkSource(nettyRequest, response, source, routeInfo);
+            return encodeResponseElements(nettyRequest, response, elements, routeInfo);
         }
 
         if (Publishers.isConvertibleToPublisher(body)) {
@@ -292,23 +292,23 @@ public abstract class ResponseLifecycle {
     }
 
     /**
-     * Stream the elements of a {@link ChunkSource} body without Reactive Streams: like the
+     * Stream the elements of a {@link ResponseElements} body without Reactive Streams: like the
      * elements of a publisher body ({@link #mapToHttpContent}), each written with the writer of
      * its type for the media type of the response, and framed as a JSON array for a JSON media
-     * type. The source is pulled one element at a time while the connection keeps up. The
-     * response is sent once the first element (or the end) is available, so a failure of the
-     * first element is answered like a failure of the route.
+     * type. The elements are pulled one at a time while the connection keeps up. The response is
+     * sent once the first element (or the end) is available, so a failure of the first element
+     * is answered like a failure of the route.
      *
      * @param request   The request
      * @param response  The response
-     * @param source    The source
+     * @param elements  The elements
      * @param routeInfo The route, if any
      * @return The encoded response
      */
-    private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeChunkSource(HttpRequest<?> request,
-                                                                              MutableHttpResponse<?> response,
-                                                                              ChunkSource<?> source,
-                                                                              @Nullable RouteInfo<Object> routeInfo) {
+    private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeResponseElements(HttpRequest<?> request,
+                                                                                   MutableHttpResponse<?> response,
+                                                                                   ResponseElements<?> elements,
+                                                                                   @Nullable RouteInfo<Object> routeInfo) {
         MediaType mediaType = response.getContentType().orElse(null);
         if (mediaType == null) {
             mediaType = routeInfo != null ? routeExecutor.resolveDefaultResponseContentType(request, routeInfo) : MediaType.APPLICATION_JSON_TYPE;
@@ -323,13 +323,11 @@ public abstract class ResponseLifecycle {
         List<MediaType> mediaTypes = List.of(mediaType);
         ResponseStreams.ElementEncoder encoder = new ResponseStreams.ElementEncoder() {
             @Override
-            public ReadBuffer encode(Object element, byte @Nullable [] prefix) throws IOException {
+            public ReadBuffer encode(Object element, ResponseStreams.Framing framing, boolean first) throws IOException {
                 Argument<Object> type = Argument.ofInstance(element);
                 MessageBodyWriter<Object> writer = messageBodyHandlerRegistry.getWriter(type, mediaTypes);
                 return byteBodyFactory.readBufferFactory().buffer(out -> {
-                    if (prefix != null) {
-                        out.write(prefix);
-                    }
+                    framing.writePrefix(out, first);
                     // the headers of the response may already be sent: the elements are
                     // written after, on any thread
                     writer.writeTo(type, finalMediaType, element, new CaseInsensitiveMutableHttpHeaders(conversionService), out);
@@ -337,12 +335,15 @@ public abstract class ResponseLifecycle {
             }
 
             @Override
-            public boolean jsonArray(@Nullable Object firstElement) {
+            public ResponseStreams.Framing framing(@Nullable Object firstElement) {
                 // like a publisher body: a JSON array unless the elements are raw bytes
-                return jsonMediaType && (firstElement == null || isJsonFormattable(Argument.ofInstance(firstElement)));
+                return jsonMediaType && (firstElement == null || isJsonFormattable(Argument.ofInstance(firstElement)))
+                    ? ResponseStreams.Framing.JSON_ARRAY
+                    : ResponseStreams.Framing.NONE;
             }
         };
-        return ResponseStreams.stream(byteBodyFactory, source, encoder)
+        int highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
+        return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark)
             .<ByteBodyHttpResponse<?>>map(body -> ByteBodyHttpResponseWrapper.wrap(response, body))
             .onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));
     }

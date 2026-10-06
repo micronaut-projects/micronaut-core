@@ -78,4 +78,26 @@ public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends Ro
      * @throws IllegalStateException if the route was already ended
      */
     void handleAsync(AsyncBodyRequestHandler<B> handler);
+
+    /**
+     * End the route with a server-sent events handler that receives the body: the response is a
+     * {@code text/event-stream} of the events the handler pushes, see
+     * {@link HttpRouteSpec#sse(SseHandler)}. What the body stage bound, e.g. an
+     * {@link io.micronaut.http.body.AsyncRequestBody} the handler reads while it sends events, is
+     * released when the stream ends.
+     *
+     * <pre>{@code
+     * routes.POST("/completions").body(Prompt.class).sse((request, pathVariables, prompt, events) -> {
+     *     for (String token : model.generate(prompt)) {
+     *         events.sendAndAwait(token);
+     *     }
+     * }).executeOn(TaskExecutors.BLOCKING);
+     * }</pre>
+     *
+     * @param handler The handler
+     * @throws IllegalStateException if the route was already ended, or declared another media type with {@code produces}
+     * @see SseBodyHandler
+     * @since 5.3.0
+     */
+    void sse(SseBodyHandler<B> handler);
 }

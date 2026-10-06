@@ -25,6 +25,7 @@ import io.micronaut.web.router.RouteArguments;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -49,12 +50,11 @@ final class PendingRoute {
      */
     private final Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes;
     private final String description;
-    /**
-     * The URI template of a route of {@code GET} only, or {@code null}: only such a route may end
-     * with a terminal of a {@code GET} request, e.g. {@link HttpRouteSpec#sse(SseHandler)}.
-     */
-    private final @Nullable String getTemplate;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
+    /**
+     * The media types of the last {@code produces}, or {@code null}.
+     */
+    private MediaType @Nullable [] produces;
     private boolean ended;
 
     /**
@@ -63,39 +63,9 @@ final class PendingRoute {
      * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
      */
     PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes, String description) {
-        this(builder, routes, description, null);
-    }
-
-    /**
-     * @param builder     The builder that declared the route
-     * @param routes      Adds the routes of the handler
-     * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
-     * @param getTemplate The URI template of a route of {@code GET} only, or {@code null}
-     */
-    PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
-                 String description, @Nullable String getTemplate) {
         this.builder = builder;
         this.routes = routes;
         this.description = description;
-        this.getTemplate = getTemplate;
-    }
-
-    /**
-     * Check that a terminal of a {@code GET} request ends a route of {@code GET} only. Any other
-     * route is dropped and the terminal fails.
-     *
-     * @param terminal The name of the terminal, for the message
-     * @return The URI template of the route, under the prefix
-     * @throws IllegalStateException if the route is not a route of {@code GET} only
-     */
-    String getOnly(String terminal) {
-        String template = getTemplate;
-        if (template == null) {
-            drop();
-            throw new IllegalStateException("The route " + description + " cannot end with " + terminal
-                + ": it is a terminal of a GET route, e.g. GET(uri)." + terminal + "(...)");
-        }
-        return template;
     }
 
     /**
@@ -159,10 +129,33 @@ final class PendingRoute {
     }
 
     /**
+     * Check that the route produces nothing but the media type its terminal writes, e.g. the
+     * {@code text/event-stream} of {@link HttpRouteSpec#sse}: a route that declared another one
+     * would negotiate a type it does not write. Such a route is dropped and the terminal fails.
+     *
+     * @param mediaType The media type the terminal writes
+     * @param terminal  The name of the terminal, for the message
+     * @throws IllegalStateException if the route declared another media type
+     */
+    void producesOnly(MediaType mediaType, String terminal) {
+        MediaType[] declared = produces;
+        if (declared == null) {
+            return;
+        }
+        for (MediaType type : declared) {
+            if (!type.getName().equals(mediaType.getName())) {
+                drop();
+                throw new IllegalStateException("The route " + description + " produces " + Arrays.toString(declared)
+                    + ", but " + terminal + " writes " + mediaType + ": remove produces(...)");
+            }
+        }
+    }
+
+    /**
      * Drop the route: its terminal failed, so the startup does not fail again for a route with
      * no terminal.
      */
-    void drop() {
+    private void drop() {
         ended = true;
         builder.dropPending(this);
     }
@@ -191,6 +184,7 @@ final class PendingRoute {
     void produces(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
         addSetting(added -> added.produces(checked));
+        produces = checked;
     }
 
     void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {

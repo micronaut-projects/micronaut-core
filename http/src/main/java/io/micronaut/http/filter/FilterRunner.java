@@ -26,8 +26,12 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +58,8 @@ import java.util.function.BiFunction;
  */
 @Internal
 public class FilterRunner {
+
+    private static final Logger LOG = LoggerFactory.getLogger(FilterRunner.class);
 
     @Nullable
     private final List<InternalHttpFilter> preMatchingFilters;
@@ -501,15 +507,29 @@ public class FilterRunner {
     }
 
     /**
-     * Close a response that carries body bytes when a filter drops it, i.e. when the response
-     * replacing it does not carry the same bytes.
+     * Close a response that carries body bytes, or {@link ResponseElements}, when a filter drops
+     * it, i.e. when the response replacing it does not carry the same body.
      *
      * @param previous The previous response
      * @param next     The response replacing it, or {@code null} if it was replaced by a failure
      */
     private static void closeReplacedResponse(@Nullable HttpResponse<?> previous, @Nullable HttpResponse<?> next) {
-        if (previous instanceof ByteBodyHttpResponse<?> byteBodyResponse && previous != next && !carriesBytes(next, byteBodyResponse.byteBody())) {
-            byteBodyResponse.close();
+        if (previous == null || previous == next) {
+            return;
+        }
+        if (previous instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+            if (!carriesBytes(next, byteBodyResponse.byteBody())) {
+                byteBodyResponse.close();
+            }
+        } else if (previous instanceof MutableHttpResponse<?> mutable && mutable.body() instanceof ResponseElements<?> elements
+            && !(next instanceof MutableHttpResponse<?> nextMutable && nextMutable.body() == elements)) {
+            // only a mutable response holds its body as it is: reading the body of another, e.g.
+            // of a client response, may convert it
+            try {
+                elements.close();
+            } catch (Throwable e) {
+                LOG.warn("Failed to close the elements of a response replaced by a filter", e);
+            }
         }
     }
 

@@ -17,8 +17,10 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * The elements of a streamed response body, pulled one at a time by the server as the connection
@@ -28,9 +30,9 @@ import java.util.concurrent.CompletionStage;
  * without Reactive Streams:
  *
  * <pre>{@code
- * routes.GET("/books", (request, variables) -> {
+ * routes.GET("/books", (request, pathVariables) -> {
  *     Cursor<Book> cursor = books.open();
- *     return HttpResponse.ok((ChunkSource<Book>) () -> cursor.nextAsync())
+ *     return HttpResponse.ok(ResponseElements.of(cursor::nextAsync, cursor::close))
  *         .contentType(MediaType.APPLICATION_JSON_TYPE);
  * });
  * }</pre>
@@ -43,16 +45,16 @@ import java.util.concurrent.CompletionStage;
  * (the connection is closed), since the status was already sent.</p>
  *
  * <p>Backpressure: {@link #next()} is called again only after the stage it returned completed,
- * and only while the bytes the connection has not taken yet stay below a high-water mark. A slow
- * client therefore pauses the source instead of buffering its elements. {@link #next()} is called
- * on a thread of the server, usually the event loop of the connection, or on the thread that
- * completed the previous stage: it must not block, and should return a stage that another thread
- * completes if producing the element takes time.</p>
+ * and only while the bytes the connection has not taken yet stay below a high-water mark
+ * ({@code micronaut.server.responses.stream.high-water-mark}). A slow client therefore pauses the
+ * elements instead of buffering them. {@link #next()} is called on a thread of the server,
+ * usually the event loop of the connection, or on the thread that completed the previous stage:
+ * it must not block, and should return a stage that another thread completes if producing the
+ * element takes time.</p>
  *
- * <p>{@link #close()} is called once when the response ends: after the end, after a failure,
- * when the client disconnects, and when the body is not written at all (a {@code HEAD} request).
- * A source whose response is replaced before it is written (by a filter, for example) is not
- * closed, so a source should acquire its resources on the first {@link #next()}.</p>
+ * <p>{@link #close()} is called once when the response ends: after the end, after a failure, when
+ * the client disconnects, when the body is not written at all (a {@code HEAD} request), and when a
+ * filter replaces the response.</p>
  *
  * @param <T> The type of an element
  * @author Denis Stepanov
@@ -60,7 +62,7 @@ import java.util.concurrent.CompletionStage;
  */
 @Experimental
 @FunctionalInterface
-public interface ChunkSource<T> extends AutoCloseable {
+public interface ResponseElements<T> extends AutoCloseable {
 
     /**
      * The next element. Called by the server, one call at a time.
@@ -71,11 +73,53 @@ public interface ChunkSource<T> extends AutoCloseable {
     CompletionStage<Optional<T>> next();
 
     /**
-     * Release the resources of the source: the response ended, failed, the client disconnected,
+     * Release the resources of the elements: the response ended, failed, the client disconnected,
      * or the body is not written. Called once, and not while a {@link #next()} stage is pending
      * unless the client disconnected.
      */
     @Override
     default void close() {
+    }
+
+    /**
+     * The elements a function produces, e.g. the next row of a cursor.
+     *
+     * @param next Produces the next element, see {@link #next()}
+     * @param <T>  The type of an element
+     * @return The elements
+     */
+    static <T> ResponseElements<T> of(Supplier<? extends CompletionStage<Optional<T>>> next) {
+        Objects.requireNonNull(next, "next");
+        return next::get;
+    }
+
+    /**
+     * The elements a function produces, with the resources a callback releases, e.g. the next row
+     * of a cursor and closing the cursor.
+     *
+     * @param next  Produces the next element, see {@link #next()}
+     * @param close Releases the resources, see {@link #close()}
+     * @param <T>   The type of an element
+     * @return The elements
+     */
+    static <T> ResponseElements<T> of(Supplier<? extends CompletionStage<Optional<T>>> next, Runnable close) {
+        Objects.requireNonNull(next, "next");
+        Objects.requireNonNull(close, "close");
+        return new ResponseElements<>() {
+            @Override
+            public CompletionStage<Optional<T>> next() {
+                return next.get();
+            }
+
+            @Override
+            public void close() {
+                close.run();
+            }
+
+            @Override
+            public String toString() {
+                return next.toString();
+            }
+        };
     }
 }

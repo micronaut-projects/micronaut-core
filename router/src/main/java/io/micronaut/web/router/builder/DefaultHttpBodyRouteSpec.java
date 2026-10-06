@@ -186,6 +186,19 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
         }
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public void sse(SseBodyHandler<B> handler) {
+        SseBodyHandler<B> checked = route.terminal(handler, "handler");
+        Argument<B> type = bodyType;
+        if (type == null) {
+            SseBodyHandler<FormData> form = (SseBodyHandler<FormData>) checked;
+            DefaultHttpRouteSpec.endSse(route, () -> HandlerMethod.formSse(form), DefaultHttpBodyRouteSpec::consumesForms, RouteGroupDefaults.CONSUMES_SETTING);
+        } else {
+            DefaultHttpRouteSpec.endSse(route, () -> HandlerMethod.ofSse(type, checked), null, 0);
+        }
+    }
+
     /**
      * A form route consumes the form media types whatever its group consumes, unless it says
      * otherwise.

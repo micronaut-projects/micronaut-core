@@ -166,6 +166,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     private Duration idleTimeout = Duration.ofMinutes(DEFAULT_IDLE_TIME_MINUTES);
     private MultipartConfiguration multipart = new MultipartConfiguration();
     private CorsConfiguration cors = new CorsConfiguration();
+    private ResponseStreamConfiguration responseStream = new ResponseStreamConfiguration();
     @Nullable
     private String serverHeader;
     private boolean dateHeader = DEFAULT_DATEHEADER;
@@ -335,6 +336,15 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      */
     public CorsConfiguration getCors() {
         return cors;
+    }
+
+    /**
+     * @return Configuration for the streamed response bodies written without Reactive Streams
+     * @since 5.3.0
+     */
+    @Experimental
+    public ResponseStreamConfiguration getResponseStream() {
+        return responseStream;
     }
 
     /**
@@ -576,6 +586,17 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      */
     public void setCors(CorsConfiguration cors) {
         this.cors = cors;
+    }
+
+    /**
+     * Sets the configuration of the streamed response bodies written without Reactive Streams.
+     *
+     * @param responseStream The configuration
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setResponseStream(ResponseStreamConfiguration responseStream) {
+        this.responseStream = responseStream;
     }
 
     /**
@@ -1442,6 +1463,71 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
             public boolean getPublic() {
                 return publicCache;
             }
+        }
+    }
+
+    /**
+     * Configuration of the streamed response bodies written without Reactive Streams: the events
+     * of an {@link io.micronaut.http.sse.SseEmitter}, and the elements of a
+     * {@link io.micronaut.http.body.ResponseElements} body.
+     *
+     * @since 5.3.0
+     */
+    @Experimental
+    @ConfigurationProperties("responses.stream")
+    public static class ResponseStreamConfiguration {
+
+        /**
+         * The default high-water mark, in bytes.
+         */
+        public static final int DEFAULT_HIGH_WATER_MARK = 64 * 1024;
+
+        private int highWaterMark = DEFAULT_HIGH_WATER_MARK;
+        @Nullable
+        private Duration sseHeartbeat;
+
+        /**
+         * @return The high-water mark, in bytes
+         */
+        public int getHighWaterMark() {
+            return highWaterMark;
+        }
+
+        /**
+         * The bytes of a streamed response the connection may not have taken yet before the
+         * stream waits: the send of an event completes, and the next element is pulled, only
+         * below it. An event stream fails when sixteen times as many are queued. Default value
+         * ({@value #DEFAULT_HIGH_WATER_MARK}).
+         *
+         * @param highWaterMark The high-water mark, in bytes, positive
+         */
+        public void setHighWaterMark(@ReadableBytes int highWaterMark) {
+            if (highWaterMark <= 0) {
+                throw new IllegalArgumentException("The high-water mark must be positive: " + highWaterMark);
+            }
+            this.highWaterMark = highWaterMark;
+        }
+
+        /**
+         * @return The heartbeat period of a server-sent events stream, or {@code null} for none
+         */
+        @Nullable
+        public Duration getSseHeartbeat() {
+            return sseHeartbeat;
+        }
+
+        /**
+         * The period of the heartbeat of a server-sent events stream: a comment sent when no event
+         * was sent for the period, see {@link io.micronaut.http.sse.SseEmitter#heartbeat}. A stream
+         * can change it. Default value: none.
+         *
+         * @param sseHeartbeat The period, or {@code null} for no heartbeat
+         */
+        public void setSseHeartbeat(@Nullable Duration sseHeartbeat) {
+            if (sseHeartbeat != null && sseHeartbeat.isNegative()) {
+                throw new IllegalArgumentException("The heartbeat period must not be negative: " + sseHeartbeat);
+            }
+            this.sseHeartbeat = sseHeartbeat == null || sseHeartbeat.isZero() ? null : sseHeartbeat;
         }
     }
 }

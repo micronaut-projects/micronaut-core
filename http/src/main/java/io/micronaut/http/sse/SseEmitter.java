@@ -28,14 +28,24 @@ import java.util.function.Consumer;
  * route. The events are encoded like the events of a {@code Publisher<Event>} body: the data of
  * an event is written as is if it is a {@link CharSequence}, and as JSON otherwise.
  *
+ * <h2>The end of the stream</h2>
+ * <p>The stream ends when the handler of the route returns: it is completed, or failed with the
+ * exception the handler threw. A handler that sends its events later, from callbacks or another
+ * thread, calls {@link #keepOpen()} before it returns, and ends the stream with
+ * {@link #complete()} or {@link #fail(Throwable)}. The stream also ends when the client
+ * disconnects.</p>
+ *
  * <h2>The response</h2>
  * <p>The response ({@code 200}, {@code text/event-stream}, {@code Cache-Control: no-cache}, never
- * compressed) is sent when the first event, comment or heartbeat is sent, or when the stream is
- * completed. Until then the stream can still be refused: {@link #fail(Throwable)} (or an exception
- * thrown by the handler) is answered by the error handling of the route, exactly like an exception
- * of any other route. After that, a failure ends the response abruptly: it is logged, and the
- * connection is closed. To send the response before the first event, send a
- * {@link #comment(String) comment} or configure a {@link #heartbeat(Duration) heartbeat}.</p>
+ * compressed) is sent when the first event, comment or heartbeat is sent, or when the stream ends.
+ * Until then the stream can still be refused: an exception of the handler, or
+ * {@link #fail(Throwable)}, is answered by the error handling of the route, exactly like an
+ * exception of any other route, and {@link #header} adds headers to the response. After that, a
+ * failure ends the response abruptly: it is logged, and the connection is closed. To send the
+ * response before the first event, send a {@link #comment(String) comment} or configure a
+ * {@link #heartbeat(Duration) heartbeat}. Until the response is sent, a disconnect of the client
+ * is noticed only by the next send: a stream that waits for its first event should send a comment
+ * or a heartbeat first.</p>
  *
  * <h2>Backpressure</h2>
  * <p>The stream counts the bytes the connection has not taken yet: bytes of events that are queued
@@ -47,11 +57,11 @@ import java.util.function.Consumer;
  * whether a send would complete immediately, for senders that would rather drop events than wait,
  * such as a broadcast to many clients.</p>
  * <p>The queue is bounded: a send while sixteen times the high-water mark are already queued fails
- * with a {@link io.micronaut.http.exceptions.ConnectionClosedException}, and ends the stream, since
- * the client would otherwise miss events. A sender that awaits its sends never reaches the
+ * with a {@link io.micronaut.http.exceptions.StreamOverflowException}, and ends the stream,
+ * since the client would otherwise miss events. A sender that awaits its sends never reaches the
  * bound.</p>
  *
- * <h2>Threads and the end of the stream</h2>
+ * <h2>Threads</h2>
  * <p>All methods can be called from any thread. The events are written in the order their sends
  * were called. The stages complete, and the {@link #onClose} callbacks run, on a thread chosen by
  * the server, usually the event loop of the connection, with the propagated context of the route
@@ -63,12 +73,7 @@ import java.util.function.Consumer;
  * @since 5.3.0
  */
 @Experimental
-public interface SseEmitter extends AutoCloseable {
-
-    /**
-     * The default {@link #highWaterMark(int) high-water mark}, in bytes.
-     */
-    int DEFAULT_HIGH_WATER_MARK = 64 * 1024;
+public interface SseEmitter {
 
     /**
      * Send an event.
@@ -83,7 +88,7 @@ public interface SseEmitter extends AutoCloseable {
     /**
      * Send an event with the given data.
      *
-     * @param data The data of the event
+     * @param data The data of the event, or an {@link Event}
      * @return Completes like {@link #send(Event)}
      */
     default CompletionStage<Void> send(Object data) {
@@ -106,10 +111,22 @@ public interface SseEmitter extends AutoCloseable {
      * @throws InterruptedException           if the thread was interrupted while waiting: the event
      *                                        may still be sent
      * @throws IllegalStateException          if called on an event loop thread, which must not
-     *                                        block, or if the stream is closed
+     *                                        block, or if the stream was completed or failed
      * @throws io.micronaut.http.exceptions.ConnectionClosedException if the client disconnected
+     * @throws io.micronaut.http.exceptions.StreamOverflowException if the queue overflowed
      */
     void sendAndAwait(Event<?> event) throws InterruptedException;
+
+    /**
+     * Send an event with the given data, and wait until its stage completes, see
+     * {@link #sendAndAwait(Event)}.
+     *
+     * @param data The data of the event, or an {@link Event}
+     * @throws InterruptedException if the thread was interrupted while waiting
+     */
+    default void sendAndAwait(Object data) throws InterruptedException {
+        sendAndAwait(data instanceof Event<?> event ? event : Event.of(data));
+    }
 
     /**
      * Whether a send would complete immediately: the stream is open, and the bytes the
@@ -135,9 +152,34 @@ public interface SseEmitter extends AutoCloseable {
     Optional<String> lastEventId();
 
     /**
+     * Add a header to the response, before it is sent: before the first event, comment or
+     * heartbeat, e.g. {@code X-Accel-Buffering: no} for a proxy that would buffer the stream. The
+     * status and the {@code Content-Type} of the response cannot be changed: to answer with
+     * another status, throw an exception or {@link #fail(Throwable) fail} the stream.
+     *
+     * @param name  The name of the header
+     * @param value The value
+     * @return This emitter
+     * @throws IllegalStateException    if the response was already sent
+     * @throws IllegalArgumentException if the header is {@code Content-Type}
+     */
+    SseEmitter header(CharSequence name, CharSequence value);
+
+    /**
+     * Keep the stream open after the handler returns: the handler sends the events later, from
+     * callbacks or another thread, and ends the stream with {@link #complete()} or
+     * {@link #fail(Throwable)}. Without it, the stream ends when the handler returns.
+     *
+     * @return This emitter
+     * @throws IllegalStateException if the handler already returned
+     */
+    SseEmitter keepOpen();
+
+    /**
      * Send a comment line when no event was sent for the given period, to keep the connection
      * and the proxies on the way from timing it out as idle. The first heartbeat sends the
      * response if no event was sent yet. Heartbeats are skipped while the stream is not writable.
+     * The default is {@code micronaut.server.responses.stream.sse-heartbeat}, none if not set.
      *
      * @param period The period, {@link Duration#ZERO} to stop the heartbeat
      * @return This emitter
@@ -146,7 +188,8 @@ public interface SseEmitter extends AutoCloseable {
 
     /**
      * Change the high-water mark: the number of queued bytes the connection has not taken yet
-     * above which sends wait. The default is {@link #DEFAULT_HIGH_WATER_MARK}.
+     * above which sends wait. The default is
+     * {@code micronaut.server.responses.stream.high-water-mark}, 64 KiB if not set.
      *
      * @param bytes The high-water mark, positive
      * @return This emitter
@@ -178,12 +221,4 @@ public interface SseEmitter extends AutoCloseable {
      * @param cause The failure
      */
     void fail(Throwable cause);
-
-    /**
-     * {@link #complete() Complete} the stream.
-     */
-    @Override
-    default void close() {
-        complete();
-    }
 }

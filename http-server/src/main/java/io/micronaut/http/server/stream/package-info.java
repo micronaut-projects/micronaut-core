@@ -15,7 +15,7 @@
  */
 /**
  * Streamed response bodies pushed or pulled without Reactive Streams: server-sent events and
- * chunk sources.
+ * response elements.
  *
  * @author Denis Stepanov
  * @since 5.3.0

@@ -23,7 +23,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.BodyElements;
-import io.micronaut.http.body.ChunkSource;
+import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.tck.AssertionUtils;
@@ -60,18 +60,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A {@link ChunkSource} response body: the server pulls its elements one at a time, while the
+ * A {@link ResponseElements} response body: the server pulls its elements one at a time, while the
  * client keeps up, and writes them like the elements of a publisher body, without Reactive
- * Streams. The source is closed when the response ends, fails, the client disconnects, or the
- * body is not written.
+ * Streams. The elements are closed when the response ends, fails, the client disconnects, the
+ * body is not written, or a filter replaces the response.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class HandlerRouteChunkSourceTest {
-    public static final String SPEC_NAME = "HandlerRouteChunkSourceTest";
+public class HandlerRouteResponseElementsTest {
+    public static final String SPEC_NAME = "HandlerRouteResponseElementsTest";
     private static final int CHUNK = 64 * 1024;
     private static final int LARGE_CHUNKS = 128;
     private static final int SLOW_ELEMENTS = 20_000;
@@ -80,12 +80,12 @@ public class HandlerRouteChunkSourceTest {
     @Test
     void jsonElementsAreAnArray() throws Exception {
         try (ServerUnderTest server = server()) {
-            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/chunks/json"), HttpResponseAssertion.builder()
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/elements/json"), HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("[{\"n\":1},{\"n\":2},{\"n\":3}]")
                 .build());
             assertClosed(server, "json");
-            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/chunks/empty"), HttpResponseAssertion.builder()
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/elements/empty"), HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("[]")
                 .build());
@@ -98,7 +98,7 @@ public class HandlerRouteChunkSourceTest {
         try (ServerUnderTest server = server()) {
             // the reads of the body stay open until the source is closed, after the route completed
             AssertionUtils.assertDoesNotThrow(server,
-                HttpRequest.POST("/chunks/echo", "[\"a\",\"b\",\"c\"]").contentType(MediaType.APPLICATION_JSON_TYPE),
+                HttpRequest.POST("/elements/echo", "[\"a\",\"b\",\"c\"]").contentType(MediaType.APPLICATION_JSON_TYPE),
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .body("[\"a\",\"b\",\"c\"]")
@@ -109,7 +109,7 @@ public class HandlerRouteChunkSourceTest {
     @Test
     void elementsThatCompleteLater() throws Exception {
         try (ServerUnderTest server = server()) {
-            HttpResponse<String> response = server.exchange(HttpRequest.GET("/chunks/async"), String.class);
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/elements/async"), String.class);
             assertEquals("abcdefghij", response.body());
             assertTrue(response.getHeaders().get(HttpHeaders.CONTENT_TYPE).startsWith(MediaType.TEXT_PLAIN));
             assertClosed(server, "async");
@@ -119,7 +119,7 @@ public class HandlerRouteChunkSourceTest {
     @Test
     void largeBody() throws Exception {
         try (ServerUnderTest server = server()) {
-            HttpResponse<byte[]> response = server.exchange(HttpRequest.GET("/chunks/large"), byte[].class);
+            HttpResponse<byte[]> response = server.exchange(HttpRequest.GET("/elements/large"), byte[].class);
             byte[] body = response.body();
             assertEquals(LARGE_CHUNKS * CHUNK, body.length);
             byte[] expected = new byte[CHUNK];
@@ -134,7 +134,7 @@ public class HandlerRouteChunkSourceTest {
     @Test
     void eventStream() throws Exception {
         try (ServerUnderTest server = server()) {
-            HttpResponse<String> response = server.exchange(HttpRequest.GET("/chunks/events"), String.class);
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/elements/events"), String.class);
             assertTrue(response.getHeaders().get(HttpHeaders.CONTENT_TYPE).startsWith(MediaType.TEXT_EVENT_STREAM));
             assertEquals("id: 1\ndata: a\n\nid: 2\ndata: b\n\n", response.body());
         }
@@ -143,7 +143,7 @@ public class HandlerRouteChunkSourceTest {
     @Test
     void failureOfTheFirstElementIsAnsweredLikeAnErrorOfTheRoute() throws Exception {
         try (ServerUnderTest server = server()) {
-            AssertionUtils.assertThrows(server, HttpRequest.GET("/chunks/refuse"), HttpResponseAssertion.builder()
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/elements/refuse"), HttpResponseAssertion.builder()
                 .status(HttpStatus.CONFLICT)
                 .build());
             assertClosed(server, "refuse");
@@ -154,7 +154,7 @@ public class HandlerRouteChunkSourceTest {
     void failureOfALaterElementEndsTheResponseAbruptly() throws Exception {
         try (ServerUnderTest server = server();
              Socket socket = connect(server)) {
-            request(socket, "GET /chunks/break HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            request(socket, "GET /elements/break HTTP/1.1\r\nHost: localhost\r\n\r\n");
             String received = readToEnd(socket.getInputStream());
             assertTrue(received.startsWith("HTTP/1.1 200"), received);
             assertTrue(received.contains("first"), received);
@@ -166,7 +166,7 @@ public class HandlerRouteChunkSourceTest {
     @Test
     void headRequestClosesTheSourceWithoutPullingIt() throws Exception {
         try (ServerUnderTest server = server()) {
-            HttpResponse<String> response = server.exchange(HttpRequest.HEAD("/chunks/head"), String.class);
+            HttpResponse<String> response = server.exchange(HttpRequest.HEAD("/elements/head"), String.class);
             assertEquals(HttpStatus.OK, response.getStatus());
             assertTrue(response.getBody(String.class).orElse("").isEmpty());
             assertClosed(server, "head");
@@ -179,7 +179,7 @@ public class HandlerRouteChunkSourceTest {
         try (ServerUnderTest server = server();
              Socket socket = connect(server)) {
             Recorder recorder = recorder(server);
-            request(socket, "GET /chunks/slow HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+            request(socket, "GET /elements/slow HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             // the client does not read: the source must not be pulled once the buffers are full
             Thread.sleep(2000);
             int pulledWhileStalled = recorder.pulled.get();
@@ -194,10 +194,19 @@ public class HandlerRouteChunkSourceTest {
     void clientDisconnectClosesTheSource() throws Exception {
         try (ServerUnderTest server = server()) {
             try (Socket socket = connect(server)) {
-                request(socket, "GET /chunks/endless HTTP/1.1\r\nHost: localhost\r\n\r\n");
+                request(socket, "GET /elements/endless HTTP/1.1\r\nHost: localhost\r\n\r\n");
                 readUntil(socket.getInputStream(), "tick");
             }
             assertClosed(server, "endless");
+        }
+    }
+
+    @Test
+    void responseReplacedByAFilterClosesTheElements() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/elements/replaced"), String.class);
+            assertEquals("replaced", response.body());
+            assertClosed(server, "replaced");
         }
     }
 
@@ -227,19 +236,11 @@ public class HandlerRouteChunkSourceTest {
         /**
          * A source of the given elements that records when it is closed.
          */
-        <T> ChunkSource<T> source(String key, Iterator<T> elements) {
-            return new ChunkSource<>() {
-                @Override
-                public CompletionStage<Optional<T>> next() {
-                    pulled.incrementAndGet();
-                    return CompletableFuture.completedFuture(elements.hasNext() ? Optional.of(elements.next()) : Optional.empty());
-                }
-
-                @Override
-                public void close() {
-                    closed(key).complete(null);
-                }
-            };
+        <T> ResponseElements<T> source(String key, Iterator<T> elements) {
+            return ResponseElements.of(() -> {
+                pulled.incrementAndGet();
+                return CompletableFuture.completedFuture(elements.hasNext() ? Optional.of(elements.next()) : Optional.empty());
+            }, () -> closed(key).complete(null));
         }
 
         @PreDestroy
@@ -253,20 +254,19 @@ public class HandlerRouteChunkSourceTest {
     static class Routes {
 
         @Singleton
-        HttpRoutes chunkRoutes(Recorder recorder) {
+        HttpRoutes elementRoutes(Recorder recorder) {
             return routes -> {
-                routes.GET("/chunks/json", (request, pathVariables) -> HttpResponse.ok(
+                routes.GET("/elements/json", (request, pathVariables) -> HttpResponse.ok(
                     recorder.source("json", List.of(Map.of("n", 1), Map.of("n", 2), Map.of("n", 3)).iterator())));
-                routes.POST("/chunks/echo").body().handleAsync((request, pathVariables, body) -> {
+                routes.POST("/elements/echo").body().handleAsync((request, pathVariables, body) -> {
                     BodyElements<String> elements = body.elements(String.class);
-                    ChunkSource<String> source = elements::next;
-                    return CompletableFuture.completedStage(HttpResponse.ok(source).contentType(MediaType.APPLICATION_JSON_TYPE));
+                    return CompletableFuture.completedStage(HttpResponse.ok(ResponseElements.of(elements::next)).contentType(MediaType.APPLICATION_JSON_TYPE));
                 });
-                routes.GET("/chunks/empty", (request, pathVariables) -> HttpResponse.ok(
+                routes.GET("/elements/empty", (request, pathVariables) -> HttpResponse.ok(
                     recorder.source("empty", List.of().iterator())));
-                routes.GET("/chunks/async", (request, pathVariables) -> {
+                routes.GET("/elements/async", (request, pathVariables) -> {
                     Iterator<String> letters = List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j").iterator();
-                    ChunkSource<String> source = new ChunkSource<>() {
+                    ResponseElements<String> source = new ResponseElements<>() {
                         @Override
                         public CompletionStage<Optional<String>> next() {
                             CompletableFuture<Optional<String>> next = new CompletableFuture<>();
@@ -281,7 +281,7 @@ public class HandlerRouteChunkSourceTest {
                     };
                     return HttpResponse.ok(source).contentType(MediaType.TEXT_PLAIN_TYPE);
                 });
-                routes.GET("/chunks/large", (request, pathVariables) -> HttpResponse.ok(recorder.source("large", new Iterator<byte[]>() {
+                routes.GET("/elements/large", (request, pathVariables) -> HttpResponse.ok(recorder.source("large", new Iterator<byte[]>() {
                     int i;
 
                     @Override
@@ -296,9 +296,9 @@ public class HandlerRouteChunkSourceTest {
                         return chunk;
                     }
                 })).contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE));
-                routes.GET("/chunks/events", (request, pathVariables) -> HttpResponse.ok(recorder.source("events",
+                routes.GET("/elements/events", (request, pathVariables) -> HttpResponse.ok(recorder.source("events",
                     List.of(Event.of("a").id("1"), Event.of("b").id("2")).iterator())).contentType(MediaType.TEXT_EVENT_STREAM_TYPE));
-                routes.GET("/chunks/refuse", (request, pathVariables) -> HttpResponse.ok(new ChunkSource<String>() {
+                routes.GET("/elements/refuse", (request, pathVariables) -> HttpResponse.ok(new ResponseElements<String>() {
                     @Override
                     public CompletionStage<Optional<String>> next() {
                         return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.CONFLICT, "conflict"));
@@ -309,9 +309,9 @@ public class HandlerRouteChunkSourceTest {
                         recorder.closed("refuse").complete(null);
                     }
                 }));
-                routes.GET("/chunks/break", (request, pathVariables) -> {
+                routes.GET("/elements/break", (request, pathVariables) -> {
                     AtomicInteger calls = new AtomicInteger();
-                    ChunkSource<String> source = new ChunkSource<>() {
+                    ResponseElements<String> source = new ResponseElements<>() {
                         @Override
                         public CompletionStage<Optional<String>> next() {
                             if (calls.getAndIncrement() == 0) {
@@ -329,9 +329,9 @@ public class HandlerRouteChunkSourceTest {
                     };
                     return HttpResponse.ok(source).contentType(MediaType.TEXT_PLAIN_TYPE);
                 });
-                routes.GET("/chunks/head", (request, pathVariables) -> HttpResponse.ok(recorder.source("head", List.of("never").iterator()))
+                routes.GET("/elements/head", (request, pathVariables) -> HttpResponse.ok(recorder.source("head", List.of("never").iterator()))
                     .contentType(MediaType.TEXT_PLAIN_TYPE));
-                routes.GET("/chunks/slow", (request, pathVariables) -> HttpResponse.ok(recorder.source("slow", new Iterator<String>() {
+                routes.GET("/elements/slow", (request, pathVariables) -> HttpResponse.ok(recorder.source("slow", new Iterator<String>() {
                     int i;
 
                     @Override
@@ -345,7 +345,11 @@ public class HandlerRouteChunkSourceTest {
                         return KILOBYTE;
                     }
                 })).contentType(MediaType.TEXT_PLAIN_TYPE));
-                routes.GET("/chunks/endless", (request, pathVariables) -> HttpResponse.ok(recorder.source("endless", new Iterator<String>() {
+                routes.GET("/elements/replaced")
+                    .afterReplacing((request, response) -> HttpResponse.ok("replaced").contentType(MediaType.TEXT_PLAIN_TYPE)).and()
+                    .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("replaced", List.of("never").iterator()))
+                        .contentType(MediaType.TEXT_PLAIN_TYPE));
+                routes.GET("/elements/endless", (request, pathVariables) -> HttpResponse.ok(recorder.source("endless", new Iterator<String>() {
                     @Override
                     public boolean hasNext() {
                         return true;

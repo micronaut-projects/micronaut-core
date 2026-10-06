@@ -31,6 +31,7 @@ import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.exceptions.ConnectionClosedException;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.exceptions.StreamOverflowException;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.sse.SseEmitter;
 import io.micronaut.http.tck.AssertionUtils;
@@ -77,8 +78,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Server-sent events routes of the route builder: the handler pushes events to an
  * {@link SseEmitter}, without Reactive Streams. The events keep their order and fields, the
  * response is sent with the first event (so that a failure before is answered by the error
- * routes), a slow client pauses the sender, a disconnect closes the emitter, and the stream is
- * never compressed.
+ * routes), the stream ends when the handler returns unless it keeps it open, a slow client
+ * pauses the sender, a disconnect closes the emitter, and the stream is never compressed.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -242,6 +243,7 @@ public class HandlerRouteServerSentEventsTest {
             // the client does not read
             Throwable closed = recorder(server).closed("overflow").get(30, TimeUnit.SECONDS);
             assertInstanceOf(ConnectionClosedException.class, closed);
+            assertInstanceOf(StreamOverflowException.class, closed);
             assertTrue(closed.getMessage().contains("does not read"), closed.getMessage());
         }
     }
@@ -285,6 +287,79 @@ public class HandlerRouteServerSentEventsTest {
             HttpResponse<String> response = server.exchange(HttpRequest.GET("/sse/replaced"), String.class);
             assertEquals("replaced", response.body());
             assertInstanceOf(ConnectionClosedException.class, recorder(server).closed("replaced").get(20, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void streamEndsWhenTheHandlerReturns() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertEquals("data: one\n\n", server.exchange(HttpRequest.GET("/sse/returned"), String.class).body());
+            assertNull(recorder(server).closed("returned").get(20, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void blockingHandlerFailureBeforeTheFirstEventIsAnsweredByTheErrorRoutes() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertStatus(server, "/sse/blocking-refuse", HttpStatus.NOT_FOUND);
+            assertInstanceOf(HttpStatusException.class, recorder(server).closed("blocking-refuse").get(20, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void blockingHandlerFailureAfterTheFirstEventEndsTheStreamAbruptly() throws Exception {
+        try (ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            request(socket, "GET /sse/blocking-break HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            String received = readToEnd(socket.getInputStream());
+            assertTrue(received.contains("data: one"), received);
+            assertFalse(received.endsWith("0\r\n\r\n"), "A failed stream must not end like a complete chunked body: " + received);
+            assertEquals("database went away", recorder(server).closed("blocking-break").get(20, TimeUnit.SECONDS).getMessage());
+        }
+    }
+
+    @Test
+    void keepOpenAfterTheHandlerReturnedFails() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertEquals("", server.exchange(HttpRequest.GET("/sse/late-keep-open"), String.class).getBody(String.class).orElse(""));
+            assertTrue(recorder(server).lateKeepOpen.get(20, TimeUnit.SECONDS).getMessage().contains("before the handler returns"));
+        }
+    }
+
+    @Test
+    void headersAreAddedBeforeTheFirstEvent() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/sse/headers"), String.class);
+            assertEquals("no", response.getHeaders().get("X-Accel-Buffering"));
+            assertEquals("no-store", response.getHeaders().get(HttpHeaders.CACHE_CONTROL));
+            assertNull(response.getHeaders().get("X-Late"));
+            assertEquals("data: one\n\n", response.body());
+            assertTrue(recorder(server).lateHeader.get(20, TimeUnit.SECONDS).getMessage().contains("already sent"));
+        }
+    }
+
+    @Test
+    void postedBodyIsStreamedBack() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.POST("/sse/words", "a b c").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
+            assertEquals("data: a\n\ndata: b\n\ndata: c\n\n", response.body());
+        }
+    }
+
+    @Test
+    void bodyIsReadWhileEventsAreSent() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.POST("/sse/elements", "[1,2]").contentType(MediaType.APPLICATION_JSON_TYPE), String.class);
+            assertEquals("data: start\n\ndata: 1\n\ndata: 2\n\n", response.body());
+            assertNull(recorder(server).closed("elements").get(20, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void submittedFormIsStreamedBack() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.POST("/sse/form", "name=Fred").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String.class);
+            assertEquals("data: hello Fred\n\n", response.body());
         }
     }
 
@@ -414,6 +489,8 @@ public class HandlerRouteServerSentEventsTest {
         final Map<String, CompletableFuture<@Nullable Throwable>> closed = new ConcurrentHashMap<>();
         final CompletableFuture<Throwable> failedSend = new CompletableFuture<>();
         final CompletableFuture<String> closedContext = new CompletableFuture<>();
+        final CompletableFuture<IllegalStateException> lateKeepOpen = new CompletableFuture<>();
+        final CompletableFuture<IllegalStateException> lateHeader = new CompletableFuture<>();
         final AtomicInteger sent = new AtomicInteger();
 
         CompletableFuture<@Nullable Throwable> closed(String key) {
@@ -473,18 +550,21 @@ public class HandlerRouteServerSentEventsTest {
                     events.send(Event.of(Map.of("k", "v")).comment("json"));
                     events.complete();
                 });
-                routes.GET("/sse/ordered").sse((request, pathVariables, events) -> recorder.scheduler.execute(() -> {
-                    for (int i = 0; i < 500; i++) {
-                        events.send(String.valueOf(i));
-                    }
-                    events.complete();
-                }));
+                routes.GET("/sse/ordered").sse((request, pathVariables, events) -> {
+                    events.keepOpen();
+                    recorder.scheduler.execute(() -> {
+                        for (int i = 0; i < 500; i++) {
+                            events.send(String.valueOf(i));
+                        }
+                        events.complete();
+                    });
+                });
                 routes.GET("/sse/resume").sse((request, pathVariables, events) -> {
                     events.send(events.lastEventId().map(id -> "resumed after " + id).orElse("first connection"));
                     events.complete();
                 });
                 routes.GET("/sse/heartbeat").sse((request, pathVariables, events) -> {
-                    events.heartbeat(Duration.ofMillis(100));
+                    events.keepOpen().heartbeat(Duration.ofMillis(100));
                     recorder.scheduler.schedule(() -> {
                         events.send("done");
                         events.complete();
@@ -494,7 +574,7 @@ public class HandlerRouteServerSentEventsTest {
                     throw new HttpStatusException(HttpStatus.FORBIDDEN, "forbidden");
                 });
                 routes.GET("/sse/refuse-later").sse((request, pathVariables, events) -> {
-                    recorder.record("refuse-later", events);
+                    recorder.record("refuse-later", events.keepOpen());
                     recorder.scheduler.schedule(() -> events.fail(new HttpStatusException(HttpStatus.CONFLICT, "conflict")), 50, TimeUnit.MILLISECONDS);
                 });
                 routes.GET("/sse/refuse-custom").sse((request, pathVariables, events) -> {
@@ -502,12 +582,12 @@ public class HandlerRouteServerSentEventsTest {
                 });
                 routes.error(Refused.class, (request, error) -> HttpResponse.status(HttpStatus.I_AM_A_TEAPOT).body(error.getMessage()));
                 routes.GET("/sse/break").sse((request, pathVariables, events) -> {
-                    recorder.record("break", events);
+                    recorder.record("break", events.keepOpen());
                     events.send("one").thenRun(() -> recorder.scheduler.schedule(() -> events.fail(new IllegalStateException("broken")), 100, TimeUnit.MILLISECONDS));
                 });
                 routes.GET("/sse/head").sse((request, pathVariables, events) -> recorder.record("head", events));
                 routes.GET("/sse/ticks").sse((request, pathVariables, events) -> {
-                    recorder.record("ticks", events);
+                    recorder.record("ticks", events.keepOpen());
                     ScheduledFuture<?>[] ticks = new ScheduledFuture<?>[1];
                     ticks[0] = recorder.scheduler.scheduleAtFixedRate(() -> events.send("tick").whenComplete((ignored, error) -> {
                         if (error != null) {
@@ -518,11 +598,9 @@ public class HandlerRouteServerSentEventsTest {
                 });
                 routes.GET("/sse/flood").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
                     recorder.record("flood", events);
-                    try (events) {
-                        for (int i = 0; i < FLOOD_EVENTS; i++) {
-                            events.sendAndAwait(Event.of(KILOBYTE).id(String.valueOf(i)));
-                            recorder.sent.incrementAndGet();
-                        }
+                    for (int i = 0; i < FLOOD_EVENTS; i++) {
+                        events.sendAndAwait(Event.of(KILOBYTE).id(String.valueOf(i)));
+                        recorder.sent.incrementAndGet();
                     }
                 });
                 routes.GET("/sse/overflow").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
@@ -532,10 +610,8 @@ public class HandlerRouteServerSentEventsTest {
                     }
                 });
                 routes.GET("/sse/blocking").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
-                    try (events) {
-                        for (int i = 0; i < 100; i++) {
-                            events.sendAndAwait(Event.of(String.valueOf(i)));
-                        }
+                    for (int i = 0; i < 100; i++) {
+                        events.sendAndAwait(String.valueOf(i));
                     }
                 });
                 routes.GET("/sse/context").sse((request, pathVariables, events) -> contextStream(recorder, events));
@@ -548,16 +624,64 @@ public class HandlerRouteServerSentEventsTest {
                 routes.GET("/sse/replaced")
                     .afterReplacing((request, response) -> HttpResponse.ok("replaced").contentType(MediaType.TEXT_PLAIN_TYPE)).and()
                     .sse((request, pathVariables, events) -> {
-                    recorder.record("replaced", events);
+                    recorder.record("replaced", events.keepOpen());
                     events.send("original");
                 });
+                routes.GET("/sse/returned").sse((request, pathVariables, events) -> {
+                    recorder.record("returned", events);
+                    events.send("one");
+                });
+                routes.GET("/sse/blocking-refuse").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
+                    recorder.record("blocking-refuse", events);
+                    throw new HttpStatusException(HttpStatus.NOT_FOUND, "no such job");
+                });
+                routes.GET("/sse/blocking-break").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
+                    recorder.record("blocking-break", events);
+                    events.sendAndAwait("one");
+                    throw new IllegalStateException("database went away");
+                });
+                routes.GET("/sse/late-keep-open").sse((request, pathVariables, events) ->
+                    recorder.scheduler.schedule(() -> {
+                        try {
+                            events.keepOpen();
+                        } catch (IllegalStateException e) {
+                            recorder.lateKeepOpen.complete(e);
+                        }
+                    }, 50, TimeUnit.MILLISECONDS));
+                routes.GET("/sse/headers").sse((request, pathVariables, events) -> {
+                    events.header("X-Accel-Buffering", "no").header(HttpHeaders.CACHE_CONTROL, "no-store");
+                    events.send("one");
+                    try {
+                        events.header("X-Late", "late");
+                    } catch (IllegalStateException e) {
+                        recorder.lateHeader.complete(e);
+                    }
+                });
+                routes.POST("/sse/words").consumes(MediaType.TEXT_PLAIN_TYPE).body(String.class).sse((request, pathVariables, text, events) -> {
+                    for (String word : text.split(" ")) {
+                        events.send(word);
+                    }
+                });
+                routes.POST("/sse/elements").body().sse((request, pathVariables, body, events) -> {
+                    recorder.record("elements", events.keepOpen());
+                    // the response is sent before the body is read: the body stays readable
+                    events.send("start").thenCompose(sent -> body.elements(Integer.class).forEach(events::send))
+                        .whenComplete((done, error) -> {
+                            if (error == null) {
+                                events.complete();
+                            } else {
+                                events.fail(error);
+                            }
+                        });
+                });
+                routes.POST("/sse/form").form().sse((request, pathVariables, form, events) -> events.send("hello " + form.getString("name")));
             };
         }
 
         private static void contextStream(Recorder recorder, SseEmitter events) {
             // a high-water mark of one byte: the stage completes when the connection took the
             // event, on a thread of the server
-            events.highWaterMark(1);
+            events.keepOpen().highWaterMark(1);
             events.onClose(cause -> recorder.closedContext.complete(trace()));
             events.send("handler:" + trace()).thenRun(() -> {
                 events.send("continuation:" + trace());

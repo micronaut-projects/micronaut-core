@@ -26,12 +26,13 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.AsyncRequestBody;
-import io.micronaut.http.body.ChunkSource;
 import io.micronaut.http.body.ReleasableRequestBody;
+import io.micronaut.http.body.ResponseElements;
+import io.micronaut.http.sse.SseEmitter;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -47,12 +48,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -78,8 +77,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static final String HANDLE = "handle";
 
-    private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
     private static final Logger LOG = LoggerFactory.getLogger(HandlerMethod.class);
+
+    private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
     private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class, BODY_ARGUMENT);
     private static final Argument<FormData> FORM = Argument.of(FormData.class, "form");
@@ -350,8 +350,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     /**
      * The method of a server-sent events route: the server binds the {@link SseResponder}, which
-     * creates the emitter, and the result completes with the response when the first event is
-     * sent.
+     * creates the emitter and runs the handler, and the result completes with the response when
+     * the first event is sent.
      *
      * @param handler The handler
      * @return The method that calls it
@@ -360,9 +360,47 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             SseHandler.class,
+            // like a RequestHandler: nothing reads the body
             new Argument<?>[]{REQUEST, PATH_VARIABLES, SSE_RESPONDER},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
             args -> ((SseResponder) args[2]).respond(events -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], events))
+        );
+    }
+
+    /**
+     * The method of a server-sent events route that receives the body: the
+     * {@link AsyncRequestBody} the handler reads itself, which no binder decodes, or the body
+     * decoded to a type, bound like a {@code @Body} argument, see {@link #bodyArgument(Argument)}.
+     * The {@link SseResponder} keeps what the binding of the body left open until the stream ends.
+     *
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The method that calls it
+     */
+    public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> ofSse(Argument<B> bodyType, SseBodyHandler<B> handler) {
+        Objects.requireNonNull(bodyType, "bodyType");
+        return sseBody(handler, isAsyncBody(bodyType) ? ASYNC_BODY : bodyArgument(bodyType));
+    }
+
+    /**
+     * The method of a server-sent events route that receives the whole submitted form.
+     *
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> formSse(SseBodyHandler<FormData> handler) {
+        return sseBody(handler, FORM);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> sseBody(SseBodyHandler<B> handler, Argument<?> body) {
+        return new HandlerMethod<>(
+            handler,
+            SseBodyHandler.class,
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, body, SSE_RESPONDER},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> ((SseResponder) args[3]).respond(events -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2], events))
         );
     }
 
@@ -727,9 +765,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
             if (error == null && response instanceof MutableHttpResponse<?> mutable
-                && mutable.body() instanceof ChunkSource<?> source) {
-                // the elements may be reads of the body: it is released when the source is closed
-                mutable.body(releaseWhenClosed(source, handlerRequest));
+                && mutable.body() instanceof ResponseElements<?> elements) {
+                // the elements may be reads of the body: it is released when they are closed
+                mutable.body(releaseWhenClosed(elements, handlerRequest));
                 result.complete(response);
                 return;
             }
@@ -757,47 +795,34 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * A {@link ChunkSource} body of the response of the handler that releases what the handler's
-     * read of the body left open when the server closes it: when the response ends, fails, or the
-     * client disconnects. The response is committed by then: a failure to release is logged. A
-     * source that is never written, e.g. replaced by a filter, leaves the body to the release
-     * when the request ends.
+     * The {@link ResponseElements} body of the response of the handler, releasing what the
+     * handler's read of the body left open when the server closes them: when the response ends,
+     * fails, or the client disconnects, or when a filter replaces the response. The response is
+     * committed by then: a failure to release is logged.
      *
-     * @param source  The source
-     * @param request The body of the handler
-     * @param <T>     The type of an element
-     * @return The source that releases the body when it is closed
+     * @param elements The elements
+     * @param request  The body of the handler
+     * @param <T>      The type of an element
+     * @return The elements, which release the body when they are closed
      */
-    private static <T> ChunkSource<T> releaseWhenClosed(ChunkSource<T> source, ReleasableRequestBody request) {
-        AtomicBoolean closed = new AtomicBoolean();
-        return new ChunkSource<>() {
-            @Override
-            public CompletionStage<Optional<T>> next() {
-                return source.next();
-            }
-
-            @Override
-            public void close() {
-                if (!closed.compareAndSet(false, true)) {
-                    return;
-                }
+    private static <T> ResponseElements<T> releaseWhenClosed(ResponseElements<T> elements, ReleasableRequestBody request) {
+        return ResponseElements.of(elements::next, () -> {
+            try {
+                elements.close();
+            } finally {
+                CompletionStage<Void> released;
                 try {
-                    source.close();
-                } finally {
-                    CompletionStage<Void> released;
-                    try {
-                        released = request.releaseBody();
-                    } catch (Throwable e) {
-                        released = CompletableFuture.failedFuture(e);
-                    }
-                    released.whenComplete((ignored, error) -> {
-                        if (error != null && LOG.isWarnEnabled()) {
-                            LOG.warn("Failed to release what the reads of the body left open when the streamed response of {} ended", source, error);
-                        }
-                    });
+                    released = request.releaseBody();
+                } catch (Throwable e) {
+                    released = CompletableFuture.failedFuture(e);
                 }
+                released.whenComplete((ignored, error) -> {
+                    if (error != null && LOG.isWarnEnabled()) {
+                        LOG.warn("Failed to release what the reads of the body left open when the streamed response of {} ended", elements, error);
+                    }
+                });
             }
-        };
+        });
     }
 
     /**
@@ -886,6 +911,37 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         @Override
         public Argument<R> asArgument() {
             return Argument.of(getType(), annotationMetadata, getTypeParameters());
+        }
+    }
+
+    /**
+     * Runs the handler of a server-sent events route, bound by the server for the invocation of
+     * the route: it creates the {@link SseEmitter} of the response, and keeps what the binding of
+     * the body of the route left open until the stream ends. <b>Internal API.</b>
+     */
+    @Internal
+    @FunctionalInterface
+    public interface SseResponder {
+
+        /**
+         * Run the handler with a new emitter.
+         *
+         * @param handler Runs the handler with the emitter
+         * @return Completes with the response when the first event is sent or the stream ends, or
+         * exceptionally when the handler fails before
+         */
+        CompletionStage<HttpResponse<?>> respond(Handler handler);
+
+        /**
+         * Runs the handler of the route.
+         */
+        @FunctionalInterface
+        interface Handler {
+            /**
+             * @param events The emitter
+             * @throws Exception An error of the handler
+             */
+            void handle(SseEmitter events) throws Exception;
         }
     }
 

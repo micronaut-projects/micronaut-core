@@ -21,76 +21,65 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.body.ByteBodyFactory;
-import io.micronaut.http.body.ChunkSource;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.ResponseElements;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Pulls the elements of a {@link ChunkSource} into a {@link BodyStream}: one {@link ChunkSource#next()}
- * at a time, and only while the stream is writable.
+ * Pulls the elements of a {@link ResponseElements} body into a {@link BodyStream}: one
+ * {@link ResponseElements#next()} at a time, and only while the stream is writable.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class ChunkSourceBody {
+final class ResponseElementsBody {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ChunkSourceBody.class);
-
-    private static final int PENDING = 0;
-    private static final int COMPLETED_IN_LOOP = 1;
-    private static final int LEFT_LOOP = 2;
-
-    private final ChunkSource<?> source;
+    private final ResponseElements<?> elements;
     private final ResponseStreams.ElementEncoder encoder;
-    /**
-     * Whether the elements are framed as a JSON array, decided on the first element.
-     */
-    private boolean jsonArray;
     private final BodyStream stream;
     private final ByteBodyFactory factory;
-    private final PropagatedContext context;
     private final DelayedExecutionFlow<CloseableByteBody> firstElement = DelayedExecutionFlow.create();
     /**
-     * Whether a pull loop runs or a {@link ChunkSource#next()} is pending.
+     * Whether a pull loop runs or a {@link ResponseElements#next()} is pending.
      */
     private final AtomicBoolean pulling = new AtomicBoolean();
-    private final AtomicBoolean sourceClosed = new AtomicBoolean();
+    private final AtomicBoolean closed = new AtomicBoolean();
     /**
-     * Only changed by the owner of {@link #pulling}.
+     * The framing of the elements, decided on the first element. Only changed by the owner of
+     * {@link #pulling}, like {@link #first}.
      */
+    private ResponseStreams.Framing framing = ResponseStreams.Framing.NONE;
     private boolean first = true;
+    private final PropagatedContext context;
 
-    private ChunkSourceBody(ByteBodyFactory factory, ChunkSource<?> source, ResponseStreams.ElementEncoder encoder) {
+    private ResponseElementsBody(ByteBodyFactory factory, ResponseElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
         this.factory = factory;
-        this.source = source;
+        this.elements = elements;
         this.encoder = encoder;
         this.context = PropagatedContext.getOrEmpty();
-        this.stream = new BodyStream(factory, context, ResponseStreams.DEFAULT_HIGH_WATER_MARK, false);
+        this.stream = new BodyStream(factory, context, highWaterMark, false);
     }
 
     /**
-     * Start pulling the source.
+     * Start pulling the elements.
      *
-     * @param factory   The body factory of the response
-     * @param source    The source
-     * @param encoder   Encodes the elements
+     * @param factory       The body factory of the response
+     * @param elements      The elements
+     * @param encoder       Encodes the elements
+     * @param highWaterMark The high-water mark of the stream
      * @return Completes with the body once the first element or the end is available, or
      * exceptionally if the first element fails
      */
-    static ExecutionFlow<CloseableByteBody> start(ByteBodyFactory factory, ChunkSource<?> source, ResponseStreams.ElementEncoder encoder) {
-        ChunkSourceBody body = new ChunkSourceBody(factory, source, encoder);
-        body.stream.onClose(ignored -> body.closeSource());
+    static ExecutionFlow<CloseableByteBody> start(ByteBodyFactory factory, ResponseElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
+        ResponseElementsBody body = new ResponseElementsBody(factory, elements, encoder, highWaterMark);
+        body.stream.onClose(ignored -> body.close());
         body.stream.onDemand(body::pull);
         body.pull();
         return body.firstElement;
@@ -118,26 +107,22 @@ final class ChunkSourceBody {
             }
             CompletionStage<? extends Optional<?>> next;
             try {
-                next = Objects.requireNonNull(source.next(), "The chunk source returned no stage");
+                next = Objects.requireNonNull(elements.next(), "The response elements returned no stage");
             } catch (Throwable e) {
                 failed(e);
                 return;
             }
-            AtomicInteger iteration = new AtomicInteger(PENDING);
+            // the second of the stage and this loop to get here continues the pull: this loop if
+            // the stage completed synchronously, instead of recursing, else the completing thread
+            AtomicBoolean handOff = new AtomicBoolean();
             next.whenComplete((element, error) -> {
-                if (!onNext(element, error)) {
-                    return;
-                }
-                if (!iteration.compareAndSet(PENDING, COMPLETED_IN_LOOP)) {
-                    // completed later, on another thread: continue there
+                if (onNext(element, error) && handOff.getAndSet(true)) {
                     context.propagate(this::loop);
                 }
             });
-            if (!iteration.compareAndSet(PENDING, LEFT_LOOP)) {
-                // completed synchronously: continue in this loop instead of recursing
-                continue;
+            if (!handOff.getAndSet(true)) {
+                return;
             }
-            return;
         }
     }
 
@@ -150,8 +135,12 @@ final class ChunkSourceBody {
             return false;
         }
         if (!(result instanceof Optional<?> element) || element.isEmpty()) {
-            if (first ? encoder.jsonArray(null) : jsonArray) {
-                stream.write(factory.readBufferFactory().copyOf(first ? "[]" : "]", StandardCharsets.UTF_8));
+            if (first) {
+                framing = encoder.framing(null);
+            }
+            ReadBuffer end = framing.end(factory.readBufferFactory(), first);
+            if (end != null) {
+                stream.write(end);
             }
             stream.complete();
             respond();
@@ -160,10 +149,9 @@ final class ChunkSourceBody {
         ReadBuffer data;
         try {
             if (first) {
-                jsonArray = encoder.jsonArray(element.get());
+                framing = encoder.framing(element.get());
             }
-            byte @Nullable [] prefix = !jsonArray ? null : first ? JsonFraming.OPEN : JsonFraming.COMMA;
-            data = encoder.encode(element.get(), prefix);
+            data = encoder.encode(element.get(), framing, first);
         } catch (Throwable e) {
             failed(e);
             return false;
@@ -196,21 +184,9 @@ final class ChunkSourceBody {
         }
     }
 
-    private void closeSource() {
-        if (sourceClosed.compareAndSet(false, true)) {
-            try {
-                source.close();
-            } catch (Throwable e) {
-                LOG.warn("Failed to close the chunk source of a response", e);
-            }
+    private void close() {
+        if (closed.compareAndSet(false, true)) {
+            ResponseStreams.discard(elements);
         }
-    }
-
-    /**
-     * The separators of the elements of a JSON array.
-     */
-    private static final class JsonFraming {
-        static final byte[] OPEN = "[".getBytes(StandardCharsets.UTF_8);
-        static final byte[] COMMA = ",".getBytes(StandardCharsets.UTF_8);
     }
 }

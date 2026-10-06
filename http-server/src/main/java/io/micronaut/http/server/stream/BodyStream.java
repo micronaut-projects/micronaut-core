@@ -22,8 +22,8 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
-import io.micronaut.http.body.stream.StreamingBodyExecutor;
 import io.micronaut.http.exceptions.ConnectionClosedException;
+import io.micronaut.http.exceptions.StreamOverflowException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,13 +35,14 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
  * A response body pushed from any thread, with backpressure from the connection and without
- * Reactive Streams: the core of {@link DefaultSseEmitter} and of {@link ChunkSourceBody}.
+ * Reactive Streams: the core of {@link DefaultSseEmitter} and of {@link ResponseElementsBody}.
  *
  * <p>The body is a streaming body of the {@link ByteBodyFactory} of the response, whose buffer is
  * fed on the {@link ByteBodyFactory#streamingBodyExecutor() executor} of the factory (the event
@@ -68,9 +69,10 @@ final class BodyStream implements BufferConsumer.Upstream {
     private static final CompletionStage<Void> DONE = CompletableFuture.completedStage(null);
 
     private final ReentrantLock lock = new ReentrantLock();
+    private final ByteBodyFactory factory;
     private final BufferConsumer buffer;
     private final CloseableByteBody body;
-    private final @Nullable StreamingBodyExecutor executor;
+    private final Executor executor;
     private final PropagatedContext context;
     /**
      * Whether the body is never written: the response of a HEAD request. A discard is then a
@@ -113,6 +115,7 @@ final class BodyStream implements BufferConsumer.Upstream {
      * @param bodyless      Whether the body is never written, the response of a HEAD request
      */
     BodyStream(ByteBodyFactory factory, PropagatedContext context, int highWaterMark, boolean bodyless) {
+        this.factory = factory;
         this.executor = factory.streamingBodyExecutor();
         this.context = context;
         this.highWaterMark = checkHighWaterMark(highWaterMark);
@@ -133,8 +136,7 @@ final class BodyStream implements BufferConsumer.Upstream {
      * @return Whether blocking the current thread would block an event loop
      */
     boolean isEventLoopThread() {
-        StreamingBodyExecutor e = executor;
-        return e != null && e.isEventLoopThread();
+        return factory.isEventLoopThread();
     }
 
     /**
@@ -182,7 +184,7 @@ final class BodyStream implements BufferConsumer.Upstream {
             if (written - consumed >= limit) {
                 // bounded before the write: a single write larger than the limit still goes
                 data.close();
-                Throwable overflow = new ConnectionClosedException("The client does not read the stream fast enough: "
+                Throwable overflow = new StreamOverflowException("The client does not read the stream fast enough: "
                     + (written - consumed) + " bytes are queued, the limit is " + limit + " bytes (sixteen times the high-water mark). The stream was closed");
                 closeLocked(State.FAILED, overflow, overflow, effects);
                 submitLocked(() -> buffer.error(overflow), effects);
@@ -485,14 +487,10 @@ final class BodyStream implements BufferConsumer.Upstream {
 
         void run() {
             if (drain && pendingTasks.getAndIncrement() == 0) {
-                StreamingBodyExecutor e = executor;
-                if (e == null) {
-                    drain();
-                } else {
-                    // always a new task, also on the loop: the caller may be inside a call of
-                    // the buffer, which must not be reentered
-                    e.execute(BodyStream.this::drain);
-                }
+                // always a new task, also on an event loop: the caller may be inside a call of
+                // the buffer, which must not be reentered. The default buffer runs the task on
+                // this thread, and serializes the calls itself
+                executor.execute(BodyStream.this::drain);
             }
             if (completed == null && failed == null && callbacks == null && demand == null) {
                 return;

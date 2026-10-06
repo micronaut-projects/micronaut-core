@@ -29,7 +29,6 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
-import io.micronaut.http.body.stream.StreamingBodyExecutor;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -45,6 +44,7 @@ import reactor.core.publisher.Flux;
 
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -77,8 +77,15 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
-    public StreamingBodyExecutor streamingBodyExecutor() {
-        return new LoopExecutor(loop);
+    public Executor streamingBodyExecutor() {
+        // a StreamingNettyByteBody.SharedBuffer must be fed on its loop
+        return loop;
+    }
+
+    @Override
+    public boolean isEventLoopThread() {
+        // this loop, or the loop of another connection
+        return loop.inEventLoop() || ThreadExecutorMap.currentExecutor() != null;
     }
 
     @Override
@@ -217,23 +224,5 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
             nettyHeaders.add(name, headers.getAll(name));
         }
         return nettyHeaders;
-    }
-
-    /**
-     * The event loop a {@link StreamingNettyByteBody.SharedBuffer} must be fed on.
-     *
-     * @param loop The loop
-     */
-    private record LoopExecutor(EventLoop loop) implements StreamingBodyExecutor {
-        @Override
-        public void execute(Runnable command) {
-            loop.execute(command);
-        }
-
-        @Override
-        public boolean isEventLoopThread() {
-            // this loop, or the loop of another connection
-            return loop.inEventLoop() || ThreadExecutorMap.currentExecutor() != null;
-        }
     }
 }

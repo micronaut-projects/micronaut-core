@@ -23,6 +23,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.netty.DefaultHttpClient;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRoutes;
@@ -91,6 +92,23 @@ class HandlerRouteServerSentEventsNettyTest {
             String closed = exchange(server, "GET /netty-sse/silent HTTP/1.1\r\nHost: localhost\r\n\r\n");
             assertTrue(closed.contains("data: start"), closed);
             assertFalse(closed.contains("data: done"), closed);
+        }
+    }
+
+    @Test
+    void configuredHeartbeatKeepsTheStreamFromTheIdleTimeout() throws IOException {
+        try (ApplicationContext ctx = run(Map.of(
+            "micronaut.server.idle-timeout", "500ms",
+            "micronaut.server.responses.stream.sse-heartbeat", "100ms",
+            "micronaut.server.responses.stream.high-water-mark", "16KB"
+        ))) {
+            HttpServerConfiguration.ResponseStreamConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getResponseStream();
+            assertEquals(Duration.ofMillis(100), configuration.getSseHeartbeat());
+            assertEquals(16 * 1024, configuration.getHighWaterMark());
+            String kept = exchange(ctx.getBean(EmbeddedServer.class), "GET /netty-sse/configured-heartbeat HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            assertTrue(kept.contains(":\n\n"), kept);
+            assertTrue(kept.contains("data: done"), kept);
+            assertTrue(kept.endsWith("0\r\n\r\n"), kept);
         }
     }
 
@@ -194,20 +212,28 @@ class HandlerRouteServerSentEventsNettyTest {
                     events.complete();
                 });
                 routes.GET("/netty-sse/heartbeat").sse((request, pathVariables, events) -> {
-                    events.heartbeat(Duration.ofMillis(100));
+                    events.keepOpen().heartbeat(Duration.ofMillis(100));
                     recorder.scheduler.schedule(() -> {
                         events.send("done");
                         events.complete();
                     }, 1500, TimeUnit.MILLISECONDS);
                 });
                 routes.GET("/netty-sse/silent").sse((request, pathVariables, events) -> {
-                    events.send("start");
+                    events.keepOpen().send("start");
+                    recorder.scheduler.schedule(() -> {
+                        events.send("done");
+                        events.complete();
+                    }, 1500, TimeUnit.MILLISECONDS);
+                });
+                routes.GET("/netty-sse/configured-heartbeat").sse((request, pathVariables, events) -> {
+                    events.keepOpen();
                     recorder.scheduler.schedule(() -> {
                         events.send("done");
                         events.complete();
                     }, 1500, TimeUnit.MILLISECONDS);
                 });
                 routes.GET("/netty-sse/steps").sse((request, pathVariables, events) -> {
+                    events.keepOpen();
                     recorder.version.complete(request.getHttpVersion());
                     events.send("one");
                     recorder.received.thenRun(() -> {

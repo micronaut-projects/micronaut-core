@@ -1,0 +1,37 @@
+A route streams its response without a `Publisher` in two ways: with the `sse` terminal, whose handler pushes server-sent events, or with a api:http.body.ResponseElements[] body, whose elements the server pulls one at a time.
+
+The handler of `sse(...)`, an api:web.router.builder.SseHandler[], `(request, pathVariables, events) -> ...`, sends events with the api:http.sse.SseEmitter[] it receives. The stream ends when the handler returns, unless the handler calls `keepOpen()` to send its events later. The response, `200` with `text/event-stream` and `Cache-Control: no-cache`, is sent with the first event, comment or heartbeat. Until then, an exception of the handler is answered by the error routes like the exception of any route, and `events.header(...)` adds headers to the response, e.g. `X-Accel-Buffering: no` for a proxy that buffers responses. An event stream is never compressed.
+
+snippet::io.micronaut.docs.server.functional.StreamRoutes[tags="imports,clazz", indent=0, title="Server-sent events and streamed responses"]
+
+<1> The stream ends when the handler returns. On an executor the handler may block: the response is sent with the first event while the handler still runs. An exception after the first event ends the stream abruptly, since the status was sent.
+<2> `sendAndAwait` waits until the client took the event, give or take the high-water mark, so a slow client paces the sender instead of filling the memory. On an event loop, `send` returns a stage that completes then.
+<3> `keepOpen()` keeps the stream open after the handler returns: the events are sent later, from callbacks or another thread. A heartbeat sends a comment when no event was sent for the period, which also sends the response before the first event.
+<4> `complete()` ends the stream, and `fail(...)` fails it.
+<5> `isWritable()` tells whether a send would wait: a sender that would rather drop events, e.g. a broadcast to many clients, checks it.
+<6> `onClose` runs when the stream ends: completed, failed, or because the client disconnected.
+<7> A route with a body stage streams events back, e.g. the answer to a prompt. What the body stage bound, here a decoded `String`, is released when the stream ends, not when the response is sent.
+<8> A api:http.body.ResponseElements[] body is pulled one element at a time while the client keeps up, and written like the elements of a `Publisher` body: a JSON array for JSON. `ResponseElements.of(next, close)` also releases resources, e.g. closes a cursor.
+
+The rules of a stream:
+
+* *Backpressure.* The stream counts the bytes the connection has not taken yet. A send completes, and the next element is pulled, once they are below the high-water mark, 64 KiB by default. An event stream with sixteen times as many queued fails with a `StreamOverflowException`, a `ConnectionClosedException`: a sender that waits never reaches it.
+* *Disconnects.* When the client disconnects, the pending and the later sends fail with a `ConnectionClosedException`, and `onClose` runs with it. Before the response is sent, a disconnect is noticed only by the next send: a stream that waits for its first event sends a comment or a heartbeat first.
+* *Threads.* The stages complete, and `onClose` runs, on a thread of the server, usually an event loop, with the propagated context of the handler: a continuation must not block.
+* *Reconnections.* `events.lastEventId()` is the `Last-Event-ID` header of a reconnecting client.
+* *HEAD.* A `HEAD` request runs the handler, and sends the headers of the stream without its events.
+* *Elements.* `next()` is called again only once the stage it returned completed, and only while the connection keeps up. `close()` is called once: at the end, on a failure, on a disconnect, for a `HEAD` request, and when a filter replaces the response. A failure of the first element is answered by the error routes.
+
+The high-water mark, and a heartbeat for every event stream, are configured for the server:
+
+[configuration]
+----
+micronaut:
+  server:
+    responses:
+      stream:
+        high-water-mark: 128KB
+        sse-heartbeat: 15s
+----
+
+In Kotlin, `events.launch { ... }` runs the stream in a coroutine, which ends the stream when it returns and is cancelled when the stream closes, `sendAwait(...)` suspends instead of blocking, and `Flow.asResponseElements()` streams a `Flow` as a api:http.body.ResponseElements[] body.
