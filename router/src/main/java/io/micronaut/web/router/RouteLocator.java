@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ExceptionUtils;
@@ -23,6 +24,7 @@ import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.web.router.builder.AsyncLocatorHandler;
 import io.micronaut.web.router.builder.DefaultPathVariables;
 import io.micronaut.web.router.builder.LocatedRoutes;
@@ -585,7 +587,7 @@ public final class RouteLocator implements DynamicRouteTarget {
             List<UriMatchVariable> variables = new ArrayList<>(location.variables());
             variables.addAll(inner.getVariables());
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
-                location.filters(), location.errorScopes());
+                location.filters(), location.errorScopes(), location.annotationMetadata());
             return (UriRouteMatch<T, R>) route.resolvedMatch(info);
         }
 
@@ -618,10 +620,11 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @param variables     The variables of the prefixes
      * @param filters       The filters of the groups of the locator routes, outer first
      * @param errorScopes   The groups with error or status routes of the locator routes, the closest first
+     * @param annotationMetadata The annotations of the locator routes, from their groups, outer locator first
      */
     record Location(HttpRequest<?> original, String remainder, @Nullable Object owner, Map<String, Object> rawValues,
                     Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
-                    List<RouteAssembly.RouteGroup> errorScopes) {
+                    List<RouteAssembly.RouteGroup> errorScopes, AnnotationMetadata annotationMetadata) {
 
         /**
          * @param request      The request, a {@link LocatedRequest} for a locator route of a located table
@@ -664,6 +667,9 @@ public final class RouteLocator implements DynamicRouteTarget {
             });
             // the groups with error routes of this locator route, then of the locator routes that located it
             List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
+            // the annotations of the locator routes that located this one, overridden by the ones of this locator route
+            AnnotationMetadata annotationMetadata = layered(parent == null ? AnnotationMetadata.EMPTY_METADATA : parent.location.annotationMetadata,
+                locatorMatch.getExecutableMethod().getAnnotationMetadata());
             if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
                 filters.addAll(locatorRoute.routeFilters);
                 RouteAssembly.RouteGroup errorScope = locatorRoute.errorScope;
@@ -674,9 +680,10 @@ public final class RouteLocator implements DynamicRouteTarget {
             if (parent != null) {
                 errorScopes.addAll(parent.location.errorScopes);
                 return new Location(parent.location.original, remainder, parent.target, rawValues, decoded, variables,
-                    List.copyOf(filters), List.copyOf(errorScopes));
+                    List.copyOf(filters), List.copyOf(errorScopes), annotationMetadata);
             }
-            return new Location(request, remainder, null, rawValues, decoded, variables, List.copyOf(filters), List.copyOf(errorScopes));
+            return new Location(request, remainder, null, rawValues, decoded, variables, List.copyOf(filters), List.copyOf(errorScopes),
+                annotationMetadata);
         }
 
         /**
@@ -704,6 +711,21 @@ public final class RouteLocator implements DynamicRouteTarget {
             all.putAll(values);
             return all;
         }
+    }
+
+    /**
+     * @param inherited The annotations a route inherits
+     * @param own       The annotations of the route, which override the inherited ones
+     * @return The annotations of both
+     */
+    static AnnotationMetadata layered(AnnotationMetadata inherited, AnnotationMetadata own) {
+        if (inherited.isEmpty()) {
+            return own;
+        }
+        if (own.isEmpty()) {
+            return inherited;
+        }
+        return new AnnotationMetadataHierarchy(true, inherited, own);
     }
 
     /**
@@ -760,15 +782,18 @@ public final class RouteLocator implements DynamicRouteTarget {
         private final Object target;
         private final List<GenericHttpFilter> filters;
         private final List<RouteAssembly.RouteGroup> errorScopes;
+        private final AnnotationMetadata annotationMetadata;
 
         LocatedUriMatchInfo(String uri, Map<String, Object> values, List<UriMatchVariable> variables, Object target,
-                            List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes) {
+                            List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes,
+                            AnnotationMetadata annotationMetadata) {
             this.uri = uri;
             this.values = values;
             this.variables = variables;
             this.target = target;
             this.filters = filters;
             this.errorScopes = errorScopes;
+            this.annotationMetadata = annotationMetadata;
             this.variableMap = LinkedHashMap.newLinkedHashMap(variables.size());
             for (UriMatchVariable variable : variables) {
                 variableMap.put(variable.getName(), variable);
@@ -799,6 +824,15 @@ public final class RouteLocator implements DynamicRouteTarget {
         @Override
         public List<RouteAssembly.RouteGroup> errorScopes() {
             return errorScopes;
+        }
+
+        /**
+         * @return The annotations of the groups of the locator routes that located the route, the
+         * outer locator first
+         */
+        @Override
+        public AnnotationMetadata annotationMetadata() {
+            return annotationMetadata;
         }
 
         @Override

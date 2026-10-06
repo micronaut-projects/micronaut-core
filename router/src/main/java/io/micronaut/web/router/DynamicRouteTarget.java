@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -117,5 +118,13 @@ interface DynamicRouteTarget {
          * @return The groups whose error and status routes apply after the ones of the matched route
          */
         List<RouteAssembly.RouteGroup> errorScopes();
+
+        /**
+         * @return The annotations the matched route inherits from the resolution, e.g. of the
+         * groups of the locator routes, which the annotations of the route override
+         */
+        default AnnotationMetadata annotationMetadata() {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
     }
 }
