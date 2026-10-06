@@ -27,6 +27,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.builder.HttpRouteSpec;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RequestPredicates;
 import io.micronaut.web.router.builder.RouteSpec;
@@ -53,6 +54,7 @@ import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -413,16 +415,51 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
-    void aCloseIsHandledOnceTheMessagesBeforeItWereHandled() throws Exception {
-        Client client = connect("/ws/serial-close");
+    void aCloseIsHandledAtOnceAndDiscardsTheMessagesThatWait() throws Exception {
+        Client client = connect("/ws/close-discards");
         client.ws.sendText("a", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("start a", event());
+        // waits for the handler of a, which does not complete
         client.ws.sendText("b", true).get(TIMEOUT, TimeUnit.SECONDS);
         client.close(1000, "done");
-        assertEquals("start a", event());
-        assertEquals("end a", event());
-        assertEquals("start b", event());
-        assertEquals("end b", event());
         assertEquals("close 1000", event());
+        assertNull(context.getBean(Events.class).events.poll(200, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    void aCloseIsNotHeldBackByTheMessagesThatWaitForTheOpenHandler() throws Exception {
+        Client client = connect("/ws/held");
+        assertEquals("held 1", client.next());
+        // waits for the open handler, whose stream ends when the connection closes
+        client.ws.sendText("waits", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.close(1000, "done");
+        assertEquals("held cancelled", event());
+    }
+
+    @Test
+    void theMessagesHandlerRunsOnTheExecutorOfTheRouteOnceTheOpenHandlerIsDone() throws Exception {
+        // the executor of the route redispatches from non-blocking threads only, see
+        // HttpServerConfiguration#isRedispatchNonBlockingOnly: not on the event loop
+        Client blocking = connect("/ws/async-open/blocking");
+        String thread = blocking.next();
+        assertFalse(thread.toLowerCase(Locale.ROOT).contains("eventloop"), thread);
+        assertTrue(thread.endsWith(" true"), thread);
+        // the subscriber too, with the upgrade request as the current request
+        blocking.ws.sendText("message", true).get(TIMEOUT, TimeUnit.SECONDS);
+        String subscriber = blocking.next();
+        assertFalse(subscriber.toLowerCase(Locale.ROOT).contains("eventloop"), subscriber);
+        assertTrue(subscriber.endsWith(" true"), subscriber);
+        blocking.close(1000, "done");
+
+        Client eventLoop = connect("/ws/async-open/event-loop");
+        thread = eventLoop.next();
+        assertTrue(thread.toLowerCase(Locale.ROOT).contains("eventloop"), thread);
+        assertTrue(thread.endsWith(" true"), thread);
+        eventLoop.ws.sendText("message", true).get(TIMEOUT, TimeUnit.SECONDS);
+        subscriber = eventLoop.next();
+        assertTrue(subscriber.toLowerCase(Locale.ROOT).contains("eventloop"), subscriber);
+        assertTrue(subscriber.endsWith(" true"), subscriber);
+        eventLoop.close(1000, "done");
     }
 
     @Test
@@ -718,6 +755,37 @@ class HandlerRouteWebSocketTest {
     }
 
     /**
+     * Replies to each message with the thread that received it, and whether there is a current request.
+     */
+    static final class Threads implements Subscriber<String> {
+        private final WebSocketSession session;
+
+        Threads(WebSocketSession session) {
+            this.session = session;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            s.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(String message) {
+            session.sendAsync(Thread.currentThread().getName() + " " + ServerRequestContext.currentRequest().isPresent());
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            // the connection closes
+        }
+
+        @Override
+        public void onComplete() {
+            // the connection closes
+        }
+    }
+
+    /**
      * Replies to the first message, and cancels.
      */
     static final class First implements Subscriber<String> {
@@ -928,15 +996,27 @@ class HandlerRouteWebSocketTest {
                         log.add(message);
                         return new CompletableFuture<>();
                     }));
-                routes.GET("/ws/serial-close").webSocket(ws -> ws
+                routes.GET("/ws/close-discards").webSocket(ws -> ws
                     .onMessage(String.class, (message, session) -> {
                         log.add("start " + message);
-                        return CompletableFuture.runAsync(() -> log.add("end " + message), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS));
+                        return new CompletableFuture<>();
                     })
                     .onClose((reason, session) -> {
                         log.add("close " + reason.getCode());
                         return null;
                     }));
+                for (String executor : List.of("blocking", "event-loop")) {
+                    HttpRouteSpec route = routes.GET("/ws/async-open/" + executor);
+                    if (executor.equals("blocking")) {
+                        route.executeOn(TaskExecutors.BLOCKING);
+                    }
+                    route.webSocket(ws -> ws
+                        .onOpen((session, request) -> CompletableFuture.runAsync(() -> { }, CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS)))
+                        .onMessages(String.class, (messages, session) -> {
+                            messages.subscribe(new Threads(session));
+                            return session.sendAsync(Thread.currentThread().getName() + " " + ServerRequestContext.currentRequest().isPresent());
+                        }));
+                }
                 routes.GET("/ws/open-first-concurrent").webSocket(ws -> ws
                     .maxConcurrentMessages(2)
                     .onOpen((session, request) -> CompletableFuture.runAsync(() -> log.add("opened"), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)))

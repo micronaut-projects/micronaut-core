@@ -186,13 +186,16 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      * A connection opened, before its open handler is called.
      *
      * @param session  The session of the connection
-     * @param executor The executor of the route, which signals the subscriber of the stream of the messages
+     * @param executor Runs the handlers of the route like the server does, on its executor, with
+     *                 the upgrade request as the current request: the messages handler once an
+     *                 asynchronous open handler is done, and the signals to the subscriber of the
+     *                 stream of the messages
      * @param errors   Handles an error of the connection outside of its handlers, e.g. of the
      *                 stage of its {@link WebSocketMessagesHandler}, like the error of a handler
      */
     public void connected(WebSocketSession session, Executor executor, Consumer<Throwable> errors) {
         if (streaming) {
-            connections.put(session, new Connection(new WebSocketMessageStream<>(executor, errors), errors));
+            connections.put(session, new Connection(new WebSocketMessageStream<>(executor, errors), executor, errors));
         }
     }
 
@@ -265,7 +268,13 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
             startMessages((WebSocketMessagesHandler<Object>) handler, session);
             return null;
         }
-        return opened.thenRun(() -> startMessages((WebSocketMessagesHandler<Object>) handler, session));
+        Connection connection = connections.get(session);
+        if (connection == null) {
+            // closed before it opened
+            return opened;
+        }
+        // like a handler: on the executor of the route, not on the thread that completed the stage
+        return opened.thenRunAsync(() -> startMessages((WebSocketMessagesHandler<Object>) handler, session), connection.executor());
     }
 
     private void startMessages(WebSocketMessagesHandler<Object> handler, WebSocketSession session) {
@@ -325,9 +334,10 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      * An open connection of an endpoint with a {@link WebSocketMessagesHandler}.
      *
      * @param messages The stream of its messages
+     * @param executor Runs its handlers
      * @param errors   Handles an error of the connection outside of its handlers
      */
-    private record Connection(WebSocketMessageStream<Object> messages, Consumer<Throwable> errors) {
+    private record Connection(WebSocketMessageStream<Object> messages, Executor executor, Consumer<Throwable> errors) {
     }
 
     /**

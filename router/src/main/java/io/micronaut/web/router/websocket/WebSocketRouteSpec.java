@@ -53,10 +53,12 @@ import io.micronaut.websocket.WebSocketPongMessage;
  * {@link #maxConcurrentMessages(int)} lets the handlers of more messages of a connection run at
  * the same time. The connection reads only a few messages ahead of its handlers, so a client
  * cannot send messages faster than they are handled, and it answers the pings meanwhile. A close
- * is handled once the messages before it were handled, but does not wait for the open handler. A
- * handler that returns a stage that does not complete, e.g. of a stream that does not end, holds
- * the next messages back: a handler that streams while the connection receives starts the stream
- * and returns {@code null}.</p>
+ * is handled as soon as it is read, while the handlers that run go on: the messages read before
+ * it that still wait for their turn are discarded, except for a
+ * {@link #onMessages(Argument, WebSocketMessagesHandler) messages handler}, whose stream receives
+ * them. A handler that returns a stage that does not complete, e.g. of a stream that does not
+ * end, holds the next messages back: a handler that streams while the connection receives starts
+ * the stream and returns {@code null}.</p>
  *
  * <p>Streams: {@link io.micronaut.websocket.WebSocketSession#sendAllAsync(org.reactivestreams.Publisher)}
  * sends the messages of a publisher, at the pace the connection writes them, e.g. from the open
@@ -121,8 +123,9 @@ public sealed interface WebSocketRouteSpec permits WebSocketRouteEndpoint.Spec {
      * follow. The publisher has a single subscriber, which the handler subscribes before it is
      * done: the messages of a handler that is done without a subscriber, or that fails, are
      * discarded. The publisher completes when the connection closes, once the subscriber received
-     * the messages read before. The subscriber is signaled on the executor of the route. A route
-     * has a messages handler or a message handler.
+     * the messages read before. The handler and the subscriber run on the executor of the route,
+     * with the upgrade request as the current request. A route has a messages handler or a
+     * message handler.
      *
      * <pre>{@code
      * ws.onMessages(String.class, (messages, session) -> session.sendAllAsync(Flux.from(messages).map(String::toUpperCase)));

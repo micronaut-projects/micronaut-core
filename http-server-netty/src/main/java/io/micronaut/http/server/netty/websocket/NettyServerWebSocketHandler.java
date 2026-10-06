@@ -155,9 +155,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     private int handling;
     /**
-     * The data and close frames of a WebSocket route that wait for the handlers, in order. The
-     * connection reads at most {@link #MAX_PENDING_FRAMES} ahead, so a client cannot send messages
-     * faster than they are handled, while it still reads its pings. Event loop only.
+     * The data frames of a WebSocket route that wait for the handlers, in order. The connection
+     * reads at most {@link #MAX_PENDING_FRAMES} ahead, so a client cannot send messages faster than
+     * they are handled, while it still reads its pings and its close. Event loop only.
      */
     private final ArrayDeque<WebSocketFrame> pendingFrames = new ArrayDeque<>();
     /**
@@ -236,7 +236,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         if (routeEndpoint != null) {
             // the first message is handled once the open handler is done
             opening = true;
-            routeEndpoint.connected(serverSession, Objects.requireNonNull(routeExecutor), error -> {
+            // the handlers of the route run on its executor, the event loop by default, with the
+            // upgrade request as the current request
+            Executor handlerExecutor = routeExecutor == ImmediateExecutor.INSTANCE ? channel.eventLoop() : Objects.requireNonNull(routeExecutor);
+            Executor executor = command -> handlerExecutor.execute(() -> ServerRequestContext.with(originatingRequest, command));
+            routeEndpoint.connected(serverSession, executor, error -> {
                 ChannelHandlerContext handlerCtx = channel.pipeline().context(this);
                 exceptionCaught(handlerCtx == null ? ctx : handlerCtx, error);
             });
@@ -404,13 +408,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (maxConcurrentMessages > 0) {
             WebSocketFrame frame = (WebSocketFrame) msg;
-            if (frame instanceof CloseWebSocketFrame && streamsMessages) {
-                // the stream receives the messages read before the close, then completes
-                WebSocketFrame pending;
-                while ((pending = pendingFrames.poll()) != null) {
-                    handlePending(ctx, pending);
-                }
-            } else if (isDataOrClose(frame) && (!pendingFrames.isEmpty() || !mayHandle(frame))) {
+            if (frame instanceof CloseWebSocketFrame) {
+                // handled at once, whatever the handlers that run, e.g. the open handler of a
+                // stream that ends when the connection closes
+                closePending(ctx);
+            } else if (isData(frame) && (!pendingFrames.isEmpty() || !mayHandle())) {
                 // handled in order, once the handlers before it are done; pings are answered meanwhile
                 pendingFrames.add(frame.retain());
                 return;
@@ -495,10 +497,25 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             return;
         }
         WebSocketFrame frame;
-        while ((frame = pendingFrames.peek()) != null && mayHandle(frame)) {
-            handlePending(ctx, pendingFrames.poll());
+        while (mayHandle() && (frame = pendingFrames.poll()) != null) {
+            handlePending(ctx, frame);
         }
         readAhead(ctx);
+    }
+
+    /**
+     * The connection closes: the stream of a messages handler receives the messages read before
+     * the close, and the messages that wait for a handler are discarded.
+     */
+    private void closePending(ChannelHandlerContext ctx) {
+        WebSocketFrame frame;
+        while ((frame = pendingFrames.poll()) != null) {
+            if (streamsMessages) {
+                handlePending(ctx, frame);
+            } else {
+                frame.release();
+            }
+        }
     }
 
     private void handlePending(ChannelHandlerContext ctx, WebSocketFrame frame) {
@@ -512,22 +529,17 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     /**
-     * @return Whether a data or close frame of a WebSocket route can be handled: a message once
-     * the open handler is done and fewer than the most messages are handled, a close once the
-     * messages before it were handled
+     * @return Whether a message of a WebSocket route can be handled: once the open handler is done
+     * and while fewer than the most messages are handled
      */
-    private boolean mayHandle(WebSocketFrame frame) {
-        if (frame instanceof CloseWebSocketFrame) {
-            return handling == 0;
-        }
+    private boolean mayHandle() {
         return !opening && handling < maxConcurrentMessages;
     }
 
-    private static boolean isDataOrClose(WebSocketFrame frame) {
+    private static boolean isData(WebSocketFrame frame) {
         return frame instanceof TextWebSocketFrame
             || frame instanceof BinaryWebSocketFrame
-            || frame instanceof ContinuationWebSocketFrame
-            || frame instanceof CloseWebSocketFrame;
+            || frame instanceof ContinuationWebSocketFrame;
     }
 
     private void readAhead(ChannelHandlerContext ctx) {
