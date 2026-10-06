@@ -132,10 +132,14 @@ public final class DevRuntime implements Closeable {
      * What Netty initializes once per JVM and keeps: {@code PlatformDependent} keeps the exception that tells why it does
      * not use {@code Unsafe}, whose stack trace holds the classes on the stack of the thread that first used Netty. It reads
      * its system properties, such as {@code io.netty.noUnsafe}, then: in development mode they are those the JVM was
-     * launched with, not those an application's {@code main} would set before it runs Micronaut.
+     * launched with, not those an application's {@code main} would set before it runs Micronaut. H2's {@code DbException}
+     * preallocates the exceptions it reports an out of memory error with, whose stack traces hold the classes on the stack
+     * of the thread that first opened a connection; it loads its messages then, in the locale the JVM was launched with,
+     * not one an application's {@code main} would set before it opens a connection.
      */
     private static final List<String> PARENT_TIER_STATICS = List.of(
-        "io.netty.util.internal.PlatformDependent"
+        "io.netty.util.internal.PlatformDependent",
+        "org.h2.message.DbException"
     );
     /**
      * Reactor's schedulers: the shared ones live as long as the JVM and create their threads as work needs them.

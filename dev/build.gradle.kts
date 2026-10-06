@@ -42,6 +42,8 @@ dependencies {
     testImplementation(projects.micronautJacksonDatabind)
     // a Reactor application in development mode, run in a JVM of its own, to see what the shared schedulers' threads keep
     testImplementation(libs.managed.reactor)
+    // an H2 data source retained across generations, in a JVM of its own, to see what H2 keeps from its first use
+    testImplementation(libs.h2)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
