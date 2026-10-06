@@ -16,6 +16,7 @@
 package io.micronaut.http.client.sse;
 
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -34,6 +35,20 @@ import java.net.URL;
  * @since 1.0
  */
 public interface SseClient {
+
+    /**
+     * The {@link AsyncSseClient} view of this client, with {@link java.util.concurrent.CompletionStage}
+     * results and events pulled one at a time instead of Reactive Streams. The view shares this
+     * client: closing it closes this client.
+     * <p>The default implementation adapts {@link #exchangeEventStream(HttpRequest, Argument, Argument)}.</p>
+     *
+     * @return The async view of this client
+     * @since 5.3.0
+     */
+    @Experimental
+    default AsyncSseClient toAsyncSse() {
+        return new DefaultAsyncOverReactiveSseClient(this);
+    }
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>

@@ -111,3 +111,17 @@ Flux<String> messages = Flux.from(sseClient.exchangeEventStream(request, Argumen
 <4> When the body holds no event, for example for a `202 Accepted` response, a single response without a body is emitted
 
 When the response has an error status, the publisher fails with an api:http.client.exceptions.HttpClientResponseException[] whose response carries the error body, decoded into the given error type, instead of completing empty.
+
+==== Reading Events Asynchronously
+
+The api:http.client.sse.AsyncSseClient[] reads the same responses with a `CompletionStage` instead of a `Publisher`, and without Reactor on the Netty client. Obtain it from an api:http.client.sse.SseClient[] with `toAsyncSse()`, as `toAsync()` returns the api:http.client.AsyncHttpClient[] of an api:http.client.HttpClient[]:
+
+snippet::io.micronaut.docs.sse.AsyncSseClientSpec[tags="async", indent=0, title="Async SSE Client"]
+
+<1> The async view shares the client: closing it closes the client
+<2> `exchangeEventStream` completes with the response once its status and headers arrived, and fails with an api:http.client.exceptions.HttpClientResponseException[] for an error status. The `Accept` header and the decoding of the body follow the reactive `exchangeEventStream`
+<3> The body of the response is a api:http.body.BodyElements[] cursor over the events: the next event is read from the connection when it is asked for. A single body is one event, and a response without a body has no event
+<4> `forEach` reads the next event when the stage returned for the previous one completed. `next()` reads one event at a time
+<5> The status and the headers of the response are available while the events are read
+
+The connection stays reserved until the events were read to the end or the api:http.body.BodyElements[] was closed, so close the events of a stream that you do not read to the end. The stages complete on an I/O thread: do not block in them. `eventStream` sets `Accept: text/event-stream` and completes with the events only.
