@@ -305,6 +305,56 @@ class BeanWatchTest {
     }
 
     @Test
+    void aRecreatedProcessorIsGivenTheStartupMethodsOnceAndTheDestroyedOneNothingMore() {
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).trackBeanDependencies(true).start()) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            LegacyTickProcessor processor = context.getBean(LegacyTickProcessor.class);
+            assertEquals(List.of("tick", "tock"), processor.processed.stream().sorted().toList());
+
+            assertTrue(beanContext.recreate(processor));
+            LegacyTickProcessor recreated = context.getBean(LegacyTickProcessor.class);
+            assertNotSame(processor, recreated);
+            // the new processor is given what the startup pass gave the first one, once
+            assertEquals(List.of("tick", "tock"), recreated.processed.stream().sorted().toList());
+            assertEquals(List.of("tick", "tock"), processor.processed.stream().sorted().toList());
+            assertFalse(beanContext.adaptedProcessors().contains(processor));
+            assertTrue(beanContext.adaptedProcessors().contains(recreated));
+
+            // an addition reaches the new processor once, through its own adapter, and the destroyed one not at all
+            BeanDefinition<Ticker> definition = context.getBeanDefinition(Ticker.class);
+            beanContext.notifyDefinitionChange(List.of(definition), List.of(definition));
+            assertEquals(List.of("tick", "tick", "tock", "tock"), recreated.processed.stream().sorted().toList());
+            assertEquals(2, processor.processed.size());
+        }
+    }
+
+    @Test
+    void aProcessorRecreatedAsADependentIsCreatedAgainAndGivenTheStartupMethodsOnce() {
+        Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "pool-tick-processor.enabled", true);
+        try (ApplicationContext context = ApplicationContext.builder(properties).trackBeanDependencies(true).start()) {
+            WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            // created and fed by the startup pass, with the pool it received
+            PoolTickProcessor processor = context.getBean(PoolTickProcessor.class);
+            assertEquals(List.of("tick", "tock"), processor.processed.stream().sorted().toList());
+            Pool pool = processor.pool;
+
+            assertTrue(beanContext.recreate(pool));
+            // created again at once, as nothing would ask for it, on top of the new pool
+            Collection<BeanRegistration<PoolTickProcessor>> active = context.getActiveBeanRegistrations(PoolTickProcessor.class);
+            assertEquals(1, active.size());
+            PoolTickProcessor recreated = active.iterator().next().bean();
+            assertNotSame(processor, recreated);
+            assertNotSame(pool, recreated.pool);
+            assertSame(context.getBean(Pool.class), recreated.pool);
+            assertEquals(List.of("tick", "tock"), recreated.processed.stream().sorted().toList());
+            // the destroyed one is given nothing more
+            assertEquals(2, processor.processed.size());
+            assertSame(recreated, context.getBean(PoolTickProcessor.class));
+            assertEquals(2, recreated.processed.size());
+        }
+    }
+
+    @Test
     void aResourceStateReportedBeforeTheContextStartsIsTheFirstBatchDeliveredOnce() {
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).build()) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;

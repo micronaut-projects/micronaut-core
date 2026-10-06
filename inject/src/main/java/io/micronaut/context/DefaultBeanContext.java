@@ -291,6 +291,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
     /**
+     * Whether the startup pass has fed the executable method processors: a processor recreated before it, such as by
+     * the first batch of a watch, is fed by that pass, not again by {@link #recreateBean(Object)}.
+     */
+    private volatile boolean startupMethodsProcessed;
+    /**
      * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
      * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
      * in both cases before the context creates a bean; it only ever goes from null to a graph.
@@ -609,6 +614,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             disabledConfigurations.clear();
             singletonScope.clear();
             watches.clear();
+            startupMethodsProcessed = false;
             attributes.clear();
             beanInitializedEventListeners = null;
             beanCreationEventListeners = null;
@@ -809,6 +815,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * Replaces a singleton with a new instance of its definition, destroying first the beans that received
      * it, as the dependency graph records, so that they are created again on top of the new instance.
      *
+     * <p>An {@link ExecutableMethodProcessor} among them is created again at once, as the startup pass created it,
+     * since nothing else would ask for it, and is given the methods the startup pass gave it.</p>
+     *
      * @param bean The bean to recreate
      * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace
      */
@@ -818,19 +827,77 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             return false;
         }
         BeanDefinition<Object> definition = registration.getBeanDefinition();
+        List<BeanDefinition<Object>> processors = new ArrayList<>(2);
         if (dependencyGraph != null) {
             List<BeanDefinition<?>> dependents = new ArrayList<>(dependencyGraph.transitiveDependentsOf(definition));
             Collections.reverse(dependents);
             for (BeanDefinition<?> dependent : dependents) {
                 BeanRegistration<Object> held = singletonScope.findBeanRegistration((BeanDefinition<Object>) dependent);
                 if (held != null) {
+                    if (held.bean instanceof ExecutableMethodProcessor<?> && !processors.contains(held.getBeanDefinition())) {
+                        processors.add(held.getBeanDefinition());
+                    }
                     destroyBean(held);
                 }
             }
         }
         destroyBean(registration);
-        getBean(definition);
+        Object recreated = getBean(definition);
+        if (recreated instanceof ExecutableMethodProcessor<?> processor) {
+            processRecreated(definition, processor);
+        }
+        // in the order they were created, the reverse of the order they were destroyed in
+        Collections.reverse(processors);
+        for (BeanDefinition<Object> processorDefinition : processors) {
+            if (processorDefinition != definition && getBean(processorDefinition) instanceof ExecutableMethodProcessor<?> processor) {
+                processRecreated(processorDefinition, processor);
+            }
+        }
         return true;
+    }
+
+    /**
+     * Gives a processor created again by {@link #recreateBean(Object)} the methods the startup pass gives a
+     * processor of its annotation: those of the processed definitions whose executable stereotypes include it. The
+     * adapter the processor was given as it was created sees later additions only, so nothing is given twice; a
+     * deprecated processor was given every method as it was created, by the legacy listener.
+     *
+     * @param processorDefinition The definition of the processor
+     * @param processor The new processor
+     */
+    @SuppressWarnings("java:S3776")
+    private void processRecreated(BeanDefinition<?> processorDefinition, ExecutableMethodProcessor<?> processor) {
+        if (!startupMethodsProcessed || processorDefinition.hasAnnotation(Deprecated.class)) {
+            // the startup pass has not run yet, and gives the processor its methods when it does, or never runs, without
+            // eager beans
+            return;
+        }
+        List<Argument<?>> typeArguments = processorDefinition.getTypeArguments(ExecutableMethodProcessor.class);
+        if (typeArguments.size() != 1) {
+            return;
+        }
+        Class<?> annotationType = typeArguments.get(0).getType();
+        boolean started = false;
+        try {
+            for (BeanDefinition<Object> processed : processedBeanDefinitions()) {
+                for (ExecutableMethod<Object, ?> method : processed.getExecutableMethodsForProcessing()) {
+                    if (!method.getAnnotationMetadata().getAnnotationTypesByStereotype(Executable.class).contains(annotationType)) {
+                        continue;
+                    }
+                    if (!started) {
+                        started = true;
+                        if (processor instanceof LifeCycle<?> cycle) {
+                            cycle.start();
+                        }
+                    }
+                    processor.process(processed, method);
+                }
+            }
+        } finally {
+            if (started && processor instanceof LifeCycle<?> cycle) {
+                cycle.stop();
+            }
+        }
     }
 
     @Override
@@ -2779,6 +2846,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                 adaptProcessor(entry.getKey(), processor);
             }
         }
+        startupMethodsProcessed = true;
     }
 
     /**

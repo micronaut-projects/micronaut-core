@@ -206,6 +206,10 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
      * context in {@link io.micronaut.context.env.DevelopmentMode development mode} does; any other context recreates
      * nothing and returns false, rather than leave dependents holding the instance it destroyed.</p>
      *
+     * <p>An {@link io.micronaut.context.processor.ExecutableMethodProcessor}, whether it is the bean recreated or one
+     * of its dependents, is created again at once and given the methods the context gave it at startup, once, so
+     * that it picks up again what it was processing; the destroyed instance is given nothing more.</p>
+     *
      * @param bean The bean to recreate
      * @return Whether the context held the bean as a singleton and recreated it; false for a prototype, a bean of a
      * custom scope, a singleton registered at runtime, whose definition may only hand back the same instance, an
