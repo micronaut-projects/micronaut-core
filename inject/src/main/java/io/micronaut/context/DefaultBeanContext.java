@@ -4395,9 +4395,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         BeanRegistration<T> adopted = BeanRegistration.of(this, original.getIdentifier(), definition, original.getBean(), dependents, interceptorRegistrations);
         singletonScope.registerSingletonBean(adopted, definition.getDeclaredQualifier());
-        adoptedRetainedBeans.add(original.bean);
+        // the prototypes the instance owns are one set however many registrations it is adopted under
+        boolean firstRegistration = adoptedRetainedBeans.add(original.bean);
         if (dependencyGraph != null && registration instanceof RetainedRegistration<T> retained) {
             for (BeanDependencyGraph.BeanDependency edge : retained.dependencies) {
+                if (!firstRegistration && edge.dependent() != original.getBeanDefinition()) {
+                    // the edges of the prototypes it owns, already counted once per prototype instance
+                    continue;
+                }
                 // an edge of the bean itself, or of a prototype it owns: both ends are re-keyed to this context
                 BeanDefinition<?> dependent = edge.dependent() == original.getBeanDefinition() ? definition : resolveAdoptedDefinition(edge.dependent());
                 BeanDefinition<?> dependency = resolveAdoptedDefinition(edge.dependency());

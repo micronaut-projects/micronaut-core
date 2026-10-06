@@ -89,6 +89,43 @@ class RetainedRegistrationsSpec extends Specification {
         Consumer.DESTROYED.get() == 2
     }
 
+    void "an edge carried by the prototypes of two adopted beans stays until the last of them is destroyed"() {
+        given: "two singletons that each own a prototype holding the same singleton"
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .trackBeanDependencies(true)
+            .start()
+        LeaseHolderA a = first.getBean(LeaseHolderA)
+        LeaseHolderB b = first.getBean(LeaseHolderB)
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType in [LeaseHolderA, LeaseHolderB] }
+
+        when: "a new context adopts both, then destroys one of them and the prototype it owns"
+        ApplicationContext second = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .trackBeanDependencies(true)
+            .retainedRegistrations(retained)
+            .start()
+        def graph = second.findDependencyGraph().get()
+        def source = second.getBeanDefinition(Source)
+        assert second.getBean(LeaseHolderA).is(a)
+        assert second.getBean(LeaseHolderB).is(b)
+        assert graph.transitiveDependentsOf(source)*.beanType.containsAll([Lease, LeaseHolderA, LeaseHolderB])
+        second.destroyBean(LeaseHolderA)
+
+        then: "the prototype the other one owns still holds the singleton, so the other one still depends on it"
+        graph.dependentsOf(source)*.dependent()*.beanType.contains(Lease)
+        graph.transitiveDependentsOf(source)*.beanType.containsAll([Lease, LeaseHolderB])
+
+        when: "the other one is destroyed too"
+        second.destroyBean(LeaseHolderB)
+
+        then: "no prototype holds the singleton any more"
+        !graph.dependentsOf(source)*.dependent()*.beanType.contains(Lease)
+
+        cleanup:
+        second.close()
+    }
+
     void "a retained registration nobody adopts is destroyed with what it owns"() {
         given:
         ApplicationContext first = ApplicationContext.run('spec.name': 'RetainedRegistrationsSpec')

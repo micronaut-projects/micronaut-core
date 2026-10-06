@@ -315,13 +315,14 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
     }
 
     /**
-     * Records a dependency carried over from another context, for a bean adopted from it.
+     * Records a dependency carried over from another context, for a bean adopted from it. An edge of a prototype the
+     * bean owns counts as one more live instance holding it, as if that instance had been created here, so destroying
+     * another instance that holds the same edge does not drop it.
      *
-     * @param edge The dependency, with this context's definitions
+     * @param edge The dependency, with this context's definitions, once per instance that holds it
      */
     void record(BeanDependency edge) {
-        byDependent.computeIfAbsent(Key.of(edge.dependent()), k -> ConcurrentHashMap.newKeySet()).add(edge);
-        byDependency.computeIfAbsent(Key.of(edge.dependency()), k -> ConcurrentHashMap.newKeySet()).add(edge);
+        add(edge);
     }
 
     private static InjectionKind kindOf(BeanResolutionContext.Segment<?, ?> segment) {
