@@ -103,16 +103,27 @@ final class PendingRoute {
      * @throws NullPointerException if it is {@code null}
      */
     <T> T terminal(@Nullable T terminal, String name) {
-        checkPending();
         if (terminal == null) {
-            ended = true;
-            builder.dropPending(this);
-            throw new NullPointerException(name);
+            throw missing(name);
         }
+        checkPending();
         return terminal;
     }
 
-    private void record(Consumer<HandlerRoutes> setting) {
+    /**
+     * Drop the route that was given no handler or response.
+     *
+     * @param name The name of the missing handler or response, for the message
+     * @return The error to throw
+     */
+    NullPointerException missing(String name) {
+        checkPending();
+        ended = true;
+        builder.dropPending(this);
+        return new NullPointerException(name);
+    }
+
+    private void addSetting(Consumer<HandlerRoutes> setting) {
         checkPending();
         settings.add(setting);
     }
@@ -126,40 +137,40 @@ final class PendingRoute {
 
     void consumes(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        record(routes -> routes.consumes(checked));
+        addSetting(added -> added.consumes(checked));
     }
 
     void consumesAll() {
-        record(HandlerRoutes::consumesAll);
+        addSetting(HandlerRoutes::consumesAll);
     }
 
     void produces(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        record(routes -> routes.produces(checked));
+        addSetting(added -> added.produces(checked));
     }
 
     void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
         Objects.requireNonNull(annotationMetadata, "annotationMetadata");
-        record(routes -> routes.annotationMetadata(annotationMetadata));
+        addSetting(added -> added.annotationMetadata(annotationMetadata));
     }
 
     void annotate(AnnotationValue<?> annotationValue) {
         Objects.requireNonNull(annotationValue, "annotationValue");
-        record(routes -> routes.annotate(annotationValue));
+        addSetting(added -> added.annotate(annotationValue));
     }
 
     void responseType(Argument<?> responseType) {
         Objects.requireNonNull(responseType, "responseType");
-        record(routes -> routes.responseType(responseType));
+        addSetting(added -> added.responseType(responseType));
     }
 
     void executeOn(String executorName) {
         String name = RouteArguments.executorName(executorName);
-        record(routes -> routes.executeOn(name));
+        addSetting(added -> added.executeOn(name));
     }
 
     void nonBlocking() {
-        record(HandlerRoutes::nonBlocking);
+        addSetting(HandlerRoutes::nonBlocking);
     }
 
     void port(String port) {
@@ -168,31 +179,31 @@ final class PendingRoute {
 
     void port(int port) {
         int checked = RouteArguments.port(port);
-        record(routes -> routes.port(checked));
+        addSetting(added -> added.port(checked));
     }
 
     void attribute(String name, Object value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
-        record(routes -> routes.attribute(name, value));
+        addSetting(added -> added.attribute(name, value));
     }
 
     void order(int order) {
-        record(routes -> routes.order(order));
+        addSetting(added -> added.order(order));
     }
 
     void where(RouteCondition condition) {
         Objects.requireNonNull(condition, "condition");
-        record(routes -> routes.where(condition));
+        addSetting(added -> added.where(condition));
     }
 
     void constrain(Predicate<? super PathVariables> accepted) {
         Objects.requireNonNull(accepted, "accepted");
-        record(routes -> routes.constrain(accepted));
+        addSetting(added -> added.constrain(accepted));
     }
 
     void filter(FilterRegistration filter) {
         // the filter spec of the registration may choose its executor until the route is built
-        record(routes -> routes.filter(filter));
+        addSetting(added -> added.filter(filter));
     }
 }

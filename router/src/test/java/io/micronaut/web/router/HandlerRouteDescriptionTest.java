@@ -68,7 +68,8 @@ class HandlerRouteDescriptionTest {
             group.error(IllegalStateException.class, (request, error) -> HttpResponse.ok());
             group.GET("/x", HandlerRouteDescriptionTest::ok);
         });
-        RoutingException e = assertThrows(RoutingException.class, () -> new DefaultRouter(List.of(), List.of(() -> assembly)));
+        List<AssembledRoutes> assembled = List.of(() -> assembly);
+        RoutingException e = assertThrows(RoutingException.class, () -> new DefaultRouter(List.of(), assembled));
         assertTrue(e.getMessage().endsWith("IllegalStateException -> ErrorRouteHandler lambda in HandlerRouteDescriptionTest"), e.getMessage());
     }
 

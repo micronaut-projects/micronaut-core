@@ -24,6 +24,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
@@ -44,11 +45,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * A route match filter, here versioning, applies to the candidates before the ambiguity between
  * them is resolved, and the order of the routes still breaks the ties among the routes the filter
- * accepts.
+ * accepts, also in the table of a located target.
  */
 class FilteredRouteOrderTest {
 
     private static final String VERSION = HeaderVersionResolverConfiguration.DEFAULT_HEADER_NAME;
+
 
     @Test
     void theOrderBreaksTheTieAmongTheRoutesOfTheRequestedVersion() {
@@ -74,9 +76,25 @@ class FilteredRouteOrderTest {
             routes.GET("/items/{name}").annotate(version("2")).order(-5).handle(handler("c"));
         });
 
-        DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/items/x").header(VERSION, "1")));
+        var versionOne = HttpRequest.GET("/items/x").header(VERSION, "1");
+        DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(versionOne));
         assertEquals(2, error.getUriRoutes().size());
         assertEquals("c", target(router, HttpRequest.GET("/items/x").header(VERSION, "2")));
+    }
+
+    @Test
+    void theRoutesOfALocatedTableAreFilteredBeforeTheirAmbiguityIsResolved() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> {
+            located.GET("/items/{name}").annotate(version("1")).order(5).handle(handler("v1 late"));
+            located.GET("/items/{name}").annotate(version("1")).order(-5).handle(handler("v1 early"));
+            located.GET("/items/special").annotate(version("2")).handle(handler("v2 special"));
+        });
+        // the locator route has no version: it is not rejected for a request of a version
+        Router router = versioned(routes -> routes.locate("/shops/{id}", (request, pathVariables) -> "shop", shop -> items));
+
+        assertEquals("v1 early", target(router, HttpRequest.GET("/shops/1/items/special").header(VERSION, "1")));
+        assertEquals("v2 special", target(router, HttpRequest.GET("/shops/1/items/special").header(VERSION, "2")));
+        assertNull(router.findClosest(HttpRequest.GET("/shops/1/items/other").header(VERSION, "2")));
     }
 
     private static AnnotationValue<Version> version(String version) {

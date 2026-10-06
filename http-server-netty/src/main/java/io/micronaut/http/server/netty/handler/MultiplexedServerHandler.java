@@ -155,6 +155,16 @@ abstract class MultiplexedServerHandler {
         private boolean outboundWritableScheduled;
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
+        /**
+         * The callbacks of {@link #whenAbandoned(Runnable)}, guarded by this stream, or
+         * {@code null} if none is registered.
+         */
+        @Nullable
+        private List<Runnable> abandonCallbacks;
+        /**
+         * Whether the stream was abandoned, guarded by this stream.
+         */
+        private boolean abandoned;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -357,6 +367,7 @@ abstract class MultiplexedServerHandler {
          */
         final void onRstStreamRead(Exception e) {
             reset = true;
+            abandon();
             if (streamer != null) {
                 streamer.error(e);
             }
@@ -377,6 +388,64 @@ abstract class MultiplexedServerHandler {
                     buf.release();
                 }
                 bufferedContent = null;
+            }
+        }
+
+        /**
+         * Called when the stream is closed, by either side or with the connection: if the
+         * response was not written, the request is abandoned.
+         */
+        final void onStreamClosed() {
+            if (!finished) {
+                abandon();
+            }
+        }
+
+        /**
+         * Run the callbacks of {@link #whenAbandoned(Runnable)}, once.
+         */
+        private void abandon() {
+            List<Runnable> callbacks;
+            synchronized (this) {
+                if (abandoned) {
+                    return;
+                }
+                abandoned = true;
+                callbacks = abandonCallbacks;
+                abandonCallbacks = null;
+            }
+            if (callbacks != null) {
+                for (Runnable callback : callbacks) {
+                    callback.run();
+                }
+            }
+        }
+
+        @Override
+        public final Runnable whenAbandoned(Runnable callback) {
+            // the request of a stream is abandoned with the stream, not with the connection
+            synchronized (this) {
+                if (!abandoned) {
+                    List<Runnable> callbacks = abandonCallbacks;
+                    if (callbacks == null) {
+                        callbacks = new ArrayList<>(1);
+                        abandonCallbacks = callbacks;
+                    }
+                    callbacks.add(callback);
+                    return () -> removeAbandonCallback(callback);
+                }
+            }
+            callback.run();
+            return () -> { };
+        }
+
+        private synchronized void removeAbandonCallback(Runnable callback) {
+            List<Runnable> callbacks = abandonCallbacks;
+            if (callbacks != null) {
+                callbacks.remove(callback);
+                if (callbacks.isEmpty()) {
+                    abandonCallbacks = null;
+                }
             }
         }
 

@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -283,7 +284,25 @@ final class UriRouteSet {
      * @return The closest matches
      */
     <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, @Nullable Set<Integer> ports) {
-        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request, ports);
+        return findAllClosest(request, null, ports);
+    }
+
+    /**
+     * The closest matches of the request among the candidates a filter accepts, see
+     * {@link Router#findAllClosest(HttpRequest, Predicate)}. A route with a dynamic target is no
+     * candidate itself: the filter applies to the matches its target resolves.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidates, applied before the ambiguity is resolved, or {@code null}
+     * @param ports   The default ports, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches
+     */
+    <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request,
+                                                    @Nullable Predicate<UriRouteMatch<T, R>> filter,
+                                                    @Nullable Set<Integer> ports) {
+        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request, filter, ports);
         if (!hasDynamicTargets || matches.isEmpty()) {
             return matches;
         }
@@ -293,7 +312,7 @@ final class UriRouteSet {
             if (target == null) {
                 result.add(match);
             } else {
-                result.addAll(target.findAllClosest(request, match));
+                result.addAll(target.findAllClosest(request, match, filter));
             }
         }
         return result;
@@ -303,17 +322,41 @@ final class UriRouteSet {
      * The closest matches of a request.
      *
      * @param request The request
+     * @param filter  The filter of the candidates, or {@code null}
      * @param ports   The default ports, or {@code null}
      * @param <T>     The target type
      * @param <R>     The result type
      * @return The closest matches
      */
-    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request, @Nullable Set<Integer> ports) {
-        List<UriRouteMatch<T, R>> uriRoutes = findMatches(request, request.getPath(), ports);
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request,
+                                                                  @Nullable Predicate<UriRouteMatch<T, R>> filter,
+                                                                  @Nullable Set<Integer> ports) {
+        List<UriRouteMatch<T, R>> uriRoutes = filter(findMatches(request, request.getPath(), ports), filter);
         if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
         return DefaultRouter.resolveAmbiguity(request, uriRoutes);
+    }
+
+    private <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (filter == null || matches.isEmpty()) {
+            return matches;
+        }
+        var filtered = new ArrayList<UriRouteMatch<T, R>>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            if (accepts(filter, match)) {
+                filtered.add(match);
+            }
+        }
+        return filtered;
+    }
+
+    /**
+     * Whether the filter accepts a candidate. A route with a dynamic target is no candidate: the
+     * filter applies to the matches its target resolves.
+     */
+    private <T, R> boolean accepts(Predicate<UriRouteMatch<T, R>> filter, UriRouteMatch<T, R> match) {
+        return hasDynamicTargets && DynamicRouteTarget.of(match.getRouteInfo()) != null || filter.test(match);
     }
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, UriRouteInfo<Object, Object>[] routes) {
@@ -427,7 +470,7 @@ final class UriRouteSet {
                     continue;
                 }
                 UriRouteMatch match = route.tryMatch(path);
-                if (match != null && acceptsVariables(route, match)) {
+                if (match != null && acceptsVariables(request, route, match)) {
                     matchedRoutes.add(match);
                 }
             }
@@ -447,7 +490,7 @@ final class UriRouteSet {
             DynamicRouteTarget target = DynamicRouteTarget.of(match.getRouteInfo());
             if (target == null) {
                 result.add(match);
-            } else if (dynamicMatch == null || match.getRouteInfo().compareTo((UriRouteInfo) dynamicMatch.getRouteInfo()) < 0) {
+            } else if (dynamicMatch == null || match.getRouteInfo().compareTo(dynamicMatch.getRouteInfo()) < 0) {
                 dynamicMatch = match;
                 dynamicTarget = target;
             }
@@ -539,7 +582,7 @@ final class UriRouteSet {
         UriRouteMatch<Object, Object> constrainedMatch = null;
         if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.isConstrained()) {
             constrainedMatch = info.tryMatch(uri);
-            if (constrainedMatch == null || !info.acceptsVariables(constrainedMatch.getVariableValues())) {
+            if (constrainedMatch == null || !info.acceptsVariables(constrainedValues(request, constrainedMatch.getVariableValues()))) {
                 return null;
             }
         }
@@ -568,6 +611,29 @@ final class UriRouteSet {
     private static boolean acceptsVariables(UriRouteInfo<?, ?> route, UriMatchInfo match) {
         return !(route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained())
             || info.acceptsVariables(match.getVariableValues());
+    }
+
+    /**
+     * @param request The request
+     * @param route   The route
+     * @param match   A match of the route
+     * @return Whether the constraints of the route, if any, accept the variables of the match
+     */
+    private static boolean acceptsVariables(HttpRequest<?> request, UriRouteInfo<?, ?> route, UriMatchInfo match) {
+        return !(route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained())
+            || info.acceptsVariables(constrainedValues(request, match.getVariableValues()));
+    }
+
+    /**
+     * The variables the constraints of a route see: those its handler gets, with the variables of
+     * the decoded prefixes of the locator routes for a route of a located target.
+     *
+     * @param request The request, a {@link RouteLocator.LocatedRequest} for a route of a located target
+     * @param values  The raw values of the variables of the match
+     * @return The values
+     */
+    private static Map<String, Object> constrainedValues(HttpRequest<?> request, Map<String, Object> values) {
+        return request instanceof RouteLocator.LocatedRequest<?> located ? located.location().withDecodedPrefixValues(values) : values;
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {

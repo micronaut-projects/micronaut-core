@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -39,6 +40,7 @@ import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -84,6 +86,10 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
+    /**
+     * The request attribute of a preflight request answered after the route is matched.
+     */
+    private static final String DEFERRED_PREFLIGHT_ATTRIBUTE = "micronaut.cors.preflight.deferred";
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
@@ -97,9 +103,10 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     private final StaticResourceResolver staticResourceResolver;
 
     /**
-     * The {@link CrossOrigin} configuration per route. Routes are fixed at startup, so this stays bounded.
+     * The {@link CrossOrigin} configuration per route, with the annotations it was built from.
+     * Routes are fixed at startup, so this stays bounded.
      */
-    private final Map<RouteInfo<?>, Optional<CorsOriginConfiguration>> routeConfigurations = new ConcurrentHashMap<>();
+    private final Map<RouteInfo<?>, RouteCorsConfiguration> routeConfigurations = new ConcurrentHashMap<>();
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
@@ -134,7 +141,14 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     @Internal
     public final HttpResponse<?> filterPreFlightRequest(HttpRequest<?> request) {
         if (isEnabled(request) && CorsUtil.isPreflightRequest(request)) {
+            // finding the routes of the path starts the asynchronous route locators of the path
             List<UriRouteMatch<Object, Object>> routeMatches = router != null ? router.findAny(request) : Collections.emptyList();
+            if (RouteLocator.isLocating(request)) {
+                // an asynchronous route locator of the path has not located its target yet: the
+                // routes of the path are known once the request is matched, see filterRequest
+                request.setAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE, Boolean.TRUE);
+                return null; // proceed
+            }
             CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request, routeMatches).orElse(null);
             if (corsOriginConfiguration != null) {
                 return handlePreflightRequest(request, corsOriginConfiguration, routeMatches);
@@ -151,6 +165,16 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (origin == null) {
             LOG.trace("Http Header {} not present. Proceeding with the request.", HttpHeaders.ORIGIN);
             return null; // proceed
+        }
+        if (request.getAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE).isPresent()) {
+            // the preflight request of a path an asynchronous route locator serves, now that the
+            // locator located its target
+            request.removeAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE, Boolean.class);
+            List<UriRouteMatch<Object, Object>> routeMatches = router != null ? router.findAny(request) : Collections.emptyList();
+            CorsOriginConfiguration anyConfiguration = getAnyConfiguration(request, routeMatches).orElse(null);
+            if (anyConfiguration != null) {
+                return handlePreflightRequest(request, anyConfiguration, routeMatches);
+            }
         }
         CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {
@@ -409,12 +433,19 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     /**
-     * The {@link CrossOrigin} configuration of a route, built once per route.
-     * The route annotation metadata does not change for a route, so the configuration does not either.
+     * The {@link CrossOrigin} configuration of a route match, built once per route from the annotations of its matches.
+     * A match of a route reached through a route locator may also carry the annotations of the groups of the locator
+     * routes, which differ by location for the same route: such a match has annotations other than the ones the
+     * cached configuration was built from, and its configuration is built from its own annotations instead.
      */
     private Optional<CorsOriginConfiguration> getCorsOriginConfiguration(RouteMatch<?> routeMatch) {
-        return routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
-            routeInfo -> CrossOriginUtil.getCorsOriginConfiguration(routeMatch.getAnnotationMetadata()));
+        AnnotationMetadata annotationMetadata = routeMatch.getAnnotationMetadata();
+        RouteCorsConfiguration cached = routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
+            routeInfo -> new RouteCorsConfiguration(annotationMetadata, CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata)));
+        if (cached.annotationMetadata() == annotationMetadata) {
+            return cached.configuration();
+        }
+        return CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata);
     }
 
     private static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
@@ -539,4 +570,13 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return methods;
     }
 
+    /**
+     * The {@link CrossOrigin} configuration of a route.
+     *
+     * @param annotationMetadata The annotations the configuration was built from
+     * @param configuration      The configuration
+     */
+    private record RouteCorsConfiguration(AnnotationMetadata annotationMetadata,
+                                          Optional<CorsOriginConfiguration> configuration) {
+    }
 }

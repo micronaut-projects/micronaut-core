@@ -70,8 +70,9 @@ class BodyRoutesTest {
     void boundedText() {
         BlockingHttpClient http = client.toBlocking();
         assertEquals("received 5 characters", http.retrieve(HttpRequest.POST("/async/notes", "hello").contentType(MediaType.TEXT_PLAIN_TYPE)));
-        HttpClientResponseException tooLarge = assertThrows(HttpClientResponseException.class, () ->
-            http.retrieve(HttpRequest.POST("/async/notes", "x".repeat(2048)).contentType(MediaType.TEXT_PLAIN_TYPE)));
+        var tooLargeRequest = HttpRequest.POST("/async/notes", "x".repeat(2048)).contentType(MediaType.TEXT_PLAIN_TYPE);
+        HttpClientResponseException tooLarge = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(tooLargeRequest));
         assertEquals(HttpStatus.REQUEST_ENTITY_TOO_LARGE, tooLarge.getStatus());
     }
 
@@ -88,8 +89,9 @@ class BodyRoutesTest {
     @Test
     void aRequestRejectedWithoutReadingTheBody() {
         BlockingHttpClient http = client.toBlocking();
-        HttpClientResponseException unauthorized = assertThrows(HttpClientResponseException.class, () ->
-            http.retrieve(HttpRequest.POST("/async/guarded", new byte[10]).contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE)));
+        var unauthorizedRequest = HttpRequest.POST("/async/guarded", new byte[10]).contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE);
+        HttpClientResponseException unauthorized = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(unauthorizedRequest));
         assertEquals(HttpStatus.UNAUTHORIZED, unauthorized.getStatus());
         assertEquals("accepted 10 bytes", http.retrieve(HttpRequest.POST("/async/guarded", new byte[10])
             .contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE)

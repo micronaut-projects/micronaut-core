@@ -368,7 +368,7 @@ public final class RouteExecutor {
                 }
                 if (errorRoute == null) {
                     // handle error with a status route of the groups of the handler route
-                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode());
+                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode(), cause);
                 }
                 if (errorRoute == null) {
                     // handle error with a method that is global with bad request
