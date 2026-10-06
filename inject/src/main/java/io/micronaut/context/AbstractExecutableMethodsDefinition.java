@@ -92,6 +92,28 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
     }
 
+    /**
+     * Releases the environment and the context that the methods were configured with last, if they still are: a
+     * definition of the parent tier holds these methods statically, for every context that loads it, and a stopped
+     * context must not stay reachable from them. A context that configured them since keeps them.
+     *
+     * @param environment The environment of the context that stops
+     * @param beanContext The context that stops
+     */
+    final void release(Environment environment, BeanContext beanContext) {
+        BeanContext configuredContext = this.beanContext;
+        if (this.environment != environment || configuredContext != null && configuredContext != beanContext) {
+            return;
+        }
+        this.environment = null;
+        this.beanContext = null;
+        for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
+            if (executableMethod != null) {
+                executableMethod.release();
+            }
+        }
+    }
+
     @Override
     public List<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsList == null) {
@@ -469,6 +491,24 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
                     if (argumentAnnotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
                         eam.configure(beanContext);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Forgets the environment and the bean context configured last, and the metadata wrapped for them.
+         */
+        @SuppressWarnings("NullAway") // an evaluation context takes a null bean context, which is what it starts with
+        void release() {
+            environment = null;
+            beanContext = null;
+            annotationMetadata = sourceAnnotationMetadata;
+            returnType = null;
+            if (argumentsAnnotationsWithExpressions) {
+                for (Argument<?> argument : arguments) {
+                    if (argument.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata eam) {
+                        eam.configure(null);
                     }
                 }
             }

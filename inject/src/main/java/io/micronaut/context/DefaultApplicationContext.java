@@ -299,6 +299,16 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * default reads, tracks bean dependencies too, unless the builder switched tracking off. The environment
      * has started when this is asked, and no bean has been created yet.
      */
+    /**
+     * In development mode, the environment of this context when the context created it: a context given its environment
+     * may share it with a running context that configured the shared executable methods last.
+     */
+    @Override
+    @Nullable
+    Environment environmentToReleaseOnStop() {
+        return environmentManaged && DevelopmentMode.isEnabled(environment) ? environment : null;
+    }
+
     @Override
     boolean isBeanDependencyTrackingEnabledOnStart() {
         boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isBeanDependencyTrackingSwitchedOff();
