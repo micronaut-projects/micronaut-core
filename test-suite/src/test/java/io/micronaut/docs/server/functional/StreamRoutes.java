@@ -16,6 +16,7 @@ import jakarta.inject.Singleton;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
@@ -56,6 +57,14 @@ public class StreamRoutes implements HttpRoutes {
         routes.POST("/words").consumes(MediaType.TEXT_PLAIN_TYPE).body(String.class).sse((request, pathVariables, text, events) -> { // <7>
             for (String word : text.split(" ")) {
                 events.send(word);
+            }
+        });
+        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String.class).sse((request, pathVariables, message, events) -> {
+            events.header("Session-Id", "s-1"); // <9>
+            switch (message) {
+                case "notify" -> events.respond(HttpResponse.accepted()); // <10>
+                case "ping" -> events.respond(HttpResponse.ok(Map.of("result", "pong")));
+                default -> events.send("received " + message);
             }
         });
         routes.GET("/numbers", (request, pathVariables) -> {

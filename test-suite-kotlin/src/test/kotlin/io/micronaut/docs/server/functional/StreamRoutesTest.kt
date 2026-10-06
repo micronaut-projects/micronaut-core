@@ -2,6 +2,8 @@ package io.micronaut.docs.server.functional
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -19,7 +21,17 @@ class StreamRoutesTest {
                 assertEquals("data: tick 1\n\ndata: tick 2\n\ndata: tick 3\n\n", http.retrieve(HttpRequest.GET<Any>("/ticks")))
                 assertEquals("data: a\n\ndata: b\n\n", http.retrieve(HttpRequest.POST("/words", "a b").contentType(MediaType.TEXT_PLAIN_TYPE)))
                 assertEquals("[1,2,3]", http.retrieve(HttpRequest.GET<Any>("/numbers")))
+                val notified = http.exchange(message("notify"), String::class.java)
+                assertEquals(HttpStatus.ACCEPTED, notified.status)
+                assertEquals("s-1", notified.headers.get("Session-Id"))
+                assertEquals("{\"result\":\"pong\"}", http.retrieve(message("ping")))
+                assertEquals("data: received hello\n\n", http.retrieve(message("hello")))
             }
         }
     }
+
+    private fun message(message: String): MutableHttpRequest<String> =
+        HttpRequest.POST("/messages", message)
+            .contentType(MediaType.TEXT_PLAIN_TYPE)
+            .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE)
 }

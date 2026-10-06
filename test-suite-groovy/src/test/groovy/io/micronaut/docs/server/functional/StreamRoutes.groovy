@@ -55,6 +55,16 @@ class StreamRoutes implements HttpRoutes {
                 events.send(word)
             }
         }
+        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String).sse { request, pathVariables, String message, events ->
+            events.header("Session-Id", "s-1") // <9>
+            if (message == "notify") {
+                events.respond(HttpResponse.accepted()) // <10>
+            } else if (message == "ping") {
+                events.respond(HttpResponse.ok([result: "pong"]))
+            } else {
+                events.send("received " + message)
+            }
+        }
         routes.GET("/numbers") { request, pathVariables ->
             Iterator<Integer> numbers = [1, 2, 3].iterator()
             HttpResponse.ok(ResponseElements.of { // <8>

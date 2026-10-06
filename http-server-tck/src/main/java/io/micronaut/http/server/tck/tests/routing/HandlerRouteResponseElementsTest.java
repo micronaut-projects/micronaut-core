@@ -26,6 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.sse.Event;
@@ -202,6 +203,32 @@ public class HandlerRouteResponseElementsTest {
                 readUntil(socket.getInputStream(), "tick");
             }
             assertClosed(server, "endless");
+        }
+    }
+
+    @Test
+    void elementsOfTheRequestBodyInAWrappedResponse() throws Exception {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server,
+                HttpRequest.POST("/elements/echo-wrapped", "[\"a\",\"b\",\"c\"]").contentType(MediaType.APPLICATION_JSON_TYPE),
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("[\"a\",\"b\",\"c\"]")
+                    .build());
+        }
+    }
+
+    @Test
+    void streamingByteBodyElementIsWrittenAsItArrives() throws Exception {
+        try (ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            request(socket, "POST /elements/echo-body HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/octet-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n");
+            // the response starts before the request body, the element, ends
+            String start = readUntil(socket.getInputStream(), "hello");
+            assertTrue(start.startsWith("HTTP/1.1 200"), start);
+            request(socket, "6\r\n world\r\n0\r\n\r\n");
+            String rest = readToEnd(socket.getInputStream());
+            assertTrue(rest.contains("world"), rest);
         }
     }
 
@@ -410,6 +437,19 @@ public class HandlerRouteResponseElementsTest {
                     .afterReplacing((request, response) -> new HttpResponseWrapper<>(response)).and()
                     .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("wrapped", List.of("hello").iterator()))
                         .contentType(MediaType.TEXT_PLAIN_TYPE));
+                routes.POST("/elements/echo-wrapped").body().handleAsync((request, pathVariables, body) -> {
+                    BodyElements<String> elements = body.elements(String.class);
+                    // the wrapper hides the elements from a check of the response type
+                    return CompletableFuture.completedStage(new HttpResponseWrapper<>(
+                        HttpResponse.ok(ResponseElements.of(elements::next)).contentType(MediaType.APPLICATION_JSON_TYPE)));
+                });
+                routes.POST("/elements/echo-body").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync((request, pathVariables, body) -> {
+                    // one element: the request body, streamed back as it arrives
+                    Iterator<CloseableByteBody> element = List.of(body.takeBody()).iterator();
+                    return CompletableFuture.completedStage(HttpResponse.ok(ResponseElements.of(() ->
+                            CompletableFuture.completedFuture(element.hasNext() ? Optional.of(element.next()) : Optional.<CloseableByteBody>empty())))
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE));
+                });
                 routes.GET("/elements/endless", (request, pathVariables) -> HttpResponse.ok(recorder.source("endless", new Iterator<String>() {
                     @Override
                     public boolean hasNext() {

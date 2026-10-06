@@ -16,6 +16,7 @@
 package io.micronaut.http.sse;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpResponse;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -40,7 +41,8 @@ import java.util.function.Consumer;
  * compressed) is sent when the first event, comment or heartbeat is sent, or when the stream ends.
  * Until then the stream can still be refused: an exception of the handler, or
  * {@link #fail(Throwable)}, is answered by the error handling of the route, exactly like an
- * exception of any other route, and {@link #header} adds headers to the response. After that, a
+ * exception of any other route, {@link #header} adds headers to the response, and
+ * {@link #respond} answers with another response instead of the event stream. After that, a
  * failure ends the response abruptly: it is logged, and the connection is closed. To send the
  * response before the first event, send a {@link #comment(String) comment} or configure a
  * {@link #heartbeat(Duration) heartbeat}. Until the response is sent, a disconnect of the client
@@ -164,6 +166,20 @@ public interface SseEmitter {
      * @throws IllegalArgumentException if the header is {@code Content-Type}
      */
     SseEmitter header(CharSequence name, CharSequence value);
+
+    /**
+     * Answer with another response instead of the event stream, before the first event, comment
+     * or heartbeat: e.g. a single JSON message, or {@code 202 Accepted} without a body, for a
+     * protocol in which the server decides per request whether to stream, such as the
+     * <a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http">MCP
+     * Streamable HTTP transport</a>. The headers added with {@link #header} are added to the
+     * response, unless it has them, and a body without a content type is written as JSON. The
+     * stream ends: the {@link #onClose} callbacks run with {@code null}.
+     *
+     * @param response The response
+     * @throws IllegalStateException if the response was already sent, or the stream ended
+     */
+    void respond(HttpResponse<?> response);
 
     /**
      * Keep the stream open after the handler returns: the handler sends the events later, from

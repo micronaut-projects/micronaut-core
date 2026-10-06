@@ -40,6 +40,8 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -278,6 +280,30 @@ final class DefaultSseEmitter implements SseEmitter {
     }
 
     @Override
+    public void respond(HttpResponse<?> other) {
+        Objects.requireNonNull(other, "response");
+        if (!stream.replace(() -> responseState.compareAndSet(ResponseState.PENDING, ResponseState.REPLACED))) {
+            throw new IllegalStateException("The response was already sent, or the stream ended: answer with another response before the first event, comment or heartbeat");
+        }
+        MutableHttpResponse<?> replacement = other.toMutableResponse();
+        synchronized (this) {
+            // the headers given before: header(...) can no longer add any, the response is replaced
+            for (Map.Entry<String, List<String>> header : headers.getHeaders()) {
+                if (!replacement.getHeaders().contains(header.getKey())) {
+                    for (String value : header.getValue()) {
+                        replacement.header(header.getKey(), value);
+                    }
+                }
+            }
+        }
+        if (replacement.getContentType().isEmpty() && replacement.getBody().isPresent()) {
+            // the route produces text/event-stream, which is not the type of this body
+            replacement.contentType(MediaType.APPLICATION_JSON_TYPE);
+        }
+        context.propagate(() -> response.complete(replacement));
+    }
+
+    @Override
     public synchronized SseEmitter heartbeat(Duration period) {
         Objects.requireNonNull(period, "period");
         if (period.isNegative()) {
@@ -392,13 +418,14 @@ final class DefaultSseEmitter implements SseEmitter {
     }
 
     /**
-     * Whether the response was sent ({@link #SENT}), or refused by a failure before
-     * ({@link #REFUSED}).
+     * Whether the response was sent ({@link #SENT}), refused by a failure before
+     * ({@link #REFUSED}), or replaced by another response ({@link #REPLACED}).
      */
     private enum ResponseState {
         PENDING,
         SENT,
-        REFUSED
+        REFUSED,
+        REPLACED
     }
 
     /**

@@ -3,11 +3,13 @@ from typing import Annotated
 import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
-from micronaut.http import HttpRequest, MediaType
+from micronaut.http import HttpRequest, HttpStatus, MediaType
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
+
+String = java.type("java.lang.String")
 
 
 @Property(name="spec.name", value="StreamRoutesTest")
@@ -22,3 +24,14 @@ class StreamRoutesTest:
         assert http.retrieve(HttpRequest.GET("/ticks")) == "data: tick 1\n\ndata: tick 2\n\ndata: tick 3\n\n"
         assert http.retrieve(HttpRequest.POST("/words", "a b").contentType(MediaType.TEXT_PLAIN_TYPE)) == "data: a\n\ndata: b\n\n"
         assert http.retrieve(HttpRequest.GET("/numbers")) == "[1,2,3]"
+        notified = http.exchange(message("notify"), String)
+        assert notified.getStatus() == HttpStatus.ACCEPTED
+        assert notified.getHeaders().get("Session-Id") == "s-1"
+        assert http.retrieve(message("ping")) == '{"result":"pong"}'
+        assert http.retrieve(message("hello")) == "data: received hello\n\n"
+
+
+def message(message):
+    return (HttpRequest.POST("/messages", message)
+            .contentType(MediaType.TEXT_PLAIN_TYPE)
+            .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE))

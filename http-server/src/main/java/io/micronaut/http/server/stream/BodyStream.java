@@ -289,6 +289,31 @@ final class BodyStream implements BufferConsumer.Upstream {
     }
 
     /**
+     * End the stream without sending its body, if it is open and the response is replaced by
+     * another one: the decision is atomic with the state of the stream. The body is closed, and
+     * the callbacks run with {@code null}: the stream ended normally.
+     *
+     * @param replace Replaces the response, under the lock of the stream: {@code false} if the
+     *                response was sent or refused meanwhile
+     * @return Whether this ended the stream
+     */
+    boolean replace(BooleanSupplier replace) {
+        Effects effects = new Effects();
+        lock.lock();
+        try {
+            if (state != State.OPEN || !replace.getAsBoolean()) {
+                return false;
+            }
+            closeLocked(State.COMPLETED, new IllegalStateException("The stream was answered with another response"), null, effects);
+        } finally {
+            lock.unlock();
+        }
+        effects.run();
+        body.close();
+        return true;
+    }
+
+    /**
      * @return Whether a write would complete immediately
      */
     boolean isWritable() {

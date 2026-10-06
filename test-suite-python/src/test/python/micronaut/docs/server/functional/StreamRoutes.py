@@ -13,6 +13,7 @@ from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes
 
 CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
 Duration = java.type("java.time.Duration")
+Map = java.type("java.util.Map")
 Optional = java.type("java.util.Optional")
 String = java.type("java.lang.String")
 # end::imports[]
@@ -54,6 +55,17 @@ class StreamRoutes(HttpRoutes):
                 events.send(word)
 
         routes.POST("/words").consumes(MediaType.TEXT_PLAIN_TYPE).body(String).sse(words)  # <7>
+
+        def messages(request, path_variables, message, events):
+            events.header("Session-Id", "s-1")  # <9>
+            if message == "notify":
+                events.respond(HttpResponse.accepted())  # <10>
+            elif message == "ping":
+                events.respond(HttpResponse.ok(Map.of("result", "pong")))
+            else:
+                events.send(f"received {message}")
+
+        routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String).sse(messages)
 
         def numbers(request, path_variables):
             remaining = iter([1, 2, 3])

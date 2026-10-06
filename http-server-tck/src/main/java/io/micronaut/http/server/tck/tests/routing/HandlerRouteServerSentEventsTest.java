@@ -356,6 +356,42 @@ public class HandlerRouteServerSentEventsTest {
     }
 
     @Test
+    void handlerAnswersWithAnotherResponseBeforeTheFirstEvent() throws Exception {
+        try (ServerUnderTest server = server()) {
+            // a notification: 202 without a body
+            HttpResponse<String> accepted = server.exchange(message("notify"), String.class);
+            assertEquals(HttpStatus.ACCEPTED, accepted.getStatus());
+            assertEquals("abc-123", accepted.getHeaders().get("Mcp-Session-Id"));
+            assertEquals("", accepted.getBody(String.class).orElse(""));
+            // a single JSON message
+            HttpResponse<String> json = server.exchange(message("ping"), String.class);
+            assertEquals(HttpStatus.OK, json.getStatus());
+            assertTrue(json.getHeaders().get(HttpHeaders.CONTENT_TYPE).startsWith(MediaType.APPLICATION_JSON), json.getHeaders().get(HttpHeaders.CONTENT_TYPE));
+            assertEquals("abc-123", json.getHeaders().get("Mcp-Session-Id"));
+            assertEquals("{\"result\":\"pong\"}", json.body());
+            // an event stream
+            HttpResponse<String> stream = server.exchange(message("work"), String.class);
+            assertTrue(stream.getHeaders().get(HttpHeaders.CONTENT_TYPE).startsWith(MediaType.TEXT_EVENT_STREAM));
+            assertEquals("abc-123", stream.getHeaders().get("Mcp-Session-Id"));
+            assertEquals("data: progress\n\ndata: done\n\n", stream.body());
+        }
+    }
+
+    @Test
+    void anotherResponseAfterTheFirstEventFails() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertEquals("data: one\n\n", server.exchange(HttpRequest.GET("/sse/late-respond"), String.class).body());
+            assertTrue(recorder(server).lateRespond.get(20, TimeUnit.SECONDS).getMessage().contains("already sent"));
+        }
+    }
+
+    private static HttpRequest<String> message(String message) {
+        return HttpRequest.POST("/sse/messages", message)
+            .contentType(MediaType.TEXT_PLAIN_TYPE)
+            .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE);
+    }
+
+    @Test
     void failureAfterTheStreamCompletedHasNoEffect() throws Exception {
         try (ServerUnderTest server = server()) {
             HttpResponse<String> response = server.exchange(HttpRequest.GET("/sse/fail-on-close"), String.class);
@@ -500,6 +536,7 @@ public class HandlerRouteServerSentEventsTest {
         final CompletableFuture<String> closedContext = new CompletableFuture<>();
         final CompletableFuture<IllegalStateException> lateKeepOpen = new CompletableFuture<>();
         final CompletableFuture<IllegalStateException> lateHeader = new CompletableFuture<>();
+        final CompletableFuture<IllegalStateException> lateRespond = new CompletableFuture<>();
         final AtomicInteger sent = new AtomicInteger();
 
         CompletableFuture<@Nullable Throwable> closed(String key) {
@@ -684,6 +721,25 @@ public class HandlerRouteServerSentEventsTest {
                                 events.fail(error);
                             }
                         });
+                });
+                routes.POST("/sse/messages").consumes(MediaType.TEXT_PLAIN_TYPE).body(String.class).sse((request, pathVariables, message, events) -> {
+                    events.header("Mcp-Session-Id", "abc-123");
+                    switch (message) {
+                        case "notify" -> events.respond(HttpResponse.accepted());
+                        case "ping" -> events.respond(HttpResponse.ok(Map.of("result", "pong")));
+                        default -> {
+                            events.send("progress");
+                            events.send("done");
+                        }
+                    }
+                });
+                routes.GET("/sse/late-respond").sse((request, pathVariables, events) -> {
+                    events.send("one");
+                    try {
+                        events.respond(HttpResponse.ok("never"));
+                    } catch (IllegalStateException e) {
+                        recorder.lateRespond.complete(e);
+                    }
                 });
                 routes.GET("/sse/fail-on-close").sse((request, pathVariables, events) ->
                     events.onClose(cause -> events.fail(new HttpStatusException(HttpStatus.CONFLICT, "late failure"))));

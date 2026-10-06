@@ -24,17 +24,23 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseElements;
+import io.micronaut.http.body.stream.BaseStreamingByteBody;
+import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Pulls the elements of a {@link ResponseElements} body into a {@link BodyStream}: one
  * {@link ResponseElements#next()} at a time, and only while the stream is writable. An element
- * is encoded, possibly on another thread, and written before the next one is pulled.
+ * is encoded, possibly on another thread, and written before the next one is pulled. An element
+ * whose bytes are streamed, e.g. a {@link io.micronaut.http.body.ByteBody} of another
+ * connection, is forwarded as its bytes arrive, as fast as the connection takes them.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -45,6 +51,8 @@ final class ResponseElementsBody {
     private final ResponseElements<?> elements;
     private final ResponseStreams.ElementEncoder encoder;
     private final BodyStream stream;
+    private final ByteBodyFactory factory;
+    private final int highWaterMark;
     private final PropagatedContext context;
     private final DelayedExecutionFlow<CloseableByteBody> firstElement = DelayedExecutionFlow.create();
     /**
@@ -53,11 +61,17 @@ final class ResponseElementsBody {
     private final AtomicBoolean pulling = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     /**
+     * The streaming element being forwarded, or {@code null}.
+     */
+    private final AtomicReference<@Nullable PieceForwarder> forwarding = new AtomicReference<>();
+    /**
      * Only changed by the owner of {@link #pulling}.
      */
     private boolean first = true;
 
     private ResponseElementsBody(ByteBodyFactory factory, ResponseElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
+        this.factory = factory;
+        this.highWaterMark = highWaterMark;
         this.elements = elements;
         this.encoder = encoder;
         this.context = PropagatedContext.getOrEmpty();
@@ -161,14 +175,7 @@ final class ResponseElementsBody {
             if (piece instanceof CloseableAvailableByteBody available) {
                 write(available, done);
             } else {
-                piece.buffer().whenComplete((available, bufferError) -> {
-                    if (bufferError != null) {
-                        failed(unwrap(bufferError));
-                        done.accept(false);
-                    } else {
-                        write(available, done);
-                    }
-                });
+                forward(piece, done);
             }
         });
     }
@@ -182,6 +189,27 @@ final class ResponseElementsBody {
             done.accept(false);
         } else {
             done.accept(true);
+        }
+    }
+
+    /**
+     * Forward the bytes of a streamed element as they arrive: the element is asked for more bytes
+     * as the stream takes the previous ones, so a slow client pauses it.
+     *
+     * @param piece The element
+     * @param done  Called when the element ended
+     */
+    private void forward(CloseableByteBody piece, StepDone done) {
+        PieceForwarder forwarder = new PieceForwarder(done);
+        forwarding.set(forwarder);
+        BufferConsumer.Upstream upstream;
+        try (BaseStreamingByteBody<?> streaming = factory.toStreaming(piece)) {
+            upstream = streaming.primary(forwarder);
+        }
+        forwarder.start(upstream);
+        if (closed.get()) {
+            // the stream closed meanwhile
+            forwarder.discard();
         }
     }
 
@@ -214,6 +242,10 @@ final class ResponseElementsBody {
 
     private void close() {
         if (closed.compareAndSet(false, true)) {
+            PieceForwarder forwarder = forwarding.get();
+            if (forwarder != null) {
+                forwarder.discard();
+            }
             try {
                 encoder.close();
             } finally {
@@ -235,5 +267,97 @@ final class ResponseElementsBody {
          * @param proceed Whether to continue pulling
          */
         void accept(boolean proceed);
+    }
+
+    /**
+     * Forwards the bytes of a streamed element to the stream. The element gets one high-water mark
+     * of bytes in advance, and more bytes as the stream takes the bytes it forwarded.
+     */
+    private final class PieceForwarder implements BufferConsumer {
+        private final StepDone done;
+        private BufferConsumer.@Nullable Upstream upstream;
+        /**
+         * The bytes the stream took before the upstream was known. Guarded by this forwarder.
+         */
+        private long earlyCredit;
+        private boolean ended;
+
+        PieceForwarder(StepDone done) {
+            this.done = done;
+        }
+
+        void start(BufferConsumer.Upstream upstream) {
+            long credit;
+            synchronized (this) {
+                this.upstream = upstream;
+                credit = earlyCredit;
+                earlyCredit = 0;
+            }
+            upstream.start();
+            upstream.onBytesConsumed(highWaterMark + credit);
+        }
+
+        private void credit(long bytes) {
+            BufferConsumer.Upstream current;
+            synchronized (this) {
+                current = upstream;
+                if (current == null) {
+                    earlyCredit += bytes;
+                    return;
+                }
+            }
+            current.onBytesConsumed(bytes);
+        }
+
+        @Override
+        public void add(ReadBuffer rb) {
+            long bytes = rb.readable();
+            stream.write(rb).whenComplete((ignored, error) -> {
+                if (error == null) {
+                    credit(bytes);
+                }
+            });
+            respond();
+        }
+
+        @Override
+        public void complete() {
+            if (end()) {
+                respond();
+                done.accept(stream.isOpen());
+            }
+        }
+
+        @Override
+        public void error(Throwable e) {
+            if (end()) {
+                failed(e);
+                done.accept(false);
+            }
+        }
+
+        @Override
+        public void discard() {
+            BufferConsumer.Upstream current;
+            synchronized (this) {
+                current = upstream;
+            }
+            if (current != null) {
+                current.allowDiscard();
+                current.disregardBackpressure();
+            }
+            if (end()) {
+                done.accept(false);
+            }
+        }
+
+        private synchronized boolean end() {
+            if (ended) {
+                return false;
+            }
+            ended = true;
+            forwarding.compareAndSet(this, null);
+            return true;
+        }
     }
 }

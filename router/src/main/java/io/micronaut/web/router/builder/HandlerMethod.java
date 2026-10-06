@@ -26,6 +26,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Body;
@@ -764,8 +765,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         }
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
-            if (error == null && response instanceof MutableHttpResponse<?> mutable
-                && mutable.body() instanceof ResponseElements<?> elements) {
+            MutableHttpResponse<?> mutable = error == null ? holderOf(response) : null;
+            if (mutable != null && mutable.body() instanceof ResponseElements<?> elements) {
                 // the elements may be reads of the body: it is released when they are closed
                 mutable.body(releaseWhenClosed(elements, handlerRequest));
                 result.complete(response);
@@ -823,6 +824,23 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
                 });
             }
         });
+    }
+
+    /**
+     * The mutable response that holds the body of a response, through its wrappers: a wrapper
+     * delegates its body to the response it wraps.
+     *
+     * @param response The response
+     * @return The mutable response, or {@code null}
+     */
+    private static @Nullable MutableHttpResponse<?> holderOf(@Nullable HttpResponse<?> response) {
+        while (response != null) {
+            if (response instanceof MutableHttpResponse<?> mutable) {
+                return mutable;
+            }
+            response = response instanceof HttpResponseWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
+        return null;
     }
 
     /**
