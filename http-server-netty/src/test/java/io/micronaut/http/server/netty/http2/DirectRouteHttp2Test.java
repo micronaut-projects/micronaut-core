@@ -113,9 +113,9 @@ class DirectRouteHttp2Test {
             routes.GET("/h2-direct/health", HttpResponse.ok("UP").contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.GET("/h2-direct/host").where(RouteCondition.host("localhost", "127.0.0.1")).respond(HttpResponse.ok("local"));
             routes.GET("/h2-direct/other-host").where(RouteCondition.host("example.com")).respond(HttpResponse.ok("other"));
-            routes.GET("/h2-async/later").respondAsync(direct -> CompletableFuture.supplyAsync(() -> direct.responses().ok("later"),
+            routes.GET("/h2-async/later").respondAsync(direct -> CompletableFuture.supplyAsync(() -> HttpResponse.ok("later"),
                 CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)));
-            routes.GET("/h2-async/executor").executeOn(TaskExecutors.BLOCKING).respond(direct -> direct.responses().ok("executor"));
+            routes.GET("/h2-async/executor").executeOn(TaskExecutors.BLOCKING).respond(direct -> HttpResponse.ok("executor"));
             routes.GET("/h2-async/failed").respondAsync(direct -> CompletableFuture.failedFuture(new IllegalStateException("failed")));
             routes.POST("/h2-async/upload").respondAsync(direct -> CompletableFuture.supplyAsync(() -> null,
                 CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)));

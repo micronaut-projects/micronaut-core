@@ -12,7 +12,7 @@ CACHED = {"logo.png", "style.css"}
 class CachedAssets(HttpDirectRoutes):
     def routes(self, routes: DirectRouteBuilder) -> None:
         routes.GET("/assets/{name}").respond(lambda direct:
-                   direct.responses().ok("cached " + direct.pathVariables().getString("name"))
+                   HttpResponse.ok("cached " + direct.pathVariables().getString("name"))
                    if direct.pathVariables().getString("name") in CACHED else None)  # <1>
 
 

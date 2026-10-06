@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -353,8 +354,9 @@ class DirectRouteTest {
             routes.GET("/direct/computed").respond(direct -> {
                 counters.supplierCalled.set(true);
                 counters.supplierSawRequest.set(ServerRequestContext.currentRequest().isPresent());
-                MutableHttpResponse<String> response = direct.responses().ok("computed");
-                counters.nettyFactory.set(direct.responses() instanceof NettyHttpResponseFactory);
+                MutableHttpResponse<String> response = HttpResponse.ok("computed");
+                // the static factory of HttpResponse is the one of the server
+                counters.nettyFactory.set(HttpResponseFactory.INSTANCE instanceof NettyHttpResponseFactory);
                 counters.nettyResponse.set(response instanceof NettyMutableHttpResponse<?>);
                 return response;
             });
@@ -365,7 +367,7 @@ class DirectRouteTest {
 
             routes.GET("/direct/guarded").where(RouteCondition.header("X-Direct")).respond(HttpResponse.ok("guarded direct"));
 
-            routes.GET("/direct/files/{name}").respond(direct -> direct.responses().ok("file " + direct.pathVariables().getString("name")));
+            routes.GET("/direct/files/{name}").respond(direct -> HttpResponse.ok("file " + direct.pathVariables().getString("name")));
             routes.GET("/direct/files/special", HttpResponse.ok("special"));
 
             // the test client connects from the loopback address

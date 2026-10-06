@@ -124,6 +124,14 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
     }
 
     /**
+     * @return The name of the bean that declares the routes, for the messages, or {@code null}
+     */
+    @Nullable String declaringBeanName() {
+        Class<?> bean = declaringBean;
+        return bean == null ? null : beanName(bean);
+    }
+
+    /**
      * @return Prepares the body of a response given as a value, see {@link ResponseTemplate#direct}
      */
     UnaryOperator<Object> shareableBody() {

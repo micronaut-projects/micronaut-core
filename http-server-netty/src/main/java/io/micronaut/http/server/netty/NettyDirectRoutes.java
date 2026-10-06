@@ -32,9 +32,10 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.util.HttpDateHeader;
+import io.micronaut.web.router.direct.DirectMatch;
 import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
-import io.micronaut.web.router.direct.PendingResponse;
+import io.micronaut.web.router.direct.InvalidDirectRequestException;
 import io.micronaut.web.router.uri.UriUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -63,8 +64,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -83,7 +84,7 @@ import java.util.function.Supplier;
  *
  * <p>A synchronous route is answered on the event loop, and its body written there: a blocking
  * message body writer is refused, with {@code 500}. An asynchronous route, see
- * {@link PendingResponse}, holds the request, and its body, until the stage of its
+ * {@link DirectMatch.Async}, holds the request, and its body, until the stage of its
  * response completes. Its body is then written on the event loop, unless its writer blocks: a
  * blocking writer runs on the thread that completed the stage, e.g. the executor of the route,
  * or on the IO executor when that thread is an event loop. The response is written by the event
@@ -178,13 +179,19 @@ final class NettyDirectRoutes {
             return false;
         }
         NettyDirectRequest directRequest = new NettyDirectRequest(ctx, request, configuration);
-        io.micronaut.http.HttpResponse<?> direct;
+        io.micronaut.http.@Nullable HttpResponse<?> direct = null;
+        CompletableFuture<io.micronaut.http.@Nullable HttpResponse<?>> pending = null;
         try {
-            direct = routes.find(directRequest, RESPONSES);
-        } catch (InvalidRequestException e) {
-            // the target or the query is not a valid URI, read before any route runs: the
-            // ordinary path answers 400, with the body untouched
-            return false;
+            // a target or a query that is not a valid URI is not matched: the ordinary path answers 400
+            DirectMatch match = routes.match(directRequest);
+            switch (match) {
+                case null -> {
+                    return false;
+                }
+                // started, on its executor if it has one
+                case DirectMatch.Async async -> pending = async.respondAsync(RESPONSES);
+                case DirectMatch.Sync sync -> direct = sync.respond(RESPONSES);
+            }
         } catch (Throwable e) {
             // an Error too: the request is answered
             LOG.error("The direct routes failed to match {} {}: {}", request.method(), request.uri(), e.getMessage(), e);
@@ -192,13 +199,13 @@ final class NettyDirectRoutes {
             writeServerError(outboundAccess);
             return true;
         }
-        if (direct == null) {
-            // no direct route, or the one that matched declined: the body is untouched
-            return false;
-        }
-        if (direct instanceof PendingResponse pending) {
-            answerAsync(ctx, request, pending.stage(), body, outboundAccess);
+        if (pending != null) {
+            answerAsync(ctx, request, pending, body, outboundAccess);
             return true;
+        }
+        if (direct == null) {
+            // the route declined: the body is untouched
+            return false;
         }
         // the route never reads it
         body.close();
@@ -229,11 +236,11 @@ final class NettyDirectRoutes {
      */
     private void answerAsync(ChannelHandlerContext ctx,
                              HttpRequest request,
-                             CompletionStage<io.micronaut.http.@Nullable HttpResponse<?>> stage,
+                             CompletableFuture<io.micronaut.http.@Nullable HttpResponse<?>> stage,
                              CloseableByteBody body,
                              OutboundAccess outboundAccess) {
         // the connection closes, or the HTTP/2 stream of the request is reset or closed
-        Runnable cancelOnAbandon = outboundAccess.onAbandoned(() -> cancel(stage));
+        Runnable cancelOnAbandon = outboundAccess.onAbandoned(() -> stage.cancel(false));
         stage.whenComplete((response, error) -> {
             // on the thread that completed the stage
             if (error != null || response == null) {
@@ -318,14 +325,6 @@ final class NettyDirectRoutes {
             task.run();
         } else {
             ctx.executor().execute(task);
-        }
-    }
-
-    private static void cancel(CompletionStage<?> stage) {
-        try {
-            stage.toCompletableFuture().cancel(false);
-        } catch (UnsupportedOperationException e) {
-            LOG.debug("The stage of a direct route cannot be cancelled: {}", e.getMessage());
         }
     }
 
@@ -506,17 +505,6 @@ final class NettyDirectRoutes {
     }
 
     /**
-     * A request target or a query that is not a valid URI, e.g. with a malformed escape, found
-     * when the lookup reads it: the request is not a direct route's, and the ordinary path
-     * answers it with {@code 400}.
-     */
-    private static final class InvalidRequestException extends RuntimeException {
-        InvalidRequestException(IllegalArgumentException cause) {
-            super(cause.getMessage(), cause, false, false);
-        }
-    }
-
-    /**
      * A response ready to be written.
      *
      * @param head    Its status and headers
@@ -545,8 +533,8 @@ final class NettyDirectRoutes {
      * The Netty request as the direct routes read it. The request target is validated when the
      * lookup first reads the path, like the {@link NettyHttpRequest} the server would create
      * validates it, so a request whose method has no direct route is not scanned: an invalid
-     * target throws an {@link InvalidRequestException}. The query is decoded when a query
-     * condition first reads it, like {@link NettyHttpRequest} decodes it: with the charset of the
+     * target throws an {@link InvalidDirectRequestException}. The query is decoded when it is
+     * first read, by a query condition or the function of a route, like {@link NettyHttpRequest} decodes it: with the charset of the
      * content type of the request, or the default charset of the server, and the limits of the
      * server.
      */
@@ -566,7 +554,7 @@ final class NettyDirectRoutes {
         /**
          * @return The request target, validated like the request the server would create, e.g.
          * an absolute-form or escaped target
-         * @throws InvalidRequestException if it is not a valid URI
+         * @throws InvalidDirectRequestException if it is not a valid URI
          */
         private String target() {
             String validated = target;
@@ -576,7 +564,7 @@ final class NettyDirectRoutes {
                     try {
                         validated = AbstractNettyHttpRequest.validatedTarget(validated, configuration.isEscapeHtmlUrl());
                     } catch (IllegalArgumentException e) {
-                        throw new InvalidRequestException(e);
+                        throw new InvalidDirectRequestException(e);
                     }
                 }
                 target = validated;
@@ -593,7 +581,7 @@ final class NettyDirectRoutes {
                     parameters = new QueryStringDecoder(target(), charset, true, configuration.getMaxParams(),
                         configuration.isSemicolonIsNormalChar()).parameters();
                 } catch (IllegalArgumentException e) {
-                    throw new InvalidRequestException(e);
+                    throw new InvalidDirectRequestException(e);
                 }
                 query = parameters;
             }

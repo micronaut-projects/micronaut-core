@@ -3,13 +3,11 @@ package io.micronaut.docs.server.functional
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.web.router.builder.DirectContext
 import io.micronaut.web.router.builder.DirectRouteBuilder
 import io.micronaut.web.router.builder.HttpDirectRoutes
 import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRoutes
 import jakarta.inject.Singleton
-import java.util.function.Function
 
 private val CACHED = setOf("logo.png", "style.css")
 
@@ -18,10 +16,10 @@ private val CACHED = setOf("logo.png", "style.css")
 @Singleton
 class CachedAssets : HttpDirectRoutes {
     override fun routes(routes: DirectRouteBuilder) {
-        routes.GET("/assets/{name}").respond(Function<DirectContext, HttpResponse<*>?> { direct ->
-            if (CACHED.contains(direct.pathVariables().getString("name"))) direct.responses().ok("cached " + direct.pathVariables().getString("name"))
+        routes.GET("/assets/{name}").respond { direct ->
+            if (CACHED.contains(direct.pathVariables().getString("name"))) HttpResponse.ok("cached " + direct.pathVariables().getString("name"))
             else null
-        }) // <1>
+        } // <1>
     }
 }
 

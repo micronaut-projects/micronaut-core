@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpMethod;
@@ -25,9 +26,10 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.web.router.RouteConditionContext;
+import io.micronaut.web.router.direct.DirectMatch;
 import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
-import io.micronaut.web.router.direct.PendingResponse;
+import io.micronaut.web.router.direct.InvalidDirectRequestException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,13 +61,16 @@ import java.util.function.Predicate;
  * routes whose URI template, constraints and conditions accept the request, the most specific
  * wins, then, like the router, an explicit {@code HEAD} route over the implicit one of a
  * {@code GET} route, then the lowest order: routes left make the request ambiguous, answered with
- * {@code 400} like the router does. A route that matched and declined the request ends the
- * lookup: the request continues to the ordinary routes, whether the route is synchronous or
- * asynchronous.</p>
+ * {@code 400} like the router does. Routes that would make every request of their URI template
+ * ambiguous, of the same method, URI template and order, without a condition or a constraint,
+ * fail to build.</p>
  *
- * <p>{@link #find} matches a request once: it answers a synchronous route, and starts an
- * asynchronous route, on its executor, or on the calling thread without one, and returns a
- * {@link PendingResponse} with the stage of its response.</p>
+ * <p>{@link #match} matches a request once, and runs no route: a route that answers with a value
+ * is matched by a {@link DirectMatch.Sync} allocated once, and a route whose function composes the
+ * response by a {@link FunctionMatch}, allocated for the request, which is the
+ * {@link DirectContext} of its function too. The runtime then runs the route: a route that
+ * declines the request ends it, and the request continues to the ordinary routes, whether the
+ * route is synchronous or asynchronous.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -76,10 +81,10 @@ final class DirectRouteTable implements DirectRouteLookup {
     private static final Logger LOG = LoggerFactory.getLogger(DirectRouteTable.class);
     private static final Route[] NONE = new Route[0];
     /**
-     * What {@link #lookup(Route[], String, DirectRequest, HttpResponseFactory)} returns when the
-     * route that matched declined the request: unlike no match, it ends the lookup.
+     * The match of a request that routes match equally well: answered with {@code 400}, like the
+     * router does.
      */
-    private static final Object DECLINED = new Object();
+    private static final DirectMatch.Sync AMBIGUOUS = responses -> responses.status(HttpStatus.BAD_REQUEST);
     private static final Comparator<Route> BY_SPECIFICITY = Comparator
         .comparingInt((Route route) -> -route.rawLength)
         .thenComparingInt(route -> route.variableCount)
@@ -107,8 +112,9 @@ final class DirectRouteTable implements DirectRouteLookup {
      * @param conditionContext  Gives the clock of the time conditions
      * @param executors         The executor of a name
      * @param discard           Releases a response an asynchronous route completed after its
-     *                          stage was cancelled, which the runtime never writes
+     *                          response was cancelled, which the runtime never writes
      * @return The routes
+     * @throws ConfigurationException if two routes would make every request of their URI template ambiguous
      */
     static DirectRouteTable build(List<DirectRouteDeclaration> declarations,
                                   ConversionService conversionService,
@@ -116,8 +122,18 @@ final class DirectRouteTable implements DirectRouteLookup {
                                   ExecutorLookup executors,
                                   Consumer<HttpResponse<?>> discard) {
         Map<String, List<Route>> byMethod = new HashMap<>();
+        Map<Unconditional, DirectRouteDeclaration> unconditional = new HashMap<>();
         for (DirectRouteDeclaration declaration : declarations) {
             Route route = route(declaration, executors, discard);
+            if (route.unconditional && route.constraints.length == 0) {
+                DirectRouteDeclaration same = unconditional.putIfAbsent(
+                    new Unconditional(declaration.httpMethodName, declaration.uriTemplate, declaration.order), declaration);
+                if (same != null) {
+                    throw new ConfigurationException("The " + same.describe() + " and the " + declaration.describe()
+                        + " have the same URI template and order, and no condition or constraint: every request they match "
+                        + "would be ambiguous. Give one of them another order, a condition or a constraint, or remove one");
+                }
+            }
             byMethod.computeIfAbsent(declaration.httpMethodName, name -> new ArrayList<>()).add(route);
             if (HttpMethod.GET.name().equals(declaration.httpMethodName)) {
                 // the implicit HEAD route of a GET route, ranked with the HEAD routes
@@ -149,7 +165,7 @@ final class DirectRouteTable implements DirectRouteLookup {
     }
 
     @Override
-    public @Nullable HttpResponse<?> find(DirectRequest request, HttpResponseFactory responses) {
+    public @Nullable DirectMatch match(DirectRequest request) {
         if (empty) {
             return null;
         }
@@ -158,17 +174,25 @@ final class DirectRouteTable implements DirectRouteLookup {
             // no direct route of the method: the path is not parsed
             return null;
         }
-        Object response = lookup(routes, request.path(), request, responses);
-        return response == DECLINED ? null : (HttpResponse<?>) response;
+        try {
+            return lookup(routes, request.path(), request);
+        } catch (InvalidDirectRequestException e) {
+            // the target or the query is not valid: the runtime answers the request on its ordinary path
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("The direct routes do not match the invalid request {}: {}", request.methodName(), e.getMessage());
+            }
+            return null;
+        }
     }
 
     /**
-     * @return The response, a {@link PendingResponse} for an asynchronous route, {@link #DECLINED}
-     * if the route that matched declined the request, or {@code null} if no route matched
+     * @return The match of the route that answers the request, {@link #AMBIGUOUS}, or
+     * {@code null} if no route matched
      */
-    private @Nullable Object lookup(Route[] routes, String path, DirectRequest request, HttpResponseFactory responses) {
+    private @Nullable DirectMatch lookup(Route[] routes, String path, DirectRequest request) {
         Route best = null;
         UriMatchInfo bestMatch = null;
+        PathVariables bestVariables = null;
         boolean ambiguous = false;
         for (Route route : routes) {
             if (best != null && !best.equallySpecific(route)) {
@@ -176,12 +200,18 @@ final class DirectRouteTable implements DirectRouteLookup {
                 break;
             }
             UriMatchInfo match = route.matcher.tryMatch(path);
-            if (match == null || !route.accepts(match, request, conversionService, conditionContext)) {
+            if (match == null) {
+                continue;
+            }
+            // the constraints read the variables the function of the route is given
+            PathVariables variables = route.constraints.length == 0 ? null : new DefaultPathVariables(match.getVariableValues(), conversionService);
+            if (!route.accepts(match, variables, request, conditionContext)) {
                 continue;
             }
             if (best == null || route.preferredTo(best)) {
                 best = route;
                 bestMatch = match;
+                bestVariables = variables;
                 ambiguous = false;
             } else if (route.implicitHead == best.implicitHead && route.order == best.order) {
                 ambiguous = true;
@@ -194,18 +224,13 @@ final class DirectRouteTable implements DirectRouteLookup {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Several direct routes match {} {} equally well, e.g. the {}", request.methodName(), path, best.declaration);
             }
-            // like the router
-            return responses.status(HttpStatus.BAD_REQUEST);
+            return AMBIGUOUS;
         }
-        HttpResponse<?> response = best.async
-            ? best.respondAsync(bestMatch, conversionService, responses)
-            : best.respond(bestMatch, conversionService, responses);
-        return response == null ? DECLINED : response;
+        return best.match(request, bestMatch, bestVariables, conversionService);
     }
 
     private static HttpResponse<?> serverError(DirectRouteDeclaration declaration, Throwable error, HttpResponseFactory responses) {
-        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
-        LOG.error("The {} failed to create its response: {}", declaration, cause.getMessage(), cause);
+        LOG.error("The {} failed to create its response: {}", declaration, error.getMessage(), error);
         return responses.status(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -224,6 +249,91 @@ final class DirectRouteTable implements DirectRouteLookup {
     }
 
     /**
+     * What makes two routes without a condition or a constraint match the same requests equally
+     * well.
+     *
+     * @param httpMethodName The method
+     * @param uriTemplate    The URI template
+     * @param order          The order
+     */
+    private record Unconditional(String httpMethodName, String uriTemplate, int order) {
+    }
+
+    /**
+     * The match of a route whose function composes the response, allocated for a request: the
+     * {@link DirectContext} of the function too, so that a request costs one object besides its
+     * response. Its path variables are created when they are first read, unless the constraints
+     * of the route created them. It is used by one thread at a time: the thread that received the
+     * request, then the executor of the route, which the runtime hands it over to.
+     */
+    abstract static sealed class FunctionMatch implements DirectContext {
+
+        final Route route;
+        private final DirectRequest request;
+        private final UriMatchInfo match;
+        private final ConversionService conversionService;
+        private @Nullable PathVariables variables;
+
+        FunctionMatch(Route route, DirectRequest request, UriMatchInfo match, @Nullable PathVariables variables, ConversionService conversionService) {
+            this.route = route;
+            this.request = request;
+            this.match = match;
+            this.variables = variables;
+            this.conversionService = conversionService;
+        }
+
+        @Override
+        public DirectRequest request() {
+            return request;
+        }
+
+        @Override
+        public PathVariables pathVariables() {
+            PathVariables pathVariables = variables;
+            if (pathVariables == null) {
+                pathVariables = new DefaultPathVariables(match.getVariableValues(), conversionService);
+                variables = pathVariables;
+            }
+            return pathVariables;
+        }
+
+        @Override
+        public String toString() {
+            return "match of the " + route.declaration + ": " + match.getVariableValues();
+        }
+    }
+
+    /**
+     * The match of a synchronous route whose function composes the response.
+     */
+    static final class SyncMatch extends FunctionMatch implements DirectMatch.Sync {
+
+        SyncMatch(Route route, DirectRequest request, UriMatchInfo match, @Nullable PathVariables variables, ConversionService conversionService) {
+            super(route, request, match, variables, conversionService);
+        }
+
+        @Override
+        public @Nullable HttpResponse<?> respond(HttpResponseFactory responses) {
+            return route.respond(this, responses);
+        }
+    }
+
+    /**
+     * The match of an asynchronous route: on an executor, or completed later.
+     */
+    static final class AsyncMatch extends FunctionMatch implements DirectMatch.Async {
+
+        AsyncMatch(Route route, DirectRequest request, UriMatchInfo match, @Nullable PathVariables variables, ConversionService conversionService) {
+            super(route, request, match, variables, conversionService);
+        }
+
+        @Override
+        public CompletableFuture<@Nullable HttpResponse<?>> respondAsync(HttpResponseFactory responses) {
+            return route.respondAsync(this, responses);
+        }
+    }
+
+    /**
      * A built direct route.
      */
     private static final class Route {
@@ -239,7 +349,11 @@ final class DirectRouteTable implements DirectRouteLookup {
         final @Nullable Executor executor;
         final boolean async;
         /**
-         * Releases a response completed after the stage of the route was cancelled.
+         * The match of a route that answers with a value, allocated once, or {@code null}.
+         */
+        final DirectMatch.@Nullable Sync constant;
+        /**
+         * Releases a response completed after the response of the route was cancelled.
          */
         final Consumer<HttpResponse<?>> discard;
         /**
@@ -261,6 +375,9 @@ final class DirectRouteTable implements DirectRouteLookup {
             this.unconditional = condition.equals(RouteConditions.ALWAYS);
             this.executor = executor;
             this.async = declaration.isAsync();
+            ResponseTemplate template = declaration.constant;
+            // a value is never on an executor, see DefaultDirectRouteSpec#respond(HttpResponse)
+            this.constant = template == null ? null : template::create;
             this.discard = discard;
             this.implicitHead = false;
         }
@@ -277,6 +394,7 @@ final class DirectRouteTable implements DirectRouteLookup {
             this.unconditional = get.unconditional;
             this.executor = get.executor;
             this.async = get.async;
+            this.constant = get.constant;
             this.discard = get.discard;
             this.implicitHead = true;
         }
@@ -306,10 +424,11 @@ final class DirectRouteTable implements DirectRouteLookup {
 
         /**
          * The constraints first, as in the router, then the conditions.
+         *
+         * @param variables The path variables, {@code null} if the route has no constraint
          */
-        boolean accepts(UriMatchInfo match, DirectRequest request, ConversionService conversionService, RouteConditionContext context) {
-            if (constraints.length > 0) {
-                PathVariables variables = new DefaultPathVariables(match.getVariableValues(), conversionService);
+        boolean accepts(UriMatchInfo match, @Nullable PathVariables variables, DirectRequest request, RouteConditionContext context) {
+            if (variables != null) {
                 for (Predicate<? super PathVariables> constraint : constraints) {
                     try {
                         if (!constraint.test(variables)) {
@@ -327,23 +446,30 @@ final class DirectRouteTable implements DirectRouteLookup {
         }
 
         /**
-         * The response of a request, composed for it: a response given as a value is copied.
-         *
-         * @return The response, or {@code null} if the function of the route declined the request
+         * @return The match of this route for a request
          */
-        @Nullable HttpResponse<?> respond(UriMatchInfo match, ConversionService conversionService, HttpResponseFactory responses) {
-            ResponseTemplate constant = declaration.constant;
-            Function<DirectContext, ? extends @Nullable HttpResponse<?>> response = declaration.response;
-            if (constant != null) {
-                return constant.create(responses);
+        DirectMatch match(DirectRequest request, UriMatchInfo match, @Nullable PathVariables variables, ConversionService conversionService) {
+            DirectMatch.Sync value = constant;
+            if (value != null) {
+                return value;
             }
+            return async
+                ? new AsyncMatch(this, request, match, variables, conversionService)
+                : new SyncMatch(this, request, match, variables, conversionService);
+        }
+
+        /**
+         * The response of a request, composed for it by the function of the route.
+         *
+         * @return The response, or {@code null} if the function declined the request
+         */
+        @Nullable HttpResponse<?> respond(DirectContext context, HttpResponseFactory responses) {
             try {
                 // null declines: the request continues as if no direct route matched it
-                return Objects.requireNonNull(response, "response")
-                    .apply(new DefaultDirectContext(responses, new DefaultPathVariables(match.getVariableValues(), conversionService)));
+                return Objects.requireNonNull(declaration.response, "response").apply(context);
             } catch (Throwable t) {
                 // an Error too: the request is answered, like an ordinary route's
-                return serverError(declaration, t, responses);
+                return failed(t, responses);
             }
         }
 
@@ -351,23 +477,23 @@ final class DirectRouteTable implements DirectRouteLookup {
          * Start an asynchronous route: the function runs on the executor of the route, or on the
          * calling thread without one.
          *
-         * @return The pending response, with the stage of the response
+         * @return The response, completed later
          */
-        PendingResponse respondAsync(UriMatchInfo match, ConversionService conversionService, HttpResponseFactory responses) {
+        CompletableFuture<@Nullable HttpResponse<?>> respondAsync(DirectContext context, HttpResponseFactory responses) {
             CompletableFuture<@Nullable HttpResponse<?>> result = new CompletableFuture<>();
             Executor routeExecutor = executor;
             if (routeExecutor == null) {
-                run(match, conversionService, responses, result);
-                return new PendingResponse(result);
+                run(context, responses, result);
+                return result;
             }
             try {
                 routeExecutor.execute(() -> {
                     // cancelled, e.g. as the connection closed, before it started
                     if (!result.isDone()) {
                         try {
-                            run(match, conversionService, responses, result);
+                            run(context, responses, result);
                         } catch (Throwable t) {
-                            // the task never ends without completing the stage
+                            // the task never ends without completing the response
                             complete(result, serverError(declaration, t, responses));
                         }
                     }
@@ -375,26 +501,24 @@ final class DirectRouteTable implements DirectRouteLookup {
             } catch (RejectedExecutionException e) {
                 result.complete(serverError(declaration, e, responses));
             }
-            return new PendingResponse(result);
+            return result;
         }
 
-        private void run(UriMatchInfo match,
-                         ConversionService conversionService,
+        private void run(DirectContext context,
                          HttpResponseFactory responses,
                          CompletableFuture<@Nullable HttpResponse<?>> result) {
             Function<DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> asyncResponse = declaration.asyncResponse;
             if (asyncResponse == null) {
-                // a function or a value on an executor
-                complete(result, respond(match, conversionService, responses));
+                // a function on an executor
+                complete(result, respond(context, responses));
                 return;
             }
             CompletionStage<? extends @Nullable HttpResponse<?>> stage;
             try {
-                stage = Objects.requireNonNull(
-                    asyncResponse.apply(new DefaultDirectContext(responses, new DefaultPathVariables(match.getVariableValues(), conversionService))),
+                stage = Objects.requireNonNull(asyncResponse.apply(context),
                     "The function of an asynchronous direct route returned no stage");
             } catch (Throwable t) {
-                complete(result, serverError(declaration, t, responses));
+                complete(result, failed(t, responses));
                 return;
             }
             stage.whenComplete((response, error) -> {
@@ -402,7 +526,7 @@ final class DirectRouteTable implements DirectRouteLookup {
                     // null declines
                     complete(result, response);
                 } else if (!result.isDone()) {
-                    result.complete(serverError(declaration, error, responses));
+                    result.complete(failed(error, responses));
                 }
             });
             result.whenComplete((response, error) -> {
@@ -413,16 +537,31 @@ final class DirectRouteTable implements DirectRouteLookup {
         }
 
         /**
-         * Complete the stage of the response, or release the response if the stage was
-         * cancelled meanwhile, e.g. as the connection closed: nothing writes it then.
+         * Complete the response, or release it if the response was cancelled meanwhile, e.g. as
+         * the connection closed: nothing writes it then.
          */
         private void complete(CompletableFuture<@Nullable HttpResponse<?>> result, @Nullable HttpResponse<?> response) {
             if (!result.complete(response) && response != null) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("The {} completed its response after its stage was cancelled: the response is released", declaration);
+                    LOG.debug("The {} completed its response after it was cancelled: the response is released", declaration);
                 }
                 discard.accept(response);
             }
+        }
+
+        /**
+         * The response of a function that failed: {@code null}, which declines the request, if
+         * the function read the target or the query of an invalid request, otherwise {@code 500}.
+         */
+        private @Nullable HttpResponse<?> failed(Throwable error, HttpResponseFactory responses) {
+            Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+            if (cause instanceof InvalidDirectRequestException) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("The {} read an invalid request, which it declines: {}", declaration, cause.getMessage());
+                }
+                return null;
+            }
+            return serverError(declaration, cause, responses);
         }
 
         private void cancel(CompletionStage<?> stage) {

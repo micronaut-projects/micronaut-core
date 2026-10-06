@@ -142,7 +142,7 @@ class DirectRouteConditionsTest {
             builder.GET("/dc/future").where(RouteCondition.after(NOW.plusSeconds(60))).respond(HttpResponse.ok("future"));
 
             builder.POST("/dc/items/{id}").respond(direct ->
-                direct.pathVariables().getLong("id") < 5 ? direct.responses().ok("cached " + direct.pathVariables().getLong("id")) : null);
+                direct.pathVariables().getLong("id") < 5 ? HttpResponse.ok("cached " + direct.pathVariables().getLong("id")) : null);
 
             builder.GET("/dc/declined").respond(direct -> null);
         }

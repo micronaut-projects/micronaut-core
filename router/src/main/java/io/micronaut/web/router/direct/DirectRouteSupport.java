@@ -28,7 +28,7 @@ import io.micronaut.http.HttpResponse;
  * as an ordinary route, with the filters it was declared to skip.
  *
  * <p>Its presence is the capability: a runtime that declares it answers every direct route, the
- * asynchronous ones included, see {@link PendingResponse}. Its methods, with defaults, let the
+ * asynchronous ones included, see {@link DirectMatch.Async}. Its methods, with defaults, let the
  * runtime manage the bodies of its own types: prepare a body the requests of a route share, and
  * release the body of a response it never writes.</p>
  *
@@ -56,7 +56,7 @@ public interface DirectRouteSupport {
 
     /**
      * Release a response the runtime never writes: the response an asynchronous direct route
-     * completed after the {@link PendingResponse#stage() stage} of its response was cancelled,
+     * completed after its response was cancelled, see {@link DirectMatch.Async#respondAsync},
      * e.g. as the connection closed. A runtime releases the body of the response if it is of its
      * own type and holds a resource, e.g. a buffer, and leaves any other body alone: every runtime
      * is given the response.

@@ -4,13 +4,11 @@ package io.micronaut.docs.server.functional
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.web.router.builder.DirectContext
 import io.micronaut.web.router.builder.DirectRouteBuilder
 import io.micronaut.web.router.builder.HttpDirectRoutes
 import jakarta.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
-import java.util.function.Function
 // end::imports[]
 
 @Requires(property = "spec.name", value = "AsyncDirectRoutesTest")
@@ -26,14 +24,14 @@ class AsyncDirectRoutes : HttpDirectRoutes {
     override fun routes(routes: DirectRouteBuilder) {
         routes.GET("/reports/{id}")
             .executeOn(TaskExecutors.BLOCKING) // <1>
-            .respond(Function<DirectContext, HttpResponse<*>?> { direct ->
-            val report = loadReport(direct.pathVariables().getString("id"))
-            if (report == null) null else direct.responses().ok(report)
-        }) // <2>
-        routes.GET("/quotes/{symbol}").respondAsync(Function<DirectContext, CompletionStage<HttpResponse<*>?>> { direct ->
+            .respond { direct ->
+                val report = loadReport(direct.pathVariables().getString("id"))
+                if (report == null) null else HttpResponse.ok(report)
+            } // <2>
+        routes.GET("/quotes/{symbol}").respondAsync { direct ->
             fetchQuote(direct.pathVariables().getString("symbol")) // <3>
-                .thenApply { quote -> if (quote == null) null else direct.responses().ok(quote) } // <4>
-        })
+                .thenApply { quote -> if (quote == null) null else HttpResponse.ok(quote) } // <4>
+        }
     }
 
     /**

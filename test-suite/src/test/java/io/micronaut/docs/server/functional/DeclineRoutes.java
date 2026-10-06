@@ -22,7 +22,7 @@ public class DeclineRoutes {
         @Override
         public void routes(DirectRouteBuilder routes) {
             routes.GET("/assets/{name}").respond(direct -> CACHED.contains(direct.pathVariables().getString("name"))
-                ? direct.responses().ok("cached " + direct.pathVariables().getString("name"))
+                ? HttpResponse.ok("cached " + direct.pathVariables().getString("name"))
                 : null); // <1>
         }
     }

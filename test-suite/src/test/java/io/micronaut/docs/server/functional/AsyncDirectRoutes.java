@@ -2,6 +2,7 @@ package io.micronaut.docs.server.functional;
 
 // tag::imports[]
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
@@ -26,10 +27,10 @@ public class AsyncDirectRoutes implements HttpDirectRoutes {
             .executeOn(TaskExecutors.BLOCKING) // <1>
             .respond(direct -> {
                 String report = loadReport(direct.pathVariables().getString("id"));
-                return report == null ? null : direct.responses().ok(report);
+                return report == null ? null : HttpResponse.ok(report);
             }); // <2>
         routes.GET("/quotes/{symbol}").respondAsync(direct -> fetchQuote(direct.pathVariables().getString("symbol")) // <3>
-            .thenApply(quote -> quote == null ? null : direct.responses().ok(quote))); // <4>
+            .thenApply(quote -> quote == null ? null : HttpResponse.ok(quote))); // <4>
     }
 
     /**

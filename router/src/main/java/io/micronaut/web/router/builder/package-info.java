@@ -74,9 +74,12 @@
  *     <li>{@link io.micronaut.web.router.builder.HttpDirectRoutes}, the beans that declare
  *     direct routes with a {@link io.micronaut.web.router.builder.DirectRouteBuilder}: the server
  *     answers a direct route before it creates the request, without any filter. A pending direct
- *     route is a {@link io.micronaut.web.router.builder.DirectRouteSpec}, and its function
- *     composes the response from a {@link io.micronaut.web.router.builder.DirectContext}. The
- *     server runtimes answer them through the SPI of {@link io.micronaut.web.router.direct}.</li>
+ *     route is a {@link io.micronaut.web.router.builder.DirectRouteSpec}, which shares its
+ *     conditions, constraints and order with the ordinary routes, see
+ *     {@link io.micronaut.web.router.builder.MatchSpec}, and its function composes the response
+ *     from a {@link io.micronaut.web.router.builder.DirectContext}, which reads the request as
+ *     the server received it. The server runtimes answer them through the SPI of
+ *     {@link io.micronaut.web.router.direct}.</li>
  * </ul>
  *
  * <p>The builders, the route, group, error, status and server filter specs and the path

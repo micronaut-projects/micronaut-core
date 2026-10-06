@@ -1,6 +1,7 @@
 package io.micronaut.docs.server.functional
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
@@ -23,6 +24,12 @@ class DirectRoutesTest {
                 assertEquals("cached logo.png", http.retrieve(HttpRequest.GET<Any>("/assets/logo.png")))
                 assertEquals("rendered readme.txt", http.retrieve(HttpRequest.GET<Any>("/assets/readme.txt")))
                 assertEquals("User-agent: *\nDisallow: /private/\n", http.retrieve(HttpRequest.GET<Any>("/robots.txt")))
+                // a conditional GET: the function reads the request
+                val version = http.exchange(HttpRequest.GET<Any>("/version"), String::class.java)
+                assertEquals("1.0.0", version.body())
+                assertEquals("\"1.0.0\"", version.header(HttpHeaders.ETAG))
+                val notModified = http.exchange(HttpRequest.GET<Any>("/version").header(HttpHeaders.IF_NONE_MATCH, "\"1.0.0\""), String::class.java)
+                assertEquals(HttpStatus.NOT_MODIFIED, notModified.status)
                 val forbidden = assertThrows(HttpClientResponseException::class.java) {
                     http.retrieve(HttpRequest.POST("/orders", "{}").header("User-Agent", "BadBot/1.0"))
                 }

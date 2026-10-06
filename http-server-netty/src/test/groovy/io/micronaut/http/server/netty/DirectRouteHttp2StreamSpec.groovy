@@ -120,7 +120,7 @@ class DirectRouteHttp2StreamSpec extends Specification {
             // a route that gives a body to a status that has none
             routes.GET('/status/{code}').respond(direct -> {
                 String code = direct.pathVariables().getString('code')
-                direct.responses().status(HttpStatus.valueOf(Integer.parseInt(code))).body('status ' + code)
+                io.micronaut.http.HttpResponse.status(HttpStatus.valueOf(Integer.parseInt(code))).body('status ' + code)
             })
         }
     }

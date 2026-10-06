@@ -2,6 +2,7 @@ from micronaut.context.annotation import Requires
 # tag::imports[]
 import java
 from jakarta.inject import Singleton
+from micronaut.http import HttpResponse
 from micronaut.scheduling import TaskExecutors
 from micronaut.web.router.builder import DirectRouteBuilder, HttpDirectRoutes
 
@@ -21,12 +22,12 @@ class AsyncDirectRoutes(HttpDirectRoutes):
     def routes(self, routes: DirectRouteBuilder) -> None:
         def report(direct):
             text = self.load_report(direct.pathVariables().getString("id"))  # <1>
-            return None if text is None else direct.responses().ok(text)
+            return None if text is None else HttpResponse.ok(text)
 
         routes.GET("/reports/{id}").executeOn(TaskExecutors.BLOCKING).respond(report)  # <2>
         routes.GET("/quotes/{symbol}").respondAsync(lambda direct:
                         self.fetch_quote(direct.pathVariables().getString("symbol"))  # <3>
-                        .thenApply(lambda quote: None if quote is None else direct.responses().ok(quote)))  # <4>
+                        .thenApply(lambda quote: None if quote is None else HttpResponse.ok(quote)))  # <4>
 
     def load_report(self, report_id: str):
         """Blocks, e.g. on a database."""

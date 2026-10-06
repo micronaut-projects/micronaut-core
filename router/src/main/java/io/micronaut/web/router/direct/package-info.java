@@ -20,12 +20,12 @@
  * application declares them with {@link io.micronaut.web.router.builder.HttpDirectRoutes} beans.
  *
  * <p>A server runtime that answers direct routes, e.g. the Netty server or a servlet container,
- * declares a {@link io.micronaut.web.router.direct.DirectRouteSupport} bean, and looks up the
- * response of a request with {@link io.micronaut.web.router.direct.DirectRouteLookup} before it
- * creates the {@link io.micronaut.http.HttpRequest}, from the method, the path, the headers and
- * the peer address of the request it received, a
- * {@link io.micronaut.web.router.direct.DirectRequest}. An asynchronous route answers with a
- * {@link io.micronaut.web.router.direct.PendingResponse}.</p>
+ * declares a {@link io.micronaut.web.router.direct.DirectRouteSupport} bean, and matches the
+ * direct routes with {@link io.micronaut.web.router.direct.DirectRouteLookup} before it creates
+ * the {@link io.micronaut.http.HttpRequest}, from the method, the path, the headers and the peer
+ * address of the request it received, a {@link io.micronaut.web.router.direct.DirectRequest}. The
+ * matched route, a {@link io.micronaut.web.router.direct.DirectMatch}, composes the response:
+ * synchronously, or later for an asynchronous route.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0

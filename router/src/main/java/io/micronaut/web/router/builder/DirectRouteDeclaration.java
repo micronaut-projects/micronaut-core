@@ -59,6 +59,10 @@ final class DirectRouteDeclaration {
      * The name of the executor the function runs on, or {@code null} for the thread that received the request.
      */
     @Nullable String executorName;
+    /**
+     * The name of the bean that declares the route, for the messages, or {@code null}.
+     */
+    @Nullable String declaringBean;
 
     /**
      * @param httpMethodName The name of the method
@@ -84,6 +88,15 @@ final class DirectRouteDeclaration {
      */
     boolean isAsync() {
         return asyncResponse != null || executorName != null;
+    }
+
+    /**
+     * @return The route and the bean that declares it, for the messages, e.g.
+     * {@code direct route GET /health declared by HealthRoutes}
+     */
+    String describe() {
+        String bean = declaringBean;
+        return bean == null ? toString() : this + " declared by " + bean;
     }
 
     @Override

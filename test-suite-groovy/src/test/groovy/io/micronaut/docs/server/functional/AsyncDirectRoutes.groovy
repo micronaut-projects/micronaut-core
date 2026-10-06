@@ -11,7 +11,6 @@ import jakarta.inject.Singleton
 
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
-import java.util.function.Function
 // end::imports[]
 
 @Requires(property = "spec.name", value = "AsyncDirectRoutesSpec")
@@ -26,14 +25,14 @@ class AsyncDirectRoutes implements HttpDirectRoutes {
     void routes(DirectRouteBuilder routes) {
         routes.GET("/reports/{id}")
             .executeOn(TaskExecutors.BLOCKING) // <1>
-            .respond({ DirectContext direct ->
-            String report = loadReport(direct.pathVariables().getString("id"))
-            report == null ? null : direct.responses().ok(report)
-        } as Function<DirectContext, HttpResponse<?>>) // <2>
-        routes.GET("/quotes/{symbol}").respondAsync({ DirectContext direct ->
+            .respond { DirectContext direct ->
+                String report = loadReport(direct.pathVariables().getString("id"))
+                report == null ? null : HttpResponse.ok(report)
+            } // <2>
+        routes.GET("/quotes/{symbol}").respondAsync { DirectContext direct ->
             fetchQuote(direct.pathVariables().getString("symbol")) // <3>
-                .thenApply { String quote -> quote == null ? null : direct.responses().ok(quote) } // <4>
-        } as Function<DirectContext, CompletionStage<HttpResponse<?>>>)
+                .thenApply { String quote -> quote == null ? null : HttpResponse.ok(quote) } // <4>
+        }
     }
 
     /**

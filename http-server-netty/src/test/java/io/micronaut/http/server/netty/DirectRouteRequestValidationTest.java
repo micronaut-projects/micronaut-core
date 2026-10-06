@@ -130,8 +130,7 @@ class DirectRouteRequestValidationTest {
     static class Routes implements HttpDirectRoutes {
         @Override
         public void routes(DirectRouteBuilder routes) {
-            routes.GET("/validation/greet/{name}").respond(direct -> direct.responses()
-                .ok("hello " + direct.pathVariables().getString("name"))
+            routes.GET("/validation/greet/{name}").respond(direct -> HttpResponse.ok("hello " + direct.pathVariables().getString("name"))
                 .contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.GET("/validation/q").where(RouteCondition.query("mode", "debug")).respond(HttpResponse.ok("debug"));
             routes.GET("/validation/error").respond(direct -> {

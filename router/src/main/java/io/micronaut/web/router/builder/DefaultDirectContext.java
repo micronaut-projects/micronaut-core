@@ -16,17 +16,18 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.direct.DirectRequest;
 
 /**
- * The {@link DirectContext} of a request, created by the lookup of the direct routes.
+ * A {@link DirectContext} given its values, see {@link DirectContext#of}: the lookup of the
+ * direct routes gives a function its match instead, see {@link DirectRouteTable.FunctionMatch}.
  *
- * @param responses     The response factory of the server runtime
- * @param pathVariables The path variables of the matched route
+ * @param request       The request
+ * @param pathVariables The path variables of the route
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record DefaultDirectContext(HttpResponseFactory responses, PathVariables pathVariables) implements DirectContext {
+record DefaultDirectContext(DirectRequest request, PathVariables pathVariables) implements DirectContext {
 }

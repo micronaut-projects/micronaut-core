@@ -297,10 +297,10 @@ class DirectRouteAsyncTest {
                 }).executeOn(TaskExecutors.BLOCKING)
                 .respond(direct -> {
                     threads.function.set(Thread.currentThread());
-                    return direct.responses().ok("report " + direct.pathVariables().getString("id"));
+                    return HttpResponse.ok("report " + direct.pathVariables().getString("id"));
                 });
                 async.GET("/now", HttpResponse.ok("now"));
-                async.GET("/later").respondAsync(direct -> CompletableFuture.supplyAsync(() -> direct.responses().ok("later"), LATER));
+                async.GET("/later").respondAsync(direct -> CompletableFuture.supplyAsync(() -> HttpResponse.ok("later"), LATER));
 
                 // declined later, and on an executor
                 async.POST("/upload").respondAsync(direct -> CompletableFuture.supplyAsync(() -> null, LATER));
@@ -316,12 +316,12 @@ class DirectRouteAsyncTest {
                     throw new IllegalStateException("failed");
                 });
 
-                async.GET("/blocking-writer/sync").respond(direct -> direct.responses().ok(new BlockingBody("sync")).contentType(BLOCKING));
+                async.GET("/blocking-writer/sync").respond(direct -> HttpResponse.ok(new BlockingBody("sync")).contentType(BLOCKING));
                 async.GET("/blocking-writer/executor")
                     .executeOn(TaskExecutors.BLOCKING)
-                    .respond(direct -> direct.responses().ok(new BlockingBody("executor")).contentType(BLOCKING));
+                    .respond(direct -> HttpResponse.ok(new BlockingBody("executor")).contentType(BLOCKING));
                 async.GET("/blocking-writer/completed").respondAsync(direct ->
-                    CompletableFuture.completedFuture(direct.responses().ok(new BlockingBody("completed")).contentType(BLOCKING)));
+                    CompletableFuture.completedFuture(HttpResponse.ok(new BlockingBody("completed")).contentType(BLOCKING)));
 
                 async.GET("/hanging").respondAsync(direct -> {
                     CompletableFuture<HttpResponse<?>> stage = new CompletableFuture<>();

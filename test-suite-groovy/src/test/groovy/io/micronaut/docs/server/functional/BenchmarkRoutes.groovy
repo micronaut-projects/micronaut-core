@@ -6,13 +6,11 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.web.router.builder.DirectContext
 import io.micronaut.web.router.builder.DirectRouteBuilder
 import io.micronaut.web.router.builder.HttpDirectRoutes
 import jakarta.inject.Singleton
 
 import java.nio.charset.StandardCharsets
-import java.util.function.Function
 // end::imports[]
 
 @Requires(property = "spec.name", value = "BenchmarkRoutesSpec")
@@ -24,16 +22,16 @@ class BenchmarkRoutes implements HttpDirectRoutes {
 
     @Override
     void routes(DirectRouteBuilder routes) {
-        routes.GET("/plaintext").respond({ DirectContext direct -> // <2>
-            direct.responses().ok(HELLO)
+        routes.GET("/plaintext").respond { direct -> // <2>
+            HttpResponse.ok(HELLO)
                 .contentType(MediaType.TEXT_PLAIN_TYPE)
                 .header(HttpHeaders.SERVER, "Micronaut") // <3>
-        } as Function<DirectContext, HttpResponse<?>>)
-        routes.GET("/json").respond({ DirectContext direct -> // <4>
-            direct.responses().ok(new Message("Hello, World!"))
+        }
+        routes.GET("/json").respond { direct -> // <4>
+            HttpResponse.ok(new Message("Hello, World!"))
                 .contentType(MediaType.APPLICATION_JSON_TYPE)
                 .header(HttpHeaders.SERVER, "Micronaut")
-        } as Function<DirectContext, HttpResponse<?>>)
+        }
     }
 }
 

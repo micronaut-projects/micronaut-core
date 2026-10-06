@@ -70,7 +70,8 @@ public sealed interface ExecutionSpec<S extends ExecutionSpec<S>> permits RouteS
      * thread that received the request, then its response is composed, and its body written,
      * on the executor, which may block, e.g. on a database, or use a blocking message body
      * writer. The server holds the request meanwhile. An executor that does not exist fails the
-     * startup.</p>
+     * startup. A direct route that answers with a response given as a value has nothing to run on
+     * an executor: its terminal fails, see {@link DirectRouteSpec#respond(io.micronaut.http.HttpResponse)}.</p>
      *
      * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
      * @return The route, the group or the filter

@@ -4,6 +4,7 @@ package io.micronaut.docs.server.functional;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
@@ -25,10 +26,10 @@ public class BenchmarkRoutes implements HttpDirectRoutes {
 
     @Override
     public void routes(DirectRouteBuilder routes) {
-        routes.GET("/plaintext").respond(direct -> direct.responses().ok(HELLO) // <2>
+        routes.GET("/plaintext").respond(direct -> HttpResponse.ok(HELLO) // <2>
             .contentType(MediaType.TEXT_PLAIN_TYPE)
             .header(HttpHeaders.SERVER, "Micronaut")); // <3>
-        routes.GET("/json").respond(direct -> direct.responses().ok(new Message("Hello, World!")) // <4>
+        routes.GET("/json").respond(direct -> HttpResponse.ok(new Message("Hello, World!")) // <4>
             .contentType(MediaType.APPLICATION_JSON_TYPE)
             .header(HttpHeaders.SERVER, "Micronaut"));
     }

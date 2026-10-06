@@ -1,7 +1,9 @@
 package io.micronaut.docs.server.functional
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -23,6 +25,17 @@ class DirectRoutesSpec extends Specification {
         client.toBlocking().retrieve(HttpRequest.GET("/assets/logo.png")) == "cached logo.png"
         client.toBlocking().retrieve(HttpRequest.GET("/assets/readme.txt")) == "rendered readme.txt"
         client.toBlocking().retrieve(HttpRequest.GET("/robots.txt")) == "User-agent: *\nDisallow: /private/\n"
+    }
+
+    void "a conditional GET reads the request"() {
+        when:
+        HttpResponse<String> version = client.toBlocking().exchange(HttpRequest.GET("/version"), String)
+        HttpResponse<String> notModified = client.toBlocking().exchange(HttpRequest.GET("/version").header(HttpHeaders.IF_NONE_MATCH, '"1.0.0"'), String)
+
+        then:
+        version.body() == "1.0.0"
+        version.header(HttpHeaders.ETAG) == '"1.0.0"'
+        notModified.status == HttpStatus.NOT_MODIFIED
     }
 
     void "a blocked client is answered with 403"() {

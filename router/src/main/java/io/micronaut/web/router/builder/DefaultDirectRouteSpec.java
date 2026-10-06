@@ -110,7 +110,16 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
 
     @Override
     public void respond(HttpResponse<?> response) {
-        ResponseTemplate constant = ResponseTemplate.direct(terminal(response), builder.shareableBody());
+        HttpResponse<?> checked = terminal(response);
+        if (executorName != null) {
+            // dropped, like a terminal without a response: the startup fails once, for this
+            ended = true;
+            builder.dropPending(this);
+            throw new IllegalStateException("The direct route " + description + " answers with a response given as a value, "
+                + "which is copied on the thread that received the request: remove executeOn(\"" + executorName + "\"), "
+                + "or compose the response on the executor with respond(Function)");
+        }
+        ResponseTemplate constant = ResponseTemplate.direct(checked, builder.shareableBody());
         end(constant, null, null);
     }
 
@@ -151,6 +160,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
             route.constraints.addAll(constraints);
             route.order = order;
             route.executorName = executorName;
+            route.declaringBean = builder.declaringBeanName();
             routes.add(route);
         }
         builder.addRoutes(this, routes);

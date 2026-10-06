@@ -24,10 +24,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteConditionContext;
+import io.micronaut.web.router.direct.DirectMatch;
 import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
 import io.micronaut.web.router.direct.DirectRouteSupport;
@@ -143,8 +143,8 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
     }
 
     @Override
-    public @Nullable HttpResponse<?> find(DirectRequest request, HttpResponseFactory responses) {
-        return routes.find(request, responses);
+    public @Nullable DirectMatch match(DirectRequest request) {
+        return routes.match(request);
     }
 
     @Override

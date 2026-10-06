@@ -279,14 +279,14 @@ class DirectRouteBenchmarkTest {
         public void routes(DirectRouteBuilder builder) {
             builder.GET("/plaintext").respond(direct -> {
                 plaintext.incrementAndGet();
-                return direct.responses().ok(HELLO)
+                return HttpResponse.ok(HELLO)
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
                     .header(HttpHeaders.SERVER, "Micronaut")
                     .header(HttpHeaders.DATE, date());
             });
             builder.GET("/json").respond(direct -> {
                 json.incrementAndGet();
-                return direct.responses().ok(new Message("Hello, World!"))
+                return HttpResponse.ok(new Message("Hello, World!"))
                     .header(HttpHeaders.SERVER, "Micronaut")
                     .header(HttpHeaders.DATE, date());
             });

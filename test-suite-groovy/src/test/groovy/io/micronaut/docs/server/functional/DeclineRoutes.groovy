@@ -10,7 +10,6 @@ import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRoutes
 import jakarta.inject.Singleton
 
-import java.util.function.Function
 
 @Requires(property = "spec.name", value = "DirectRoutesSpec")
 // tag::clazz[]
@@ -20,11 +19,11 @@ class CachedAssets implements HttpDirectRoutes {
 
     @Override
     void routes(DirectRouteBuilder routes) {
-        routes.GET("/assets/{name}").respond({ DirectContext direct ->
+        routes.GET("/assets/{name}").respond { DirectContext direct ->
             CACHED.contains(direct.pathVariables().getString("name"))
-                ? direct.responses().ok("cached " + direct.pathVariables().getString("name"))
+                ? HttpResponse.ok("cached " + direct.pathVariables().getString("name"))
                 : null
-        } as Function<DirectContext, HttpResponse<?>>) // <1>
+        } // <1>
     }
 }
 
