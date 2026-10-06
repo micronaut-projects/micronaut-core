@@ -257,6 +257,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
 
+    /**
+     * The definitions the legacy {@link ExecutableMethodProcessorListener} gave every method of to a processor it was
+     * given, by processor, so that the startup pass does not give them again. Null outside a start.
+     */
+    private @Nullable Map<ExecutableMethodProcessor<?>, Collection<BeanDefinition<Object>>> givenByLegacyListener;
+
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
     /**
@@ -2131,8 +2137,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         });
     }
 
+    /**
+     * Records that the legacy {@link ExecutableMethodProcessorListener} gave the processor every method of the
+     * definitions, so that the startup pass does not give them again.
+     *
+     * @param processor The processor
+     * @param definitions The definitions
+     */
+    void givenByLegacyListener(ExecutableMethodProcessor<?> processor, Collection<BeanDefinition<Object>> definitions) {
+        Map<ExecutableMethodProcessor<?>, Collection<BeanDefinition<Object>>> given = givenByLegacyListener;
+        if (given != null) {
+            given.put(processor, new HashSet<>(definitions));
+        }
+    }
+
     private void processExecutableMethodsProcessAtStartup() {
         Map<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> processorsByAnnotation = CollectionUtils.newLinkedHashMap(10);
+        Map<ExecutableMethodProcessor<?>, Collection<BeanDefinition<Object>>> given = givenByLegacyListener;
         List<BeanDefinition<Object>> processedBeans = new ArrayList<>(100);
         beanDefinitionProvider.getProcessedBeans(this).forEach(processedBeans::add);
         filterReplacedBeans(processedBeans);
@@ -2151,11 +2172,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         }
                     }
                     for (ExecutableMethodProcessor<?> processor : processors) {
+                        if (given != null && given.getOrDefault(processor, Set.of()).contains(definition)) {
+                            // the legacy listener gave the processor every method of this definition already
+                            continue;
+                        }
                         processor.process(definition, method);
                     }
                 }
             }
         }
+        givenByLegacyListener = null;
 
         for (Collection<ExecutableMethodProcessor> processors : processorsByAnnotation.values()) {
             for (ExecutableMethodProcessor<?> processor : processors) {
@@ -3634,6 +3660,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void configureAndStartContext() {
+        // each start runs the startup pass again, which needs what the legacy listener gives the processors it creates;
+        // without eager beans the startup pass does not run
+        givenByLegacyListener = eagerBeansEnabled ? Collections.synchronizedMap(new IdentityHashMap<>()) : null;
         registerConversionService();
         configureContextInternal();
         initializeEventListeners();
