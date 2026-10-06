@@ -22,6 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
@@ -75,11 +76,11 @@ class RouteWhereTest {
         List<String> evaluated = new ArrayList<>();
         Router router = router(routes -> routes.path("/beta", beta -> {
             beta.path("/inner", inner -> {
-                inner.GET("/search").where(record(evaluated, "route", request -> request.getHeaders().contains("X-Q"))).handle(handler("search"));
-                inner.where(record(evaluated, "inner", request -> request.getHeaders().contains("X-Inner")));
+                inner.GET("/search").where(recorded(evaluated, "route", request -> request.getHeaders().contains("X-Q"))).handle(handler("search"));
+                inner.where(recorded(evaluated, "inner", request -> request.getHeaders().contains("X-Inner")));
             });
             // declared after the routes of the group
-            beta.where(record(evaluated, "outer", request -> request.getHeaders().contains("X-Beta")));
+            beta.where(recorded(evaluated, "outer", request -> request.getHeaders().contains("X-Beta")));
         }));
 
         assertEquals("search", target(router, HttpRequest.GET("/beta/inner/search").header("X-Q", "1").header("X-Beta", "1").header("X-Inner", "1")));
@@ -97,7 +98,24 @@ class RouteWhereTest {
         });
 
         assertEquals("any", target(router, HttpRequest.GET("/reports/1")));
-        assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/reports/1").header("X-Export", "csv")));
+        var export = HttpRequest.GET("/reports/1").header("X-Export", "csv");
+        assertThrows(DuplicateRouteException.class, () -> router.findClosest(export));
+    }
+
+    @Test
+    void aDeclaredRouteAndALocatorRouteHaveTheConditionsOfTheirGroups() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items", handler("items")));
+        Router router = router(routes -> routes.group(group -> {
+            group.where(CSV);
+            group.GET("/declared/{id}").where(request -> request.getHeaders().contains("X-Q")).handle(handler("declared"));
+            group.locate("/orders/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> items);
+        }));
+
+        assertEquals("declared", target(router, HttpRequest.GET("/declared/1").header("X-Q", "1").header("X-Export", "csv")));
+        assertNull(router.findClosest(HttpRequest.GET("/declared/1").header("X-Q", "1")));
+        assertNull(router.findClosest(HttpRequest.GET("/declared/1").header("X-Export", "csv")));
+        assertEquals("items", target(router, HttpRequest.GET("/orders/1/items").header("X-Export", "csv")));
+        assertNull(router.findClosest(HttpRequest.GET("/orders/1/items")));
     }
 
     @Test
@@ -110,7 +128,7 @@ class RouteWhereTest {
         assertEquals("both", target(router, HttpRequest.PATCH("/both", "").header("X-Export", "csv")));
     }
 
-    private static Predicate<HttpRequest<?>> record(List<String> evaluated, String name, Predicate<HttpRequest<?>> condition) {
+    private static Predicate<HttpRequest<?>> recorded(List<String> evaluated, String name, Predicate<HttpRequest<?>> condition) {
         return request -> {
             evaluated.add(name);
             return condition.test(request);

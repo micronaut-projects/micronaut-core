@@ -34,6 +34,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.http.form.FormData;
 import org.jspecify.annotations.Nullable;
 
@@ -353,9 +354,28 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         );
     }
 
+    /**
+     * The target of a locator route: the router resolves the route to a route of the located
+     * target, so the method is never invoked.
+     *
+     * @param locator The locator
+     * @return The method
+     */
+    public static HandlerMethod<Object> of(RouteLocator locator) {
+        return new HandlerMethod<>(
+            locator,
+            RouteLocator.class,
+            new Argument<?>[0],
+            returnType(Object.class),
+            args -> {
+                throw new IllegalStateException("The router resolves a locator route to a route of the located target: " + locator);
+            }
+        );
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <R> ReturnType<R> returnType(Class<?> type, Argument<?>... typeArguments) {
-        return (ReturnType<R>) ReturnType.of((Class) type, typeArguments);
+        return (ReturnType<R>) ReturnType.of(type, typeArguments);
     }
 
     @Override
@@ -491,6 +511,30 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * The same handler with annotations it inherits, e.g. a located route with the annotations
+     * of the groups of its locator routes: the annotations of this method override them, like the
+     * annotations of a route override the ones of its groups.
+     *
+     * @param inherited The inherited annotations
+     * @return The method with the annotations of both, or this method if it inherits none
+     */
+    @Internal
+    public HandlerMethod<R> inheriting(AnnotationMetadata inherited) {
+        if (inherited.isEmpty()) {
+            return this;
+        }
+        AnnotationMetadata own = annotationMetadata;
+        AnnotationMetadata metadata = own.isEmpty() ? inherited : new AnnotationMetadataHierarchy(true, inherited, own);
+        HandlerMethod<R> method = new HandlerMethod<>(handler, handlerType, arguments, returnType, invoker);
+        method.annotationMetadataProvider = annotationMetadataProvider;
+        method.groupAnnotations = groupAnnotations;
+        method.annotationMetadata = metadata;
+        // like the return type of a method, it has the annotations of the method
+        method.annotatedReturnType = new AnnotatedReturnType<>(returnType, metadata);
+        return method;
+    }
+
+    /**
      * The element the route to the handler has the annotations of, see
      * {@link HttpRouteSpec#annotationMetadata}.
      *
@@ -604,6 +648,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         ExecutableMethod<?, ?> target = implemented();
         if (target != null) {
             return withoutPackage(target.getDeclaringType().getName()) + '#' + target.getMethodName();
+        }
+        if (handlerType == RouteLocator.class) {
+            return "locator " + handler;
         }
         String name = handler.getClass().getName();
         int lambda = name.indexOf("$$Lambda");

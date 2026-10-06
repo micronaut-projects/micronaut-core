@@ -64,7 +64,8 @@ class RouteOrderTest {
             routes.GET("/reports/{id}").order(7).handle(handler("c"));
         });
 
-        DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/reports/1")));
+        var request = HttpRequest.GET("/reports/1");
+        DuplicateRouteException error = assertThrows(DuplicateRouteException.class, () -> router.findClosest(request));
         assertEquals(2, error.getUriRoutes().size(), "the routes with the lowest order are the ambiguous ones");
     }
 

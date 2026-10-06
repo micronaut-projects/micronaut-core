@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -31,17 +32,20 @@ import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.DefaultPathVariables;
+import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.http.PathVariables;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -56,6 +60,7 @@ import java.util.function.Predicate;
 public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R>, IndexedRoute {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultUrlRouteInfo.class);
+    private static final InheritingRoute[] NO_INHERITING_ROUTES = new InheritingRoute[0];
 
     /**
      * The filters of this route only, in the order the filter chain runs them.
@@ -98,6 +103,20 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Nullable
     private Executor executor;
+    /**
+     * Whether the route has a {@link DynamicRouteTarget}, e.g. a locator route, whose target's
+     * routes decide what they consume and produce.
+     */
+    private final boolean dynamicTarget;
+    /**
+     * Builds this route again for a target method with other annotations, see {@link #inheriting(AnnotationMetadata)}.
+     */
+    private final Function<MethodExecutionHandle<T, R>, DefaultUrlRouteInfo<T, R>> rebuild;
+    /**
+     * The routes built by {@link #inheriting(AnnotationMetadata)}, by the identity of the inherited annotations.
+     */
+    @SuppressWarnings("java:S3077") // the array is never changed: a new array replaces it
+    private volatile InheritingRoute[] inheritingRoutes = NO_INHERITING_ROUTES;
 
     @SuppressWarnings("ParameterNumber")
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -241,6 +260,68 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.errorScope = errorScope;
         this.anyMethod = anyMethod;
         this.constraints = List.copyOf(constraints);
+        this.dynamicTarget = targetMethod instanceof HandlerMethod<?> handler && handler.getTarget() instanceof DynamicRouteTarget;
+        this.rebuild = method -> new DefaultUrlRouteInfo<>(httpMethod, httpMethodName, uriMatchTemplate, defaultCharset, method,
+            bodyArgumentName, bodyArgument, consumesMediaTypes, producesMediaTypes, predicates, port, conversionService,
+            executorSelector, messageBodyHandlerRegistry, implicitHead, routeFilters, order, attributes, errorScope, anyMethod,
+            this.constraints);
+    }
+
+    /**
+     * This route with annotations it inherits, which its own annotations override: the route a
+     * route of a {@link io.micronaut.web.router.builder.LocatedRoutes} table is at a location,
+     * with the annotations of the groups of the locator routes, like a route declared in those
+     * groups has them. Everything the route derives from its annotations, such as its
+     * {@code @Produces}, {@code @Consumes} and {@code @Status}, the filters bound to its
+     * annotations and its executor, derives from both.
+     *
+     * <p>The routes are built once per inherited annotations, which a location keeps the same
+     * for every request, see {@link RouteLocator}: the route of a request is one of them, like an
+     * ordinary route, and a cache keyed by route, such as the CORS configuration, stays bounded.</p>
+     *
+     * @param inherited The inherited annotations
+     * @return The route with the annotations of both, or this route if it inherits none or its
+     * target is not a handler function
+     */
+    @SuppressWarnings("unchecked")
+    DefaultUrlRouteInfo<T, R> inheriting(AnnotationMetadata inherited) {
+        if (inherited.isEmpty() || !(getTargetMethod() instanceof HandlerMethod<?> handler)) {
+            return this;
+        }
+        DefaultUrlRouteInfo<T, R> found = findInheriting(inheritingRoutes, inherited);
+        if (found != null) {
+            return found;
+        }
+        synchronized (this) {
+            InheritingRoute[] routes = inheritingRoutes;
+            found = findInheriting(routes, inherited);
+            if (found != null) {
+                return found;
+            }
+            DefaultUrlRouteInfo<T, R> route = rebuild.apply((MethodExecutionHandle<T, R>) handler.inheriting(inherited));
+            InheritingRoute[] grown = Arrays.copyOf(routes, routes.length + 1);
+            grown[routes.length] = new InheritingRoute(inherited, route);
+            inheritingRoutes = grown;
+            return route;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private @Nullable DefaultUrlRouteInfo<T, R> findInheriting(InheritingRoute[] routes, AnnotationMetadata inherited) {
+        for (InheritingRoute route : routes) {
+            if (route.inherited() == inherited) {
+                return (DefaultUrlRouteInfo<T, R>) route.route();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @return Whether the route has a {@link DynamicRouteTarget}, e.g. a locator route: the routes
+     * of its target decide which media types the request may have and accept, see {@link DynamicRouteTarget#of}
+     */
+    boolean hasDynamicTarget() {
+        return dynamicTarget;
     }
 
     /**
@@ -400,5 +481,14 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
             this.executor = executor;
         }
         return executor;
+    }
+
+    /**
+     * A route built by {@link #inheriting(AnnotationMetadata)}.
+     *
+     * @param inherited The inherited annotations
+     * @param route     The route with them
+     */
+    private record InheritingRoute(AnnotationMetadata inherited, DefaultUrlRouteInfo<?, ?> route) {
     }
 }

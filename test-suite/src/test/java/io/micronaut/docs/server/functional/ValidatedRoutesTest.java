@@ -22,8 +22,10 @@ class ValidatedRoutesTest {
              HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {
             HttpResponse<?> created = client.toBlocking().exchange(HttpRequest.POST("/products", Map.of("name", "lamp")));
             assertEquals(HttpStatus.CREATED, created.getStatus());
+            var blockingClient = client.toBlocking();
+            var invalidRequest = HttpRequest.POST("/products", Map.of("name", ""));
             HttpClientResponseException invalid = assertThrows(HttpClientResponseException.class,
-                () -> client.toBlocking().exchange(HttpRequest.POST("/products", Map.of("name", ""))));
+                () -> blockingClient.exchange(invalidRequest));
             assertEquals(HttpStatus.BAD_REQUEST, invalid.getStatus());
         }
     }
