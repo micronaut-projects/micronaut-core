@@ -52,6 +52,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.AvailableByteBody;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CharSequenceBodyWriter;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
@@ -94,6 +95,8 @@ import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
+import io.micronaut.http.client.sse.AsyncSseClient;
+import io.micronaut.http.client.sse.EventStreamResponse;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
@@ -847,6 +850,55 @@ final class NettyHttpClient implements
             response.setBody(event);
         }
         return new HttpResponseWrapper<>(response);
+    }
+
+    @Override
+    public AsyncSseClient toAsyncSse() {
+        return new DefaultAsyncSseClient(this);
+    }
+
+    /**
+     * The exchange of {@link DefaultAsyncSseClient}: {@link #exchangeEventStream} without Reactor.
+     * The flow completes with the status and the headers of the response, and its events are read
+     * from the response body as they are pulled.
+     *
+     * @param request   The request
+     * @param eventType The event data type
+     * @param errorType The error type
+     * @param <I>       The request body type
+     * @param <B>       The event data type
+     * @return The flow of the response, whose body is the events
+     */
+    <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+        setupConversionService(request);
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
+        if (!acceptsEvents(mutableRequest)) {
+            // keep what the caller accepts, such as application/json, and accept an event stream too
+            mutableRequest.getHeaders().add(io.micronaut.http.HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
+        }
+        return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
+            propagatedContext,
+            null,
+            mutableRequest.uri(target.uri()),
+            target.selection(),
+            (req, resp) -> {
+                if (resp.code() >= 400) {
+                    // the error body is decoded into the error type, as for exchange
+                    return InternalByteBody.bufferFlow(resp.byteBody())
+                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
+                        .flatMap(av -> handleExchangeResponse(null, errorType, resp, av));
+                }
+                return ExecutionFlow.just(EventStreamResponse.of(resp, handlerRegistry, eventType, sizeLimits().maxBufferSize()));
+            }
+        )).flatMap(response -> {
+            if (!(response.getBody().orElse(null) instanceof BodyElements<?>)) {
+                return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without events. Do not replace the response in client filters for event stream requests"));
+            }
+            @SuppressWarnings("unchecked")
+            HttpResponse<BodyElements<Event<B>>> events = (HttpResponse<BodyElements<Event<B>>>) response;
+            return ExecutionFlow.just(events);
+        });
     }
 
     @Override

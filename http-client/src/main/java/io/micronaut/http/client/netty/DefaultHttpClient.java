@@ -40,6 +40,7 @@ import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
+import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -482,6 +483,11 @@ public class DefaultHttpClient implements
     @Override
     public AsyncRawHttpClient toAsyncRaw() {
         return nettyHttpClient.toAsyncRaw();
+    }
+
+    @Override
+    public AsyncSseClient toAsyncSse() {
+        return nettyHttpClient.toAsyncSse();
     }
 
     @Override
