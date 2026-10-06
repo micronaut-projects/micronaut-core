@@ -2,6 +2,7 @@ package io.micronaut.context
 
 
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.ApplicationConfiguration
 import spock.lang.Specification
 
@@ -9,6 +10,25 @@ import java.lang.reflect.Method
 import java.util.function.Function
 
 class DefaultBeanContextSpec extends Specification {
+
+    def "getBeanRegistrations(Class, Qualifier) applies the qualifier"() {
+        given:
+            BeanContext beanContext = BeanContext.run()
+            beanContext.registerSingleton(NamedThing, new NamedThing("a"), Qualifiers.byName("a"))
+            beanContext.registerSingleton(NamedThing, new NamedThing("b"), Qualifiers.byName("b"))
+
+        when:
+            def registrations = beanContext.getBeanRegistrations(NamedThing, Qualifiers.<NamedThing>byName("a"))
+
+        then:
+            registrations.size() == 1
+            registrations.first().bean().name == "a"
+            beanContext.getBeanRegistrations(NamedThing).size() == 2
+            beanContext.getBeanRegistrations(NamedThing, null).size() == 2
+
+        cleanup:
+            beanContext.close()
+    }
 
     def "test null safe methods and special cases"() {
         given:
@@ -144,5 +164,13 @@ class DefaultBeanContextSpec extends Specification {
 
     private static Object invokeAsIterable(Method method, DefaultBeanContext beanContext, Object container) {
         method.invoke(beanContext, (Object) container)
+    }
+}
+
+class NamedThing {
+    final String name
+
+    NamedThing(String name) {
+        this.name = name
     }
 }
