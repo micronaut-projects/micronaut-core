@@ -126,6 +126,15 @@ public final class DevRuntime implements Closeable {
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
     private static final int LEAK_TOLERANCE = 2;
     private static final int MAX_PROPAGATION_PASSES = 5;
+    /**
+     * What Netty initializes once per JVM and keeps: {@code PlatformDependent} keeps the exception that tells why it does
+     * not use {@code Unsafe}, whose stack trace holds the classes on the stack of the thread that first used Netty. It reads
+     * its system properties, such as {@code io.netty.noUnsafe}, then: in development mode they are those the JVM was
+     * launched with, not those an application's {@code main} would set before it runs Micronaut.
+     */
+    private static final List<String> PARENT_TIER_STATICS = List.of(
+        "io.netty.util.internal.PlatformDependent"
+    );
 
     private final DevManifest manifest;
     private final DevClassLoader classLoader;
@@ -265,6 +274,7 @@ public final class DevRuntime implements Closeable {
         arguments = args.clone();
         ApplicationContext first;
         try {
+            initializeParentTierStatics();
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
             if (manifest.strategy() != ReloadStrategy.RESTART && !NativeImageUtils.inImageRuntimeCode()) {
                 // the fast path needs an agent: the launcher's, or one attached now. A native image has none: its
@@ -582,6 +592,7 @@ public final class DevRuntime implements Closeable {
             throw new IllegalStateException("A development runtime already runs this process");
         }
         try {
+            initializeParentTierStatics();
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
             // what the class files depend on and which are tests, before any change comes: a first change that removes a
             // constant, or deletes a test, needs to know the state it changes
@@ -935,6 +946,24 @@ public final class DevRuntime implements Closeable {
             liveReload = factory.start(manifest.liveReload().port());
         } catch (IOException e) {
             LOG.warn("LiveReload server could not bind port {}: {}", manifest.liveReload().port(), e.getMessage());
+        }
+    }
+
+    /**
+     * Initializes, on the launcher's thread and outside any generation, what a library of the parent tier initializes
+     * once per JVM and keeps for good, such as Netty's {@code PlatformDependent}. Initialized by the first generation, it
+     * would keep that generation: an exception created then holds, in its stack trace, the classes of the generation's
+     * frames, its application class among them. A library missing from the classpath is skipped.
+     */
+    private void initializeParentTierStatics() {
+        ClassLoader parentTier = classLoader.getParent() != null ? classLoader.getParent() : DevRuntime.class.getClassLoader();
+        for (String name : PARENT_TIER_STATICS) {
+            try {
+                Class.forName(name, true, parentTier);
+            } catch (ClassNotFoundException | LinkageError e) {
+                // not there, or not initializable outside the application: the generation that uses it initializes it
+                LOG.trace("Not initialized ahead of the first generation: {}", name, e);
+            }
         }
     }
 

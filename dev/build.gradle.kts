@@ -35,6 +35,9 @@ dependencies {
     // classpath, whose endpoints would start with every application the tests launch
     testImplementation(projects.micronautRouter)
     testCompileOnly(projects.micronautManagement)
+    // a Netty application in development mode, run in a JVM of its own, to see what Netty keeps from its first use
+    testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
