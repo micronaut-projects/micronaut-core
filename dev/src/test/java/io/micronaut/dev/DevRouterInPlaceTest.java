@@ -39,33 +39,11 @@ class DevRouterInPlaceTest {
             port = socket.getLocalPort();
         }
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
-        Files.writeString(src.resolve("Application.java"), """
-            package app;
-            public class Application {
-                public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "DevRouterInPlaceTest", "micronaut.server.port", args[0]))
-                        .mainClass(Application.class)
-                        .start();
-                }
-            }
-            """);
+        Files.writeString(src.resolve("Application.java"), application());
         Files.writeString(src.resolve("HelloController.java"), controller("hello-1"));
         Files.writeString(src.resolve("Routes.java"), routes("/fn", "fn-1"));
-        Path manifestFile = project.resolve("dev.properties");
-        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
-        Files.writeString(manifestFile, """
-            micronaut.dev.main-class=app.Application
-            micronaut.dev.strategy=auto
-            micronaut.dev.reloadable=build/classes
-            micronaut.dev.compile-classpath=@cp.argfile
-            micronaut.dev.processor-path=@cp.argfile
-            micronaut.dev.sources.java=src/main/java
-            micronaut.dev.compile.java.output=build/classes
-            micronaut.dev.patch-in-place=false
-            """);
 
-        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[] {String.valueOf(port)});
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
         try {
             assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
@@ -101,6 +79,85 @@ class DevRouterInPlaceTest {
         } finally {
             runtime.close();
         }
+    }
+
+    @Test
+    void aBodyOnlyEditOfAnInheritedRouteMethodRebuildsTheRouteTableInPlace() throws Exception {
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), application());
+        Files.writeString(src.resolve("BaseRoutes.java"), baseRoutes("/inherited", "inherited-1"));
+        Files.writeString(src.resolve("Routes.java"), """
+            package app;
+            @jakarta.inject.Singleton
+            public class Routes extends BaseRoutes {
+            }
+            """);
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
+        try {
+            assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
+            DevRouter router = context.getBean(DevRouter.class);
+            awaitServer(port);
+            assertEquals("200 inherited-1", get(port, "/inherited"));
+
+            // only the superclass changes, and it declares the routes of the bean that extends it
+            Files.writeString(src.resolve("BaseRoutes.java"), baseRoutes("/inherited-moved", "inherited-2"));
+            runtime.reload();
+            assertEquals(1, runtime.redefinitions());
+            assertEquals(1, runtime.generation());
+            assertSame(context, runtime.context().orElseThrow());
+            assertEquals(1, router.rebuilds());
+            assertEquals("200 inherited-2", get(port, "/inherited-moved"));
+            assertTrue(get(port, "/inherited").startsWith("404 "));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    private Path manifest() throws IOException {
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=auto
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            micronaut.dev.patch-in-place=false
+            """);
+        return manifestFile;
+    }
+
+    private static String application() {
+        return """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args)
+                        .properties(java.util.Map.of("spec.name", "DevRouterInPlaceTest", "micronaut.server.port", args[0]))
+                        .mainClass(Application.class)
+                        .start();
+                }
+            }
+            """;
+    }
+
+    private static String baseRoutes(String path, String body) {
+        return """
+            package app;
+            public abstract class BaseRoutes implements io.micronaut.web.router.builder.HttpRoutes {
+                @Override
+                public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
+                    routes.GET("%s", (request, variables) -> io.micronaut.http.HttpResponse.ok("%s").contentType("text/plain"));
+                }
+            }
+            """.formatted(path, body);
     }
 
     private static String controller(String greeting) {

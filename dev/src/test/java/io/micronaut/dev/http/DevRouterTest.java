@@ -1,6 +1,7 @@
 package io.micronaut.dev.http;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentMode;
@@ -18,10 +19,13 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -134,6 +138,39 @@ class DevRouterTest {
     }
 
     @Test
+    void aRebuildThatFailsThenRecoversKeepsTheDefaultPorts() throws IOException {
+        int main = freePort();
+        int management = freePort();
+        try (ApplicationContext context = ApplicationContext.run(Map.of(
+            "spec.name", "DevRouterTest",
+            "dev-router.flaky", true,
+            "dev-router.management-port", management,
+            "micronaut.server.netty.listeners.main.port", main,
+            "micronaut.server.netty.listeners.management.port", management,
+            "micronaut.server.netty.listeners.management.expose-default-routes", false,
+            DevelopmentMode.PROPERTY, true))) {
+            context.getBean(EmbeddedServer.class).start();
+            DevRouter devRouter = context.getBean(DevRouter.class);
+            assertEquals("200 static", get(main, "/dev-router/static"));
+            assertEquals("200 management", get(management, "/dev-router/management"));
+            assertTrue(get(management, "/dev-router/static").startsWith("404 "));
+
+            // the router fails once to be built: the rebuild fails, and the router the context builds next is used
+            Router before = devRouter.current();
+            FlakyRouteBuilder.FAIL_NEXT.set(true);
+            devRouter.rebuild();
+            assertFalse(FlakyRouteBuilder.FAIL_NEXT.get(), "the rebuild failed once");
+            assertEquals(0, devRouter.rebuilds());
+            assertFalse(before == devRouter.current(), "a new router");
+
+            // the routes that name no port are still served only on the listeners that expose them
+            assertEquals("200 static", get(main, "/dev-router/static"));
+            assertEquals("200 management", get(management, "/dev-router/management"));
+            assertTrue(get(management, "/dev-router/static").startsWith("404 "));
+        }
+    }
+
+    @Test
     void anApplicationThatDeclaresAPrimaryRouterKeepsIt() throws IOException {
         try (ApplicationContext context = ApplicationContext.run(Map.of(
             "spec.name", "DevRouterTest",
@@ -156,8 +193,18 @@ class DevRouterTest {
         return HttpResponse.ok(body).contentType("text/plain");
     }
 
+    private static int freePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        }
+    }
+
     private static String get(EmbeddedServer server, String path) throws IOException {
-        try (Socket socket = new Socket("localhost", server.getPort())) {
+        return get(server.getPort(), path);
+    }
+
+    private static String get(int port, String path) throws IOException {
+        try (Socket socket = new Socket("localhost", port)) {
             socket.setSoTimeout(30_000);
             socket.getOutputStream().write(("GET " + path + " HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
             String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -191,6 +238,36 @@ class DevRouterTest {
     static class PrimaryRouter extends DefaultRouter {
         PrimaryRouter(java.util.Collection<RouteBuilder> builders) {
             super(builders);
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DevRouterTest")
+    @Requires(property = "dev-router.management-port")
+    @Controller(value = "/dev-router", port = "${dev-router.management-port}")
+    static class ManagementController {
+        @Get(value = "/management", produces = "text/plain")
+        String management() {
+            return "management";
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DevRouterTest")
+    @Requires(property = "dev-router.flaky")
+    @Singleton
+    static class FlakyRouteBuilder extends DefaultRouteBuilder {
+        static final AtomicBoolean FAIL_NEXT = new AtomicBoolean();
+
+        FlakyRouteBuilder(ExecutionHandleLocator locator) {
+            super(locator);
+        }
+
+        @Override
+        public Set<Integer> getExposedPorts() {
+            // read by the router as it is built: the router built next fails once
+            if (FAIL_NEXT.compareAndSet(true, false)) {
+                throw new IllegalStateException("flaky routes");
+            }
+            return super.getExposedPorts();
         }
     }
 

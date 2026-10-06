@@ -29,6 +29,7 @@ import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.watch.BeanDefinitionChange;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -168,12 +169,7 @@ public final class DevRouter implements Router {
                     // still held when no builder was, such as when every builder is a singleton registered at runtime
                     watchable.recreate(previous);
                 }
-                Router fresh = resolve();
-                List<Integer> ports = defaultPorts;
-                if (ports != null) {
-                    fresh.applyDefaultPorts(ports);
-                }
-                router = fresh;
+                install(resolve());
                 rebuilds++;
                 LOG.debug("Rebuilt the route table in place");
             } catch (RuntimeException e) {
@@ -181,12 +177,26 @@ public final class DevRouter implements Router {
                 // the builders recreated so far took the previous router with them: route through whatever the context
                 // can build now, or else through the previous router, whose table is still the one it built
                 try {
-                    router = resolve();
+                    install(resolve());
                 } catch (RuntimeException again) {
                     LOG.debug("No router can be built until the routes are fixed; the previous routes stay", again);
                 }
             }
         }
+    }
+
+    /**
+     * Routes requests through the given router, restricted to the ports the server gave for the routes that name none:
+     * without them a router serves those routes on every listener, such as the management one.
+     *
+     * @param fresh The router
+     */
+    private void install(Router fresh) {
+        List<Integer> ports = defaultPorts;
+        if (ports != null) {
+            fresh.applyDefaultPorts(ports);
+        }
+        router = fresh;
     }
 
     private <T> void onChange(BeanDefinitionChange<T> change) {
@@ -216,23 +226,53 @@ public final class DevRouter implements Router {
 
     /**
      * @return The classes whose code declares routes: the {@link HttpRoutes} and {@link RouteBuilder} beans and the
-     * factories producing them
+     * factories producing them, with the application's superclasses and interfaces of each, as a bean may inherit the
+     * method that declares its routes
      */
     private Set<String> routeDeclaringClasses() {
         Set<String> names = new HashSet<>();
         for (Class<?> type : List.of(HttpRoutes.class, RouteBuilder.class)) {
             for (BeanDefinition<?> definition : context.getBeanDefinitions(type)) {
                 names.add(definition.getBeanType().getName());
-                definition.getDeclaringType().ifPresent(declaringType -> names.add(declaringType.getName()));
+                addAncestors(definition.getBeanType(), names);
+                definition.getDeclaringType().ifPresent(declaringType -> {
+                    names.add(declaringType.getName());
+                    addAncestors(declaringType, names);
+                });
             }
             for (BeanRegistration<?> registration : context.getActiveBeanRegistrations(type)) {
                 // a lambda's class is named after the class declaring it
-                String name = registration.getBean().getClass().getName();
+                Class<?> beanClass = registration.getBean().getClass();
+                String name = beanClass.getName();
                 int lambda = name.indexOf("$$");
                 names.add(lambda > 0 ? name.substring(0, lambda) : name);
+                addAncestors(beanClass, names);
             }
         }
         return names;
+    }
+
+    /**
+     * Adds the superclasses and interfaces of a type, but those of the JDK and the router's own types, such as
+     * {@link HttpRoutes} itself. Which of the others belong to the application is not told by their package, as an
+     * application may use any: a framework type is never redefined in place, so its name never matches a change.
+     *
+     * @param type  The type
+     * @param names The names to add to
+     */
+    private static void addAncestors(Class<?> type, Set<String> names) {
+        for (Class<?> ancestor : ClassUtils.resolveHierarchy(type)) {
+            String name = ancestor.getName();
+            if (ancestor != type
+                && ancestor != Object.class
+                && !name.startsWith("java.")
+                && !name.startsWith("javax.")
+                && !name.startsWith("jdk.")
+                && !name.startsWith("sun.")
+                && !name.startsWith("io.micronaut.web.router.")) {
+                names.add(name);
+            }
+        }
     }
 
     /**
