@@ -83,6 +83,21 @@ class SseRouteDeclarationTest {
             route(router, HttpRequest.POST("/messages", "")).getProduces());
     }
 
+    @Test
+    void aLocatedRouteMayBeAnEventStreamRoute() {
+        TestLocatedRoutes<Object> located = TestLocatedRoutes.of(routes -> {
+            routes.GET("/events").sse((request, pathVariables, events) -> events.send("one"));
+            routes.POST("/completions").body(String.class).sse((request, pathVariables, prompt, events) -> events.send(prompt));
+        });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
+        builder.locate("/orders/{id}", (request, pathVariables) -> "order", target -> located);
+        builder.close();
+        Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
+        assertEquals(List.of(MediaType.TEXT_EVENT_STREAM_TYPE), route(router, HttpRequest.GET("/orders/1/events")).getProduces());
+        assertEquals(List.of(MediaType.TEXT_EVENT_STREAM_TYPE), route(router, HttpRequest.POST("/orders/1/completions", "")).getProduces());
+    }
+
     private static UriRouteInfo<?, ?> route(Router router, HttpRequest<?> request) {
         UriRouteMatch<Object, Object> match = router.findClosest(request);
         assertNotNull(match, request.getPath());

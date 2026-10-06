@@ -189,7 +189,7 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
     @SuppressWarnings("unchecked")
     @Override
     public void sse(SseBodyHandler<B> handler) {
-        SseBodyHandler<B> checked = route.terminal(handler, "handler");
+        SseBodyHandler<B> checked = route.terminal(handler, HANDLER);
         Argument<B> type = bodyType;
         if (type == null) {
             SseBodyHandler<FormData> form = (SseBodyHandler<FormData>) checked;

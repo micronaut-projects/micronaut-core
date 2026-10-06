@@ -79,6 +79,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static final String HANDLE = "handle";
 
+    /**
+     * The name of the body type parameter of the factories, for the messages.
+     */
+    private static final String BODY_TYPE = "bodyType";
+
     private static final Logger LOG = LoggerFactory.getLogger(HandlerMethod.class);
 
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
@@ -222,7 +227,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> ofAsync(Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        Objects.requireNonNull(bodyType, "bodyType");
+        Objects.requireNonNull(bodyType, BODY_TYPE);
         if (isAsyncBody(bodyType)) {
             return new HandlerMethod<>(
                 handler,
@@ -273,7 +278,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <B> HandlerMethod<HttpResponse<?>> of(Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        Objects.requireNonNull(bodyType, "bodyType");
+        Objects.requireNonNull(bodyType, BODY_TYPE);
         return new HandlerMethod<>(
             handler,
             BodyRequestHandler.class,
@@ -381,7 +386,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * @return The method that calls it
      */
     public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> ofSse(Argument<B> bodyType, SseBodyHandler<B> handler) {
-        Objects.requireNonNull(bodyType, "bodyType");
+        Objects.requireNonNull(bodyType, BODY_TYPE);
         return sseBody(handler, isAsyncBody(bodyType) ? ASYNC_BODY : bodyArgument(bodyType));
     }
 

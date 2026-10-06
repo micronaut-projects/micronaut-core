@@ -210,7 +210,7 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
 
     @Override
     public void sse(SseHandler handler) {
-        SseHandler checked = route.terminal(handler, "handler");
+        SseHandler checked = route.terminal(handler, HANDLER);
         endSse(route, () -> HandlerMethod.of(checked), null, 0);
     }
 
