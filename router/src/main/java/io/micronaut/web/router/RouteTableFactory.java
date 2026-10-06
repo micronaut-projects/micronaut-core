@@ -22,9 +22,14 @@ import io.micronaut.web.router.builder.DefaultLocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Builds the {@link RouteTable}s of located targets, see
@@ -34,6 +39,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * One factory serves the routes of an application, including the located tables, which may
  * locate again.
  *
+ * <p>A table is kept no longer than its instance: the instance is referenced weakly, and its
+ * table is dropped once the instance is collected. A table whose handlers reference the instance,
+ * e.g. lambdas of the instance that use its fields, keeps it, and is kept, as long as the
+ * factory.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -41,7 +51,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class RouteTableFactory {
     private final @Nullable Object beanLocator;
     private final ConversionService conversionService;
-    private final Map<Identity, DefaultRouteTable> tables = new ConcurrentHashMap<>();
+    /**
+     * The tables by the identity of their instances, weakly referenced.
+     */
+    private final Map<Object, TableHolder> tables = new ConcurrentHashMap<>();
+    /**
+     * The keys of the collected instances.
+     */
+    private final ReferenceQueue<LocatedRoutes<?>> collected = new ReferenceQueue<>();
 
     /**
      * @param beanLocator       The locator of the application beans, see {@link RouteAssembly}
@@ -54,8 +71,9 @@ public final class RouteTableFactory {
 
     /**
      * The table of located routes, built on the first call for the instance and then reused: a
-     * concurrent first call waits for the table the other call builds. A table that fails to
-     * build is not kept, the next call builds it again.
+     * concurrent first call for the instance waits for the table the other call builds, a call
+     * for another instance does not. A table that fails to build is not kept, the next call
+     * builds it again. Building a table may build the tables of other instances.
      *
      * @param routes The routes
      * @return The table
@@ -64,7 +82,25 @@ public final class RouteTableFactory {
      */
     RouteTable table(LocatedRoutes<?> routes) {
         Objects.requireNonNull(routes, "routes");
-        return tables.computeIfAbsent(new Identity(routes), identity -> build(identity.routes()));
+        expungeCollected();
+        TableHolder holder = tables.get(new Lookup(routes));
+        if (holder == null) {
+            TableHolder created = new TableHolder();
+            holder = tables.putIfAbsent(new WeakKey(routes, collected), created);
+            if (holder == null) {
+                holder = created;
+            }
+        }
+        return holder.table(routes);
+    }
+
+    /**
+     * Drop the tables of the collected instances.
+     */
+    private void expungeCollected() {
+        for (Reference<?> key = collected.poll(); key != null; key = collected.poll()) {
+            tables.remove(key);
+        }
     }
 
     /**
@@ -100,15 +136,84 @@ public final class RouteTableFactory {
     }
 
     /**
-     * The key of the table of an instance of {@link LocatedRoutes}: its identity, whatever its
-     * {@code equals}.
+     * The table of an instance, built outside of the map of the tables, once.
+     */
+    private final class TableHolder {
+        private final ReentrantLock lock = new ReentrantLock();
+        private final AtomicReference<@Nullable DefaultRouteTable> table = new AtomicReference<>();
+
+        /**
+         * @param routes The routes of the table
+         * @return The table, built by the first call
+         */
+        DefaultRouteTable table(LocatedRoutes<?> routes) {
+            DefaultRouteTable built = table.get();
+            if (built != null) {
+                return built;
+            }
+            if (lock.isHeldByCurrentThread()) {
+                throw new IllegalStateException("The routes declare a locator that needs their own table while they are declared: " + routes);
+            }
+            lock.lock();
+            try {
+                built = table.get();
+                if (built == null) {
+                    built = build(routes);
+                    table.set(built);
+                }
+                return built;
+            } finally {
+                lock.unlock();
+            }
+        }
+    }
+
+    /**
+     * The key of the table of an instance of {@link LocatedRoutes} in the map: its identity,
+     * whatever its {@code equals}, referenced weakly. Equal to the {@link Lookup} of the instance
+     * while it is not collected, and to itself.
+     */
+    private static final class WeakKey extends WeakReference<LocatedRoutes<?>> {
+        private final int hash;
+
+        WeakKey(LocatedRoutes<?> routes, ReferenceQueue<LocatedRoutes<?>> queue) {
+            super(routes, queue);
+            this.hash = System.identityHashCode(routes);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == this) {
+                return true;
+            }
+            Object routes = get();
+            if (routes == null) {
+                return false;
+            }
+            if (o instanceof Lookup lookup) {
+                return lookup.routes == routes;
+            }
+            return o instanceof WeakKey other && other.get() == routes;
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+    }
+
+    /**
+     * Looks up the table of an instance by its identity.
      *
      * @param routes The routes
      */
-    private record Identity(LocatedRoutes<?> routes) {
+    private record Lookup(LocatedRoutes<?> routes) {
         @Override
         public boolean equals(Object o) {
-            return o instanceof Identity other && other.routes == routes;
+            if (o instanceof Lookup other) {
+                return other.routes == routes;
+            }
+            return o instanceof WeakKey key && key.get() == routes;
         }
 
         @Override

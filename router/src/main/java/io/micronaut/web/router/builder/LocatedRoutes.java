@@ -40,7 +40,7 @@ import org.jspecify.annotations.Nullable;
  * }</pre>
  *
  * <p>The router declares the routes of an instance once, when a locator locates the first target
- * that the instance routes, and keeps them for as long as the application routes: an instance
+ * that the instance routes, and keeps them for as long as the instance is reachable: an instance
  * describes the routes of every target of its type, not of one target, which reaches the
  * handlers as an argument or through {@link LocatedRoutes#locatedTarget(PathVariables)}. Locators that answer
  * the same instance share its routes. Declare the routes of a type once and reuse the instance,
