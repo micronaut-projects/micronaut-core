@@ -647,7 +647,8 @@ final class NettyHttpClient implements
                                             if (d.length == 0) {
                                                 currentEvent.data = content.toByteArray();
                                             } else {
-                                                currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
+                                                // data lines are joined with a line feed
+                                                currentEvent.data = ArrayUtils.concat(ArrayUtils.concat(d, (byte) '\n'), content.toByteArray());
                                             }
                                         }
                                         case "id" -> {
@@ -1293,7 +1294,7 @@ final class NettyHttpClient implements
         if (eventsByContentType) {
             return isEventStream(response);
         }
-        return isAcceptEvents(request) || (acceptsEvents(request) && isEventStream(response));
+        return isAcceptEvents(request);
     }
 
     private <B> MutableHttpResponse<B> toStreamingResponse(NettyClientByteBodyResponse resp, Publisher<HttpContent> content) {

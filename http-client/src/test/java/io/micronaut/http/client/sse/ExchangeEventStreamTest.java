@@ -228,6 +228,32 @@ class ExchangeEventStreamTest {
         assertEquals(new Message("2.0", 1, "pong"), list.get(0).getData());
     }
 
+    @Test
+    void multilineDataIsJoinedWithLineFeed() {
+        MutableHttpRequest<String> request = HttpRequest.POST("/mcp/multiline", "{}").contentType(MediaType.APPLICATION_JSON_TYPE);
+        Event<String> legacy = Flux.from(client.eventStream(request, String.class)).blockLast(TIMEOUT);
+        HttpResponse<Event<String>> exchanged = Flux.from(client.exchangeEventStream(request, Argument.STRING)).blockLast(TIMEOUT);
+
+        assertNotNull(legacy);
+        assertNotNull(exchanged);
+        assertEquals("second line\nthird", legacy.getData());
+        assertEquals("second line\nthird", exchanged.body().getData());
+    }
+
+    @Test
+    void dataStreamWithSeveralAcceptedTypesIsNotSplit() {
+        // only an Accept of exactly text/event-stream splits the body of the existing streaming methods into lines
+        MutableHttpRequest<String> request = HttpRequest.POST("/mcp/multiline", "{}")
+            .contentType(MediaType.APPLICATION_JSON_TYPE)
+            .header(HttpHeaders.ACCEPT, ACCEPT);
+        String body = Flux.from(((io.micronaut.http.client.StreamingHttpClient) httpClient).dataStream(request))
+            .map(buffer -> buffer.toString(java.nio.charset.StandardCharsets.UTF_8))
+            .collect(java.util.stream.Collectors.joining())
+            .block(TIMEOUT);
+
+        assertEquals("data: second line\ndata: third\n\n", body);
+    }
+
     record Message(String jsonrpc, int id, String result) {
     }
 
@@ -265,6 +291,11 @@ class ExchangeEventStreamTest {
         @Post(uri = "/events-accept", produces = MediaType.TEXT_EVENT_STREAM)
         Publisher<Event<String>> eventsAccept(@Body String body, @Header(HttpHeaders.ACCEPT) String accept) {
             return Flux.just(Event.of(accept));
+        }
+
+        @Post(uri = "/multiline", produces = MediaType.TEXT_EVENT_STREAM)
+        Publisher<Event<String>> multiline(@Body String body) {
+            return Flux.just(Event.of("second line\nthird"));
         }
 
         @Post(uri = "/accepted", produces = {MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM})
