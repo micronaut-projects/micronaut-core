@@ -35,6 +35,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -44,7 +45,6 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
-import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -195,7 +195,7 @@ public abstract class ResponseLifecycle {
                 ((MutableHttpResponse<Object>) response).body(headBody);
                 return encodeBody(nettyRequest, response, headBody).map(this::discardContent);
             }
-            if (body instanceof ResponseElements<?> elements) {
+            if (body instanceof BodyElements<?> elements) {
                 // the response of a HEAD request: the elements are not written; the route
                 // executor discarded the body it moved aside already
                 ResponseStreams.discard(elements);
@@ -244,9 +244,9 @@ public abstract class ResponseLifecycle {
             return encodeNoBody(response);
         }
 
-        if (body instanceof ResponseElements<?> elements) {
+        if (body instanceof BodyElements<?> elements) {
             response.body(null);
-            return encodeResponseElements(nettyRequest, response, elements, routeInfo);
+            return encodeBodyElements(nettyRequest, response, elements, routeInfo);
         }
 
         if (Publishers.isConvertibleToPublisher(body)) {
@@ -290,7 +290,7 @@ public abstract class ResponseLifecycle {
     }
 
     /**
-     * Stream the elements of a {@link ResponseElements} body without Reactive Streams: like the
+     * Stream the elements of a {@link BodyElements} body without Reactive Streams: like the
      * elements of a publisher body ({@link #mapToHttpContent}), each written with the writer of
      * its type for the media type of the response, and framed as a JSON array for a JSON media
      * type, through the piece writers of the publisher body: a blocking writer runs on the I/O
@@ -305,9 +305,9 @@ public abstract class ResponseLifecycle {
      * @param routeInfo The route, if any
      * @return The encoded response
      */
-    private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeResponseElements(HttpRequest<?> request,
+    private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeBodyElements(HttpRequest<?> request,
                                                                                    MutableHttpResponse<?> response,
-                                                                                   ResponseElements<?> elements,
+                                                                                   BodyElements<?> elements,
                                                                                    @Nullable RouteInfo<Object> routeInfo) {
         MediaType mediaType = response.getContentType().orElse(null);
         if (mediaType == null) {

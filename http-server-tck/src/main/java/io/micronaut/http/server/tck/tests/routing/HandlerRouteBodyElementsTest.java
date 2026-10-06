@@ -29,7 +29,6 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.tck.AssertionUtils;
@@ -67,7 +66,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A {@link ResponseElements} response body: the server pulls its elements one at a time, while the
+ * A {@link BodyElements} response body: the server pulls its elements one at a time, while the
  * client keeps up, and writes them like the elements of a publisher body, without Reactive
  * Streams. The elements are closed when the response ends, fails, the client disconnects, the
  * body is not written, or a filter replaces the response.
@@ -77,8 +76,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class HandlerRouteResponseElementsTest {
-    public static final String SPEC_NAME = "HandlerRouteResponseElementsTest";
+public class HandlerRouteBodyElementsTest {
+    public static final String SPEC_NAME = "HandlerRouteBodyElementsTest";
     private static final int CHUNK = 64 * 1024;
     private static final int LARGE_CHUNKS = 128;
     private static final int SLOW_ELEMENTS = 20_000;
@@ -209,6 +208,20 @@ public class HandlerRouteResponseElementsTest {
     }
 
     @Test
+    void elementsOfTheRequestBodyAreTheResponseBody() throws Exception {
+        try (ServerUnderTest server = server()) {
+            // the reads of the request body are released when the response ends, not when the
+            // route returned: the elements are read after it
+            AssertionUtils.assertDoesNotThrow(server,
+                HttpRequest.POST("/elements/echo-direct", "[\"a\",\"b\",\"c\"]").contentType(MediaType.APPLICATION_JSON_TYPE),
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("[\"a\",\"b\",\"c\"]")
+                    .build());
+        }
+    }
+
+    @Test
     void elementsOfTheRequestBodyInAWrappedResponse() throws Exception {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server,
@@ -305,10 +318,10 @@ public class HandlerRouteResponseElementsTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ElementsController {
         @Get(produces = MediaType.APPLICATION_JSON)
-        ResponseElements<Map<String, Integer>> numbers() {
+        BodyElements<Map<String, Integer>> numbers() {
             Iterator<Map<String, Integer>> numbers = List.of(Map.of("n", 1), Map.of("n", 2)).iterator();
-            return ResponseElements.of(() ->
-                CompletableFuture.completedFuture(numbers.hasNext() ? Optional.of(numbers.next()) : Optional.<Map<String, Integer>>empty()));
+            // a lambda: the server calls it one element at a time
+            return () -> CompletableFuture.completedFuture(numbers.hasNext() ? Optional.of(numbers.next()) : Optional.empty());
         }
     }
 
@@ -332,8 +345,8 @@ public class HandlerRouteResponseElementsTest {
         /**
          * A source of the given elements that records when it is closed.
          */
-        <T> ResponseElements<T> source(String key, Iterator<T> elements) {
-            return ResponseElements.of(() -> {
+        <T> BodyElements<T> source(String key, Iterator<T> elements) {
+            return BodyElements.of(() -> {
                 pulled.incrementAndGet();
                 return CompletableFuture.completedFuture(elements.hasNext() ? Optional.of(elements.next()) : Optional.empty());
             }, () -> closed(key).complete(null));
@@ -356,13 +369,13 @@ public class HandlerRouteResponseElementsTest {
                     recorder.source("json", List.of(Map.of("n", 1), Map.of("n", 2), Map.of("n", 3)).iterator())));
                 routes.POST("/elements/echo").body().handleAsync((request, pathVariables, body) -> {
                     BodyElements<String> elements = body.elements(String.class);
-                    return CompletableFuture.completedStage(HttpResponse.ok(ResponseElements.of(elements::next)).contentType(MediaType.APPLICATION_JSON_TYPE));
+                    return CompletableFuture.completedStage(HttpResponse.ok(BodyElements.of(elements::next)).contentType(MediaType.APPLICATION_JSON_TYPE));
                 });
                 routes.GET("/elements/empty", (request, pathVariables) -> HttpResponse.ok(
                     recorder.source("empty", List.of().iterator())));
                 routes.GET("/elements/async", (request, pathVariables) -> {
                     Iterator<String> letters = List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j").iterator();
-                    ResponseElements<String> source = new ResponseElements<>() {
+                    BodyElements<String> source = new BodyElements<>() {
                         @Override
                         public CompletionStage<Optional<String>> next() {
                             CompletableFuture<Optional<String>> next = new CompletableFuture<>();
@@ -394,7 +407,7 @@ public class HandlerRouteResponseElementsTest {
                 })).contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE));
                 routes.GET("/elements/events", (request, pathVariables) -> HttpResponse.ok(recorder.source("events",
                     List.of(Event.of("a").id("1"), Event.of("b").id("2")).iterator())).contentType(MediaType.TEXT_EVENT_STREAM_TYPE));
-                routes.GET("/elements/refuse", (request, pathVariables) -> HttpResponse.ok(new ResponseElements<String>() {
+                routes.GET("/elements/refuse", (request, pathVariables) -> HttpResponse.ok(new BodyElements<String>() {
                     @Override
                     public CompletionStage<Optional<String>> next() {
                         return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.CONFLICT, "conflict"));
@@ -407,7 +420,7 @@ public class HandlerRouteResponseElementsTest {
                 }));
                 routes.GET("/elements/break", (request, pathVariables) -> {
                     AtomicInteger calls = new AtomicInteger();
-                    ResponseElements<String> source = new ResponseElements<>() {
+                    BodyElements<String> source = new BodyElements<>() {
                         @Override
                         public CompletionStage<Optional<String>> next() {
                             if (calls.getAndIncrement() == 0) {
@@ -449,7 +462,7 @@ public class HandlerRouteResponseElementsTest {
                     ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).copyOf("hello ", StandardCharsets.UTF_8),
                     ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).copyOf("bytes", StandardCharsets.UTF_8)).iterator()))
                     .contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE));
-                routes.GET("/elements/refuse-custom", (request, pathVariables) -> HttpResponse.ok(ResponseElements.of(
+                routes.GET("/elements/refuse-custom", (request, pathVariables) -> HttpResponse.ok(BodyElements.of(
                     () -> CompletableFuture.<Optional<String>>failedFuture(new Refused()), () -> recorder.closed("refuse-custom").complete(null))));
                 routes.error(Refused.class, (request, error) -> HttpResponse.status(HttpStatus.I_AM_A_TEAPOT).body("handled"));
                 routes.GET("/elements/body-replaced")
@@ -460,16 +473,19 @@ public class HandlerRouteResponseElementsTest {
                     .afterReplacing((request, response) -> new HttpResponseWrapper<>(response)).and()
                     .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("wrapped", List.of("hello").iterator()))
                         .contentType(MediaType.TEXT_PLAIN_TYPE));
+                routes.POST("/elements/echo-direct").body().handleAsync((request, pathVariables, body) ->
+                    // the elements of the request body are the body of the response
+                    CompletableFuture.completedStage(HttpResponse.ok(body.elements(String.class)).contentType(MediaType.APPLICATION_JSON_TYPE)));
                 routes.POST("/elements/echo-wrapped").body().handleAsync((request, pathVariables, body) -> {
                     BodyElements<String> elements = body.elements(String.class);
                     // the wrapper hides the elements from a check of the response type
                     return CompletableFuture.completedStage(new HttpResponseWrapper<>(
-                        HttpResponse.ok(ResponseElements.of(elements::next)).contentType(MediaType.APPLICATION_JSON_TYPE)));
+                        HttpResponse.ok(BodyElements.of(elements::next)).contentType(MediaType.APPLICATION_JSON_TYPE)));
                 });
                 routes.POST("/elements/echo-body").consumes(MediaType.APPLICATION_OCTET_STREAM_TYPE).body().handleAsync((request, pathVariables, body) -> {
                     // one element: the request body, streamed back as it arrives
                     Iterator<CloseableByteBody> element = List.of(body.takeBody()).iterator();
-                    return CompletableFuture.completedStage(HttpResponse.ok(ResponseElements.of(() ->
+                    return CompletableFuture.completedStage(HttpResponse.ok(BodyElements.of(() ->
                             CompletableFuture.completedFuture(element.hasNext() ? Optional.of(element.next()) : Optional.<CloseableByteBody>empty())))
                         .contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE));
                 });

@@ -4,7 +4,7 @@ package io.micronaut.docs.server.functional;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.body.ResponseElements;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.sse.Event;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
@@ -71,7 +71,7 @@ public class StreamRoutes implements HttpRoutes {
         });
         routes.GET("/numbers", (request, pathVariables) -> {
             Iterator<Integer> numbers = List.of(1, 2, 3).iterator();
-            return HttpResponse.ok(ResponseElements.of(() -> // <8>
+            return HttpResponse.ok(BodyElements.of(() -> // <8>
                 CompletableFuture.completedFuture(numbers.hasNext() ? Optional.of(numbers.next()) : Optional.<Integer>empty())));
         });
     }

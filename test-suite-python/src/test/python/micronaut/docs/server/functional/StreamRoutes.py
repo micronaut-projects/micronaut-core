@@ -6,7 +6,7 @@ from typing import Annotated
 import java
 from jakarta.inject import Named, Singleton
 from micronaut.http import HttpResponse, MediaType
-from micronaut.http.body import ResponseElements
+from micronaut.http.body import BodyElements
 from micronaut.http.sse import Event
 from micronaut.scheduling import TaskExecutors, TaskScheduler
 from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes
@@ -71,7 +71,7 @@ class StreamRoutes(HttpRoutes):
 
         def numbers(request, path_variables):
             remaining = iter([1, 2, 3])
-            return HttpResponse.ok(ResponseElements.of(lambda:  # <8>
+            return HttpResponse.ok(BodyElements.of(lambda:  # <8>
                                    CompletableFuture.completedFuture(Optional.ofNullable(next(remaining, None)))))
 
         routes.GET("/numbers", numbers)

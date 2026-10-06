@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 /**
- * The coroutine extensions of the streams: SseEmitter.launch and sendAwait, and Flow.asResponseElements.
+ * The coroutine extensions of the streams: SseEmitter.launch and sendAwait, and Flow.asBodyElements.
  */
 class CoroutineStreamRoutesTest {
 

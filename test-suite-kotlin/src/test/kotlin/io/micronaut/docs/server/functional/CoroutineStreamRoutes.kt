@@ -3,7 +3,7 @@ package io.micronaut.docs.server.functional
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.body.asResponseElements
+import io.micronaut.http.body.asBodyElements
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.sse.launch
 import io.micronaut.http.sse.sendAwait
@@ -64,13 +64,13 @@ class CoroutineStreamRoutes : HttpRoutes {
             }
         }
         routes.GET("/coroutine/error-numbers") { _, _ ->
-            HttpResponse.ok(flow<Int> { throw AssertionError("an error, not an exception") }.asResponseElements())
+            HttpResponse.ok(flow<Int> { throw AssertionError("an error, not an exception") }.asBodyElements())
         }
         routes.GET("/coroutine/numbers") { _, _ ->
-            HttpResponse.ok(flowOf(1, 2, 3).asResponseElements())
+            HttpResponse.ok(flowOf(1, 2, 3).asBodyElements())
         }
         routes.GET("/coroutine/refused-numbers") { _, _ ->
-            HttpResponse.ok(flow<Int> { throw HttpStatusException(HttpStatus.CONFLICT, "conflict") }.asResponseElements())
+            HttpResponse.ok(flow<Int> { throw HttpStatusException(HttpStatus.CONFLICT, "conflict") }.asBodyElements())
         }
     }
 }

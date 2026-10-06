@@ -40,10 +40,11 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ReleasableRequestBody;
-import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.ReleasingBodyElements;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
@@ -759,7 +760,7 @@ public final class RouteExecutor {
             return response;
         }
         Object body = response.body();
-        if (body instanceof ResponseElements<?> elements) {
+        if (body instanceof BodyElements<?> elements) {
             return response.body(releaseWhenClosed(request, elements));
         }
         if (body == null || body instanceof HttpResponse<?> || !Publishers.isConvertibleToPublisher(body)) {
@@ -774,7 +775,7 @@ public final class RouteExecutor {
 
     /**
      * Release the bodies the route of the request was invoked with when the
-     * {@link ResponseElements} body of its response is closed, like {@link #releaseWhenStreamEnds}
+     * {@link BodyElements} body of its response is closed, like {@link #releaseWhenStreamEnds}
      * does for a stream: the elements may be made of the reads of the body. The server closes
      * them once: when the response ends, fails, or the client disconnects, or when a filter
      * replaces the response.
@@ -784,18 +785,13 @@ public final class RouteExecutor {
      * @param <T>      The type of an element
      * @return The elements, which release the bodies when they are closed
      */
-    private static <T> ResponseElements<T> releaseWhenClosed(HttpRequest<?> request, ResponseElements<T> elements) {
+    private static <T> BodyElements<T> releaseWhenClosed(HttpRequest<?> request, BodyElements<T> elements) {
         ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
         if (bodies == null) {
             return elements;
         }
-        return ResponseElements.of(elements::next, () -> {
-            try {
-                elements.close();
-            } finally {
-                releaseLogged(request, bodies);
-            }
-        });
+        // the elements keep their own operations, e.g. the elements of the request body
+        return ReleasingBodyElements.onClose(elements, () -> releaseLogged(request, bodies));
     }
 
     private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
@@ -804,7 +800,7 @@ public final class RouteExecutor {
             final Object o = response.getBody().orElse(null);
             if (o instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
-            } else if (o instanceof ResponseElements<?> elements) {
+            } else if (o instanceof BodyElements<?> elements) {
                 // they are never pulled
                 ResponseStreams.discard(elements);
             }

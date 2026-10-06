@@ -1,4 +1,4 @@
-A route streams its response without a `Publisher` in two ways: with the `sse` terminal, whose handler pushes server-sent events, or with a api:http.body.ResponseElements[] body, whose elements the server pulls one at a time.
+A route streams its response without a `Publisher` in two ways: with the `sse` terminal, whose handler pushes server-sent events, or with a api:http.body.BodyElements[] body, whose elements the server pulls one at a time. `BodyElements` is the same type a handler reads the elements of a request body with, so elements read from a request, or from another server with the HTTP client, can be returned as they are.
 
 The handler of `sse(...)`, an api:web.router.builder.SseHandler[], `(request, pathVariables, events) -> ...`, sends events with the api:http.sse.SseEmitter[] it receives. The stream ends when the handler returns, unless the handler calls `keepOpen()` to send its events later. The response, `200` with `text/event-stream` and `Cache-Control: no-cache`, is sent with the first event, comment or heartbeat. Until then, an exception of the handler is answered by the error routes like the exception of any route, `events.header(...)` adds headers to the response, e.g. `X-Accel-Buffering: no` for a proxy that buffers responses, and `events.respond(...)` answers with another response instead of the event stream. An event stream is never compressed.
 
@@ -11,7 +11,7 @@ snippet::io.micronaut.docs.server.functional.StreamRoutes[tags="imports,clazz", 
 <5> `isWritable()` tells whether a send would wait: a sender that would rather drop events, e.g. a broadcast to many clients, checks it.
 <6> `onClose` runs when the stream ends: completed, failed, or because the client disconnected.
 <7> A route with a body stage streams events back, e.g. the answer to a prompt. What the body stage bound, here a decoded `String`, is released when the stream ends, not when the response is sent.
-<8> A api:http.body.ResponseElements[] body is pulled one element at a time while the client keeps up, and written like the elements of a `Publisher` body: a JSON array for JSON. `ResponseElements.of(next, close)` also releases resources, e.g. closes a cursor.
+<8> A api:http.body.BodyElements[] body is pulled one element at a time while the client keeps up, and written like the elements of a `Publisher` body: a JSON array for JSON. `BodyElements.of(next)` makes elements of a function, and `BodyElements.of(next, close)` also releases resources, e.g. closes a cursor; both follow the rules of `BodyElements`, e.g. one read at a time. A plain lambda is elements too.
 <9> `header(...)` adds a header to the response before the first event, whichever response is sent: the event stream, or the response given to `respond(...)`.
 <10> `respond(...)` answers with another response instead of the event stream, before the first event: here `202 Accepted` without a body for a notification, and a single JSON message for a request. This is how a protocol in which the server decides per request whether to stream works, such as the https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http[MCP Streamable HTTP transport]. A body without a content type is written as JSON, and the stream ends normally.
 <11> An event stream route produces `text/event-stream`. It may declare other media types besides, for the responses given to `respond(...)`, so that a client that accepts only JSON reaches the handler. A route that declares media types without `text/event-stream` fails.
@@ -38,4 +38,4 @@ micronaut:
         sse-heartbeat: 15s
 ----
 
-In Kotlin, `events.launch { ... }` runs the stream in a coroutine, which ends the stream when it returns and is cancelled when the stream closes, `sendAwait(...)` suspends instead of blocking, and `Flow.asResponseElements()` streams a `Flow` as a api:http.body.ResponseElements[] body.
+In Kotlin, `events.launch { ... }` runs the stream in a coroutine, which ends the stream when it returns and is cancelled when the stream closes, `sendAwait(...)` suspends instead of blocking, and `Flow.asBodyElements()` streams a `Flow` as a api:http.body.BodyElements[] body.

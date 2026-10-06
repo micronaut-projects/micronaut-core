@@ -31,8 +31,9 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ReleasableRequestBody;
-import io.micronaut.http.body.ResponseElements;
+import io.micronaut.http.body.stream.ReleasingBodyElements;
 import io.micronaut.http.sse.SseEmitter;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -766,7 +767,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
             MutableHttpResponse<?> mutable = error == null ? holderOf(response) : null;
-            if (mutable != null && mutable.body() instanceof ResponseElements<?> elements) {
+            if (mutable != null && mutable.body() instanceof BodyElements<?> elements) {
                 // the elements may be reads of the body: it is released when they are closed
                 mutable.body(releaseWhenClosed(elements, handlerRequest));
                 result.complete(response);
@@ -796,7 +797,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * The {@link ResponseElements} body of the response of the handler, releasing what the
+     * The {@link BodyElements} body of the response of the handler, releasing what the
      * handler's read of the body left open when the server closes them: when the response ends,
      * fails, or the client disconnects, or when a filter replaces the response. The response is
      * committed by then: a failure to release is logged.
@@ -806,23 +807,20 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * @param <T>      The type of an element
      * @return The elements, which release the body when they are closed
      */
-    private static <T> ResponseElements<T> releaseWhenClosed(ResponseElements<T> elements, ReleasableRequestBody request) {
-        return ResponseElements.of(elements::next, () -> {
+    private static <T> BodyElements<T> releaseWhenClosed(BodyElements<T> elements, ReleasableRequestBody request) {
+        // the elements keep their own operations, e.g. the elements of the request body
+        return ReleasingBodyElements.onClose(elements, () -> {
+            CompletionStage<Void> released;
             try {
-                elements.close();
-            } finally {
-                CompletionStage<Void> released;
-                try {
-                    released = request.releaseBody();
-                } catch (Throwable e) {
-                    released = CompletableFuture.failedFuture(e);
-                }
-                released.whenComplete((ignored, error) -> {
-                    if (error != null && LOG.isWarnEnabled()) {
-                        LOG.warn("Failed to release what the reads of the body left open when the streamed response of {} ended", elements, error);
-                    }
-                });
+                released = request.releaseBody();
+            } catch (Throwable e) {
+                released = CompletableFuture.failedFuture(e);
             }
+            released.whenComplete((ignored, error) -> {
+                if (error != null && LOG.isWarnEnabled()) {
+                    LOG.warn("Failed to release what the reads of the body left open when the streamed response of {} ended", elements, error);
+                }
+            });
         });
     }
 

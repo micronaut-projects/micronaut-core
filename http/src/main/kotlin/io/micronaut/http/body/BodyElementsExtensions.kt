@@ -32,14 +32,14 @@ import java.util.Optional
 import kotlin.coroutines.CoroutineContext
 
 /**
- * The elements of the flow as a [ResponseElements] body, without Reactive Streams: the flow is
+ * The elements of the flow as a [BodyElements] body, without Reactive Streams: the flow is
  * collected in a coroutine as the server pulls the elements, one at a time, so it is suspended
  * while the client does not take them. The coroutine is cancelled when the server closes the
  * elements, e.g. when the client disconnects, and runs with the propagated context of the caller.
  *
  * ```
  * routes.GET("/books") { _, _ ->
- *     HttpResponse.ok(books.findAll().asResponseElements())
+ *     HttpResponse.ok(books.findAll().asBodyElements())
  * }
  * ```
  *
@@ -48,7 +48,7 @@ import kotlin.coroutines.CoroutineContext
  * @since 5.3.0
  */
 @Experimental
-fun <T : Any> Flow<T>.asResponseElements(context: CoroutineContext = Dispatchers.Default): ResponseElements<T> {
+fun <T : Any> Flow<T>.asBodyElements(context: CoroutineContext = Dispatchers.Default): BodyElements<T> {
     val flow = this
     // rendezvous: the flow emits the next element only once the server took the previous one
     val channel = Channel<T>(Channel.RENDEZVOUS)
@@ -65,7 +65,7 @@ fun <T : Any> Flow<T>.asResponseElements(context: CoroutineContext = Dispatchers
             channel.close(e)
         }
     }
-    return ResponseElements.of({
+    return BodyElements.of({
         producer.start()
         scope.future {
             val result = channel.receiveCatching()

@@ -20,7 +20,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.body.ResponseElements;
+import io.micronaut.http.body.BodyElements;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +41,7 @@ public final class ResponseStreams {
     }
 
     /**
-     * Stream the elements of a {@link ResponseElements} body, pulled one element at a time while
+     * Stream the elements of a {@link BodyElements} body, pulled one element at a time while
      * the connection keeps up.
      *
      * @param factory       The body factory of the response
@@ -52,10 +52,10 @@ public final class ResponseStreams {
      * exceptionally if producing or encoding the first element failed: nothing was sent then
      */
     public static ExecutionFlow<CloseableByteBody> stream(ByteBodyFactory factory,
-                                                          ResponseElements<?> elements,
+                                                          BodyElements<?> elements,
                                                           ElementEncoder encoder,
                                                           int highWaterMark) {
-        return ResponseElementsBody.start(factory, elements, encoder, highWaterMark);
+        return ElementsBody.start(factory, elements, encoder, highWaterMark);
     }
 
     /**
@@ -63,7 +63,7 @@ public final class ResponseStreams {
      *
      * @param elements The elements
      */
-    public static void discard(ResponseElements<?> elements) {
+    public static void discard(BodyElements<?> elements) {
         try {
             elements.close();
         } catch (Throwable e) {

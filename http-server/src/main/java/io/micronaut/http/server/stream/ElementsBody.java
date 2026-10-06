@@ -23,7 +23,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.body.ResponseElements;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BufferConsumer;
 import org.jspecify.annotations.Nullable;
@@ -36,8 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Pulls the elements of a {@link ResponseElements} body into a {@link BodyStream}: one
- * {@link ResponseElements#next()} at a time, and only while the stream is writable. An element
+ * Pulls the elements of a {@link BodyElements} body into a {@link BodyStream}: one
+ * {@link BodyElements#next()} at a time, and only while the stream is writable. An element
  * is encoded, possibly on another thread, and written before the next one is pulled. An element
  * whose bytes are streamed, e.g. a {@link io.micronaut.http.body.ByteBody} of another
  * connection, is forwarded as its bytes arrive, as fast as the connection takes them.
@@ -46,9 +46,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 5.3.0
  */
 @Internal
-final class ResponseElementsBody {
+final class ElementsBody {
 
-    private final ResponseElements<?> elements;
+    private final BodyElements<?> elements;
     private final ResponseStreams.ElementEncoder encoder;
     private final BodyStream stream;
     private final ByteBodyFactory factory;
@@ -69,7 +69,7 @@ final class ResponseElementsBody {
      */
     private boolean first = true;
 
-    private ResponseElementsBody(ByteBodyFactory factory, ResponseElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
+    private ElementsBody(ByteBodyFactory factory, BodyElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
         this.factory = factory;
         this.highWaterMark = highWaterMark;
         this.elements = elements;
@@ -88,8 +88,8 @@ final class ResponseElementsBody {
      * @return Completes with the body once the first element or the end is available, or
      * exceptionally if the first element fails
      */
-    static ExecutionFlow<CloseableByteBody> start(ByteBodyFactory factory, ResponseElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
-        ResponseElementsBody body = new ResponseElementsBody(factory, elements, encoder, highWaterMark);
+    static ExecutionFlow<CloseableByteBody> start(ByteBodyFactory factory, BodyElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
+        ElementsBody body = new ElementsBody(factory, elements, encoder, highWaterMark);
         body.stream.onClose(ignored -> body.close());
         body.stream.onDemand(body::pull);
         body.pull();

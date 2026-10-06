@@ -43,7 +43,7 @@ import java.util.function.Consumer;
 
 /**
  * A response body pushed from any thread, with backpressure from the connection and without
- * Reactive Streams: the core of {@link DefaultSseEmitter} and of {@link ResponseElementsBody}.
+ * Reactive Streams: the core of {@link DefaultSseEmitter} and of {@link ElementsBody}.
  *
  * <p>The body is a streaming body of the {@link ByteBodyFactory} of the response, whose buffer is
  * fed on the {@link ByteBodyFactory#streamingBodyExecutor() executor} of the factory (the event

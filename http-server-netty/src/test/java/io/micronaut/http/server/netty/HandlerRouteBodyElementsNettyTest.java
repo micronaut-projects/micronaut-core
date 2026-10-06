@@ -23,7 +23,7 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.body.ResponseElements;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.TypedMessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -46,12 +46,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Netty specifics of a {@link ResponseElements} body: a blocking writer of the elements runs on a
+ * Netty specifics of a {@link BodyElements} body: a blocking writer of the elements runs on a
  * worker thread, not on the event loop, like the writer of the elements of a publisher body.
  */
-class HandlerRouteResponseElementsNettyTest {
+class HandlerRouteBodyElementsNettyTest {
 
-    private static final String SPEC_NAME = "HandlerRouteResponseElementsNettyTest";
+    private static final String SPEC_NAME = "HandlerRouteBodyElementsNettyTest";
 
     @Test
     void blockingWriterOfTheElementsRunsOnAWorker() throws IOException {
@@ -111,7 +111,7 @@ class HandlerRouteResponseElementsNettyTest {
         HttpRoutes nettyElementRoutes() {
             return routes -> routes.GET("/netty-elements/blocking", (request, pathVariables) -> {
                 var elements = List.of(new Blocking(), new Blocking()).iterator();
-                return HttpResponse.ok(ResponseElements.of(() ->
+                return HttpResponse.ok(BodyElements.of(() ->
                     CompletableFuture.completedFuture(elements.hasNext() ? Optional.of(elements.next()) : Optional.<Blocking>empty())))
                     .contentType(MediaType.TEXT_PLAIN_TYPE);
             });

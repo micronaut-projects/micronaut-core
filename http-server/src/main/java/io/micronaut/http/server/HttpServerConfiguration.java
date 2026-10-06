@@ -1469,7 +1469,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     /**
      * Configuration of the streamed response bodies written without Reactive Streams: the events
      * of an {@link io.micronaut.http.sse.SseEmitter}, and the elements of a
-     * {@link io.micronaut.http.body.ResponseElements} body.
+     * {@link io.micronaut.http.body.BodyElements} body.
      *
      * @since 5.3.0
      */
