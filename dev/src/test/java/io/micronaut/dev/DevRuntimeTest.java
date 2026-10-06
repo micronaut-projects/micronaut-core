@@ -324,7 +324,7 @@ class DevRuntimeTest {
             package app;
             public class Application {
                 public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
                 }
             }
             """);
