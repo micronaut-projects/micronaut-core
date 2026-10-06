@@ -405,6 +405,11 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+        return nettyHttpClient.exchangeEventStream(request, eventType, errorType);
+    }
+
+    @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(HttpRequest<I> request) {
         return nettyHttpClient.dataStream(request);
     }
