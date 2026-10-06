@@ -15,6 +15,10 @@ snippet::io.micronaut.docs.server.functional.StreamRoutes[tags="imports,clazz", 
 <9> `header(...)` adds a header to the response before the first event, whichever response is sent: the event stream, or the response given to `respond(...)`.
 <10> `respond(...)` answers with another response instead of the event stream, before the first event: here `202 Accepted` without a body for a notification, and a single JSON message for a request. This is how a protocol in which the server decides per request whether to stream works, such as the https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http[MCP Streamable HTTP transport]. A body without a content type is written as JSON, and the stream ends normally.
 <11> An event stream route produces `text/event-stream`. It may declare other media types besides, for the responses given to `respond(...)`, so that a client that accepts only JSON reaches the handler. A route that declares media types without `text/event-stream` fails.
+<12> An exception before the first event is answered by the error routes, here with `404`: check what the stream needs, e.g. that the resource exists or the user may see it, before sending anything. `events.fail(...)` does the same from another thread.
+<13> After the first event the status was sent: an exception, or `fail(...)`, ends the stream abruptly, which a client sees as a broken connection and usually answers by reconnecting. An error the client should act on is better sent as an event, here named `error`, before completing the stream.
+<14> A client that reconnects, e.g. a browser `EventSource` after a broken connection, sends the id of the last event it received as the `Last-Event-ID` header: `events.lastEventId()` resumes after it. The events need ids for this, and the source must be able to replay the events after an id.
+<15> `retry` tells the client how long to wait before it reconnects.
 
 The rules of a stream:
 
@@ -38,4 +42,15 @@ micronaut:
         sse-heartbeat: 15s
 ----
 
-In Kotlin, `events.launch { ... }` runs the stream in a coroutine, which ends the stream when it returns and is cancelled when the stream closes, `sendAwait(...)` suspends instead of blocking, and `Flow.asBodyElements()` streams a `Flow` as a api:http.body.BodyElements[] body.
+In Kotlin, the streams work with coroutines:
+
+[source,kotlin]
+.Server-sent events and streamed responses with coroutines
+----
+include::test-suite-kotlin/src/test/kotlin/io/micronaut/docs/server/functional/CoroutineStreamRoutes.kt[tags=launch,indent=0]
+----
+
+<1> `events.launch { ... }` runs the stream in a coroutine, on `Dispatchers.Default` unless given another context, with the propagated context of the request. The stream ends when the coroutine returns, and the coroutine is cancelled when the stream closes, e.g. when the client disconnects.
+<2> `sendAwait(...)` suspends until the client took the event, give or take the high-water mark, instead of blocking a thread.
+<3> An exception of the coroutine fails the stream: before the first event it is answered by the error routes, here with `404`, after it the stream ends abruptly.
+<4> `Flow.asBodyElements()` streams a `Flow` as a api:http.body.BodyElements[] body: the flow is collected one element at a time as the client keeps up, and cancelled when the response ends or the client disconnects.

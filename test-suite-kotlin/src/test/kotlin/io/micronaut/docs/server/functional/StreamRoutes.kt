@@ -3,8 +3,10 @@ package io.micronaut.docs.server.functional
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.body.BodyElements
+import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.sse.Event
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.TaskScheduler
@@ -55,6 +57,31 @@ class StreamRoutes(@Named(TaskExecutors.SCHEDULED) private val scheduler: TaskSc
                 "notify" -> events.respond(HttpResponse.accepted<Any>()) // <10>
                 "ping" -> events.respond(HttpResponse.ok(mapOf("result" to "pong")))
                 else -> events.send("received $message")
+            }
+        }
+        routes.GET("/orders/{id}/updates").sse { request, pathVariables, events ->
+            val id = pathVariables.getInt("id")
+            if (id != 1) {
+                throw HttpStatusException(HttpStatus.NOT_FOUND, "No order $id") // <12>
+            }
+            events.send("order $id shipped")
+        }
+        routes.GET("/jobs/{id}").sse { request, pathVariables, events ->
+            events.send("started")
+            if (pathVariables.getInt("id") != 1) {
+                events.send(Event.of("the job failed").name("error")) // <13>
+                return@sse
+            }
+            events.send("done")
+        }
+        routes.GET("/feed").sse { request, pathVariables, events ->
+            val last = events.lastEventId().map { it.toInt() }.orElse(0) // <14>
+            for (i in last + 1..3) {
+                val event = Event.of("item $i").id(i.toString())
+                if (i == last + 1) {
+                    event.retry(Duration.ofSeconds(5)) // <15>
+                }
+                events.send(event)
             }
         }
         routes.GET("/numbers") { request, pathVariables ->

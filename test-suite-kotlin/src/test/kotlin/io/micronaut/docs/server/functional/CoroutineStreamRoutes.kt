@@ -26,10 +26,11 @@ class CoroutineStreamRoutes : HttpRoutes {
     val cancelled = CompletableFuture<Throwable?>()
 
     override fun routes(routes: HttpRouteBuilder) {
+        // tag::launch[]
         routes.GET("/coroutine/ticks").sse { _, _, events ->
-            events.launch {
+            events.launch { // <1>
                 for (tick in 1..3) {
-                    sendAwait("tick $tick")
+                    sendAwait("tick $tick") // <2>
                     delay(5)
                 }
             }
@@ -37,9 +38,10 @@ class CoroutineStreamRoutes : HttpRoutes {
         routes.GET("/coroutine/refuse").sse { _, _, events ->
             events.launch {
                 delay(5)
-                throw HttpStatusException(HttpStatus.NOT_FOUND, "no such stream")
+                throw HttpStatusException(HttpStatus.NOT_FOUND, "no such stream") // <3>
             }
         }
+        // end::launch[]
         routes.GET("/coroutine/endless").sse { _, _, events ->
             events.onClose { cancelled.complete(it) }
             events.launch {
@@ -66,9 +68,11 @@ class CoroutineStreamRoutes : HttpRoutes {
         routes.GET("/coroutine/error-numbers") { _, _ ->
             HttpResponse.ok(flow<Int> { throw AssertionError("an error, not an exception") }.asBodyElements())
         }
+        // tag::launch[]
         routes.GET("/coroutine/numbers") { _, _ ->
-            HttpResponse.ok(flowOf(1, 2, 3).asBodyElements())
+            HttpResponse.ok(flowOf(1, 2, 3).asBodyElements()) // <4>
         }
+        // end::launch[]
         routes.GET("/coroutine/refused-numbers") { _, _ ->
             HttpResponse.ok(flow<Int> { throw HttpStatusException(HttpStatus.CONFLICT, "conflict") }.asBodyElements())
         }

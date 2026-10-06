@@ -5,8 +5,9 @@ from typing import Annotated
 
 import java
 from jakarta.inject import Named, Singleton
-from micronaut.http import HttpResponse, MediaType
+from micronaut.http import HttpResponse, HttpStatus, MediaType
 from micronaut.http.body import BodyElements
+from micronaut.http.exceptions import HttpStatusException
 from micronaut.http.sse import Event
 from micronaut.scheduling import TaskExecutors, TaskScheduler
 from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes
@@ -68,6 +69,33 @@ class StreamRoutes(HttpRoutes):
         (routes.POST("/messages").consumes(MediaType.TEXT_PLAIN_TYPE)
             .produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE)  # <11>
             .body(String).sse(messages))
+
+        def updates(request, path_variables, events):
+            order = path_variables.getInt("id")
+            if order != 1:
+                raise HttpStatusException(HttpStatus.NOT_FOUND, f"No order {order}")  # <12>
+            events.send(f"order {order} shipped")
+
+        routes.GET("/orders/{id}/updates").sse(updates)
+
+        def jobs(request, path_variables, events):
+            events.send("started")
+            if path_variables.getInt("id") != 1:
+                events.send(Event.of("the job failed").name("error"))  # <13>
+                return
+            events.send("done")
+
+        routes.GET("/jobs/{id}").sse(jobs)
+
+        def feed(request, path_variables, events):
+            last = int(events.lastEventId().orElse("0"))  # <14>
+            for i in range(last + 1, 4):
+                event = Event.of(f"item {i}").id(str(i))
+                if i == last + 1:
+                    event.retry(Duration.ofSeconds(5))  # <15>
+                events.send(event)
+
+        routes.GET("/feed").sse(feed)
 
         def numbers(request, path_variables):
             remaining = iter([1, 2, 3])
