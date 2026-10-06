@@ -159,9 +159,8 @@ class ExchangeEventStreamTest {
 
     @Test
     void errorStatusCarriesTheBody() {
-        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
-            Flux.from(client.exchangeEventStream(post("/mcp/error"), Argument.of(Message.class), Argument.of(ErrorMessage.class)))
-                .blockLast(TIMEOUT));
+        Flux<HttpResponse<Event<Message>>> responses = Flux.from(client.exchangeEventStream(post("/mcp/error"), Argument.of(Message.class), Argument.of(ErrorMessage.class)));
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> responses.blockLast(TIMEOUT));
 
         assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
         assertEquals("abc-123", e.getResponse().getHeaders().get("Mcp-Session-Id"));
@@ -171,8 +170,8 @@ class ExchangeEventStreamTest {
 
     @Test
     void errorStatusCarriesTheBodyWithDefaultErrorType() {
-        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
-            Flux.from(client.exchangeEventStream(post("/mcp/error"), Message.class)).blockLast(TIMEOUT));
+        Flux<HttpResponse<Event<Message>>> responses = Flux.from(client.exchangeEventStream(post("/mcp/error"), Message.class));
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> responses.blockLast(TIMEOUT));
 
         assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
         String body = e.getResponse().getBody(String.class).orElseThrow();
@@ -185,8 +184,8 @@ class ExchangeEventStreamTest {
         MutableHttpRequest<String> request = HttpRequest.POST("/mcp/json", "{}")
             .contentType(MediaType.APPLICATION_JSON_TYPE)
             .accept(MediaType.TEXT_EVENT_STREAM_TYPE);
-        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
-            Flux.from(client.exchangeEventStream(request, Argument.of(Message.class), Argument.STRING)).blockLast(TIMEOUT));
+        Flux<HttpResponse<Event<Message>>> responses = Flux.from(client.exchangeEventStream(request, Argument.of(Message.class), Argument.STRING));
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> responses.blockLast(TIMEOUT));
 
         assertEquals(HttpStatus.NOT_ACCEPTABLE, e.getStatus());
         assertTrue(e.getResponse().getBody(String.class).isPresent());
@@ -199,8 +198,8 @@ class ExchangeEventStreamTest {
         MutableHttpRequest<String> request = HttpRequest.POST("/mcp/json", "{}")
             .contentType(MediaType.APPLICATION_JSON_TYPE)
             .accept(MediaType.APPLICATION_JSON_TYPE);
-        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
-            Flux.from(client.eventStream(request, Argument.STRING, Argument.STRING)).blockLast(TIMEOUT));
+        Flux<Event<String>> events = Flux.from(client.eventStream(request, Argument.STRING, Argument.STRING));
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> events.blockLast(TIMEOUT));
 
         assertEquals(HttpStatus.NOT_ACCEPTABLE, e.getStatus());
         assertTrue(e.getResponse().getBody(String.class).isPresent());
