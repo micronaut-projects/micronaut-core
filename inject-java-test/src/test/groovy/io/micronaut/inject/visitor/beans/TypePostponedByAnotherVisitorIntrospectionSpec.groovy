@@ -82,6 +82,36 @@ public class Holder {
         load(classLoader, 'test.$Holder$Builder$Introspection').beanType.name == 'test.Holder$Builder'
     }
 
+    void "an imported introspection written while its postponed target's expression class is refused is written once"() {
+        when: "the importers' introspection of Target originates from the importer, its expression class from Target"
+        ClassLoader classLoader = buildClassLoader('test.Owner', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Introspected(classes = Target.class)
+public class Owner {}
+
+@PostponeOnce
+record Target(@Ann("#{'test'}") String name) {}
+
+@Introspected(classes = Target.class)
+class OtherOwner {}
+
+@interface PostponeOnce {}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface Ann {
+    String value();
+}
+''')
+
+        then: "it compiles: the second importer does not write the introspection the first one wrote"
+        classLoader.loadClass('test.$test_Target$Introspection') != null
+    }
+
     private static BeanIntrospection load(ClassLoader classLoader, String introspectionName) {
         return (classLoader.loadClass(introspectionName).newInstance() as BeanIntrospectionReference).load()
     }
