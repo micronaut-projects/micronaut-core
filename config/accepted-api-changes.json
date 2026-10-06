@@ -1371,5 +1371,25 @@
     "type": "io.micronaut.http.netty.channel.loom.LoomCarrierConfiguration",
     "member": "Constructor io.micronaut.http.netty.channel.loom.LoomCarrierConfiguration(java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration,int,int,int)",
     "reason": "Experimental configuration record, added the workSpillMinQueueAge component"
+  },
+  {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Class io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
+  },
+  {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Constructor io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux(io.micronaut.http.body.stream.BaseSharedBuffer)",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
+  },
+  {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Method io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux.asFlux(io.micronaut.http.body.stream.BufferConsumer$Upstream)",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
+  },
+  {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Implemented interface io.micronaut.http.body.stream.BufferConsumer",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
   }
 ]
