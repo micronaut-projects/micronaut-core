@@ -70,7 +70,10 @@
  *     and the route filter functions;</li>
  *     <li>{@link io.micronaut.http.PathVariables}, the typed path variables of the
  *     matched route, and {@link io.micronaut.web.router.builder.RequestPredicates}, conditions
- *     for {@code where(...)}.</li>
+ *     for {@code where(...)};</li>
+ *     <li>{@link io.micronaut.web.router.builder.DirectRouteSpec}, the configuration of a direct
+ *     route, which {@link io.micronaut.web.router.direct.HttpDirectRoutes} beans declare: the
+ *     server answers it before it creates the request, without any filter.</li>
  * </ul>
  *
  * <p>The builders, the route, group, error, status and server filter specs and the path

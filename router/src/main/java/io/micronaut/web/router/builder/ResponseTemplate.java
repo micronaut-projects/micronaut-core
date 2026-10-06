@@ -18,10 +18,13 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,6 +80,36 @@ record ResponseTemplate(int code,
     }
 
     /**
+     * The template of a response given as a value to a direct route: a text body is encoded
+     * once, and a {@code byte[]} body copied, so that the server only wraps the bytes of the body
+     * the requests share.
+     *
+     * @param response The response
+     * @return The template
+     */
+    static ResponseTemplate direct(HttpResponse<?> response) {
+        ResponseTemplate template = of(response);
+        Object body = template.body();
+        if (body instanceof CharSequence text) {
+            Charset charset = response.getContentType().flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
+            return template.withBody(text.toString().getBytes(charset));
+        }
+        if (body instanceof byte[] bytes) {
+            // the caller keeps the array
+            return template.withBody(bytes.clone());
+        }
+        return template;
+    }
+
+    /**
+     * @param newBody The body
+     * @return A copy of the template with the body
+     */
+    ResponseTemplate withBody(Object newBody) {
+        return new ResponseTemplate(code, reason, headers, attributes, newBody);
+    }
+
+    /**
      * @return The content type of the response, or {@code null}
      */
     @Nullable MediaType contentType() {
@@ -94,7 +127,15 @@ record ResponseTemplate(int code,
      */
     @Override
     public HttpResponse<?> get() {
-        MutableHttpResponse<Object> response = HttpResponse.status(code, reason);
+        return create(HttpResponseFactory.INSTANCE);
+    }
+
+    /**
+     * @param responses The factory of the responses, e.g. the one of a server runtime
+     * @return A new response of the factory
+     */
+    MutableHttpResponse<?> create(HttpResponseFactory responses) {
+        MutableHttpResponse<Object> response = responses.status(code, reason);
         for (Map.Entry<String, String> header : headers) {
             response.header(header.getKey(), header.getValue());
         }

@@ -1,0 +1,114 @@
+An api:web.router.direct.HttpDirectRoutes[] bean declares *direct routes*: the server answers a request the route matches as soon as it has received it, from its method, path, headers and peer address, before it creates the api:http.HttpRequest[], runs the filters and looks up the ordinary routes. A direct route is the cheapest answer the server can give, for liveness and readiness probes, static answers such as `robots.txt`, and block lists.
+
+WARNING: *No filter runs for a direct route*, of any kind: no `@ServerFilter` or api:http.filter.HttpServerFilter[] bean, no server filter of an `HttpRoutes` bean, no filter of a group, and so none of the filters of Micronaut Security, CORS or the session. A direct route must never answer with protected content. Declare a <<functionalRoutesRespond, `respond(...)` route>> instead, which the filters see.
+
+`HttpDirectRoutes` is a sibling of `HttpRoutes`, with its own builder, api:web.router.direct.DirectRouteBuilder[]: a direct route shares nothing with the ordinary routes, so it cannot be declared in a group of ordinary routes and inherit its filters, its port or its executor by accident. The builder has the methods of a direct route only, and a path prefix. The beans declare their routes when the application starts, under `micronaut.server.context-path`, and their order only orders the beans, like the order of the `HttpRoutes` beans.
+
+snippet::io.micronaut.docs.server.functional.DirectRoutes[tags="imports,clazz", indent=0, title="Direct routes"]
+
+<1> `path(...)` declares routes under a path prefix, like `path(...)` of `HttpRouteBuilder`: the prefix is all they share.
+<2> A shortcut: a response given as a value, the same as `GET(uri).respond(response)`. The route copies its status and headers for each request, and shares only its body, a text encoded once.
+<3> The terminal `respond(Function)` ends the pending route with a function that composes the response of each request from a api:web.router.direct.DirectContext[]: `responses()`, the response factory of the server runtime, and `pathVariables()`, the path variables of the route. The constraints of the route select the values it answers: another value continues to the ordinary routes.
+<4> A static answer with its own content type.
+<5> `route(Set<HttpMethod>, uri)` declares the route for several methods, here to block every request of a client whatever its method and path.
+<6> A block list: the requests whose `User-Agent` names a bad bot, or that come from an address range, are answered with `403` before anything else runs for them.
+
+A direct route is declared in stages, like an ordinary route: a creator of the builder, `GET(uri)`, `POST(uri)`, `PUT(uri)`, `PATCH(uri)`, `DELETE(uri)`, `HEAD(uri)` or `OPTIONS(uri)`, `route(HttpMethod, uri)` for a method given as a value, or `route(Set<HttpMethod>, uri)` for several methods, returns the pending route, a api:web.router.builder.DirectRouteSpec[]; its settings come next; one terminal ends it: `respond(HttpResponse)` with a response given as a value, `respond(Function<DirectContext, HttpResponse>)` with a function, or `respondAsync(...)` with a function that completes the response later. A route with no settings that answers with a value has a shortcut per method, e.g. `GET(uri, HttpResponse)`. A pending route without a terminal fails the startup, with a message that names it and its `HttpDirectRoutes` bean.
+
+A response the function creates with `responses()` is the server runtime's own type, which the server writes as it is, without converting it: build responses with it rather than with the static `HttpResponse` methods. A response of another type, e.g. `HttpResponse.ok()` or one a library returns, still works: the server converts it. The settings of a `DirectRouteSpec` are `where(...)`, `constrain(...)`, `order(...)`, and the `executeOn(...)` and `nonBlocking()` of <<functionalRoutesDirectAsync, executors>>, and nothing else: a direct route has no filters, media types, annotations, attributes, error routes or port.
+
+=== How a direct route answers
+
+The server looks up the direct routes for every request it receives, before it creates the request: nothing else runs for a request a direct route matches. There is no api:http.HttpRequest[], so there are no request events, no request scope, no propagated context and no `ServerRequestContext`; the error routes and the status routes do not apply; the body of the request is discarded without being read once the route answers.
+
+The server writes exactly the status, the headers and the body of the response, composed for each request, and adds only what the protocol needs to frame it: the `Content-Length` of the body, and the handling of the connection, keep-alive or close. *A direct response gets no header from the server*: no `Date`, no `Server` and no `Content-Type`, whatever `micronaut.server.date-header` and `micronaut.server.server-header` say, as they apply to the ordinary responses the server completes. A route that needs them sets them itself, as the application chooses. This is the guarantee of the Netty server; another server runtime may add a header it cannot leave out, see <<functionalRoutesDirectRuntimes, the other runtimes>>. The compression of the connection, which a client asks for with `Accept-Encoding`, applies to a direct response as to any other: it is part of the transfer, with its `Content-Encoding`.
+
+The body is written as it is when it is bytes or text: a `byte[]` or a `java.nio.ByteBuffer`, wrapped without a copy and never changed, so one array may serve every response, a Netty `ByteBuf`, written once and released, e.g. `shared.retainedDuplicate()` returned for each request, or a `CharSequence`, encoded with the charset of its content type, UTF-8 without one. Any other body, e.g. a record, is written for each request by the message body writer of its content type, `application/json` if the response has none, which it then gets, like the body of an ordinary route; the writer is looked up once per body type. A function that throws, or a body that cannot be written, is answered with `500`.
+
+The function of a route is called on the event loop that received the request, unless the route is asynchronous, and the body of its response is written there: it must be fast and must not block, like the constraints. A message body writer that blocks, an api:http.body.MessageBodyWriter[] whose `isBlocking()` is `true`, is refused on such a route, and the request answered with `500`. *Blocking work belongs on an executor or in an asynchronous route*, see <<functionalRoutesDirectAsync, below>>.
+
+A response given as a value is copied for each request, with the response factory of the server: its status, headers and attributes, so that nothing is shared but its body, which the requests share. A text body is encoded once, when the route is declared, and a `byte[]` body is copied then. A body that is consumed when it is written, such as a Netty `ByteBuf`, cannot be given as a value: return it from a function, e.g. a retained duplicate of a shared buffer for each request.
+
+A `GET` direct route also answers `HEAD` requests, with the headers of its response, its `Content-Length` included, and no body, unless a `HEAD` direct route matches them. The response is written like any other response of the server, in the order of the requests of the connection, so keep-alive and HTTP/1.1 pipelining work across direct and ordinary routes. Over HTTP/2, and HTTP/3, the server converts each stream to a request before it looks up the direct routes, so a direct route answers the streams of a connection the same way.
+
+[[functionalRoutesDirectAsync]]
+=== Executors and asynchronous routes
+
+A direct route runs on the thread that received the request, whatever the thread selection of the server: `nonBlocking()` is its default, and it inherits no executor from anywhere. `executeOn(name)` runs it on the named executor, like `@ExecuteOn`: the route is still matched on the thread that received the request, by its URI template, its conditions and its constraints, then the server holds the request while the function composes the response on the executor. A function that returns a `CompletionStage` of the response ends the route with the terminal `respondAsync(...)`: it is called on the thread that received the request, or on the executor of the route, and the stage may complete on any thread.
+
+snippet::io.micronaut.docs.server.functional.AsyncDirectRoutes[tags="imports,clazz", indent=0, title="A route on an executor, and an asynchronous route"]
+
+<1> The function blocks, e.g. on a database: it may, as it runs on an executor. `null` declines the request, as for any direct route.
+<2> `executeOn(...)` runs the function on the named executor, here `TaskExecutors.BLOCKING`.
+<3> An asynchronous route returns the stage of its response, e.g. the response of a non-blocking client, and does not block the thread that received the request.
+<4> A stage completed with `null` declines the request: it continues to the ordinary routes, with its body untouched.
+
+An asynchronous route, on an executor or completed later, answers like any direct route: without a filter or a request, with the headers of its response only, in the order of the requests of the connection, so a response completed after the response of a later request is still written first under HTTP/1.1 pipelining, and over HTTP/2 the same way. Until the stage completes, the server holds the request, and neither reads nor discards its body: a declined request reaches the ordinary routes as if no direct route had matched it. The server cancels the stage when the connection closes, and answers a failed stage, or a function that throws, with `500`.
+
+The body of the response of an asynchronous route may be written by a blocking message body writer: on the executor of the route, or, when the stage completes on an event loop, on the IO executor of the server. An executor that does not exist fails the startup with a message that names it and the route.
+
+=== The TechEmpower benchmarks
+
+The plaintext and JSON tests of the https://github.com/TechEmpower/FrameworkBenchmarks/wiki/Project-Information-Framework-Tests-Overview[TechEmpower Framework Benchmarks] can be written with direct routes within their rules: the response is composed for each request, and only the body buffer of the plaintext test is reused.
+
+snippet::io.micronaut.docs.server.functional.BenchmarkRoutes[tags="imports,clazz", indent=0, title="The plaintext and JSON tests"]
+
+<1> The body text, encoded once: reusing one buffer for the body is the only part of the response the rules let a test keep.
+<2> A direct response gets no header from the server, so the routes set `Server` and `Date` themselves. Here the example formats the date at most once per second, which the rules allow; formatting it for each request is fine too. How the date is computed is the application's choice.
+<3> A function composes the response of each request with the response factory of the server: its status and headers are new every time, and the server writes the response without converting it.
+<4> The JSON test creates the object for each request, and the message body writer of `application/json` serializes it for each request.
+
+=== Matching
+
+The URI template of a direct route, under its prefix and the context path, is matched like the URI template of an ordinary route, and the direct routes rank among themselves like the router ranks its routes: the most specific template first, then the constraints and the conditions, then the lowest order. Direct routes of the same specificity and order that both match a request make it ambiguous, answered with `400`.
+
+A direct route is not a route of the router. It answers the requests it matches before any ordinary route, whatever their specificity: a direct route `/{+path}` answers every request its conditions accept, even one to a more specific controller route.
+
+NOTE: A direct route answers before any ordinary route on the same path, e.g. a controller route or a handler route with the same URI template: the ordinary route only sees the requests the direct route does not answer.
+
+A request that no direct route matches, because of its path, method, conditions or constraints, continues as usual, to the filters and the ordinary routes, which may answer it with a `404` or a `405`.
+
+A function that returns `null` declines the request: the server handles it as if no direct route matched it, before the body of the request is read or discarded. An ordinary route on the same path answers it, and can read its body, or it is answered with `404` as usual. A direct route can so answer the common case cheaply and leave the rest to an ordinary route:
+
+snippet::io.micronaut.docs.server.functional.DeclineRoutes[tags="clazz", indent=0, title="A direct route that declines some requests"]
+
+<1> The direct route answers the cached assets, and declines the others by returning `null`.
+<2> The ordinary route of an `HttpRoutes` bean answers the requests the direct route declined, with its filters.
+
+=== Conditions
+
+A direct route takes the conditions the server decides from the request it received:
+
+* `RouteCondition.method(...)`;
+* `RouteCondition.header(...)` and `RouteCondition.cookie(...)`, read from the headers as they were received;
+* `RouteCondition.query(...)`, decoded from the URI like the parameters of an ordinary request, with the charset of the content type of the request or the default charset of the server and its limits. The query is decoded only when a route with a query condition is tried, once per request;
+* `RouteCondition.host(...)`, which reads the `Host` header, or the authority of an HTTP/2 request, and never a forwarded header or the host resolver of the server;
+* `RouteCondition.peerAddress(...)`, the address of the peer of the connection;
+* `RouteCondition.before(...)`, `after(...)` and `between(...)`, which read the `java.time.Clock` bean if there is one, otherwise the system clock, like the conditions of the ordinary routes;
+* their combinations with `all`, `any`, `not`, `and`, `or` and `negate`.
+
+Two conditions are rejected, with an `IllegalArgumentException` when they are given to the route, so that the application fails to start with a message that names the route and the condition:
+
+* a condition of a lambda, `RouteCondition.custom(...)` or `where(Predicate<HttpRequest>)`, as it receives the api:http.HttpRequest[], which a direct route never creates;
+* `RouteCondition.remoteAddress(...)`, as it resolves the client address with the api:http.server.util.HttpClientAddressResolver[] of the server, from the request and its forwarded headers. `peerAddress(...)`, which reads the connection only, is the condition for a direct route.
+
+=== Runtimes
+
+The Netty server answers direct routes, synchronous and asynchronous. An application that declares a direct route on a runtime that does not, e.g. a serverless function runtime, fails to start with a message that says so: a direct route is never served as an ordinary route, which the filters it was declared to skip would see. A runtime that answers direct routes answers the asynchronous ones too: one that cannot hold a request without a thread waits for the stage on a worker thread, and may then not cancel it when the connection closes.
+
+[[functionalRoutesDirectRuntimes]]
+Another server runtime that answers direct routes writes the response as it is too, but may add a header it cannot leave out: some always add a `Date` header, or a `Server` header when configured to. A `Date` or `Server` header the route sets replaces the runtime's where the runtime allows it. The reason phrase of the status is written where the runtime lets it be set, and a compressed direct response may be sent chunked and carry a `Vary` header.
+
+=== Implementing direct routes in a server runtime
+
+The package pkg:web.router.direct[] is the experimental SPI between the router and a server runtime, e.g. a servlet container:
+
+* the runtime declares a api:web.router.direct.DirectRouteSupport[] bean, which tells the router that direct routes are answered: without one, an application that declares a direct route fails to start. The bean has no method: every runtime that declares it answers the asynchronous direct routes too, as described below;
+* when it starts, it gets the api:web.router.direct.DirectRouteLookup[] bean, if there is one and it is not empty, and skips the lookup otherwise;
+* for each request it receives, before it creates the api:http.HttpRequest[] or runs anything else, it calls `find(DirectRequest, HttpResponseFactory)`, on the thread that received it. The api:web.router.direct.DirectRequest[] reads its own request: the method, the raw path without the query, of an absolute-form request target too, the headers, the query parameters, decoded like the parameters of its requests and only when a query condition asks for them, and the address of the peer. The api:http.HttpResponseFactory[] is its own, so that the responses of the routes are of its own type;
+* when a response is returned, it discards the body of the request and writes the response: exactly its status, its headers and its body, with only the framing the protocol needs, the `Content-Length` of the body and the handling of the connection, and no header of its own that it can leave out, and the headers only for a `HEAD` request. A `Date` or `Server` header it always adds is replaced by the route's where it allows it, and the reason phrase is written where it can be set. A body that is not bytes or text is written by the message body writer of the content type of the response, `application/json` if it has none. A response of another type than its own is converted;
+* it honours `MessageBodyWriter.isBlocking()`, see api:http.body.MessageBodyWriter[]: the response `find` returns is written on the thread that received the request, so it refuses a blocking writer and answers `500`, and it runs the blocking writer of the response of an asynchronous route off its event loops;
+* when `null` is returned, it handles the request as usual, with its body untouched;
+* when `DirectRouteLookup.PENDING` is returned, a shared constant that `find` returns without calling an asynchronous route, it calls `findAsync(DirectRequest, HttpResponseFactory)` with the same request, which matches it again and calls the route, on its executor if it has one. It holds the request, without reading or discarding its body, until the returned stage completes, then writes its response as above, or handles the request as usual, with its body untouched, when it completes with `null`, as when `findAsync` itself returns `null`. It writes the responses of a connection in the order of its requests, cancels the stage when the connection closes, and answers a failed stage with `500`. A runtime that cannot hold a request without a thread waits for the stage on a worker thread, never on the thread that reads the connection.
+
+The synchronous lookup allocates no more for an application with asynchronous routes: `find` allocates only the response and the context of the function of a synchronous route, and a request an asynchronous route matches pays for its second match in `findAsync`.

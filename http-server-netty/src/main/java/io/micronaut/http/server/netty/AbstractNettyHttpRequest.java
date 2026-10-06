@@ -272,7 +272,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
      * Extract the path out of the uri.
      * https://github.com/eclipse-vertx/vert.x/blob/master/src/main/java/io/vertx/core/http/impl/HttpUtils.java
      */
-    private static String parsePath(String uri) {
+    static String parsePath(String uri) {
         if (uri.isEmpty()) {
             return "";
         }

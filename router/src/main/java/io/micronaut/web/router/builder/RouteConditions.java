@@ -344,7 +344,7 @@ public final class RouteConditions {
             || request.getMethod() == HttpMethod.CUSTOM && method.methods().contains(HttpMethod.CUSTOM.name());
     }
 
-    private static boolean anyValue(ValueMatcher matcher, List<String> values) {
+    static boolean anyValue(ValueMatcher matcher, List<String> values) {
         if (values.isEmpty()) {
             return matches(matcher, null);
         }
@@ -363,12 +363,23 @@ public final class RouteConditions {
      */
     private static boolean cookie(RouteCondition.Cookie cookie, HttpRequest<?> request) {
         List<String> headers = request.getHeaders().getAll(HttpHeaders.COOKIE);
+        if (headers.isEmpty()) {
+            io.micronaut.http.cookie.Cookie found = request.getCookies().findCookie(cookie.name()).orElse(null);
+            return matches(cookie.value(), found == null ? null : found.getValue());
+        }
+        return cookie(cookie, headers);
+    }
+
+    /**
+     * Scan {@code Cookie} headers for the cookies of the name: the other cookies are not decoded.
+     *
+     * @param cookie  The condition
+     * @param headers The values of the {@code Cookie} headers
+     * @return Whether a cookie of the name matches, or none is present and the matcher matches an absent value
+     */
+    static boolean cookie(RouteCondition.Cookie cookie, List<String> headers) {
         String name = cookie.name();
         ValueMatcher matcher = cookie.value();
-        if (headers.isEmpty()) {
-            io.micronaut.http.cookie.Cookie found = request.getCookies().findCookie(name).orElse(null);
-            return matches(matcher, found == null ? null : found.getValue());
-        }
         boolean found = false;
         for (String header : headers) {
             int length = header.length();
@@ -420,7 +431,7 @@ public final class RouteConditions {
      * Match the host of a resolved value, a host, a host and a port, or a URI with a scheme,
      * without the scheme, the port and a final dot, in place.
      */
-    private static boolean host(ValueMatcher matcher, @Nullable String resolved) {
+    static boolean host(ValueMatcher matcher, @Nullable String resolved) {
         if (resolved == null) {
             return matches(matcher, null);
         }
@@ -463,7 +474,7 @@ public final class RouteConditions {
             .orElse(false);
     }
 
-    private static boolean inRanges(List<Cidr> ranges, byte @Nullable [] address) {
+    static boolean inRanges(List<Cidr> ranges, byte @Nullable [] address) {
         if (address == null) {
             return false;
         }
@@ -475,7 +486,7 @@ public final class RouteConditions {
         return false;
     }
 
-    private static boolean timeWindow(TimeWindow timeWindow, Instant now) {
+    static boolean timeWindow(TimeWindow timeWindow, Instant now) {
         Instant after = timeWindow.after();
         Instant before = timeWindow.before();
         return (after == null || !now.isBefore(after)) && (before == null || now.isBefore(before));

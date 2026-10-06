@@ -19,17 +19,20 @@ import io.micronaut.core.annotation.Experimental;
 
 /**
  * Where code runs: the handler of a route, see {@link HttpRouteSpec}, the handlers of the routes
- * of a group, see {@link HttpRouteGroup}, or a filter, see {@link FilterSpec}. Every kind of code
+ * of a group, see {@link HttpRouteGroup}, a filter, see {@link FilterSpec}, or the function of a
+ * direct route, see {@link DirectRouteSpec}. Every kind of code
  * chooses its thread with the same methods, declared once here: a way to choose a thread that is
  * added to this interface, e.g. a future {@code executeOnIO()}, is available to the routes, the
- * groups and the filters at once.
+ * groups, the filters and the direct routes at once.
  *
  * <p>On a route, the choice is the one of the route, like {@code @ExecuteOn} or
  * {@code @NonBlocking} on a controller method. On a group, it is the default of the routes
  * declared in the lambda of the group, and of its nested groups, wherever it is declared in the
  * lambda: a route that chooses its thread, or a nested group that does, overrides it. On a
- * filter, it is the choice of that filter only, like {@code @ExecuteOn} on a filter method. The
- * last of {@code executeOn} and {@code nonBlocking} called wins.</p>
+ * filter, it is the choice of that filter only, like {@code @ExecuteOn} on a filter method. On a
+ * direct route, it is the choice of that route only: a direct route inherits nothing, and runs
+ * on the thread that received the request unless it chooses an executor. The last of
+ * {@code executeOn} and {@code nonBlocking} called wins.</p>
  *
  * <pre>{@code
  * routes.path("/reports", reports -> {
@@ -45,7 +48,7 @@ import io.micronaut.core.annotation.Experimental;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface ExecutionSpec<S extends ExecutionSpec<S>> permits RouteSpec, FilterSpec {
+public sealed interface ExecutionSpec<S extends ExecutionSpec<S>> permits RouteSpec, FilterSpec, DirectRouteSpec {
 
     /**
      * Run the code on the named executor, like {@code @ExecuteOn}. It applies whatever the thread
@@ -63,6 +66,12 @@ public sealed interface ExecutionSpec<S extends ExecutionSpec<S>> permits RouteS
      * continues on that executor. An asynchronous filter is called on the executor, and the
      * filter chain continues where its stage completes.</p>
      *
+     * <p>On a direct route, the function runs on the executor: the route is matched on the
+     * thread that received the request, then its response is composed, and its body written,
+     * on the executor, which may block, e.g. on a database, or use a blocking message body
+     * writer. The server holds the request meanwhile. An executor that does not exist fails the
+     * startup.</p>
+     *
      * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
      * @return The route, the group or the filter
      */
@@ -73,7 +82,9 @@ public sealed interface ExecutionSpec<S extends ExecutionSpec<S>> permits RouteS
      * like {@code @NonBlocking} on a controller method, when the server selects threads
      * automatically: the route must not block. On a group, the default of its routes, like
      * {@link #executeOn(String)}. On a filter, the default: the filter runs on the thread of the
-     * filter chain, like a filter method without {@code @ExecuteOn}.
+     * filter chain, like a filter method without {@code @ExecuteOn}. On a direct route, the
+     * default: the function runs on the thread that received the request, whatever the thread
+     * selection of the server, and must not block.
      *
      * @return The route, the group or the filter
      */
