@@ -100,6 +100,10 @@ public final class DevRuntime implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
     private static final AtomicReference<DevRuntime> CURRENT = new AtomicReference<>();
+    /**
+     * The system property that has {@code BeanIntrospector.SHARED} read the introspections of the thread's context class loader.
+     */
+    private static final String INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
     private static final Duration COALESCE = Duration.ofMillis(150);
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
@@ -141,6 +145,7 @@ public final class DevRuntime implements Closeable {
      * @param compilers The compilers, by language
      */
     DevRuntime(DevManifest manifest, DevClassLoader classLoader, ApplicationLauncher launcher, Map<SourceKind, SourceCompiler> compilers) {
+        listIntrospectionsOfTheReloadableTier();
         this.manifest = manifest;
         this.classLoader = classLoader;
         this.launcher = launcher;
@@ -157,6 +162,19 @@ public final class DevRuntime implements Closeable {
     @Nullable
     public static DevRuntime current() {
         return CURRENT.get();
+    }
+
+    /**
+     * Lets {@code BeanIntrospector.SHARED} list the introspections of the reloadable tier: it reads those of its own
+     * loader, the runtime classpath's, unless {@value #INTROSPECTIONS_USE_CONTEXT_CLASSLOADER} tells it to read those of
+     * the thread's context class loader, which on a generation's threads is that generation's loader. Without it, a
+     * module that lists introspections, as Micronaut Data's schema generation lists the entities, sees none of the
+     * application's. A system property, set for this development JVM only, unless the launch set it.
+     */
+    private static void listIntrospectionsOfTheReloadableTier() {
+        if (System.getProperty(INTROSPECTIONS_USE_CONTEXT_CLASSLOADER) == null) {
+            System.setProperty(INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, "true");
+        }
     }
 
     /**
