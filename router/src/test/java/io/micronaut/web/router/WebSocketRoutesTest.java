@@ -31,6 +31,7 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.web.router.websocket.WebSocketRouteSpec;
 import io.micronaut.websocket.CloseReason;
+import io.micronaut.websocket.WebSocketPingMessage;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
@@ -213,6 +214,40 @@ class WebSocketRoutesTest {
         AtomicReference<WebSocketRouteSpec> escaped = new AtomicReference<>();
         router(routes -> routes.GET("/escaped").webSocket(escaped::set));
         assertThrows(IllegalStateException.class, () -> escaped.get().onOpen((session, request) -> null));
+    }
+
+    @Test
+    void aRouteHasAMessageHandlerOrAMessagesHandler() {
+        assertThrows(IllegalStateException.class, () -> router(routes -> routes.GET("/both").webSocket(ws -> ws
+            .onMessage(String.class, (message, session) -> null)
+            .onMessages(String.class, (messages, session) -> null))));
+        assertThrows(IllegalStateException.class, () -> router(routes -> routes.GET("/both").webSocket(ws -> ws
+            .onMessages(String.class, (messages, session) -> null)
+            .onMessage(String.class, (message, session) -> null))));
+        assertThrows(IllegalArgumentException.class, () -> router(routes -> routes.GET("/bad").webSocket(ws -> ws.maxConcurrentMessages(0))));
+
+        Router router = router(routes -> routes.GET("/stream").webSocket(ws -> ws
+            .maxPayloadLength(1024)
+            .maxConcurrentMessages(4)
+            .onMessages(Argument.listOf(Integer.class), (messages, session) -> null)
+            .onPing((ping, session) -> null)));
+        WebSocketRouteEndpoint endpoint = endpoint(route(router, HttpRequest.GET("/stream")));
+        assertEquals(4, endpoint.maxConcurrentMessages());
+        // the messages are decoded like for a message handler, and the stream starts on the opening
+        MethodExecutionHandle<Object, ?> message = endpoint.messageMethod().orElseThrow();
+        assertEquals(OptionalInt.of(1024), message.intValue(OnMessage.class, "maxPayloadLength"));
+        assertSame(message.getArguments()[0], endpoint.messageArgument());
+        assertEquals(Integer.class, endpoint.messageArgument().getTypeParameters()[0].getType());
+        assertTrue(endpoint.openMethod().isPresent());
+        assertEquals(WebSocketPingMessage.class, endpoint.pingArgument().getType());
+        assertNotNull(endpoint.pingMethod());
+
+        // one message at a time by default
+        Router plain = router(routes -> routes.GET("/plain").webSocket(ws -> ws.onOpen((session, request) -> null)));
+        WebSocketRouteEndpoint plainEndpoint = endpoint(route(plain, HttpRequest.GET("/plain")));
+        assertEquals(1, plainEndpoint.maxConcurrentMessages());
+        assertNull(plainEndpoint.pingMethod());
+        assertNull(plainEndpoint.pingArgument());
     }
 
     @Test

@@ -40,6 +40,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
@@ -288,6 +291,173 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
+    void theOpenHandlerSendsAStream() throws Exception {
+        Client client = connect("/ws/ticks/3");
+        assertEquals("tick 1", client.next());
+        assertEquals("tick 2", client.next());
+        assertEquals("tick 3", client.next());
+        assertEquals("sent 3 ticks", event());
+        client.close(1000, "done");
+    }
+
+    @Test
+    void theRepliesToAMessageAreAStream() throws Exception {
+        Client client = connect("/ws/replies");
+        client.ws.sendText("reply", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("reply 1", client.next());
+        assertEquals("reply 2", client.next());
+        assertEquals("reply 3", client.next());
+        client.close(1000, "done");
+    }
+
+    @Test
+    void aStreamThatDoesNotEndIsCancelledWhenTheConnectionCloses() throws Exception {
+        Client client = connect("/ws/endless");
+        assertEquals("endless 1", client.next());
+        // the stream does not hold the messages back: it was not returned
+        client.ws.sendText("still read", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("echo still read", client.next());
+        client.close(1000, "done");
+        assertEquals("endless cancelled", event());
+    }
+
+    @Test
+    void theMessagesOfAConnectionAreHandledOneAfterTheOther() throws Exception {
+        Client client = connect("/ws/serial");
+        client.ws.sendText("a", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendText("b", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("done a", client.next());
+        assertEquals("done b", client.next());
+        assertEquals("start a", event());
+        assertEquals("end a", event());
+        assertEquals("start b", event());
+        assertEquals("end b", event());
+        client.close(1000, "done");
+    }
+
+    @Test
+    void theMessagesOfAConnectionAreHandledConcurrentlyUpToTheMaximum() throws Exception {
+        Client client = connect("/ws/concurrent");
+        // the first is done once the second arrives: one at a time, it never would be
+        client.ws.sendText("first", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendText("second", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("second done", client.next());
+        assertEquals("first done", client.next());
+        client.close(1000, "done");
+    }
+
+    @Test
+    void theFirstMessageIsHandledOnceTheOpenHandlerIsDone() throws Exception {
+        Client client = connect("/ws/open-first");
+        client.ws.sendText("x", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("got x", client.next());
+        assertEquals("opened", event());
+        assertEquals("message x", event());
+        client.close(1000, "done");
+    }
+
+    @Test
+    void theMessagesHandlerReceivesTheMessagesAsAStream() throws Exception {
+        Client client = connect("/ws/upper");
+        client.ws.sendText("a", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendText("b", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendText("c", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("A", client.next());
+        assertEquals("B", client.next());
+        assertEquals("C", client.next());
+        client.close(1000, "done");
+        // the stream completes when the connection closes
+        assertEquals("upper complete", event());
+    }
+
+    @Test
+    void aSubscriberThatCancelsDiscardsTheMessagesThatFollow() throws Exception {
+        Client client = connect("/ws/first");
+        client.ws.sendText("a", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("first a", client.next());
+        client.ws.sendText("b", true).get(TIMEOUT, TimeUnit.SECONDS);
+        // the connection reads on: the ping after the discarded message is handled
+        client.ws.sendPing(ByteBuffer.wrap("p".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("ping p", client.next());
+        client.close(1000, "done");
+    }
+
+    @Test
+    void aFailingMessagesHandlerReachesTheErrorHandler() throws Exception {
+        Client client = connect("/ws/messages-failing");
+        assertEquals("error messages failed", event());
+        // its messages are discarded: the connection is not held back
+        client.ws.sendText("discarded", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendText("discarded too", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.close(1000, "done");
+    }
+
+    @Test
+    void aStreamOfTheOpenHandlerDoesNotHoldThePingsAndTheCloseBack() throws Exception {
+        Client client = connect("/ws/held");
+        assertEquals("held 1", client.next());
+        client.ws.sendPing(ByteBuffer.wrap("still".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("still", client.pongs.poll(TIMEOUT, TimeUnit.SECONDS));
+        client.close(1000, "done");
+        assertEquals("held cancelled", event());
+    }
+
+    @Test
+    void aHandlerThatRunsDoesNotHoldThePingsBack() throws Exception {
+        Client client = connect("/ws/stuck");
+        client.ws.sendText("stuck", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("stuck", event());
+        client.ws.sendPing(ByteBuffer.wrap("alive".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("alive", client.pongs.poll(TIMEOUT, TimeUnit.SECONDS));
+        client.ws.abort();
+    }
+
+    @Test
+    void aCloseIsHandledOnceTheMessagesBeforeItWereHandled() throws Exception {
+        Client client = connect("/ws/serial-close");
+        client.ws.sendText("a", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendText("b", true).get(TIMEOUT, TimeUnit.SECONDS);
+        client.close(1000, "done");
+        assertEquals("start a", event());
+        assertEquals("end a", event());
+        assertEquals("start b", event());
+        assertEquals("end b", event());
+        assertEquals("close 1000", event());
+    }
+
+    @Test
+    void theFirstMessageIsHandledOnceTheOpenHandlerIsDoneWhateverTheMaximum() throws Exception {
+        Client client = connect("/ws/open-first-concurrent");
+        client.ws.sendText("x", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("got x", client.next());
+        assertEquals("opened", event());
+        assertEquals("message x", event());
+        client.close(1000, "done");
+    }
+
+    @Test
+    void theStreamReceivesTheMessagesInOrderOnAnExecutorOfManyThreads() throws Exception {
+        Client client = connect("/ws/upper-blocking");
+        for (int i = 1; i <= 20; i++) {
+            client.ws.sendText("m" + i, true).get(TIMEOUT, TimeUnit.SECONDS);
+        }
+        for (int i = 1; i <= 20; i++) {
+            assertEquals("M" + i, client.next());
+        }
+        client.close(1000, "done");
+        assertEquals("upper complete", event());
+    }
+
+    @Test
+    void thePingHandlerReceivesThePingsWhichAreAnswered() throws Exception {
+        Client client = connect("/ws/ping");
+        client.ws.sendPing(ByteBuffer.wrap("ping-data".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("ping ping-data", client.next());
+        assertEquals("ping-data", client.pongs.poll(TIMEOUT, TimeUnit.SECONDS));
+        client.close(1000, "done");
+    }
+
+    @Test
     void theExecutorOfTheRouteRunsTheHandlers() throws Exception {
         Client client = connect("/ws/executor");
         String open = client.next();
@@ -401,6 +571,7 @@ class HandlerRouteWebSocketTest {
     static final class Client implements WebSocket.Listener {
 
         final BlockingQueue<Object> messages = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> pongs = new LinkedBlockingQueue<>();
         final CompletableFuture<Closed> closed = new CompletableFuture<>();
         private final StringBuilder text = new StringBuilder();
         private final ByteArrayOutputStream binary = new ByteArrayOutputStream();
@@ -426,6 +597,13 @@ class HandlerRouteWebSocketTest {
                 messages.add(binary.toByteArray());
                 binary.reset();
             }
+            webSocket.request(1);
+            return null;
+        }
+
+        @Override
+        public CompletionStage<?> onPong(WebSocket webSocket, ByteBuffer message) {
+            pongs.add(StandardCharsets.UTF_8.decode(message).toString());
             webSocket.request(1);
             return null;
         }
@@ -459,6 +637,117 @@ class HandlerRouteWebSocketTest {
             ws.sendClose(code, reason).get(TIMEOUT, TimeUnit.SECONDS);
             // the server closes the connection when its close handler is done, like for a bean
             closed.handle((c, e) -> c).get(TIMEOUT, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * Emits its messages as they are requested, and reports a cancel.
+     *
+     * @param name     The name of the messages
+     * @param count    The number of messages
+     * @param complete Whether it completes after them
+     * @param log      Reports a cancel
+     */
+    record Ticks(String name, int count, boolean complete, BlockingQueue<String> log) implements Publisher<String> {
+
+        @Override
+        public void subscribe(Subscriber<? super String> subscriber) {
+            subscriber.onSubscribe(new Subscription() {
+                private long requested;
+                private int emitted;
+                private boolean done;
+
+                @Override
+                public synchronized void request(long n) {
+                    requested += n;
+                    while (requested > 0 && emitted < count && !done) {
+                        requested--;
+                        emitted++;
+                        subscriber.onNext(name + " " + emitted);
+                    }
+                    if (emitted == count && complete && !done) {
+                        done = true;
+                        subscriber.onComplete();
+                    }
+                }
+
+                @Override
+                public synchronized void cancel() {
+                    if (!done) {
+                        done = true;
+                        log.add(name + " cancelled");
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Replies to each message in upper case, and requests the next once the reply was sent.
+     */
+    static final class Upper implements Subscriber<String> {
+        private final WebSocketSession session;
+        private final BlockingQueue<String> log;
+        private Subscription subscription;
+
+        Upper(WebSocketSession session, BlockingQueue<String> log) {
+            this.session = session;
+            this.log = log;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            subscription = s;
+            s.request(1);
+        }
+
+        @Override
+        public void onNext(String message) {
+            session.sendAsync(message.toUpperCase(Locale.ROOT)).thenRun(() -> subscription.request(1));
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            log.add("upper error " + t.getMessage());
+        }
+
+        @Override
+        public void onComplete() {
+            log.add("upper complete");
+        }
+    }
+
+    /**
+     * Replies to the first message, and cancels.
+     */
+    static final class First implements Subscriber<String> {
+        private final WebSocketSession session;
+        private Subscription subscription;
+
+        First(WebSocketSession session) {
+            this.session = session;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            subscription = s;
+            s.request(1);
+        }
+
+        @Override
+        public void onNext(String message) {
+            subscription.cancel();
+            session.sendAsync("first " + message);
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            // it cancelled: no signal follows
+        }
+
+        @Override
+        public void onComplete() {
+            // it cancelled: no signal follows
         }
     }
 
@@ -596,6 +885,100 @@ class HandlerRouteWebSocketTest {
 
                 routes.GET("/ws/port").port(routePort).webSocket(ws -> ws
                     .onOpen((session, request) -> session.sendAsync("port " + request.getServerAddress().getPort())));
+
+                // streams, without Reactor
+                routes.GET("/ws/ticks/{count}").webSocket(ws -> ws
+                    .onOpen((session, request) -> {
+                        int count = session.getUriVariables().get("count", Integer.class).orElseThrow();
+                        return session.sendAllAsync(new Ticks("tick", count, true, log))
+                            .thenRun(() -> log.add("sent " + count + " ticks"));
+                    }));
+                routes.GET("/ws/replies").webSocket(ws -> ws
+                    .onMessage(String.class, (message, session) -> session.sendAllAsync(new Ticks(message, 3, true, log))));
+                routes.GET("/ws/endless").webSocket(ws -> ws
+                    .onOpen((session, request) -> {
+                        // not returned, so that it does not hold the messages back
+                        session.sendAllAsync(new Ticks("endless", 1, false, log));
+                        return null;
+                    })
+                    .onMessage(String.class, (message, session) -> session.sendAsync("echo " + message)));
+                routes.GET("/ws/upper").webSocket(ws -> ws
+                    .onMessages(String.class, (messages, session) -> {
+                        messages.subscribe(new Upper(session, log));
+                        return null;
+                    }));
+                routes.GET("/ws/first").webSocket(ws -> ws
+                    .onMessages(String.class, (messages, session) -> {
+                        messages.subscribe(new First(session));
+                        return null;
+                    })
+                    .onPing((ping, session) -> session.sendAsync("ping " + ping.getContent().toString(StandardCharsets.UTF_8))));
+                routes.GET("/ws/messages-failing").webSocket(ws -> ws
+                    .onMessages(String.class, (messages, session) -> CompletableFuture.failedFuture(new IllegalStateException("messages failed")))
+                    .onError((error, session) -> {
+                        log.add("error " + error.getMessage());
+                        return null;
+                    }));
+                routes.GET("/ws/held").webSocket(ws -> ws
+                    // returned: it holds the messages back, but not the pings and the close
+                    .onOpen((session, request) -> session.sendAllAsync(new Ticks("held", 1, false, log)))
+                    .onMessage(String.class, (message, session) -> null));
+                routes.GET("/ws/stuck").webSocket(ws -> ws
+                    .onMessage(String.class, (message, session) -> {
+                        log.add(message);
+                        return new CompletableFuture<>();
+                    }));
+                routes.GET("/ws/serial-close").webSocket(ws -> ws
+                    .onMessage(String.class, (message, session) -> {
+                        log.add("start " + message);
+                        return CompletableFuture.runAsync(() -> log.add("end " + message), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS));
+                    })
+                    .onClose((reason, session) -> {
+                        log.add("close " + reason.getCode());
+                        return null;
+                    }));
+                routes.GET("/ws/open-first-concurrent").webSocket(ws -> ws
+                    .maxConcurrentMessages(2)
+                    .onOpen((session, request) -> CompletableFuture.runAsync(() -> log.add("opened"), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)))
+                    .onMessage(String.class, (message, session) -> {
+                        log.add("message " + message);
+                        return session.sendAsync("got " + message);
+                    }));
+                routes.GET("/ws/upper-blocking")
+                    .executeOn(TaskExecutors.BLOCKING)
+                    .webSocket(ws -> ws
+                        .maxConcurrentMessages(4)
+                        .onMessages(String.class, (messages, session) -> {
+                            messages.subscribe(new Upper(session, log));
+                            return null;
+                        }));
+                routes.GET("/ws/ping").webSocket(ws -> ws
+                    .onPing((ping, session) -> session.sendAsync("ping " + ping.getContent().toString(StandardCharsets.UTF_8))));
+
+                // one message after the other, or concurrently
+                routes.GET("/ws/serial").webSocket(ws -> ws
+                    .onMessage(String.class, (message, session) -> {
+                        log.add("start " + message);
+                        return CompletableFuture.runAsync(() -> log.add("end " + message), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS))
+                            .thenCompose(ignored -> session.sendAsync("done " + message));
+                    }));
+                routes.GET("/ws/concurrent").webSocket(ws -> ws
+                    .maxConcurrentMessages(2)
+                    .onMessage(String.class, (message, session) -> {
+                        if (message.equals("first")) {
+                            CompletableFuture<Object> second = new CompletableFuture<>();
+                            session.put("second", second);
+                            return second.thenCompose(ignored -> session.sendAsync("first done"));
+                        }
+                        CompletableFuture<?> second = session.get("second", CompletableFuture.class).orElseThrow();
+                        return session.sendAsync("second done").thenRun(() -> second.complete(null));
+                    }));
+                routes.GET("/ws/open-first").webSocket(ws -> ws
+                    .onOpen((session, request) -> CompletableFuture.runAsync(() -> log.add("opened"), CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)))
+                    .onMessage(String.class, (message, session) -> {
+                        log.add("message " + message);
+                        return session.sendAsync("got " + message);
+                    }));
 
                 routes.GET("/ws/executor")
                     .executeOn(TaskExecutors.BLOCKING)

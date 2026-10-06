@@ -40,6 +40,11 @@ import java.util.concurrent.CompletionStage;
 @Internal
 final class WebSocketRouteMethod implements ExecutableMethod<Object, CompletionStage<?>>, MethodExecutionHandle<Object, CompletionStage<?>> {
 
+    /**
+     * The stage of a handler that is done.
+     */
+    static final CompletionStage<Void> DONE = CompletableFuture.completedStage(null);
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static final ReturnType<CompletionStage<?>> RETURN_TYPE = (ReturnType) ReturnType.of((Class) CompletionStage.class, Argument.OBJECT_ARGUMENT);
 
@@ -84,7 +89,7 @@ final class WebSocketRouteMethod implements ExecutableMethod<Object, CompletionS
             return ExceptionUtils.sneakyThrow(e);
         }
         // a handler without a stage is done
-        return stage == null ? CompletableFuture.completedFuture(null) : stage;
+        return stage == null ? DONE : stage;
     }
 
     @Override

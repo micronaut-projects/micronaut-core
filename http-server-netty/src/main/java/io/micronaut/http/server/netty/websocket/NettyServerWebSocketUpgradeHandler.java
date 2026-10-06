@@ -295,8 +295,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 } catch (NoSuchElementException ignored) {
                 }
 
-                // websocket needs auto read for now
-                ctx.channel().config().setAutoRead(true);
+                // the connection of a WebSocket route reads once its handlers are done, see
+                // NettyServerWebSocketHandler, the connection of a bean all the time
+                ctx.channel().config().setAutoRead(routeEndpoint == null);
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error opening WebSocket: {}", e.getMessage(), e);

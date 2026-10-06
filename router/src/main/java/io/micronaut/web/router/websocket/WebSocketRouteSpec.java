@@ -17,6 +17,7 @@ package io.micronaut.web.router.websocket;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
+import io.micronaut.websocket.WebSocketPingMessage;
 import io.micronaut.websocket.WebSocketPongMessage;
 
 /**
@@ -47,8 +48,28 @@ import io.micronaut.websocket.WebSocketPongMessage;
  * routes reaches it through a {@link io.micronaut.context.BeanProvider}, e.g.
  * {@code BeanProvider<WebSocketBroadcaster>}.</p>
  *
- * <p>The messages are delivered as they arrive: the handler of a message may still run when the
- * next message arrives.</p>
+ * <p>The handlers of a connection run one after the other: the first message is handled once the
+ * open handler is done, and each next message once the handler of the previous one is done.
+ * {@link #maxConcurrentMessages(int)} lets the handlers of more messages of a connection run at
+ * the same time. The connection reads only a few messages ahead of its handlers, so a client
+ * cannot send messages faster than they are handled, and it answers the pings meanwhile. A close
+ * is handled once the messages before it were handled, but does not wait for the open handler. A
+ * handler that returns a stage that does not complete, e.g. of a stream that does not end, holds
+ * the next messages back: a handler that streams while the connection receives starts the stream
+ * and returns {@code null}.</p>
+ *
+ * <p>Streams: {@link io.micronaut.websocket.WebSocketSession#sendAllAsync(org.reactivestreams.Publisher)}
+ * sends the messages of a publisher, at the pace the connection writes them, e.g. from the open
+ * handler, or as the replies to a message; {@link #onMessages(Argument, WebSocketMessagesHandler)}
+ * receives the messages of a connection as a publisher, at the pace its subscriber requests them.</p>
+ *
+ * <pre>{@code
+ * routes.GET("/ticks").webSocket(ws -> ws
+ *     .onOpen((session, request) -> session.sendAllAsync(ticks)));
+ *
+ * routes.GET("/upper").webSocket(ws -> ws
+ *     .onMessages(String.class, (messages, session) -> session.sendAllAsync(Flux.from(messages).map(String::toUpperCase))));
+ * }</pre>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -69,7 +90,8 @@ public sealed interface WebSocketRouteSpec permits WebSocketRouteEndpoint.Spec {
      * {@link io.micronaut.websocket.annotation.OnMessage} method: {@code String} and
      * {@code byte[]} as they are, other types from JSON. A connection to a route
      * without a message handler is closed with
-     * {@link io.micronaut.websocket.CloseReason#UNSUPPORTED_DATA} when a message arrives.
+     * {@link io.micronaut.websocket.CloseReason#UNSUPPORTED_DATA} when a message arrives. A route
+     * has a message handler or a {@link #onMessages(Argument, WebSocketMessagesHandler) messages handler}.
      *
      * @param messageType The type of the messages
      * @param handler     The handler
@@ -89,6 +111,50 @@ public sealed interface WebSocketRouteSpec permits WebSocketRouteEndpoint.Spec {
     default <T> WebSocketRouteSpec onMessage(Class<T> messageType, WebSocketMessageHandler<T> handler) {
         return onMessage(Argument.of(messageType), handler);
     }
+
+    /**
+     * Handle the messages of a connection as a stream: the handler is called once for each
+     * connection, after the open handler, with a publisher of the messages of the connection,
+     * decoded like for {@link #onMessage(Argument, WebSocketMessageHandler)}, in the order they are
+     * read. A message is handled once the subscriber requested it, so a subscriber that requests
+     * no more holds the next messages back, and one that cancels discards the messages that
+     * follow. The publisher has a single subscriber, which the handler subscribes before it is
+     * done: the messages of a handler that is done without a subscriber, or that fails, are
+     * discarded. The publisher completes when the connection closes, once the subscriber received
+     * the messages read before. The subscriber is signaled on the executor of the route. A route
+     * has a messages handler or a message handler.
+     *
+     * <pre>{@code
+     * ws.onMessages(String.class, (messages, session) -> session.sendAllAsync(Flux.from(messages).map(String::toUpperCase)));
+     * }</pre>
+     *
+     * @param messageType The type of the messages
+     * @param handler     The handler
+     * @param <T>         The type of the messages
+     * @return This spec
+     */
+    <T> WebSocketRouteSpec onMessages(Argument<T> messageType, WebSocketMessagesHandler<T> handler);
+
+    /**
+     * Handle the messages of a connection as a stream, see {@link #onMessages(Argument, WebSocketMessagesHandler)}.
+     *
+     * @param messageType The type of the messages
+     * @param handler     The handler
+     * @param <T>         The type of the messages
+     * @return This spec
+     */
+    default <T> WebSocketRouteSpec onMessages(Class<T> messageType, WebSocketMessagesHandler<T> handler) {
+        return onMessages(Argument.of(messageType), handler);
+    }
+
+    /**
+     * Handle the ping messages of a connection: the server answers each ping with a pong itself,
+     * and then calls the handler.
+     *
+     * @param handler The handler
+     * @return This spec
+     */
+    WebSocketRouteSpec onPing(WebSocketMessageHandler<WebSocketPingMessage> handler);
 
     /**
      * Handle the pong messages of a connection.
@@ -135,4 +201,16 @@ public sealed interface WebSocketRouteSpec permits WebSocketRouteEndpoint.Spec {
      * @return This spec
      */
     WebSocketRouteSpec maxPayloadLength(int maxPayloadLength);
+
+    /**
+     * The most messages of a connection that are handled at the same time: {@code 1} by default,
+     * the handlers of the messages of a connection run one after the other, in order. With more,
+     * they may run concurrently and complete in any order. The next messages wait while that many
+     * are handled. For a {@link #onMessages(Argument, WebSocketMessagesHandler) messages handler},
+     * it is the most messages offered to the stream before the subscriber requests them.
+     *
+     * @param maxConcurrentMessages The most messages handled at the same time
+     * @return This spec
+     */
+    WebSocketRouteSpec maxConcurrentMessages(int maxConcurrentMessages);
 }

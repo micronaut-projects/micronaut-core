@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -24,6 +25,7 @@ import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
@@ -47,6 +49,7 @@ import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.websocket.CloseReason;
+import io.micronaut.websocket.WebSocketPingMessage;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.bind.WebSocketState;
@@ -54,9 +57,15 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
 import io.micronaut.websocket.event.WebSocketSessionOpenEvent;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.ssl.SslHandler;
@@ -68,8 +77,10 @@ import reactor.core.publisher.Flux;
 import reactor.util.context.Context;
 
 import java.security.Principal;
+import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -92,7 +103,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     public static final String ID = "websocket-handler";
 
+    /**
+     * The most frames of a WebSocket route that wait for its handlers, see {@link #pendingFrames}.
+     */
+    private static final int MAX_PENDING_FRAMES = 16;
+
     private final NettyWebSocketSession serverSession;
+    private final Channel channel;
     private final NettyEmbeddedServices nettyEmbeddedServices;
     @Nullable
     private final CoroutineHelper coroutineHelper;
@@ -109,6 +126,45 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     @Nullable
     private final Executor routeExecutor;
+    /**
+     * The endpoint of a WebSocket route of handler functions, or {@code null} for a bean.
+     */
+    @Nullable
+    private final WebSocketRouteEndpoint routeEndpoint;
+    @Nullable
+    private final MethodExecutionHandle<?, ?> pingHandler;
+    @Nullable
+    private final Argument<?> pingArgument;
+    /**
+     * The most messages of a connection to a WebSocket route that are handled at the same time,
+     * see {@link io.micronaut.web.router.websocket.WebSocketRouteSpec#maxConcurrentMessages(int)}.
+     * {@code 0} for a bean, whose messages are handled as they are read.
+     */
+    private final int maxConcurrentMessages;
+    /**
+     * Whether the endpoint of a WebSocket route receives the messages as a stream, see
+     * {@link io.micronaut.web.router.websocket.WebSocketRouteSpec#onMessages}.
+     */
+    private final boolean streamsMessages;
+    /**
+     * Whether the open handler of a WebSocket route runs: the messages wait. Event loop only.
+     */
+    private boolean opening;
+    /**
+     * The handlers of the messages of a WebSocket route that run. Event loop only.
+     */
+    private int handling;
+    /**
+     * The data and close frames of a WebSocket route that wait for the handlers, in order. The
+     * connection reads at most {@link #MAX_PENDING_FRAMES} ahead, so a client cannot send messages
+     * faster than they are handled, while it still reads its pings. Event loop only.
+     */
+    private final ArrayDeque<WebSocketFrame> pendingFrames = new ArrayDeque<>();
+    /**
+     * The context of this handler once it is added. Event loop only.
+     */
+    @Nullable
+    private ChannelHandlerContext handlerContext;
 
     /**
      * Default constructor.
@@ -153,7 +209,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.threadSelection = threadSelection;
         this.executorSelector = executorSelector;
         this.routeExecutor = routeExecutor;
+        this.routeEndpoint = routeEndpoint;
+        this.maxConcurrentMessages = routeEndpoint == null ? 0 : routeEndpoint.maxConcurrentMessages();
+        this.streamsMessages = routeEndpoint != null && routeEndpoint.streamsMessages();
+        this.pingHandler = routeEndpoint == null ? null : routeEndpoint.pingMethod();
+        this.pingArgument = routeEndpoint == null ? null : routeEndpoint.pingArgument();
 
+        this.channel = ctx.channel();
         this.serverSession = createWebSocketSession(ctx);
 
         if (routeEndpoint != null) {
@@ -171,6 +233,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.coroutineHelper = coroutineHelper;
         RouteAttributes.setRouteMatch(request, routeMatch);
 
+        if (routeEndpoint != null) {
+            // the first message is handled once the open handler is done
+            opening = true;
+            routeEndpoint.connected(serverSession, Objects.requireNonNull(routeExecutor), error -> {
+                ChannelHandlerContext handlerCtx = channel.pipeline().context(this);
+                exceptionCaught(handlerCtx == null ? ctx : handlerCtx, error);
+            });
+        }
         callOpenMethod(ctx).onComplete((v, t) -> {
             if (t != null) {
                 forwardErrorToUser(ctx, e -> {
@@ -178,6 +248,12 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                         LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
                     }
                 }, t);
+            }
+            if (maxConcurrentMessages > 0) {
+                channel.eventLoop().execute(() -> {
+                    opening = false;
+                    handlePending();
+                });
             }
         });
 
@@ -316,7 +392,151 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
-    protected ExecutionFlow<?> invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+        handlerContext = ctx;
+        super.handlerAdded(ctx);
+        if (maxConcurrentMessages > 0) {
+            handlePending();
+        }
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+        if (maxConcurrentMessages > 0) {
+            WebSocketFrame frame = (WebSocketFrame) msg;
+            if (frame instanceof CloseWebSocketFrame && streamsMessages) {
+                // the stream receives the messages read before the close, then completes
+                WebSocketFrame pending;
+                while ((pending = pendingFrames.poll()) != null) {
+                    handlePending(ctx, pending);
+                }
+            } else if (isDataOrClose(frame) && (!pendingFrames.isEmpty() || !mayHandle(frame))) {
+                // handled in order, once the handlers before it are done; pings are answered meanwhile
+                pendingFrames.add(frame.retain());
+                return;
+            }
+        }
+        super.channelRead0(ctx, msg);
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        super.channelReadComplete(ctx);
+        if (maxConcurrentMessages > 0) {
+            readAhead(ctx);
+        }
+    }
+
+    @Override
+    protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
+        if (pingHandler != null && msg instanceof PingWebSocketFrame ping && serverSession.isOpen()) {
+            // the content outlives the pong that answers the ping
+            ByteBuf content = ping.content().retainedDuplicate();
+            super.handleWebSocketFrame(ctx, msg);
+            callPingHandler(ctx, pingHandler, content);
+        } else {
+            super.handleWebSocketFrame(ctx, msg);
+        }
+    }
+
+    private void callPingHandler(ChannelHandlerContext ctx, MethodExecutionHandle<?, ?> handler, ByteBuf content) {
+        WebSocketPingMessage message = new WebSocketPingMessage(NettyByteBufferFactory.DEFAULT.wrap(content));
+        try {
+            ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>(Map.of(Objects.requireNonNull(pingArgument), message));
+            BoundExecutable<?, ?> boundExecutable = binder.bind(handler.getExecutableMethod(), webSocketBinder, new WebSocketState(serverSession, originatingRequest));
+            invokeExecutable(boundExecutable, handler).onComplete((v, t) -> {
+                content.release();
+                if (t != null) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error Processing WebSocket Ping Message [{}]: {}", webSocketBean, t.getMessage(), t);
+                    }
+                    exceptionCaught(ctx, t);
+                }
+            });
+        } catch (Throwable e) {
+            content.release();
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error Processing WebSocket Ping Message [{}]: {}", webSocketBean, e.getMessage(), e);
+            }
+            exceptionCaught(ctx, e);
+        }
+    }
+
+    @Override
+    protected ExecutionFlow<?> invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> handler) {
+        if (maxConcurrentMessages > 0 && handler == messageHandler) {
+            // the next messages wait while the most messages are handled
+            handling++;
+            ExecutionFlow<?> flow;
+            try {
+                flow = invokeHandler(boundExecutable, handler);
+            } catch (RuntimeException e) {
+                flow = ExecutionFlow.error(e);
+            }
+            CompletableFuture<?> handled = flow.toCompletableFuture();
+            handled.whenComplete((result, error) -> channel.eventLoop().execute(() -> {
+                // always later, so that the frame of the handler is done with first
+                handling--;
+                handlePending();
+            }));
+            return CompletableFutureExecutionFlow.just(handled);
+        }
+        return invokeHandler(boundExecutable, handler);
+    }
+
+    /**
+     * Handle the frames of a WebSocket route that waited for the handlers before them, as far as
+     * the handlers allow, and read on.
+     */
+    private void handlePending() {
+        ChannelHandlerContext ctx = handlerContext;
+        if (ctx == null) {
+            // removed, or not added yet: it handles them once it is
+            return;
+        }
+        WebSocketFrame frame;
+        while ((frame = pendingFrames.peek()) != null && mayHandle(frame)) {
+            handlePending(ctx, pendingFrames.poll());
+        }
+        readAhead(ctx);
+    }
+
+    private void handlePending(ChannelHandlerContext ctx, WebSocketFrame frame) {
+        try {
+            super.channelRead0(ctx, frame);
+        } catch (Throwable e) {
+            exceptionCaught(ctx, e);
+        } finally {
+            frame.release();
+        }
+    }
+
+    /**
+     * @return Whether a data or close frame of a WebSocket route can be handled: a message once
+     * the open handler is done and fewer than the most messages are handled, a close once the
+     * messages before it were handled
+     */
+    private boolean mayHandle(WebSocketFrame frame) {
+        if (frame instanceof CloseWebSocketFrame) {
+            return handling == 0;
+        }
+        return !opening && handling < maxConcurrentMessages;
+    }
+
+    private static boolean isDataOrClose(WebSocketFrame frame) {
+        return frame instanceof TextWebSocketFrame
+            || frame instanceof BinaryWebSocketFrame
+            || frame instanceof ContinuationWebSocketFrame
+            || frame instanceof CloseWebSocketFrame;
+    }
+
+    private void readAhead(ChannelHandlerContext ctx) {
+        if (pendingFrames.size() < MAX_PENDING_FRAMES) {
+            ctx.read();
+        }
+    }
+
+    private ExecutionFlow<?> invokeHandler(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         if (coroutineHelper != null) {
             Executable<?, ?> target = boundExecutable.getTarget();
             if (target instanceof ExecutableMethod<?, ?> executableMethod) {
@@ -345,7 +565,16 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        Executor executor = routeExecutor != null ? routeExecutor : executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
+        Executor executor;
+        if (routeExecutor == null) {
+            executor = executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
+        } else if (streamsMessages && messageHandler == this.messageHandler) {
+            // the stream receives the messages in the order they were read, and signals its
+            // subscriber on the executor of the route
+            executor = ImmediateExecutor.INSTANCE;
+        } else {
+            executor = routeExecutor;
+        }
         ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
         return ExecutionFlow.<Object>async(executor, () -> {
             Object result = invokeWithContext(boundExecutable, messageHandler).get();
@@ -390,6 +619,20 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        handlerContext = null;
+        WebSocketFrame frame;
+        while ((frame = pendingFrames.poll()) != null) {
+            frame.release();
+        }
+        if (routeEndpoint != null) {
+            try {
+                routeEndpoint.disconnected(serverSession);
+            } catch (RuntimeException e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error completing the WebSocket messages of [{}]: {}", webSocketBean, e.getMessage(), e);
+                }
+            }
+        }
         Channel channel = ctx.channel();
         channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         if (LOG.isDebugEnabled()) {

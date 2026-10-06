@@ -23,6 +23,7 @@ import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.security.Principal;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -162,6 +163,43 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      */
     default void sendSync(Object message) {
         sendSync(message, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    /**
+     * Send the messages of a publisher to the remote peer, in order, one after the other: the next
+     * message is requested once the previous one was written, so the publisher produces no faster
+     * than the connection writes. Cancelling the returned future cancels the publisher, and so
+     * does the session closing.
+     *
+     * <pre>{@code
+     * routes.GET("/ticks").webSocket(ws -> ws
+     *     .onOpen((session, request) -> session.sendAllAsync(ticks)));
+     * }</pre>
+     *
+     * @param messages The messages
+     * @return A future that completes when the publisher completed and its messages were sent, or
+     * the session closed, and fails when the publisher or a send fails
+     * @since 5.3.0
+     */
+    default CompletableFuture<Void> sendAllAsync(Publisher<?> messages) {
+        return sendAllAsync(messages, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    /**
+     * Send the messages of a publisher to the remote peer, see {@link #sendAllAsync(Publisher)}.
+     *
+     * @param messages  The messages
+     * @param mediaType The media type of the messages
+     * @return A future that completes when the publisher completed and its messages were sent, or
+     * the session closed, and fails when the publisher or a send fails
+     * @since 5.3.0
+     */
+    default CompletableFuture<Void> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
+        Objects.requireNonNull(messages, "messages");
+        Objects.requireNonNull(mediaType, "mediaType");
+        CompletableFuture<Void> sent = new CompletableFuture<>();
+        messages.subscribe(new WebSocketMessagesSubscriber(this, mediaType, sent));
+        return sent;
     }
 
     /**

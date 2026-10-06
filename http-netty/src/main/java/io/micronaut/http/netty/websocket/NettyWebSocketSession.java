@@ -31,10 +31,12 @@ import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
@@ -224,6 +226,16 @@ public class NettyWebSocketSession implements WebSocketSession {
                 });
             }
         }, FluxSink.OverflowStrategy.ERROR);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
+        CompletableFuture<Void> sent = WebSocketSession.super.sendAllAsync(messages, mediaType);
+        // the session closing cancels the publisher, e.g. a stream that never completes
+        ChannelFutureListener closed = future -> sent.complete(null);
+        channel.closeFuture().addListener(closed);
+        sent.whenComplete((ignored, error) -> channel.closeFuture().removeListener(closed));
+        return sent;
     }
 
     @Override
