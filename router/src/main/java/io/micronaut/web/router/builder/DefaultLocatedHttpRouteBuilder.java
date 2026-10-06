@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
@@ -104,6 +105,16 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
         return located(super.any(uri));
     }
 
+    @Override
+    public LocatedHttpRouteSpec<T> route(HttpMethod method, RouteTemplate template) {
+        return located(super.route(method, template));
+    }
+
+    @Override
+    public LocatedHttpRouteSpec<T> route(String httpMethodName, RouteTemplate template) {
+        return located(super.route(httpMethodName, template));
+    }
+
     /**
      * @param route The pending route
      * @return The located route: its located handlers read the target from the path variables
@@ -126,6 +137,22 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
         Objects.requireNonNull(locator, "locator");
         AsyncLocatorHandler<U> untyped = (request, pathVariables) -> locator.locate(request, pathVariables, target(pathVariables));
         locateAsync(prefixUri, untyped, routesOf);
+    }
+
+    @Override
+    public <U> void locate(RouteTemplate prefix, LocatedLocatorHandler<T, ? extends U> locator,
+                           Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
+        Objects.requireNonNull(locator, "locator");
+        LocatorHandler<U> untyped = (request, pathVariables) -> locator.locate(request, pathVariables, target(pathVariables));
+        locate(prefix, untyped, routesOf);
+    }
+
+    @Override
+    public <U> void locateAsync(RouteTemplate prefix, LocatedAsyncLocatorHandler<T, ? extends U> locator,
+                                Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
+        Objects.requireNonNull(locator, "locator");
+        AsyncLocatorHandler<U> untyped = (request, pathVariables) -> locator.locate(request, pathVariables, target(pathVariables));
+        locateAsync(prefix, untyped, routesOf);
     }
 
     /**

@@ -59,4 +59,6 @@ noReflection {
     allowIn("io.micronaut.http.cookie.ServerCookieDecoder", "SERVICE_LOADING")
     allowIn("io.micronaut.http.cookie.ServerCookieEncoder", "SERVICE_LOADING")
     allowIn("io.micronaut.http.reactive.execution.FlowAsMono", "FIELD_UPDATERS")
+    // loads the route template engines, see RouteTemplateEngine
+    allowIn("io.micronaut.http.uri.spi.RouteTemplateEngines", "SERVICE_LOADING")
 }

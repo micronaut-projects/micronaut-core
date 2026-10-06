@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RoutePathVariables;
 import org.jspecify.annotations.Nullable;
@@ -26,7 +27,7 @@ import java.util.Map;
 /**
  * The {@link PathVariables} of a route match given to a handler function: its variable values,
  * converted with its conversion service, and the target a {@code DynamicRouteTarget} resolved for
- * the route.
+ * the route, and the media type of the response its route selector negotiated.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -35,16 +36,29 @@ import java.util.Map;
 public final class DefaultPathVariables extends RoutePathVariables {
 
     private final @Nullable Object resolvedTarget;
+    private final @Nullable MediaType selectedMediaType;
 
     /**
      * @param values            The variable values, viewed read-only: the map of the match is
      *                          shared with the other arguments bound from it
      * @param conversionService The conversion service of the route
      * @param resolvedTarget    The target a {@code DynamicRouteTarget} resolved for the route, or {@code null}
+     * @param selectedMediaType The media type of the response a route selector negotiated, or {@code null}
      */
-    public DefaultPathVariables(Map<String, Object> values, ConversionService conversionService, @Nullable Object resolvedTarget) {
+    public DefaultPathVariables(Map<String, Object> values, ConversionService conversionService,
+                                @Nullable Object resolvedTarget, @Nullable MediaType selectedMediaType) {
         super(values, conversionService);
         this.resolvedTarget = resolvedTarget;
+        this.selectedMediaType = selectedMediaType;
+    }
+
+    /**
+     * @param values            The variable values
+     * @param conversionService The conversion service of the route
+     * @param resolvedTarget    The target a {@code DynamicRouteTarget} resolved for the route, or {@code null}
+     */
+    public DefaultPathVariables(Map<String, Object> values, ConversionService conversionService, @Nullable Object resolvedTarget) {
+        this(values, conversionService, resolvedTarget, null);
     }
 
     /**
@@ -60,6 +74,13 @@ public final class DefaultPathVariables extends RoutePathVariables {
      */
     public @Nullable Object resolvedTarget() {
         return resolvedTarget;
+    }
+
+    /**
+     * @return The media type of the response a route selector negotiated, or {@code null}
+     */
+    public @Nullable MediaType selectedMediaType() {
+        return selectedMediaType;
     }
 
     @Override
