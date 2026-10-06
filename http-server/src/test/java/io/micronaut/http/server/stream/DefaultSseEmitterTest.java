@@ -61,6 +61,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -160,7 +161,8 @@ class DefaultSseEmitterTest {
             ExecutionException late = assertThrows(ExecutionException.class, () -> emitter.get().send("late").toCompletableFuture().get());
             assertTrue(late.getCause().getMessage().contains("keepOpen()"), late.getCause().getMessage());
         }
-        IllegalStateException keepOpen = assertThrows(IllegalStateException.class, () -> emitter.get().keepOpen());
+        SseEmitter ended = emitter.get();
+        IllegalStateException keepOpen = assertThrows(IllegalStateException.class, ended::keepOpen);
         assertTrue(keepOpen.getMessage().contains("before the handler returns"), keepOpen.getMessage());
     }
 
@@ -191,7 +193,8 @@ class DefaultSseEmitterTest {
         HttpResponse<?> response = response(start(HttpRequest.POST("/messages", ""), events -> {
             events.header("Session-Id", "s-1").header("X-Both", "events");
             events.respond(HttpResponse.ok(Map.of("result", "pong")).header("X-Both", "response"));
-            assertThrows(IllegalStateException.class, () -> events.respond(HttpResponse.accepted()));
+            HttpResponse<?> again = HttpResponse.accepted();
+            assertThrows(IllegalStateException.class, () -> events.respond(again));
             assertThrows(IllegalStateException.class, () -> events.header("X-Late", "1"));
             assertTrue(events.send("never").toCompletableFuture().isCompletedExceptionally());
         }, null));
@@ -211,7 +214,8 @@ class DefaultSseEmitterTest {
         AtomicReference<IllegalStateException> late = new AtomicReference<>();
         assertTrue(read(response(start(HttpRequest.POST("/messages", ""), events -> {
             events.send("one");
-            late.set(assertThrows(IllegalStateException.class, () -> events.respond(HttpResponse.accepted())));
+            HttpResponse<?> tooLate = HttpResponse.accepted();
+            late.set(assertThrows(IllegalStateException.class, () -> events.respond(tooLate)));
         }, null))).complete);
         assertTrue(late.get().getMessage().contains("already sent"), late.get().getMessage());
     }
@@ -270,7 +274,8 @@ class DefaultSseEmitterTest {
         AtomicReference<Throwable> sendAndAwait = new AtomicReference<>();
         Consumer body = read(response(start(HttpRequest.GET("/events"), events -> {
             events.send(new Broken()).whenComplete((ignored, error) -> send.set(error));
-            sendAndAwait.set(assertThrows(CodecException.class, () -> events.sendAndAwait(new Broken())));
+            Broken broken = new Broken();
+            sendAndAwait.set(assertThrows(CodecException.class, () -> events.sendAndAwait(broken)));
             events.send("after");
         }, null)));
         assertInstanceOf(CodecException.class, send.get());
@@ -314,7 +319,8 @@ class DefaultSseEmitterTest {
         body.upstream().allowDiscard();
         assertInstanceOf(ConnectionClosedException.class, closed.get());
         assertFalse(emitter.get().isOpen());
-        ConnectionClosedException failure = assertThrows(ConnectionClosedException.class, () -> emitter.get().sendAndAwait("two"));
+        SseEmitter left = emitter.get();
+        ConnectionClosedException failure = assertThrows(ConnectionClosedException.class, () -> left.sendAndAwait("two"));
         assertTrue(failure.getMessage().startsWith("The stream is closed"), failure.getMessage());
         assertSame(closed.get(), failure.getCause());
     }
@@ -341,7 +347,8 @@ class DefaultSseEmitterTest {
         AtomicReference<SseEmitter> emitter = new AtomicReference<>();
         CompletionStage<HttpResponse<?>> stage = start(HttpRequest.GET("/events"), events -> {
             emitter.set(events);
-            assertThrows(IllegalArgumentException.class, () -> events.heartbeat(Duration.ofMillis(-1)));
+            Duration negative = Duration.ofMillis(-1);
+            assertThrows(IllegalArgumentException.class, () -> events.heartbeat(negative));
             // the first beat sends the response
             events.keepOpen().heartbeat(Duration.ofMillis(10));
         }, null);
@@ -350,7 +357,7 @@ class DefaultSseEmitterTest {
         // events count as activity
         for (int i = 0; i < 5; i++) {
             emitter.get().send("event");
-            Thread.sleep(5);
+            pause(5);
         }
         emitter.get().heartbeat(Duration.ZERO);
         emitter.get().complete();
@@ -378,7 +385,7 @@ class DefaultSseEmitterTest {
                 silent.set(events);
                 events.keepOpen().heartbeat(Duration.ZERO).send("one");
             })));
-            Thread.sleep(50);
+            pause(50);
             silent.get().complete();
             assertEquals("data: one\n\n", quiet.received());
         }
@@ -447,9 +454,18 @@ class DefaultSseEmitterTest {
             if (System.nanoTime() > deadline) {
                 return false;
             }
-            Thread.sleep(5);
+            pause(5);
         }
         return true;
+    }
+
+    /**
+     * Let the heartbeat scheduler run for a while.
+     *
+     * @param millis How long
+     */
+    private static void pause(long millis) {
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(millis));
     }
 
     /**

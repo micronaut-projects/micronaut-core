@@ -563,9 +563,9 @@ final class BodyStream implements BufferConsumer.Upstream {
                 }
             }
             if (failed != null) {
-                Throwable cause = failure;
+                Throwable error = failure;
                 for (CompletableFuture<Void> future : failed) {
-                    future.completeExceptionally(cause);
+                    future.completeExceptionally(error);
                 }
             }
             if (demand != null) {

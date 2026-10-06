@@ -21,6 +21,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.builder.SseHandler;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -62,9 +64,9 @@ class SseRouteDeclarationTest {
     @Test
     void anEventStreamRouteThatProducesAnotherTypeFails() {
         Router router = router(routes -> {
-            IllegalStateException failure = assertThrows(IllegalStateException.class, () -> routes.GET("/json")
-                .produces(MediaType.APPLICATION_JSON_TYPE)
-                .sse((request, pathVariables, events) -> events.send("never")));
+            HttpRouteSpec json = routes.GET("/json").produces(MediaType.APPLICATION_JSON_TYPE);
+            SseHandler handler = (request, pathVariables, events) -> events.send("never");
+            IllegalStateException failure = assertThrows(IllegalStateException.class, () -> json.sse(handler));
             assertTrue(failure.getMessage().contains("remove produces"), failure.getMessage());
             // the event stream type itself is allowed
             routes.GET("/events").produces(MediaType.TEXT_EVENT_STREAM_TYPE).sse((request, pathVariables, events) -> events.send("one"));

@@ -136,7 +136,7 @@ final class ElementsBody {
      * @param done Called once the element is written, with whether to continue pulling
      */
     private void step(StepDone done) {
-        CompletionStage<? extends Optional<?>> next;
+        CompletionStage<?> next;
         try {
             next = Objects.requireNonNull(elements.next(), "The response elements returned no stage");
         } catch (Throwable e) {
