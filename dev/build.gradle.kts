@@ -111,6 +111,9 @@ noReflection {
     allowIn("io.micronaut.dev.test.JUnitPlatformExecution", "CLASS_LOADING")
     allowIn("io.micronaut.dev.test.TestEventListeners", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.TestSession", "SERVICE_LOADING")
+    // the parent tier statics are initialized, and the compiled languages listed, for the runtime
+    allowIn("io.micronaut.dev.GenerationMemory", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.Compilations", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
