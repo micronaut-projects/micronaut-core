@@ -68,6 +68,8 @@ public abstract sealed class ProxyTargetHandlerBean<H extends ProxyTargetHandler
     }
 
     private final Class<H> type;
+    /** The argument of the handler type, built once: the default builds it on every creation. */
+    private final Argument<H> argument;
     /**
      * The binding of each proxy constructor this handler is injected into, which is the same for every proxy it
      * creates. Keyed by the identity of the parameter: arguments are equal by type and name, which every handler
@@ -78,6 +80,7 @@ public abstract sealed class ProxyTargetHandlerBean<H extends ProxyTargetHandler
 
     private ProxyTargetHandlerBean(Class<H> type, Function<ProxyTargetHandler.Creation, H> constructor) {
         this.type = type;
+        this.argument = Argument.of(type);
         this.constructor = constructor;
     }
 
@@ -108,6 +111,22 @@ public abstract sealed class ProxyTargetHandlerBean<H extends ProxyTargetHandler
         MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
         metadata.addDeclaredAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, bound.getValues());
         return Optional.of(Qualifiers.byInterceptorBinding(metadata));
+    }
+
+    @Override
+    public Argument<H> asArgument() {
+        return argument;
+    }
+
+    /**
+     * A handler has no qualifier. The default reads the annotation metadata on every call, and the context asks
+     * for the qualifier several times per bean created.
+     *
+     * @return null
+     */
+    @Override
+    public @Nullable Qualifier<H> getDeclaredQualifier() {
+        return null;
     }
 
     @Override
