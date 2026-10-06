@@ -1112,6 +1112,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         /**
+         * The request ends with the channel: the HTTP/1 connection, or the stream channel of an
+         * HTTP/3 request.
+         */
+        @Override
+        public Runnable onAbandoned(Runnable task) {
+            ChannelFuture closeFuture = requiredCtx().channel().closeFuture();
+            ChannelFutureListener listener = future -> task.run();
+            closeFuture.addListener(listener);
+            return () -> closeFuture.removeListener(listener);
+        }
+
+        /**
          * Mark this channel to be closed after this response has been written, from inside the
          * event loop. Unlike {@link #closeAfterWrite()} this also adds the {@code connection}
          * header to the response if {@link #preprocess} has already run for it.

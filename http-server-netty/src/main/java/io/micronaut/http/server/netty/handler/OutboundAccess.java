@@ -44,4 +44,20 @@ public interface OutboundAccess extends NettyWriteContext {
      */
     default void skipCompression() {
     }
+
+    /**
+     * Run a task, once, if the request is abandoned before its response is written: its
+     * connection closes, or, over HTTP/2, its stream is reset or closed. A component that holds
+     * the request while it computes the response, e.g. an asynchronous direct route, cancels its
+     * work with it. The task runs on the event loop of the connection, at once if the request is
+     * already abandoned. By default it never runs.
+     *
+     * @param task The task
+     * @return Unregisters the task, e.g. once the response is ready to be written; call it on the
+     * event loop
+     * @since 5.3.0
+     */
+    default Runnable onAbandoned(Runnable task) {
+        return () -> { };
+    }
 }

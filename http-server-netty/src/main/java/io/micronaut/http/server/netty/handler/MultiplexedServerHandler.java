@@ -155,6 +155,12 @@ abstract class MultiplexedServerHandler {
         private boolean outboundWritableScheduled;
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
+        /**
+         * Runs once if the stream is reset or closed before its response is finished, see
+         * {@link #onAbandoned(Runnable)}.
+         */
+        @Nullable
+        private Runnable abandoned;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -361,6 +367,7 @@ abstract class MultiplexedServerHandler {
                 streamer.error(e);
             }
             disposeWriteSide();
+            abandon();
         }
 
         /**
@@ -377,6 +384,35 @@ abstract class MultiplexedServerHandler {
                     buf.release();
                 }
                 bufferedContent = null;
+            }
+            abandon();
+        }
+
+        /**
+         * The stream of the request is reset or closed, with the connection too, so the request
+         * is abandoned unless its response is finished.
+         */
+        @Override
+        public final Runnable onAbandoned(Runnable task) {
+            if (reset || closed) {
+                if (!finished) {
+                    task.run();
+                }
+                return () -> { };
+            }
+            abandoned = task;
+            return () -> {
+                if (abandoned == task) {
+                    abandoned = null;
+                }
+            };
+        }
+
+        private void abandon() {
+            Runnable task = abandoned;
+            abandoned = null;
+            if (task != null && !finished) {
+                task.run();
             }
         }
 
@@ -398,6 +434,7 @@ abstract class MultiplexedServerHandler {
                 return false;
             }
             finished = true;
+            abandoned = null;
             disposeWriteSide();
             requestHandler.responseWritten(attachment);
             return true;

@@ -50,7 +50,8 @@ import org.jspecify.annotations.Nullable;
  *     compression of the connection applies, and a compressed response may be framed
  *     differently, e.g. chunked, and carry a {@code Vary} header. A {@code HEAD} request is
  *     answered with the headers only, and the {@code Content-Length} of the body, or the one the
- *     route set when it has no body. A body that is not bytes or text is written by the message
+ *     route set when it has no body. A status that has no body, {@code 1xx}, {@code 204} or
+ *     {@code 304}, is written without the body and without a {@code Content-Length}. A body that is not bytes or text is written by the message
  *     body writer of the content type of the response, {@code application/json} if it has
  *     none;</li>
  *     <li>if {@code null} is returned, handles the request as usual, with its body untouched;</li>
@@ -59,8 +60,9 @@ import org.jspecify.annotations.Nullable;
  *     request, without reading or discarding its body, until the {@link PendingResponse#stage()
  *     stage} completes, and then writes the response as above, or handles the request as usual
  *     when the stage completes with {@code null}. The responses of a connection keep the order of
- *     its requests, e.g. under HTTP/1.1 pipelining. It cancels the stage when the connection
- *     closes, and answers a failed stage with {@code 500}; a response the route completes after
+ *     its requests, e.g. under HTTP/1.1 pipelining. It cancels the stage when the request is
+ *     abandoned: the connection closes, or the stream of the request is reset, e.g. by an HTTP/2
+ *     {@code RST_STREAM}, and answers a failed stage with {@code 500}; a response the route completes after
  *     the stage was cancelled is given to {@link DirectRouteSupport#discard}. Every runtime that declares
  *     {@link DirectRouteSupport} answers the asynchronous routes: a runtime that cannot hold a
  *     request without a thread waits for the stage on a worker thread, never on the thread that

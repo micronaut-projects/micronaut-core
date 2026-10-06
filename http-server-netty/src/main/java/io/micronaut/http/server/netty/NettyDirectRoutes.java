@@ -39,7 +39,6 @@ import io.micronaut.web.router.uri.UriUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -90,7 +89,8 @@ import java.util.function.Supplier;
  * or on the IO executor when that thread is an event loop. The response is written by the event
  * loop, in the order of the requests of the connection. A stage completed
  * with {@code null} continues the request as an ordinary request, with its body untouched. The
- * stage is cancelled when the connection closes.</p>
+ * stage is cancelled when the request is abandoned: the connection closes, or its HTTP/2 stream
+ * is reset or closed, see {@link OutboundAccess#onAbandoned(Runnable)}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -232,12 +232,12 @@ final class NettyDirectRoutes {
                              CompletionStage<io.micronaut.http.@Nullable HttpResponse<?>> stage,
                              CloseableByteBody body,
                              OutboundAccess outboundAccess) {
-        ChannelFutureListener cancelOnClose = future -> cancel(stage);
-        ctx.channel().closeFuture().addListener(cancelOnClose);
+        // the connection closes, or the HTTP/2 stream of the request is reset or closed
+        Runnable cancelOnAbandon = outboundAccess.onAbandoned(() -> cancel(stage));
         stage.whenComplete((response, error) -> {
             // on the thread that completed the stage
             if (error != null || response == null) {
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnClose, response, error, null));
+                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, error, null));
                 return;
             }
             MutableHttpResponse<?> mutable;
@@ -246,7 +246,7 @@ final class NettyDirectRoutes {
                 mutable = mutable(response);
                 writer = writer(mutable, true);
             } catch (Throwable e) {
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnClose, response, e, null));
+                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
                 return;
             }
             Runnable prepare = () -> {
@@ -255,10 +255,10 @@ final class NettyDirectRoutes {
                     prepared = prepare(ctx, request, mutable, writer);
                 } catch (Throwable t) {
                     // e.g. an allocation error
-                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnClose, response, t, null));
+                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, t, null));
                     return;
                 }
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnClose, response, null, prepared));
+                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, null, prepared));
             };
             if (writer == null || !writer.blocking()) {
                 // bytes, text and the writers that do not block are written on the event loop
@@ -268,7 +268,7 @@ final class NettyDirectRoutes {
                 try {
                     ioExecutor.get().execute(prepare);
                 } catch (RuntimeException e) {
-                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnClose, response, e, null));
+                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
                 }
             } else {
                 // e.g. the executor of the route
@@ -287,11 +287,11 @@ final class NettyDirectRoutes {
                           HttpRequest request,
                           CloseableByteBody body,
                           OutboundAccess outboundAccess,
-                          ChannelFutureListener cancelOnClose,
+                          Runnable cancelOnAbandon,
                           io.micronaut.http.@Nullable HttpResponse<?> response,
                           @Nullable Throwable error,
                           @Nullable Prepared prepared) {
-        ctx.channel().closeFuture().removeListener(cancelOnClose);
+        cancelOnAbandon.run();
         if (error == null && response == null) {
             // declined: the request continues with its body untouched
             ordinary.accept(ctx, request, body, outboundAccess);
@@ -367,11 +367,18 @@ final class NettyDirectRoutes {
         addConfiguredHeaders(headers);
         // the framing of the body: the Content-Length of the body is set by the outbound handler
         headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
-        if (HttpMethod.HEAD.equals(request.method())) {
-            if (!PipeliningServerHandler.canHaveBody(head.status())) {
-                // e.g. 204, which has no Content-Length
-                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
-            } else if (content.isReadable() || !headers.contains(HttpHeaderNames.CONTENT_LENGTH)) {
+        boolean headRequest = HttpMethod.HEAD.equals(request.method());
+        if (!PipeliningServerHandler.canHaveBody(head.status())) {
+            // e.g. 204 or 304: never a body, nor a Content-Length, whatever the route set
+            headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+            content.release();
+            if (headRequest) {
+                outboundAccess.writeHeadResponse(head);
+            } else {
+                outboundAccess.write(head, NettyByteBodyFactory.empty());
+            }
+        } else if (headRequest) {
+            if (content.isReadable() || !headers.contains(HttpHeaderNames.CONTENT_LENGTH)) {
                 // the length of the GET response, or the one a HEAD route without a body declares
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
             }

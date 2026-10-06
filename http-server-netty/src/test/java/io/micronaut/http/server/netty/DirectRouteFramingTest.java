@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
@@ -121,6 +122,26 @@ class DirectRouteFramingTest {
     }
 
     @Test
+    void aStatusWithoutABodyIsWrittenWithoutTheBodyOfItsRoute() throws IOException {
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.setSoTimeout(5000);
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            for (String path : new String[] {"/framing/no-content-body", "/framing/not-modified-body"}) {
+                out.write(DirectRouteTest.request("GET", path));
+                String response = DirectRouteTest.readResponse(in, false);
+                assertFalse(response.contains("content-length"), path + ": " + response);
+                assertTrue(response.endsWith("\r\n\r\n"), path + ": " + response);
+                // the next response starts right after the head: no body was written
+                out.write(DirectRouteTest.request("GET", "/framing/text"));
+                String next = DirectRouteTest.readResponse(in, false);
+                assertTrue(next.startsWith("http/1.1 200 ok\r\n"), path + ": " + next);
+                assertTrue(next.endsWith("text"), path + ": " + next);
+            }
+        }
+    }
+
+    @Test
     void aHeadRouteThatDeclinesContinuesToTheOrdinaryRouteAsynchronousOrNot() throws IOException {
         for (String path : new String[] {"/framing/declined-sync", "/framing/declined-async"}) {
             try (Socket socket = new Socket(server.getHost(), server.getPort())) {
@@ -172,6 +193,9 @@ class DirectRouteFramingTest {
             routes.GET("/framing/text", HttpResponse.ok("text"));
             routes.HEAD("/framing/head-length", HttpResponse.ok().header(HttpHeaders.CONTENT_LENGTH, "42"));
             routes.GET("/framing/no-content", HttpResponse.noContent());
+            // a body the status forbids
+            routes.GET("/framing/no-content-body", HttpResponse.status(HttpStatus.NO_CONTENT).body("unexpected body"));
+            routes.GET("/framing/not-modified-body", HttpResponse.status(HttpStatus.NOT_MODIFIED).body("unexpected body"));
             routes.GET("/framing/own-headers", HttpResponse.ok("own")
                 .header(HttpHeaders.DATE, ROUTE_DATE)
                 .header(HttpHeaders.SERVER, "own-server"));
