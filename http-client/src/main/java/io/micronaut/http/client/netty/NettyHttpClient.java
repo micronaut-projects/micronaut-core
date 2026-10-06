@@ -816,7 +816,7 @@ final class NettyHttpClient implements
      */
     <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         return exchangeElementsFlow(request, errorType, true,
-            response -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate));
+            response -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), NettyEventStreamReader::new));
     }
 
     /**

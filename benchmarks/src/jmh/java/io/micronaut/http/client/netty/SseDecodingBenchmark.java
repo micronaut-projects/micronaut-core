@@ -8,6 +8,7 @@ import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.stream.PieceReaders;
+import io.micronaut.http.client.sse.EventStreamDecoder;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport;
@@ -119,6 +120,12 @@ public class SseDecodingBenchmark {
     @Benchmark
     public int pieceReader() throws IOException {
         return read(EventStreams.reader(registry, BOOK, headers, Long.MAX_VALUE));
+    }
+
+    @Benchmark
+    public int nettyPieceReader() throws IOException {
+        return read(new NettyEventStreamReader<>(new EventStreamDecoder(Long.MAX_VALUE),
+            EventStreams.dataReader(registry, BOOK, MediaType.APPLICATION_JSON_TYPE, headers)));
     }
 
     private int read(PieceReader<Event<Book>> pieceReader) throws IOException {
