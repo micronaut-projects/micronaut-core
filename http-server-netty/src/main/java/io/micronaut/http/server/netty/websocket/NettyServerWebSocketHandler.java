@@ -58,8 +58,12 @@ import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
 import io.micronaut.websocket.event.WebSocketSessionOpenEvent;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
@@ -67,6 +71,7 @@ import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketFrameDecoder;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -102,6 +107,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * The id of the handler used when adding it to the Netty pipeline.
      */
     public static final String ID = "websocket-handler";
+
+    /**
+     * The name of the handler before the frame decoder of a WebSocket route, see {@link #decodeHeld()}.
+     */
+    private static final String DECODE_TRIGGER = "websocket-decode-trigger";
 
     private final NettyWebSocketSession serverSession;
     private final Channel channel;
@@ -160,6 +170,28 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * they are handled, while it still reads its pings and its close. Event loop only.
      */
     private final ArrayDeque<WebSocketFrame> pendingFrames = new ArrayDeque<>();
+    /**
+     * The frame decoder of a connection to a WebSocket route with a limit of pending frames: it
+     * decodes one frame at a time once the pending frames almost fill up, so that the frames of a
+     * read do not exceed the limit, and holds the bytes of the others. Event loop only.
+     */
+    @Nullable
+    private ByteToMessageDecoder frameDecoder;
+    /**
+     * The context of the handler before {@link #frameDecoder}, which gives it nothing to decode
+     * the bytes it held. Event loop only.
+     */
+    @Nullable
+    private ChannelHandlerContext decodeTrigger;
+    /**
+     * Whether {@link #frameDecoder} decoded one frame at a time, so that it may hold the bytes of
+     * frames. Event loop only.
+     */
+    private boolean decoderMayHold;
+    /**
+     * The frames this handler received, to tell whether {@link #frameDecoder} decoded one. Event loop only.
+     */
+    private long framesReceived;
     /**
      * The context of this handler once it is added. Event loop only.
      */
@@ -401,13 +433,66 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         handlerContext = ctx;
         super.handlerAdded(ctx);
         if (maxConcurrentMessages > 0) {
+            if (maxPendingFrames > 0) {
+                limitDecoding(ctx.pipeline());
+            }
             handlePending();
+        }
+    }
+
+    /**
+     * Keep the frames of a read within the limit of pending frames: a socket read can hold many
+     * frames, which the frame decoder decodes at once unless it decodes one at a time.
+     */
+    private void limitDecoding(ChannelPipeline pipeline) {
+        if (pipeline.get(WebSocketFrameDecoder.class) instanceof ByteToMessageDecoder decoder) {
+            ChannelHandlerContext decoderContext = pipeline.context(decoder);
+            if (decoderContext != null) {
+                pipeline.addBefore(decoderContext.name(), DECODE_TRIGGER, new ChannelInboundHandlerAdapter());
+                decodeTrigger = pipeline.context(DECODE_TRIGGER);
+                frameDecoder = decoder;
+                updateDecoding();
+            }
+        }
+    }
+
+    /**
+     * Let the frame decoder decode one frame at a time once at most one frame fits in the pending
+     * frames: it stops after the frame that fills them.
+     */
+    private void updateDecoding() {
+        ByteToMessageDecoder decoder = frameDecoder;
+        if (decoder != null) {
+            boolean oneAtATime = maxPendingFrames - pendingFrames.size() <= 1;
+            decoder.setSingleDecode(oneAtATime);
+            if (oneAtATime) {
+                decoderMayHold = true;
+            }
+        }
+    }
+
+    /**
+     * Decode the frames whose bytes the frame decoder held, as far as the pending frames allow:
+     * the handler before the decoder gives it an empty buffer, so that it decodes what it holds.
+     */
+    private void decodeHeld() {
+        ChannelHandlerContext trigger = decodeTrigger;
+        while (trigger != null && !trigger.isRemoved() && decoderMayHold && pendingFrames.size() < maxPendingFrames) {
+            decoderMayHold = false;
+            updateDecoding();
+            long received = framesReceived;
+            trigger.fireChannelRead(Unpooled.EMPTY_BUFFER);
+            if (framesReceived == received) {
+                // nothing left: the reads go on
+                break;
+            }
         }
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (maxConcurrentMessages > 0) {
+            framesReceived++;
             WebSocketFrame frame = (WebSocketFrame) msg;
             if (frame instanceof CloseWebSocketFrame) {
                 // handled at once, whatever the handlers that run, e.g. the open handler of a
@@ -416,6 +501,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             } else if (isData(frame) && (!pendingFrames.isEmpty() || !mayHandle())) {
                 // handled in order, once the handlers before it are done; pings are answered meanwhile
                 pendingFrames.add(frame.retain());
+                updateDecoding();
                 return;
             }
         }
@@ -426,6 +512,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         super.channelReadComplete(ctx);
         if (maxConcurrentMessages > 0) {
+            // e.g. a ping after a frame that the decoder decoded on its own
+            decodeHeld();
             readAhead(ctx);
         }
     }
@@ -501,12 +589,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         while (mayHandle() && (frame = pendingFrames.poll()) != null) {
             handlePending(ctx, frame);
         }
+        updateDecoding();
+        decodeHeld();
         readAhead(ctx);
     }
 
     /**
-     * The connection closes: the stream of a messages handler receives the messages read before
-     * the close, and the messages that wait for a handler are discarded.
+     * The connection closes: the stream of a message stream handler receives the messages read
+     * before the close, and then completes, before the close handler runs, which may wait for it;
+     * the messages that wait for a handler are discarded.
      */
     private void closePending(ChannelHandlerContext ctx) {
         WebSocketFrame frame;
@@ -515,6 +606,25 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 handlePending(ctx, frame);
             } else {
                 frame.release();
+            }
+        }
+        if (streamsMessages) {
+            completeMessages();
+        }
+    }
+
+    /**
+     * Complete the stream of the messages of a message stream handler, once.
+     */
+    private void completeMessages() {
+        WebSocketRouteEndpoint endpoint = routeEndpoint;
+        if (endpoint != null) {
+            try {
+                endpoint.disconnected(serverSession);
+            } catch (RuntimeException e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error completing the WebSocket messages of [{}]: {}", webSocketBean, e.getMessage(), e);
+                }
             }
         }
     }
@@ -633,19 +743,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         handlerContext = null;
+        frameDecoder = null;
+        decodeTrigger = null;
         WebSocketFrame frame;
         while ((frame = pendingFrames.poll()) != null) {
             frame.release();
         }
-        if (routeEndpoint != null) {
-            try {
-                routeEndpoint.disconnected(serverSession);
-            } catch (RuntimeException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error completing the WebSocket messages of [{}]: {}", webSocketBean, e.getMessage(), e);
-                }
-            }
-        }
+        // e.g. the connection was lost without a close: a stream completed on the close is not again
+        completeMessages();
         Channel channel = ctx.channel();
         channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         if (LOG.isDebugEnabled()) {

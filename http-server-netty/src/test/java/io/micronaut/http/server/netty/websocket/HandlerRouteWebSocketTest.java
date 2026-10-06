@@ -45,7 +45,14 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -443,6 +450,50 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
+    void aBurstReadAtOnceIsDecodedNoFurtherThanThePendingLimit() throws Exception {
+        try (RawClient raw = new RawClient(server.getPort(), "/ws/burst")) {
+            ByteArrayOutputStream burst = new ByteArrayOutputStream();
+            for (int i = 0; i < 32; i++) {
+                burst.writeBytes(RawClient.frame(0x1, "m" + i));
+            }
+            burst.writeBytes(RawClient.frame(0x9, "after"));
+            // one write: the server reads the messages and the ping at once
+            raw.write(burst.toByteArray());
+            assertEquals("burst m0", event());
+            // the handler of m0 runs and one message waits: the frames that follow, the ping
+            // included, are not decoded
+            assertThrows(SocketTimeoutException.class, () -> raw.next(300));
+            context.getBean(Events.class).burstGate.complete(null);
+            for (int i = 1; i < 32; i++) {
+                assertEquals("burst m" + i, event());
+            }
+            Map.Entry<Integer, String> pong = raw.next((int) TimeUnit.SECONDS.toMillis(TIMEOUT));
+            assertEquals(0xA, pong.getKey());
+            assertEquals("after", pong.getValue());
+        }
+    }
+
+    @Test
+    void pingsReadAtOnceAreAllAnswered() throws Exception {
+        try (RawClient raw = new RawClient(server.getPort(), "/ws/burst")) {
+            raw.write(concat(RawClient.frame(0x9, "one"), RawClient.frame(0x9, "two"), RawClient.frame(0x9, "three")));
+            assertEquals("one", raw.next((int) TimeUnit.SECONDS.toMillis(TIMEOUT)).getValue());
+            assertEquals("two", raw.next((int) TimeUnit.SECONDS.toMillis(TIMEOUT)).getValue());
+            assertEquals("three", raw.next((int) TimeUnit.SECONDS.toMillis(TIMEOUT)).getValue());
+        }
+    }
+
+    @Test
+    void theStreamCompletesBeforeTheCloseHandlerRuns() throws Exception {
+        Client client = connect("/ws/stream-close");
+        client.ws.sendText("a", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("stream a", event());
+        // the close handler waits for the stream to complete
+        client.close(1000, "done");
+        assertEquals("closed after the stream completed", event());
+    }
+
+    @Test
     void aCloseIsNotHeldBackByTheMessagesThatWaitForTheOpenHandler() throws Exception {
         Client client = connect("/ws/held");
         assertEquals("held 1", client.next());
@@ -802,6 +853,117 @@ class HandlerRouteWebSocketTest {
     }
 
     /**
+     * Logs the messages, and completes once they completed.
+     */
+    static final class Completion implements Subscriber<String> {
+        private final CompletableFuture<Object> received;
+        private final BlockingQueue<String> log;
+
+        Completion(CompletableFuture<Object> received, BlockingQueue<String> log) {
+            this.received = received;
+            this.log = log;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            s.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(String message) {
+            log.add("stream " + message);
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            received.completeExceptionally(t);
+        }
+
+        @Override
+        public void onComplete() {
+            received.complete(null);
+        }
+    }
+
+    /**
+     * A WebSocket client over a socket, which writes frames at once, so that the server reads
+     * them at once.
+     */
+    static final class RawClient implements AutoCloseable {
+        private final Socket socket;
+        private final InputStream in;
+        private final OutputStream out;
+
+        RawClient(int port, String path) throws IOException {
+            socket = new Socket("localhost", port);
+            socket.setSoTimeout((int) TimeUnit.SECONDS.toMillis(TIMEOUT));
+            in = new BufferedInputStream(socket.getInputStream());
+            out = socket.getOutputStream();
+            write(("GET " + path + " HTTP/1.1\r\nHost: localhost:" + port + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            StringBuilder head = new StringBuilder();
+            while (head.indexOf("\r\n\r\n") < 0) {
+                int b = in.read();
+                if (b < 0) {
+                    throw new EOFException(head.toString());
+                }
+                head.append((char) b);
+            }
+            if (!head.toString().startsWith("HTTP/1.1 101")) {
+                throw new IOException("Not upgraded: " + head);
+            }
+        }
+
+        /**
+         * @return A masked frame of a client, of a payload shorter than 126 bytes
+         */
+        static byte[] frame(int opcode, String payload) {
+            byte[] data = payload.getBytes(StandardCharsets.UTF_8);
+            byte[] mask = {1, 2, 3, 4};
+            byte[] frame = new byte[6 + data.length];
+            frame[0] = (byte) (0x80 | opcode);
+            frame[1] = (byte) (0x80 | data.length);
+            System.arraycopy(mask, 0, frame, 2, 4);
+            for (int i = 0; i < data.length; i++) {
+                frame[6 + i] = (byte) (data[i] ^ mask[i % 4]);
+            }
+            return frame;
+        }
+
+        void write(byte[] bytes) throws IOException {
+            out.write(bytes);
+            out.flush();
+        }
+
+        /**
+         * @return The opcode and the payload of the next frame of the server, of a payload shorter than 126 bytes
+         */
+        Map.Entry<Integer, String> next(int timeoutMillis) throws IOException {
+            socket.setSoTimeout(timeoutMillis);
+            int first = in.read();
+            if (first < 0) {
+                throw new EOFException();
+            }
+            int length = in.read() & 0x7F;
+            byte[] payload = in.readNBytes(length);
+            return Map.entry(first & 0x0F, new String(payload, StandardCharsets.UTF_8));
+        }
+
+        @Override
+        public void close() throws IOException {
+            socket.close();
+        }
+    }
+
+    private static byte[] concat(byte[]... parts) {
+        ByteArrayOutputStream all = new ByteArrayOutputStream();
+        for (byte[] part : parts) {
+            all.writeBytes(part);
+        }
+        return all.toByteArray();
+    }
+
+    /**
      * Replies to the first message, and cancels.
      */
     static final class First implements Subscriber<String> {
@@ -842,6 +1004,10 @@ class HandlerRouteWebSocketTest {
     @Requires(property = "spec.name", value = SPEC)
     static class Events {
         final BlockingQueue<String> events = new LinkedBlockingQueue<>();
+        /**
+         * Completes the handler of the first message of the burst route.
+         */
+        final CompletableFuture<Object> burstGate = new CompletableFuture<>();
     }
 
     /**
@@ -1013,6 +1179,21 @@ class HandlerRouteWebSocketTest {
                         log.add(message);
                         return new CompletableFuture<>();
                     }));
+                routes.GET("/ws/burst").webSocket(ws -> ws
+                    .maxPendingMessages(1)
+                    .onMessage(String.class, (session, message) -> {
+                        log.add("burst " + message);
+                        return message.equals("m0") ? events.burstGate : null;
+                    }));
+                routes.GET("/ws/stream-close").webSocket(ws -> ws
+                    .onMessageStream(String.class, (session, messages) -> {
+                        CompletableFuture<Object> received = new CompletableFuture<>();
+                        session.put("received", received);
+                        messages.subscribe(new Completion(received, log));
+                        return null;
+                    })
+                    .onClose((session, reason) -> session.get("received", CompletableFuture.class).orElseThrow()
+                        .thenRun(() -> log.add("closed after the stream completed"))));
                 routes.GET("/ws/unbounded").webSocket(ws -> ws
                     .maxPendingMessages(0)
                     .onMessage(String.class, (session, message) -> {

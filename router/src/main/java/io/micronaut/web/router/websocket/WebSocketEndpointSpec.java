@@ -130,7 +130,8 @@ public sealed interface WebSocketEndpointSpec permits WebSocketRouteEndpoint.Spe
      * follow. The publisher has a single subscriber, which the handler subscribes before it is
      * done: the messages of a handler that is done without a subscriber, or that fails, are
      * discarded. The publisher completes when the connection closes, once the subscriber received
-     * the messages read before. The handler and the subscriber run on the executor of the route,
+     * the messages read before: on a close, before the close handler runs, so that the close
+     * handler can wait for the stream. The handler and the subscriber run on the executor of the route,
      * with the upgrade request as the current request. A route has a message stream handler or a
      * message handler, and its messages are received in order, one after the other: it has no
      * {@link #maxConcurrentMessages(int)}.
@@ -230,9 +231,10 @@ public sealed interface WebSocketEndpointSpec permits WebSocketRouteEndpoint.Spe
     /**
      * The most messages of a connection read ahead of its handlers: {@code 16} by default. A
      * message sent in fragments counts each of its fragments, so that the messages that wait take
-     * a bounded amount of memory. Once that many wait, the connection reads nothing until a
-     * handler is done, which also holds back the pings and the close that follow them, e.g. when a
-     * handler does not complete. {@code 0} reads all the time, without backpressure: the pings and
+     * a bounded amount of memory. Once that many wait, the connection decodes and reads nothing
+     * until a handler is done, which also holds back the pings and the close that follow them,
+     * e.g. when a handler does not complete; frames that arrive at once beyond the limit stay
+     * undecoded. {@code 0} reads all the time, without backpressure: the pings and
      * the close are never held back, and the messages that wait are kept in memory, however many.
      *
      * @param maxPendingMessages The most messages read ahead, or {@code 0} for no limit
