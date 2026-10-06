@@ -49,8 +49,10 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Internal
 public final class RouteTableFactory {
-    private final @Nullable Object beanLocator;
-    private final ConversionService conversionService;
+    /**
+     * An assembly without routes whose beans and settings the assemblies of the tables use.
+     */
+    private final RouteAssembly resolved;
     /**
      * The tables by the identity of their instances, weakly referenced.
      */
@@ -65,8 +67,15 @@ public final class RouteTableFactory {
      * @param conversionService The conversion service
      */
     RouteTableFactory(@Nullable Object beanLocator, ConversionService conversionService) {
-        this.beanLocator = beanLocator;
-        this.conversionService = conversionService;
+        this(new RouteAssembly(beanLocator, conversionService, uri -> uri, route -> { }));
+    }
+
+    /**
+     * @param resolved An assembly without routes whose beans and settings the assemblies of the
+     *                 tables use, resolved once, not when a request locates a target
+     */
+    RouteTableFactory(RouteAssembly resolved) {
+        this.resolved = resolved;
     }
 
     /**
@@ -113,7 +122,7 @@ public final class RouteTableFactory {
      */
     private <T> DefaultRouteTable build(LocatedRoutes<T> routes) {
         Argument<T> targetType = Objects.requireNonNull(routes.targetType(), "targetType");
-        RouteAssembly assembly = new RouteAssembly(beanLocator, conversionService, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(resolved);
         // the located tables of the table are kept here too
         assembly.locatedTables = this;
         DefaultLocatedHttpRouteBuilder<T> builder = new DefaultLocatedHttpRouteBuilder<>(assembly, targetType, routes.getClass());
@@ -127,7 +136,7 @@ public final class RouteTableFactory {
         builder.close();
         assembly.addImplicitHeadRoutes();
         if (!assembly.statusRoutes().isEmpty() || !assembly.errorRoutes().isEmpty() || !assembly.filterRoutes().isEmpty()) {
-            throw new IllegalArgumentException("Located routes can only declare URI routes, not filter, status or error routes: " + routes);
+            throw new IllegalArgumentException("Located routes cannot declare global error or status routes, or server filters: " + routes);
         }
         if (!assembly.exposedPorts().isEmpty()) {
             throw new IllegalArgumentException("Located routes cannot expose ports: " + assembly.exposedPorts());

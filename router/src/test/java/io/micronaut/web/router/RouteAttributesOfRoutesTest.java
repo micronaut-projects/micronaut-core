@@ -90,8 +90,8 @@ class RouteAttributesOfRoutesTest {
         }));
 
         assertEquals(Map.of("bean", "shop", "kind", "declared"), attributes(router, "/declared/1"));
-        // the attributes of the located route, from its own table
-        assertEquals(Map.of("kind", "item"), attributes(router, "/orders/1/items"));
+        // the attributes of the located route, from its own table, with the ones of the group of its locator route
+        assertEquals(Map.of("bean", "shop", "kind", "item"), attributes(router, "/orders/1/items"));
     }
 
     private static Map<String, Object> attributes(Router router, String path) {

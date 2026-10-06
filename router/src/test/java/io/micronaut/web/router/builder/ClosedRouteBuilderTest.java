@@ -65,14 +65,6 @@ public class ClosedRouteBuilderTest {
      * @param routes A closed builder
      */
     public static void assertEveryDeclarationFails(HttpRouteBuilder routes) {
-        assertEveryScopeDeclarationFails(routes);
-        assertClosed(() -> routes.serverFilter("/**"));
-    }
-
-    /**
-     * @param routes A closed builder of routes, of an {@link HttpRoutes} bean or of {@link LocatedRoutes}
-     */
-    public static void assertEveryScopeDeclarationFails(HttpRouteScope routes) {
         assertClosed(() -> routes.GET("/late", ClosedRouteBuilderTest::ok));
         assertClosed(() -> routes.route(Set.of(HttpMethod.GET, HttpMethod.POST), "/late").handle(ClosedRouteBuilderTest::ok));
         assertClosed(() -> routes.route("PROPFIND", "/late").handle(ClosedRouteBuilderTest::ok));
@@ -84,9 +76,9 @@ public class ClosedRouteBuilderTest {
         assertClosed(() -> routes.GET("/late").handle(ClosedRouteBuilderTest::ok));
         assertClosed(() -> routes.error(IllegalStateException.class, (request, error) -> HttpResponse.ok()));
         assertClosed(() -> routes.status(HttpStatus.NOT_FOUND, request -> HttpResponse.ok()));
+        assertClosed(() -> routes.serverFilter("/**"));
         assertClosed(() -> routes.group(group -> group.GET("/late", ClosedRouteBuilderTest::ok)));
         assertClosed(() -> routes.path("/late", group -> group.GET("/x", ClosedRouteBuilderTest::ok)));
-        assertClosed(() -> routes.locate("/late", (request, pathVariables) -> "target", target -> null));
     }
 
     /**
@@ -95,7 +87,7 @@ public class ClosedRouteBuilderTest {
     public static void assertClosed(Executable declaration) {
         IllegalStateException e = assertThrows(IllegalStateException.class, declaration);
         assertEquals("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
-            + "or inside LocatedRoutes.routes(...), not after it returned", e.getMessage());
+            + "not after it returned", e.getMessage());
     }
 
     private static HttpResponse<?> ok(HttpRequest<?> request, PathVariables pathVariables) {

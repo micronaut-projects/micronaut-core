@@ -15,17 +15,23 @@
  */
 package io.micronaut.http.server.netty;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -34,6 +40,7 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.DefaultHttp2ResetFrame;
@@ -48,6 +55,8 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -62,18 +71,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Over HTTP/2, the stage of an asynchronous route locator that has not located its target yet is
- * cancelled when the client resets the stream of the request, while the connection stays open:
- * the cancellation follows the stream, not the connection.
+ * Over HTTP/2, the server stops waiting for the stage of an asynchronous route locator that has
+ * not located its target yet when the stream of the request is reset, by the client or by the
+ * server, while the connection stays open: the abandonment follows the stream, not the
+ * connection. The stage is not cancelled.
  */
 class HandlerRouteLocatorHttp2CancellationTest {
     private static final String SPEC_NAME = "HandlerRouteLocatorHttp2CancellationTest";
     private static final long TIMEOUT_MILLIS = 10_000;
 
+    private static final ListAppender<ILoggingEvent> LOGS = new ListAppender<>();
+
     private static ApplicationContext ctx;
     private static EmbeddedServer server;
     private static Stages stages;
     private static EventLoopGroup group;
+    private static @Nullable Level level;
 
     @BeforeAll
     static void start() {
@@ -86,10 +99,19 @@ class HandlerRouteLocatorHttp2CancellationTest {
         server = ctx.getBean(EmbeddedServer.class).start();
         stages = ctx.getBean(Stages.class);
         group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        // an abandoned request is logged at the debug level, like a request whose connection closed
+        Logger logger = routeExecutorLogger();
+        level = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        LOGS.start();
+        logger.addAppender(LOGS);
     }
 
     @AfterAll
     static void stop() {
+        Logger logger = routeExecutorLogger();
+        logger.detachAppender(LOGS);
+        logger.setLevel(level);
         if (group != null) {
             group.shutdownGracefully();
         }
@@ -99,17 +121,19 @@ class HandlerRouteLocatorHttp2CancellationTest {
     }
 
     @Test
-    void aPendingLocatorIsCancelledWhenTheClientResetsTheStream() throws Exception {
+    void aPendingLocatorIsAbandonedWhenTheClientResetsTheStream() throws Exception {
         Client client = new Client();
         Channel channel = connect(client);
         try {
             for (String id : new String[]{"first", "second", "third"}) {
+                int abandoned = abandoned();
                 Http2FrameStream stream = request(channel, client, "/pending/" + id + "/items");
                 await("the locator of " + id + " runs", () -> stages.stages.containsKey(id));
                 CompletableFuture<Object> stage = stages.stages.get(id);
                 assertFalse(stage.isDone());
                 channel.writeAndFlush(new DefaultHttp2ResetFrame(Http2Error.CANCEL).stream(stream)).sync();
-                await("the stage of the locator of " + id + " is cancelled", stage::isCancelled);
+                await("the request of " + id + " is abandoned", () -> abandoned() > abandoned);
+                assertFalse(stage.isCancelled(), "the stage of " + id + " is not cancelled");
             }
             assertTrue(channel.isActive(), "the connection stays open");
 
@@ -123,14 +147,62 @@ class HandlerRouteLocatorHttp2CancellationTest {
     }
 
     @Test
-    void aPendingLocatorIsCancelledWhenTheClientClosesTheConnection() throws Exception {
+    void aPendingLocatorIsAbandonedWhenTheClientClosesTheConnection() throws Exception {
         Client client = new Client();
         Channel channel = connect(client);
+        int abandoned = abandoned();
         request(channel, client, "/pending/closed/items");
         await("the locator of closed runs", () -> stages.stages.containsKey("closed"));
         channel.close().sync();
-        CompletableFuture<Object> stage = stages.stages.get("closed");
-        await("the stage of the locator of closed is cancelled", stage::isCancelled);
+        await("the request of closed is abandoned", () -> abandoned() > abandoned);
+        assertFalse(stages.stages.get("closed").isCancelled(), "the stage of closed is not cancelled");
+    }
+
+    @Test
+    void aStreamTheServerResetsWhileItsLocatorIsPendingKeepsTheConnectionOpen() throws Exception {
+        Client client = new Client();
+        Channel channel = connect(client);
+        int abandoned = abandoned();
+        try {
+            CompletableFuture<Http2FrameStream> written = new CompletableFuture<>();
+            channel.eventLoop().execute(() -> {
+                Http2FrameStream stream = client.newStream();
+                DefaultHttp2Headers headers = new DefaultHttp2Headers();
+                headers.method("POST").scheme("http").authority("localhost").path("/pending/server-reset/items");
+                headers.set("content-length", "1");
+                headers.set("content-type", "text/plain");
+                channel.writeAndFlush(new DefaultHttp2HeadersFrame(headers, false).stream(stream));
+                written.complete(stream);
+            });
+            Http2FrameStream stream = written.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            await("the locator of server-reset runs", () -> stages.stages.containsKey("server-reset"));
+            // more data than the content length: Netty resets the stream with a stream error
+            channel.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("too long", StandardCharsets.UTF_8), true).stream(stream)).sync();
+            await("the request of server-reset is abandoned", () -> abandoned() > abandoned);
+
+            // the connection keeps serving
+            CompletableFuture<String> body = client.body();
+            request(channel, client, "/located/1/items");
+            assertEquals("item", body.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
+            assertTrue(channel.isActive(), "the connection stays open");
+        } finally {
+            channel.close().sync();
+        }
+    }
+
+    private static Logger routeExecutorLogger() {
+        return (Logger) LoggerFactory.getLogger(RouteExecutor.class);
+    }
+
+    /**
+     * @return The number of requests the server stopped waiting for
+     */
+    private static int abandoned() {
+        synchronized (LOGS) {
+            return (int) LOGS.list.stream()
+                .filter(event -> event.getThrowableProxy() != null && event.getThrowableProxy().getClassName().endsWith("LocationAbandoned"))
+                .count();
+        }
     }
 
     private static Channel connect(Client client) throws InterruptedException {

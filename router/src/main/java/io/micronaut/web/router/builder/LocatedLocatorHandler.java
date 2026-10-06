@@ -31,7 +31,7 @@ import org.jspecify.annotations.Nullable;
  *     }
  *
  *     public void routes(LocatedHttpRouteBuilder<Folder> folder) {
- *         folder.handle(HttpMethod.GET, "/", (request, pathVariables, current) -> HttpResponse.ok(current.name()));
+ *         folder.GET("/").handle((request, pathVariables, current) -> HttpResponse.ok(current.name()));
  *         folder.locate("/{name}", (request, pathVariables, parent) -> parent.child(pathVariables.getString("name")), this);
  *     }
  * }

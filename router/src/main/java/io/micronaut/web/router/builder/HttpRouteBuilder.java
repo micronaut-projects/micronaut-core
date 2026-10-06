@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Consumer;
+
 /**
  * Builds routes to handler functions: in an {@link HttpRoutes} bean, which adds them to the
  * application routes. A handler route runs like a
@@ -50,6 +52,50 @@ import org.jspecify.annotations.Nullable;
  */
 @Experimental
 public sealed interface HttpRouteBuilder extends HttpRouteScope permits DefaultHttpRouteBuilder {
+
+    /**
+     * Declare a group of routes, whose filters apply to every route declared in the lambda,
+     * e.g. to filter every route of an {@link HttpRoutes} bean. The builder of an
+     * {@link HttpRoutes} bean has no route filter methods of its own, as it is shared by the beans:
+     * the group is the scope of the filters, see {@link HttpRouteBuilder#serverFilter(String...)} for a server filter.
+     *
+     * <pre>{@code
+     * routes.group(all -> {
+     *     all.beforeReplacing((request, propagatedContext) -> {
+     *         propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
+     *         return null;
+     *     });
+     *     all.GET("/orders", ordersHandler);
+     *     all.GET("/customers", customersHandler);
+     * });
+     * }</pre>
+     *
+     * <p>See {@link HttpRouteGroup} for which routes the filters apply to, and in which order.
+     * A route declared in the lambda is ended with a terminal, see {@link HttpRouteSpec}, before
+     * the lambda returns: otherwise the group fails with an {@link IllegalStateException} naming
+     * the route.</p>
+     *
+     * @param routes Declares the routes and the filters of the group
+     * @since 5.3.0
+     */
+    void group(Consumer<HttpRouteGroup> routes);
+
+    /**
+     * Declare a group of routes under a prefix: the URI template of every route of the group,
+     * including the routes of its nested groups, is the prefix followed by
+     * the URI template of the route, like the URI of a controller method under the URI of the
+     * controller: {@code path("/api", api -> api.GET("/orders", handler))} routes
+     * {@code GET /api/orders}. The prefixes of nested groups add up. The filters of the group apply
+     * to every route declared in the lambda, see {@link HttpRouteGroup}.
+     *
+     * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
+     * query or fragment.</p>
+     *
+     * @param prefix The prefix of the URI templates of the routes of the group
+     * @param routes Declares the routes and the filters of the group
+     * @since 5.3.0
+     */
+    void path(String prefix, Consumer<HttpRouteGroup> routes);
 
     /**
      * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters

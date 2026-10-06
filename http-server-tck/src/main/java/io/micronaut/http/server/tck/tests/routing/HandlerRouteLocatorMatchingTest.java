@@ -150,10 +150,11 @@ public class HandlerRouteLocatorMatchingTest {
     @Test
     void aRequestWithACustomMethodIsAnsweredByALocatedRouteOfAnyMethod() throws IOException {
         try (ServerUnderTest server = server()) {
-            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/matching/custom/3/all", "QUERY"),
+            // REPORT is a custom method, of the routes of any method, not a standard one like QUERY
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/matching/custom/3/all", "REPORT"),
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
-                    .body("QUERY all of 3")
+                    .body("REPORT all of 3")
                     .build());
         }
     }

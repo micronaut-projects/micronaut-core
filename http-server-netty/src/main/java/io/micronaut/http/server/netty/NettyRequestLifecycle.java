@@ -115,6 +115,12 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
             HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
             rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError(), writeErrorHandler);
         } else {
+            // a request that waits for an asynchronous route locator before it is matched, e.g. a
+            // CORS preflight request, stops waiting when it is abandoned, like one being matched
+            CompletionStage<?> located = RouteLocator.whenLocated(request);
+            if (located != null) {
+                onPendingLocation(request, located);
+            }
             result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler));
         }
     }
@@ -139,7 +145,7 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
         }
         // the client abandons the request, closing the HTTP/1.1 connection or resetting the
         // HTTP/2 stream: no one waits for the target any more
-        Runnable remove = outboundAccess.whenAbandoned(() -> RouteLocator.cancelPendingLocations(request));
+        Runnable remove = outboundAccess.whenAbandoned(() -> RouteLocator.abandonPendingLocations(request));
         located.whenComplete((ignored, error) -> remove.run());
     }
 

@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  *     }
  *
  *     public void routes(LocatedHttpRouteBuilder<Order> items) {
- *         items.handle(HttpMethod.GET, "/items/{item}", (request, pathVariables, order) ->
+ *         items.GET("/items/{item}").handle((request, pathVariables, order) ->
  *             HttpResponse.ok(order.item(pathVariables.getInt("item"))));
  *     }
  * };
@@ -42,24 +42,26 @@ import org.jspecify.annotations.Nullable;
  * <p>The router declares the routes of an instance once, when a locator locates the first target
  * that the instance routes, and keeps them for as long as the instance is reachable: an instance
  * describes the routes of every target of its type, not of one target, which reaches the
- * handlers as an argument or through {@link LocatedRoutes#locatedTarget(PathVariables)}. Locators that answer
+ * handlers as an argument or through {@link LocatedRoutes#locatedTarget(PathVariables)}. Locators that return
  * the same instance share its routes. Declare the routes of a type once and reuse the instance,
  * e.g. in a field, rather than creating an instance per target.</p>
  *
- * <p>A located route inherits the annotations of the groups enclosing its locator route, see
- * {@link HttpRouteGroup#annotate(io.micronaut.core.annotation.AnnotationValue)}, like a route
- * declared in those groups, and its own annotations take precedence: e.g. a filter bound to a
- * {@code @FilterMatcher} annotation of such a group runs for it, and the {@code @Produces},
- * {@code @Consumes}, {@code @Status} and {@code @ExecuteOn} of the group apply to it. The routes
- * a locator route locates decide which media types the request may have and accept: the
- * annotations of the groups of the locator route do so through them, not through the locator
- * route. Builder settings of the groups, such as {@code produces(...)}, are not
- * inherited.</p>
+ * <p>A located route inherits what a route declared in the groups enclosing its locator route
+ * has of them, and its own settings, and those of the groups of its {@code LocatedRoutes}, take
+ * precedence: the annotations, see {@link HttpRouteGroup#annotate(io.micronaut.core.annotation.AnnotationValue)},
+ * e.g. a filter bound to a {@code @FilterMatcher} annotation of such a group runs for it, and
+ * the {@code @Produces}, {@code @Consumes}, {@code @Status} and {@code @ExecuteOn} of the group
+ * apply to it; the attributes, see {@link RouteSpec#attribute(String, Object)}; and the media
+ * types and the executor, see {@link RouteSpec#produces(io.micronaut.http.MediaType...)} and
+ * {@link ExecutionSpec#executeOn(String)}. The routes a locator route locates decide which media
+ * types the request may have and accept, with what they inherit, not the locator route.</p>
  *
- * <p>Error and status routes declared in a group of the builder are local to its routes and
- * supported; global ones, declared on the builder itself, and ports are not: they belong to
- * the application routes, and declaring them fails the request that located the first target.
- * The builder has no server filters, see {@link HttpRouteBuilder#serverFilter(String...)}.</p>
+ * <p>Error and status routes declared in a group of the builder, see
+ * {@link LocatedHttpRouteBuilder#group(java.util.function.Consumer)}, are local to its routes and
+ * supported; global ones, declared on the builder itself, and ports are not: they belong to the
+ * application routes, and declaring them fails, when the routes are declared. Routes that fail
+ * to declare fail every request routed to them, and are declared again for the next one. The
+ * builder has no server filters, see {@link HttpRouteBuilder#serverFilter(String...)}.</p>
  *
  * @param <T> The type of the located targets
  * @author Denis Stepanov

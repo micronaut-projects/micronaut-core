@@ -160,13 +160,35 @@ public final class RouteAssembly {
     }
 
     /**
+     * An assembly of the routes of located targets, without routes, with the beans and the
+     * settings of an assembly already resolved: the routes of a located target are declared
+     * while a request is matched, which looks no bean up.
+     *
+     * @param resolved The assembly whose beans and settings the assembly uses
+     */
+    RouteAssembly(RouteAssembly resolved) {
+        this.contextPath = null;
+        this.beanLocator = resolved.beanLocator;
+        this.conversionService = resolved.conversionService;
+        // the URIs of located routes are relative to the prefix of their locator
+        this.routeUri = uri -> uri;
+        this.routeCreated = route -> { };
+        this.defaultCharset = resolved.defaultCharset;
+        this.executorSelector = resolved.executorSelector;
+        this.threadSelection = resolved.threadSelection;
+        this.messageBodyHandlerRegistry = resolved.messageBodyHandlerRegistry;
+        this.conditionContext = resolved.conditionContext;
+    }
+
+    /**
      * @return The factory of the tables of the targets that the locator routes of the assembly
      * locate, shared by the assembly and those tables
      */
     public RouteTableFactory locatedTables() {
         RouteTableFactory tables = locatedTables;
         if (tables == null) {
-            tables = new RouteTableFactory(beanLocator, conversionService);
+            // the beans and the settings of this assembly, without its routes
+            tables = new RouteTableFactory(new RouteAssembly(this));
             locatedTables = tables;
         }
         return tables;
@@ -1347,13 +1369,33 @@ public final class RouteAssembly {
                 attributes(),
                 errorScope,
                 settings.isAnyMethod(),
-                constraints(group)
+                constraints(group),
+                declaredSettings(),
+                null
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built
                 errorScope.buildErrorAndStatusRoutes();
             }
             return routeInfo;
+        }
+
+        /**
+         * @return The settings the route, or a group of it, declares, which it does not inherit at
+         * a location, see {@link DefaultUrlRouteInfo#inheriting(LocationInheritance)}
+         */
+        private int declaredSettings() {
+            int declared = 0;
+            if (settings.getConsumes() != null) {
+                declared |= DefaultUrlRouteInfo.DECLARED_CONSUMES;
+            }
+            if (settings.getProduces() != null) {
+                declared |= DefaultUrlRouteInfo.DECLARED_PRODUCES;
+            }
+            if (settings.getExecutorName() != null || settings.isNonBlocking()) {
+                declared |= DefaultUrlRouteInfo.DECLARED_EXECUTOR;
+            }
+            return declared;
         }
 
         /**

@@ -38,6 +38,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
+import io.netty.util.concurrent.EventExecutor;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -393,16 +394,21 @@ abstract class MultiplexedServerHandler {
 
         /**
          * Called when the stream is closed, by either side or with the connection: if the
-         * response was not written, the request is abandoned.
+         * response was not written, the request is abandoned, and the stream cannot take the
+         * response any more, like a stream the client reset: e.g. a stream that Netty reset for a
+         * stream error, while the request waited for its route.
          */
         final void onStreamClosed() {
             if (!finished) {
+                reset = true;
                 abandon();
             }
         }
 
         /**
-         * Run the callbacks of {@link #whenAbandoned(Runnable)}, once.
+         * Run the callbacks of {@link #whenAbandoned(Runnable)}, once, on the event loop, after
+         * the event that abandoned the stream: a callback may answer the request, which the
+         * closed stream drops.
          */
         private void abandon() {
             List<Runnable> callbacks;
@@ -415,9 +421,11 @@ abstract class MultiplexedServerHandler {
                 abandonCallbacks = null;
             }
             if (callbacks != null) {
-                for (Runnable callback : callbacks) {
-                    callback.run();
-                }
+                requiredCtx().executor().execute(() -> {
+                    for (Runnable callback : callbacks) {
+                        callback.run();
+                    }
+                });
             }
         }
 
@@ -435,7 +443,13 @@ abstract class MultiplexedServerHandler {
                     return () -> removeAbandonCallback(callback);
                 }
             }
-            callback.run();
+            // already abandoned: at once on the event loop, or on it
+            EventExecutor executor = requiredCtx().executor();
+            if (executor.inEventLoop()) {
+                callback.run();
+            } else {
+                executor.execute(callback);
+            }
             return () -> { };
         }
 

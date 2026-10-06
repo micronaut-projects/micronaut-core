@@ -28,6 +28,8 @@ import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.MethodReference;
+import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
@@ -40,12 +42,13 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -58,6 +61,19 @@ import java.util.function.Predicate;
  */
 @Internal
 public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R>, IndexedRoute {
+
+    /**
+     * The route, or a group of it, declares the media types it consumes.
+     */
+    static final int DECLARED_CONSUMES = 1;
+    /**
+     * The route, or a group of it, declares the media types it produces.
+     */
+    static final int DECLARED_PRODUCES = 1 << 1;
+    /**
+     * The route, or a group of it, declares its executor.
+     */
+    static final int DECLARED_EXECUTOR = 1 << 2;
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultUrlRouteInfo.class);
     private static final InheritingRoute[] NO_INHERITING_ROUTES = new InheritingRoute[0];
@@ -109,11 +125,21 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      */
     private final boolean dynamicTarget;
     /**
-     * Builds this route again for a target method with other annotations, see {@link #inheriting(AnnotationMetadata)}.
+     * Builds this route again with what it inherits at a location, see {@link #inheriting(LocationInheritance)},
+     * or {@code null} for a route that is not built again: a route to a bean method.
      */
-    private final Function<MethodExecutionHandle<T, R>, DefaultUrlRouteInfo<T, R>> rebuild;
+    private final @Nullable Rebuild<T, R> rebuild;
     /**
-     * The routes built by {@link #inheriting(AnnotationMetadata)}, by the identity of the inherited annotations.
+     * What this route inherits at a location, or {@code null} for a route that is not built at a location.
+     */
+    private final @Nullable LocationInheritance inherited;
+    /**
+     * What the routes of this locator route inherit, built once, see {@link #locatedInheritance()}.
+     */
+    @SuppressWarnings("java:S3077") // an immutable record, built once
+    private volatile @Nullable LocationInheritance locatedInheritance;
+    /**
+     * The routes built by {@link #inheriting(LocationInheritance)}, by the identity of the inheritance.
      */
     @SuppressWarnings("java:S3077") // the array is never changed: a new array replaces it
     private volatile InheritingRoute[] inheritingRoutes = NO_INHERITING_ROUTES;
@@ -193,7 +219,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                boolean implicitHead) {
         this(httpMethod, httpMethodName, uriMatchTemplate, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
             consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
-            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of());
+            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of(), 0, null);
     }
 
     /**
@@ -221,6 +247,9 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * @param anyMethod                  Whether the route is a route of {@code HttpRouteBuilder.any(...)}
      * @param constraints                The constraints on the path variables, of the groups of the route first, see
      *                                   {@code RouteSpec#constrain(Predicate)}
+     * @param declaredSettings           The settings the route, or a group of it, declares, which it does not inherit
+     *                                   at a location: {@link #DECLARED_CONSUMES}, {@link #DECLARED_PRODUCES}, {@link #DECLARED_EXECUTOR}
+     * @param inherited                  What the route inherits at a location, see {@link #inheriting(LocationInheritance)}, or {@code null}
      */
     @SuppressWarnings("ParameterNumber")
     DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -243,7 +272,9 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                         Map<String, Object> attributes,
                         RouteAssembly.@Nullable RouteGroup errorScope,
                         boolean anyMethod,
-                        List<Predicate<? super PathVariables>> constraints) {
+                        List<Predicate<? super PathVariables>> constraints,
+                        int declaredSettings,
+                        @Nullable LocationInheritance inherited) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
@@ -261,59 +292,135 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.anyMethod = anyMethod;
         this.constraints = List.copyOf(constraints);
         this.dynamicTarget = targetMethod instanceof HandlerMethod<?> handler && handler.getTarget() instanceof DynamicRouteTarget;
-        this.rebuild = method -> new DefaultUrlRouteInfo<>(httpMethod, httpMethodName, uriMatchTemplate, defaultCharset, method,
-            bodyArgumentName, bodyArgument, consumesMediaTypes, producesMediaTypes, predicates, port, conversionService,
-            executorSelector, messageBodyHandlerRegistry, implicitHead, routeFilters, order, attributes, errorScope, anyMethod,
-            this.constraints);
+        this.inherited = inherited;
+        if (targetMethod instanceof HandlerMethod<?>) {
+            // only a route to a handler function is built again at a location, see inheriting(LocationInheritance)
+            this.rebuild = (method, inheritance) -> new DefaultUrlRouteInfo<>(httpMethod, httpMethodName, uriMatchTemplate,
+                defaultCharset, method, bodyArgumentName, bodyArgument,
+                inheritedMediaTypes(declaredSettings, DECLARED_CONSUMES, inheritance.consumes(), consumesMediaTypes),
+                inheritedMediaTypes(declaredSettings, DECLARED_PRODUCES, inheritance.produces(), producesMediaTypes),
+                predicates, port, conversionService, inheritedExecutor(declaredSettings, inheritance, executorSelector, method),
+                messageBodyHandlerRegistry, implicitHead, routeFilters, order, inheritedAttributes(inheritance.attributes(), attributes),
+                errorScope, anyMethod, this.constraints, declaredSettings, inheritance);
+        } else {
+            this.rebuild = null;
+        }
     }
 
     /**
-     * This route with annotations it inherits, which its own annotations override: the route a
-     * route of a {@link io.micronaut.web.router.builder.LocatedRoutes} table is at a location,
-     * with the annotations of the groups of the locator routes, like a route declared in those
-     * groups has them. Everything the route derives from its annotations, such as its
-     * {@code @Produces}, {@code @Consumes} and {@code @Status}, the filters bound to its
-     * annotations and its executor, derives from both.
+     * @param declaredSettings The settings the route declares
+     * @param setting          The setting of the media types
+     * @param inherited        The inherited media types, or {@code null}
+     * @param own              The media types of the route
+     * @return The media types of the route at a location
+     */
+    private static List<MediaType> inheritedMediaTypes(int declaredSettings, int setting, @Nullable List<MediaType> inherited, List<MediaType> own) {
+        return (declaredSettings & setting) != 0 || inherited == null ? own : inherited;
+    }
+
+    /**
+     * @param declaredSettings The settings the route declares
+     * @param inheritance      What the route inherits
+     * @param own              The executor selector of the route
+     * @param method           The handler of the route
+     * @return The executor selector of the route at a location
+     */
+    private static ExecutorSelector inheritedExecutor(int declaredSettings, LocationInheritance inheritance, ExecutorSelector own,
+                                                      MethodExecutionHandle<?, ?> method) {
+        if ((declaredSettings & DECLARED_EXECUTOR) != 0 || !inheritance.hasExecutor()) {
+            return own;
+        }
+        return new InheritedExecutorSelector(inheritance.executorName(), inheritance.nonBlocking(), own, method);
+    }
+
+    /**
+     * This route with the settings it inherits at a location, which its own settings override:
+     * the route a route of a {@link io.micronaut.web.router.builder.LocatedRoutes} table is at a
+     * location, with the annotations, the attributes, the media types and the executor of the
+     * groups of the locator routes, like a route declared in those groups has them. Everything
+     * the route derives from its annotations, such as its {@code @Produces}, {@code @Consumes}
+     * and {@code @Status}, the filters bound to its annotations and its executor, derives from
+     * both. The media types and the executor the route, or a group of its table, declares are
+     * its own.
      *
-     * <p>The routes are built once per inherited annotations, which a location keeps the same
-     * for every request, see {@link RouteLocator}: the route of a request is one of them, like an
-     * ordinary route, and a cache keyed by route, such as the CORS configuration, stays bounded.</p>
+     * <p>The routes are built once per inheritance, which a location keeps the same for every
+     * request, see {@link RouteLocator}: the route of a request is one of them, like an ordinary
+     * route, and a cache keyed by route, such as the CORS configuration, stays bounded.</p>
      *
-     * @param inherited The inherited annotations
-     * @return The route with the annotations of both, or this route if it inherits none or its
+     * @param inheritance What the route inherits
+     * @return The route with the settings of both, or this route if it inherits nothing or its
      * target is not a handler function
      */
     @SuppressWarnings("unchecked")
-    DefaultUrlRouteInfo<T, R> inheriting(AnnotationMetadata inherited) {
-        if (inherited.isEmpty() || !(getTargetMethod() instanceof HandlerMethod<?> handler)) {
+    DefaultUrlRouteInfo<T, R> inheriting(LocationInheritance inheritance) {
+        Rebuild<T, R> builder = rebuild;
+        if (inheritance.isEmpty() || builder == null || !(getTargetMethod() instanceof HandlerMethod<?> handler)) {
             return this;
         }
-        DefaultUrlRouteInfo<T, R> found = findInheriting(inheritingRoutes, inherited);
+        DefaultUrlRouteInfo<T, R> found = findInheriting(inheritingRoutes, inheritance);
         if (found != null) {
             return found;
         }
         synchronized (this) {
             InheritingRoute[] routes = inheritingRoutes;
-            found = findInheriting(routes, inherited);
+            found = findInheriting(routes, inheritance);
             if (found != null) {
                 return found;
             }
-            DefaultUrlRouteInfo<T, R> route = rebuild.apply((MethodExecutionHandle<T, R>) handler.inheriting(inherited));
+            DefaultUrlRouteInfo<T, R> route = builder.rebuild(
+                (MethodExecutionHandle<T, R>) handler.inheriting(inheritance.annotationMetadata()), inheritance);
             InheritingRoute[] grown = Arrays.copyOf(routes, routes.length + 1);
-            grown[routes.length] = new InheritingRoute(inherited, route);
+            grown[routes.length] = new InheritingRoute(inheritance, route);
             inheritingRoutes = grown;
             return route;
         }
     }
 
     @SuppressWarnings("unchecked")
-    private @Nullable DefaultUrlRouteInfo<T, R> findInheriting(InheritingRoute[] routes, AnnotationMetadata inherited) {
+    private @Nullable DefaultUrlRouteInfo<T, R> findInheriting(InheritingRoute[] routes, LocationInheritance inheritance) {
         for (InheritingRoute route : routes) {
-            if (route.inherited() == inherited) {
+            if (route.inherited() == inheritance) {
                 return (DefaultUrlRouteInfo<T, R>) route.route();
             }
         }
         return null;
+    }
+
+    /**
+     * @param inherited The inherited attributes
+     * @param own       The attributes of the route, which override them
+     * @return The attributes of both
+     */
+    private static Map<String, Object> inheritedAttributes(Map<String, Object> inherited, Map<String, Object> own) {
+        if (inherited.isEmpty()) {
+            return own;
+        }
+        if (own.isEmpty()) {
+            return inherited;
+        }
+        Map<String, Object> all = new LinkedHashMap<>(inherited);
+        all.putAll(own);
+        return Collections.unmodifiableMap(all);
+    }
+
+    /**
+     * What the routes this locator route locates inherit, see {@link LocationInheritance}: its
+     * annotations and attributes, with the ones of its groups, the media types and the executor
+     * of its groups, and what it inherits from the locator routes that located it. Built once.
+     *
+     * @return The inheritance, {@link LocationInheritance#NONE} for a route that is not a locator route
+     */
+    LocationInheritance locatedInheritance() {
+        LocationInheritance result = locatedInheritance;
+        if (result == null) {
+            if (getTargetMethod() instanceof HandlerMethod<?> handler && handler.getTarget() instanceof RouteLocator locator) {
+                result = LocationInheritance.of(handler.getAnnotationMetadata(), attributes, locator.groupSettings(), inherited);
+            } else {
+                result = inherited == null ? LocationInheritance.NONE : inherited;
+            }
+            locatedInheritance = result;
+        }
+        return result;
     }
 
     /**
@@ -489,6 +596,54 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * @param inherited The inherited annotations
      * @param route     The route with them
      */
-    private record InheritingRoute(AnnotationMetadata inherited, DefaultUrlRouteInfo<?, ?> route) {
+    private record InheritingRoute(LocationInheritance inherited, DefaultUrlRouteInfo<?, ?> route) {
+    }
+
+    /**
+     * Builds a route again with what it inherits at a location.
+     *
+     * @param <T> The target type
+     * @param <R> The result type
+     */
+    @FunctionalInterface
+    private interface Rebuild<T, R> {
+        /**
+         * @param method      The handler, with the annotations of both
+         * @param inheritance What the route inherits
+         * @return The route
+         */
+        DefaultUrlRouteInfo<T, R> rebuild(MethodExecutionHandle<T, R> method, LocationInheritance inheritance);
+    }
+
+    /**
+     * The executor of a route that inherits the executor of the groups of its locator routes, see
+     * {@code HttpRouteGroup#executeOn(String)} and {@code HttpRouteGroup#nonBlocking()}, like the
+     * executor of the route had it declared it.
+     *
+     * @param executorName The name of the executor, or {@code null}
+     * @param nonBlocking  Whether the route runs on the event loop when the threads are selected automatically
+     * @param route        The executor selector of the route, which declares no executor
+     * @param method       The handler of the route
+     */
+    private record InheritedExecutorSelector(@Nullable String executorName, boolean nonBlocking, ExecutorSelector route,
+                                             MethodExecutionHandle<?, ?> method) implements ExecutorSelector {
+
+        @Override
+        public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> reference, ThreadSelection threadSelection) {
+            String name = executorName;
+            if (name != null) {
+                return Optional.of(route.select(name).orElseThrow(() -> new SchedulerConfigurationException(
+                    method.getExecutableMethod(), "No executor configured for name: " + name)));
+            }
+            if (nonBlocking && threadSelection == ThreadSelection.AUTO) {
+                return Optional.empty();
+            }
+            return route.select(reference, threadSelection);
+        }
+
+        @Override
+        public Optional<ExecutorService> select(String name) {
+            return route.select(name);
+        }
     }
 }

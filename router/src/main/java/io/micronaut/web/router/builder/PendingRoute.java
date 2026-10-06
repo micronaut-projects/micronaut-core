@@ -178,6 +178,7 @@ final class PendingRoute {
     }
 
     void port(int port) {
+        builder.checkPort();
         int checked = RouteArguments.port(port);
         addSetting(added -> added.port(checked));
     }

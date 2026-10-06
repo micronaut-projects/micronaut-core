@@ -16,17 +16,11 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
-import java.lang.annotation.Annotation;
-import java.util.Objects;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 
 /**
  * The {@link HttpRouteGroup}: the routes it adds carry its filters, which it collects until its
@@ -36,11 +30,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Internal
-final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements HttpRouteGroup, ContextFilterSpec<HttpRouteGroup> {
-
-    private final RouteAssembly.RouteFilters filters;
-    private final RouteAssembly.RouteGroup settings;
-    private final RouteGroupDefaults defaults;
+final class DefaultHttpRouteGroup extends AbstractHttpRouteGroup<HttpRouteGroup> implements HttpRouteGroup {
 
     /**
      * @param assembly The assembly the routes are added to
@@ -52,107 +42,21 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
      */
     DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings,
                           RouteGroupDefaults defaults, @Nullable RoutePrefix prefix, @Nullable PropertyPlaceholderResolver placeholderResolver) {
-        super(assembly, filters, settings, prefix, placeholderResolver);
-        this.filters = filters;
-        this.settings = settings;
-        this.defaults = defaults;
+        super(assembly, filters, settings, defaults, prefix, placeholderResolver);
     }
 
     @Override
-    RouteGroupDefaults groupDefaults() {
-        return defaults;
-    }
-
-    /**
-     * Close the group: its lambda returned.
-     */
-    void close() {
-        filters.close();
-        settings.close();
-        // the last: the routes inherit the settings of the closed groups
-        defaults.close();
-    }
-
-    @Override
-    public HttpRouteGroup consumes(MediaType... mediaTypes) {
-        defaults.consumes(mediaTypes);
+    HttpRouteGroup self() {
         return this;
     }
 
     @Override
-    public HttpRouteGroup consumesAll() {
-        defaults.consumesAll();
-        return this;
+    public void group(Consumer<HttpRouteGroup> routes) {
+        declareGroup(DefaultHttpRouteGroup::new, routes);
     }
 
     @Override
-    public HttpRouteGroup produces(MediaType... mediaTypes) {
-        defaults.produces(mediaTypes);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup executeOn(String executorName) {
-        defaults.executeOn(executorName);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup nonBlocking() {
-        defaults.nonBlocking();
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup port(String port) {
-        return port(resolvePort(port));
-    }
-
-    @Override
-    public HttpRouteGroup port(int port) {
-        settings.port(port);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup where(RouteCondition condition) {
-        settings.where(condition);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup constrain(Predicate<? super PathVariables> accepted) {
-        settings.constrain(accepted);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup order(int order) {
-        settings.order(order);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> HttpRouteGroup annotate(AnnotationValue<T> annotationValue) {
-        settings.annotations().add(Objects.requireNonNull(annotationValue, "annotationValue"));
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
-        settings.annotations().element(annotationMetadata);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup attribute(String name, Object value) {
-        settings.attribute(name, value);
-        return this;
-    }
-
-    @Override
-    public FilterSpec<HttpRouteGroup> addFilter(FilterRegistration filter) {
-        filters.add(filter);
-        return new DefaultFilterSpec<>(this, filter);
+    public void path(String prefix, Consumer<HttpRouteGroup> routes) {
+        declarePath(prefix, DefaultHttpRouteGroup::new, routes);
     }
 }

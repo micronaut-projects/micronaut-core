@@ -15,11 +15,16 @@
  */
 package io.micronaut.http.server.netty;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
@@ -31,6 +36,8 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -43,24 +50,30 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * The stage of an asynchronous route locator that has not located its target yet is cancelled
- * when the client closes the connection: the server stops waiting for a target no one will
- * receive a response for, and keeps serving.
+ * The server stops waiting for the stage of an asynchronous route locator that has not located
+ * its target yet when the client closes the connection: no one will receive a response for the
+ * request, and the server keeps serving. The stage is not cancelled, as the locator may share it
+ * with other requests, and the abandoned request is not logged as an error.
  */
 class HandlerRouteLocatorCancellationTest {
     private static final String SPEC_NAME = "HandlerRouteLocatorCancellationTest";
     private static final String ORIGIN = "https://foo.com";
     private static final long TIMEOUT_MILLIS = 10_000;
 
+    private static final ListAppender<ILoggingEvent> LOGS = new ListAppender<>();
+
     private static ApplicationContext ctx;
     private static EmbeddedServer server;
     private static Stages stages;
+    private static @Nullable Level level;
 
     @BeforeAll
     static void start() {
@@ -72,37 +85,101 @@ class HandlerRouteLocatorCancellationTest {
         ));
         server = ctx.getBean(EmbeddedServer.class).start();
         stages = ctx.getBean(Stages.class);
+        // an abandoned request is logged at the debug level, like a request whose connection closed
+        Logger logger = routeExecutorLogger();
+        level = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        LOGS.start();
+        logger.addAppender(LOGS);
     }
 
     @AfterAll
     static void stop() {
+        Logger logger = routeExecutorLogger();
+        logger.detachAppender(LOGS);
+        logger.setLevel(level);
         if (ctx != null) {
             ctx.close();
         }
     }
 
+    private static Logger routeExecutorLogger() {
+        return (Logger) LoggerFactory.getLogger(RouteExecutor.class);
+    }
+
+    /**
+     * @return The logged events of the requests the server stopped waiting for
+     */
+    private static List<ILoggingEvent> abandonments() {
+        synchronized (LOGS) {
+            return LOGS.list.stream()
+                .filter(event -> event.getThrowableProxy() != null && event.getThrowableProxy().getClassName().endsWith("LocationAbandoned"))
+                .toList();
+        }
+    }
+
     @Test
-    void aPendingLocatorIsCancelledWhenTheClientCloses() throws Exception {
+    void aPendingLocatorIsAbandonedWhenTheClientCloses() throws Exception {
         abandon("request", "GET /pending/request/items HTTP/1.1\r\nHost: localhost\r\n\r\n");
         assertServes();
     }
 
     @Test
-    void aPendingLocatorOfAPreflightIsCancelledWhenTheClientCloses() throws Exception {
+    void aPendingLocatorOfAPreflightIsAbandonedWhenTheClientCloses() throws Exception {
         abandon("preflight", "OPTIONS /pending/preflight/items HTTP/1.1\r\nHost: localhost\r\nOrigin: " + ORIGIN
             + "\r\nAccess-Control-Request-Method: GET\r\n\r\n");
         assertServes();
     }
 
+    @Test
+    void anAbandonedRequestIsNotLoggedAsAnError() throws Exception {
+        abandon("logged", "GET /pending/logged/items HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        List<ILoggingEvent> abandonments = abandonments();
+        assertTrue(abandonments.stream().allMatch(event -> event.getLevel() == Level.DEBUG), abandonments::toString);
+    }
+
+    @Test
+    void aStageSharedWithAnotherRequestStaysUsable() throws Exception {
+        try (Socket waiting = new Socket("localhost", server.getPort())) {
+            waiting.setSoTimeout((int) TIMEOUT_MILLIS);
+            OutputStream waitingOut = waiting.getOutputStream();
+            waitingOut.write("GET /pending/shared/items HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+            waitingOut.flush();
+            await("the locator of the waiting request runs", () -> stages.stages.containsKey("shared"));
+            // a second request for the same target, which the client abandons
+            abandon("shared", "GET /pending/shared/items HTTP/1.1\r\nHost: localhost\r\n\r\n", 2);
+
+            CompletableFuture<Object> stage = stages.stages.get("shared");
+            assertTrue(stage.complete("target"));
+            ByteArrayOutputStream response = new ByteArrayOutputStream();
+            waiting.getInputStream().transferTo(response);
+            String text = response.toString(StandardCharsets.US_ASCII);
+            assertTrue(text.startsWith("HTTP/1.1 200"), text);
+            assertTrue(text.endsWith("item"), text);
+        }
+    }
+
     private static void abandon(String id, String request) throws Exception {
+        abandon(id, request, 1);
+    }
+
+    /**
+     * Send a request whose locator waits for the stage of the id, close the connection, and wait
+     * until the server stopped waiting for the stage: the request is abandoned, and the stage is
+     * not cancelled.
+     *
+     * @param calls The calls of the locator of the id once it ran for the request
+     */
+    private static void abandon(String id, String request, int calls) throws Exception {
+        int abandoned = abandonments().size();
         try (Socket socket = new Socket("localhost", server.getPort())) {
             OutputStream out = socket.getOutputStream();
             out.write(request.getBytes(StandardCharsets.US_ASCII));
             out.flush();
-            await("the locator of " + id + " runs", () -> stages.stages.containsKey(id));
+            await("the locator of " + id + " runs", () -> stages.calls(id) >= calls);
         }
-        CompletableFuture<Object> stage = stages.stages.get(id);
-        await("the stage of the locator of " + id + " is cancelled", stage::isCancelled);
+        await("the request of " + id + " is abandoned", () -> abandonments().size() > abandoned);
+        assertFalse(stages.stages.get(id).isCancelled(), "the stage of " + id + " is not cancelled");
     }
 
     private static void assertServes() throws IOException {
@@ -134,6 +211,18 @@ class HandlerRouteLocatorCancellationTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Stages {
         final Map<String, CompletableFuture<Object>> stages = new ConcurrentHashMap<>();
+        final Map<String, AtomicInteger> calls = new ConcurrentHashMap<>();
+
+        CompletableFuture<Object> locate(String id) {
+            calls.computeIfAbsent(id, key -> new AtomicInteger()).incrementAndGet();
+            // never completes on its own, shared by the requests of the id
+            return stages.computeIfAbsent(id, key -> new CompletableFuture<>());
+        }
+
+        int calls(String id) {
+            AtomicInteger count = calls.get(id);
+            return count == null ? 0 : count.get();
+        }
     }
 
     @Singleton
@@ -150,9 +239,7 @@ class HandlerRouteLocatorCancellationTest {
         @Override
         public void routes(HttpRouteBuilder routes) {
             ItemRoutes items = new ItemRoutes();
-            // never completes on its own
-            routes.locateAsync("/pending/{id}", (request, pathVariables) ->
-                stages.stages.computeIfAbsent(pathVariables.getString("id"), id -> new CompletableFuture<>()), target -> items);
+            routes.locateAsync("/pending/{id}", (request, pathVariables) -> stages.locate(pathVariables.getString("id")), target -> items);
             routes.locateAsync("/located/{id}", (request, pathVariables) -> CompletableFuture.supplyAsync(() -> "target", executor), items);
         }
     }
