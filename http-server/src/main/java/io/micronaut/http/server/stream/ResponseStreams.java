@@ -18,18 +18,12 @@ package io.micronaut.http.server.stream;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
-import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseElements;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Streamed response bodies without Reactive Streams: the entry point of the response encoding
@@ -78,80 +72,31 @@ public final class ResponseStreams {
     }
 
     /**
-     * Encodes the elements of a streamed body.
+     * Encodes the elements of a streamed body, like the elements of a {@code Publisher} body.
      */
     public interface ElementEncoder {
         /**
+         * Encode an element, with the bytes that precede it, e.g. the separator of a JSON array.
+         * Called one element at a time, in order.
+         *
          * @param element The element
-         * @param framing The framing of the elements, see {@link #framing}
-         * @param first   Whether it is the first element
-         * @return The bytes of the element, after the bytes of the framing that precede it
-         * @throws Exception If the element cannot be encoded
+         * @return The bytes of the element, possibly encoded on another thread, e.g. by a
+         * blocking writer
          */
-        ReadBuffer encode(Object element, Framing framing, boolean first) throws Exception;
+        ExecutionFlow<CloseableByteBody> encode(Object element);
 
         /**
-         * The framing of the elements, decided on the first element.
+         * The bytes that end the body, e.g. the end of a JSON array.
          *
-         * @param firstElement The first element, or {@code null} if there is none
-         * @return The framing
-         */
-        Framing framing(@Nullable Object firstElement);
-    }
-
-    /**
-     * The bytes around and between the elements of a streamed body.
-     */
-    public enum Framing {
-        /**
-         * The elements one after the other.
-         */
-        NONE(null, null, null, null),
-        /**
-         * The elements of a JSON array: {@code [a,b]}, and {@code []} for none.
-         */
-        JSON_ARRAY("[", ",", "]", "[]");
-
-        private final byte @Nullable [] open;
-        private final byte @Nullable [] separator;
-        private final byte @Nullable [] close;
-        private final byte @Nullable [] empty;
-
-        Framing(@Nullable String open, @Nullable String separator, @Nullable String close, @Nullable String empty) {
-            this.open = bytes(open);
-            this.separator = bytes(separator);
-            this.close = bytes(close);
-            this.empty = bytes(empty);
-        }
-
-        /**
-         * Write the bytes that precede an element.
-         *
-         * @param out   The output of the element
-         * @param first Whether it is the first element
-         * @throws IOException If writing fails
-         */
-        public void writePrefix(OutputStream out, boolean first) throws IOException {
-            byte[] prefix = first ? open : separator;
-            if (prefix != null) {
-                out.write(prefix);
-            }
-        }
-
-        /**
-         * The bytes that end the body.
-         *
-         * @param factory The buffer factory
-         * @param none    Whether there was no element
+         * @param none Whether there was no element
          * @return The bytes, or {@code null} if there are none
          */
-        @Nullable ReadBuffer end(ReadBufferFactory factory, boolean none) {
-            byte[] end = none ? empty : close;
-            return end == null ? null : factory.copyOf(ByteBuffer.wrap(end));
-        }
+        @Nullable ReadBuffer end(boolean none);
 
-        private static byte @Nullable [] bytes(@Nullable String text) {
-            return text == null ? null : text.getBytes(StandardCharsets.UTF_8);
+        /**
+         * Release what the encoder holds: the body ended, failed, or the client disconnected.
+         */
+        default void close() {
         }
     }
 }

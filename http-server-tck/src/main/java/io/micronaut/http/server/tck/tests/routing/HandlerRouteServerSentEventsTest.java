@@ -356,6 +356,15 @@ public class HandlerRouteServerSentEventsTest {
     }
 
     @Test
+    void failureAfterTheStreamCompletedHasNoEffect() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/sse/fail-on-close"), String.class);
+            assertEquals(HttpStatus.OK, response.getStatus());
+            assertEquals("", response.getBody(String.class).orElse(""));
+        }
+    }
+
+    @Test
     void submittedFormIsStreamedBack() throws Exception {
         try (ServerUnderTest server = server()) {
             HttpResponse<String> response = server.exchange(HttpRequest.POST("/sse/form", "name=Fred").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String.class);
@@ -637,7 +646,9 @@ public class HandlerRouteServerSentEventsTest {
                 });
                 routes.GET("/sse/blocking-break").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
                     recorder.record("blocking-break", events);
-                    events.sendAndAwait("one");
+                    // a high-water mark of one byte: the send returns once the connection took the
+                    // event, so the failure does not overtake it
+                    events.highWaterMark(1).sendAndAwait("one");
                     throw new IllegalStateException("database went away");
                 });
                 routes.GET("/sse/late-keep-open").sse((request, pathVariables, events) ->
@@ -674,6 +685,8 @@ public class HandlerRouteServerSentEventsTest {
                             }
                         });
                 });
+                routes.GET("/sse/fail-on-close").sse((request, pathVariables, events) ->
+                    events.onClose(cause -> events.fail(new HttpStatusException(HttpStatus.CONFLICT, "late failure"))));
                 routes.POST("/sse/form").form().sse((request, pathVariables, form, events) -> events.send("hello " + form.getString("name")));
             };
         }

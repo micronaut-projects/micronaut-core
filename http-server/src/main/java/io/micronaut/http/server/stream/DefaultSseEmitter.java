@@ -347,9 +347,10 @@ final class DefaultSseEmitter implements SseEmitter {
      * @return Whether this failed the stream, which was open
      */
     private boolean failStream(Throwable cause) {
-        if (responseState.compareAndSet(ResponseState.PENDING, ResponseState.REFUSED)) {
-            // nothing was sent: the error handling of the route answers
-            stream.abandon(cause);
+        // nothing was sent: the error handling of the route answers. Only an open stream is
+        // refused: a stream that completed, e.g. a fail() from an onClose callback of complete(),
+        // keeps its response
+        if (stream.abandon(cause, () -> responseState.compareAndSet(ResponseState.PENDING, ResponseState.REFUSED))) {
             context.propagate(() -> response.completeExceptionally(cause));
             return true;
         }

@@ -21,9 +21,9 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseElements;
-import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Pulls the elements of a {@link ResponseElements} body into a {@link BodyStream}: one
- * {@link ResponseElements#next()} at a time, and only while the stream is writable.
+ * {@link ResponseElements#next()} at a time, and only while the stream is writable. An element
+ * is encoded, possibly on another thread, and written before the next one is pulled.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -44,23 +45,19 @@ final class ResponseElementsBody {
     private final ResponseElements<?> elements;
     private final ResponseStreams.ElementEncoder encoder;
     private final BodyStream stream;
-    private final ByteBodyFactory factory;
+    private final PropagatedContext context;
     private final DelayedExecutionFlow<CloseableByteBody> firstElement = DelayedExecutionFlow.create();
     /**
-     * Whether a pull loop runs or a {@link ResponseElements#next()} is pending.
+     * Whether a pull loop runs or an element is on its way.
      */
     private final AtomicBoolean pulling = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     /**
-     * The framing of the elements, decided on the first element. Only changed by the owner of
-     * {@link #pulling}, like {@link #first}.
+     * Only changed by the owner of {@link #pulling}.
      */
-    private ResponseStreams.Framing framing = ResponseStreams.Framing.NONE;
     private boolean first = true;
-    private final PropagatedContext context;
 
     private ResponseElementsBody(ByteBodyFactory factory, ResponseElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
-        this.factory = factory;
         this.elements = elements;
         this.encoder = encoder;
         this.context = PropagatedContext.getOrEmpty();
@@ -105,18 +102,11 @@ final class ResponseElementsBody {
                 }
                 return;
             }
-            CompletionStage<? extends Optional<?>> next;
-            try {
-                next = Objects.requireNonNull(elements.next(), "The response elements returned no stage");
-            } catch (Throwable e) {
-                failed(e);
-                return;
-            }
-            // the second of the stage and this loop to get here continues the pull: this loop if
-            // the stage completed synchronously, instead of recursing, else the completing thread
+            // the second of the step and this loop to get here continues the pull: this loop if
+            // the step completed synchronously, instead of recursing, else the completing thread
             AtomicBoolean handOff = new AtomicBoolean();
-            next.whenComplete((element, error) -> {
-                if (onNext(element, error) && handOff.getAndSet(true)) {
+            step(proceed -> {
+                if (proceed && handOff.getAndSet(true)) {
                     context.propagate(this::loop);
                 }
             });
@@ -127,43 +117,81 @@ final class ResponseElementsBody {
     }
 
     /**
-     * @return Whether to continue pulling
+     * Pull, encode and write one element, or end the body.
+     *
+     * @param done Called once the element is written, with whether to continue pulling
      */
-    private boolean onNext(@Nullable Object result, @Nullable Throwable error) {
-        if (error != null) {
-            failed(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
-            return false;
-        }
-        if (!(result instanceof Optional<?> element) || element.isEmpty()) {
-            if (first) {
-                framing = encoder.framing(null);
-            }
-            ReadBuffer end = framing.end(factory.readBufferFactory(), first);
-            if (end != null) {
-                stream.write(end);
-            }
-            stream.complete();
-            respond();
-            return false;
-        }
-        ReadBuffer data;
+    private void step(StepDone done) {
+        CompletionStage<? extends Optional<?>> next;
         try {
-            if (first) {
-                framing = encoder.framing(element.get());
-            }
-            data = encoder.encode(element.get(), framing, first);
+            next = Objects.requireNonNull(elements.next(), "The response elements returned no stage");
         } catch (Throwable e) {
             failed(e);
-            return false;
+            done.accept(false);
+            return;
         }
-        stream.write(data);
+        next.whenComplete((result, error) -> {
+            if (error != null) {
+                failed(unwrap(error));
+                done.accept(false);
+            } else if (!(result instanceof Optional<?> element) || element.isEmpty()) {
+                end();
+                done.accept(false);
+            } else {
+                encode(element.get(), done);
+            }
+        });
+    }
+
+    private void encode(Object element, StepDone done) {
+        ExecutionFlow<CloseableByteBody> encoded;
+        try {
+            encoded = encoder.encode(element);
+        } catch (Throwable e) {
+            failed(e);
+            done.accept(false);
+            return;
+        }
+        encoded.onComplete((piece, error) -> {
+            if (error != null || piece == null) {
+                failed(error == null ? new NullPointerException("The element was encoded to no body") : unwrap(error));
+                done.accept(false);
+                return;
+            }
+            if (piece instanceof CloseableAvailableByteBody available) {
+                write(available, done);
+            } else {
+                piece.buffer().whenComplete((available, bufferError) -> {
+                    if (bufferError != null) {
+                        failed(unwrap(bufferError));
+                        done.accept(false);
+                    } else {
+                        write(available, done);
+                    }
+                });
+            }
+        });
+    }
+
+    private void write(CloseableAvailableByteBody piece, StepDone done) {
+        stream.write(piece.toReadBuffer());
         respond();
         if (!stream.isOpen()) {
             // the client left
             pulling.set(false);
-            return false;
+            done.accept(false);
+        } else {
+            done.accept(true);
         }
-        return true;
+    }
+
+    private void end() {
+        ReadBuffer end = encoder.end(first);
+        if (end != null) {
+            stream.write(end);
+        }
+        stream.complete();
+        respond();
     }
 
     private void respond() {
@@ -186,7 +214,26 @@ final class ResponseElementsBody {
 
     private void close() {
         if (closed.compareAndSet(false, true)) {
-            ResponseStreams.discard(elements);
+            try {
+                encoder.close();
+            } finally {
+                ResponseStreams.discard(elements);
+            }
         }
+    }
+
+    private static Throwable unwrap(Throwable error) {
+        return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+    }
+
+    /**
+     * Called once when a step finished.
+     */
+    @FunctionalInterface
+    private interface StepDone {
+        /**
+         * @param proceed Whether to continue pulling
+         */
+        void accept(boolean proceed);
     }
 }

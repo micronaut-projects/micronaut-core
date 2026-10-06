@@ -26,7 +26,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
-import io.micronaut.http.CaseInsensitiveMutableHttpHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -60,7 +59,6 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
@@ -295,9 +293,11 @@ public abstract class ResponseLifecycle {
      * Stream the elements of a {@link ResponseElements} body without Reactive Streams: like the
      * elements of a publisher body ({@link #mapToHttpContent}), each written with the writer of
      * its type for the media type of the response, and framed as a JSON array for a JSON media
-     * type. The elements are pulled one at a time while the connection keeps up. The response is
-     * sent once the first element (or the end) is available, so a failure of the first element
-     * is answered like a failure of the route.
+     * type, through the piece writers of the publisher body: a blocking writer runs on the I/O
+     * executor, and a {@code ByteBody} element is written as it is. The elements are pulled one at
+     * a time while the connection keeps up. The response is sent once the first element (or the
+     * end) is available: a failure of the first element fails the flow, so the error handling of
+     * the route answers it, like a failure of a writer.
      *
      * @param request   The request
      * @param response  The response
@@ -321,31 +321,46 @@ public abstract class ResponseLifecycle {
             response.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, Boolean.TRUE);
         }
         List<MediaType> mediaTypes = List.of(mediaType);
+        // like a publisher body without a route: a JSON array unless the first element is raw bytes
+        AtomicBoolean jsonFormattable = new AtomicBoolean(true);
+        BooleanSupplier isJson = () -> jsonMediaType && jsonFormattable.get();
+        PieceStream pieces = new PieceStream(request, response, isJson);
         ResponseStreams.ElementEncoder encoder = new ResponseStreams.ElementEncoder() {
+            /**
+             * Only touched by the encoding of one element at a time.
+             */
+            private boolean first = true;
+
             @Override
-            public ReadBuffer encode(Object element, ResponseStreams.Framing framing, boolean first) throws IOException {
+            public ExecutionFlow<CloseableByteBody> encode(Object element) {
                 Argument<Object> type = Argument.ofInstance(element);
-                MessageBodyWriter<Object> writer = messageBodyHandlerRegistry.getWriter(type, mediaTypes);
-                return byteBodyFactory.readBufferFactory().buffer(out -> {
-                    framing.writePrefix(out, first);
-                    // the headers of the response may already be sent: the elements are
-                    // written after, on any thread
-                    writer.writeTo(type, finalMediaType, element, new CaseInsensitiveMutableHttpHeaders(conversionService), out);
-                });
+                if (first) {
+                    first = false;
+                    if (jsonMediaType && !isJsonFormattable(type)) {
+                        jsonFormattable.set(false);
+                    }
+                }
+                return pieces.write(messageBodyHandlerRegistry.getWriter(type, mediaTypes), type, finalMediaType, element);
             }
 
             @Override
-            public ResponseStreams.Framing framing(@Nullable Object firstElement) {
-                // like a publisher body: a JSON array unless the elements are raw bytes
-                return jsonMediaType && (firstElement == null || isJsonFormattable(Argument.ofInstance(firstElement)))
-                    ? ResponseStreams.Framing.JSON_ARRAY
-                    : ResponseStreams.Framing.NONE;
+            public @Nullable ReadBuffer end(boolean none) {
+                if (!isJson.getAsBoolean()) {
+                    return null;
+                }
+                ConcatenatingSubscriber.Separators separators = jsonSeparators();
+                ReadBuffer end = none ? separators.empty() : separators.afterLast();
+                return end == null ? null : end.duplicate();
+            }
+
+            @Override
+            public void close() {
+                pieces.close();
             }
         };
         int highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
         return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark)
-            .<ByteBodyHttpResponse<?>>map(body -> ByteBodyHttpResponseWrapper.wrap(response, body))
-            .onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));
+            .map(body -> ByteBodyHttpResponseWrapper.wrap(response, body));
     }
 
     /**

@@ -20,9 +20,12 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ResponseElements;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.sse.Event;
@@ -36,6 +39,7 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -202,6 +206,42 @@ public class HandlerRouteResponseElementsTest {
     }
 
     @Test
+    void byteBodyElementsAreWrittenAsTheyAre() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/elements/bytes"), String.class);
+            assertEquals("hello bytes", response.body());
+            assertClosed(server, "bytes");
+        }
+    }
+
+    @Test
+    void failureOfTheFirstElementReachesTheErrorRoutes() throws Exception {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/elements/refuse-custom"), HttpResponseAssertion.builder()
+                .status(HttpStatus.I_AM_A_TEAPOT)
+                .body("handled")
+                .build());
+            assertClosed(server, "refuse-custom");
+        }
+    }
+
+    @Test
+    void bodyReplacedInPlaceByAFilterClosesTheElements() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertEquals("replacement", server.exchange(HttpRequest.GET("/elements/body-replaced"), String.class).body());
+            assertClosed(server, "body-replaced");
+        }
+    }
+
+    @Test
+    void responseWrappedByAFilterKeepsTheElements() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertEquals("hello", server.exchange(HttpRequest.GET("/elements/wrapped"), String.class).body());
+            assertClosed(server, "wrapped");
+        }
+    }
+
+    @Test
     void responseReplacedByAFilterClosesTheElements() throws Exception {
         try (ServerUnderTest server = server()) {
             HttpResponse<String> response = server.exchange(HttpRequest.GET("/elements/replaced"), String.class);
@@ -220,6 +260,12 @@ public class HandlerRouteResponseElementsTest {
 
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+    }
+
+    static final class Refused extends RuntimeException {
+        Refused() {
+            super("refused");
+        }
     }
 
     @Singleton
@@ -348,6 +394,21 @@ public class HandlerRouteResponseElementsTest {
                 routes.GET("/elements/replaced")
                     .afterReplacing((request, response) -> HttpResponse.ok("replaced").contentType(MediaType.TEXT_PLAIN_TYPE)).and()
                     .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("replaced", List.of("never").iterator()))
+                        .contentType(MediaType.TEXT_PLAIN_TYPE));
+                routes.GET("/elements/bytes", (request, pathVariables) -> HttpResponse.ok(recorder.source("bytes", List.of(
+                    ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).copyOf("hello ", StandardCharsets.UTF_8),
+                    ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).copyOf("bytes", StandardCharsets.UTF_8)).iterator()))
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE));
+                routes.GET("/elements/refuse-custom", (request, pathVariables) -> HttpResponse.ok(ResponseElements.of(
+                    () -> CompletableFuture.<Optional<String>>failedFuture(new Refused()), () -> recorder.closed("refuse-custom").complete(null))));
+                routes.error(Refused.class, (request, error) -> HttpResponse.status(HttpStatus.I_AM_A_TEAPOT).body("handled"));
+                routes.GET("/elements/body-replaced")
+                    .after((request, response) -> response.body("replacement")).and()
+                    .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("body-replaced", List.of("never").iterator()))
+                        .contentType(MediaType.TEXT_PLAIN_TYPE));
+                routes.GET("/elements/wrapped")
+                    .afterReplacing((request, response) -> new HttpResponseWrapper<>(response)).and()
+                    .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("wrapped", List.of("hello").iterator()))
                         .contentType(MediaType.TEXT_PLAIN_TYPE));
                 routes.GET("/elements/endless", (request, pathVariables) -> HttpResponse.ok(recorder.source("endless", new Iterator<String>() {
                     @Override

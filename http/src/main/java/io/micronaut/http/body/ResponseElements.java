@@ -54,7 +54,12 @@ import java.util.function.Supplier;
  *
  * <p>{@link #close()} is called once when the response ends: after the end, after a failure, when
  * the client disconnects, when the body is not written at all (a {@code HEAD} request), and when a
- * filter replaces the response.</p>
+ * filter replaces the response or its body. A filter that replaces them with other elements hands
+ * them over: the new elements are closed instead, and close these if they wrap them.</p>
+ *
+ * <p>The elements are written like the elements of a {@code Publisher} body: with the writer of
+ * their type, on a worker thread if the writer is blocking, and a
+ * {@link io.micronaut.http.body.ByteBody} element as it is.</p>
  *
  * @param <T> The type of an element
  * @author Denis Stepanov

@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -255,19 +256,36 @@ final class BodyStream implements BufferConsumer.Upstream {
      * The body is closed.
      *
      * @param failure The failure, for the pending writes and the callbacks
+     * @return Whether this closed the stream, which was open
      */
-    void abandon(Throwable failure) {
+    boolean abandon(Throwable failure) {
+        return abandon(failure, () -> true);
+    }
+
+    /**
+     * Close the stream because the body will not be sent, if it is open and the response is
+     * refused: the decision is atomic with the state of the stream, so a stream that completed
+     * meanwhile is not refused. The body is closed.
+     *
+     * @param failure The failure, for the pending writes and the callbacks
+     * @param refuse  Refuses the response, under the lock of the stream: {@code false} if the
+     *                response was sent meanwhile
+     * @return Whether this closed the stream
+     */
+    boolean abandon(Throwable failure, BooleanSupplier refuse) {
         Effects effects = new Effects();
         lock.lock();
         try {
-            if (state == State.OPEN) {
-                closeLocked(State.FAILED, failure, failure, effects);
+            if (state != State.OPEN || !refuse.getAsBoolean()) {
+                return false;
             }
+            closeLocked(State.FAILED, failure, failure, effects);
         } finally {
             lock.unlock();
         }
         effects.run();
         body.close();
+        return true;
     }
 
     /**
