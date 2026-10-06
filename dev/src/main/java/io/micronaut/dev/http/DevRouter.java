@@ -21,6 +21,8 @@ import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.event.BeanDestroyedEvent;
+import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
@@ -38,6 +40,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanType;
@@ -58,8 +61,10 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
@@ -83,6 +88,10 @@ import java.util.stream.Stream;
  *     or {@link RouteBuilder} bean, or the factory producing one, whose method bodies are what declares
  *     the routes. A controller method's body is not, as its route comes from its annotations, and a
  *     change of those restarts the generation.</li>
+ *     <li>a server filter bean, a {@link ServerFilter} or a {@link Filter} one, is destroyed, such as by
+ *     {@link WatchableBeanContext#recreate(Object)}: a filter route keeps the instance it resolved first, so the table
+ *     is rebuilt for the next request, whose filter routes resolve the bean anew. A module that recreates a filter
+ *     needs nothing else.</li>
  * </ul>
  * <p>A restart needs none of this: the new generation's context builds a new router from its own classes.</p>
  *
@@ -104,6 +113,10 @@ public final class DevRouter implements Router {
     private volatile @Nullable Router router;
     private volatile @Nullable List<Integer> defaultPorts;
     private volatile int rebuilds;
+    // how many filter beans were destroyed, other than by a rebuild, and how many the route table was built after
+    private final AtomicInteger filtersDestroyed = new AtomicInteger();
+    private volatile int filtersSeen;
+    private volatile @Nullable Thread rebuilding;
 
     /**
      * @param context The context
@@ -126,14 +139,19 @@ public final class DevRouter implements Router {
      */
     public Router current() {
         Router current = router;
-        if (current != null) {
+        if (current != null && filtersSeen == filtersDestroyed.get()) {
             return current;
         }
         synchronized (lock) {
             current = router;
             if (current == null) {
+                filtersSeen = filtersDestroyed.get();
                 current = resolve();
                 router = current;
+            } else if (filtersSeen != filtersDestroyed.get()) {
+                // a filter bean was destroyed since the table was built, and its routes hold the instance that went
+                rebuild();
+                current = Objects.requireNonNull(router);
             }
             return current;
         }
@@ -159,6 +177,10 @@ public final class DevRouter implements Router {
         }
         synchronized (lock) {
             Router previous = router;
+            // the filters destroyed so far are resolved anew by the routes of a new table, as are those the rebuild destroys;
+            // should no table be built, they stay pending and the next request tries again
+            int destroyed = filtersDestroyed.get();
+            rebuilding = Thread.currentThread();
             try {
                 // the router depends on the builders: recreating one destroys the router, and the builders
                 // recreated read the definitions and the code as they are now
@@ -170,6 +192,7 @@ public final class DevRouter implements Router {
                     watchable.recreate(previous);
                 }
                 install(resolve());
+                filtersSeen = destroyed;
                 rebuilds++;
                 LOG.debug("Rebuilt the route table in place");
             } catch (RuntimeException e) {
@@ -178,10 +201,24 @@ public final class DevRouter implements Router {
                 // can build now, or else through the previous router, whose table is still the one it built
                 try {
                     install(resolve());
+                    filtersSeen = destroyed;
                 } catch (RuntimeException again) {
                     LOG.debug("No router can be built until the routes are fixed; the previous routes stay", again);
                 }
+            } finally {
+                rebuilding = null;
             }
+        }
+    }
+
+    /**
+     * Called when a server filter bean of the context is destroyed, such as by {@link WatchableBeanContext#recreate(Object)}:
+     * the next request is routed by a table rebuilt then, whose filter routes resolve the bean anew. Takes no lock, as the
+     * thread destroying the bean may hold the context's.
+     */
+    void filterDestroyed() {
+        if (rebuilding != Thread.currentThread()) {
+            filtersDestroyed.incrementAndGet();
         }
     }
 
@@ -484,6 +521,36 @@ public final class DevRouter implements Router {
                 }
             }
             return true;
+        }
+    }
+
+    /**
+     * Tells the development router that a server filter bean was destroyed. It exists only beside that router, in
+     * development mode, and looks the router up among the beans already created, never creating it.
+     */
+    @Internal
+    @Singleton
+    @Requires(classes = Router.class)
+    @Requires(condition = DevelopmentMode.Active.class)
+    @Requires(condition = DevRouter.NoPrimaryApplicationRouter.class)
+    static final class FilterDestroyedListener implements BeanDestroyedEventListener<Object> {
+
+        private final BeanContext context;
+
+        FilterDestroyedListener(BeanContext context) {
+            this.context = context;
+        }
+
+        @Override
+        public void onDestroyed(BeanDestroyedEvent<Object> event) {
+            BeanDefinition<Object> definition = event.getBeanDefinition();
+            // the filters the route table holds: a client filter declared with @Filter is left out of it
+            if (definition.hasStereotype(ServerFilter.class)
+                || (definition.hasStereotype(Filter.class) && !HttpClientFilter.class.isAssignableFrom(definition.getBeanType()))) {
+                for (BeanRegistration<DevRouter> registration : context.getActiveBeanRegistrations(DevRouter.class)) {
+                    registration.getBean().filterDestroyed();
+                }
+            }
         }
     }
 }

@@ -2,12 +2,16 @@ package io.micronaut.dev.http;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.DefaultRouteBuilder;
@@ -26,10 +30,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -171,6 +177,37 @@ class DevRouterTest {
     }
 
     @Test
+    void aRecreatedFilterBeanServesTheNextRequestWithNoExplicitRebuild() throws IOException {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(
+            "spec.name", "DevRouterTest",
+            "dev-router.filter", true,
+            "micronaut.server.port", -1,
+            DevelopmentMode.PROPERTY, true))) {
+            EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
+            DevRouter devRouter = context.getBean(DevRouter.class);
+            InstanceFilter first = context.getBean(InstanceFilter.class);
+            assertEquals(String.valueOf(first.instance), header(server.getPort(), "/dev-router/static", "X-Filter-Instance"));
+
+            // what a module does when the configuration of its filter changes, such as the security filter's
+            assertTrue(((WatchableBeanContext) context).recreate(first));
+            InstanceFilter second = context.getBean(InstanceFilter.class);
+            assertNotSame(first, second);
+
+            // the next request goes through the new instance: the router rebuilt the table by itself
+            assertEquals(String.valueOf(second.instance), header(server.getPort(), "/dev-router/static", "X-Filter-Instance"));
+            assertEquals(String.valueOf(second.instance), header(server.getPort(), "/dev-router/static", "X-Filter-Instance"));
+            assertEquals(1, devRouter.rebuilds());
+            assertEquals("200 static", get(server, "/dev-router/static"));
+
+            // an explicit rebuild still works, and keeps the instance
+            devRouter.rebuild();
+            assertEquals(2, devRouter.rebuilds());
+            assertEquals(String.valueOf(second.instance), header(server.getPort(), "/dev-router/static", "X-Filter-Instance"));
+            assertSame(second, context.getBean(InstanceFilter.class));
+        }
+    }
+
+    @Test
     void anApplicationThatDeclaresAPrimaryRouterKeepsIt() throws IOException {
         try (ApplicationContext context = ApplicationContext.run(Map.of(
             "spec.name", "DevRouterTest",
@@ -201,6 +238,20 @@ class DevRouterTest {
 
     private static String get(EmbeddedServer server, String path) throws IOException {
         return get(server.getPort(), path);
+    }
+
+    private static String header(int port, String path, String name) throws IOException {
+        try (Socket socket = new Socket("localhost", port)) {
+            socket.setSoTimeout(30_000);
+            socket.getOutputStream().write(("GET " + path + " HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            for (String line : response.substring(0, response.indexOf("\r\n\r\n")).split("\r\n")) {
+                if (line.regionMatches(true, 0, name + ":", 0, name.length() + 1)) {
+                    return line.substring(name.length() + 1).trim();
+                }
+            }
+            return null;
+        }
     }
 
     private static String get(int port, String path) throws IOException {
@@ -268,6 +319,20 @@ class DevRouterTest {
                 throw new IllegalStateException("flaky routes");
             }
             return super.getExposedPorts();
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DevRouterTest")
+    @Requires(property = "dev-router.filter")
+    @ServerFilter("/dev-router/**")
+    static class InstanceFilter {
+        static final AtomicInteger CREATED = new AtomicInteger();
+
+        private final int instance = CREATED.incrementAndGet();
+
+        @ResponseFilter
+        void tag(MutableHttpResponse<?> response) {
+            response.header("X-Filter-Instance", String.valueOf(instance));
         }
     }
 
