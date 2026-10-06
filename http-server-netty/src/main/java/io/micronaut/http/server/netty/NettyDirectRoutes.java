@@ -177,22 +177,13 @@ final class NettyDirectRoutes {
             // e.g. a malformed or too long header: the ordinary path answers 400 or 413, and closes the connection
             return false;
         }
-        String target = request.uri();
-        if (!UriUtil.isValidPath(target)) {
-            try {
-                // like the request the server would create, e.g. an absolute-form or escaped target
-                target = AbstractNettyHttpRequest.validatedTarget(target, configuration.isEscapeHtmlUrl());
-            } catch (IllegalArgumentException e) {
-                // an invalid request target: the ordinary path answers 400
-                return false;
-            }
-        }
-        NettyDirectRequest directRequest = new NettyDirectRequest(ctx, request, target, configuration);
+        NettyDirectRequest directRequest = new NettyDirectRequest(ctx, request, configuration);
         io.micronaut.http.HttpResponse<?> direct;
         try {
             direct = routes.find(directRequest, RESPONSES);
-        } catch (InvalidQueryException e) {
-            // the query does not decode: the ordinary path answers 400, with the body untouched
+        } catch (InvalidRequestException e) {
+            // the target or the query is not a valid URI, read before any route runs: the
+            // ordinary path answers 400, with the body untouched
             return false;
         } catch (Throwable e) {
             // an Error too: the request is answered
@@ -508,11 +499,12 @@ final class NettyDirectRoutes {
     }
 
     /**
-     * A query that does not decode, e.g. with a malformed escape: the request is not a direct
-     * route's, and the ordinary path answers it with {@code 400}.
+     * A request target or a query that is not a valid URI, e.g. with a malformed escape, found
+     * when the lookup reads it: the request is not a direct route's, and the ordinary path
+     * answers it with {@code 400}.
      */
-    private static final class InvalidQueryException extends RuntimeException {
-        InvalidQueryException(IllegalArgumentException cause) {
+    private static final class InvalidRequestException extends RuntimeException {
+        InvalidRequestException(IllegalArgumentException cause) {
             super(cause.getMessage(), cause, false, false);
         }
     }
@@ -543,7 +535,10 @@ final class NettyDirectRoutes {
     }
 
     /**
-     * The Netty request as the direct routes read it. The query is decoded when a query
+     * The Netty request as the direct routes read it. The request target is validated when the
+     * lookup first reads the path, like the {@link NettyHttpRequest} the server would create
+     * validates it, so a request whose method has no direct route is not scanned: an invalid
+     * target throws an {@link InvalidRequestException}. The query is decoded when a query
      * condition first reads it, like {@link NettyHttpRequest} decodes it: with the charset of the
      * content type of the request, or the default charset of the server, and the limits of the
      * server.
@@ -551,18 +546,35 @@ final class NettyDirectRoutes {
     private static final class NettyDirectRequest implements DirectRequest {
         private final ChannelHandlerContext ctx;
         private final HttpRequest request;
-        private final String target;
         private final NettyHttpServerConfiguration configuration;
+        private @Nullable String target;
         private @Nullable Map<String, List<String>> query;
 
-        /**
-         * @param target The request target, validated like the request the server would create
-         */
-        NettyDirectRequest(ChannelHandlerContext ctx, HttpRequest request, String target, NettyHttpServerConfiguration configuration) {
+        NettyDirectRequest(ChannelHandlerContext ctx, HttpRequest request, NettyHttpServerConfiguration configuration) {
             this.ctx = ctx;
             this.request = request;
-            this.target = target;
             this.configuration = configuration;
+        }
+
+        /**
+         * @return The request target, validated like the request the server would create, e.g.
+         * an absolute-form or escaped target
+         * @throws InvalidRequestException if it is not a valid URI
+         */
+        private String target() {
+            String validated = target;
+            if (validated == null) {
+                validated = request.uri();
+                if (!UriUtil.isValidPath(validated)) {
+                    try {
+                        validated = AbstractNettyHttpRequest.validatedTarget(validated, configuration.isEscapeHtmlUrl());
+                    } catch (IllegalArgumentException e) {
+                        throw new InvalidRequestException(e);
+                    }
+                }
+                target = validated;
+            }
+            return validated;
         }
 
         @Override
@@ -571,10 +583,10 @@ final class NettyDirectRoutes {
             if (parameters == null) {
                 Charset charset = HttpUtil.getCharset(request, configuration.getDefaultCharset());
                 try {
-                    parameters = new QueryStringDecoder(target, charset, true, configuration.getMaxParams(),
+                    parameters = new QueryStringDecoder(target(), charset, true, configuration.getMaxParams(),
                         configuration.isSemicolonIsNormalChar()).parameters();
                 } catch (IllegalArgumentException e) {
-                    throw new InvalidQueryException(e);
+                    throw new InvalidRequestException(e);
                 }
                 query = parameters;
             }
@@ -589,7 +601,7 @@ final class NettyDirectRoutes {
         @Override
         public String path() {
             // as NettyHttpRequest#getPath
-            return AbstractNettyHttpRequest.parsePath(target);
+            return AbstractNettyHttpRequest.parsePath(target());
         }
 
         @Override

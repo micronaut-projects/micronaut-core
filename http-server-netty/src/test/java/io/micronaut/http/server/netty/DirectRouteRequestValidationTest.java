@@ -84,6 +84,9 @@ class DirectRouteRequestValidationTest {
             String response = exchange(get(target));
             assertTrue(response.startsWith("http/1.1 400 "), target + ": " + response);
         }
+        // a method without direct routes: the target is validated by the ordinary path only
+        String post = exchange("POST /validation/greet/%zz HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n");
+        assertTrue(post.startsWith("http/1.1 400 "), post);
     }
 
     @Test

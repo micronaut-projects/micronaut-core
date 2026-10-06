@@ -45,6 +45,9 @@ public interface DirectRequest {
      * @return The path of the request as it was received, without the query, like
      * {@link io.micronaut.http.HttpRequest#getPath()}: the path of the request target in origin
      * form, so for an absolute-form target, e.g. {@code GET http://host/p}, the path only
+     * @throws RuntimeException if the runtime validates the request target lazily, when the path
+     *                          is first read, and rejects it: the lookup reads the path before it
+     *                          calls any route, and propagates the exception
      */
     String path();
 

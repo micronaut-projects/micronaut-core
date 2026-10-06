@@ -36,8 +36,10 @@ import org.jspecify.annotations.Nullable;
  *     for it, calls {@link #find(DirectRequest, HttpResponseFactory)} with a
  *     {@link DirectRequest} over its own request and its own {@link HttpResponseFactory}. A
  *     request its decoder failed on, e.g. with a malformed or too long header, or whose target
- *     it rejects as an invalid URI, is never looked up: the runtime answers it with its error as
- *     usual, e.g. {@code 400} or {@code 413};</li>
+ *     it rejects as an invalid URI, is never answered by a direct route: the runtime answers it
+ *     with its error as usual, e.g. {@code 400} or {@code 413}. It may validate the target
+ *     lazily, and throw from {@link DirectRequest#path()}, which this lookup reads before it calls
+ *     any route and only for a method that has direct routes;</li>
  *     <li>if a response is returned, discards the body of the request and writes the response
  *     as it is: its status, headers and body, with only the framing the protocol needs, e.g. the
  *     {@code Content-Length} of the body and the handling of the connection, and the headers the
