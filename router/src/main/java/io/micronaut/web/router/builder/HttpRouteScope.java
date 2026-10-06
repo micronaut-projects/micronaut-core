@@ -25,18 +25,21 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * The declarations of handler routes, group routes, error routes and status routes that the
- * {@link HttpRouteBuilder} of an {@link HttpRoutes} bean, an {@link HttpRouteGroup} and the
- * {@link LocatedHttpRouteBuilder} of {@link LocatedRoutes} have in common. A route is declared in stages, see {@link HttpRouteSpec}. Only the builder declares
- * server filters, see {@link HttpRouteBuilder#serverFilter(String...)}: the filters of a group are
- * route filters, which apply to the routes of the group only.
+ * The declarations of handler routes, locator routes, error routes and status routes that the
+ * {@link HttpRouteBuilder} of an {@link HttpRoutes} bean, an {@link HttpRouteGroup}, and the
+ * {@link LocatedHttpRouteBuilder} of {@link LocatedRoutes} and its groups have in common. A route
+ * is declared in stages, see {@link HttpRouteSpec}. The groups of routes are declared on the
+ * builders and on the groups, see {@link HttpRouteBuilder#group(Consumer)} and
+ * {@link LocatedHttpRouteScope#group(Consumer)}. Only the builder of an {@link HttpRoutes} bean
+ * declares server filters, see {@link HttpRouteBuilder#serverFilter(String...)}: the filters of a
+ * group are route filters, which apply to the routes of the group only.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
 @SuppressWarnings("MethodName")
-public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup, LocatedHttpRouteBuilder, AbstractHttpRouteBuilder {
+public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup, LocatedHttpRouteScope, AbstractHttpRouteBuilder {
 
     /**
      * Declare a route of {@code GET} requests, with an implicit {@code HEAD} route in an
@@ -310,50 +313,6 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
     StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler);
 
     /**
-     * Declare a group of routes, whose filters apply to every route declared in the lambda,
-     * e.g. to filter every route of an {@link HttpRoutes} bean. The builder of an
-     * {@link HttpRoutes} bean has no route filter methods of its own, as it is shared by the beans:
-     * the group is the scope of the filters, see {@link HttpRouteBuilder#serverFilter(String...)} for a server filter.
-     *
-     * <pre>{@code
-     * routes.group(all -> {
-     *     all.beforeReplacing((request, propagatedContext) -> {
-     *         propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
-     *         return null;
-     *     });
-     *     all.GET("/orders", ordersHandler);
-     *     all.GET("/customers", customersHandler);
-     * });
-     * }</pre>
-     *
-     * <p>See {@link HttpRouteGroup} for which routes the filters apply to, and in which order.
-     * A route declared in the lambda is ended with a terminal, see {@link HttpRouteSpec}, before
-     * the lambda returns: otherwise the group fails with an {@link IllegalStateException} naming
-     * the route.</p>
-     *
-     * @param routes Declares the routes and the filters of the group
-     * @since 5.3.0
-     */
-    void group(Consumer<HttpRouteGroup> routes);
-
-    /**
-     * Declare a group of routes under a prefix: the URI template of every route of the group,
-     * including the routes of its nested groups, is the prefix followed by
-     * the URI template of the route, like the URI of a controller method under the URI of the
-     * controller: {@code path("/api", api -> api.GET("/orders", handler))} routes
-     * {@code GET /api/orders}. The prefixes of nested groups add up. The filters of the group apply
-     * to every route declared in the lambda, see {@link HttpRouteGroup}.
-     *
-     * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
-     * query or fragment.</p>
-     *
-     * @param prefix The prefix of the URI templates of the routes of the group
-     * @param routes Declares the routes and the filters of the group
-     * @since 5.3.0
-     */
-    void path(String prefix, Consumer<HttpRouteGroup> routes);
-
-    /**
      * Route the requests under a prefix to the routes of a target located at runtime, like a
      * JAX-RS sub-resource locator. The prefix, e.g. {@code /orders/{id}}, is matched for every
      * standard HTTP method, followed by the rest of the path, which is empty or starts with a
@@ -379,14 +338,20 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
      * <p>When the located routes have no route for the rest of the path, the request is answered
      * like a request that no route matches: {@code 404}, or {@code 405}, {@code 415} or
      * {@code 406} if a located route matches the path with another method or media type. No other
-     * route of the application is tried. The filters of the matched located route apply, and the
-     * server filters apply to the full path.</p>
+     * route of the application is tried. The filters of the matched located route apply, after
+     * the filters of the groups of the locator route, and the server filters apply to the full
+     * path. A located route inherits the annotations, the attributes, the media types and the
+     * executor of the groups of the locator route, like a route declared in them, unless it, or a
+     * group of its {@link LocatedRoutes}, declares its own, see {@link HttpRouteGroup}.</p>
      *
      * <p>The locator runs while the request is matched, see {@link LocatorHandler}, at most once
      * per request: matching the request again, e.g. to find the allowed methods of a
      * {@code 405}, reuses the target, or the exception, of the first call. The routes of a
      * {@link LocatedRoutes} instance are declared once, when the first target it routes is
-     * located, and shared by every locator that answers the instance.
+     * located, and shared by every locator that returns the instance; routes that fail to
+     * declare, e.g. a global error route, fail every request routed to them, and are declared
+     * again for the next one.
+     * The prefix is a path, without a query or a fragment.
      * A request with a custom HTTP method is located like any other: the located routes of that
      * method answer it, or those declared with {@code any(...)}, and the allowed methods of its
      * {@code 405} are those of the located routes.</p>
@@ -436,9 +401,11 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
      * synchronously or asynchronously. The target is located once per request.
      * {@link io.micronaut.web.router.Router#findClosest} of an application with an asynchronous
      * locator that has not located its target yet fails: the server matches such a request
-     * again when the stage completes. The server cancels the stage when the client closes the
-     * connection before it completes, and a CORS preflight request of the prefix is answered
-     * once the target is located, with the methods of its routes.</p>
+     * again when the stage completes. A server that tells when the client goes away, e.g. closes
+     * the connection or resets the HTTP/2 stream, stops waiting for the stage then, without
+     * cancelling it: a locator may return a stage it shares with other requests, e.g. of a cache.
+     * A CORS preflight request of the prefix is answered once the target is located, with the
+     * methods of its routes.</p>
      *
      * @param prefixUri The URI template of the prefix
      * @param locator   Locates the target later, or completes with {@code null} for {@code 404}

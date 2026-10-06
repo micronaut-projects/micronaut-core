@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Handler routes under concurrent requests: the route, group and server filters, the handlers and the asynchronous locators are shared by
+ * Handler routes under concurrent requests: the route, group and server filters and the handlers are shared by
  * every request, and no request may see the values of another.
  */
 @SuppressWarnings({
@@ -68,19 +68,17 @@ public class HandlerRoutesConcurrencyTest {
         try (ServerUnderTest server = server()) {
             List<String> failures = runConcurrently(THREADS, REQUESTS_PER_THREAD, (thread, n) -> {
                 String id = thread + "-" + n;
-                int kind = ThreadLocalRandom.current().nextInt(5);
+                int kind = ThreadLocalRandom.current().nextInt(4);
                 HttpRequest<?> request = switch (kind) {
                     case 0 -> HttpRequest.GET("/conc/sync/" + id);
                     case 1 -> HttpRequest.GET("/conc/async/" + id);
                     case 2 -> HttpRequest.POST("/conc/echo/" + id, "body of " + id).contentType(MediaType.TEXT_PLAIN_TYPE);
-                    case 3 -> HttpRequest.GET("/conc/located/" + id + "/show");
                     default -> HttpRequest.GET("/conc/context/" + id);
                 };
                 String expectedBody = switch (kind) {
                     case 0 -> "sync " + id;
                     case 1 -> "async " + id;
                     case 2 -> "echo " + id + ": body of " + id;
-                    case 3 -> "located " + id;
                     default -> "context " + id;
                 };
                 HttpResponse<String> response = server.exchange(((MutableHttpRequest<?>) request).header(ID, id), String.class);
@@ -90,6 +88,31 @@ public class HandlerRoutesConcurrencyTest {
                 }
                 if (!expectedBody.equals(response.body())) {
                     problems.add("body '" + response.body() + "' expected '" + expectedBody + "'");
+                }
+                for (String header : List.of("X-Server-Filter", "X-Group-Filter", "X-Route-Filter")) {
+                    if (!id.equals(response.getHeaders().get(header))) {
+                        problems.add(header + "=" + response.getHeaders().get(header));
+                    }
+                }
+                return problems.isEmpty() ? null : request.getPath() + ": " + String.join(", ", problems);
+            });
+            assertTrue(failures.isEmpty(), () -> failures.size() + " failures, first: " + failures.subList(0, Math.min(5, failures.size())));
+        }
+    }
+
+    @Test
+    void concurrentRequestsOfAnAsynchronousLocatorSeeOnlyTheirOwnTargets() throws Exception {
+        try (ServerUnderTest server = server()) {
+            List<String> failures = runConcurrently(THREADS, REQUESTS_PER_THREAD, (thread, n) -> {
+                String id = thread + "-" + n;
+                HttpRequest<?> request = HttpRequest.GET("/conc/located/" + id + "/show");
+                HttpResponse<String> response = server.exchange(((MutableHttpRequest<?>) request).header(ID, id), String.class);
+                List<String> problems = new ArrayList<>();
+                if (response.getStatus() != HttpStatus.OK) {
+                    problems.add("status " + response.getStatus());
+                }
+                if (!("located " + id).equals(response.body())) {
+                    problems.add("body '" + response.body() + "' expected 'located " + id + "'");
                 }
                 for (String header : List.of("X-Server-Filter", "X-Group-Filter", "X-Route-Filter")) {
                     if (!id.equals(response.getHeaders().get(header))) {
@@ -174,8 +197,7 @@ public class HandlerRoutesConcurrencyTest {
             }).and().after((request, response) -> response.header("X-Server-Filter", PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
             LocatedRoutes<Located> located = TckLocatedRoutes.of(Located.class, table -> table.GET("/show")
                 .after((request, response) -> response.header("X-Route-Filter", pathVariables(request))).and()
-                .handle((request, pathVariables) ->
-                    text("located " + LocatedRoutes.locatedTarget(pathVariables, Located.class).id())));
+                .handle((request, pathVariables, target) -> text("located " + target.id())));
             routes.path("/conc", group -> {
                 group.beforeAsync(request -> CompletableFuture.supplyAsync(() -> {
                     request.setAttribute("group-id", id(request));

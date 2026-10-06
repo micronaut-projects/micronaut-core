@@ -20,8 +20,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
@@ -57,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -86,10 +90,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
-    /**
-     * The request attribute of a preflight request answered after the route is matched.
-     */
-    private static final String DEFERRED_PREFLIGHT_ATTRIBUTE = "micronaut.cors.preflight.deferred";
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
@@ -137,22 +137,37 @@ public class CorsFilter implements Ordered, ConditionalFilter {
 
     @PreMatching
     @RequestFilter
-    @Nullable
     @Internal
-    public final HttpResponse<?> filterPreFlightRequest(HttpRequest<?> request) {
+    public final @Nullable ExecutionFlow<@Nullable HttpResponse<?>> filterPreFlightRequest(HttpRequest<?> request) {
         if (isEnabled(request) && CorsUtil.isPreflightRequest(request)) {
-            // finding the routes of the path starts the asynchronous route locators of the path
-            List<UriRouteMatch<Object, Object>> routeMatches = router != null ? router.findAny(request) : Collections.emptyList();
-            if (RouteLocator.isLocating(request)) {
-                // an asynchronous route locator of the path has not located its target yet: the
-                // routes of the path are known once the request is matched, see filterRequest
-                request.setAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE, Boolean.TRUE);
-                return null; // proceed
-            }
-            CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request, routeMatches).orElse(null);
-            if (corsOriginConfiguration != null) {
-                return handlePreflightRequest(request, corsOriginConfiguration, routeMatches);
-            }
+            return preflight(request);
+        }
+        return null; // proceed
+    }
+
+    /**
+     * Answer a preflight request with the routes of its path. The routes under the prefix of an
+     * asynchronous route locator are known once the locator located its target: the preflight
+     * request waits for it here, where the filters see it like any other preflight request.
+     *
+     * @param request The preflight request
+     * @return The response, or {@code null} to proceed
+     */
+    private @Nullable ExecutionFlow<@Nullable HttpResponse<?>> preflight(HttpRequest<?> request) {
+        // finding the routes of the path starts the asynchronous route locators of the path
+        List<UriRouteMatch<Object, Object>> routeMatches = router != null ? router.findAny(request) : Collections.emptyList();
+        CompletionStage<?> located = RouteLocator.whenLocated(request);
+        if (located != null) {
+            // find the routes again once the targets are located, which may locate again
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+            return CompletableFutureExecutionFlow.just(located.toCompletableFuture()).flatMap(done -> propagatedContext.propagate(() -> {
+                ExecutionFlow<@Nullable HttpResponse<?>> next = preflight(request);
+                return next == null ? ExecutionFlow.empty() : next;
+            }));
+        }
+        CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request, routeMatches).orElse(null);
+        if (corsOriginConfiguration != null) {
+            return ExecutionFlow.just(handlePreflightRequest(request, corsOriginConfiguration, routeMatches));
         }
         return null; // proceed
     }
@@ -165,16 +180,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (origin == null) {
             LOG.trace("Http Header {} not present. Proceeding with the request.", HttpHeaders.ORIGIN);
             return null; // proceed
-        }
-        if (request.getAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE).isPresent()) {
-            // the preflight request of a path an asynchronous route locator serves, now that the
-            // locator located its target
-            request.removeAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE, Boolean.class);
-            List<UriRouteMatch<Object, Object>> routeMatches = router != null ? router.findAny(request) : Collections.emptyList();
-            CorsOriginConfiguration anyConfiguration = getAnyConfiguration(request, routeMatches).orElse(null);
-            if (anyConfiguration != null) {
-                return handlePreflightRequest(request, anyConfiguration, routeMatches);
-            }
         }
         CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {

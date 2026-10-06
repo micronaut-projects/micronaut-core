@@ -27,11 +27,14 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -85,6 +88,21 @@ public class HandlerRouteLocatorCorsPreflightTest {
                 .build()));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/cors-auth/sync/5/items", "/cors-auth/async/5/items"})
+    void aPreflightIsAnsweredBeforeTheFiltersThatRunAfterTheRouteIsMatched(String path) throws IOException {
+        // the filter of the path rejects the requests without credentials, which a preflight request has not
+        asserts(SPEC_NAME, CONFIG, preflight(path, HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> assertEquals(List.of(ORIGIN), response.getHeaders().getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)))
+                .build()));
+        asserts(SPEC_NAME, CONFIG, HttpRequest.GET(path).header(HttpHeaders.ORIGIN, ORIGIN),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.UNAUTHORIZED)
+                .build()));
+    }
+
     @Test
     void theActualRequestIsAnsweredWithTheCorsHeaders() throws IOException {
         asserts(SPEC_NAME, CONFIG, HttpRequest.GET("/cors-async/5/items").header(HttpHeaders.ORIGIN, ORIGIN),
@@ -127,6 +145,23 @@ public class HandlerRouteLocatorCorsPreflightTest {
             routes.locate("/cors-sync/{id}", (request, pathVariables) -> "order", order -> items);
             routes.locateAsync("/cors-async/{id}", (request, pathVariables) ->
                 CompletableFuture.supplyAsync(() -> later("order"), executor), order -> items);
+            routes.locate("/cors-auth/sync/{id}", (request, pathVariables) -> "order", order -> items);
+            routes.locateAsync("/cors-auth/async/{id}", (request, pathVariables) ->
+                CompletableFuture.supplyAsync(() -> later("order"), executor), order -> items);
+        }
+    }
+
+    /**
+     * Rejects the requests without credentials, at the default order: after the route is
+     * matched, and before the CORS filter would have.
+     */
+    @ServerFilter("/cors-auth/**")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class CredentialsFilter {
+        @RequestFilter
+        @Nullable
+        HttpResponse<?> authenticate(HttpRequest<?> request) {
+            return request.getHeaders().contains(HttpHeaders.AUTHORIZATION) ? null : HttpResponse.unauthorized();
         }
     }
 }

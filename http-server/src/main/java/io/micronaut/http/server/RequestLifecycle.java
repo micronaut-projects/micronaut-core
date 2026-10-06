@@ -677,15 +677,16 @@ public class RequestLifecycle {
     /**
      * Called when matching the request waits for an asynchronous route locator to locate its
      * target. A server that can tell when the client goes away, e.g. closes the connection,
-     * cancels the locators of the request with {@link RouteLocator#cancelPendingLocations} then,
-     * so that the request fails instead of waiting for a target no one receives a response for.
+     * stops waiting for the locators of the request with {@link RouteLocator#abandonPendingLocations}
+     * then, so that the request fails instead of waiting for a target no one receives a response
+     * for, and the stages of the locators no longer reference the request.
      *
      * @param request The request
-     * @param located Completes when the target is located, or the location is cancelled
+     * @param located Completes when the target is located, or the request is abandoned
      * @since 5.3.0
      */
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
-        // nothing to cancel by default: a server that knows when the client goes away overrides this
+        // nothing to abandon by default: a server that knows when the client goes away overrides this
     }
 
     /**

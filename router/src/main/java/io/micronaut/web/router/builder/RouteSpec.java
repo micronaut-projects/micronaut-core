@@ -58,7 +58,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S>, ExecutionSpec<S> permits HttpRouteSpec, HttpBodyRouteSpec, HttpRouteGroup {
+public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S>, ExecutionSpec<S> permits HttpRouteSpec, HttpBodyRouteSpec, HttpRouteGroup, LocatedHttpRouteGroup {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method,
@@ -83,8 +83,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *
      * <p>The media types, and the executor, see {@link ExecutionSpec#executeOn(String)}, of a
      * group apply to its routes to handlers, including the implicit {@code HEAD} routes, the
-     * routes declared for several methods and the declared routes, not to its locator routes,
-     * whose located routes declare their own, nor to its error and status routes.</p>
+     * routes declared for several methods and the declared routes, and to the routes its locator
+     * routes locate, unless they, or a group of their {@link LocatedRoutes}, declare their own;
+     * not to its error and status routes.</p>
      *
      * @param mediaTypes The media types
      * @return The route or the group
@@ -252,8 +253,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * not of the request, see {@link io.micronaut.web.router.RouteAttributes} for the route of a
      * request.
      *
-     * <p>On a group, the routes of the group, and of its nested groups, have the attribute; the
-     * attribute of a nested group or of a route with the same name overrides it.</p>
+     * <p>On a group, the routes of the group, and of its nested groups, have the attribute, and
+     * so do the routes its locator routes locate; the attribute of a nested group, of a route, or
+     * of a located route or a group of its {@link LocatedRoutes}, with the same name overrides it.</p>
      *
      * <pre>{@code
      * routes.path("/admin", admin -> {

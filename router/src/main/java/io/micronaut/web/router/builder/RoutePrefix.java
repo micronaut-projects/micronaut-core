@@ -46,10 +46,7 @@ record RoutePrefix(String value) {
      */
     static @Nullable RoutePrefix of(String prefix, @Nullable RoutePrefix enclosing) {
         Objects.requireNonNull(prefix, "prefix");
-        if (prefix.indexOf('?') >= 0 || prefix.indexOf('#') >= 0
-            || prefix.contains("{?") || prefix.contains("{&") || prefix.contains("{#")) {
-            throw new IllegalArgumentException("The prefix of a route group is a path, without a query or a fragment: " + prefix);
-        }
+        checkPath(prefix, "a route group");
         String normalized = prefix.strip();
         while (!normalized.isEmpty() && normalized.charAt(normalized.length() - 1) == SLASH) {
             normalized = normalized.substring(0, normalized.length() - 1);
@@ -62,6 +59,20 @@ record RoutePrefix(String value) {
             normalized = SLASH + normalized;
         }
         return new RoutePrefix(enclosing == null ? normalized : enclosing.prefix(normalized));
+    }
+
+    /**
+     * Check that a prefix is a path.
+     *
+     * @param prefix The prefix
+     * @param owner  What the prefix is the prefix of, for the message, e.g. {@code a route group}
+     * @throws IllegalArgumentException if the prefix has a query or a fragment
+     */
+    static void checkPath(String prefix, String owner) {
+        if (prefix.indexOf('?') >= 0 || prefix.indexOf('#') >= 0
+            || prefix.contains("{?") || prefix.contains("{&") || prefix.contains("{#")) {
+            throw new IllegalArgumentException("The prefix of " + owner + " is a path, without a query or a fragment: " + prefix);
+        }
     }
 
     /**

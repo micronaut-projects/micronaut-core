@@ -246,13 +246,16 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     @Override
     public void handle(LocatedRequestHandler<T> handler) {
         LocatedRequestHandler<T> checked = route.checked(handler);
-        route.handle((request, pathVariables) -> checked.handle(request, pathVariables, target.apply(pathVariables)));
+        // a local: the handler keeps the reader of the target, not this spec and its builder
+        Function<PathVariables, T> located = target;
+        route.handle((request, pathVariables) -> checked.handle(request, pathVariables, located.apply(pathVariables)));
     }
 
     @Override
     public void handleAsync(LocatedAsyncRequestHandler<T> handler) {
         LocatedAsyncRequestHandler<T> checked = route.checked(handler);
-        route.handleAsync((request, pathVariables) -> checked.handle(request, pathVariables, target.apply(pathVariables)));
+        Function<PathVariables, T> located = target;
+        route.handleAsync((request, pathVariables) -> checked.handle(request, pathVariables, located.apply(pathVariables)));
     }
 
     @Override

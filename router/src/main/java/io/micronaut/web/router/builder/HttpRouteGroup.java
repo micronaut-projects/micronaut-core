@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 
+import java.util.function.Consumer;
+
 /**
  * A group of routes, declared with {@link HttpRouteBuilder#group} or, under a prefix, with
  * {@link HttpRouteBuilder#path}: the routes declared on the group, and in the groups nested in it,
@@ -78,12 +80,14 @@ import io.micronaut.http.MediaType;
  * {@link #annotationMetadata(AnnotationMetadataProvider)} and the others, apply to the routes
  * declared in the lambda of the group, and of its nested groups, wherever they are declared in
  * the lambda, like its filters. A route, or a nested group, with its own value overrides the one
- * of the group. The media types, the executor and the annotated element apply to the routes to
- * handlers, not to the locator routes of the group.</p>
+ * of the group. The media types and the executor apply to the routes to handlers; the routes of
+ * the locator routes of the group inherit them, see below.</p>
  *
  * <p><b>Locators.</b> A {@link #locate locator route} declared in a group is under the prefix of
  * the group, and the filters of the group apply to every located route, before the filters of
- * the located route.</p>
+ * the located route. A located route inherits the annotations, the annotated element, the
+ * attributes, the media types and the executor of the group, like a route declared in the group,
+ * unless it, or a group of its {@link LocatedRoutes}, declares its own.</p>
  *
  * <p><b>Pending routes.</b> A route declared on the group is ended with a terminal, see
  * {@link HttpRouteSpec}, in the lambda of the group: a route of the group with no terminal when
@@ -94,4 +98,21 @@ import io.micronaut.http.MediaType;
  */
 @Experimental
 public sealed interface HttpRouteGroup extends HttpRouteScope, RouteSpec<HttpRouteGroup> permits DefaultHttpRouteGroup {
+
+    /**
+     * Declare a group nested in this group, see {@link HttpRouteBuilder#group(Consumer)}: the
+     * filters and the settings of this group apply to its routes too, before its own.
+     *
+     * @param routes Declares the routes and the filters of the group
+     */
+    void group(Consumer<HttpRouteGroup> routes);
+
+    /**
+     * Declare a group nested in this group under a prefix, see
+     * {@link HttpRouteBuilder#path(String, Consumer)}: the prefix follows the prefix of this group.
+     *
+     * @param prefix The prefix of the URI templates of the routes of the group
+     * @param routes Declares the routes and the filters of the group
+     */
+    void path(String prefix, Consumer<HttpRouteGroup> routes);
 }

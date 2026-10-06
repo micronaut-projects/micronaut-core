@@ -27,8 +27,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The router runs the locator while it matches the request, on the thread that matches it,
  * typically an event loop thread, before the body is read: it must not block, and it receives
- * the request and the path variables of the prefix only. It may run more than once for a
- * request, e.g. again to find the methods allowed for the path when no route matched.</p>
+ * the request and the path variables of the prefix only. It runs at most once per request: the
+ * router keeps its target, or its exception, for the rest of the request, e.g. to find the
+ * methods allowed for the path when no located route matched.</p>
  *
  * @param <T> The type of the target, which the routes function of the locator receives
  * @author Denis Stepanov

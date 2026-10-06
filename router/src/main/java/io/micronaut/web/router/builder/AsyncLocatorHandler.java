@@ -40,7 +40,9 @@ import java.util.concurrent.CompletionStage;
  * target is located once per request: the router reuses it, e.g. to find the methods allowed for
  * the path when no located route matched. A stage that completes with {@code null} answers
  * the request with {@code 404}; a stage that fails, or a locator that throws, is answered by the
- * error routes, like a failed controller method.</p>
+ * error routes, like a failed controller method. When the client goes away before the stage
+ * completes, the server stops waiting for it without cancelling it, so a stage shared with other
+ * requests, e.g. of a cache, stays usable.</p>
  *
  * @param <T> The type of the target, which the routes function of the locator receives
  * @author Denis Stepanov

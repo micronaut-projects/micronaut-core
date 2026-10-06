@@ -228,13 +228,16 @@ final class DefaultLocatedHttpBodyRouteSpec<T, B extends @Nullable Object> imple
     @Override
     public void handle(LocatedBodyRequestHandler<T, B> handler) {
         LocatedBodyRequestHandler<T, B> checked = route.checked(handler);
-        route.handle((request, pathVariables, body) -> checked.handle(request, pathVariables, target.apply(pathVariables), body));
+        // a local: the handler keeps the reader of the target, not this spec and its builder
+        Function<PathVariables, T> located = target;
+        route.handle((request, pathVariables, body) -> checked.handle(request, pathVariables, located.apply(pathVariables), body));
     }
 
     @Override
     public void handleAsync(LocatedAsyncBodyRequestHandler<T, B> handler) {
         LocatedAsyncBodyRequestHandler<T, B> checked = route.checked(handler);
-        route.handleAsync((request, pathVariables, body) -> checked.handle(request, pathVariables, target.apply(pathVariables), body));
+        Function<PathVariables, T> located = target;
+        route.handleAsync((request, pathVariables, body) -> checked.handle(request, pathVariables, located.apply(pathVariables), body));
     }
 
     private LocatedBodyFilterSpec<T, B> filter(FilterSpec<HttpBodyRouteSpec<B>> filter) {

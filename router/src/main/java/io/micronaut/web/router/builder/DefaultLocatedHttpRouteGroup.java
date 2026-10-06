@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -26,37 +27,48 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * The builder of the routes of located targets of a type, see {@link LocatedRoutes}: the handlers that receive the
- * target are routed as handlers that read it from their path variables.
+ * The {@link LocatedHttpRouteGroup}: a group of the routes of located targets, whose routes and
+ * locators receive the target like the ones of the {@link DefaultLocatedHttpRouteBuilder}.
  *
  * @param <T> The type of the located target
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBuilder implements LocatedHttpRouteBuilder<T> {
+final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<LocatedHttpRouteGroup<T>> implements LocatedHttpRouteGroup<T> {
 
     private final LocatedTarget<T> target;
 
     /**
-     * @param assembly   The assembly the routes are added to
-     * @param targetType The type of the located targets
+     * @param assembly The assembly the routes are added to
+     * @param filters  The filters of the group
+     * @param settings The other settings of the group
+     * @param defaults The media types and the executor of the group
+     * @param prefix   The prefix of the URI templates of the routes, or {@code null}
+     * @param placeholderResolver Resolves the placeholders of the ports given as strings, or {@code null}
+     * @param target   Reads the located target
      */
-    public DefaultLocatedHttpRouteBuilder(RouteAssembly assembly, Argument<T> targetType) {
-        this(assembly, targetType, null);
+    @SuppressWarnings("java:S107") // the parts of a group, and the target of its routes
+    private DefaultLocatedHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings,
+                                         RouteGroupDefaults defaults, @Nullable RoutePrefix prefix,
+                                         @Nullable PropertyPlaceholderResolver placeholderResolver, LocatedTarget<T> target) {
+        super(assembly, filters, settings, defaults, prefix, placeholderResolver);
+        this.target = target;
     }
 
     /**
-     * @param assembly   The assembly the routes are added to
-     * @param targetType The type of the located targets
-     * @param declaredBy The class of the {@link LocatedRoutes} that declares the routes, named by
-     *                   the message of a route without a terminal, or {@code null}
+     * @param target Reads the located target
+     * @param <T>    The type of the located target
+     * @return Creates the groups of the routes of the target
      */
-    public DefaultLocatedHttpRouteBuilder(RouteAssembly assembly, Argument<T> targetType, @Nullable Class<?> declaredBy) {
-        // located routes cannot open a port: no placeholder to resolve
-        super(assembly, null, null, null, null);
-        this.target = new LocatedTarget<>(targetType);
-        declaredBy(declaredBy);
+    static <T> GroupFactory<DefaultLocatedHttpRouteGroup<T>> factory(LocatedTarget<T> target) {
+        return (assembly, filters, settings, defaults, prefix, placeholderResolver) ->
+            new DefaultLocatedHttpRouteGroup<>(assembly, filters, settings, defaults, prefix, placeholderResolver, target);
+    }
+
+    @Override
+    LocatedHttpRouteGroup<T> self() {
+        return this;
     }
 
     @Override
@@ -67,25 +79,6 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     @Override
     public Argument<T> targetType() {
         return target.targetType();
-    }
-
-    /**
-     * Close the builder once the located routes were declared on it: a route declared on it
-     * later fails with an {@link IllegalStateException}, instead of being dropped.
-     *
-     * @throws IllegalStateException if a route declared on the builder was not ended with a terminal
-     */
-    public void close() {
-        closeBuilder();
-        checkEnded();
-    }
-
-    /**
-     * Close the builder when the declaration of its routes failed: the routes not ended with a
-     * terminal are not reported, the failure is.
-     */
-    public void discard() {
-        closeBuilder();
     }
 
     @Override
@@ -122,11 +115,11 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
 
     @Override
     public void group(Consumer<LocatedHttpRouteGroup<T>> routes) {
-        declareGroup(DefaultLocatedHttpRouteGroup.factory(target), routes);
+        declareGroup(factory(target), routes);
     }
 
     @Override
     public void path(String prefix, Consumer<LocatedHttpRouteGroup<T>> routes) {
-        declarePath(prefix, DefaultLocatedHttpRouteGroup.factory(target), routes);
+        declarePath(prefix, factory(target), routes);
     }
 }

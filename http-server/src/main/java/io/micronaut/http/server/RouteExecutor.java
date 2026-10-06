@@ -64,6 +64,7 @@ import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -199,7 +200,8 @@ public final class RouteExecutor {
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
-        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getUriMatchTemplate().toString());
+        // a located route has the template under the prefixes of its locator routes
+        BasicHttpAttributes.setUriTemplate(request, RouteLocator.uriTemplate(route));
     }
 
     static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {
@@ -305,7 +307,9 @@ public final class RouteExecutor {
     }
 
     static boolean isIgnorable(Throwable cause) {
-        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException) {
+        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException
+            || RouteLocator.isAbandonment(cause)) {
+            // the client went away, e.g. before a route locator located its target
             return true;
         }
         String message = cause.getMessage();

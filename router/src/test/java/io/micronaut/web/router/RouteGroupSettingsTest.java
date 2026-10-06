@@ -223,7 +223,7 @@ class RouteGroupSettingsTest {
                 group.GET("/grouped", (request, pathVariables) -> HttpResponse.ok(LocatedRoutes.locatedTarget(pathVariables, String.class)));
             });
         });
-        // the media types of the group of the locator route are not the ones of the located table
+        // the located routes inherit the media types of the group of the locator route, unless a group of the located table sets them
         Router router = router(routes -> routes.path("/located", group -> {
             group.produces(MediaType.APPLICATION_XML_TYPE).consumes(MediaType.APPLICATION_XML_TYPE);
             group.locate("/{id}", (request, pathVariables) -> pathVariables.getString("id"), target -> table);
@@ -231,9 +231,8 @@ class RouteGroupSettingsTest {
 
         assertEquals(TEXT, route(router, HttpRequest.GET("/located/1/grouped")).getProduces());
         UriRouteInfo<?, ?> plain = route(router, HttpRequest.GET("/located/1/plain"));
-        assertEquals(JSON, plain.getConsumes());
-        assertEquals(route(router(routes -> routes.GET("/plain", RouteGroupSettingsTest::ok)), HttpRequest.GET("/plain")).getProduces(),
-            plain.getProduces());
+        assertEquals(List.of(MediaType.APPLICATION_XML_TYPE), plain.getConsumes());
+        assertEquals(List.of(MediaType.APPLICATION_XML_TYPE), plain.getProduces());
     }
 
     @Test

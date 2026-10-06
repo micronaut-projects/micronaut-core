@@ -17,19 +17,21 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.builder.ClosedRouteBuilderTest;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
-import io.micronaut.web.router.builder.HttpRouteScope;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -192,25 +194,61 @@ class LocatedRoutesTableTest {
 
     @Test
     void theBuilderOfLocatedRoutesIsClosedWhenTheyReturned() {
-        AtomicReference<HttpRouteScope> kept = new AtomicReference<>();
+        AtomicReference<LocatedHttpRouteBuilder<Object>> kept = new AtomicReference<>();
         RouteTableFactory tables = new RouteTableFactory(null, ConversionService.SHARED);
         tables.table(TestLocatedRoutes.of(routes -> {
             kept.set(routes);
             routes.GET("/declared", LocatedRoutesTableTest::ok);
         }));
-        ClosedRouteBuilderTest.assertEveryScopeDeclarationFails(kept.get());
+        assertEveryLocatedDeclarationFails(kept.get());
     }
 
     @Test
     void theBuilderOfLocatedRoutesIsClosedWhenTheyFail() {
-        AtomicReference<HttpRouteScope> kept = new AtomicReference<>();
+        AtomicReference<LocatedHttpRouteBuilder<Object>> kept = new AtomicReference<>();
         RouteTableFactory tables = new RouteTableFactory(null, ConversionService.SHARED);
         LocatedRoutes<?> failing = TestLocatedRoutes.of(routes -> {
             kept.set(routes);
             throw new UnsupportedOperationException("failed");
         });
         assertThrows(UnsupportedOperationException.class, () -> tables.table(failing));
-        ClosedRouteBuilderTest.assertClosed(() -> kept.get().GET("/late", LocatedRoutesTableTest::ok));
+        assertLocatedBuilderClosed(() -> kept.get().GET("/late", LocatedRoutesTableTest::ok));
+    }
+
+    @Test
+    void theBuilderOfAnHttpRoutesBeanCannotLocateOnceClosed() {
+        DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { }));
+        routes.GET("/declared", LocatedRoutesTableTest::ok);
+        routes.close();
+
+        ClosedRouteBuilderTest.assertClosed(() -> routes.locate("/late", (request, pathVariables) -> "target", target -> null));
+        ClosedRouteBuilderTest.assertClosed(() -> routes.locateAsync("/late",
+            (request, pathVariables) -> CompletableFuture.completedFuture("target"), target -> null));
+    }
+
+    /**
+     * @param routes A closed builder of located routes
+     */
+    private static void assertEveryLocatedDeclarationFails(LocatedHttpRouteBuilder<Object> routes) {
+        assertLocatedBuilderClosed(() -> routes.GET("/late", LocatedRoutesTableTest::ok));
+        assertLocatedBuilderClosed(() -> routes.GET("/late").handle((request, pathVariables, target) -> HttpResponse.ok()));
+        assertLocatedBuilderClosed(() -> routes.route(Set.of(HttpMethod.GET, HttpMethod.POST), "/late").handle(LocatedRoutesTableTest::ok));
+        assertLocatedBuilderClosed(() -> routes.route("PROPFIND", "/late").handle(LocatedRoutesTableTest::ok));
+        assertLocatedBuilderClosed(() -> routes.POST("/late").body(Argument.of(String.class)).handle((request, pathVariables, body) -> HttpResponse.ok()));
+        assertLocatedBuilderClosed(() -> routes.any("/late"));
+        assertLocatedBuilderClosed(() -> routes.group(group -> group.GET("/late", LocatedRoutesTableTest::ok)));
+        assertLocatedBuilderClosed(() -> routes.path("/late", group -> group.GET("/x", LocatedRoutesTableTest::ok)));
+        assertLocatedBuilderClosed(() -> routes.locate("/late", (request, pathVariables) -> "target", target -> null));
+        assertLocatedBuilderClosed(() -> routes.locate("/late", (request, pathVariables, target) -> "child", target -> null));
+    }
+
+    /**
+     * @param declaration A declaration on a closed builder of located routes
+     */
+    private static void assertLocatedBuilderClosed(Executable declaration) {
+        IllegalStateException e = assertThrows(IllegalStateException.class, declaration);
+        assertEquals("The route builder is closed: declare the routes inside LocatedRoutes.routes(...), "
+            + "not after it returned", e.getMessage());
     }
 
     @Test
