@@ -172,6 +172,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final Environment environment;
     private final RoutingInBoundHandler routingHandler;
     private final boolean isDefault;
+    /**
+     * Whether {@link #stop()} or a failed {@link #start()} is still stopping the application
+     * context after releasing the server's lock. Guarded by the server's lock.
+     */
+    private boolean stoppingApplicationContext;
     private final ApplicationContext applicationContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
@@ -312,7 +317,27 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public synchronized NettyEmbeddedServer start() {
+    public NettyEmbeddedServer start() {
+        ServerStartupException failure;
+        synchronized (this) {
+            awaitApplicationContextStop();
+            try {
+                startInternal();
+                return this;
+            } catch (ServerStartupException e) {
+                failure = e;
+                stoppingApplicationContext = true;
+            }
+        }
+        // a listener failed to bind and the server has stopped itself. The application context
+        // is stopped only now that the server's lock is released: stopping the context stops
+        // this server, so a concurrent context stop would otherwise wait for the server's lock
+        // while holding the context's, and this thread for the context's while holding the server's
+        stopApplicationContext();
+        throw failure;
+    }
+
+    private void startInternal() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
                 applicationContext.start();
@@ -363,8 +388,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             fireStartupEvents();
             running.set(true);
         }
-
-        return this;
     }
 
     @Nullable
@@ -384,22 +407,36 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public synchronized NettyEmbeddedServer stop() {
-        return stop(false);
+    public NettyEmbeddedServer stop() {
+        boolean stopped;
+        synchronized (this) {
+            stopped = stop(false);
+            if (stopped) {
+                // only set here: the context stop calls stop() again, which must not clear the flag
+                stoppingApplicationContext = true;
+            }
+        }
+        if (stopped) {
+            // outside the server's lock, see start()
+            stopApplicationContext();
+        }
+        return this;
     }
 
     @Override
     public NettyEmbeddedServer stopServerOnly() {
-        return stop(true);
+        stop(true);
+        return this;
     }
 
-    private NettyEmbeddedServer stop(boolean stopServerOnly) {
+    private boolean stop(boolean stopServerOnly) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
                 stopInternal(stopServerOnly);
+                return true;
             }
         }
-        return this;
+        return false;
     }
 
     @Override
@@ -909,9 +946,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             webSocketSessions.close();
             applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
-            if (isDefault && applicationContext.isRunning() && !stopServerOnly) {
-                applicationContext.stop();
-            }
             List<Listener> activeListeners = this.activeListeners;
             if (activeListeners != null) {
                 for (Listener listener : activeListeners) {
@@ -937,6 +971,47 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: {}", e.getMessage(), e);
             }
+        }
+    }
+
+    /**
+     * Stop the application context if this is the default server, then let a waiting
+     * {@link #start()} proceed. This must not be called while holding the server's lock: stopping
+     * the context stops this server, which takes that lock.
+     */
+    private void stopApplicationContext() {
+        try {
+            if (isDefault && applicationContext.isRunning()) {
+                applicationContext.stop();
+            }
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error stopping Micronaut server: {}", e.getMessage(), e);
+            }
+        } finally {
+            synchronized (this) {
+                stoppingApplicationContext = false;
+                notifyAll();
+            }
+        }
+    }
+
+    /**
+     * Wait, while holding the server's lock, until a stop of the application context that this
+     * server started after releasing the lock has finished, so that a start is not undone by it.
+     * Waiting releases the lock, so the context can still stop this server in the meantime.
+     */
+    private void awaitApplicationContextStop() {
+        boolean interrupted = false;
+        while (stoppingApplicationContext) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 
