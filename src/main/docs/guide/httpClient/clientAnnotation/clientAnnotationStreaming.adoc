@@ -43,6 +43,32 @@ Micronaut's client does however support streaming of both individual JSON object
 
 If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as a Reactor's reactor:Flux[] or a RxJava's rx:Flowable[]), the client streams the array elements as they become available.
 
+=== Streaming without Reactive Streams
+
+A declarative client method can also return a `CompletionStage` of api:http.body.BodyElements[], a cursor that reads the elements one at a time, instead of a rs:Publisher[]:
+
+snippet::io.micronaut.docs.streaming.AsyncHeadlineClient[tags="imports, class", indent=0, title="AsyncHeadlineClient.java"]
+
+<1> The stage completes once the response arrived, and the headlines are read as they are asked for
+
+snippet::io.micronaut.docs.streaming.AsyncHeadlineClientSpec[tags="declarative", indent=0, title="Reading the headlines"]
+
+<1> The test waits for the response
+<2> `next()` reads the next headline from the connection
+<3> Closing discards the rest of the stream, and releases the connection
+
+The elements are read like the items of a streaming publisher: the events of a `text/event-stream` response (`BodyElements<Event<T>>`, or `BodyElements<T>` for their data), the elements of a JSON stream or a JSON array, or the pieces of any other body (`BodyElements<ByteBuffer<?>>`). Declare `CompletionStage<HttpResponse<BodyElements<T>>>` to read the status and the headers of an event stream or of the pieces of a body as well. A Kotlin `suspend` method that returns `BodyElements<T>` works the same way.
+
+The same is available without a declarative client through the api:http.client.AsyncStreamingHttpClient[], which `toAsync()` returns for a api:http.client.StreamingHttpClient[], and which can be injected with ann:http.client.annotation.Client[]:
+
+snippet::io.micronaut.docs.streaming.AsyncHeadlineClientSpec[tags="async", indent=0, title="AsyncStreamingHttpClient"]
+
+<1> `jsonStream` completes with the elements once the response arrived. `dataStream` and `exchangeStream` read the pieces of the body as they arrive, as heap buffers
+<2> `next()` reads one element, `forEach` reads them all, one after the other
+<3> Close the elements of a stream that is not read to the end, to release the connection
+
+When the response has an error status, the stage fails with an api:http.client.exceptions.HttpClientResponseException[] whose response carries the error body. The stages complete on an I/O thread: do not block in them.
+
 === Streaming Clients and Read Timeout
 
 When streaming responses from servers, the underlying HTTP client will not apply the default `readTimeout` setting (which defaults to 10 seconds) of the api:http.client.HttpClientConfiguration[] since the delay between reads for streaming responses may differ from normal reads.
@@ -114,7 +140,7 @@ When the response has an error status, the publisher fails with an api:http.clie
 
 ==== Reading Events Asynchronously
 
-The api:http.client.sse.AsyncSseClient[] reads the same responses with a `CompletionStage` instead of a `Publisher`, and without Reactor on the Netty client. Obtain it from an api:http.client.sse.SseClient[] with `toAsyncSse()`, as `toAsync()` returns the api:http.client.AsyncHttpClient[] of an api:http.client.HttpClient[]:
+The api:http.client.sse.AsyncSseClient[] reads the same responses with a `CompletionStage` instead of a `Publisher`, and without Reactor on the Netty client. Obtain it from an api:http.client.sse.SseClient[] with `toAsyncSse()`, as `toAsync()` returns the api:http.client.AsyncHttpClient[] of an api:http.client.HttpClient[], or inject it with ann:http.client.annotation.Client[]:
 
 snippet::io.micronaut.docs.sse.AsyncSseClientSpec[tags="async", indent=0, title="Async SSE Client"]
 

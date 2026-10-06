@@ -16,22 +16,27 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.client.AsyncHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionStage;
 
 /**
- * Default implementation of {@link AsyncHttpClient} backed by {@link NettyHttpClient}.
+ * Default implementation of {@link AsyncHttpClient} and {@link AsyncStreamingHttpClient} backed by
+ * {@link NettyHttpClient}. The exchanges run without Reactor; the elements of a JSON stream are
+ * decoded by the chunked JSON reader.
  *
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-final class DefaultAsyncHttpClient implements AsyncHttpClient {
+final class DefaultAsyncHttpClient implements AsyncStreamingHttpClient {
 
     private final NettyHttpClient nettyHttpClient;
 
@@ -49,6 +54,16 @@ final class DefaultAsyncHttpClient implements AsyncHttpClient {
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {
         return nettyHttpClient.exchangeFlow(request, bodyType, errorType).toCompletableFuture();
+    }
+
+    @Override
+    public <I> CompletionStage<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
+        return ElementsFutures.response(nettyHttpClient.exchangeStreamFlow(request, errorType));
+    }
+
+    @Override
+    public <I, O> CompletionStage<BodyElements<O>> jsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+        return ElementsFutures.elements(nettyHttpClient.jsonStreamFlow(request, type, errorType));
     }
 
     @Override

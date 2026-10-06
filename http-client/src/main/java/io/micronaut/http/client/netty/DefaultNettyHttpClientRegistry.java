@@ -44,6 +44,7 @@ import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClientRegistry;
 import io.micronaut.http.client.AsyncRawHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
@@ -54,6 +55,7 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
+import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -346,6 +348,49 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Parameter @Nullable HttpClientConfiguration configuration,
             BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncRaw();
+    }
+
+    /**
+     * Creates a new {@link AsyncStreamingHttpClient} for the given injection point, which is also
+     * the {@link io.micronaut.http.client.AsyncHttpClient}.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncStreamingHttpClient asyncHttpClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsync();
+    }
+
+    /**
+     * Creates a new {@link AsyncSseClient} for the given injection point.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncSseClient asyncSseClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncSse();
     }
 
     @Override
