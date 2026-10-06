@@ -29,8 +29,7 @@ import java.util.function.Consumer;
  *
  * <pre>{@code
  * routes.GET("/probe/live", HttpResponse.ok("UP"));
- * routes.GET("/greetings/{name}").respond(direct -> direct.responses()
- *     .ok("Hello " + direct.pathVariables().getString("name")));
+ * routes.GET("/greetings/{name}").respond(direct -> HttpResponse.ok("Hello " + direct.pathVariables().getString("name")));
  * routes.GET("/health").order(-1).respond(HttpResponse.ok("UP"));
  * routes.path("/internal", internal -> internal.GET("/ping", HttpResponse.ok("pong")));
  * }</pre>
@@ -43,7 +42,9 @@ import java.util.function.Consumer;
  * each request from a {@link DirectContext}, or a function that completes it later. A function
  * that returns {@code null}, or a stage completed with {@code null}, declines the request, which
  * continues to the ordinary routes with its body untouched. A route with no settings that answers
- * with a value has a shortcut per method, e.g. {@link #GET(String, HttpResponse)}.</p>
+ * with a value has a shortcut per method, e.g. {@link #GET(String, HttpResponse)}: unlike the
+ * shortcuts of {@link HttpRouteScope}, e.g. {@link HttpRouteScope#GET(String, RequestHandler)},
+ * which take a handler function, they take the response.</p>
  *
  * <p>A pending route that is not ended with a terminal fails the startup, naming the route and
  * the {@link HttpDirectRoutes} bean that declares it, once
@@ -60,7 +61,7 @@ import java.util.function.Consumer;
  */
 @Experimental
 @SuppressWarnings("MethodName")
-public interface DirectRouteBuilder {
+public sealed interface DirectRouteBuilder permits DefaultDirectRouteBuilder {
 
     /**
      * Declare a direct route of {@code GET} requests, and the {@code HEAD} requests that no {@code HEAD} direct route matches, with the
@@ -120,7 +121,11 @@ public interface DirectRouteBuilder {
 
     /**
      * Declare a direct route of {@code HEAD} requests: the pending route, to configure and to
-     * end with a terminal, see {@link DirectRouteSpec}.
+     * end with a terminal, see {@link DirectRouteSpec}. It wins over the {@code GET} direct route
+     * of a path when they match a request equally well, and the server writes the headers of its
+     * response only, with the {@code Content-Length} of its body, or the one it set when it has
+     * none. A {@code HEAD} direct route that declines a request hands it to the ordinary routes,
+     * not to the {@code GET} direct route.
      *
      * @param uri The URI template
      * @return The pending route
@@ -132,6 +137,17 @@ public interface DirectRouteBuilder {
     /**
      * Declare a direct route of {@code OPTIONS} requests: the pending route, to configure and to
      * end with a terminal, see {@link DirectRouteSpec}.
+     *
+     * <p>No filter runs for a direct route, the CORS filter neither: an {@code OPTIONS} direct
+     * route also answers the CORS preflight requests of its paths, without the CORS headers, so a
+     * browser rejects the cross-origin requests it covers. A route that must leave them to the
+     * CORS filter excludes them with a condition:</p>
+     *
+     * <pre>{@code
+     * routes.OPTIONS("/api/{+path}")
+     *     .where(RouteCondition.not(RouteCondition.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)))
+     *     .respond(HttpResponse.ok().header(HttpHeaders.ALLOW, "GET, POST, OPTIONS"));
+     * }</pre>
      *
      * @param uri The URI template
      * @return The pending route

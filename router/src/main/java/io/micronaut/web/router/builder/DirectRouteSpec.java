@@ -20,9 +20,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collection;
-import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -48,7 +45,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface DirectRouteSpec extends ExecutionSpec<DirectRouteSpec> permits DefaultDirectRouteSpec {
+public sealed interface DirectRouteSpec extends MatchSpec<DirectRouteSpec>, ExecutionSpec<DirectRouteSpec> permits DefaultDirectRouteSpec {
 
     /**
      * Match only the requests that meet a condition, like {@link RouteSpec#where(RouteCondition)}.
@@ -68,64 +65,33 @@ public sealed interface DirectRouteSpec extends ExecutionSpec<DirectRouteSpec> p
      * @param condition The condition
      * @return This route
      */
+    @Override
     DirectRouteSpec where(RouteCondition condition);
 
     /**
      * Match only the requests whose path variables the constraint accepts, like
-     * {@link RouteSpec#constrain(Predicate)}. The constraint runs on the thread that received
-     * the request: it must be fast and must not block.
+     * {@link RouteSpec#constrain(Predicate)}, with the overloads of {@link MatchSpec}, e.g.
+     * {@code constrain("id", Long.class, id -> id > 0)}. The constraint runs on the thread that
+     * received the request: it must be fast and must not block.
      *
      * @param accepted Whether the path variables are accepted
      * @return This route
      */
+    @Override
     DirectRouteSpec constrain(Predicate<? super PathVariables> accepted);
 
     /**
-     * Constrain a path variable, like {@link RouteSpec#constrain(String, Predicate)}.
-     *
-     * @param variable The name of the variable
-     * @param accepted Whether the value is accepted
-     * @return This route
-     */
-    default DirectRouteSpec constrain(String variable, Predicate<? super String> accepted) {
-        Objects.requireNonNull(variable, "variable");
-        Objects.requireNonNull(accepted, "accepted");
-        return constrain(variables -> variables.findString(variable).map(accepted::test).orElse(false));
-    }
-
-    /**
-     * Constrain a path variable to a set of values, like {@link RouteSpec#constrain(String, Collection)}.
-     *
-     * @param variable The name of the variable
-     * @param values   The accepted values
-     * @return This route
-     */
-    default DirectRouteSpec constrain(String variable, Collection<String> values) {
-        Objects.requireNonNull(values, "values");
-        return constrain(variable, new ValueMatcher.OneOf(Set.copyOf(values), false));
-    }
-
-    /**
-     * Constrain a path variable with a matcher of its value, like
-     * {@link RouteSpec#constrain(String, ValueMatcher)}.
-     *
-     * @param variable The name of the variable
-     * @param matcher  The matcher of the value
-     * @return This route
-     */
-    default DirectRouteSpec constrain(String variable, ValueMatcher matcher) {
-        Objects.requireNonNull(variable, "variable");
-        ValueMatcher normalized = RouteConditions.normalize(Objects.requireNonNull(matcher, "matcher"));
-        return constrain(variables -> normalized.matches(variables.findString(variable).orElse(null)));
-    }
-
-    /**
      * The order of the route among the direct routes that match a request equally well, like
-     * {@link RouteSpec#order(int)}: the lowest order wins.
+     * {@link RouteSpec#order(int)}: the lowest order wins. Two direct routes of the same method,
+     * the same URI template and the same order, without a condition or a constraint, would match
+     * every request equally well: they fail the startup. Routes that a request meets equally
+     * well only through their conditions or constraints make that request ambiguous, answered
+     * with {@code 400}.
      *
      * @param order The order
      * @return This route
      */
+    @Override
     DirectRouteSpec order(int order);
 
     /**
@@ -134,10 +100,13 @@ public sealed interface DirectRouteSpec extends ExecutionSpec<DirectRouteSpec> p
      * encoded once, and a {@code byte[]} body copied, now. A body the server consumes when it
      * writes it, e.g. a Netty {@code ByteBuf}, which it releases, is copied once by the server
      * runtime, and released, see
-     * {@link io.micronaut.web.router.direct.DirectRouteSupport#shareableBody(Object)}.
+     * {@link io.micronaut.web.router.direct.DirectRouteSupport#shareableBody(Object)}. The copy
+     * is made on the thread that received the request: a route that answers with a value does not
+     * run on an executor.
      *
      * @param response The response
-     * @throws IllegalStateException if the route was already ended
+     * @throws IllegalStateException if the route was already ended, or runs on an executor, see
+     *                               {@link #executeOn(String)}
      */
     void respond(HttpResponse<?> response);
 
