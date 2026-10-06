@@ -60,9 +60,15 @@ public class SseDecodingBenchmark {
     @Param({"small", "large"})
     String shape;
 
+    /**
+     * The pieces as heap buffers, or as direct buffers, as the Netty client receives them.
+     */
+    @Param({"heap", "direct"})
+    String buffers;
+
     private final SimpleHttpHeaders headers = new SimpleHttpHeaders();
     private MessageBodyHandlerRegistry registry;
-    private byte[][] pieces;
+    private ByteBuf[] pieces;
     private int elements;
 
     @Setup
@@ -87,14 +93,18 @@ public class SseDecodingBenchmark {
         for (int i = 0; i < values.size(); i++) {
             stream.append("id: ").append(i).append('\n').append("data: ").append(values.get(i)).append("\n\n");
         }
-        pieces = PieceReaderBenchmarkSupport.pieces(stream.toString().getBytes(StandardCharsets.UTF_8), 8192);
+        byte[][] arrays = PieceReaderBenchmarkSupport.pieces(stream.toString().getBytes(StandardCharsets.UTF_8), 8192);
+        pieces = new ByteBuf[arrays.length];
+        for (int i = 0; i < arrays.length; i++) {
+            pieces[i] = "direct".equals(buffers) ? Unpooled.directBuffer(arrays[i].length).writeBytes(arrays[i]) : Unpooled.wrappedBuffer(arrays[i]);
+        }
     }
 
     @Benchmark
     public int legacySplitterAndDecoder() {
         MessageBodyReader<Book> reader = registry.getReader(BOOK, List.of(MediaType.APPLICATION_JSON_TYPE));
         SseEventDecoder decoder = new SseEventDecoder(Long.MAX_VALUE);
-        Flux<Event<Book>> events = SseSplitter.split(Flux.fromArray(pieces).map(Unpooled::wrappedBuffer), BodySizeLimits.UNLIMITED)
+        Flux<Event<Book>> events = SseSplitter.split(Flux.fromArray(pieces).map(ByteBuf::retainedDuplicate), BodySizeLimits.UNLIMITED)
             .concatMapIterable(line -> {
                 try {
                     return decoder.line(line);
@@ -111,10 +121,14 @@ public class SseDecodingBenchmark {
 
     @Benchmark
     public int pieceReader() throws IOException {
+        return read(EventStreams.reader(registry, BOOK, headers, Long.MAX_VALUE));
+    }
+
+    private int read(PieceReader<Event<Book>> pieceReader) throws IOException {
         int count = 0;
-        try (PieceReader<Event<Book>> reader = EventStreams.reader(registry, BOOK, headers, Long.MAX_VALUE)) {
-            for (byte[] piece : pieces) {
-                reader.read(READ_BUFFERS.adapt(Unpooled.wrappedBuffer(piece)));
+        try (PieceReader<Event<Book>> reader = pieceReader) {
+            for (ByteBuf piece : pieces) {
+                reader.read(READ_BUFFERS.adapt(piece.retainedDuplicate()));
                 while (reader.poll() != null) {
                     count++;
                 }
@@ -130,10 +144,8 @@ public class SseDecodingBenchmark {
     @Benchmark
     public int pieceReaderBridge() {
         CountingSubscriber<Event<Book>> subscriber = new CountingSubscriber<>(false);
-        PieceReaders.publisher(Flux.fromArray(pieces).map(piece -> {
-            ByteBuf buf = Unpooled.wrappedBuffer(piece);
-            return READ_BUFFERS.adapt(buf);
-        }), EventStreams.reader(registry, BOOK, headers, Long.MAX_VALUE)).subscribe(subscriber);
+        PieceReaders.publisher(Flux.fromArray(pieces).map(piece -> READ_BUFFERS.adapt(piece.retainedDuplicate())),
+            EventStreams.reader(registry, BOOK, headers, Long.MAX_VALUE)).subscribe(subscriber);
         return check(subscriber.count());
     }
 

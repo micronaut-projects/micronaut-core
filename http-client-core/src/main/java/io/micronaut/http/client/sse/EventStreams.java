@@ -18,7 +18,6 @@ package io.micronaut.http.client.sse;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
-import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -41,9 +40,7 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayInputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -175,7 +172,8 @@ public final class EventStreams {
                                                       Headers headers) {
         MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(mediaType));
         return data -> {
-            B decoded = reader.read(eventType, mediaType, headers, ReadBufferFactory.getJdkFactory().adapt(data).toByteBuffer());
+            // a stream over the array: a buffer of it would be copied again to be decoded
+            B decoded = reader.read(eventType, mediaType, headers, new ByteArrayInputStream(data));
             if (decoded == null) {
                 throw new HttpClientException("Event data decoded to null for type " + eventType);
             }
@@ -338,6 +336,10 @@ public final class EventStreams {
         private final EventStreamDecoder decoder;
         private final Function<byte[], B> dataReader;
         private final ArrayDeque<Event<byte[]>> events = new ArrayDeque<>(1);
+        /**
+         * The bytes of a piece that is not a heap buffer.
+         */
+        private byte[] scratch = new byte[0];
 
         EventReader(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
             this.decoder = decoder;
@@ -347,9 +349,17 @@ public final class EventStreams {
         @Override
         public void read(ReadBuffer piece) {
             try (piece) {
-                byte[] bytes = piece.toArray();
-                // the events before a line that exceeds the limit are delivered before the failure
-                decoder.decode(bytes, 0, bytes.length, events::add);
+                // a heap buffer is decoded in place, another one is copied into an array that is reused
+                int length = piece.readable();
+                List<Event<byte[]>> decoded = piece.useFastHeapBuffer(nio -> decoder.decode(nio.array(), nio.arrayOffset() + nio.position(), nio.remaining()));
+                if (decoded == null) {
+                    if (scratch.length < length) {
+                        scratch = new byte[Math.max(length, scratch.length * 2)];
+                    }
+                    piece.toArray(scratch, 0);
+                    decoded = decoder.decode(scratch, 0, length);
+                }
+                events.addAll(decoded);
             }
         }
 

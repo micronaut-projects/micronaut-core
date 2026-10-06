@@ -134,6 +134,11 @@ public final class PieceReaders {
     private static final class EachPieceReader<T> implements PieceReader<T> {
         private final Function<ByteBuffer<?>, T> reader;
         private final ArrayDeque<ReadBuffer> pieces = new ArrayDeque<>(1);
+        /**
+         * The piece not polled yet: a reader of a publisher reads the next piece once this one
+         * was polled, more pieces queue up only when they are read without polling.
+         */
+        private @Nullable ReadBuffer next;
         private boolean closed;
 
         EachPieceReader(Function<ByteBuffer<?>, T> reader) {
@@ -144,6 +149,8 @@ public final class PieceReaders {
         public void read(ReadBuffer piece) {
             if (closed) {
                 piece.close();
+            } else if (next == null && pieces.isEmpty()) {
+                next = piece;
             } else {
                 pieces.add(piece);
             }
@@ -156,8 +163,10 @@ public final class PieceReaders {
 
         @Override
         public @Nullable T poll() {
-            ReadBuffer piece = pieces.poll();
-            if (piece == null) {
+            ReadBuffer piece = next;
+            if (piece != null) {
+                next = pieces.poll();
+            } else {
                 return null;
             }
             ByteBuffer<?> buffer;
@@ -170,6 +179,10 @@ public final class PieceReaders {
         @Override
         public void close() {
             closed = true;
+            if (next != null) {
+                next.close();
+                next = null;
+            }
             ReadBuffer piece;
             while ((piece = pieces.poll()) != null) {
                 piece.close();

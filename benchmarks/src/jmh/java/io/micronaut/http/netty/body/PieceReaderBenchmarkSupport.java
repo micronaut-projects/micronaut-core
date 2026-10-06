@@ -26,13 +26,13 @@ import java.util.Objects;
 public final class PieceReaderBenchmarkSupport {
 
     /**
-     * The element type of the benchmarks.
-     *
-     * @param id    The id
-     * @param title The title
-     * @param pages The pages
+     * The element type of the benchmarks: a class, as Jackson creates a record with
+     * {@code MethodHandle.invokeWithArguments}, which costs more than the reading measured here.
      */
-    public record Book(int id, String title, int pages) {
+    public static final class Book {
+        public int id;
+        public String title;
+        public int pages;
     }
 
     private PieceReaderBenchmarkSupport() {
