@@ -103,11 +103,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     public static final String ID = "websocket-handler";
 
-    /**
-     * The most frames of a WebSocket route that wait for its handlers, see {@link #pendingFrames}.
-     */
-    private static final int MAX_PENDING_FRAMES = 16;
-
     private final NettyWebSocketSession serverSession;
     private final Channel channel;
     private final NettyEmbeddedServices nettyEmbeddedServices;
@@ -147,6 +142,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     private final boolean streamsMessages;
     /**
+     * The most frames of a WebSocket route that wait for its handlers, see {@link #pendingFrames},
+     * or {@code 0} for no limit.
+     */
+    private final int maxPendingFrames;
+    /**
      * Whether the open handler of a WebSocket route runs: the messages wait. Event loop only.
      */
     private boolean opening;
@@ -156,7 +156,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private int handling;
     /**
      * The data frames of a WebSocket route that wait for the handlers, in order. The connection
-     * reads at most {@link #MAX_PENDING_FRAMES} ahead, so a client cannot send messages faster than
+     * reads at most {@link #maxPendingFrames} ahead, so a client cannot send messages faster than
      * they are handled, while it still reads its pings and its close. Event loop only.
      */
     private final ArrayDeque<WebSocketFrame> pendingFrames = new ArrayDeque<>();
@@ -212,6 +212,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.routeEndpoint = routeEndpoint;
         this.maxConcurrentMessages = routeEndpoint == null ? 0 : routeEndpoint.maxConcurrentMessages();
         this.streamsMessages = routeEndpoint != null && routeEndpoint.streamsMessages();
+        this.maxPendingFrames = routeEndpoint == null ? 0 : routeEndpoint.maxPendingMessages();
         this.pingHandler = routeEndpoint == null ? null : routeEndpoint.pingMethod();
         this.pingArgument = routeEndpoint == null ? null : routeEndpoint.pingArgument();
 
@@ -543,7 +544,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     private void readAhead(ChannelHandlerContext ctx) {
-        if (pendingFrames.size() < MAX_PENDING_FRAMES) {
+        if (maxPendingFrames == 0 || pendingFrames.size() < maxPendingFrames) {
             ctx.read();
         }
     }

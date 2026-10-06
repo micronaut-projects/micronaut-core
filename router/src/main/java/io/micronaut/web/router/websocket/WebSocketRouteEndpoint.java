@@ -70,6 +70,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     ));
 
     private static final int DEFAULT_MAX_PAYLOAD_LENGTH = 65536;
+    private static final int DEFAULT_MAX_PENDING_MESSAGES = 16;
     private static final String MAX_PAYLOAD_LENGTH = "maxPayloadLength";
     private static final String HANDLER = "handler";
     private static final String ON_OPEN = "onOpen";
@@ -94,6 +95,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     private @Nullable WebSocketRouteMethod onError;
     private @Nullable String subprotocols;
     private int maxConcurrentMessages = 1;
+    private int maxPendingMessages = DEFAULT_MAX_PENDING_MESSAGES;
     /**
      * Whether the endpoint has a {@link WebSocketMessagesHandler}, which receives the messages of
      * each connection as a stream, see {@link #connected(WebSocketSession, Consumer)}.
@@ -171,6 +173,14 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      */
     public int maxConcurrentMessages() {
         return maxConcurrentMessages;
+    }
+
+    /**
+     * @return The most messages of a connection read ahead of its handlers, or {@code 0} for no
+     * limit, see {@link WebSocketRouteSpec#maxPendingMessages(int)}
+     */
+    public int maxPendingMessages() {
+        return maxPendingMessages;
     }
 
     /**
@@ -357,6 +367,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
         private @Nullable List<String> protocols;
         private int maxPayloadLength = DEFAULT_MAX_PAYLOAD_LENGTH;
         private int maxConcurrent = 1;
+        private int maxPending = DEFAULT_MAX_PENDING_MESSAGES;
 
         @Override
         public WebSocketRouteSpec onOpen(WebSocketOpenHandler handler) {
@@ -442,6 +453,16 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
             return this;
         }
 
+        @Override
+        public WebSocketRouteSpec maxPendingMessages(int maxPendingMessages) {
+            checkOpen("maxPendingMessages", null);
+            if (maxPendingMessages < 0) {
+                throw new IllegalArgumentException("The most pending messages of the WebSocket route " + uri + " must not be negative: " + maxPendingMessages);
+            }
+            this.maxPending = maxPendingMessages;
+            return this;
+        }
+
         private void checkOpen(String what, @Nullable Object current) {
             if (closed) {
                 throw new IllegalStateException("The WebSocket route " + uri + " is declared: declare its handlers in its lambda");
@@ -522,6 +543,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
                 subprotocols = String.join(",", supported);
             }
             maxConcurrentMessages = maxConcurrent;
+            maxPendingMessages = maxPending;
         }
     }
 }

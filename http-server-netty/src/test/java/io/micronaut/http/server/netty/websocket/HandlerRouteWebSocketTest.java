@@ -427,6 +427,20 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
+    void withoutALimitOfPendingMessagesThePingsAndTheCloseAreNeverHeldBack() throws Exception {
+        Client client = connect("/ws/unbounded");
+        // more than the default limit, behind a handler that does not complete
+        for (int i = 0; i < 40; i++) {
+            client.ws.sendText("m" + i, true).get(TIMEOUT, TimeUnit.SECONDS);
+        }
+        assertEquals("unbounded m0", event());
+        client.ws.sendPing(ByteBuffer.wrap("alive".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("alive", client.pongs.poll(TIMEOUT, TimeUnit.SECONDS));
+        client.close(1000, "done");
+        assertEquals("unbounded close 1000", event());
+    }
+
+    @Test
     void aCloseIsNotHeldBackByTheMessagesThatWaitForTheOpenHandler() throws Exception {
         Client client = connect("/ws/held");
         assertEquals("held 1", client.next());
@@ -995,6 +1009,16 @@ class HandlerRouteWebSocketTest {
                     .onMessage(String.class, (message, session) -> {
                         log.add(message);
                         return new CompletableFuture<>();
+                    }));
+                routes.GET("/ws/unbounded").webSocket(ws -> ws
+                    .maxPendingMessages(0)
+                    .onMessage(String.class, (message, session) -> {
+                        log.add("unbounded " + message);
+                        return new CompletableFuture<>();
+                    })
+                    .onClose((reason, session) -> {
+                        log.add("unbounded close " + reason.getCode());
+                        return null;
                     }));
                 routes.GET("/ws/close-discards").webSocket(ws -> ws
                     .onMessage(String.class, (message, session) -> {

@@ -251,6 +251,17 @@ class WebSocketRoutesTest {
     }
 
     @Test
+    void theMostPendingMessagesAreBoundedByDefault() {
+        Router router = router(routes -> {
+            routes.GET("/default").webSocket(ws -> ws.onMessage(String.class, (message, session) -> null));
+            routes.GET("/unbounded").webSocket(ws -> ws.maxPendingMessages(0).onMessage(String.class, (message, session) -> null));
+        });
+        assertEquals(16, endpoint(route(router, HttpRequest.GET("/default"))).maxPendingMessages());
+        assertEquals(0, endpoint(route(router, HttpRequest.GET("/unbounded"))).maxPendingMessages());
+        assertThrows(IllegalArgumentException.class, () -> router(routes -> routes.GET("/bad").webSocket(ws -> ws.maxPendingMessages(-1))));
+    }
+
+    @Test
     void onlyARouteOfGetIsAWebSocketRoute() {
         assertThrows(IllegalStateException.class, () -> router(routes -> routes.POST("/post").webSocket(ws -> ws.onOpen((session, request) -> null))));
         assertThrows(IllegalStateException.class, () -> router(routes -> routes.any("/any").webSocket(ws -> ws.onOpen((session, request) -> null))));

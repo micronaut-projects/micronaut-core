@@ -51,8 +51,10 @@ import io.micronaut.websocket.WebSocketPongMessage;
  * <p>The handlers of a connection run one after the other: the first message is handled once the
  * open handler is done, and each next message once the handler of the previous one is done.
  * {@link #maxConcurrentMessages(int)} lets the handlers of more messages of a connection run at
- * the same time. The connection reads only a few messages ahead of its handlers, so a client
- * cannot send messages faster than they are handled, and it answers the pings meanwhile. A close
+ * the same time. The connection reads at most {@link #maxPendingMessages(int)} messages ahead of
+ * its handlers, so a client cannot send messages faster than they are handled, and it answers the
+ * pings meanwhile; once that many wait, it reads nothing until a handler is done, the pings and the
+ * close included, like the pending messages limit of Quarkus. A close
  * is handled as soon as it is read, while the handlers that run go on: the messages read before
  * it that still wait for their turn are discarded, except for a
  * {@link #onMessages(Argument, WebSocketMessagesHandler) messages handler}, whose stream receives
@@ -216,4 +218,17 @@ public sealed interface WebSocketRouteSpec permits WebSocketRouteEndpoint.Spec {
      * @return This spec
      */
     WebSocketRouteSpec maxConcurrentMessages(int maxConcurrentMessages);
+
+    /**
+     * The most messages of a connection read ahead of its handlers, a message in fragments
+     * counting each fragment: {@code 16} by default. Once that many wait, the connection reads
+     * nothing until a handler is done, which also holds back the pings and the close that follow
+     * them, e.g. when a handler does not complete. {@code 0} reads all the time, without
+     * backpressure: the pings and the close are never held back, and the messages that wait are
+     * kept in memory, however many.
+     *
+     * @param maxPendingMessages The most messages read ahead, or {@code 0} for no limit
+     * @return This spec
+     */
+    WebSocketRouteSpec maxPendingMessages(int maxPendingMessages);
 }
