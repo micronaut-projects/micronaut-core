@@ -87,6 +87,13 @@ public final class DevManifest {
      */
     public static final String MANIFEST_PROPERTY = PREFIX + "manifest";
 
+    /**
+     * The types whose beans are retained across a restart without being named: connection pools, which the
+     * application's classes do not define and which are expensive to open again. {@code micronaut.dev.retain-defaults=false}
+     * leaves them out, so that only what {@code micronaut.dev.retain} names is retained.
+     */
+    public static final List<String> DEFAULT_RETAIN = List.of("javax.sql.DataSource", "io.r2dbc.spi.ConnectionFactory");
+
     private final Path directory;
     private final String mainClass;
     private final Path projectDir;
@@ -108,6 +115,7 @@ public final class DevManifest {
     @Nullable
     private final Path buildToolTrigger;
     private final List<String> retain;
+    private final boolean retainDefaults;
     private final LiveReload liveReload;
 
     private DevManifest(Path directory, Properties properties) {
@@ -132,6 +140,7 @@ public final class DevManifest {
         String trigger = properties.getProperty(PREFIX + "build-tool.trigger");
         this.buildToolTrigger = trigger == null ? null : path(directory, trigger);
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
+        this.retainDefaults = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-defaults", "true").trim());
         this.liveReload = new LiveReload(
             properties.getProperty(PREFIX + "livereload.enabled", "auto").trim().toLowerCase(Locale.ROOT),
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
@@ -330,6 +339,16 @@ public final class DevManifest {
      */
     public List<String> retain() {
         return retain;
+    }
+
+    /**
+     * Whether the beans of the {@link #DEFAULT_RETAIN default types} are retained too, as they are unless
+     * {@code micronaut.dev.retain-defaults=false}.
+     *
+     * @return True to retain them
+     */
+    public boolean retainDefaults() {
+        return retainDefaults;
     }
 
     /**

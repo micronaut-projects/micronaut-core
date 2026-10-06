@@ -118,4 +118,21 @@ class DevManifestSpec extends Specification {
         then:
         thrown(IllegalArgumentException)
     }
+
+    void "the connection pools are retained by default unless the manifest turns the defaults off"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+
+        expect:
+        DevManifest.of(dir, properties).retainDefaults()
+        DevManifest.DEFAULT_RETAIN == ["javax.sql.DataSource", "io.r2dbc.spi.ConnectionFactory"]
+
+        when:
+        properties.setProperty("micronaut.dev.retain-defaults", "false")
+
+        then:
+        !DevManifest.of(dir, properties).retainDefaults()
+    }
 }
