@@ -265,7 +265,8 @@ public final class PythonAsyncioStreams {
             if (cancelled.get() || !terminated.compareAndSet(false, true)) {
                 return;
             }
-            dispatch(eventLoop, context, () -> callbacks.invokeMember("on_error", throwable), () -> LOG.debug("Dropping a publisher error whose Python context is closing", throwable));
+            Throwable failure = GraalPyExceptionHandler.forContext(context, throwable);
+            dispatch(eventLoop, context, () -> callbacks.invokeMember("on_error", failure), () -> LOG.debug("Dropping a publisher error whose Python context is closing", throwable));
         }
 
         @Override

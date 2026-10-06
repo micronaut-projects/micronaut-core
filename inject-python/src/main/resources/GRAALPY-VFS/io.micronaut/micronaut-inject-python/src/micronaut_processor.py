@@ -1,4 +1,5 @@
 import ast
+import builtins
 import inspect
 import keyword
 import os
@@ -1976,7 +1977,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
         Parse a base class AST node and return a TypeDef.
         Handles simple names like 'str' and subscripted types like 'MyBase[str]'.
         """
-        return self._parse_type(base_node)
+        base = self._parse_type(base_node)
+        if isinstance(base_node, ast.Name) and self._resolve_local_type_name(base_node.id):
+            return base
+        name = base.name()
+        # Resolve imports and local classes first: a user-defined RuntimeError is not a builtin.
+        builtin_name = name.removeprefix("builtins.")
+        if "." not in builtin_name and "$" not in builtin_name:
+            builtin = getattr(builtins, builtin_name, None)
+            if isinstance(builtin, type) and issubclass(builtin, Exception):
+                return TypeRef("builtins." + builtin_name, base.typeArguments(), base.typeUseDecorators(), True)
+        return base
 
     def _current_class_is_protocol(self):
         """
@@ -2147,7 +2158,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         Parse the arguments of an ast.FunctionDef node and return ArgumentsDef.
         """
-        args_list = func_node.args.args
+        # positional-only parameters come first and share the defaults with the others
+        args_list = func_node.args.posonlyargs + func_node.args.args
         defaults = func_node.args.defaults
 
         # Only the last len(defaults) arguments have defaults
@@ -2736,7 +2748,7 @@ def extract_arg_defaults(func_node, visitor=None):
     as None, which is no default at all, rather than as an AST repr: the Java side has no reliable
     way to tell a dump from a string default with the same text.
     """
-    arg_names = [a.arg for a in func_node.args.args]
+    arg_names = [a.arg for a in func_node.args.posonlyargs + func_node.args.args]
     defaults = func_node.args.defaults
 
     # Only the last len(defaults) arguments have defaults
@@ -2759,7 +2771,7 @@ def extract_arg_decorators(visitor, func_node):
     through typing.Annotated metadata.
     """
     member_decorators = {}
-    for arg in func_node.args.args:
+    for arg in func_node.args.posonlyargs + func_node.args.args:
         annotation = getattr(arg, 'annotation', None)
         if visitor._is_annotated_subscript(annotation):
             _, decorators = visitor._parse_annotated_type(annotation)
@@ -2773,7 +2785,7 @@ def extract_arg_types(visitor, func_node):
     types keyed by argument name.
     """
     member_types = {}
-    for arg in func_node.args.args:
+    for arg in func_node.args.posonlyargs + func_node.args.args:
         annotation = getattr(arg, 'annotation', None)
         if annotation is None:
             continue
@@ -2899,7 +2911,7 @@ def is_python_decorator_function(funcdef):
         for stmt in funcdef.body
         if isinstance(stmt, ast.FunctionDef)
     }
-    positional_argument_names = [arg.arg for arg in funcdef.args.args]
+    positional_argument_names = [arg.arg for arg in funcdef.args.posonlyargs + funcdef.args.args]
     single_target_argument = positional_argument_names[0] if len(positional_argument_names) == 1 else None
 
     for stmt in ast.walk(funcdef):

@@ -56,6 +56,15 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     }
 
     @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type) {
+        return dependencies.resolve(context, null, resolution -> {
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            resolution.require(registration);
+            return registration;
+        });
+    }
+
+    @Override
     public BeanDependencyGroup createGroup() {
         return dependencies.resolve(context, null, resolution -> {
             BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies.destructionContext);

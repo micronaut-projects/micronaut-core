@@ -46,7 +46,7 @@ final class PythonVfsBytecodeTest {
                 micronaut_transformer.__cached__
                 """).asString();
 
-            assertTrue(cachePath.contains("/__pycache__/micronaut_transformer."));
+            assertTrue(cachePath.replace('\\', '/').contains("/__pycache__/micronaut_transformer."));
             assertTrue(cachePath.endsWith(".pyc"));
         }
     }
