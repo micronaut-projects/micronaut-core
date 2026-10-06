@@ -14,7 +14,8 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * A JDBC data source survives the restarts of an application in development mode without the manifest naming it: the
+ * A JDBC data source survives the restarts of an application in development mode without the manifest naming it, since
+ * the factory method that makes it is annotated with {@link io.micronaut.context.annotation.Retain}: the
  * new generation is served the same pool, behind the wrapper its own bean created listener makes, as Micronaut Data
  * wraps a data source, and the first generation is collected. H2, which preallocates exceptions as it is first used,
  * is initialized outside any generation.
@@ -83,7 +84,7 @@ class DataSourceGenerationMemoryTest {
                 """);
             Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
             Path manifestFile = project.resolve("dev.properties");
-            // no micronaut.dev.retain: a data source is retained by default
+            // no micronaut.dev.retain: the factory method that makes the data source is annotated with @Retain
             Files.writeString(manifestFile, """
                 micronaut.dev.main-class=app.Application
                 micronaut.dev.strategy=restart
