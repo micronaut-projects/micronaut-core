@@ -1,6 +1,5 @@
 package io.micronaut.http.client.netty;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
@@ -8,7 +7,6 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceReader;
-import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.netty.body.NettyJsonHandler;
@@ -42,9 +40,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The events of an event stream split into pieces: the line splitter and the event decoder of the
- * reactive client as they were, the piece reader of the async client directly, and the piece
- * reader behind the publisher bridge.
+ * The events of an event stream split into heap or direct pieces: the piece reader of the client
+ * directly, and the piece reader behind the publisher bridge.
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
@@ -98,25 +95,6 @@ public class SseDecodingBenchmark {
         for (int i = 0; i < arrays.length; i++) {
             pieces[i] = "direct".equals(buffers) ? Unpooled.directBuffer(arrays[i].length).writeBytes(arrays[i]) : Unpooled.wrappedBuffer(arrays[i]);
         }
-    }
-
-    @Benchmark
-    public int legacySplitterAndDecoder() {
-        MessageBodyReader<Book> reader = registry.getReader(BOOK, List.of(MediaType.APPLICATION_JSON_TYPE));
-        SseEventDecoder decoder = new SseEventDecoder(Long.MAX_VALUE);
-        Flux<Event<Book>> events = SseSplitter.split(Flux.fromArray(pieces).map(ByteBuf::retainedDuplicate), BodySizeLimits.UNLIMITED)
-            .concatMapIterable(line -> {
-                try {
-                    return decoder.line(line);
-                } finally {
-                    line.release();
-                }
-            })
-            .map(event -> Event.of(event, reader.read(BOOK, MediaType.APPLICATION_JSON_TYPE, headers,
-                NettyByteBufferFactory.DEFAULT.wrap(Unpooled.wrappedBuffer(event.getData())))));
-        CountingSubscriber<Event<Book>> subscriber = new CountingSubscriber<>(false);
-        events.subscribe(subscriber);
-        return check(subscriber.count());
     }
 
     @Benchmark
