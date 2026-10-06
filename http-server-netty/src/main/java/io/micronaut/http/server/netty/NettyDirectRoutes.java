@@ -35,6 +35,7 @@ import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
 import io.micronaut.web.router.direct.PendingResponse;
+import io.micronaut.web.router.uri.UriUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -167,14 +168,34 @@ final class NettyDirectRoutes {
      * @param body           The body of the request, closed if the request is answered
      * @param outboundAccess Writes the response
      * @return Whether a direct route answered the request, or will answer it or hand it to
-     * {@link OrdinaryRequests} when its asynchronous response is complete
+     * {@link OrdinaryRequests} when its asynchronous response is complete. A request the
+     * decoder failed on, or whose target or query is not a valid URI, is never answered by a
+     * direct route: the ordinary path answers it, with its error
      */
     boolean answer(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        NettyDirectRequest directRequest = new NettyDirectRequest(ctx, request, configuration);
+        if (request.decoderResult().isFailure()) {
+            // e.g. a malformed or too long header: the ordinary path answers 400 or 413, and closes the connection
+            return false;
+        }
+        String target = request.uri();
+        if (!UriUtil.isValidPath(target)) {
+            try {
+                // like the request the server would create, e.g. an absolute-form or escaped target
+                target = AbstractNettyHttpRequest.validatedTarget(target, configuration.isEscapeHtmlUrl());
+            } catch (IllegalArgumentException e) {
+                // an invalid request target: the ordinary path answers 400
+                return false;
+            }
+        }
+        NettyDirectRequest directRequest = new NettyDirectRequest(ctx, request, target, configuration);
         io.micronaut.http.HttpResponse<?> direct;
         try {
             direct = routes.find(directRequest, RESPONSES);
-        } catch (RuntimeException e) {
+        } catch (InvalidQueryException e) {
+            // the query does not decode: the ordinary path answers 400, with the body untouched
+            return false;
+        } catch (Throwable e) {
+            // an Error too: the request is answered
             LOG.error("The direct routes failed to match {} {}: {}", request.method(), request.uri(), e.getMessage(), e);
             body.close();
             writeServerError(outboundAccess);
@@ -198,11 +219,11 @@ final class NettyDirectRoutes {
             content = content(ctx, response, writer(response, false));
             try {
                 head = NettyMutableHttpResponse.toNoBodyResponse(response);
-            } catch (RuntimeException e) {
+            } catch (Throwable e) {
                 content.release();
                 throw e;
             }
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             LOG.error("The direct route of {} {} failed to write its response: {}", request.method(), request.uri(), e.getMessage(), e);
             writeServerError(outboundAccess);
             return true;
@@ -233,7 +254,7 @@ final class NettyDirectRoutes {
             try {
                 mutable = mutable(response);
                 writer = writer(mutable, true);
-            } catch (RuntimeException e) {
+            } catch (Throwable e) {
                 onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnClose, response, e, null));
                 return;
             }
@@ -333,12 +354,12 @@ final class NettyDirectRoutes {
             HttpResponse head;
             try {
                 head = NettyMutableHttpResponse.toNoBodyResponse(response);
-            } catch (RuntimeException e) {
+            } catch (Throwable e) {
                 content.release();
                 throw e;
             }
             return new Prepared(head, content);
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             LOG.error("The direct route of {} {} failed to write its response: {}", request.method(), request.uri(), e.getMessage(), e);
             return null;
         }
@@ -487,6 +508,16 @@ final class NettyDirectRoutes {
     }
 
     /**
+     * A query that does not decode, e.g. with a malformed escape: the request is not a direct
+     * route's, and the ordinary path answers it with {@code 400}.
+     */
+    private static final class InvalidQueryException extends RuntimeException {
+        InvalidQueryException(IllegalArgumentException cause) {
+            super(cause.getMessage(), cause, false, false);
+        }
+    }
+
+    /**
      * A response ready to be written.
      *
      * @param head    Its status and headers
@@ -520,12 +551,17 @@ final class NettyDirectRoutes {
     private static final class NettyDirectRequest implements DirectRequest {
         private final ChannelHandlerContext ctx;
         private final HttpRequest request;
+        private final String target;
         private final NettyHttpServerConfiguration configuration;
         private @Nullable Map<String, List<String>> query;
 
-        NettyDirectRequest(ChannelHandlerContext ctx, HttpRequest request, NettyHttpServerConfiguration configuration) {
+        /**
+         * @param target The request target, validated like the request the server would create
+         */
+        NettyDirectRequest(ChannelHandlerContext ctx, HttpRequest request, String target, NettyHttpServerConfiguration configuration) {
             this.ctx = ctx;
             this.request = request;
+            this.target = target;
             this.configuration = configuration;
         }
 
@@ -534,8 +570,12 @@ final class NettyDirectRoutes {
             Map<String, List<String>> parameters = query;
             if (parameters == null) {
                 Charset charset = HttpUtil.getCharset(request, configuration.getDefaultCharset());
-                parameters = new QueryStringDecoder(request.uri(), charset, true, configuration.getMaxParams(),
-                    configuration.isSemicolonIsNormalChar()).parameters();
+                try {
+                    parameters = new QueryStringDecoder(target, charset, true, configuration.getMaxParams(),
+                        configuration.isSemicolonIsNormalChar()).parameters();
+                } catch (IllegalArgumentException e) {
+                    throw new InvalidQueryException(e);
+                }
                 query = parameters;
             }
             return parameters.getOrDefault(name, List.of());
@@ -549,7 +589,7 @@ final class NettyDirectRoutes {
         @Override
         public String path() {
             // as NettyHttpRequest#getPath
-            return AbstractNettyHttpRequest.parsePath(request.uri());
+            return AbstractNettyHttpRequest.parsePath(target);
         }
 
         @Override

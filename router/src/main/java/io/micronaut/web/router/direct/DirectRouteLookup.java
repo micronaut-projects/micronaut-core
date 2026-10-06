@@ -32,9 +32,12 @@ import org.jspecify.annotations.Nullable;
  *     declares a direct route fails to start;</li>
  *     <li>gets the bean of this type, if there is one and it is not {@link #isEmpty() empty},
  *     when it starts;</li>
- *     <li>for each request it receives, before anything else runs for it, calls
- *     {@link #find(DirectRequest, HttpResponseFactory)} with a {@link DirectRequest} over its
- *     own request and its own {@link HttpResponseFactory};</li>
+ *     <li>for each request it receives and decodes without an error, before anything else runs
+ *     for it, calls {@link #find(DirectRequest, HttpResponseFactory)} with a
+ *     {@link DirectRequest} over its own request and its own {@link HttpResponseFactory}. A
+ *     request its decoder failed on, e.g. with a malformed or too long header, or whose target
+ *     it rejects as an invalid URI, is never looked up: the runtime answers it with its error as
+ *     usual, e.g. {@code 400} or {@code 413};</li>
  *     <li>if a response is returned, discards the body of the request and writes the response
  *     as it is: its status, headers and body, with only the framing the protocol needs, e.g. the
  *     {@code Content-Length} of the body and the handling of the connection, and the headers the
@@ -55,7 +58,8 @@ import org.jspecify.annotations.Nullable;
  *     stage} completes, and then writes the response as above, or handles the request as usual
  *     when the stage completes with {@code null}. The responses of a connection keep the order of
  *     its requests, e.g. under HTTP/1.1 pipelining. It cancels the stage when the connection
- *     closes, and answers a failed stage with {@code 500}. Every runtime that declares
+ *     closes, and answers a failed stage with {@code 500}; a response the route completes after
+ *     the stage was cancelled is given to {@link DirectRouteSupport#discard}. Every runtime that declares
  *     {@link DirectRouteSupport} answers the asynchronous routes: a runtime that cannot hold a
  *     request without a thread waits for the stage on a worker thread, never on the thread that
  *     reads the connection, and may then not cancel the stage when the connection closes.</li>

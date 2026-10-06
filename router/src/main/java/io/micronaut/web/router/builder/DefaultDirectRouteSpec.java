@@ -72,7 +72,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
     public DirectRouteSpec where(RouteCondition condition) {
         Objects.requireNonNull(condition, "condition");
         checkPending();
-        // rejected now, and again with the conditions of the prefixes when the routes are built
+        // rejected now, so that the application fails to start naming the route: the routes are built without checking again
         DirectConditions.check(condition, this);
         conditions.add(condition);
         return this;

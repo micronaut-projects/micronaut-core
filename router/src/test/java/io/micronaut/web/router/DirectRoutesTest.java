@@ -51,8 +51,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -155,6 +158,58 @@ class DirectRoutesTest {
         calls = Routes.headDeclines;
         assertNull(find("HEAD", "/ctx/head-declines-async-get"));
         assertEquals(calls + 1, Routes.headDeclines);
+    }
+
+    @Test
+    void aHeadRequestRanksTheHeadAndGetRoutesTogetherLikeTheRouter() {
+        // the more specific GET route wins over a matching HEAD route
+        assertEquals("rank health", text(find("HEAD", "/ctx/rank/health")));
+        assertEquals(403, find("HEAD", "/ctx/rank/other").code());
+        // equally specific: the explicit HEAD route wins, whatever its order
+        assertEquals("explicit head", text(find("HEAD", "/ctx/rank/ordered")));
+        assertEquals("get", text(find("GET", "/ctx/rank/ordered")));
+    }
+
+    @Test
+    void anErrorOfAFunctionIsAnsweredWith500() throws Exception {
+        assertEquals(500, find("GET", "/ctx/error/sync").code());
+        assertEquals(500, findAsync("GET", "/ctx/error/executor").code());
+        assertEquals(500, findAsync("GET", "/ctx/error/async").code());
+    }
+
+    @Test
+    void aResponseCompletedAfterItsStageWasCancelledIsDiscarded() throws Exception {
+        TestDirectRouteSupport.discarded.clear();
+        // a function on an executor, still running when the stage is cancelled
+        Routes.lateRunning = new CountDownLatch(1);
+        Routes.lateRelease = new CountDownLatch(1);
+        CompletionStage<@Nullable HttpResponse<?>> onExecutor = pendingStage(find("GET", "/ctx/late/executor"));
+        assertTrue(Routes.lateRunning.await(5, TimeUnit.SECONDS));
+        onExecutor.toCompletableFuture().cancel(false);
+        Routes.lateRelease.countDown();
+        assertEquals("late executor", text(TestDirectRouteSupport.discarded.poll(5, TimeUnit.SECONDS)));
+
+        // a stage of the route that cancelling does not reach, completed later
+        Routes.lateStage = new CompletableFuture<>();
+        CompletionStage<@Nullable HttpResponse<?>> later = pendingStage(find("GET", "/ctx/late/stage"));
+        later.toCompletableFuture().cancel(false);
+        Routes.lateStage.complete(FACTORY.ok("late stage"));
+        assertEquals("late stage", text(TestDirectRouteSupport.discarded.poll(5, TimeUnit.SECONDS)));
+
+        // a response completed in time is written, never discarded
+        assertEquals("hello async", text(findAsync("GET", "/ctx/async/hello")));
+        assertNull(TestDirectRouteSupport.discarded.poll());
+    }
+
+    @Test
+    void aPendingResponseIsNotAResponseToWrite() throws Exception {
+        HttpResponse<?> pending = find("GET", "/ctx/async/hello");
+        assertInstanceOf(PendingResponse.class, pending);
+        // a runtime that writes it by mistake fails, instead of writing a status that is not final
+        assertThrows(IllegalStateException.class, pending::code);
+        assertThrows(IllegalStateException.class, pending::getHeaders);
+        assertThrows(IllegalStateException.class, pending::getBody);
+        assertEquals("hello async", text(await(pending)));
     }
 
     @Test
@@ -547,12 +602,21 @@ class DirectRoutesTest {
          * The types of the bodies given to {@link #shareableBody(Object)}.
          */
         static final Set<Class<?>> prepared = ConcurrentHashMap.newKeySet();
+        /**
+         * The responses given to {@link #discard(HttpResponse)}.
+         */
+        static final BlockingQueue<HttpResponse<?>> discarded = new LinkedBlockingQueue<>();
 
         @Override
         public Object shareableBody(Object body) {
             prepared.add(body.getClass());
             // a body the runtime of the test consumes when it writes it
             return body instanceof ConsumedBody consumed ? consumed.text().getBytes(StandardCharsets.UTF_8) : body;
+        }
+
+        @Override
+        public void discard(HttpResponse<?> response) {
+            discarded.add(response);
         }
     }
 
@@ -581,6 +645,9 @@ class DirectRoutesTest {
         static volatile int asyncCalls;
         static volatile int asyncConstraints;
         static volatile int headDeclines;
+        static volatile CountDownLatch lateRunning = new CountDownLatch(0);
+        static volatile CountDownLatch lateRelease = new CountDownLatch(0);
+        static volatile CompletableFuture<HttpResponse<?>> lateStage = new CompletableFuture<>();
         static volatile Thread constraintThread;
         static volatile Thread executorThread;
         static volatile CompletableFuture<HttpResponse<?>> hanging;
@@ -618,6 +685,30 @@ class DirectRoutesTest {
             });
             routes.GET("/head-declines-async-get").respondAsync(direct -> CompletableFuture.completedFuture(direct.responses().ok("get")));
             routes.GET("/consumed", HttpResponse.ok(new ConsumedBody("consumed")));
+            routes.HEAD("/rank/{+rest}", HttpResponse.status(HttpStatus.FORBIDDEN));
+            routes.GET("/rank/health", HttpResponse.ok("rank health"));
+            routes.HEAD("/rank/ordered").order(5).respond(HttpResponse.ok("explicit head"));
+            routes.GET("/rank/ordered").order(1).respond(HttpResponse.ok("get"));
+            routes.GET("/error/sync").respond(direct -> {
+                throw new AssertionError("failed");
+            });
+            routes.GET("/error/executor").executeOn(TaskExecutors.BLOCKING).respond(direct -> {
+                throw new AssertionError("failed");
+            });
+            routes.GET("/error/async").respondAsync(direct -> {
+                throw new AssertionError("failed");
+            });
+            routes.GET("/late/executor").executeOn(TaskExecutors.BLOCKING).respond(direct -> {
+                lateRunning.countDown();
+                try {
+                    lateRelease.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return direct.responses().ok("late executor");
+            });
+            // a minimal stage: cancelling its CompletableFuture copy does not reach it
+            routes.GET("/late/stage").respondAsync(direct -> lateStage.minimalCompletionStage());
 
             routes.GET("/beta").where(RouteCondition.any(
                 RouteCondition.header("X-Channel", ValueMatcher.equalTo("beta").ignoringCase()),

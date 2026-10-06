@@ -21,13 +21,13 @@ import io.micronaut.http.PathVariables;
 
 /**
  * What the function of a direct route receives for a request, see
- * {@link DirectRouteBuilder#GET(String, java.util.function.Function)}: the response factory of
+ * {@link DirectRouteSpec#respond(java.util.function.Function)}: the response factory of
  * the server runtime that received the request, whose responses the server writes as they are,
  * and the path variables of the matched route. There is no {@link io.micronaut.http.HttpRequest}:
  * a direct route is answered before the server creates it.
  *
  * <pre>{@code
- * routes.GET("/greetings/{name}", direct -> direct.responses()
+ * routes.GET("/greetings/{name}").respond(direct -> direct.responses()
  *     .ok("Hello " + direct.pathVariables().getString("name"))
  *     .contentType(MediaType.TEXT_PLAIN_TYPE));
  * }</pre>

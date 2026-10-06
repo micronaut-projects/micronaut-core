@@ -44,6 +44,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -52,13 +53,15 @@ import java.util.function.Predicate;
  * routes of each method sorted like the routes of the router, the most specific URI template
  * first, with their conditions normalized and checked, see {@link DirectConditions}.
  *
- * <p>A request is matched against the routes of its method, and a {@code HEAD} request that no
- * {@code HEAD} route matches against the {@code GET} routes, as the router adds an implicit
- * {@code HEAD} route to a {@code GET} route. Among the routes whose URI template, constraints and
- * conditions accept the request, the most specific wins, then the lowest order: routes left with
- * the same order make the request ambiguous, answered with {@code 400} like the router does. A
- * route that matched and declined the request ends the lookup: the request continues to the
- * ordinary routes, whether the route is synchronous or asynchronous.</p>
+ * <p>A request is matched against the routes of its method. A {@code HEAD} request is matched
+ * against the {@code HEAD} routes and the {@code GET} routes together, as the router adds an
+ * implicit {@code HEAD} route to a {@code GET} route and ranks it with the others. Among the
+ * routes whose URI template, constraints and conditions accept the request, the most specific
+ * wins, then, like the router, an explicit {@code HEAD} route over the implicit one of a
+ * {@code GET} route, then the lowest order: routes left make the request ambiguous, answered with
+ * {@code 400} like the router does. A route that matched and declined the request ends the
+ * lookup: the request continues to the ordinary routes, whether the route is synchronous or
+ * asynchronous.</p>
  *
  * <p>{@link #find} matches a request once: it answers a synchronous route, and starts an
  * asynchronous route, on its executor, or on the calling thread without one, and returns a
@@ -83,8 +86,6 @@ final class DirectRouteTable implements DirectRouteLookup {
         .thenComparingInt(route -> route.patternVariableCount);
 
     private final Map<String, Route[]> routesByMethod;
-    private final Route[] getRoutes;
-    private final Route[] headRoutes;
     private final ConversionService conversionService;
     private final RouteConditionContext conditionContext;
     private final boolean empty;
@@ -93,8 +94,6 @@ final class DirectRouteTable implements DirectRouteLookup {
                              ConversionService conversionService,
                              RouteConditionContext conditionContext) {
         this.routesByMethod = routesByMethod;
-        this.getRoutes = routesByMethod.getOrDefault(HttpMethod.GET.name(), NONE);
-        this.headRoutes = routesByMethod.getOrDefault(HttpMethod.HEAD.name(), NONE);
         this.conversionService = conversionService;
         this.conditionContext = conditionContext;
         this.empty = routesByMethod.isEmpty();
@@ -107,16 +106,23 @@ final class DirectRouteTable implements DirectRouteLookup {
      * @param conversionService Converts the path variables
      * @param conditionContext  Gives the clock of the time conditions
      * @param executors         The executor of a name
+     * @param discard           Releases a response an asynchronous route completed after its
+     *                          stage was cancelled, which the runtime never writes
      * @return The routes
      */
     static DirectRouteTable build(List<DirectRouteDeclaration> declarations,
                                   ConversionService conversionService,
                                   RouteConditionContext conditionContext,
-                                  ExecutorLookup executors) {
+                                  ExecutorLookup executors,
+                                  Consumer<HttpResponse<?>> discard) {
         Map<String, List<Route>> byMethod = new HashMap<>();
         for (DirectRouteDeclaration declaration : declarations) {
-            Route route = route(declaration, executors);
+            Route route = route(declaration, executors, discard);
             byMethod.computeIfAbsent(declaration.httpMethodName, name -> new ArrayList<>()).add(route);
+            if (HttpMethod.GET.name().equals(declaration.httpMethodName)) {
+                // the implicit HEAD route of a GET route, ranked with the HEAD routes
+                byMethod.computeIfAbsent(HttpMethod.HEAD.name(), name -> new ArrayList<>()).add(route.asImplicitHead());
+            }
         }
         Map<String, Route[]> routesByMethod = HashMap.newHashMap(byMethod.size());
         for (Map.Entry<String, List<Route>> entry : byMethod.entrySet()) {
@@ -128,13 +134,13 @@ final class DirectRouteTable implements DirectRouteLookup {
         return new DirectRouteTable(routesByMethod, conversionService, conditionContext);
     }
 
-    private static Route route(DirectRouteDeclaration declaration, ExecutorLookup executors) {
+    private static Route route(DirectRouteDeclaration declaration, ExecutorLookup executors, Consumer<HttpResponse<?>> discard) {
         // checked when they were given to the route
         RouteCondition condition = RouteConditions.normalizeAll(declaration.conditions);
         String executorName = declaration.executorName;
         Executor executor = executorName == null ? null : executors.executor(executorName, declaration);
         return new Route(declaration, new UriTemplateMatcher(declaration.uriTemplate), condition,
-            declaration.constraints.toArray(new Predicate[0]), declaration.order, executor);
+            declaration.constraints.toArray(new Predicate[0]), declaration.order, executor, discard);
     }
 
     @Override
@@ -147,27 +153,12 @@ final class DirectRouteTable implements DirectRouteLookup {
         if (empty) {
             return null;
         }
-        String method = request.methodName();
-        Route[] routes;
-        boolean head = false;
-        if (HttpMethod.HEAD.name().equals(method)) {
-            routes = headRoutes;
-            head = true;
-        } else if (HttpMethod.GET.name().equals(method)) {
-            routes = getRoutes;
-        } else {
-            routes = routesByMethod.getOrDefault(method, NONE);
-        }
-        if (routes.length == 0 && !(head && getRoutes.length > 0)) {
+        Route[] routes = routesByMethod.getOrDefault(request.methodName(), NONE);
+        if (routes.length == 0) {
             // no direct route of the method: the path is not parsed
             return null;
         }
-        String path = request.path();
-        Object response = lookup(routes, path, request, responses);
-        if (response == null && head) {
-            // the implicit HEAD route of a GET route, when no HEAD route matched: the server writes the headers only
-            response = lookup(getRoutes, path, request, responses);
-        }
+        Object response = lookup(routes, request.path(), request, responses);
         return response == DECLINED ? null : (HttpResponse<?>) response;
     }
 
@@ -188,11 +179,11 @@ final class DirectRouteTable implements DirectRouteLookup {
             if (match == null || !route.accepts(match, request, conversionService, conditionContext)) {
                 continue;
             }
-            if (best == null || route.order < best.order) {
+            if (best == null || route.preferredTo(best)) {
                 best = route;
                 bestMatch = match;
                 ambiguous = false;
-            } else if (route.order == best.order) {
+            } else if (route.implicitHead == best.implicitHead && route.order == best.order) {
                 ambiguous = true;
             }
         }
@@ -247,9 +238,18 @@ final class DirectRouteTable implements DirectRouteLookup {
         final boolean unconditional;
         final @Nullable Executor executor;
         final boolean async;
+        /**
+         * Releases a response completed after the stage of the route was cancelled.
+         */
+        final Consumer<HttpResponse<?>> discard;
+        /**
+         * Whether this is the implicit {@code HEAD} route of a {@code GET} route.
+         */
+        final boolean implicitHead;
 
         Route(DirectRouteDeclaration declaration, UriTemplateMatcher matcher, RouteCondition condition,
-              Predicate<? super PathVariables>[] constraints, int order, @Nullable Executor executor) {
+              Predicate<? super PathVariables>[] constraints, int order, @Nullable Executor executor,
+              Consumer<HttpResponse<?>> discard) {
             this.declaration = declaration;
             this.matcher = matcher;
             this.condition = condition;
@@ -261,6 +261,43 @@ final class DirectRouteTable implements DirectRouteLookup {
             this.unconditional = condition.equals(RouteConditions.ALWAYS);
             this.executor = executor;
             this.async = declaration.isAsync();
+            this.discard = discard;
+            this.implicitHead = false;
+        }
+
+        private Route(Route get) {
+            this.declaration = get.declaration;
+            this.matcher = get.matcher;
+            this.condition = get.condition;
+            this.constraints = get.constraints;
+            this.order = get.order;
+            this.rawLength = get.rawLength;
+            this.variableCount = get.variableCount;
+            this.patternVariableCount = get.patternVariableCount;
+            this.unconditional = get.unconditional;
+            this.executor = get.executor;
+            this.async = get.async;
+            this.discard = get.discard;
+            this.implicitHead = true;
+        }
+
+        /**
+         * @return The implicit {@code HEAD} route of this {@code GET} route: the server writes
+         * the headers of its response only
+         */
+        Route asImplicitHead() {
+            return new Route(this);
+        }
+
+        /**
+         * Whether this route wins over an equally specific one, like in the router: an explicit
+         * {@code HEAD} route over the implicit one of a {@code GET} route, then the lowest order.
+         */
+        boolean preferredTo(Route other) {
+            if (implicitHead != other.implicitHead) {
+                return !implicitHead;
+            }
+            return order < other.order;
         }
 
         boolean equallySpecific(Route other) {
@@ -304,8 +341,9 @@ final class DirectRouteTable implements DirectRouteLookup {
                 // null declines: the request continues as if no direct route matched it
                 return Objects.requireNonNull(response, "response")
                     .apply(new DefaultDirectContext(responses, new DefaultPathVariables(match.getVariableValues(), conversionService)));
-            } catch (RuntimeException e) {
-                return serverError(declaration, e, responses);
+            } catch (Throwable t) {
+                // an Error too: the request is answered, like an ordinary route's
+                return serverError(declaration, t, responses);
             }
         }
 
@@ -326,7 +364,12 @@ final class DirectRouteTable implements DirectRouteLookup {
                 routeExecutor.execute(() -> {
                     // cancelled, e.g. as the connection closed, before it started
                     if (!result.isDone()) {
-                        run(match, conversionService, responses, result);
+                        try {
+                            run(match, conversionService, responses, result);
+                        } catch (Throwable t) {
+                            // the task never ends without completing the stage
+                            complete(result, serverError(declaration, t, responses));
+                        }
                     }
                 });
             } catch (RejectedExecutionException e) {
@@ -342,7 +385,7 @@ final class DirectRouteTable implements DirectRouteLookup {
             Function<DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> asyncResponse = declaration.asyncResponse;
             if (asyncResponse == null) {
                 // a function or a value on an executor
-                result.complete(respond(match, conversionService, responses));
+                complete(result, respond(match, conversionService, responses));
                 return;
             }
             CompletionStage<? extends @Nullable HttpResponse<?>> stage;
@@ -350,14 +393,14 @@ final class DirectRouteTable implements DirectRouteLookup {
                 stage = Objects.requireNonNull(
                     asyncResponse.apply(new DefaultDirectContext(responses, new DefaultPathVariables(match.getVariableValues(), conversionService))),
                     "The function of an asynchronous direct route returned no stage");
-            } catch (RuntimeException e) {
-                result.complete(serverError(declaration, e, responses));
+            } catch (Throwable t) {
+                complete(result, serverError(declaration, t, responses));
                 return;
             }
             stage.whenComplete((response, error) -> {
                 if (error == null) {
                     // null declines
-                    result.complete(response);
+                    complete(result, response);
                 } else if (!result.isDone()) {
                     result.complete(serverError(declaration, error, responses));
                 }
@@ -367,6 +410,19 @@ final class DirectRouteTable implements DirectRouteLookup {
                     cancel(stage);
                 }
             });
+        }
+
+        /**
+         * Complete the stage of the response, or release the response if the stage was
+         * cancelled meanwhile, e.g. as the connection closed: nothing writes it then.
+         */
+        private void complete(CompletableFuture<@Nullable HttpResponse<?>> result, @Nullable HttpResponse<?> response) {
+            if (!result.complete(response) && response != null) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("The {} completed its response after its stage was cancelled: the response is released", declaration);
+                }
+                discard.accept(response);
+            }
         }
 
         private void cancel(CompletionStage<?> stage) {

@@ -16,6 +16,7 @@
 package io.micronaut.web.router.direct;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpResponse;
 
 /**
  * The capability of a server runtime to answer direct routes: a runtime that looks up the
@@ -27,8 +28,9 @@ import io.micronaut.core.annotation.Experimental;
  * as an ordinary route, with the filters it was declared to skip.
  *
  * <p>Its presence is the capability: a runtime that declares it answers every direct route, the
- * asynchronous ones included, see {@link PendingResponse}. Its one method, with a default, lets
- * the runtime prepare the bodies the requests of a route share.</p>
+ * asynchronous ones included, see {@link PendingResponse}. Its methods, with defaults, let the
+ * runtime manage the bodies of its own types: prepare a body the requests of a route share, and
+ * release the body of a response it never writes.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -50,5 +52,17 @@ public interface DirectRouteSupport {
      */
     default Object shareableBody(Object body) {
         return body;
+    }
+
+    /**
+     * Release a response the runtime never writes: the response an asynchronous direct route
+     * completed after the {@link PendingResponse#stage() stage} of its response was cancelled,
+     * e.g. as the connection closed. A runtime releases the body of the response if it is of its
+     * own type and holds a resource, e.g. a buffer, and leaves any other body alone: every runtime
+     * is given the response.
+     *
+     * @param response The response, never written
+     */
+    default void discard(HttpResponse<?> response) {
     }
 }

@@ -16,15 +16,18 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.direct.DirectRouteSupport;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.util.ReferenceCounted;
 import jakarta.inject.Singleton;
 
 /**
  * Declares that the Netty server answers direct routes: {@link RoutingInBoundHandler} looks them
  * up for each request it receives, see {@link NettyDirectRoutes}. A Netty buffer given as the
- * body of a direct route's response value is copied once, as writing it releases it.
+ * body of a direct route's response value is copied once, as writing it releases it, and the
+ * buffer of a response that is never written is released.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -51,6 +54,19 @@ final class NettyDirectRouteSupport implements DirectRouteSupport {
             return ByteBufUtil.getBytes(buf);
         } finally {
             buf.release();
+        }
+    }
+
+    /**
+     * A reference counted body, e.g. a {@link ByteBuf} or a buffer over one, is released.
+     */
+    @Override
+    public void discard(HttpResponse<?> response) {
+        Object body = response.body();
+        if (body instanceof ReferenceCounted counted) {
+            counted.release();
+        } else if (body instanceof io.micronaut.core.io.buffer.ReferenceCounted counted) {
+            counted.release();
         }
     }
 }

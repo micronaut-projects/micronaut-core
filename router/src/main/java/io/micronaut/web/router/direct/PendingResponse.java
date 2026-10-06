@@ -20,8 +20,6 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.body.stream.NoTrailers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
@@ -37,8 +35,10 @@ import java.util.concurrent.CompletionStage;
  * declined the request.
  *
  * <p>It is not a response to write: a server runtime checks for it with {@code instanceof}
- * before it writes the response {@code find} returned. Its status, {@code 102}, has no headers
- * and no body, and its attributes are immutable.</p>
+ * before it writes the response {@code find} returned. Its status, its headers and its body
+ * throw an {@link IllegalStateException}, so that a runtime that writes it by mistake fails, and
+ * answers {@code 500}, instead of writing a response without a final status. Its attributes are
+ * empty and immutable.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -47,6 +47,8 @@ import java.util.concurrent.CompletionStage;
 public final class PendingResponse implements HttpResponse<Object> {
 
     private static final MutableConvertibleValues<Object> NO_ATTRIBUTES = new MutableConvertibleValuesMap<>(Map.of());
+    private static final String NOT_A_RESPONSE = "A PendingResponse is not a response to write: "
+        + "write the response its stage() completes with, see DirectRouteLookup#find";
 
     private final CompletionStage<@Nullable HttpResponse<?>> stage;
 
@@ -63,7 +65,8 @@ public final class PendingResponse implements HttpResponse<Object> {
      * response, e.g. the executor of the route, with a {@code 500} response if the function of
      * the route throws or its stage fails, and with {@code null} if the route declines the
      * request. Cancelling it cancels the stage of the route, and a function that has not started
-     * on its executor does not run.
+     * on its executor does not run; a response the route completes after it was cancelled is
+     * given to {@link DirectRouteSupport#discard(HttpResponse)}.
      *
      * @return The stage of the response
      */
@@ -73,17 +76,17 @@ public final class PendingResponse implements HttpResponse<Object> {
 
     @Override
     public int code() {
-        return HttpStatus.PROCESSING.getCode();
+        throw new IllegalStateException(NOT_A_RESPONSE);
     }
 
     @Override
     public String reason() {
-        return "Pending direct route";
+        throw new IllegalStateException(NOT_A_RESPONSE);
     }
 
     @Override
     public HttpHeaders getHeaders() {
-        return NoTrailers.HEADERS;
+        throw new IllegalStateException(NOT_A_RESPONSE);
     }
 
     @Override
@@ -94,7 +97,7 @@ public final class PendingResponse implements HttpResponse<Object> {
 
     @Override
     public Optional<Object> getBody() {
-        return Optional.empty();
+        throw new IllegalStateException(NOT_A_RESPONSE);
     }
 
     @Override

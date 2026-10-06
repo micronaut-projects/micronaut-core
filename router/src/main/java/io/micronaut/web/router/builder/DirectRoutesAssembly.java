@@ -33,6 +33,8 @@ import io.micronaut.web.router.direct.DirectRouteLookup;
 import io.micronaut.web.router.direct.DirectRouteSupport;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +58,8 @@ import java.util.concurrent.Executor;
 @Singleton
 @Requires(beans = HttpDirectRoutes.class)
 final class DirectRoutesAssembly implements DirectRouteLookup {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DirectRoutesAssembly.class);
 
     private final DirectRouteLookup routes;
 
@@ -92,7 +96,8 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
         RouteConditionContext conditionContext = RouteConditionContext.lazy(() -> beanLocator.findBean(RouteConditionContext.class)
             .orElse(RouteConditionContext.fallback()));
         DirectRouteTable table = DirectRouteTable.build(declarations, conversionService, conditionContext,
-            (executorName, route) -> executor(beanLocator, executorName, route));
+            (executorName, route) -> executor(beanLocator, executorName, route),
+            response -> discard(directRouteSupport, response));
         if (!table.isEmpty() && directRouteSupport.isEmpty()) {
             // never served as ordinary routes, which the filters they skip would see
             throw new ConfigurationException("The application declares direct routes, see HttpDirectRoutes, "
@@ -113,6 +118,19 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
             shared = Objects.requireNonNull(runtime.shareableBody(shared), "shareableBody");
         }
         return shared;
+    }
+
+    /**
+     * Release a response no runtime writes: each runtime releases the bodies of its own types.
+     */
+    private static void discard(List<DirectRouteSupport> runtimes, HttpResponse<?> response) {
+        for (DirectRouteSupport runtime : runtimes) {
+            try {
+                runtime.discard(response);
+            } catch (RuntimeException e) {
+                LOG.warn("Failed to release a response of a direct route: {}", e.getMessage(), e);
+            }
+        }
     }
 
     private static Executor executor(BeanLocator beanLocator, String executorName, DirectRouteDeclaration route) {
