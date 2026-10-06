@@ -30,8 +30,11 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
+import io.micronaut.web.router.direct.PendingResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -39,6 +42,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -70,15 +74,16 @@ import java.util.function.Supplier;
  * looks up the Netty request it received, an HTTP/1.1 request or an HTTP/2 or HTTP/3 stream
  * converted to one, before it creates the {@link NettyHttpRequest}. A request a direct route
  * matches is answered with the status, the headers and the body of the response the route
- * created for it, and nothing else: the only header added is the {@code Content-Length} of the
- * body, and the response is written by the {@link OutboundAccess} of the request like any
- * response, so keep-alive, pipelining and {@code HEAD} are handled as for the other responses.
- * The body of the request is discarded. No filter, route, request event or request scope sees
- * the request.
+ * created for it, and the headers the server is configured to add to every response, the
+ * {@code Date} and {@code Server} headers, when the route did not set them. The
+ * {@code Content-Length} of the body frames it, and the response is written by the
+ * {@link OutboundAccess} of the request like any response, so keep-alive, pipelining and
+ * {@code HEAD} are handled as for the other responses. The body of the request is discarded. No
+ * filter, route, request event or request scope sees the request.
  *
  * <p>A synchronous route is answered on the event loop, and its body written there: a blocking
  * message body writer is refused, with {@code 500}. An asynchronous route, see
- * {@link DirectRouteLookup#PENDING}, holds the request, and its body, until the stage of its
+ * {@link PendingResponse}, holds the request, and its body, until the stage of its
  * response completes. Its body is then written on the event loop, unless its writer blocks: a
  * blocking writer runs on the thread that completed the stage, e.g. the executor of the route,
  * or on the IO executor when that thread is an event loop. The response is written by the event
@@ -105,6 +110,14 @@ final class NettyDirectRoutes {
     private final Supplier<? extends Executor> ioExecutor;
     private final OrdinaryRequests ordinary;
     /**
+     * Whether to add the {@code Date} header, see {@code micronaut.server.date-header}.
+     */
+    private final boolean dateHeader;
+    /**
+     * The {@code Server} header to add, see {@code micronaut.server.server-header}, or {@code null}.
+     */
+    private final @Nullable String serverHeader;
+    /**
      * The message body writers of the bodies that are neither bytes nor text, looked up once per
      * type and media type.
      */
@@ -120,6 +133,8 @@ final class NettyDirectRoutes {
         this.bodyHandlers = bodyHandlers;
         this.ioExecutor = ioExecutor;
         this.ordinary = ordinary;
+        this.dateHeader = configuration.isDateHeader();
+        this.serverHeader = configuration.getServerHeader().orElse(null);
     }
 
     /**
@@ -169,8 +184,9 @@ final class NettyDirectRoutes {
             // no direct route, or the one that matched declined: the body is untouched
             return false;
         }
-        if (direct == DirectRouteLookup.PENDING) {
-            return answerAsync(ctx, request, directRequest, body, outboundAccess);
+        if (direct instanceof PendingResponse pending) {
+            answerAsync(ctx, request, pending.stage(), body, outboundAccess);
+            return true;
         }
         // the route never reads it
         body.close();
@@ -196,27 +212,14 @@ final class NettyDirectRoutes {
     }
 
     /**
-     * Answer a request an asynchronous route matched: the request is held until the stage of its
-     * response completes.
+     * Answer a request an asynchronous route matched, and started: the request is held until the
+     * stage of its response completes.
      */
-    private boolean answerAsync(ChannelHandlerContext ctx,
-                                HttpRequest request,
-                                NettyDirectRequest directRequest,
-                                CloseableByteBody body,
-                                OutboundAccess outboundAccess) {
-        CompletionStage<io.micronaut.http.@Nullable HttpResponse<?>> stage;
-        try {
-            stage = routes.findAsync(directRequest, RESPONSES);
-        } catch (RuntimeException e) {
-            LOG.error("The direct routes failed to match {} {}: {}", request.method(), request.uri(), e.getMessage(), e);
-            body.close();
-            writeServerError(outboundAccess);
-            return true;
-        }
-        if (stage == null) {
-            // no direct route matches any more, e.g. as the time passed a time condition
-            return false;
-        }
+    private void answerAsync(ChannelHandlerContext ctx,
+                             HttpRequest request,
+                             CompletionStage<io.micronaut.http.@Nullable HttpResponse<?>> stage,
+                             CloseableByteBody body,
+                             OutboundAccess outboundAccess) {
         ChannelFutureListener cancelOnClose = future -> cancel(stage);
         ctx.channel().closeFuture().addListener(cancelOnClose);
         stage.whenComplete((response, error) -> {
@@ -260,7 +263,6 @@ final class NettyDirectRoutes {
                 prepare.run();
             }
         });
-        return true;
     }
 
     /**
@@ -345,14 +347,22 @@ final class NettyDirectRoutes {
     /**
      * Write a response, on the event loop.
      */
-    private static void write(ChannelHandlerContext ctx, HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess) {
+    private void write(ChannelHandlerContext ctx, HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Direct response {} - {} {}", head.status().code(), request.method(), request.uri());
         }
-        // the framing of the body: the only header the server adds
-        head.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
-        head.headers().set(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
+        HttpHeaders headers = head.headers();
+        addConfiguredHeaders(headers);
+        // the framing of the body: the Content-Length of the body is set by the outbound handler
+        headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
         if (HttpMethod.HEAD.equals(request.method())) {
+            if (!PipeliningServerHandler.canHaveBody(head.status())) {
+                // e.g. 204, which has no Content-Length
+                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+            } else if (content.isReadable() || !headers.contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                // the length of the GET response, or the one a HEAD route without a body declares
+                headers.set(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
+            }
             content.release();
             outboundAccess.writeHeadResponse(head);
         } else {
@@ -367,10 +377,26 @@ final class NettyDirectRoutes {
         return NettyByteBodyFactory.empty();
     }
 
-    private static void writeServerError(OutboundAccess outboundAccess) {
+    private void writeServerError(OutboundAccess outboundAccess) {
         DefaultHttpResponse error = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+        addConfiguredHeaders(error.headers());
         error.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         outboundAccess.write(error, NettyByteBodyFactory.empty());
+    }
+
+    /**
+     * Add the headers the server is configured to add to every response, like the ordinary
+     * responses get them: the {@code Date} header, formatted at most once per second, and the
+     * {@code Server} header, unless the route set them.
+     */
+    private void addConfiguredHeaders(HttpHeaders headers) {
+        if (dateHeader && !headers.contains(HttpHeaderNames.DATE)) {
+            headers.set(HttpHeaderNames.DATE, HttpDateHeader.now());
+        }
+        String server = serverHeader;
+        if (server != null && !headers.contains(HttpHeaderNames.SERVER)) {
+            headers.set(HttpHeaderNames.SERVER, server);
+        }
     }
 
     /**

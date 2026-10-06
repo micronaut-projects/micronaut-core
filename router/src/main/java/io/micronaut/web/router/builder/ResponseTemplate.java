@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 /**
  * A copy of the response of a {@link HttpRouteSpec#respond(HttpResponse)} route,
@@ -81,15 +82,21 @@ record ResponseTemplate(int code,
 
     /**
      * The template of a response given as a value to a direct route: a text body is encoded
-     * once, and a {@code byte[]} body copied, so that the server only wraps the bytes of the body
-     * the requests share.
+     * once, a {@code byte[]} body copied, and any other body prepared by the server runtimes, so
+     * that the server only wraps or writes a body the requests share, and never consumes it.
      *
-     * @param response The response
+     * @param response      The response
+     * @param shareableBody Prepares a body of a server runtime, e.g. copies a buffer the runtime
+     *                      releases once written, see
+     *                      {@link io.micronaut.web.router.direct.DirectRouteSupport#shareableBody(Object)}
      * @return The template
      */
-    static ResponseTemplate direct(HttpResponse<?> response) {
+    static ResponseTemplate direct(HttpResponse<?> response, UnaryOperator<Object> shareableBody) {
         ResponseTemplate template = of(response);
         Object body = template.body();
+        if (body == null) {
+            return template;
+        }
         if (body instanceof CharSequence text) {
             Charset charset = response.getContentType().flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
             return template.withBody(text.toString().getBytes(charset));
@@ -98,7 +105,8 @@ record ResponseTemplate(int code,
             // the caller keeps the array
             return template.withBody(bytes.clone());
         }
-        return template;
+        Object shared = shareableBody.apply(body);
+        return shared == body ? template : template.withBody(shared);
     }
 
     /**

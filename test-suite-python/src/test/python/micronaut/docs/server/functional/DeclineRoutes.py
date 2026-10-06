@@ -1,8 +1,7 @@
 from jakarta.inject import Singleton
 from micronaut.context.annotation import Requires
 from micronaut.http import HttpResponse, MediaType
-from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes
-from micronaut.web.router.direct import DirectRouteBuilder, HttpDirectRoutes
+from micronaut.web.router.builder import DirectRouteBuilder, HttpDirectRoutes, HttpRouteBuilder, HttpRoutes
 
 CACHED = {"logo.png", "style.css"}
 

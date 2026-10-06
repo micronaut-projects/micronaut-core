@@ -3,7 +3,7 @@ from micronaut.context.annotation import Requires
 import java
 from jakarta.inject import Singleton
 from micronaut.scheduling import TaskExecutors
-from micronaut.web.router.direct import DirectRouteBuilder, HttpDirectRoutes
+from micronaut.web.router.builder import DirectRouteBuilder, HttpDirectRoutes
 
 CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
 # end::imports[]

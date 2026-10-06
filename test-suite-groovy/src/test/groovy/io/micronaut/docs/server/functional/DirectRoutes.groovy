@@ -6,11 +6,11 @@ import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.web.router.builder.DirectContext
+import io.micronaut.web.router.builder.DirectRouteBuilder
+import io.micronaut.web.router.builder.HttpDirectRoutes
 import io.micronaut.web.router.builder.RouteCondition
 import io.micronaut.web.router.builder.ValueMatcher
-import io.micronaut.web.router.direct.DirectContext
-import io.micronaut.web.router.direct.DirectRouteBuilder
-import io.micronaut.web.router.direct.HttpDirectRoutes
 import jakarta.inject.Singleton
 
 import java.util.function.Function

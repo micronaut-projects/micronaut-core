@@ -32,10 +32,10 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.web.router.builder.DirectRouteBuilder;
+import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.direct.DirectRouteBuilder;
-import io.micronaut.web.router.direct.HttpDirectRoutes;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
@@ -112,8 +112,8 @@ class DirectRouteAsyncTest {
         assertInstanceOf(FastThreadLocalThread.class, threads.constraint.get());
         Thread blocking = threads.function.get();
         assertFalse(blocking instanceof FastThreadLocalThread, blocking.getName());
-        // a direct response gets no header of the server
-        assertNull(response.getHeaders().get("Date"));
+        // a direct response gets the Date header of the server
+        assertNotNull(response.getHeaders().get("Date"));
         assertEquals("9", response.getHeaders().get("Content-Length"));
         assertEquals(0, threads.filtered.get());
     }

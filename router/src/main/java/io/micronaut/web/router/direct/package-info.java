@@ -14,22 +14,18 @@
  * limitations under the License.
  */
 /**
- * Direct routes: routes the server answers as soon as it has received a request, before it
- * creates the {@link io.micronaut.http.HttpRequest}, runs the filters and looks up the ordinary
- * routes.
+ * The SPI between the router and the server runtimes for direct routes: routes the server
+ * answers as soon as it has received a request, before it creates the
+ * {@link io.micronaut.http.HttpRequest}, runs the filters and looks up the ordinary routes. The
+ * application declares them with {@link io.micronaut.web.router.builder.HttpDirectRoutes} beans.
  *
- * <p>The application declares them with {@link io.micronaut.web.router.direct.HttpDirectRoutes}
- * beans and their {@link io.micronaut.web.router.direct.DirectRouteBuilder}; a function of a
- * route composes the response of a request from a
- * {@link io.micronaut.web.router.direct.DirectContext}. The configuration of a route is a
- * {@link io.micronaut.web.router.builder.DirectRouteSpec}.</p>
- *
- * <p>The other types of this package are the SPI between the router and the server runtimes,
- * e.g. the Netty server or a servlet container: a server that answers direct routes declares a
- * {@link io.micronaut.web.router.direct.DirectRouteSupport} bean, and looks up the response of a
- * request with {@link io.micronaut.web.router.direct.DirectRouteLookup} before it creates the
- * {@link io.micronaut.http.HttpRequest}, from the method, the path, the headers and the peer
- * address of the request it received, a {@link io.micronaut.web.router.direct.DirectRequest}.</p>
+ * <p>A server runtime that answers direct routes, e.g. the Netty server or a servlet container,
+ * declares a {@link io.micronaut.web.router.direct.DirectRouteSupport} bean, and looks up the
+ * response of a request with {@link io.micronaut.web.router.direct.DirectRouteLookup} before it
+ * creates the {@link io.micronaut.http.HttpRequest}, from the method, the path, the headers and
+ * the peer address of the request it received, a
+ * {@link io.micronaut.web.router.direct.DirectRequest}. An asynchronous route answers with a
+ * {@link io.micronaut.web.router.direct.PendingResponse}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0

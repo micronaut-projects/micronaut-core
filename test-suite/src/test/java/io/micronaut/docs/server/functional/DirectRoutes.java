@@ -8,8 +8,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.RouteCondition;
 import io.micronaut.web.router.builder.ValueMatcher;
-import io.micronaut.web.router.direct.DirectRouteBuilder;
-import io.micronaut.web.router.direct.HttpDirectRoutes;
+import io.micronaut.web.router.builder.DirectRouteBuilder;
+import io.micronaut.web.router.builder.HttpDirectRoutes;
 import jakarta.inject.Singleton;
 
 import java.util.EnumSet;

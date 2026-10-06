@@ -3,8 +3,8 @@ package io.micronaut.docs.server.functional;
 // tag::imports[]
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.web.router.direct.DirectRouteBuilder;
-import io.micronaut.web.router.direct.HttpDirectRoutes;
+import io.micronaut.web.router.builder.DirectRouteBuilder;
+import io.micronaut.web.router.builder.HttpDirectRoutes;
 import jakarta.inject.Singleton;
 
 import java.util.Map;

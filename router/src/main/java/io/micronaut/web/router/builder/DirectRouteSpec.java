@@ -18,7 +18,6 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.direct.DirectContext;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
@@ -30,7 +29,7 @@ import java.util.function.Predicate;
 
 /**
  * A pending direct route, declared by a creator of the
- * {@link io.micronaut.web.router.direct.DirectRouteBuilder}, e.g. {@code GET(uri)}: first what
+ * {@link DirectRouteBuilder}, e.g. {@code GET(uri)}: first what
  * the server can decide from the request it received, before it creates the
  * {@link io.micronaut.http.HttpRequest}, and where the function of the route runs, see
  * {@link ExecutionSpec}: on the thread that received the request by default, or on an executor
@@ -131,7 +130,11 @@ public sealed interface DirectRouteSpec extends ExecutionSpec<DirectRouteSpec> p
 
     /**
      * End the route with a response given as a value: the route copies the status, the headers
-     * and the attributes of the response for each request, and shares its body.
+     * and the attributes of the response for each request, and shares its body. A text body is
+     * encoded once, and a {@code byte[]} body copied, now. A body the server consumes when it
+     * writes it, e.g. a Netty {@code ByteBuf}, which it releases, is copied once by the server
+     * runtime, and released, see
+     * {@link io.micronaut.web.router.direct.DirectRouteSupport#shareableBody(Object)}.
      *
      * @param response The response
      * @throws IllegalStateException if the route was already ended

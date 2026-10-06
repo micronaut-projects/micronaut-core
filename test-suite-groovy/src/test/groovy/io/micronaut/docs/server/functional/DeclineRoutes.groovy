@@ -3,11 +3,11 @@ package io.micronaut.docs.server.functional
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
+import io.micronaut.web.router.builder.DirectContext
+import io.micronaut.web.router.builder.DirectRouteBuilder
+import io.micronaut.web.router.builder.HttpDirectRoutes
 import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRoutes
-import io.micronaut.web.router.direct.DirectContext
-import io.micronaut.web.router.direct.DirectRouteBuilder
-import io.micronaut.web.router.direct.HttpDirectRoutes
 import jakarta.inject.Singleton
 
 import java.util.function.Function

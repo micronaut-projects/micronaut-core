@@ -3,8 +3,7 @@ from micronaut.context.annotation import Requires
 import java
 from jakarta.inject import Singleton
 from micronaut.http import HttpMethod, HttpResponse, HttpStatus, MediaType
-from micronaut.web.router.builder import RouteCondition, ValueMatcher
-from micronaut.web.router.direct import DirectRouteBuilder, HttpDirectRoutes
+from micronaut.web.router.builder import DirectRouteBuilder, HttpDirectRoutes, RouteCondition, ValueMatcher
 
 EnumSet = java.type("java.util.EnumSet")
 List = java.type("java.util.List")

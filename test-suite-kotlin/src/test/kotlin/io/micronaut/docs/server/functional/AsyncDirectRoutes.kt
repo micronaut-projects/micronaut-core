@@ -4,9 +4,9 @@ package io.micronaut.docs.server.functional
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.web.router.direct.DirectContext
-import io.micronaut.web.router.direct.DirectRouteBuilder
-import io.micronaut.web.router.direct.HttpDirectRoutes
+import io.micronaut.web.router.builder.DirectContext
+import io.micronaut.web.router.builder.DirectRouteBuilder
+import io.micronaut.web.router.builder.HttpDirectRoutes
 import jakarta.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage

@@ -25,10 +25,9 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.web.router.RouteConditionContext;
-import io.micronaut.web.router.direct.DefaultDirectContext;
-import io.micronaut.web.router.direct.DirectContext;
 import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
+import io.micronaut.web.router.direct.PendingResponse;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +48,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * The direct routes of the {@link io.micronaut.web.router.direct.HttpDirectRoutes} beans: the
+ * The direct routes of the {@link HttpDirectRoutes} beans: the
  * routes of each method sorted like the routes of the router, the most specific URI template
  * first, with their conditions normalized and checked, see {@link DirectConditions}.
  *
@@ -57,12 +56,13 @@ import java.util.function.Predicate;
  * {@code HEAD} route matches against the {@code GET} routes, as the router adds an implicit
  * {@code HEAD} route to a {@code GET} route. Among the routes whose URI template, constraints and
  * conditions accept the request, the most specific wins, then the lowest order: routes left with
- * the same order make the request ambiguous, answered with {@code 400} like the router does.</p>
+ * the same order make the request ambiguous, answered with {@code 400} like the router does. A
+ * route that matched and declined the request ends the lookup: the request continues to the
+ * ordinary routes, whether the route is synchronous or asynchronous.</p>
  *
- * <p>{@link #find} answers the synchronous routes, and returns {@link #PENDING} for an
- * asynchronous route without calling it; {@link #findAsync} matches the request again, and runs
- * the function of the route on its executor, or on the calling thread for an asynchronous route
- * without one.</p>
+ * <p>{@link #find} matches a request once: it answers a synchronous route, and starts an
+ * asynchronous route, on its executor, or on the calling thread without one, and returns a
+ * {@link PendingResponse} with the stage of its response.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -72,6 +72,11 @@ final class DirectRouteTable implements DirectRouteLookup {
 
     private static final Logger LOG = LoggerFactory.getLogger(DirectRouteTable.class);
     private static final Route[] NONE = new Route[0];
+    /**
+     * What {@link #lookup(Route[], String, DirectRequest, HttpResponseFactory)} returns when the
+     * route that matched declined the request: unlike no match, it ends the lookup.
+     */
+    private static final Object DECLINED = new Object();
     private static final Comparator<Route> BY_SPECIFICITY = Comparator
         .comparingInt((Route route) -> -route.rawLength)
         .thenComparingInt(route -> route.variableCount)
@@ -142,43 +147,35 @@ final class DirectRouteTable implements DirectRouteLookup {
         if (empty) {
             return null;
         }
-        return (HttpResponse<?>) lookup(request, responses, false);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public @Nullable CompletionStage<@Nullable HttpResponse<?>> findAsync(DirectRequest request, HttpResponseFactory responses) {
-        if (empty) {
-            return null;
-        }
-        return (CompletionStage<@Nullable HttpResponse<?>>) lookup(request, responses, true);
-    }
-
-    /**
-     * @param async Whether to return the stage of the response, see {@link #findAsync}, rather
-     *              than the response, see {@link #find}
-     * @return The response, or its stage, or {@code null}
-     */
-    private @Nullable Object lookup(DirectRequest request, HttpResponseFactory responses, boolean async) {
         String method = request.methodName();
         Route[] routes;
+        boolean head = false;
         if (HttpMethod.HEAD.name().equals(method)) {
             routes = headRoutes;
+            head = true;
         } else if (HttpMethod.GET.name().equals(method)) {
             routes = getRoutes;
         } else {
             routes = routesByMethod.getOrDefault(method, NONE);
         }
-        String path = request.path();
-        Object response = lookup(routes, path, request, responses, async);
-        if (response == null && routes == headRoutes) {
-            // the implicit HEAD route of a GET route: the server writes the headers only
-            response = lookup(getRoutes, path, request, responses, async);
+        if (routes.length == 0 && !(head && getRoutes.length > 0)) {
+            // no direct route of the method: the path is not parsed
+            return null;
         }
-        return response;
+        String path = request.path();
+        Object response = lookup(routes, path, request, responses);
+        if (response == null && head) {
+            // the implicit HEAD route of a GET route, when no HEAD route matched: the server writes the headers only
+            response = lookup(getRoutes, path, request, responses);
+        }
+        return response == DECLINED ? null : (HttpResponse<?>) response;
     }
 
-    private @Nullable Object lookup(Route[] routes, String path, DirectRequest request, HttpResponseFactory responses, boolean async) {
+    /**
+     * @return The response, a {@link PendingResponse} for an asynchronous route, {@link #DECLINED}
+     * if the route that matched declined the request, or {@code null} if no route matched
+     */
+    private @Nullable Object lookup(Route[] routes, String path, DirectRequest request, HttpResponseFactory responses) {
         Route best = null;
         UriMatchInfo bestMatch = null;
         boolean ambiguous = false;
@@ -207,14 +204,12 @@ final class DirectRouteTable implements DirectRouteLookup {
                 LOG.debug("Several direct routes match {} {} equally well, e.g. the {}", request.methodName(), path, best.declaration);
             }
             // like the router
-            HttpResponse<?> badRequest = responses.status(HttpStatus.BAD_REQUEST);
-            return async ? CompletableFuture.completedFuture(badRequest) : badRequest;
+            return responses.status(HttpStatus.BAD_REQUEST);
         }
-        if (async) {
-            return best.respondAsync(bestMatch, conversionService, responses);
-        }
-        // an asynchronous route is not called: the server calls findAsync
-        return best.async ? PENDING : best.respond(bestMatch, conversionService, responses);
+        HttpResponse<?> response = best.async
+            ? best.respondAsync(bestMatch, conversionService, responses)
+            : best.respond(bestMatch, conversionService, responses);
+        return response == null ? DECLINED : response;
     }
 
     private static HttpResponse<?> serverError(DirectRouteDeclaration declaration, Throwable error, HttpResponseFactory responses) {
@@ -315,25 +310,17 @@ final class DirectRouteTable implements DirectRouteLookup {
         }
 
         /**
-         * The stage of the response of a request: the function runs on the executor of the route,
-         * or on the calling thread without one.
+         * Start an asynchronous route: the function runs on the executor of the route, or on the
+         * calling thread without one.
          *
-         * @return The stage of the response, or {@code null} if a synchronous route declined the
-         * request
+         * @return The pending response, with the stage of the response
          */
-        @Nullable CompletionStage<@Nullable HttpResponse<?>> respondAsync(UriMatchInfo match,
-                                                                          ConversionService conversionService,
-                                                                          HttpResponseFactory responses) {
-            if (!async) {
-                // the route matched again is synchronous, e.g. as the time passed a time condition
-                HttpResponse<?> response = respond(match, conversionService, responses);
-                return response == null ? null : CompletableFuture.completedFuture(response);
-            }
+        PendingResponse respondAsync(UriMatchInfo match, ConversionService conversionService, HttpResponseFactory responses) {
             CompletableFuture<@Nullable HttpResponse<?>> result = new CompletableFuture<>();
             Executor routeExecutor = executor;
             if (routeExecutor == null) {
                 run(match, conversionService, responses, result);
-                return result;
+                return new PendingResponse(result);
             }
             try {
                 routeExecutor.execute(() -> {
@@ -345,7 +332,7 @@ final class DirectRouteTable implements DirectRouteLookup {
             } catch (RejectedExecutionException e) {
                 result.complete(serverError(declaration, e, responses));
             }
-            return result;
+            return new PendingResponse(result);
         }
 
         private void run(UriMatchInfo match,

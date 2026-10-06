@@ -71,9 +71,12 @@
  *     <li>{@link io.micronaut.http.PathVariables}, the typed path variables of the
  *     matched route, and {@link io.micronaut.web.router.builder.RequestPredicates}, conditions
  *     for {@code where(...)};</li>
- *     <li>{@link io.micronaut.web.router.builder.DirectRouteSpec}, the configuration of a direct
- *     route, which {@link io.micronaut.web.router.direct.HttpDirectRoutes} beans declare: the
- *     server answers it before it creates the request, without any filter.</li>
+ *     <li>{@link io.micronaut.web.router.builder.HttpDirectRoutes}, the beans that declare
+ *     direct routes with a {@link io.micronaut.web.router.builder.DirectRouteBuilder}: the server
+ *     answers a direct route before it creates the request, without any filter. A pending direct
+ *     route is a {@link io.micronaut.web.router.builder.DirectRouteSpec}, and its function
+ *     composes the response from a {@link io.micronaut.web.router.builder.DirectContext}. The
+ *     server runtimes answer them through the SPI of {@link io.micronaut.web.router.direct}.</li>
  * </ul>
  *
  * <p>The builders, the route, group, error, status and server filter specs and the path

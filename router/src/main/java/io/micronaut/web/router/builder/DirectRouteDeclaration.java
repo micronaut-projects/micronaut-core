@@ -18,7 +18,6 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.direct.DirectContext;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -30,7 +29,7 @@ import java.util.function.Predicate;
 
 /**
  * A direct route while it is declared, see {@link DefaultDirectRouteBuilder}: its settings are
- * recorded until the routes of every {@link io.micronaut.web.router.direct.HttpDirectRoutes} bean
+ * recorded until the routes of every {@link HttpDirectRoutes} bean
  * are declared, when the route is built into a {@link DirectRouteTable}.
  *
  * @author Denis Stepanov

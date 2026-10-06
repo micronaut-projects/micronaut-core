@@ -17,7 +17,6 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.web.router.direct.DirectRouteBuilder;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -41,6 +40,7 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
 
     private final List<DirectRouteDeclaration> declarations;
     private final UnaryOperator<String> routeUri;
+    private final UnaryOperator<Object> shareableBody;
     private final @Nullable RoutePrefix prefix;
     private final boolean[] closed;
     /**
@@ -53,18 +53,22 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
     private @Nullable Class<?> declaringBean;
 
     /**
-     * @param routeUri The URI template of a route, e.g. under the context path
+     * @param routeUri      The URI template of a route, e.g. under the context path
+     * @param shareableBody Prepares the body of a response given as a value, which the requests
+     *                      of the route share, see {@link ResponseTemplate#direct}
      */
-    DefaultDirectRouteBuilder(UnaryOperator<String> routeUri) {
-        this(new ArrayList<>(), routeUri, null, new boolean[1]);
+    DefaultDirectRouteBuilder(UnaryOperator<String> routeUri, UnaryOperator<Object> shareableBody) {
+        this(new ArrayList<>(), routeUri, shareableBody, null, new boolean[1]);
     }
 
     private DefaultDirectRouteBuilder(List<DirectRouteDeclaration> declarations,
                                       UnaryOperator<String> routeUri,
+                                      UnaryOperator<Object> shareableBody,
                                       @Nullable RoutePrefix prefix,
                                       boolean[] closed) {
         this.declarations = declarations;
         this.routeUri = routeUri;
+        this.shareableBody = shareableBody;
         this.prefix = prefix;
         this.closed = closed;
     }
@@ -102,7 +106,7 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
     public void path(String prefix, Consumer<DirectRouteBuilder> routes) {
         Objects.requireNonNull(routes, "routes");
         checkOpen();
-        DefaultDirectRouteBuilder nested = new DefaultDirectRouteBuilder(declarations, routeUri, RoutePrefix.of(prefix, this.prefix), closed);
+        DefaultDirectRouteBuilder nested = new DefaultDirectRouteBuilder(declarations, routeUri, shareableBody, RoutePrefix.of(prefix, this.prefix), closed);
         nested.declaringBean = declaringBean;
         routes.accept(nested);
         // the routes under the prefix are ended in its lambda
@@ -117,6 +121,13 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
      */
     void declaredBy(@Nullable Class<?> bean) {
         this.declaringBean = bean;
+    }
+
+    /**
+     * @return Prepares the body of a response given as a value, see {@link ResponseTemplate#direct}
+     */
+    UnaryOperator<Object> shareableBody() {
+        return shareableBody;
     }
 
     /**

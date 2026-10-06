@@ -31,13 +31,12 @@ import io.micronaut.web.router.RouteConditionContext;
 import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
 import io.micronaut.web.router.direct.DirectRouteSupport;
-import io.micronaut.web.router.direct.HttpDirectRoutes;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletionStage;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 /**
@@ -72,7 +71,8 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
                          List<HttpDirectRoutes> routes,
                          @Nullable @Value("${micronaut.server.context-path}") String contextPath,
                          List<DirectRouteSupport> directRouteSupport) {
-        DefaultDirectRouteBuilder builder = new DefaultDirectRouteBuilder(uri -> RouteAssembly.underContextPath(contextPath, uri));
+        DefaultDirectRouteBuilder builder = new DefaultDirectRouteBuilder(uri -> RouteAssembly.underContextPath(contextPath, uri),
+            body -> shareableBody(directRouteSupport, body));
         List<HttpDirectRoutes> ordered = new ArrayList<>(routes);
         OrderUtil.sort(ordered);
         try {
@@ -103,6 +103,18 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
         this.routes = table;
     }
 
+    /**
+     * The body of a response given as a value, as every runtime can share it, e.g. the bytes of a
+     * buffer that a runtime releases once written.
+     */
+    private static Object shareableBody(List<DirectRouteSupport> runtimes, Object body) {
+        Object shared = body;
+        for (DirectRouteSupport runtime : runtimes) {
+            shared = Objects.requireNonNull(runtime.shareableBody(shared), "shareableBody");
+        }
+        return shared;
+    }
+
     private static Executor executor(BeanLocator beanLocator, String executorName, DirectRouteDeclaration route) {
         ExecutorSelector selector = beanLocator.findBean(ExecutorSelector.class).orElse(null);
         if (selector == null) {
@@ -115,11 +127,6 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
     @Override
     public @Nullable HttpResponse<?> find(DirectRequest request, HttpResponseFactory responses) {
         return routes.find(request, responses);
-    }
-
-    @Override
-    public @Nullable CompletionStage<@Nullable HttpResponse<?>> findAsync(DirectRequest request, HttpResponseFactory responses) {
-        return routes.findAsync(request, responses);
     }
 
     @Override

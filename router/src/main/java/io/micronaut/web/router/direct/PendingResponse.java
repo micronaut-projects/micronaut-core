@@ -15,32 +15,60 @@
  */
 package io.micronaut.web.router.direct;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.stream.NoTrailers;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 /**
- * {@link DirectRouteLookup#PENDING}: the marker of a request an asynchronous direct route
- * matched, compared by identity. It is immutable, and a server runtime never writes it.
+ * What {@link DirectRouteLookup#find(DirectRequest, io.micronaut.http.HttpResponseFactory)}
+ * returns when the direct route that matches a request is asynchronous: it runs on an executor,
+ * or completes its response later. The route was matched once and has started: the
+ * {@link #stage() stage} completes with the response to write, or with {@code null} if the route
+ * declined the request.
+ *
+ * <p>It is not a response to write: a server runtime checks for it with {@code instanceof}
+ * before it writes the response {@code find} returned. Its status, {@code 102}, has no headers
+ * and no body, and its attributes are immutable.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
-@Internal
-final class PendingResponse implements HttpResponse<Object> {
+@Experimental
+public final class PendingResponse implements HttpResponse<Object> {
 
-    static final PendingResponse INSTANCE = new PendingResponse();
+    private static final MutableConvertibleValues<Object> NO_ATTRIBUTES = new MutableConvertibleValuesMap<>(Map.of());
 
-    private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>(Map.of());
+    private final CompletionStage<@Nullable HttpResponse<?>> stage;
 
-    private PendingResponse() {
+    /**
+     * @param stage The stage of the response of the route, completed with {@code null} if the
+     *              route declines the request
+     */
+    public PendingResponse(CompletionStage<@Nullable HttpResponse<?>> stage) {
+        this.stage = Objects.requireNonNull(stage, "stage");
+    }
+
+    /**
+     * The stage of the response of the route. It completes on whatever thread completes the
+     * response, e.g. the executor of the route, with a {@code 500} response if the function of
+     * the route throws or its stage fails, and with {@code null} if the route declines the
+     * request. Cancelling it cancels the stage of the route, and a function that has not started
+     * on its executor does not run.
+     *
+     * @return The stage of the response
+     */
+    public CompletionStage<@Nullable HttpResponse<?>> stage() {
+        return stage;
     }
 
     @Override
@@ -61,7 +89,7 @@ final class PendingResponse implements HttpResponse<Object> {
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
         // Map.of: immutable
-        return attributes;
+        return NO_ATTRIBUTES;
     }
 
     @Override
@@ -71,6 +99,6 @@ final class PendingResponse implements HttpResponse<Object> {
 
     @Override
     public String toString() {
-        return "DirectRouteLookup.PENDING";
+        return "PendingResponse[" + stage + "]";
     }
 }

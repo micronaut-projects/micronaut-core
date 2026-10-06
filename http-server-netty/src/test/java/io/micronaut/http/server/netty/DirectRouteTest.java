@@ -23,8 +23,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.simple.SimpleHttpResponseFactory;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
@@ -32,12 +30,14 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.simple.SimpleHttpResponseFactory;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.web.router.builder.DirectRouteBuilder;
+import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RouteCondition;
-import io.micronaut.web.router.direct.DirectRouteBuilder;
-import io.micronaut.web.router.direct.HttpDirectRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -108,10 +108,10 @@ class DirectRouteTest {
             HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/direct/health"), String.class);
             assertEquals(HttpStatus.OK, response.getStatus());
             assertEquals("UP", response.body());
-            // exactly the headers of the response, and its length: no Date, no Server, no Content-Type
+            // the headers of the response, its length, and the headers the server is configured to add: no Content-Type
             assertNull(response.getHeaders().get("Content-Type"));
-            assertNull(response.getHeaders().get("Date"));
-            assertNull(response.getHeaders().get("Server"));
+            assertNotNull(response.getHeaders().get("Date"));
+            assertEquals("micronaut-test", response.getHeaders().get("Server"));
             assertEquals("2", response.getHeaders().get("Content-Length"));
         }
         HttpResponse<String> computed = client.toBlocking().exchange(HttpRequest.GET("/direct/computed"), String.class);

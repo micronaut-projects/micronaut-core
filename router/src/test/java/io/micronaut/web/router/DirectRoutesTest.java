@@ -21,20 +21,21 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseFactory;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.DirectRouteSpec;
+import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RouteCondition;
 import io.micronaut.web.router.builder.ValueMatcher;
 import io.micronaut.web.router.direct.DirectRequest;
-import io.micronaut.web.router.direct.DirectRouteBuilder;
 import io.micronaut.web.router.direct.DirectRouteLookup;
 import io.micronaut.web.router.direct.DirectRouteSupport;
-import io.micronaut.web.router.direct.HttpDirectRoutes;
+import io.micronaut.web.router.direct.PendingResponse;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
@@ -51,12 +52,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -136,6 +139,51 @@ class DirectRoutesTest {
         assertEquals("UP", text(find("HEAD", "/ctx/health")));
         assertEquals("explicit head", text(find("HEAD", "/ctx/explicit-head")));
         assertNull(find("POST", "/ctx/health"));
+    }
+
+    @Test
+    void aHeadRouteThatDeclinesContinuesToTheOrdinaryRoutesNotToTheGetRoute() throws Exception {
+        int calls = Routes.headDeclines;
+        // the HEAD route matched and declined: the GET route does not answer instead
+        assertNull(find("HEAD", "/ctx/head-declines"));
+        assertEquals(calls + 1, Routes.headDeclines);
+        assertEquals("get", text(find("GET", "/ctx/head-declines")));
+        // the same for an asynchronous HEAD route, whose stage declines
+        assertNull(findAsync("HEAD", "/ctx/async-head-declines"));
+        assertEquals("get", text(find("GET", "/ctx/async-head-declines")));
+        // and for a HEAD route that declines before an asynchronous GET route: called once
+        calls = Routes.headDeclines;
+        assertNull(find("HEAD", "/ctx/head-declines-async-get"));
+        assertEquals(calls + 1, Routes.headDeclines);
+    }
+
+    @Test
+    void theConstraintsOfAnAsynchronousRouteRunOnce() throws Exception {
+        int calls = Routes.asyncConstraints;
+        assertEquals("counted 1", text(findAsync("GET", "/ctx/async/counted/1")));
+        assertEquals(calls + 1, Routes.asyncConstraints);
+    }
+
+    @Test
+    void theRuntimePreparesABodyItConsumesOnceForEveryRequest() {
+        HttpResponse<?> first = find("GET", "/ctx/consumed");
+        HttpResponse<?> second = find("GET", "/ctx/consumed");
+        // the runtime of the test copies the body to bytes, once, when the route is declared
+        assertEquals("consumed", text(first));
+        assertSame(first.body(), second.body());
+        // text and byte[] bodies are prepared by the router, and never given to the runtime
+        assertFalse(TestDirectRouteSupport.prepared.contains(String.class), TestDirectRouteSupport.prepared.toString());
+        assertFalse(TestDirectRouteSupport.prepared.contains(byte[].class), TestDirectRouteSupport.prepared.toString());
+    }
+
+    @Test
+    void aMethodWithoutDirectRoutesDoesNotReadThePath() {
+        TestRequest patch = request("PATCH", "/ctx/health");
+        assertNull(find(patch));
+        assertEquals(0, patch.pathReads);
+        TestRequest head = request("HEAD", "/ctx/health");
+        assertEquals("UP", text(find(head)));
+        assertEquals(1, head.pathReads);
     }
 
     @Test
@@ -241,23 +289,21 @@ class DirectRoutesTest {
     }
 
     @Test
-    void anAsynchronousRouteIsPendingThenAnsweredByFindAsync() throws Exception {
+    void anAsynchronousRouteIsStartedByFindAndAnswersWithItsStage() throws Exception {
         int calls = Routes.asyncCalls;
-        // matched, not called
-        assertSame(DirectRouteLookup.PENDING, find("GET", "/ctx/async/hello"));
-        assertEquals(calls, Routes.asyncCalls);
-        assertEquals("hello async", text(findAsync("GET", "/ctx/async/hello")));
+        // matched once, and started: the pending response carries the stage of the route
+        HttpResponse<?> pending = find("GET", "/ctx/async/hello");
+        assertEquals(calls + 1, Routes.asyncCalls);
+        assertEquals("hello async", text(await(pending)));
         assertEquals(calls + 1, Routes.asyncCalls);
         // the implicit HEAD route
-        assertSame(DirectRouteLookup.PENDING, find("HEAD", "/ctx/async/hello"));
         assertEquals("hello async", text(findAsync("HEAD", "/ctx/async/hello")));
         // no route matches
-        assertNull(directRoutes.findAsync(request("GET", "/ctx/async-none"), FACTORY));
+        assertNull(find("GET", "/ctx/async-none"));
     }
 
     @Test
     void aRouteOnAnExecutorRunsThereAfterItIsMatchedOnTheCallingThread() throws Exception {
-        assertSame(DirectRouteLookup.PENDING, find("GET", "/ctx/on-executor/7"));
         Thread caller = Thread.currentThread();
         assertEquals("item 7", text(findAsync("GET", "/ctx/on-executor/7")));
         assertSame(caller, Routes.constraintThread);
@@ -265,23 +311,19 @@ class DirectRoutesTest {
         // the blocking executor: virtual threads where available
         assertTrue(Routes.executorThread.isVirtual() || Routes.executorThread.getName().contains("blocking"), Routes.executorThread.getName());
         // a value on an executor, and nonBlocking, the default, which undoes it
-        assertSame(DirectRouteLookup.PENDING, find("GET", "/ctx/value-on-executor"));
         assertEquals("value", text(findAsync("GET", "/ctx/value-on-executor")));
         assertEquals("not pending", text(find("GET", "/ctx/non-blocking")));
     }
 
     @Test
     void anAsynchronousRouteDeclinesFailsAndIsCancelled() throws Exception {
-        CompletionStage<@Nullable HttpResponse<?>> declined = directRoutes.findAsync(request("GET", "/ctx/async/declined"), FACTORY);
-        assertNotNull(declined);
-        assertNull(declined.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        assertNull(findAsync("GET", "/ctx/async/declined"));
         assertEquals(500, findAsync("GET", "/ctx/async/failed").code());
         assertEquals(500, findAsync("GET", "/ctx/async/throwing").code());
         assertEquals(500, findAsync("GET", "/ctx/async/no-stage").code());
         assertEquals(500, findAsync("GET", "/ctx/throwing-on-executor").code());
 
-        CompletionStage<@Nullable HttpResponse<?>> hanging = directRoutes.findAsync(request("GET", "/ctx/async/hanging"), FACTORY);
-        assertNotNull(hanging);
+        CompletionStage<@Nullable HttpResponse<?>> hanging = pendingStage(find("GET", "/ctx/async/hanging"));
         CompletableFuture<HttpResponse<?>> routeStage = Routes.hanging;
         assertFalse(routeStage.isDone());
         hanging.toCompletableFuture().cancel(false);
@@ -291,12 +333,10 @@ class DirectRoutesTest {
 
     @Test
     void everyRuntimeWithDirectRouteSupportAnswersAsynchronousRoutes() {
-        // DirectRouteSupport has no method: its presence is enough for the asynchronous routes too
+        // the presence of DirectRouteSupport is enough for the asynchronous routes too
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "DirectRoutesTestPlainSupport"))) {
             DirectRouteLookup lookup = context.getBean(DirectRouteLookup.class);
-            assertSame(DirectRouteLookup.PENDING, lookup.find(request("GET", "/report"), FACTORY));
-            CompletionStage<@Nullable HttpResponse<?>> report = lookup.findAsync(request("GET", "/report"), FACTORY);
-            assertNotNull(report);
+            CompletionStage<@Nullable HttpResponse<?>> report = pendingStage(lookup.find(request("GET", "/report"), FACTORY));
             assertEquals("report", report.toCompletableFuture().join().body());
         }
     }
@@ -366,10 +406,20 @@ class DirectRoutesTest {
         return directRoutes.find(request, FACTORY);
     }
 
+    /**
+     * The response of an asynchronous route: {@code find} returns a pending response, whose
+     * stage completes with it.
+     */
     private static @Nullable HttpResponse<?> findAsync(String method, String path) throws Exception {
-        CompletionStage<@Nullable HttpResponse<?>> stage = directRoutes.findAsync(request(method, path), FACTORY);
-        assertNotNull(stage, method + " " + path);
-        return stage.toCompletableFuture().get(5, TimeUnit.SECONDS);
+        return await(find(method, path));
+    }
+
+    private static @Nullable HttpResponse<?> await(@Nullable HttpResponse<?> pending) throws Exception {
+        return pendingStage(pending).toCompletableFuture().get(5, TimeUnit.SECONDS);
+    }
+
+    private static CompletionStage<@Nullable HttpResponse<?>> pendingStage(@Nullable HttpResponse<?> pending) {
+        return assertInstanceOf(PendingResponse.class, pending).stage();
     }
 
     private static TestRequest request(String method, String path) {
@@ -425,6 +475,7 @@ class DirectRoutesTest {
         private final List<Map.Entry<String, String>> query = new ArrayList<>();
         private @Nullable InetSocketAddress peer;
         int queryReads;
+        int pathReads;
 
         TestRequest(String method, String path) {
             this.method = method;
@@ -465,6 +516,7 @@ class DirectRoutesTest {
 
         @Override
         public String path() {
+            pathReads++;
             return path;
         }
 
@@ -491,6 +543,25 @@ class DirectRoutesTest {
     @Singleton
     @Requires(property = "spec.name", pattern = "DirectRoutesTest(Rejected|PlainSupport)?")
     static class TestDirectRouteSupport implements DirectRouteSupport {
+        /**
+         * The types of the bodies given to {@link #shareableBody(Object)}.
+         */
+        static final Set<Class<?>> prepared = ConcurrentHashMap.newKeySet();
+
+        @Override
+        public Object shareableBody(Object body) {
+            prepared.add(body.getClass());
+            // a body the runtime of the test consumes when it writes it
+            return body instanceof ConsumedBody consumed ? consumed.text().getBytes(StandardCharsets.UTF_8) : body;
+        }
+    }
+
+    /**
+     * A body the server runtime of the test consumes when it writes it, like a buffer it releases.
+     *
+     * @param text The text of the body
+     */
+    record ConsumedBody(String text) {
     }
 
     @Singleton
@@ -508,6 +579,8 @@ class DirectRoutesTest {
     static class Routes implements HttpDirectRoutes {
         static volatile DirectRouteBuilder builder;
         static volatile int asyncCalls;
+        static volatile int asyncConstraints;
+        static volatile int headDeclines;
         static volatile Thread constraintThread;
         static volatile Thread executorThread;
         static volatile CompletableFuture<HttpResponse<?>> hanging;
@@ -532,6 +605,19 @@ class DirectRoutesTest {
 
             routes.HEAD("/explicit-head", HttpResponse.ok("explicit head"));
             routes.GET("/explicit-head", HttpResponse.ok("get"));
+            routes.HEAD("/head-declines").respond(direct -> {
+                headDeclines++;
+                return null;
+            });
+            routes.GET("/head-declines", HttpResponse.ok("get"));
+            routes.HEAD("/async-head-declines").respondAsync(direct -> CompletableFuture.completedFuture(null));
+            routes.GET("/async-head-declines", HttpResponse.ok("get"));
+            routes.HEAD("/head-declines-async-get").respond(direct -> {
+                headDeclines++;
+                return null;
+            });
+            routes.GET("/head-declines-async-get").respondAsync(direct -> CompletableFuture.completedFuture(direct.responses().ok("get")));
+            routes.GET("/consumed", HttpResponse.ok(new ConsumedBody("consumed")));
 
             routes.GET("/beta").where(RouteCondition.any(
                 RouteCondition.header("X-Channel", ValueMatcher.equalTo("beta").ignoringCase()),
@@ -573,6 +659,10 @@ class DirectRoutesTest {
                 return CompletableFuture.supplyAsync(() -> direct.responses().ok("hello async"));
             });
             routes.GET("/async/declined").respondAsync(direct -> CompletableFuture.supplyAsync(() -> null));
+            routes.GET("/async/counted/{id}").constrain(variables -> {
+                asyncConstraints++;
+                return true;
+            }).respondAsync(direct -> CompletableFuture.completedFuture(direct.responses().ok("counted " + direct.pathVariables().getString("id"))));
             routes.GET("/async/failed").respondAsync(direct -> CompletableFuture.failedFuture(new IllegalStateException("failed")));
             routes.GET("/async/throwing").respondAsync(direct -> {
                 throw new IllegalStateException("failed");

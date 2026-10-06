@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
-import io.micronaut.web.router.direct.DirectContext;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -111,7 +110,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
 
     @Override
     public void respond(HttpResponse<?> response) {
-        ResponseTemplate constant = ResponseTemplate.direct(terminal(response));
+        ResponseTemplate constant = ResponseTemplate.direct(terminal(response), builder.shareableBody());
         end(constant, null, null);
     }
 

@@ -26,12 +26,29 @@ import io.micronaut.core.annotation.Experimental;
  * the routes fail to build, and the application fails to start: a direct route is never served
  * as an ordinary route, with the filters it was declared to skip.
  *
- * <p>The bean has no method: its presence is the capability. A runtime that declares it answers
- * every direct route, the asynchronous ones included, see {@link DirectRouteLookup#PENDING}.</p>
+ * <p>Its presence is the capability: a runtime that declares it answers every direct route, the
+ * asynchronous ones included, see {@link PendingResponse}. Its one method, with a default, lets
+ * the runtime prepare the bodies the requests of a route share.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
 public interface DirectRouteSupport {
+
+    /**
+     * Prepare the body of a response given as a value to a direct route, see
+     * {@link io.micronaut.web.router.builder.DirectRouteSpec#respond(io.micronaut.http.HttpResponse)}:
+     * the route shares it with every response it creates, so the runtime writes it once per
+     * request. It is called once per route, when the routes are built. A runtime that consumes a
+     * body of its own type when it writes it, e.g. a buffer it releases once written, returns a
+     * copy it can write any number of times, e.g. the bytes of the buffer, and releases the body.
+     *
+     * @param body The body, neither text nor a {@code byte[]}, which the router encodes or
+     *             copies itself
+     * @return The body the responses of the route share: by default the body itself
+     */
+    default Object shareableBody(Object body) {
+        return body;
+    }
 }
