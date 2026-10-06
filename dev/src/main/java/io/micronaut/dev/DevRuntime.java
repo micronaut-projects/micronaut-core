@@ -75,6 +75,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -974,7 +975,7 @@ public final class DevRuntime implements Closeable {
      * from, and run each task with the current generation's. A library missing from the classpath is skipped.
      */
     private void initializeParentTierStatics() {
-        ClassLoader parentTier = classLoader.getParent() != null ? classLoader.getParent() : DevRuntime.class.getClassLoader();
+        ClassLoader parentTier = parentTier();
         for (String name : PARENT_TIER_STATICS) {
             try {
                 Class.forName(name, true, parentTier);
@@ -1727,6 +1728,9 @@ public final class DevRuntime implements Closeable {
             // the stopping context, filled them again with its classes: forgotten again now that it no longer runs
             forgetRetired(retired);
         }
+        // a thread a retained bean started in a retired generation took that generation's loader as its context
+        // class loader, and keeps it as long as the bean lives
+        releaseThreads();
         retainedForNext = retained;
         started = new CompletableFuture<>();
         ApplicationContext fresh;
@@ -1833,6 +1837,22 @@ public final class DevRuntime implements Closeable {
                 return type.getClassLoader() instanceof GenerationClassLoader;
             }
         };
+    }
+
+    /**
+     * Gives the live threads whose context class loader is a retired generation, such as the housekeeper a retained
+     * connection pool started in the generation that created it, the parent tier's loader: see {@link GenerationThreads}.
+     * The threads of the runtime itself are left as they are.
+     */
+    private void releaseThreads() {
+        List<String> released = GenerationThreads.release(classLoader.liveRetiredGenerations(), parentTier(), Arrays.asList(Thread.currentThread(), applicationThread));
+        if (!released.isEmpty() && LOG.isDebugEnabled()) {
+            LOG.debug("Gave {} thread(s) the parent tier's loader as their context class loader, in place of a retired generation: {}", released.size(), released);
+        }
+    }
+
+    private ClassLoader parentTier() {
+        return classLoader.getParent() != null ? classLoader.getParent() : DevRuntime.class.getClassLoader();
     }
 
     /**
