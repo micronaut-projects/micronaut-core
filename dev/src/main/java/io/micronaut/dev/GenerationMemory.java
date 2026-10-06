@@ -48,11 +48,16 @@ final class GenerationMemory {
      * launched with, not those an application's {@code main} would set before it runs Micronaut. H2's {@code DbException}
      * preallocates the exceptions it reports an out of memory error with, whose stack traces hold the classes on the stack
      * of the thread that first opened a connection; it loads its messages then, in the locale the JVM was launched with,
-     * not one an application's {@code main} would set before it opens a connection.
+     * not one an application's {@code main} would set before it opens a connection. UCP's
+     * {@code UniversalConnectionPoolManagerBase} registers a shutdown hook as it initializes, a thread that is never
+     * started until the JVM exits and so has the context class loader of the thread that first used a pool; it is not
+     * among the live threads a restart gives the parent tier's loader. It reads {@code oracle.ucp.*} system properties
+     * then, such as whether to register the hook at all.
      */
     private static final List<String> PARENT_TIER_STATICS = List.of(
         "io.netty.util.internal.PlatformDependent",
-        "org.h2.message.DbException"
+        "org.h2.message.DbException",
+        "oracle.ucp.admin.UniversalConnectionPoolManagerBase"
     );
     /**
      * Reactor's schedulers: the shared ones live as long as the JVM and create their threads as work needs them.
@@ -73,19 +78,29 @@ final class GenerationMemory {
      * Initializes, on the launcher's thread and outside any generation, what a library of the parent tier initializes
      * once per JVM and keeps for good, such as Netty's {@code PlatformDependent}. Initialized by the first generation, it
      * would keep that generation: an exception created then holds, in its stack trace, the classes of the generation's
-     * frames, its application class among them. The threads of Reactor's schedulers, which live as long as the JVM, are
+     * frames, its application class among them, and a thread created then, such as UCP's shutdown hook, holds the
+     * generation's loader as its context class loader. They are initialized with the parent tier's loader as the
+     * context class loader. The threads of Reactor's schedulers, which live as long as the JVM, are
      * given the parent tier's loader as their context class loader, not the loader of the generation they are created
      * from, and run each task with the current generation's. A library missing from the classpath is skipped.
      */
     void initializeParentTierStatics() {
         ClassLoader parentTier = parentTier();
-        for (String name : PARENT_TIER_STATICS) {
-            try {
-                Class.forName(name, true, parentTier);
-            } catch (ClassNotFoundException | LinkageError e) {
-                // not there, or not initializable outside the application: the generation that uses it initializes it
-                LOG.trace("Not initialized ahead of the first generation: {}", name, e);
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        // a thread a library creates as it initializes, such as UCP's shutdown hook, takes the parent tier's loader
+        thread.setContextClassLoader(parentTier);
+        try {
+            for (String name : PARENT_TIER_STATICS) {
+                try {
+                    Class.forName(name, true, parentTier);
+                } catch (ClassNotFoundException | LinkageError e) {
+                    // not there, or not initializable outside the application: the generation that uses it initializes it
+                    LOG.trace("Not initialized ahead of the first generation: {}", name, e);
+                }
             }
+        } finally {
+            thread.setContextClassLoader(previous);
         }
         try {
             // the helper links to the Reactor of the launcher's own loader: used only when that is the parent tier's

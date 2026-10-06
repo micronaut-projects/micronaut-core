@@ -44,6 +44,9 @@ dependencies {
     testImplementation(libs.managed.reactor)
     // an H2 data source retained across generations, in a JVM of its own, to see what H2 keeps from its first use
     testImplementation(libs.h2)
+    // a UCP pool of H2 retained across generations, in a JVM of its own, to see what UCP's JVM-wide threads keep
+    testImplementation(libs.ucp)
+    testImplementation(libs.ojdbc)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
