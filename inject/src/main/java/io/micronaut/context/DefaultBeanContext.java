@@ -619,8 +619,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
+        return getBeanRegistration(null, definition, beanType);
+    }
+
+    /**
+     * Resolves the given definition as the given bean type, as {@link #getBeanRegistration(BeanDefinition, Argument)}
+     * does, on behalf of the bean the resolution context resolves for: a bean the resolution creates that has no
+     * scope of its own is recorded as a dependent of the resolution context, as one a lookup by type creates is.
+     *
+     * @param resolutionContext The resolution context, or {@code null}
+     * @param definition        The bean definition
+     * @param beanType          The potentially parameterized bean type to resolve the definition as
+     * @param <T>               The bean type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    final <T> BeanRegistration<T> getBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                      BeanDefinition<? extends T> definition,
+                                                      Argument<T> beanType) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
         ArgumentUtils.requireNonNull("beanType", beanType);
         // resolved as the requested type, of which the definition's own type is a subtype
@@ -631,7 +650,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!isInjectableCandidate(resolvedBeanType, beanDefinition)) {
             throw new NoSuchBeanException(beanType, null, "The bean definition [" + beanDefinition + "] is not a candidate for that type.");
         }
-        BeanRegistration<T> registration = resolveBeanRegistration(null, beanDefinition, resolvedBeanType, beanDefinition.getDeclaredQualifier());
+        BeanRegistration<T> registration = resolveBeanRegistration(resolutionContext, beanDefinition, resolvedBeanType, beanDefinition.getDeclaredQualifier());
         if (registration.bean == null) {
             // only a nullable definition gets here: any other fails to instantiate when it produces no bean
             registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
