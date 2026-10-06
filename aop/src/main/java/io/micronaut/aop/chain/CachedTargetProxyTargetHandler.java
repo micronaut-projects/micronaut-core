@@ -19,20 +19,15 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 
 /**
- * The handler of a proxy whose target can be replaced while the proxy is in use.
+ * The handler of a proxy that resolves its target on the first call, holds it, and can be told to forget it.
  *
  * @param <T> The target type
  * @since 5.3.0
  */
 @Internal
-public sealed interface HotSwappableProxyTargetHandler<T> extends HeldTargetProxyTargetHandler<T> permits HotSwapProxyTargetHandler {
+public sealed interface CachedTargetProxyTargetHandler<T> extends HeldTargetProxyTargetHandler<T> permits CachedProxyTargetHandler {
 
-    /**
-     * Replaces the target.
-     *
-     * @param newTarget The new target
-     * @return The previous target
-     */
+    /** Forgets the held target; the next call resolves another. */
     @UsedByGeneratedCode
-    T swap(T newTarget);
+    void clearCachedTarget();
 }

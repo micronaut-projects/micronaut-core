@@ -15,24 +15,30 @@
  */
 package io.micronaut.aop.chain;
 
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import org.jspecify.annotations.Nullable;
 
 /**
- * The handler of a proxy whose target can be replaced while the proxy is in use.
+ * The handler of a proxy that holds its target, rather than looking it up for every call.
  *
  * @param <T> The target type
  * @since 5.3.0
  */
 @Internal
-public sealed interface HotSwappableProxyTargetHandler<T> extends HeldTargetProxyTargetHandler<T> permits HotSwapProxyTargetHandler {
+public sealed interface HeldTargetProxyTargetHandler<T> extends ProxyTargetHandler<T>
+    permits CachedTargetProxyTargetHandler, HotSwappableProxyTargetHandler, FixedProxyTargetHandler {
 
     /**
-     * Replaces the target.
-     *
-     * @param newTarget The new target
-     * @return The previous target
+     * @return Whether a target is held now
      */
     @UsedByGeneratedCode
-    T swap(T newTarget);
+    boolean hasCachedTarget();
+
+    /**
+     * @return The registration of the held target, or null when none is held or the context holds none for it
+     */
+    @UsedByGeneratedCode
+    @Nullable BeanRegistration<T> targetRegistration();
 }

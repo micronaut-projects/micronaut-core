@@ -34,6 +34,9 @@ import java.util.List;
  * interceptors of the call and runs them. A generated proxy is injected with one, of the kind its declaration
  * asks for, and has no logic of its own.
  *
+ * <p>This is all a proxy whose target is looked up for every call needs. A proxy that holds its target has a
+ * {@link HeldTargetProxyTargetHandler}, and the proxy exposes what the handler can say about that target.</p>
+ *
  * @param <T> The target type
  * @since 5.3.0
  */
@@ -72,22 +75,6 @@ public interface ProxyTargetHandler<T> {
      */
     @UsedByGeneratedCode
     T target();
-
-    /**
-     * @return Whether the handler holds a target
-     */
-    @UsedByGeneratedCode
-    boolean hasCachedTarget();
-
-    /** Forgets the target the handler holds, if it can resolve another. */
-    @UsedByGeneratedCode
-    void clearCachedTarget();
-
-    /**
-     * @return The registration of the target the handler holds, or null
-     */
-    @UsedByGeneratedCode
-    @Nullable BeanRegistration<T> targetRegistration();
 
     /**
      * @param qualifier The qualifier later lookups of the target use

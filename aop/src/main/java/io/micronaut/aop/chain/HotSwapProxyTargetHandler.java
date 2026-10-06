@@ -112,4 +112,14 @@ public final class HotSwapProxyTargetHandler<T> extends AbstractProxyTargetHandl
     public boolean hasCachedTarget() {
         return target != null;
     }
+
+    @Override
+    public @Nullable BeanRegistration<T> targetRegistration() {
+        readLock.lock();
+        try {
+            return registration;
+        } finally {
+            readLock.unlock();
+        }
+    }
 }

@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  */
 @Internal
 @SuppressWarnings({"NullAway.Init", "rawtypes"})
-public final class FixedProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> {
+public final class FixedProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> implements HeldTargetProxyTargetHandler<T> {
     private BeanRegistration<T> registration;
     private T target;
     /** The interceptors of the target, when they are those of the target: it never changes, so they are kept here. */

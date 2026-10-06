@@ -93,11 +93,8 @@ public abstract class AbstractProxyTargetHandler<T> implements ProxyTargetHandle
     }
 
     @Override
-    public final void bind(Argument<T> targetType,
-                                            boolean introduction,
-                                            boolean perTarget,
-                                            String[] methodNames,
-                                            Class<?>[][] methodArguments) {
+    public final void bind(Argument<T> targetType, boolean introduction, boolean perTarget,
+                           String[] methodNames, Class<?>[][] methodArguments) {
         BeanResolutionContext resolutionContext = creationContext;
         if (resolutionContext == null) {
             throw new IllegalStateException("The handler is already bound to a proxy");
@@ -232,20 +229,6 @@ public abstract class AbstractProxyTargetHandler<T> implements ProxyTargetHandle
 
     @Override
     public abstract T target();
-
-    @Override
-    public boolean hasCachedTarget() {
-        return false;
-    }
-
-    @Override
-    public void clearCachedTarget() {
-    }
-
-    @Override
-    public @Nullable BeanRegistration<T> targetRegistration() {
-        return null;
-    }
 
     @Override
     public final void withQualifier(@Nullable Qualifier<T> qualifier) {

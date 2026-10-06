@@ -24,7 +24,9 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.CachedProxyTargetHandler;
+import io.micronaut.aop.chain.CachedTargetProxyTargetHandler;
 import io.micronaut.aop.chain.FixedProxyTargetHandler;
+import io.micronaut.aop.chain.HeldTargetProxyTargetHandler;
 import io.micronaut.aop.chain.HotSwapProxyTargetHandler;
 import io.micronaut.aop.chain.HotSwappableProxyTargetHandler;
 import io.micronaut.aop.chain.InterceptorCandidateResolver;
@@ -174,9 +176,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Method HANDLER_INVOKE = ReflectionUtils.getRequiredInternalMethod(
         ProxyTargetHandler.class, "invoke", int.class, Object[].class);
     private static final Method HANDLER_TARGET = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "target");
-    private static final Method HANDLER_HAS_CACHED_TARGET = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "hasCachedTarget");
-    private static final Method HANDLER_CLEAR_CACHED_TARGET = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "clearCachedTarget");
-    private static final Method HANDLER_TARGET_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "targetRegistration");
+    private static final Method HANDLER_HAS_CACHED_TARGET = ReflectionUtils.getRequiredInternalMethod(HeldTargetProxyTargetHandler.class, "hasCachedTarget");
+    private static final Method HANDLER_CLEAR_CACHED_TARGET = ReflectionUtils.getRequiredInternalMethod(CachedTargetProxyTargetHandler.class, "clearCachedTarget");
+    private static final Method HANDLER_TARGET_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(HeldTargetProxyTargetHandler.class, "targetRegistration");
     private static final Method HANDLER_WITH_QUALIFIER = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "withQualifier", Qualifier.class);
     private static final Method HANDLER_DEPENDENCIES = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "dependencies");
     private static final Method HANDLER_INTERCEPTED_METHODS = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "interceptedMethods");
@@ -462,6 +464,19 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         return invocation;
     }
 
+    /**
+     * The interface the proxy holds its handler as: what the handler can say about the target.
+     */
+    private Class<?> handlerInterface() {
+        if (hotswap) {
+            return HotSwappableProxyTargetHandler.class;
+        }
+        if (cacheLazyTarget) {
+            return CachedTargetProxyTargetHandler.class;
+        }
+        return lazy ? ProxyTargetHandler.class : HeldTargetProxyTargetHandler.class;
+    }
+
     private static Class<?> handlerType(OptionalValues<Boolean> settings) {
         if (settings.get(Interceptor.LAZY).orElse(false)) {
             return settings.get(Interceptor.CACHEABLE_LAZY_TARGET).orElse(false)
@@ -478,9 +493,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
      */
     private List<OutputObjectDef> buildProxyTarget(ClassDef.ClassDefBuilder proxyBuilder) {
         ParameterElement handlerParameter = constructor.getParameter(HANDLER_PARAMETER);
-        // held and called through the interface; the parameter declares the kind the container injects
-        FieldDef handlerField = FieldDef.builder(FIELD_HANDLER,
-                ClassTypeDef.of(hotswap ? HotSwappableProxyTargetHandler.class : ProxyTargetHandler.class))
+        // held and called through the interface that says what the handler can tell about its target; the parameter
+        // declares the kind the container injects
+        FieldDef handlerField = FieldDef.builder(FIELD_HANDLER, ClassTypeDef.of(handlerInterface()))
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
             .build();
         proxyBuilder.addField(handlerField);
@@ -535,10 +550,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         proxyBuilder.addMethod(MethodDef.override(METHOD_INTERCEPTED_TARGET)
             .build((aThis, methodParameters) -> aThis.field(handlerField).invoke(HANDLER_TARGET).returning()));
         // a proxy that looks its target up for every call holds none: it keeps the defaults of the interface
-        boolean holdsTarget = !lazy || cacheLazyTarget;
-        if (holdsTarget) {
+        if (!lazy || cacheLazyTarget) {
             proxyBuilder.addMethod(MethodDef.override(METHOD_HAS_CACHED_INTERCEPTED_METHOD)
                 .build((aThis, methodParameters) -> aThis.field(handlerField).invoke(HANDLER_HAS_CACHED_TARGET).returning()));
+            proxyBuilder.addMethod(MethodDef.override(METHOD_INTERCEPTED_TARGET_REGISTRATION)
+                .build((aThis, methodParameters) -> aThis.field(handlerField).invoke(HANDLER_TARGET_REGISTRATION).returning()));
         }
         if (cacheLazyTarget) {
             proxyBuilder.addMethod(MethodDef.override(METHOD_CLEAR_CACHED_INTERCEPTED_METHOD)
@@ -547,9 +563,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         if (hotswap) {
             proxyBuilder.addMethod(MethodDef.override(SWAP_METHOD)
                 .build((aThis, methodParameters) -> aThis.field(handlerField).invoke(HANDLER_SWAP, methodParameters.get(0)).returning()));
-        } else if (holdsTarget) {
-            proxyBuilder.addMethod(MethodDef.override(METHOD_INTERCEPTED_TARGET_REGISTRATION)
-                .build((aThis, methodParameters) -> aThis.field(handlerField).invoke(HANDLER_TARGET_REGISTRATION).returning()));
         }
         if (lazy && !cacheLazyTarget && shouldGenerateLazyProxyTargetToStringMethod(interceptedMethods)) {
             proxyBuilder.addMethod(getLazyProxyTargetToStringMethod());
