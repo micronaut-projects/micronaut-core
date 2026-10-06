@@ -51,6 +51,7 @@ import java.util.function.Supplier;
 abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits DefaultHttpRouteBuilder, AbstractHttpRouteGroup, DefaultLocatedHttpRouteBuilder {
 
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
+    private static final String STATUS = "status";
 
     final RouteAssembly assembly;
     /**
@@ -310,13 +311,13 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
 
     @Override
     public final StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
-        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(status, STATUS);
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
     @Override
     public final StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler) {
-        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(status, STATUS);
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
@@ -464,7 +465,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         // global on the builder, local to the routes of the group in a group
         RouteAssembly.RouteGroup settings = groupSettings;
         if (settings == null) {
-            checkGlobal("status");
+            checkGlobal(STATUS);
         }
         RouteAssembly.DefaultStatusRoute route = settings == null
             ? assembly.addStatusRoute(null, status, handle(handler))
