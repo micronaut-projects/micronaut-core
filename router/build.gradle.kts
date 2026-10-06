@@ -8,7 +8,7 @@ dependencies {
     api(projects.micronautInject)
     api(projects.micronautHttp)
     compileOnly(libs.managed.groovy)
-    // the types of HttpRouteBuilder.webSocket: an application that declares a WebSocket route has micronaut-websocket
+    // the WebSocket routes, io.micronaut.web.router.websocket: an application that declares one has micronaut-websocket
     compileOnly(projects.micronautWebsocket)
 
     testImplementation(projects.micronautContext)

@@ -13,39 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.websocket.route;
+package io.micronaut.web.router.websocket;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.websocket.WebSocketSession;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionStage;
 
 /**
- * Called when a connection to a WebSocket route opens, like an
- * {@link io.micronaut.websocket.annotation.OnOpen} method.
- *
- * <pre>{@code
- * ws.onOpen((session, request) -> session.sendAsync("joined " + session.getUriVariables().get("room", String.class).orElseThrow()));
- * }</pre>
+ * Called when a handler of a WebSocket route fails, or its connection fails, like an
+ * {@link io.micronaut.websocket.annotation.OnError} method. Without an error handler, the
+ * connection is closed with {@link io.micronaut.websocket.CloseReason#INTERNAL_ERROR}; with one,
+ * the error handler decides, e.g. with {@link WebSocketSession#close(io.micronaut.websocket.CloseReason)}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see WebSocketRouteSpec#onOpen(WebSocketOpenHandler)
+ * @see WebSocketRouteSpec#onError(WebSocketErrorHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface WebSocketOpenHandler {
+public interface WebSocketErrorHandler {
 
     /**
-     * The connection opened.
+     * Handle an error.
      *
+     * @param error   The error
      * @param session The session of the connection
-     * @param request The upgrade request
      * @return A stage that completes when the handler is done, or {@code null} if it is done
-     * @throws Exception An error, which closes the connection and is passed to the
-     *                   {@link WebSocketRouteSpec#onError(WebSocketErrorHandler) error handler}
+     * @throws Exception An error, which is logged, and closes the connection
      */
-    @Nullable CompletionStage<?> onOpen(WebSocketSession session, HttpRequest<?> request) throws Exception;
+    @Nullable CompletionStage<?> onError(Throwable error, WebSocketSession session) throws Exception;
 }

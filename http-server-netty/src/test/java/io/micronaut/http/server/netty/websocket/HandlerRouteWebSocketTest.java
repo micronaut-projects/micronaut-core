@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -28,6 +29,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RequestPredicates;
+import io.micronaut.web.router.builder.RouteSpec;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
@@ -80,9 +82,14 @@ class HandlerRouteWebSocketTest {
     private static ApplicationContext context;
     private static EmbeddedServer server;
     private static HttpClient http;
+    /**
+     * The port of the route of its own port, see {@link RouteSpec#port(int)}.
+     */
+    private static int routePort;
 
     @BeforeAll
     static void start() {
+        routePort = SocketUtils.findAvailableTcpPort();
         context = ApplicationContext.run(Map.of("spec.name", SPEC, "micronaut.server.port", -1));
         server = context.getBean(EmbeddedServer.class).start();
         http = HttpClient.newHttpClient();
@@ -253,6 +260,34 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
+    void theClosestRouteIsUpgradedBeforeARouteOfALowerOrder() throws Exception {
+        // like for any other request: the literal route, though the variable one has a lower order
+        Client literal = connect("/ws/closest/fixed");
+        assertEquals("literal", literal.next());
+        literal.close(1000, "done");
+
+        Client variable = connect("/ws/closest/other");
+        assertEquals("variable other", variable.next());
+        variable.close(1000, "done");
+
+        // of equally close routes, the one of the lowest order
+        Client ordered = connect("/ws/ordered");
+        assertEquals("lower order", ordered.next());
+        ordered.close(1000, "done");
+    }
+
+    @Test
+    void theRouteOfAPortIsUpgradedOnItsPortOnly() throws Exception {
+        Client client = connect(uri(routePort, "/ws/port"), builder -> { });
+        assertEquals("port " + routePort, client.next());
+        client.close(1000, "done");
+        assertEquals(404, handshakeStatus(uri(server.getPort(), "/ws/port"), builder -> { }));
+
+        // a route without a port is a route of the default ports, not of the port of another route
+        assertEquals(404, handshakeStatus(uri(routePort, "/ws/push"), builder -> { }));
+    }
+
+    @Test
     void theExecutorOfTheRouteRunsTheHandlers() throws Exception {
         Client client = connect("/ws/executor");
         String open = client.next();
@@ -309,23 +344,31 @@ class HandlerRouteWebSocketTest {
     }
 
     private static Client connect(String path, Consumer<WebSocket.Builder> customizer) throws Exception {
+        return connect(uri(server.getPort(), path), customizer);
+    }
+
+    private static Client connect(URI uri, Consumer<WebSocket.Builder> customizer) throws Exception {
         Client client = new Client();
         WebSocket.Builder builder = http.newWebSocketBuilder();
         customizer.accept(builder);
-        client.ws = builder.buildAsync(uri(path), client).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws = builder.buildAsync(uri, client).get(TIMEOUT, TimeUnit.SECONDS);
         return client;
     }
 
     private static int handshakeStatus(String path, Consumer<WebSocket.Builder> customizer) throws Exception {
+        return handshakeStatus(uri(server.getPort(), path), customizer);
+    }
+
+    private static int handshakeStatus(URI uri, Consumer<WebSocket.Builder> customizer) throws Exception {
         WebSocket.Builder builder = http.newWebSocketBuilder();
         customizer.accept(builder);
         ExecutionException error = assertThrows(ExecutionException.class,
-            () -> builder.buildAsync(uri(path), new Client()).get(TIMEOUT, TimeUnit.SECONDS));
+            () -> builder.buildAsync(uri, new Client()).get(TIMEOUT, TimeUnit.SECONDS));
         return assertInstanceOf(WebSocketHandshakeException.class, error.getCause()).getResponse().statusCode();
     }
 
-    private static URI uri(String path) {
-        return URI.create("ws://localhost:" + server.getPort() + path);
+    private static URI uri(int port, String path) {
+        return URI.create("ws://localhost:" + port + path);
     }
 
     private static String room(WebSocketSession session) {
@@ -540,6 +583,19 @@ class HandlerRouteWebSocketTest {
                     .where(RequestPredicates.header("X-Variant", "b"))
                     .webSocket(ws -> ws
                         .onOpen((session, request) -> session.sendAsync("where")));
+
+                // the closest route wins over the order, then the lowest order
+                routes.GET("/ws/closest/{name}").order(-10).webSocket(ws -> ws
+                    .onOpen((session, request) -> session.sendAsync("variable " + session.getUriVariables().get("name", String.class).orElseThrow())));
+                routes.GET("/ws/closest/fixed").webSocket(ws -> ws
+                    .onOpen((session, request) -> session.sendAsync("literal")));
+                routes.GET("/ws/ordered").order(10).webSocket(ws -> ws
+                    .onOpen((session, request) -> session.sendAsync("higher order")));
+                routes.GET("/ws/ordered").order(-10).webSocket(ws -> ws
+                    .onOpen((session, request) -> session.sendAsync("lower order")));
+
+                routes.GET("/ws/port").port(routePort).webSocket(ws -> ws
+                    .onOpen((session, request) -> session.sendAsync("port " + request.getServerAddress().getPort())));
 
                 routes.GET("/ws/executor")
                     .executeOn(TaskExecutors.BLOCKING)

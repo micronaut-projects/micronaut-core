@@ -43,16 +43,17 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
+import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
-import io.micronaut.websocket.route.WebSocketRouteEndpoint;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
@@ -199,11 +200,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
-            Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
+            // the WebSocket routes that accept the port and the conditions of the request, e.g. the
+            // where predicates of a route of the route builder, the most specific first
+            List<UriRouteMatch<Object, Object>> webSocketRoutes = router.<Object, Object>findAny(msg.getPath(), msg)
+                .filter(rm -> rm.getHttpMethod() == HttpMethod.GET)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                // the conditions of the route, e.g. the where predicates of a route of the route builder
-                .filter(rm -> rm.getRouteInfo().matching(msg))
-                // the first of the lowest order
+                .toList();
+            // the closest route, then the first of the lowest order, like the route of any other request
+            Optional<UriRouteMatch<Object, Object>> optionalRoute = DefaultRouter.resolveAmbiguity(msg, webSocketRoutes).stream()
                 .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
 
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));

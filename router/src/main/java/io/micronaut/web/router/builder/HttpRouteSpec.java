@@ -21,7 +21,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
-import io.micronaut.websocket.route.WebSocketRouteSpec;
+import io.micronaut.web.router.websocket.WebSocketRouteSpec;
 
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -264,13 +264,16 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      *
      * <p>The route is a route of the upgrade request: its conditions, filters, groups, order, port
      * and attributes apply to the upgrade request, e.g. a filter that answers with a response
-     * rejects the upgrade, and a request that is not an upgrade is answered with an error. Its
-     * executor, see {@link RouteSpec#executeOn(String)}, or the executor of its group, runs the
-     * handlers of the connections; by default they run like a controller method that returns a
-     * stage. The media types of its group do not apply to it.</p>
+     * rejects the upgrade, and a request that is not an upgrade is answered with an error. Of the
+     * WebSocket routes that match an upgrade, the closest one is upgraded, then the one of the
+     * lowest order, like the route of any other request. Its executor, see
+     * {@link RouteSpec#executeOn(String)}, or the executor of its group, runs the handlers of the
+     * connections; by default they run like a controller method that returns a stage. The media
+     * types of its group do not apply to it.</p>
      *
      * @param endpoint Declares the handlers of the WebSocket connections
-     * @throws IllegalStateException if the route was already ended, or is not a route of {@code GET} only
+     * @throws IllegalStateException if the route was already ended, is not a route of {@code GET}
+     *                               only, or {@code micronaut-websocket} is missing
      * @since 5.3.0
      */
     void webSocket(Consumer<WebSocketRouteSpec> endpoint);

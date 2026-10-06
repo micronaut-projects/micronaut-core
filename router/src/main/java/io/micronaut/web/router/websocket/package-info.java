@@ -15,12 +15,18 @@
  */
 /**
  * WebSocket endpoints declared as routes of handler functions, see
- * {@link io.micronaut.websocket.route.WebSocketRouteSpec}.
+ * {@link io.micronaut.web.router.websocket.WebSocketRouteSpec}.
+ *
+ * <p>The types of this package use {@code micronaut-websocket}, which the router has as an optional
+ * dependency: they are only loaded by an application that declares a WebSocket route, and no
+ * other type of the router has them in its signatures, so the router works without
+ * {@code micronaut-websocket}, e.g. for Groovy, which reflects on the generic signatures of the
+ * route builder.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @NullMarked
-package io.micronaut.websocket.route;
+package io.micronaut.web.router.websocket;
 
 import org.jspecify.annotations.NullMarked;

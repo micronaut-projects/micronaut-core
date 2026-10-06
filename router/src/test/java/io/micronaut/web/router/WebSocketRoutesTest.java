@@ -28,13 +28,13 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
+import io.micronaut.web.router.websocket.WebSocketRouteSpec;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.context.WebSocketBean;
-import io.micronaut.websocket.route.WebSocketRouteEndpoint;
-import io.micronaut.websocket.route.WebSocketRouteSpec;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
