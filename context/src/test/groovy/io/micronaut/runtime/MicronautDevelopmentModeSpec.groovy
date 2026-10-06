@@ -82,6 +82,26 @@ class MicronautDevelopmentModeSpec extends Specification {
         }
     }
 
+    void "the shutdown hook goes when the context is stopped while the embedded application starts, before the hook is registered"() {
+        given: "an application whose context another thread stops while it starts, as a development launcher may"
+        WeakReference<StoppedWhileStarting> stopped = startApplicationStoppedWhileStarting()
+
+        expect: "the hook registered after the context stopped is removed at once, and keeps nothing"
+        new PollingConditions(timeout: 20, delay: 0.2).eventually {
+            System.gc()
+            assert stopped.get() == null
+        }
+    }
+
+    private static WeakReference<StoppedWhileStarting> startApplicationStoppedWhileStarting() {
+        ApplicationContext context = Micronaut.build()
+            .deduceEnvironment(false)
+            .properties('spec.name': 'MicronautDevelopmentModeSpec', 'spec.application': 'stopped-while-starting')
+            .start()
+        assert !context.running
+        return new WeakReference<>(StoppedWhileStarting.LAST.getAndSet(null))
+    }
+
     private static WeakReference<Application> startAndStopApplication() {
         ApplicationContext context = Micronaut.build()
             .deduceEnvironment(false)
@@ -235,6 +255,47 @@ class MicronautDevelopmentModeSpec extends Specification {
         @Override
         void onApplicationEvent(StartupEvent event) {
             throw new ApplicationStartupException("listener failed")
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'MicronautDevelopmentModeSpec')
+    @Requires(property = 'spec.application', value = 'stopped-while-starting')
+    static class StoppedWhileStarting implements EmbeddedApplication<StoppedWhileStarting> {
+        static final AtomicReference<StoppedWhileStarting> LAST = new AtomicReference<>()
+        private final ApplicationContext applicationContext
+        private final ApplicationConfiguration applicationConfiguration
+        private final AtomicBoolean running = new AtomicBoolean()
+
+        StoppedWhileStarting(ApplicationContext applicationContext, ApplicationConfiguration applicationConfiguration) {
+            this.applicationContext = applicationContext
+            this.applicationConfiguration = applicationConfiguration
+        }
+
+        @Override
+        ApplicationContext getApplicationContext() { applicationContext }
+
+        @Override
+        ApplicationConfiguration getApplicationConfiguration() { applicationConfiguration }
+
+        @Override
+        boolean isRunning() { running.get() }
+
+        @Override
+        StoppedWhileStarting start() {
+            running.set(true)
+            LAST.set(this)
+            // the context stops on another thread before start() returns and Micronaut registers the hook
+            Thread stopper = new Thread(() -> applicationContext.stop())
+            stopper.start()
+            stopper.join()
+            return this
+        }
+
+        @Override
+        StoppedWhileStarting stop() {
+            running.set(false)
+            return this
         }
     }
 
