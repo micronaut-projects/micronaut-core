@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -30,6 +31,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -205,6 +208,43 @@ class DevRestartRequestsTest {
             assertEquals(1, servers.size());
             assertTrue(servers.get(0).isRunning());
             assertEquals("200 greeting-0", get("/hello"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aFirstGenerationWhoseServerCannotBindIsReportedFailedNotStarted() throws Exception {
+        DevRuntime runtime;
+        // the port is taken before the application starts: its server cannot bind, and its context stops again.
+        // Netty binds the IPv6 wildcard, so the port is held dual stack
+        try (ServerSocket occupied = new ServerSocket()) {
+            occupied.bind(new InetSocketAddress(port));
+            runtime = launch();
+        }
+        try {
+            assertTrue(runtime.isStartFailed());
+            // a caller waiting for the generation sees the failure, not its stopped context
+            assertThrows(IllegalStateException.class, () -> runtime.awaitGeneration(1, Duration.ofSeconds(1)));
+            List<String> messages = logged.list.stream()
+                .filter(event -> event.getLoggerName().equals(DevRuntime.class.getName()))
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
+            assertTrue(messages.stream().noneMatch(message -> message.contains("generation 1 started")), messages.toString());
+            List<ILoggingEvent> failures = logged.list.stream()
+                .filter(event -> event.getLoggerName().equals(DevRuntime.class.getName()))
+                .filter(event -> event.getLevel().isGreaterOrEqual(Level.WARN))
+                .filter(event -> event.getFormattedMessage().contains("generation 1 failed to start"))
+                .toList();
+            assertEquals(1, failures.size(), messages.toString());
+            assertTrue(failures.get(0).getFormattedMessage().contains(String.valueOf(port)), failures.get(0).getFormattedMessage());
+
+            // once the port is free, the next change starts a generation that serves
+            Files.writeString(src.resolve("Greeter.java"), greeter(1));
+            runtime.reload();
+            assertTrue(runtime.awaitGeneration(2, Duration.ofMinutes(2)).isRunning());
+            assertEquals("200 greeting-1", get("/hello"));
+            assertFalse(runtime.isStartFailed());
         } finally {
             runtime.close();
         }

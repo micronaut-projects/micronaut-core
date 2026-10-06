@@ -155,15 +155,17 @@ final class RestartRequests {
      * @param fresh The generation
      * @param current Whether it is still the current generation
      * @param launching Whether the application's main is still running, and may yet create a server
+     * @return Whether the generation's context defines an HTTP server, for the runtime to tell whether it runs
      */
-    void started(ApplicationContext fresh, BooleanSupplier current, BooleanSupplier launching) {
+    boolean started(ApplicationContext fresh, BooleanSupplier current, BooleanSupplier launching) {
+        // the servers are created after the context starts: the definition says one is coming before any is registered,
+        // and a retained socket is bound only once a server claimed it. Looked up first: a context whose server
+        // cannot bind stops again, and then no longer tells
+        boolean definesServer = definesServer(fresh);
         DevServerSockets sockets = serverSockets;
         if (sockets != null && !sockets.stopServingUnavailable(current)) {
-            return;
+            return definesServer;
         }
-        // the servers are created after the context starts: the definition says one is coming before any is registered,
-        // and a retained socket is bound only once a server claimed it
-        boolean definesServer = definesServer(fresh);
         if (sockets != null && (definesServer || sockets.isBound())) {
             // a newer generation can start while this one's servers are awaited, when a change is taken at once:
             // the sockets handed to it after this mark are its own, and are kept
@@ -175,6 +177,7 @@ final class RestartRequests {
         } else if (definesServer) {
             awaitServers(fresh, launching);
         }
+        return definesServer;
     }
 
     /**
@@ -229,6 +232,22 @@ final class RestartRequests {
             LOG.debug("Draining generation {} failed", generation, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Whether every HTTP server a generation created runs; true when it created none.
+     *
+     * @param generation The generation's context
+     * @return Whether its servers run
+     */
+    static boolean serversRun(ApplicationContext generation) {
+        try {
+            return generation.getActiveBeanRegistrations(EmbeddedServer.class).stream().allMatch(registration -> registration.getBean().isRunning());
+        } catch (RuntimeException e) {
+            // a context stopped meanwhile runs no server
+            LOG.debug("Cannot look up the servers of a generation", e);
+            return false;
         }
     }
 
