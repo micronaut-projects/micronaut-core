@@ -17,7 +17,6 @@ package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -57,7 +56,6 @@ import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
 import java.util.Collections;
@@ -526,8 +524,8 @@ public abstract class ResponseLifecycle {
                                                                               Object body,
                                                                               @Nullable RouteInfo<Object> routeInfo) {
         MediaType mediaType = response.getContentType().orElse(null);
-        Flux<Object> bodyPublisher = Flux.from(Publishers.convertToPublisher(conversionService, body));
-        Flux<ByteBody> httpContentPublisher;
+        Publisher<Object> bodyPublisher = Publishers.convertToPublisher(conversionService, body);
+        Function<Object, ExecutionFlow<CloseableByteBody>> writePiece;
         BooleanSupplier isJson;
         PieceStream pieces;
         if (routeInfo != null) {
@@ -541,7 +539,7 @@ public abstract class ResponseLifecycle {
             isJson = () -> isJsonRoute;
             MediaType finalMediaType = mediaType;
             pieces = new PieceStream(request, response, isJson);
-            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
+            writePiece = message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
                 @SuppressWarnings("unchecked")
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
@@ -551,7 +549,7 @@ public abstract class ResponseLifecycle {
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 }
                 return pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
-            });
+            };
         } else {
             MediaType finalMediaType = mediaType;
             // A single-value publisher (Mono, Single, Maybe, ...) is one document, not a stream of
@@ -568,21 +566,17 @@ public abstract class ResponseLifecycle {
             AtomicBoolean first = new AtomicBoolean(true);
             isJson = () -> isJsonMediaType && jsonFormattable.get();
             pieces = new PieceStream(request, response, isJson);
-            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
+            writePiece = message -> {
                 Argument<Object> type = Argument.ofInstance(message);
                 if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
                     jsonFormattable.set(false);
                 }
                 MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
                 return pieces.write(messageBodyWriter, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
-            });
+            };
         }
 
-        httpContentPublisher = httpContentPublisher
-            .doOnDiscard(CloseableByteBody.class, CloseableByteBody::close)
-            .doFinally(signal -> pieces.close());
-
-        return LazySendingSubscriber.create(httpContentPublisher).map(items -> {
+        return ResponsePieces.write(bodyPublisher, writePiece, pieces::close).map(items -> {
             CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
             return ByteBodyHttpResponseWrapper.wrap(response, byteBody);
         }).onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));
