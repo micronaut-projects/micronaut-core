@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -102,9 +103,10 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     private final StaticResourceResolver staticResourceResolver;
 
     /**
-     * The {@link CrossOrigin} configuration per route. Routes are fixed at startup, so this stays bounded.
+     * The {@link CrossOrigin} configuration per route, with the annotations it was built from.
+     * Routes are fixed at startup, so this stays bounded.
      */
-    private final Map<RouteInfo<?>, Optional<CorsOriginConfiguration>> routeConfigurations = new ConcurrentHashMap<>();
+    private final Map<RouteInfo<?>, RouteCorsConfiguration> routeConfigurations = new ConcurrentHashMap<>();
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
@@ -431,12 +433,19 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     /**
-     * The {@link CrossOrigin} configuration of a route, built once per route.
-     * The route annotation metadata does not change for a route, so the configuration does not either.
+     * The {@link CrossOrigin} configuration of a route match, built once per route from the annotations of its matches.
+     * A match of a route reached through a route locator may also carry the annotations of the groups of the locator
+     * routes, which differ by location for the same route: such a match has annotations other than the ones the
+     * cached configuration was built from, and its configuration is built from its own annotations instead.
      */
     private Optional<CorsOriginConfiguration> getCorsOriginConfiguration(RouteMatch<?> routeMatch) {
-        return routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
-            routeInfo -> CrossOriginUtil.getCorsOriginConfiguration(routeMatch.getAnnotationMetadata()));
+        AnnotationMetadata annotationMetadata = routeMatch.getAnnotationMetadata();
+        RouteCorsConfiguration cached = routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
+            routeInfo -> new RouteCorsConfiguration(annotationMetadata, CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata)));
+        if (cached.annotationMetadata() == annotationMetadata) {
+            return cached.configuration();
+        }
+        return CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata);
     }
 
     private static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
@@ -561,4 +570,13 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return methods;
     }
 
+    /**
+     * The {@link CrossOrigin} configuration of a route.
+     *
+     * @param annotationMetadata The annotations the configuration was built from
+     * @param configuration      The configuration
+     */
+    private record RouteCorsConfiguration(AnnotationMetadata annotationMetadata,
+                                          Optional<CorsOriginConfiguration> configuration) {
+    }
 }
