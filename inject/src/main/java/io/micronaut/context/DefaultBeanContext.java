@@ -300,6 +300,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * Instances adopted under at least one registration, so a rejection under another does not destroy them.
      */
     private Set<Object> adoptedRetainedBeans = Collections.newSetFromMap(new IdentityHashMap<>());
+    /**
+     * Adopted registrations of instances that bean created listeners replaced in the previous context, to wrap again
+     * with this context's listeners once they are known.
+     */
+    private List<BeanRegistration<?>> adoptedToWrap = new ArrayList<>();
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -3946,6 +3951,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                 interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
                             }
                         }
+                        T created = bean;
                         bean = postBeanCreated(context, definition, beanType, qualifier, bean);
                         if (customizeNull && bean == null) {
                             bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
@@ -3961,8 +3967,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         }
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                        beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
+                        BeanDisposingRegistration<T> disposing = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
                             dependentBeans, interceptorCandidates, creation.dependencies);
+                        if (dependencyGraph != null && created != bean) {
+                            // a listener replaced the instance: a development context retains the one it received
+                            disposing.setBeforeListeners(created);
+                        }
+                        beanRegistration = disposing;
                     } catch (RuntimeException | Error e) {
                         destroyDependentsOfFailedBean(context, e);
                         destroyCreatedBeans(creation.dependencies.takeDependents(), e);
@@ -4219,6 +4230,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         registerConversionService();
         configureContextInternal();
         initializeEventListeners();
+        wrapAdoptedRegistrations();
         destroyRejectedRetainedRegistrations();
         initializeTypeConverters();
         initializeContext();
@@ -4237,6 +4249,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * one of them is a proxy or holds a {@link BeanProvider}, a {@code Provider}, a proxy, the context, its
      * environment, its event publisher or its conversion service, because those would keep resolving
      * through this stopped context; without the graph the predicate answers for all of that.
+     * When the graph is recorded, a bean that a {@link io.micronaut.context.event.BeanCreatedEventListener} replaced,
+     * by a wrapper that may hold this context, is retained as the listeners received it, and the adopting context
+     * wraps it again with its own listeners; the wrapper is dropped, neither destroyed nor announced.
      * Whoever holds the returned registrations destroys them eventually, through the context that adopted
      * them or {@link #destroyBean(BeanRegistration)}.</p>
      *
@@ -4400,8 +4415,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             dependents = rebindAll(owned);
             interceptorRegistrations = rebindInterceptors(disposing.getInterceptorCandidates().legacyRegistrations(), owned, dependents);
         }
-        BeanRegistration<T> adopted = BeanRegistration.of(this, original.getIdentifier(), definition, original.getBean(), dependents, interceptorRegistrations);
+        // a retained registration carries the instance as the listeners received it when they replaced it: that one is
+        // registered, and wrapped again by this context's listeners once they are initialized
+        BeanRegistration<T> adopted = BeanRegistration.of(this, original.getIdentifier(), definition, registration.getBean(), dependents, interceptorRegistrations);
         singletonScope.registerSingletonBean(adopted, definition.getDeclaredQualifier());
+        if (registration instanceof RetainedRegistration<T> retained && retained.wrapAgain) {
+            adoptedToWrap.add(adopted);
+        }
         // the prototypes the instance owns are one set however many registrations it is adopted under
         boolean firstRegistration = adoptedRetainedBeans.add(original.bean);
         if (dependencyGraph != null && registration instanceof RetainedRegistration<T> retained) {
@@ -4421,6 +4441,77 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Adopted retained bean [{}] with identifier [{}]", original.bean, original.identifier);
         }
+    }
+
+    /**
+     * Wraps the adopted instances that bean created listeners replaced in the previous context with this context's
+     * listeners, as their creation would have: a wrapper bound to the stopped context, such as one holding its bean
+     * locator, is made again bound to this one, around the same retained instance. The listeners run on the instance
+     * they received before; one that configures rather than replaces what it receives sees it again, and the state of
+     * the replacement the previous context had is not carried over. Between the adoption and this, while the context is
+     * configured, the instance is registered as the listeners received it, as a bean created then would be, since the
+     * listeners only apply once they are initialized.
+     */
+    private void wrapAdoptedRegistrations() {
+        if (adoptedToWrap.isEmpty()) {
+            return;
+        }
+        List<BeanRegistration<?>> adopted = adoptedToWrap;
+        adoptedToWrap = new ArrayList<>();
+        for (BeanRegistration<?> registration : adopted) {
+            wrapAdopted(registration);
+        }
+        // a collection of beans resolved since the adoption holds the instances as they were adopted
+        singletonBeanRegistrations.clear();
+    }
+
+    private <T> void wrapAdopted(BeanRegistration<T> adopted) {
+        BeanDefinition<T> definition = adopted.beanDefinition;
+        if (singletonScope.findBeanRegistration(definition) != adopted) {
+            // destroyed or replaced since it was adopted, by what configured this context
+            return;
+        }
+        T instance = adopted.bean;
+        T wrapped;
+        List<BeanRegistration<?>> created;
+        try (BeanResolutionContext context = newResolutionContext(definition, null)) {
+            try {
+                // as the creation of the bean applies them: the listeners, then the validation of what they returned
+                wrapped = triggerBeanCreatedEventListener(context, definition, instance, definition.asArgument(), definition.getDeclaredQualifier());
+                if (definition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
+                    wrapped = validatedBeanDefinition.validate(context, wrapped);
+                }
+            } catch (RuntimeException | Error e) {
+                // what the listeners created for it is owned by nothing
+                destroyDependentsOfFailedBean(context, e);
+                throw e;
+            }
+            created = context.getAndResetDependentBeans();
+        }
+        if (wrapped == instance && created.isEmpty()) {
+            return;
+        }
+        List<BeanRegistration<?>> dependents = new ArrayList<>(adopted.dependentBeans());
+        dependents.addAll(created);
+        List<?> interceptorRegistrations = adopted instanceof BeanDisposingRegistration<T> disposing
+            ? disposing.getInterceptorCandidates().legacyRegistrations() : null;
+        BeanRegistration<T> registration = BeanRegistration.of(this, adopted.identifier, definition, wrapped, dependents, interceptorRegistrations);
+        if (wrapped != instance && registration instanceof BeanDisposingRegistration<T> disposing) {
+            // retained again as the listeners received it on the next restart
+            disposing.setBeforeListeners(instance);
+        }
+        singletonScope.registerSingletonBean(registration, definition.getDeclaredQualifier());
+        if (LOG_LIFECYCLE.isDebugEnabled()) {
+            LOG_LIFECYCLE.debug("Wrapped adopted bean [{}] again as [{}]", instance, wrapped);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> RetainedRegistration<T> retainedRegistration(BeanRegistration<T> registration,
+                                                                    List<BeanDependencyGraph.BeanDependency> dependencies,
+                                                                    AtomicBoolean destroyed) {
+        T beforeListeners = registration instanceof BeanDisposingRegistration<T> disposing ? (T) disposing.getBeforeListeners() : null;
+        return new RetainedRegistration<>(registration, dependencies, destroyed, beforeListeners);
     }
 
     /**
@@ -4553,12 +4644,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * Shared by the registrations of one instance, so a launcher destroying them all destroys it once.
          */
         private final AtomicBoolean destroyed;
+        /**
+         * Whether the bean is the instance the bean created listeners received, which replaced it with one bound to
+         * the stopped context: the adopting context wraps it again with its own listeners.
+         */
+        private final boolean wrapAgain;
 
-        RetainedRegistration(BeanRegistration<T> original, List<BeanDependencyGraph.BeanDependency> dependencies, AtomicBoolean destroyed) {
-            super(original.identifier, original.beanDefinition, original.bean);
+        RetainedRegistration(BeanRegistration<T> original, List<BeanDependencyGraph.BeanDependency> dependencies, AtomicBoolean destroyed,
+                             @Nullable T beforeListeners) {
+            super(original.identifier, original.beanDefinition, beforeListeners != null ? beforeListeners : original.bean);
             this.original = original;
             this.dependencies = dependencies;
             this.destroyed = destroyed;
+            this.wrapAgain = beforeListeners != null;
         }
 
         @Override
@@ -5031,7 +5129,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (dependencyGraph != null) {
                     collectDependencies(registration, dependencies, Collections.newSetFromMap(new IdentityHashMap<>()));
                 }
-                retainedOnStop.add(new RetainedRegistration<>(registration, List.copyOf(dependencies), destroyed));
+                retainedOnStop.add(retainedRegistration(registration, List.copyOf(dependencies), destroyed));
                 if (LOG_LIFECYCLE.isDebugEnabled()) {
                     LOG_LIFECYCLE.debug("Retaining bean [{}] with identifier [{}] across the restart", registration.bean, registration.identifier);
                 }
@@ -5127,7 +5225,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!visited.add(registration)) {
             return false;
         }
-        if (registration.beanDefinition.isProxy() || isContextOwned(registration.bean)) {
+        if (registration.beanDefinition.isProxy() || isContextOwned(registration.bean)
+            || registration instanceof BeanDisposingRegistration<?> disposing && isContextOwned(disposing.getBeforeListeners())) {
             return true;
         }
         // the context and what it owns (its environment, its event publishers, its conversion service, its
