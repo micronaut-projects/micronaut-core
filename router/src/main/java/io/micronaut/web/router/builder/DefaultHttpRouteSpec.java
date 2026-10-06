@@ -24,10 +24,13 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.websocket.route.WebSocketRouteEndpoint;
+import io.micronaut.websocket.route.WebSocketRouteSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -188,6 +191,25 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, RESPONSE);
         respond(() -> HandlerMethod.respond(checked), null, false);
+    }
+
+    @Override
+    public void webSocket(Consumer<WebSocketRouteSpec> endpoint) {
+        Consumer<WebSocketRouteSpec> checked = route.terminal(endpoint, "endpoint");
+        String template = route.webSocketTemplate();
+        WebSocketRouteEndpoint webSocket;
+        try {
+            webSocket = WebSocketRouteEndpoint.of(template, checked);
+        } catch (RuntimeException e) {
+            route.drop();
+            throw e;
+        }
+        // the upgrade request has no body and the connection no response body: the media types
+        // of a group do not apply, its executor runs the handlers of the connections
+        route.end(() -> HandlerMethod.webSocket(webSocket, WebSocketRouteEndpoint.ROUTE_METADATA),
+            // the server finds the endpoint in the attribute of the route
+            settings -> settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket),
+            RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
     }
 
     /**

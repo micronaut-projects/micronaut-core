@@ -17,6 +17,7 @@ package io.micronaut.websocket.context;
 
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.websocket.annotation.ServerWebSocket;
 
 import java.util.Optional;
 
@@ -40,6 +41,17 @@ public interface WebSocketBean<T> {
      * @return The target instance
      */
     T getTarget();
+
+    /**
+     * The subprotocols a server WebSocket supports, see {@link ServerWebSocket#subprotocols()}.
+     *
+     * @return The comma separated subprotocols, or empty if the WebSocket supports none
+     * @since 5.3.0
+     */
+    default Optional<String> getSubprotocols() {
+        return getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
+            .filter(subprotocols -> !subprotocols.isEmpty());
+    }
 
     /**
      * Returns the method annotated with {@link io.micronaut.websocket.annotation.OnMessage} responsible for regular
