@@ -461,6 +461,10 @@ def __micronaut_is_coroutine_function(function):
     return inspect.iscoroutinefunction(function)
 
 
+def __micronaut_is_async_generator_function(function):
+    return inspect.isasyncgenfunction(function)
+
+
 def __micronaut_await_stage(stage, to_awaitable):
     return _MicronautStageAwaitable(stage, to_awaitable)
 
