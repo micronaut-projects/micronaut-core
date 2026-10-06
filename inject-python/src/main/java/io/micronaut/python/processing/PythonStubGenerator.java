@@ -5933,13 +5933,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {
-                            yield PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
-                                    invokedValue, CLASS_OBJECT)
-                                .cast(ClassTypeDef.of(returnType));
+                            yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
+                                    invokedValue, CLASS_OBJECT), returnType);
                         }
-                        yield PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
-                                invokedValue, toClassExpression(bodyType))
-                            .cast(ClassTypeDef.of(returnType));
+                        // The body class is erased, so a nested generic body type is cast unchecked
+                        yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
+                                invokedValue, toClassExpression(bodyType)), returnType);
                     } else {
                         if (isGeneratedWrapperType(allClasses, returnType)) {
                             yield javaClassType(returnType)
