@@ -80,6 +80,28 @@ class ResourceBundleMessageSourceSpec extends Specification {
         "test {abcd"             | "test {abcd"
     }
 
+    void "test null message argument is rendered as null"() {
+        given:
+        ResourceBundleMessageSource ms = new ResourceBundleMessageSource("io.micronaut.context.i18n.Test")
+
+        expect:
+        ms.getMessage("hello.argument", Locale.ENGLISH, [null] as Object[]).get() == 'Hello world null'
+        ms.getMessage("hello.arguments", Locale.ENGLISH, ['Bob', null, 'Alice'] as Object[]).get() == 'Hello Bob, null and Alice'
+        ms.getMessage("hello.arguments", Locale.ENGLISH, [null, 'Bob', null] as Object[]).get() == 'Hello null, Bob and null'
+        ms.getMessage("hello.argument", Locale.ENGLISH, 'Bob').get() == 'Hello world Bob'
+        ms.getMessage("hello.argument", Locale.ENGLISH).get() == 'Hello world 0'
+    }
+
+    void "test null variable is not resolved as a message code"() {
+        given:
+        ResourceBundleMessageSource ms = new ResourceBundleMessageSource("io.micronaut.context.i18n.Test")
+
+        expect:
+        ms.interpolate("test {hello.message}", MessageSource.MessageContext.of(['hello.message': null])) == 'test null'
+        ms.interpolate("test {hello.message} {other}", MessageSource.MessageContext.of(['other': null])) == 'test Hello null'
+        ms.interpolate("test {hello.message}", MessageSource.MessageContext.DEFAULT) == 'test Hello'
+    }
+
     void "successful message lookups are cached"() {
         given:
         ResourceBundleMessageSource ms = new ResourceBundleMessageSource("io.micronaut.context.i18n.Test")
