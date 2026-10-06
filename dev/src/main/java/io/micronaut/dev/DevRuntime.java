@@ -135,6 +135,10 @@ public final class DevRuntime implements Closeable {
     private static final List<String> PARENT_TIER_STATICS = List.of(
         "io.netty.util.internal.PlatformDependent"
     );
+    /**
+     * Reactor's schedulers: the shared ones live as long as the JVM and create their threads as work needs them.
+     */
+    private static final String REACTOR_SCHEDULERS = "reactor.core.scheduler.Schedulers";
 
     private final DevManifest manifest;
     private final DevClassLoader classLoader;
@@ -157,6 +161,7 @@ public final class DevRuntime implements Closeable {
     private volatile int retainedCount;
     private volatile long generationStartedNanos;
     private volatile boolean closed;
+    private volatile boolean reactorThreads;
     /**
      * Whether the runtime closed because its generation budget was spent, for its launcher to relaunch the process.
      */
@@ -802,6 +807,11 @@ public final class DevRuntime implements Closeable {
                 compiler.close();
             }
         } finally {
+            if (reactorThreads) {
+                // whatever failed to stop: the threads of the shared schedulers end with them, and the schedule hook
+                // keeps this runtime's loader no longer
+                ReactorThreads.release(classLoader);
+            }
             // whatever failed to stop, whoever waits for the runtime to close is released
             CURRENT.compareAndSet(this, null);
             closedLatch.countDown();
@@ -953,7 +963,9 @@ public final class DevRuntime implements Closeable {
      * Initializes, on the launcher's thread and outside any generation, what a library of the parent tier initializes
      * once per JVM and keeps for good, such as Netty's {@code PlatformDependent}. Initialized by the first generation, it
      * would keep that generation: an exception created then holds, in its stack trace, the classes of the generation's
-     * frames, its application class among them. A library missing from the classpath is skipped.
+     * frames, its application class among them. The threads of Reactor's schedulers, which live as long as the JVM, are
+     * given the parent tier's loader as their context class loader, not the loader of the generation they are created
+     * from, and run each task with the current generation's. A library missing from the classpath is skipped.
      */
     private void initializeParentTierStatics() {
         ClassLoader parentTier = classLoader.getParent() != null ? classLoader.getParent() : DevRuntime.class.getClassLoader();
@@ -964,6 +976,16 @@ public final class DevRuntime implements Closeable {
                 // not there, or not initializable outside the application: the generation that uses it initializes it
                 LOG.trace("Not initialized ahead of the first generation: {}", name, e);
             }
+        }
+        try {
+            // the helper links to the Reactor of the launcher's own loader: used only when that is the parent tier's
+            Class<?> schedulers = Class.forName(REACTOR_SCHEDULERS, false, parentTier);
+            if (schedulers == Class.forName(REACTOR_SCHEDULERS, false, DevRuntime.class.getClassLoader())) {
+                ReactorThreads.use(classLoader, parentTier);
+                reactorThreads = true;
+            }
+        } catch (ClassNotFoundException | LinkageError e) {
+            LOG.trace("The threads of Reactor's schedulers keep the context class loader of the thread that creates them", e);
         }
     }
 

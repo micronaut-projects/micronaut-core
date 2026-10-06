@@ -28,6 +28,8 @@ dependencies {
     compileOnly(libs.bytebuddy.agent)
     // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
     compileOnly(libs.managed.methvin.directoryWatcher)
+    // the threads of Reactor's schedulers get the parent tier's loader when Reactor is on the classpath
+    compileOnly(libs.managed.reactor)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
@@ -38,6 +40,8 @@ dependencies {
     // a Netty application in development mode, run in a JVM of its own, to see what Netty keeps from its first use
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautJacksonDatabind)
+    // a Reactor application in development mode, run in a JVM of its own, to see what the shared schedulers' threads keep
+    testImplementation(libs.managed.reactor)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
