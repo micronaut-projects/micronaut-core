@@ -719,6 +719,71 @@ class BeanWatchTest {
         assertTrue(ConfigurationChange.ofKeys(Set.of("micronaut.server.thread-selection")).touches("micronaut.server"));
     }
 
+    @Test
+    void anObjectWatchWithAQualifierSeesABeanWithTypeArgumentsAddedAndRemovedAsItsFirstBatchListsIt() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            BeanDefinition<StringCodec> codec = context.getBeanDefinition(StringCodec.class);
+            List<BeanDefinitionChange<Object>> changes = new ArrayList<>();
+            BeanWatch watch = beanContext.watchDefinitions(Object.class, Qualifiers.byName("codec"), changes::add);
+
+            assertEquals(1, changes.size());
+            assertEquals(List.of(codec), changes.get(0).added());
+
+            // a change is matched as the first batch was: Object selects every definition, not only those exposing it
+            beanContext.notifyDefinitionChange(List.of(codec), List.of());
+            assertEquals(2, changes.size());
+            assertEquals(List.of(codec), changes.get(1).removed());
+
+            beanContext.notifyDefinitionChange(List.of(), List.of(codec));
+            assertEquals(3, changes.size());
+            assertEquals(List.of(codec), changes.get(2).added());
+
+            // the qualifier still applies
+            beanContext.notifyDefinitionChange(List.of(), List.of(context.getBeanDefinition(ARule.class)));
+            assertEquals(3, changes.size());
+            watch.close();
+        }
+    }
+
+    @Test
+    void aTypedWatchSeesTheChangesOfTheDefinitionsItsFirstBatchLists() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            BeanDefinition<StringCodec> codec = context.getBeanDefinition(StringCodec.class);
+            BeanDefinition<MarkedOnly> marked = context.getBeanDefinition(MarkedOnly.class);
+            List<BeanDefinitionChange<Codec>> rawChanges = new ArrayList<>();
+            List<BeanDefinitionChange<Codec>> typedChanges = new ArrayList<>();
+            List<BeanDefinitionChange<IndexMarker>> indexedChanges = new ArrayList<>();
+            List<BeanChange<IndexMarker>> indexedBeanChanges = new ArrayList<>();
+            List<BeanWatch> watches = List.of(
+                beanContext.watchDefinitions(Codec.class, null, rawChanges::add),
+                beanContext.watchDefinitions(Argument.of(Codec.class, String.class), null, typedChanges::add),
+                beanContext.watchDefinitions(IndexMarker.class, null, indexedChanges::add),
+                beanContext.watchBeans(IndexMarker.class, null, indexedBeanChanges::add));
+
+            assertEquals(List.of(codec), rawChanges.get(0).added());
+            assertEquals(List.of(codec), typedChanges.get(0).added());
+            // a bean indexed by a type it does not implement is listed by that type
+            assertEquals(List.of(marked), indexedChanges.get(0).added());
+
+            beanContext.notifyDefinitionChange(List.of(codec, marked), List.of());
+            beanContext.notifyDefinitionChange(List.of(), List.of(codec, marked));
+            Map<String, List<? extends BeanDefinitionChange<?>>> byWatch = Map.of(
+                "Codec", rawChanges, "Codec<String>", typedChanges, "IndexMarker", indexedChanges);
+            for (Map.Entry<String, List<? extends BeanDefinitionChange<?>>> entry : byWatch.entrySet()) {
+                List<? extends BeanDefinitionChange<?>> changes = entry.getValue();
+                assertEquals(3, changes.size(), entry.getKey());
+                assertEquals(changes.get(0).added(), changes.get(1).removed());
+                assertEquals(changes.get(0).added(), changes.get(2).added());
+            }
+            // a bean indexed by a type it does not implement is not a bean of that type
+            assertEquals(1, indexedBeanChanges.size());
+            assertTrue(indexedBeanChanges.get(0).added().isEmpty());
+            watches.forEach(BeanWatch::close);
+        }
+    }
+
     private static void await(CountDownLatch latch) {
         try {
             if (!latch.await(10, TimeUnit.SECONDS)) {

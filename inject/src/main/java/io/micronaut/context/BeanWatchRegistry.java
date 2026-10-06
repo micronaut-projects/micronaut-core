@@ -37,7 +37,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -873,8 +875,8 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed);
-            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added);
+            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed, true);
+            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added, true);
             if (removedHere.isEmpty() && addedHere.isEmpty()) {
                 return;
             }
@@ -918,8 +920,8 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed);
-            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added);
+            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed, false);
+            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added, false);
             if (removedHere.isEmpty() && addedHere.isEmpty()) {
                 return;
             }
@@ -1120,13 +1122,13 @@ final class BeanWatchRegistry {
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> List<BeanDefinition<T>> select(@Nullable Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<? extends BeanDefinition<?>> definitions) {
+    private <T> List<BeanDefinition<T>> select(@Nullable Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<? extends BeanDefinition<?>> definitions, boolean indexed) {
         if (definitions.isEmpty()) {
             return List.of();
         }
         Set<BeanDefinition<T>> candidates = new LinkedHashSet<>();
         for (BeanDefinition<?> definition : definitions) {
-            if (beanType == null || definition.isCandidateBean(beanType)) {
+            if (beanType == null || isCandidate(beanType, definition, indexed)) {
                 candidates.add((BeanDefinition<T>) definition);
             }
         }
@@ -1138,5 +1140,43 @@ final class BeanWatchRegistry {
             stream = qualifier.reduce(beanType != null ? beanType.getType() : (Class<T>) Object.class, stream);
         }
         return stream.toList();
+    }
+
+    /**
+     * Whether a changed definition is one the lookup of the watch's first batch would list for the type, so
+     * that a change is matched as the first batch was: {@code Object} lists every definition but the
+     * {@code @Any} providers, whatever types it exposes, and another type the candidates the resolution
+     * customizer accepts for it or for its lookup type, and, when definitions are watched, the beans indexed
+     * by either of them: a bean is looked up among the candidates only, so a bean watch leaves those out.
+     *
+     * @param beanType The type watched
+     * @param definition The changed definition
+     * @param indexed Whether the beans indexed by the type without implementing it are candidates
+     * @return Whether the definition is a candidate for the type
+     */
+    private boolean isCandidate(Argument<?> beanType, BeanDefinition<?> definition, boolean indexed) {
+        if (beanType.getType() == Object.class) {
+            return !AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier());
+        }
+        BeanResolutionCustomizer customizer = context.getBeanResolutionCustomizer();
+        if (customizer.isCandidateBean(beanType, definition)) {
+            return true;
+        }
+        Argument<?> lookupType = customizer.resolveBeanLookupArgument(beanType);
+        if (!lookupType.equals(beanType) && customizer.isCandidateBean(lookupType, definition)) {
+            return true;
+        }
+        return indexed && (isIndexedBy(beanType.getType(), definition) || isIndexedBy(lookupType.getType(), definition));
+    }
+
+    private static boolean isIndexedBy(Class<?> type, BeanDefinition<?> definition) {
+        if (definition instanceof BeanDefinitionReference<?> reference && !type.isAssignableFrom(reference.getBeanType())) {
+            for (Class<?> indexedType : reference.getIndexes()) {
+                if (indexedType == type) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
