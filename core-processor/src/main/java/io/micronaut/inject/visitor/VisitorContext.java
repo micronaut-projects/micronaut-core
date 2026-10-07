@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotationBuilderRequests;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
@@ -137,6 +138,65 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default RetentionPolicy getAnnotationRetentionPolicy(String annotationName) {
         return getAnnotationMetadataBuilder().getRetentionPolicy(annotationName);
+    }
+
+    /**
+     * Requests an {@link io.micronaut.core.annotation.AnnotationBuilder} for an annotation type, as if the type were
+     * listed in {@link io.micronaut.core.annotation.RegisterAnnotations}, so that
+     * {@link io.micronaut.core.annotation.AnnotationBuilder#find(Class)} builds annotations of the type without a
+     * proxy. A visitor calls it for an annotation type it encounters, which can be declared in the compilation or come
+     * from a library.
+     *
+     * <p>The builder, its implementation and its service entry are written next to the type of the originating
+     * element: the type itself, the type that declares a member, or the {@code package-info} of a package. A builder
+     * is never written twice for the same type, and how far one is shared depends on the
+     * {@link #getVisitorKind() kind} of the visitor, so that the builders stay right in an incremental
+     * compilation:</p>
+     * <ul>
+     *     <li>the requests of {@link TypeElementVisitor.VisitorKind#AGGREGATING aggregating} visitors share one
+     *     builder per annotation type in the compilation, since such a visitor processes all of its types again in
+     *     every compilation;</li>
+     *     <li>a request of an {@link TypeElementVisitor.VisitorKind#ISOLATING isolating} visitor writes a builder
+     *     next to the type of its originating element, which is written again whenever the type is. To have a single
+     *     builder for an annotation type declared in the compilation, request it with the declaration of the
+     *     annotation type as the originating element.</li>
+     * </ul>
+     *
+     * <p>Other modules can write a builder for the same annotation type: at runtime the registry picks one of
+     * them.</p>
+     *
+     * @param annotationType     The annotation type, which has to be an annotation
+     * @param originatingElement The originating element: a type, a member of a type or a package
+     * @return {@code true} when the compilation has a builder for the type, {@code false} when the annotation type
+     * is not public and cannot have one
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean registerAnnotationBuilder(ClassElement annotationType, Element originatingElement) {
+        return getAnnotationBuilderRequests().register(annotationType, originatingElement, getVisitorKind(), this);
+    }
+
+    /**
+     * The kind of the visitors this context runs, which decides how an incremental compilation processes their
+     * types.
+     *
+     * @return The visitor kind
+     * @since 5.3.0
+     */
+    @Internal
+    default TypeElementVisitor.VisitorKind getVisitorKind() {
+        return TypeElementVisitor.VisitorKind.ISOLATING;
+    }
+
+    /**
+     * The annotation builders of the compilation. A language processor shares them between its visitor contexts.
+     *
+     * @return The annotation builders written in the compilation
+     * @since 5.3.0
+     */
+    @Internal
+    default AnnotationBuilderRequests getAnnotationBuilderRequests() {
+        return AnnotationBuilderRequests.forCompilation(this);
     }
 
     /**

@@ -36,6 +36,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.annotation.AnnotationBuilderRequests;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -236,6 +237,12 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public @NonNull GroovyAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
         return annotationMetadataBuilder;
+    }
+
+    @Override
+    public AnnotationBuilderRequests getAnnotationBuilderRequests() {
+        // a context is created per source unit and phase, the compilation unit is shared by them
+        return AnnotationBuilderRequests.forCompilation(compilationUnit != null ? compilationUnit : sourceUnit);
     }
 
     @Override

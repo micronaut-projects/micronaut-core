@@ -10,3 +10,4 @@ io.micronaut.inject.visitor.GeneratedSourceVisitor
 io.micronaut.inject.visitor.ConstructorArityVisitor
 io.micronaut.ast.groovy.annotation.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
 io.micronaut.ast.groovy.annotation.ConstantReferenceDefaultsSpec$ConstantDefaultsRecordingVisitor
+io.micronaut.ast.groovy.annotation.RegisterAnnotationBuilderSpec$RequestingVisitor
