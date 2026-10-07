@@ -17,6 +17,18 @@ A file set with `logger.config`, or with `logback.configurationFile` in Micronau
 
 That logging system, `io.micronaut.management.endpoint.loggers.impl.LogbackLoggingSystem`, is created by the Micronaut framework when the loggers endpoint is enabled. Its public constructor, which reads only `logger.config`, is deprecated for removal, and with `null` it no longer defaults to `logback.xml`: the refresh then configures Logback the way Logback configures itself at startup. Do not construct the class: obtain the bean from the application context, for example by injecting `LoggingSystem` or `ManagedLoggingSystem`, or replace it with a bean of your own that implements both, annotated with `@Replaces(LogbackLoggingSystem.class)`, rather than extending it.
 
+=== The event streams of the HTTP client follow the Server-Sent Events specification (5.3)
+
+The `eventStream` methods of api:http.client.sse.SseClient[] in the Netty client now decode the body as the https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation[event stream interpretation] of the Server-Sent Events specification, like `exchangeEventStream` and the api:http.client.sse.AsyncSseClient[]. The body is still read as an event stream whatever the content type of the response, and an error status still fails the stream. A subscriber can observe these changes:
+
+* A comment line, such as a `: ping` heartbeat, is ignored. Previously a comment followed by a blank line was emitted as an event with empty data.
+* The `id` of an event carries over to the events that follow it until another `id` line, as the last event id of the specification. Previously only the event with the `id` line had an id.
+* The name of an `event:` line and the value of an `id:` line are no longer trimmed: only the one space after the colon is removed.
+* A `data` line without a colon adds an empty line to the data of the event, and a blank line after an event without data no longer fails the stream with a `NullPointerException`: an event without data is not emitted.
+* A carriage return alone ends a line, as a line feed or a carriage return followed by a line feed does. A leading byte order mark is skipped, an `id` containing a null character and a `retry` that is not a number are ignored.
+* When the request accepts an event stream, `dataStream` and `exchangeStream` split the body into lines at a carriage return alone as well.
+* The line limit (`micronaut.http.client.max-content-length`) applies to each line and to the data of one event. Exceeding it fails `eventStream` with a api:http.client.exceptions.ContentLengthExceededException[], an `HttpClientException`, instead of an `HttpClientException` ("Error consuming Server Sent Events") that wraps a `BufferLengthExceededException`.
+
 === Construct advice no longer wraps injection and `@PostConstruct` (5.3)
 
 A api:aop.ConstructorInterceptor[] now wraps only the constructor call. Fields and methods of the bean are injected, and
