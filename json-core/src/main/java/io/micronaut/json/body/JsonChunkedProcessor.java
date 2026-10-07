@@ -32,10 +32,10 @@ import java.util.function.Consumer;
  * their boundaries, for any {@link ReadBuffer}.
  *
  * <p>A piece that is backed by an array is scanned in place, and the values are split off it
- * without copying. A piece that is not, e.g. a direct buffer, is scanned in a scratch copy, and
- * the values it holds whole are copied out of it to the heap, where the mappers read them
- * fastest. A value that spans pieces is copied into one array when it completes. Every byte of a
- * value is copied at most once.</p>
+ * without copying. A piece that is not, e.g. a direct buffer, is copied to the heap, where the
+ * mappers read the values fastest, and scanned there: the values it holds whole are views of the
+ * copy, which is reused for the next piece if it holds none. A value that spans pieces is
+ * copied into one array when it completes. Every byte of a value is copied at most once.</p>
  *
  * @author Jonas Konrad
  * @author Denis Stepanov
@@ -77,7 +77,8 @@ final class JsonChunkedProcessor {
      */
     private boolean firstRegionContinues;
     /**
-     * The copy of a piece that is not backed by an array, to scan it.
+     * The copy of a piece that is not backed by an array, to scan it, unless values are views
+     * of it.
      */
     private byte @Nullable [] scratch;
     /**
@@ -109,33 +110,32 @@ final class JsonChunkedProcessor {
      * @throws IOException If the input is malformed
      */
     void feed(ReadBuffer piece, Consumer<? super ReadBuffer> out) throws IOException {
-        ReadBuffer rest = piece;
         try {
-            if (rest.readable() == 0) {
+            if (piece.readable() == 0) {
                 return;
             }
             regionCount = 0;
             bufferingFrom = -1;
             firstRegionContinues = false;
             failure = null;
-            ReadBuffer view = rest.duplicate();
+            ReadBuffer view = piece.duplicate();
             if (view.useFastHeapBuffer(this::scan) != null) {
-                emit(rest, out);
+                emit(piece, out);
             } else {
                 // no array to scan in place
                 view.close();
-                int length = rest.readable();
+                int length = piece.readable();
                 byte[] bytes = scratch;
                 if (bytes == null || bytes.length < length) {
                     bytes = new byte[length];
                     scratch = bytes;
                 }
-                rest.duplicate().toArray(bytes, 0);
+                piece.duplicate().toArray(bytes, 0);
                 scan(bytes, 0, length);
-                emitCopying(rest, bytes, out);
+                emitCopying(piece, bytes, out);
             }
         } finally {
-            rest.close();
+            piece.close();
         }
         Throwable f = failure;
         if (f != null) {
@@ -242,9 +242,9 @@ final class JsonChunkedProcessor {
     }
 
     /**
-     * Hand over the values the scan found in a scratch copy of a piece: the values the piece
-     * holds whole are copied out of the scratch copy, only the parts of the values that span
-     * pieces are split off the piece.
+     * Hand over the values the scan found in a copy of a piece: the values the piece holds whole
+     * are views of the copy, only the parts of the values that span pieces are split off the
+     * piece.
      */
     private void emitCopying(ReadBuffer piece, byte[] bytes, Consumer<? super ReadBuffer> out) {
         int consumed = 0;
@@ -256,7 +256,11 @@ final class JsonChunkedProcessor {
                 buffer(piece.split(end));
                 consumed = end;
             } else {
-                buffer(ReadBufferFactory.getJdkFactory().adapt(Arrays.copyOfRange(bytes, start, end)));
+                if (bytes == scratch) {
+                    // the values are views of it: the next piece is copied to a new array
+                    scratch = null;
+                }
+                buffer(ReadBufferFactory.getJdkFactory().adapt(java.nio.ByteBuffer.wrap(bytes, start, end - start)));
             }
             flush(out);
         }
