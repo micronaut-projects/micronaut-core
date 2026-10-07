@@ -1284,6 +1284,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (body instanceof AvailableByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
+                EventLoop eventLoop = requiredCtx().channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    // e.g. a relayed response completed on a thread of another client. The body
+                    // is claimed here, the streaming buffer of the connection is created on its
+                    // event loop, where it is written
+                    CloseableByteBody claimed = body.move();
+                    eventLoop.execute(() -> write(response, claimed));
+                    return;
+                }
                 // a body whose trailers are known, e.g. a relayed body that was received fully
                 // before it is written, may have a known length. The trailers need the chunked
                 // transfer coding: a Content-Length response would drop them
