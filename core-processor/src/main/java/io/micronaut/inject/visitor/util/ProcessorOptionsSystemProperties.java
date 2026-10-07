@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 /**
  * Exposes the Micronaut processor options of a compilation as system properties, for the visitors
@@ -86,6 +87,26 @@ public final class ProcessorOptionsSystemProperties {
      */
     public static synchronized void acquire(Object processor) {
         HOLDERS.add(processor);
+    }
+
+    /**
+     * Runs a processing round of the given processor while it holds the properties, and releases them
+     * after the last round.
+     *
+     * @param processor      The processor
+     * @param processingOver Whether this is the last round
+     * @param round          The processing of the round
+     * @return The result of the round
+     */
+    public static boolean process(Object processor, boolean processingOver, BooleanSupplier round) {
+        acquire(processor);
+        try {
+            return round.getAsBoolean();
+        } finally {
+            if (processingOver) {
+                release(processor);
+            }
+        }
     }
 
     /**
