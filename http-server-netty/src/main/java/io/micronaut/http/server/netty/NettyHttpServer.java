@@ -1021,6 +1021,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * @param contextStopped Completed once the context is stopped
      */
     private void awaitApplicationContextStop(CompletableFuture<Void> contextStopped) {
+        // This relies on DefaultBeanContext.start()/stop() (and DefaultApplicationContext.stop())
+        // being synchronized on the context instance. If they move to a private lock, or another
+        // ApplicationContext implementation is used, holdsLock is false here, and a stop calling
+        // back into this server would join its own pending future and hang.
         if (!Thread.holdsLock(applicationContext)) {
             contextStopped.join();
         }
