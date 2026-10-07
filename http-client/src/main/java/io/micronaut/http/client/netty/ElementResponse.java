@@ -19,22 +19,22 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.sse.Event;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
 /**
- * An event of an event stream, with the status and the headers of its response.
+ * An element of the body of a response, e.g. an event of an event stream or a piece of the body,
+ * with the status and the headers of its response.
  *
  * @param response The response
- * @param event    The event, or {@code null} if the response has no event
- * @param <B>      The event data type
+ * @param element  The element, or {@code null} if the response has none
+ * @param <T>      The type of an element
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record EventResponse<B>(HttpResponse<?> response, @Nullable Event<B> event) implements HttpResponse<Event<B>> {
+record ElementResponse<T>(HttpResponse<?> response, @Nullable T element) implements HttpResponse<T> {
     @Override
     public int code() {
         return response.code();
@@ -56,7 +56,7 @@ record EventResponse<B>(HttpResponse<?> response, @Nullable Event<B> event) impl
     }
 
     @Override
-    public Optional<Event<B>> getBody() {
-        return Optional.ofNullable(event);
+    public Optional<T> getBody() {
+        return Optional.ofNullable(element);
     }
 }

@@ -23,10 +23,12 @@ import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.stream.ByteBodyElements;
+import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 
 /**
  * The pieces of a response body as they were received, as heap buffers that are not reference
@@ -50,6 +52,19 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
     @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
     public static BodyElements<ByteBuffer<?>> elements(CloseableByteBody body) {
         return new ByteBodyElements<>(body, new BodyPieces(), BodyPieces::wrap);
+    }
+
+    /**
+     * The lines of a response body, without their line ending: a line feed, or a carriage return
+     * and a line feed. Every line is an element, an empty one too, and the bytes after the last
+     * line ending are not, as the lines of an event stream were split before.
+     *
+     * @param body          The body, which the elements take over
+     * @param maxLineLength The largest number of bytes a line may have
+     * @return The lines
+     */
+    public static BodyElements<ByteBuffer<?>> lines(CloseableByteBody body, long maxLineLength) {
+        return new ByteBodyElements<>(body, new Lines(maxLineLength), BodyPieces::wrap);
     }
 
     /**
@@ -84,5 +99,73 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
     @Override
     public void close() {
         pieces.clear();
+    }
+
+    /**
+     * Splits the pieces of a body into lines.
+     */
+    private static final class Lines implements PieceReader<ByteBuffer<?>> {
+        private final long maxLineLength;
+        private final ArrayDeque<ByteBuffer<?>> lines = new ArrayDeque<>(1);
+        /**
+         * The bytes of the line that is not ended yet.
+         */
+        private byte[] pending = new byte[0];
+
+        Lines(long maxLineLength) {
+            this.maxLineLength = maxLineLength;
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            byte[] bytes;
+            try (piece) {
+                bytes = piece.toArray();
+            }
+            int start = 0;
+            for (int i = 0; i < bytes.length; i++) {
+                if (bytes[i] == '\n') {
+                    byte[] line = join(bytes, start, i);
+                    int length = line.length;
+                    if (length > 0 && line[length - 1] == '\r') {
+                        length--;
+                    }
+                    lines.add(ByteArrayBufferFactory.INSTANCE.wrap(length == line.length ? line : Arrays.copyOf(line, length)));
+                    pending = new byte[0];
+                    start = i + 1;
+                }
+            }
+            pending = join(bytes, start, bytes.length);
+        }
+
+        /**
+         * @return The pending bytes and the given ones
+         */
+        private byte[] join(byte[] bytes, int from, int to) {
+            long length = (long) pending.length + (to - from);
+            if (length > maxLineLength) {
+                throw new ContentLengthExceededException(maxLineLength, length);
+            }
+            byte[] joined = Arrays.copyOf(pending, (int) length);
+            System.arraycopy(bytes, from, joined, pending.length, to - from);
+            return joined;
+        }
+
+        @Override
+        public void complete() {
+            // the bytes after the last line ending are not a line
+            pending = new byte[0];
+        }
+
+        @Override
+        public @Nullable ByteBuffer<?> poll() {
+            return lines.poll();
+        }
+
+        @Override
+        public void close() {
+            lines.clear();
+            pending = new byte[0];
+        }
     }
 }
