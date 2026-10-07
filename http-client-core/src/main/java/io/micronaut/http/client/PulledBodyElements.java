@@ -41,7 +41,7 @@ import java.util.function.Function;
 @Internal
 public abstract class PulledBodyElements<T> implements BodyElements<T> {
 
-    private static final String CLOSED = "The elements of the body were closed";
+    private static final String CLOSED_MESSAGE = "The elements of the body were closed";
 
     // guarded by this
     private final ArrayDeque<T> queue = new ArrayDeque<>();
@@ -179,7 +179,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
             w = walking;
             walking = null;
         }
-        CancellationException cancelled = new CancellationException(CLOSED);
+        CancellationException cancelled = new CancellationException(CLOSED_MESSAGE);
         if (w != null) {
             w.completeExceptionally(cancelled);
         }
@@ -200,7 +200,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
      */
     private synchronized void start() {
         if (closed) {
-            throw new IllegalStateException(CLOSED);
+            throw new IllegalStateException(CLOSED_MESSAGE);
         }
         if (busy) {
             throw new IllegalStateException("Another operation on the elements of the body is in progress");
@@ -222,7 +222,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
             element = queue.poll();
             if (element == null) {
                 if (closed) {
-                    error = new CancellationException(CLOSED);
+                    error = new CancellationException(CLOSED_MESSAGE);
                 } else if (failure != null) {
                     error = failure;
                 } else if (ended) {
