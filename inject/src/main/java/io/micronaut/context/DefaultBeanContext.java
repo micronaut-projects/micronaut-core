@@ -302,6 +302,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     private Set<Object> adoptedRetainedBeans = Collections.newSetFromMap(new IdentityHashMap<>());
     /**
+     * While retained registrations are adopted, the instances this context adopts, by identity.
+     */
+    private Set<Object> adoptingRetainedBeans = Set.of();
+    /**
      * Adopted registrations of instances that bean created listeners replaced in the previous context, to wrap again
      * with this context's listeners once they are known.
      */
@@ -4319,8 +4323,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
             }
         }
-        for (Map.Entry<BeanRegistration<?>, BeanDefinition<?>> entry : adoptable.entrySet()) {
-            adopt(entry.getKey(), entry.getValue());
+        Set<Object> adopting = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (BeanRegistration<?> registration : adoptable.keySet()) {
+            adopting.add(originalOf(registration).bean);
+            adopting.add(registration.bean);
+        }
+        adoptingRetainedBeans = adopting;
+        try {
+            for (Map.Entry<BeanRegistration<?>, BeanDefinition<?>> entry : adoptable.entrySet()) {
+                adopt(entry.getKey(), entry.getValue());
+            }
+        } finally {
+            adoptingRetainedBeans = Set.of();
         }
         for (BeanRegistration<?> registration : rejected) {
             rejectedRetainedRegistrations.add(originalOf(registration));
@@ -4626,9 +4640,31 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * A registration a retained bean owns (a prototype it received, an interceptor of its own), bound to
      * this context instead of the stopped one, under this context's definition where it has one.
      */
+    @SuppressWarnings("unchecked")
     private <T> BeanRegistration<T> rebind(BeanRegistration<T> registration) {
         if (!(registration instanceof BeanDisposingRegistration<T> disposing)) {
             return registration;
+        }
+        if (disposing.getBean() instanceof DefaultBeanDependencyResolver && disposing.getBeanDefinition() != dependencyResolverDefinition) {
+            // a resolver the bean received, or a group it opened: bound to the stopped context, and through its owner to
+            // that context's graph. What it resolved stays owned, under a resolver of this context; the bean only used
+            // the resolver while it was created, and a bean that kept it would hold the stopped context anyway
+            List<BeanRegistration<?>> owned = rebindAll(disposing.dependentBeans());
+            DefaultBeanDependencyResolver resolver = new DefaultBeanDependencyResolver(this);
+            BeanRegistration<T> rebound = (BeanRegistration<T>) BeanRegistration.of(this, disposing.getIdentifier(), dependencyResolverDefinition,
+                resolver, owned, null);
+            // the singletons it resolved that this context adopts too, which the bean's destruction is ordered before, as
+            // registrations of this context; one the stopped context destroyed is not held, it would keep that context's
+            // generation reachable
+            List<BeanRegistration<?>> required = new ArrayList<>();
+            for (BeanRegistration<?> shared : disposing.getDependencies().requiredBeans()) {
+                BeanRegistration<?> here = adoptingRetainedBeans.contains(shared.getBean()) ? sharedRegistration(shared) : null;
+                if (here != null) {
+                    required.add(here);
+                }
+            }
+            resolver.dependencies.requireAll(required);
+            return rebound;
         }
         BeanDefinition<T> definition = resolveAdoptedDefinition(disposing.getBeanDefinition());
         List<BeanRegistration<?>> owned = disposing.dependentBeans();
@@ -4641,6 +4677,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             dependents,
             rebindInterceptors(disposing.getInterceptorCandidates().legacyRegistrations(), owned, dependents)
         );
+    }
+
+    /**
+     * A registration of this context for a shared instance a rebound resolver orders its destruction by: the instance
+     * under this context's definition, as it is adopted, without what the stopped context's registration owned. The
+     * stopped context's definition is not held: it was configured with that context's environment.
+     */
+    @Nullable
+    private <S> BeanRegistration<S> sharedRegistration(BeanRegistration<S> shared) {
+        BeanDefinition<S> definition = resolveAdoptedDefinition(shared.getBeanDefinition());
+        return definition == null ? null : BeanRegistration.of(this, shared.getIdentifier(), definition, shared.getBean());
     }
 
     /**
