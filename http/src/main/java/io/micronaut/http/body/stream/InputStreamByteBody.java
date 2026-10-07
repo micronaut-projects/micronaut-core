@@ -191,10 +191,12 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                     s.onSubscribe(new Subscription() {
                         @Override
                         public void request(long n) {
+                            // a rejected subscriber is only failed
                         }
 
                         @Override
                         public void cancel() {
+                            // a rejected subscriber is only failed
                         }
                     });
                     s.onError(new IllegalStateException("The bytes of a stream are published to a single subscriber"));

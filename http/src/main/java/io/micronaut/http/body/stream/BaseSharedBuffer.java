@@ -883,10 +883,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         private static final Subscription REJECTED = new Subscription() {
             @Override
             public void request(long n) {
+                // a rejected subscriber is only failed
             }
 
             @Override
             public void cancel() {
+                // a rejected subscriber is only failed
             }
         };
 
