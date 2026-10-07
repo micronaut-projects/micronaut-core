@@ -32,6 +32,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.annotation.AnnotationBuilderRequests;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -210,6 +211,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     /**
      * @return The visitor kind
      */
+    @Override
     public TypeElementVisitor.VisitorKind getVisitorKind() {
         return visitorKind;
     }
@@ -235,6 +237,13 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      */
     public void setVisitUnresolvedInterfaces(boolean visitUnresolvedInterfaces) {
         this.visitUnresolvedInterfaces = visitUnresolvedInterfaces;
+    }
+
+    @Override
+    public AnnotationBuilderRequests getAnnotationBuilderRequests() {
+        // the element utilities of javac are shared by the processors of a compilation, the processing environment
+        // and the filer can be wrapped per processor
+        return AnnotationBuilderRequests.forCompilation(elements);
     }
 
     @Override

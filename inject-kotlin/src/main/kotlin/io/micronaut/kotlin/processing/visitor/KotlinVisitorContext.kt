@@ -44,11 +44,13 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationBuilderRequests
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.beans.BeanElementBuilder
+import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.inject.writer.GeneratedFile
@@ -539,6 +541,13 @@ internal class KotlinVisitorContext(
     override fun getExpressionCompilationContextFactory(): ExpressionCompilationContextFactory {
         return expressionCompilationContextFactory
     }
+
+    override fun getVisitorKind(): TypeElementVisitor.VisitorKind =
+        if (aggregating) TypeElementVisitor.VisitorKind.AGGREGATING else TypeElementVisitor.VisitorKind.ISOLATING
+
+    // a context is created per round, the environment is shared by the rounds
+    override fun getAnnotationBuilderRequests(): AnnotationBuilderRequests =
+        AnnotationBuilderRequests.forCompilation(environment)
 
     override fun getAnnotationMetadataBuilder(): AbstractAnnotationMetadataBuilder<*, *> {
         return annotationMetadataBuilder

@@ -29,7 +29,6 @@ import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -72,11 +71,7 @@ public final class RegisterAnnotationsVisitor implements TypeElementVisitor<Regi
             if (!annotationType.isPublic()) {
                 throw new ProcessingException(element, "The annotation type has to be public to have a builder: " + name);
             }
-            try {
-                AnnotationBuilderWriter.write(holderName, annotationType, element, context);
-            } catch (IOException e) {
-                throw new ProcessingException(element, "Failed to write the annotation builder of " + name + ": " + e.getMessage(), e);
-            }
+            context.getAnnotationBuilderRequests().registerListed(holderName, annotationType, element, context);
         }
     }
 
