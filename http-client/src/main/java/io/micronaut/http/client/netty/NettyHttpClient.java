@@ -651,7 +651,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         } catch (RuntimeException e) {
             flow = ExecutionFlow.error(e);
         }
-        return RawResponseFuture.ofMutable(flow, httpRequest instanceof RawHttpRequestWrapper<?> claimed ? claimed::close : null);
+        return RawResponseFuture.ofMutable(flow, httpRequest instanceof RawHttpRequestWrapper<?> claimed ? claimed::close : null, propagatedContext);
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> proxyFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {

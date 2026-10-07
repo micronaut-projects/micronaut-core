@@ -18,6 +18,7 @@ package io.micronaut.http.client.jdk;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -153,6 +154,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
      */
     CompletionStage<MutableHttpResponse<?>> proxyAsync(HttpRequest<?> request, ProxyRequestOptions options) {
         Objects.requireNonNull(options, "options");
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         ProxyExchange exchange;
         try {
             exchange = proxyExchange(request, options);
@@ -173,7 +175,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         } catch (RuntimeException e) {
             flow = ExecutionFlow.error(e);
         }
-        return RawResponseFuture.ofMutable(flow, serverBody == null ? null : serverBody::close);
+        return RawResponseFuture.ofMutable(flow, serverBody == null ? null : serverBody::close, propagatedContext);
     }
 
     /**

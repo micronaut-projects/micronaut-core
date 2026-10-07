@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
@@ -89,13 +90,19 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
      * future cancels the flow. The given release runs once, when the flow completes or the future
      * is cancelled, e.g. to release the claimed body of the proxied request.
      *
+     * The future completes within the given context, as the publisher of a reactive proxy
+     * client does, so that the stages that depend on it see the context of the caller.
+     *
      * @param flow    The exchange flow
      * @param release Releases what the exchange holds, or {@code null}
+     * @param context The context propagated from the caller
      * @return The future
      * @since 5.3.0
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static CompletionStage<MutableHttpResponse<?>> ofMutable(ExecutionFlow<? extends MutableHttpResponse<?>> flow, @Nullable Runnable release) {
+    public static CompletionStage<MutableHttpResponse<?>> ofMutable(ExecutionFlow<? extends MutableHttpResponse<?>> flow,
+                                                                    @Nullable Runnable release,
+                                                                    PropagatedContext context) {
         RawResponseFuture future = new RawResponseFuture();
         Runnable releaseOnce = release == null ? () -> { } : new Runnable() {
             private final AtomicBoolean released = new AtomicBoolean();
@@ -113,7 +120,11 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
         });
         flow.onComplete((response, error) -> {
             releaseOnce.run();
-            future.deliver(response, error);
+            if (context == PropagatedContext.empty()) {
+                future.deliver(response, error);
+            } else {
+                context.propagate(() -> future.deliver(response, error));
+            }
         });
         // it only completes with the mutable responses of the flow
         return (CompletionStage) future;
