@@ -28,7 +28,6 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
-import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -526,11 +525,15 @@ abstract class AbstractJdkHttpClient {
      * the response body is streamed, and the outcome is reported to the load balancer once it
      * ended.
      *
-     * @param request   The request, with an absolute URI
-     * @param selection The selection of the load balancer, or {@code null}
+     * @param request         The request, with an absolute URI
+     * @param selection       The selection of the load balancer, or {@code null}
+     * @param bufferedHeaders For an exchange whose response body is read whole, set once the
+     *                        response headers arrived, else {@code null}
      * @return The flow of the response
      */
-    ExecutionFlow<JdkByteBodyResponse> sendRequest(MutableHttpRequest<?> request, @Nullable LoadBalancerSelection selection) {
+    ExecutionFlow<JdkByteBodyResponse> sendRequest(MutableHttpRequest<?> request,
+                                                   @Nullable LoadBalancerSelection selection,
+                                                   @Nullable AtomicBoolean bufferedHeaders) {
         HttpRequest httpRequest;
         try {
             httpRequest = toJdkRequest(request.getUri(), request, null);
@@ -548,8 +551,8 @@ abstract class AbstractJdkHttpClient {
         // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
         boolean raw = request.getAttribute(RAW_ATTRIBUTE).isPresent();
         HttpClient httpClient = raw ? rawClient.get() : client;
-        if (!raw && request.getAttribute(AbstractHttpClient.BUFFER_RESPONSE).isPresent()) {
-            return sendBuffered(httpClient, httpRequest, selection);
+        if (!raw && bufferedHeaders != null) {
+            return sendBuffered(httpClient, httpRequest, selection, bufferedHeaders);
         }
         BodySizeLimits limits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
         // whether the headers arrived, so that a failure of the body is told from one before
@@ -597,8 +600,10 @@ abstract class AbstractJdkHttpClient {
      * Send a request whose response body is read whole, into an array: the outcome is reported
      * once the body is read.
      */
-    private ExecutionFlow<JdkByteBodyResponse> sendBuffered(HttpClient httpClient, HttpRequest httpRequest, @Nullable LoadBalancerSelection selection) {
-        AtomicBoolean headersReceived = new AtomicBoolean();
+    private ExecutionFlow<JdkByteBodyResponse> sendBuffered(HttpClient httpClient,
+                                                            HttpRequest httpRequest,
+                                                            @Nullable LoadBalancerSelection selection,
+                                                            AtomicBoolean headersReceived) {
         DelayedExecutionFlow<JdkByteBodyResponse> result = DelayedExecutionFlow.create();
         CompletableFuture<java.net.http.HttpResponse<byte[]>> sent;
         try {

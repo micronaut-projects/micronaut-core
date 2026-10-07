@@ -138,12 +138,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      */
     public static final String NO_FOLLOW_REDIRECTS = "micronaut.http.client.raw.no-follow-redirects";
 
-    /**
-     * Request attribute of an exchange whose response body is read whole, see
-     * {@link #readFullResponse}: a transport may read it into memory right away.
-     */
-    public static final String BUFFER_RESPONSE = "micronaut.http.client.buffer-response";
-
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
 
     protected final HttpClientConfiguration configuration;
@@ -246,6 +240,31 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                              @Nullable Thread blockedThread,
                                              MutableHttpRequest<?> request,
                                              @Nullable LoadBalancerSelection selection);
+
+    /**
+     * Send one request of an exchange whose response body is read whole, see
+     * {@link #readFullResponse}, without filters and without following redirects: a transport may
+     * read the body into memory right away. By default, see {@link #send}.
+     *
+     * @param propagatedContext  The context propagated from the original client call
+     * @param preferredScheduler A reference holding the preferred scheduler for timeouts, which
+     *                           the transport may replace with the one of its connection
+     * @param blockedThread      The thread that blocks on the response, if any
+     * @param request            The request to send, with a resolved absolute URI
+     * @param selection          The selection of the load balancer for the request, or {@code null}
+     * @param headersReceived    Set by a transport that reads the body before the flow completes,
+     *                           once the response headers arrived: a timeout of the exchange then
+     *                           elapsed while the body was read
+     * @return The flow of the raw response
+     */
+    protected ExecutionFlow<R> sendBuffered(PropagatedContext propagatedContext,
+                                            AtomicReference<ScheduledExecutorService> preferredScheduler,
+                                            @Nullable Thread blockedThread,
+                                            MutableHttpRequest<?> request,
+                                            @Nullable LoadBalancerSelection selection,
+                                            AtomicBoolean headersReceived) {
+        return send(propagatedContext, preferredScheduler, blockedThread, request, selection);
+    }
 
     /**
      * Build the response of an exchange whose body was read, decoded into the body type, or the
@@ -581,6 +600,30 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         @Nullable LoadBalancerSelection selection,
         BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
     ) {
+        return sendRequestWithRedirects(propagatedContext, preferredScheduler, blockedThread, request, selection, null, readResponse);
+    }
+
+    /**
+     * @param propagatedContext  The context propagated from the original client call
+     * @param preferredScheduler A reference holding the preferred scheduler for timeouts
+     * @param blockedThread      The thread that blocks on the response, if any
+     * @param request            The request to send
+     * @param selection          The selection of the load balancer for the request, or {@code null}
+     * @param bufferedHeaders    For an exchange whose response body is read whole, see
+     *                           {@link #sendBuffered}, else {@code null}. It is kept out of the
+     *                           request, which may be the object of the caller
+     * @param readResponse       Reads the response from the raw response
+     * @return A flow containing the response
+     */
+    private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
+        PropagatedContext propagatedContext,
+        AtomicReference<ScheduledExecutorService> preferredScheduler,
+        @Nullable Thread blockedThread,
+        MutableHttpRequest<?> request,
+        @Nullable LoadBalancerSelection selection,
+        @Nullable AtomicBoolean bufferedHeaders,
+        BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
+    ) {
         if (informationalServiceId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
             ClientAttributes.setServiceId(request, informationalServiceId);
         }
@@ -597,12 +640,12 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         ExecutionFlow<HttpResponse<?>> flow;
         if (filters.isEmpty()) {
             // what the filter runner does without a filter
-            flow = sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, request, selection, readResponse);
+            flow = sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, request, selection, bufferedHeaders, readResponse);
         } else {
             FilterRunner runner = new FilterRunner(filters) {
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
-                    return sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, request, selection, readResponse);
+                    return sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, request, selection, bufferedHeaders, readResponse);
                 }
             };
             flow = runner.run(request, propagatedContext);
@@ -639,6 +682,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         URI resolvedUri,
         HttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
+        @Nullable AtomicBoolean bufferedHeaders,
         BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
     ) {
         try {
@@ -651,6 +695,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     blockedThread,
                     sent.uri().equals(filtered.getUri()) ? filtered : filtered.uri(sent.uri()),
                     sent.selection(),
+                    bufferedHeaders,
                     readResponse
                 ));
                 LoadBalancerSelection other = sent.selection();
@@ -729,14 +774,22 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         @Nullable Thread blockedThread,
         MutableHttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
+        @Nullable AtomicBoolean bufferedHeaders,
         BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
     ) {
-        return send(propagatedContext, preferredScheduler, blockedThread, request, selection).flatMap(byteBodyResponse -> {
+        ExecutionFlow<R> sending = bufferedHeaders == null
+            ? send(propagatedContext, preferredScheduler, blockedThread, request, selection)
+            : sendBuffered(propagatedContext, preferredScheduler, blockedThread, request, selection, bufferedHeaders);
+        return sending.flatMap(byteBodyResponse -> {
             // handle redirects or map the response bytes
             int code = byteBodyResponse.code();
             String location = byteBodyResponse.getHeaders().get(HttpHeaders.LOCATION);
             if (code > 300 && code < 400 && configuration.isFollowRedirects() && request.getAttribute(NO_FOLLOW_REDIRECTS).isEmpty() && location != null) {
                 byteBodyResponse.close();
+                if (bufferedHeaders != null) {
+                    // the headers of the redirect are not those of the response
+                    bufferedHeaders.set(false);
+                }
 
                 MutableHttpRequest<Object> redirectRequest;
                 boolean isRedirectWithBody = code == 307 || code == 308;
@@ -758,7 +811,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 return resolveRedirectURI(request, redirectRequest)
                     .flatMap(target -> {
                         setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
-                        return sendRequestWithRedirects(propagatedContext, blockedThread, redirectRequest.uri(target.uri()), target.selection(), readResponse);
+                        return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockedThread, redirectRequest.uri(target.uri()), target.selection(), bufferedHeaders, readResponse);
                     })
                     .onErrorResume(e -> {
                         // the body went to the server that redirected, it is not unsent
@@ -788,7 +841,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
         request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
         request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
-        request.getAttribute(BUFFER_RESPONSE).ifPresent(buffer -> redirect.setAttribute(BUFFER_RESPONSE, buffer));
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest<?> request,
@@ -1036,7 +1088,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         AtomicBoolean headersReceived = new AtomicBoolean();
         ExecutionFlow<HttpResponse<O>> flow = resolveRequestURI(request).flatMap(target -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(target.uri());
-            mutableRequest.setAttribute(BUFFER_RESPONSE, Boolean.TRUE);
             //noinspection unchecked
             return sendRequestWithRedirects(
                 propagatedContext,
@@ -1044,6 +1095,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 blockedThread,
                 mutableRequest,
                 target.selection(),
+                headersReceived,
                 (req, resp) -> {
                     headersReceived.set(true);
                     return readFullResponse(resp, bodyType, errorType, t -> {
@@ -1059,10 +1111,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
         Duration requestTimeout = configuration.getRequestTimeout();
         if (requestTimeout == null) {
-            // for compatibility
-            requestTimeout = configuration.getReadTimeout()
-                .filter(d -> !d.isNegative())
-                .map(d -> d.plusSeconds(1)).orElse(null);
+            requestTimeout = defaultRequestTimeout();
         }
         if (requestTimeout != null) {
             if (!requestTimeout.isNegative()) {
@@ -1076,6 +1125,19 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             }
         }
         return flow;
+    }
+
+    /**
+     * The timeout of an exchange whose response body is read whole, when no
+     * {@link HttpClientConfiguration#getRequestTimeout() request timeout} is configured: for
+     * compatibility, the read timeout plus one second.
+     *
+     * @return The timeout, or {@code null} for none
+     */
+    protected @Nullable Duration defaultRequestTimeout() {
+        return configuration.getReadTimeout()
+            .filter(d -> !d.isNegative())
+            .map(d -> d.plusSeconds(1)).orElse(null);
     }
 
     @Override

@@ -55,9 +55,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -239,7 +241,29 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
                                                       @Nullable Thread blockedThread,
                                                       MutableHttpRequest<?> request,
                                                       @Nullable LoadBalancerSelection selection) {
-        return transport.sendRequest(request, selection);
+        return transport.sendRequest(request, selection, null);
+    }
+
+    @Override
+    protected ExecutionFlow<JdkByteBodyResponse> sendBuffered(PropagatedContext propagatedContext,
+                                                              AtomicReference<ScheduledExecutorService> preferredScheduler,
+                                                              @Nullable Thread blockedThread,
+                                                              MutableHttpRequest<?> request,
+                                                              @Nullable LoadBalancerSelection selection,
+                                                              AtomicBoolean headersReceived) {
+        return transport.sendRequest(request, selection, headersReceived);
+    }
+
+    /**
+     * The read timeout of the JDK client applies to the response headers, see
+     * {@link HttpRequestFactory}, and a body that keeps coming is read to its end, as before
+     * the JDK client shared the pipeline: no overall timeout is derived from the read timeout.
+     *
+     * @return {@code null}
+     */
+    @Override
+    protected @Nullable Duration defaultRequestTimeout() {
+        return null;
     }
 
     @Override
@@ -270,7 +294,9 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
                                                                          Argument<E> errorType,
                                                                          JdkByteBodyResponse response,
                                                                          byte[] bytes) {
-        boolean convert = convertsWithBodyType(response.code(), bodyType, errorType);
+        // the JDK client returns the response of an error status, decoded into the body type, when
+        // it does not fail on an error status
+        boolean convert = !configuration.isExceptionOnErrorStatus() || convertsWithBodyType(response.code(), bodyType, errorType);
         HttpResponseAdapter<O> full = new HttpResponseAdapter<>(
             new BufferedJdkResponse(response.jdkResponse(), bytes),
             convert ? bodyType : null,
@@ -363,10 +389,18 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * The scheduler of the request timeouts of the JDK clients.
      */
     private static final class Timeouts {
-        static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "jdk-http-client-timeouts");
-            thread.setDaemon(true);
-            return thread;
-        });
+        static final ScheduledExecutorService SCHEDULER = scheduler();
+
+        private static ScheduledExecutorService scheduler() {
+            ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1, runnable -> {
+                Thread thread = new Thread(runnable, "jdk-http-client-timeouts");
+                thread.setDaemon(true);
+                return thread;
+            });
+            // the timeout of an exchange that completed in time is removed at once, instead of
+            // staying queued until it would have elapsed
+            executor.setRemoveOnCancelPolicy(true);
+            return executor;
+        }
     }
 }

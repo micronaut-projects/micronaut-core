@@ -19,9 +19,8 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @ExcludeClassNamePatterns({
     "io.micronaut.http.client.tck.tests.ContinueTest", // Unsupported body type errors
     "io.micronaut.http.client.tck.tests.RawTest", // There's no raw client for the JDK client
-    "io.micronaut.http.client.tck.tests.StreamTest", // dataStreamRelease: the TCK leak detector flags the buffers the JDK client threads create
     "io.micronaut.http.client.tck.tests.DecompressionConfigTest", // Netty-specific decompression behavior; not applicable to JDK client
-    "io.micronaut.http.client.tck.tests.RedirectHeaderCopyTest", // The JDK client does not send Proxy-Authorization, and adds a Content-Type
+    "io.micronaut.http.client.tck.tests.RedirectHeaderCopyTest", // The JDK client does not send the Proxy-Authorization header to a server that is not a proxy
 })
 public class JdkHttpMethodTests {
 }
