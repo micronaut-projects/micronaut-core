@@ -23,20 +23,22 @@ import jakarta.validation.valueextraction.Unwrapping
 
 class DataclassFieldValidationSpec extends AbstractPythonTypeElementSpec {
 
-    void "dataclass field metadata uses the existing Jakarta NotBlank validator"() {
+    void "dataclass Annotated fields use the existing Jakarta NotBlank validator"() {
         given:
         def context = buildContext('''
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Annotated
+from jakarta.validation.constraints import NotBlank
 
 @dataclass
 class Contact:
-    name: str = field(metadata={"validation": {"not_blank": True}})
+    name: Annotated[str, NotBlank]
 ''', true)
         def introspection = getBeanIntrospection(context, "python.Contact")
         def validator = context.getBean(Validator)
 
         expect:
-        introspection.getRequiredProperty("name", String).hasAnnotation("jakarta.validation.constraints.NotBlank")
+        introspection.getRequiredProperty("name", String).annotationMetadata.getAnnotationValuesByType(jakarta.validation.constraints.NotBlank).size() == 1
         introspection.constructorArguments*.name == ["name"]
 
         when:
@@ -67,6 +69,8 @@ class Contact:
         def context = buildContext('''
 import dataclasses as dc
 from dataclasses import dataclass as data, field as f
+from typing import Annotated
+from jakarta.validation.constraints import NotBlank
 from micronaut.core.annotation import Introspected as Inspect
 
 @data
@@ -90,7 +94,7 @@ class Configured:
 @data
 class Defaults:
     optional: str | None = f(default=None)
-    label: str = f(default="ready", metadata={"validation": {"not_blank": True}})
+    label: Annotated[str, NotBlank()] = f(default="ready")
     tags: list[str] = f(default_factory=list)
 ''')
         def base = getBeanIntrospection(context, "python.Base")
@@ -127,25 +131,26 @@ class Defaults:
     void "constraint members are enforced by the Jakarta validators"() {
         given:
         def context = buildContext('''
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
+from typing import Annotated
+from jakarta.validation.constraints import (
+    Size, Pattern, Min, Max, DecimalMin, DecimalMax, Digits,
+    AssertTrue, AssertFalse, Email, Past, Future,
+)
 
 @dataclass
 class Options:
-    title: str = field(metadata={"validation": {
-        "size": {"min": 3, "max": 8, "message": "title size"},
-        "pattern": {"regexp": "[a-z]+", "flags": ["CASE_INSENSITIVE"], "message": "letters"}
-    }})
-    count: int = field(metadata={"validation": {"min": 0, "max": 9}})
-    price: str = field(metadata={"validation": {
-        "decimal_min": {"value": "0.10", "inclusive": False},
-        "decimal_max": "9.99", "digits": {"integer": 1, "fraction": 2}
-    }})
-    enabled: bool = field(metadata={"validation": {"assert_true": True}})
-    disabled: bool = field(metadata={"validation": {"assert_false": True}})
-    email: str = field(metadata={"validation": {"email": {"regexp": ".*@example[.]com", "flags": ["CASE_INSENSITIVE"]}}})
-    before: date = field(metadata={"validation": {"past": True}})
-    after: date = field(metadata={"validation": {"future": True}})
+    title: Annotated[str,
+        Size(min=3, max=8, message="title size"),
+        Pattern(regexp="[a-z]+", flags=[Pattern.Flag.CASE_INSENSITIVE], message="letters")]
+    count: Annotated[int, Min(0), Max(9)]
+    price: Annotated[str, DecimalMin("0.10", inclusive=False), DecimalMax("9.99"), Digits(integer=1, fraction=2)]
+    enabled: Annotated[bool, AssertTrue]
+    disabled: Annotated[bool, AssertFalse()]
+    email: Annotated[str, Email(regexp=".*@example[.]com", flags=[Pattern.Flag.CASE_INSENSITIVE])]
+    before: Annotated[date, Past]
+    after: Annotated[date, Future]
 ''', true)
         def introspection = getBeanIntrospection(context, "python.Options")
         def validator = context.getBean(Validator)
@@ -195,14 +200,15 @@ class Options:
     void "constraint groups and payload use existing annotation class values"() {
         given:
         def context = buildContext('''
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Annotated
+from java.io import Serializable
+from jakarta.validation.constraints import NotBlank
 from jakarta.validation.valueextraction import Unwrapping
 
 @dataclass
 class Grouped:
-    name: str = field(metadata={"validation": {
-        "not_blank": {"message": "selected group", "groups": ["java.io.Serializable"], "payload": [Unwrapping.Skip]}
-    }})
+    name: Annotated[str, NotBlank(message="selected group", groups=[Serializable], payload=[Unwrapping.Skip])]
 ''', true)
         def introspection = getBeanIntrospection(context, "python.Grouped")
         def validator = context.getBean(Validator)
@@ -219,24 +225,29 @@ class Grouped:
         context?.close()
     }
 
-    void "remaining built-in constraints and disabled constraints retain Jakarta behavior"() {
+    void "remaining built-in constraints and unannotated fields retain Jakarta behavior"() {
         given:
         def context = buildContext('''
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
+from typing import Annotated
+from jakarta.validation.constraints import (
+    NotNull, Null, NotEmpty, Positive, PositiveOrZero, Negative,
+    NegativeOrZero, PastOrPresent, FutureOrPresent,
+)
 
 @dataclass
 class Remaining:
-    required: str | None = field(metadata={"validation": {"not_null": True}})
-    absent: str | None = field(metadata={"validation": {"null": True}})
-    items: list[str] = field(metadata={"validation": {"not_empty": True}})
-    positive: int = field(metadata={"validation": {"positive": True}})
-    nonnegative: int = field(metadata={"validation": {"positive_or_zero": True}})
-    negative: int = field(metadata={"validation": {"negative": True}})
-    nonpositive: int = field(metadata={"validation": {"negative_or_zero": True}})
-    before: date = field(metadata={"validation": {"past_or_present": True}})
-    after: date = field(metadata={"validation": {"future_or_present": True}})
-    unchecked: str = field(default=" ", metadata={"validation": {"not_blank": False}})
+    required: Annotated[str | None, NotNull]
+    absent: Annotated[str | None, Null]
+    items: Annotated[list[str], NotEmpty]
+    positive: Annotated[int, Positive]
+    nonnegative: Annotated[int, PositiveOrZero]
+    negative: Annotated[int, Negative]
+    nonpositive: Annotated[int, NegativeOrZero]
+    before: Annotated[date, PastOrPresent]
+    after: Annotated[date, FutureOrPresent]
+    unchecked: str = " "
 ''', true)
         def introspection = getBeanIntrospection(context, "python.Remaining")
         def validator = context.getBean(Validator)
@@ -271,15 +282,18 @@ class Remaining:
     void "Valid cascades through actual generated dataclass introspections"() {
         given:
         def context = buildContext('''
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Annotated
+from jakarta.validation import Valid
+from jakarta.validation.constraints import NotBlank
 
 @dataclass
 class Address:
-    street: str = field(metadata={"validation": {"not_blank": True}})
+    street: Annotated[str, NotBlank]
 
 @dataclass
 class Person:
-    address: Address = field(metadata={"validation": {"valid": True}})
+    address: Annotated[Address, Valid]
 ''')
         def addressIntrospection = getBeanIntrospection(context, "python.Address")
         def personIntrospection = getBeanIntrospection(context, "python.Person")

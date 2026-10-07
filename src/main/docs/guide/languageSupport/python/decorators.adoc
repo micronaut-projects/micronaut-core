@@ -17,66 +17,32 @@ class OrderedTest:
 
 == Dataclass Field Validation
 
-Python dataclasses can declare validation constraints through the standard-library `field(metadata=...)` extension point, without importing constraint annotations:
+The compiler generates introspection for every Python dataclass automatically. An explicit `@Introspected(...)` is only needed to customize its configuration; introspection alone does not enable serialization or database mapping.
+
+Declare validation constraints with standard `typing.Annotated` and the existing typed markers exported by `pyronaut.validation`:
 
 [source,python]
 ----
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Annotated
+from pyronaut import validation
 
 @dataclass
 class Contact:
-    name: str = field(metadata={
-        "validation": {
-            "not_blank": True,
-            "size": {"min": 1, "max": 80, "message": "Use 1 to 80 characters"},
-        }
-    })
+    name: Annotated[str,
+        validation.NotBlank,
+        validation.Size(min=1, max=80, message="Use 1 to 80 characters")]
 ----
 
-The compiler generates introspection for Python dataclasses automatically; an explicit `@Introspected(...)` is only needed to customize its configuration. This does not add serialization or database-mapping annotations.
+Bare markers and calls without options have the same annotation meaning. Marker calls expose their supported members through the generated Python type stubs, instead of introducing a separate string-key dictionary schema. The same `Annotated[...]` syntax works for fields and method parameters, and constraints can be reused through annotated type aliases.
 
-The compiler reads literal validation metadata and supported compile-time constants; it does not execute expressions to determine annotation values. It translates the `validation` dictionary to the existing Jakarta validation metadata. Use Micronaut Validation to enforce it at validation boundaries; ordinary Python construction such as `Contact("")` does not run validation automatically. A metadata-only field remains a required constructor argument. Explicit `default` and `default_factory` values keep their dataclass meaning.
+Use Micronaut Validation to enforce constraints at validation boundaries; ordinary Python construction such as `Contact("")` does not run validation automatically. An annotated field without a default remains a required constructor argument. Explicit `default` and `default_factory` values keep their dataclass meaning. Standard-library `field(metadata=...)` remains available to other Python libraries and is not interpreted as a Micronaut validation DSL.
 
-Set a constraint to `True` to enable its defaults, or `False` to disable it. A dictionary supplies annotation options. Constraints with required options must provide them; for example, `"min": {"value": 0}`. Numeric zero is a bound, not a disabled constraint. `"assert_false": True` enables the constraint requiring a false value.
+The markers use the existing Jakarta validation constraints and their members. For example, `validation.Min(0)` supplies an inclusive minimum of zero, `validation.DecimalMin("0.01", inclusive=False)` sets an exclusive decimal bound, and `validation.AssertFalse` requires a false value. Omit a marker when no constraint is wanted.
 
-[%header,cols="2,3"]
-|===
-|Constraint keys |Additional options
+Constraint options also include `message`, `groups`, and `payload`. Regular expressions and flags retain Jakarta/Java semantics, not Python `re` semantics; use enum members such as `validation.Pattern.Flag.CASE_INSENSITIVE`. Temporal, null, and whitespace checks likewise use the existing validators, without coercing or stripping Python values.
 
-|`not_blank`, `not_empty`, `not_null`, `null`
-|None
-
-|`positive`, `positive_or_zero`, `negative`, `negative_or_zero`
-|None
-
-|`assert_true`, `assert_false`
-|None
-
-|`past`, `past_or_present`, `future`, `future_or_present`
-|None
-
-|`size`
-|`min`, `max`
-
-|`min`, `max`
-|Required integer `value`; an integer shorthand such as `"min": 0` is also supported
-
-|`decimal_min`, `decimal_max`
-|Required string `value`, optional `inclusive`; a string shorthand such as `"decimal_min": "0.01"` is also supported
-
-|`digits`
-|Required `integer` and `fraction`
-
-|`pattern`
-|Required `regexp`, optional `flags`; a string shorthand such as `"pattern": "[A-Z]+"` is also supported
-
-|`email`
-|`regexp`, `flags`
-|===
-
-Constraint options also include `message`, `groups`, and `payload`. Regular expressions and flags retain Jakarta/Java semantics, not Python `re` semantics; flag names are strings such as `"CASE_INSENSITIVE"`. Temporal, null, and whitespace checks likewise use the existing validators, without coercing or stripping Python values. Repeating a constraint with a list of member dictionaries is not supported.
-
-Use `"valid": True` for cascaded validation of an introspected nested object; `valid` has no constraint options. Unknown constraint names, unknown options, missing required options, and malformed recognized validation metadata are compilation errors. Other metadata namespaces are left alone. Method parameters continue to use `Annotated[...]` metadata.
+Use `Annotated[Address, validation.Valid]` for cascaded validation of an introspected nested object. Annotation members are read from source and supported compile-time constants, not arbitrary evaluated expressions.
 
 == Custom Annotations
 

@@ -36,26 +36,6 @@ ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 _JAVA_INT_MIN = -2 ** 31
 _JAVA_INT_MAX = 2 ** 31 - 1
 
-# Standard Jakarta field validation annotations.
-_FIELD_CONSTRAINTS = {
-    "not_blank": "NotBlank", "not_null": "NotNull", "null": "Null", "not_empty": "NotEmpty",
-    "size": "Size", "min": "Min", "max": "Max", "decimal_min": "DecimalMin", "decimal_max": "DecimalMax",
-    "positive": "Positive", "positive_or_zero": "PositiveOrZero", "negative": "Negative",
-    "negative_or_zero": "NegativeOrZero", "digits": "Digits", "pattern": "Pattern", "email": "Email",
-    "assert_true": "AssertTrue", "assert_false": "AssertFalse", "past": "Past", "past_or_present": "PastOrPresent",
-    "future": "Future", "future_or_present": "FutureOrPresent", "valid": "Valid",
-}
-_FIELD_CONSTRAINT_MEMBERS = {
-    "Size": {"min", "max"}, "Min": {"value"}, "Max": {"value"},
-    "DecimalMin": {"value", "inclusive"}, "DecimalMax": {"value", "inclusive"},
-    "Digits": {"integer", "fraction"}, "Pattern": {"regexp", "flags"}, "Email": {"regexp", "flags"},
-}
-_FIELD_CONSTRAINT_REQUIRED_MEMBERS = {
-    "Min": {"value"}, "Max": {"value"}, "DecimalMin": {"value"}, "DecimalMax": {"value"},
-    "Digits": {"integer", "fraction"}, "Pattern": {"regexp"},
-}
-
-
 class UnresolvedAnnotationMemberError(ValueError):
     """
     A decorator member value references a Java class member (Outer.NAME) that the class does not declare.
@@ -951,7 +931,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         if keyword.arg is not None:
                             keywords[keyword.arg] = keyword.value
                         else:
-                            for key, keyword_value in self._field_metadata_entries(keyword.value):
+                            for key, keyword_value in self._literal_dict_entries(keyword.value):
                                 if isinstance(key, ast.Constant) and isinstance(key.value, str):
                                     keywords[key.value] = keyword_value
                                 else:
@@ -961,10 +941,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     has_default = default is not None or factory is not None or None in keywords
                     value = literal_attribute_value(default) if default is not None else None
                     default_factory_name = self._callable_name(factory) if factory is not None else None
-                    try:
-                        decorators.extend(self._dataclass_field_validation(keywords.get("metadata")))
-                    except ValueError as error:
-                        self.unresolved_member_errors.append(str(error))
                 attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, has_default, decorators, None, is_static, None, default_factory_name)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
@@ -996,106 +972,18 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return TypeRef("set")
         return TypeRef("object")
 
-    def _dataclass_field_validation(self, metadata):
-        # Only the recognized namespace is ours: third-party metadata can be dynamic.
-        metadata = self._field_metadata_literal(metadata)
-        if not isinstance(metadata, ast.Dict):
-            return []
-        decorators = []
-        seen_validation = False
-        for namespace, validation in self._field_metadata_entries(metadata):
-            if not isinstance(namespace, ast.Constant) or namespace.value != "validation":
-                continue
-            if seen_validation:
-                raise ValueError("Duplicate dataclass field [metadata] key [validation]")
-            seen_validation = True
-            for key, options in self._field_metadata_dict(validation, "validation").items():
-                options = self._field_metadata_literal(options)
-                simple_name = _FIELD_CONSTRAINTS.get(key)
-                if simple_name is None:
-                    raise ValueError(f"Unknown dataclass field validation constraint [{key}]")
-                canonical_name = f"jakarta.validation.{'Valid' if key == 'valid' else 'constraints.' + simple_name}"
-                if isinstance(options, ast.Constant) and options.value is False:
-                    continue
-                if isinstance(options, ast.Constant) and options.value is True:
-                    member_nodes = {}
-                elif isinstance(options, ast.Dict):
-                    member_nodes = self._field_metadata_dict(options, f"validation.{key}")
-                elif isinstance(options, ast.Constant) and (
-                        (key in ("min", "max") and type(options.value) is int)
-                        or (key in ("decimal_min", "decimal_max", "pattern") and isinstance(options.value, str))):
-                    member_nodes = {"regexp" if key == "pattern" else "value": options}
-                else:
-                    raise ValueError(f"Validation [{key}] requires a boolean or member dictionary, or a supported scalar shorthand")
-                allowed = set() if key == "valid" else {"message", "groups", "payload"} | _FIELD_CONSTRAINT_MEMBERS.get(simple_name, set())
-                unknown = member_nodes.keys() - allowed
-                missing = _FIELD_CONSTRAINT_REQUIRED_MEMBERS.get(simple_name, set()) - member_nodes.keys()
-                if unknown:
-                    raise ValueError(f"Unknown member [{sorted(unknown)[0]}] of @{canonical_name}")
-                if missing:
-                    raise ValueError(f"Missing required member [{sorted(missing)[0]}] of @{canonical_name}")
-                members = {}
-                for name, member_node in member_nodes.items():
-                    if not _is_convertible_default(member_node, self):
-                        raise ValueError(f"Member [{name}] of @{canonical_name} must be a compile-time constant")
-                    value = convert_annotation_member_value(canonical_name, name, member_node, self)
-                    if isinstance(member_node, (ast.Name, ast.Attribute)) and name not in ("groups", "payload", "flags"):
-                        written_name = self._callable_name(member_node)
-                        resolved_name = self._resolved_callable_name(member_node)
-                        constant_key = _current_class_constant_key(self, written_name)
-                        known = written_name in self.local_constant_values or resolved_name in self.local_constant_values or constant_key in self.local_constant_values
-                        if not known and value in (written_name, resolved_name):
-                            raise ValueError(f"Member [{name}] of @{canonical_name} must be a compile-time constant")
-                    self._check_field_constraint_member(simple_name, name, value)
-                    members[name] = value
-                decorators.append(DecoratorDef(simple_name, canonical_name, None, members, []))
-        return decorators
-
-    def _check_field_constraint_member(self, annotation, name, value):
-        valid = value is not None
-        if name in ("min", "max", "integer", "fraction") or (name == "value" and annotation in ("Min", "Max")):
-            valid = type(value) is int
-        elif name == "inclusive":
-            valid = type(value) is bool
-        elif name in ("message", "regexp", "value"):
-            valid = isinstance(value, str)
-        elif name in ("groups", "payload", "flags"):
-            values = value if isinstance(value, (list, tuple)) else [value]
-            valid = all(isinstance(item, str) for item in values)
-            if name == "flags":
-                flags = {"UNIX_LINES", "CASE_INSENSITIVE", "COMMENTS", "MULTILINE", "DOTALL", "UNICODE_CASE", "CANON_EQ"}
-                valid = valid and all(item.rsplit(".", 1)[-1] in flags for item in values)
-        if not valid:
-            raise ValueError(f"Invalid value for member [{name}] of @{annotation}: [{value}]")
-
-    def _field_metadata_dict(self, node, description):
-        node = self._field_metadata_literal(node)
-        if not isinstance(node, ast.Dict):
-            raise ValueError(f"Dataclass field [{description}] must be a literal dictionary")
-        entries = {}
-        for key, value in zip(node.keys, node.values):
-            if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
-                raise ValueError(f"Dataclass field [{description}] requires literal string keys without dictionary expansion")
-            if key.value in entries:
-                raise ValueError(f"Duplicate dataclass field [{description}] key [{key.value}]")
-            entries[key.value] = value
-        return entries
-
-    def _field_metadata_literal(self, node):
+    def _literal_dict_entries(self, node):
+        # Resolve literal **field_options without evaluating user expressions.
         if isinstance(node, (ast.Name, ast.Attribute)):
             value = convert_ast_value(node, self)
             if isinstance(value, dict):
-                return ast.parse(repr(value), mode="eval").body
-        return node
-
-    def _field_metadata_entries(self, node):
-        node = self._field_metadata_literal(node)
+                node = ast.parse(repr(value), mode="eval").body
         if not isinstance(node, ast.Dict):
             yield None, node
             return
         for key, value in zip(node.keys, node.values):
             if key is None:
-                yield from self._field_metadata_entries(value)
+                yield from self._literal_dict_entries(value)
             else:
                 yield key, value
 
