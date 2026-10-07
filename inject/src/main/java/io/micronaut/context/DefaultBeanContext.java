@@ -28,6 +28,7 @@ import io.micronaut.context.beans.DefaultBeanDefinitionService;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -4546,12 +4547,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // an @EachProperty entry or an @EachBean member: this context makes its own delegate from its
             // configuration and beans, and the retained bean is registered under that one. No delegate here
             // means the entry was removed or the origin is gone, and the bean is destroyed like any other
-            return findBeanDefinition(delegate.asArgument(), delegate.getDeclaredQualifier())
+            BeanDefinition<T> found = findBeanDefinition(delegate.asArgument(), delegate.getDeclaredQualifier())
                 .filter(definition -> definition.isEnabled(this))
                 .orElse(null);
+            return found != null ? found : resolveNestedEntryDefinition(delegate);
         }
         BeanDefinition<T> definition = findBeanDefinitionByDefinitionClass((Class<? extends BeanDefinition<T>>) retained.getClass()).orElse(null);
         return definition != null && definition.isEnabled(this) ? definition : null;
+    }
+
+    /**
+     * This context's definition for an {@code @EachProperty} entry nested in the entry of another configuration, which
+     * a lookup finds only within the configuration path of its parent: no lookup has walked that path yet while the
+     * retained beans are adopted. The entry's delegate is made again from the path it was created under, over this
+     * context's definition, as the walk would make it, as long as this context's configuration still has the entry. It
+     * equals the delegate the walk makes later, so lookups find the adopted instance under it.
+     */
+    @Nullable
+    private <T> BeanDefinition<T> resolveNestedEntryDefinition(BeanDefinitionDelegate<T> delegate) {
+        ConfigurationPath path = delegate.getConfigurationPath().orElse(null);
+        Qualifier<T> qualifier = delegate.getDeclaredQualifier();
+        // only an entry of configuration nested in another's: an @EachBean member, or a top-level entry, is found by the
+        // lookup when its origin or its entry is still there, and is gone otherwise
+        if (path == null || qualifier == null || !path.hasDynamicSegments() || delegate.getTarget() instanceof BeanDefinitionDelegate<T>
+            || !delegate.getTarget().hasStereotype(io.micronaut.context.annotation.ConfigurationReader.class)
+            || !(this instanceof PropertyResolver resolver) || !resolver.containsProperties(path.prefix())) {
+            return null;
+        }
+        BeanDefinition<T> target = resolveAdoptedDefinition(delegate.getTarget());
+        if (target == null) {
+            return null;
+        }
+        BeanDefinitionDelegate<T> again = BeanDefinitionDelegate.create(target, qualifier, path.copy());
+        return again.isEnabled(this) ? again : null;
     }
 
     @Nullable
