@@ -37,18 +37,22 @@ class JsonChunkedDiscardTest {
                 .subscribe(new Subscriber<Object>() {
                     @Override
                     public void onSubscribe(Subscription s) {
+                        // nothing to do in this test
                     }
 
                     @Override
                     public void onNext(Object o) {
+                        // nothing to do in this test
                     }
 
                     @Override
                     public void onError(Throwable t) {
+                        // nothing to do in this test
                     }
 
                     @Override
                     public void onComplete() {
+                        // nothing to do in this test
                     }
                 });
             ByteBuf discarded = Unpooled.buffer(4).writeInt(1);
