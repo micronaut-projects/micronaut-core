@@ -115,6 +115,45 @@ class Markers:
         messages.join("\n").contains("The annotation [Header] is a default value without being called: write [Header()]")
     }
 
+    void "test an injected parameter a bridge cannot pass is reported: #description"() {
+        when:
+        buildContext(source, true)
+
+        then:
+        def e = thrown(RuntimeException)
+        def messages = []
+        for (Throwable t = e; t != null; t = t.cause) {
+            messages << String.valueOf(t.message)
+        }
+        messages.join("\n").contains(message)
+
+        where:
+        description                      | source                                                    | message
+        "a function declaring *args"     | """
+from jakarta.inject import Inject
+from micronaut.context import ApplicationContext
+from micronaut.http.annotation import Get
+
+
+@Get("/module/varargs")
+def varargs(ctx: ApplicationContext = Inject(), *args: str) -> str:
+    return str(ctx)
+"""                                                                                                         | "The parameter [ctx] of [varargs] is injected with Inject(), which a function that declares *args does not support"
+        "a static method of a class"     | """
+from jakarta.inject import Inject
+from micronaut.context import ApplicationContext
+from micronaut.http.annotation import Controller, Get
+
+
+@Controller("/markers")
+class Markers:
+    @staticmethod
+    @Get("/static")
+    def static_route(ctx: ApplicationContext = Inject()) -> str:
+        return str(ctx)
+"""                                                                                                         | "The parameter [ctx] of [static_route] is injected with Inject(), which a static or class method does not support"
+    }
+
     void "test a parameter marked Inject() receives a bean, not a request value"() {
         given:
         def context = buildContext('''
@@ -141,6 +180,34 @@ class Markers:
         expect:
         client.toBlocking().retrieve("/module/injected") == "True"
         client.toBlocking().retrieve("/markers/injected/fred") == "fred:True"
+
+        cleanup:
+        client?.close()
+        context?.close()
+    }
+
+    void "test a parameter marked Inject() receives a bean on a context-pooled controller"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Inject
+from micronaut.context import ApplicationContext
+from micronaut.context.python.scope import ContextPooled
+from micronaut.http.annotation import Controller, Get
+
+
+@ContextPooled
+@Controller("/pooled")
+class Pooled:
+    @Get("/{name}")
+    def injected(self, name: str, ctx: ApplicationContext = Inject()) -> str:
+        return name + ":" + str(ctx.isRunning())
+''', true, ["micronaut.python.pool.size": 4])
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL)
+
+        expect: "every per-context instance receives the bean the generated class holds"
+        (1..8).collect { client.toBlocking().retrieve("/pooled/fred" + it) } == (1..8).collect { "fred" + it + ":True" }
 
         cleanup:
         client?.close()

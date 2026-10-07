@@ -4603,7 +4603,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         int argumentsStart = receiverOffset == 1 ? 1 : 0;
                         for (PythonMethodElement.InjectedArgument injected : pythonMethod.injectedArguments()) {
                             int index = Math.min(argumentsStart + injected.position(), parameterExpressions.size());
-                            parameterExpressions.add(index, targetValue.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(injected.attribute())));
+                            parameterExpressions.add(index, targetValue.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(injected.attribute())));
                         }
                     }
                     ExpressionDef pythonArguments = TypeDef.OBJECT.array().instantiate(parameterExpressions);
@@ -5389,7 +5389,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return "is" + NameUtils.capitalize(name);
     }
 
-    private static String beanSetterName(String name) {
+    static String beanSetterName(String name) {
         return "set" + NameUtils.capitalize(name);
     }
 

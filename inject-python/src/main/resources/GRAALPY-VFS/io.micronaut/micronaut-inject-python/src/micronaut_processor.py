@@ -1290,6 +1290,19 @@ class MicronautAstVisitor(ast.NodeVisitor):
         into, on the class of a method or on the module of a function: the generated bridge passes the bean from it,
         the parameter being no argument of the method Micronaut sees. The name is the one PythonMethodElement uses.
         """
+        # the bridges that pass the bean cover instance methods and module functions without *args: reject the rest
+        # rather than let the function receive the marker in place of the bean
+        unsupported = None
+        if func_node.args.vararg is not None:
+            unsupported = "a function that declares *args"
+        elif self.current_class is not None and is_static_method(func_node):
+            unsupported = "a static or class method"
+        if unsupported is not None:
+            self.unresolved_member_errors.append(
+                f"The parameter [{arg.arg}] of [{func_node.name}] is injected with Inject(), which {unsupported} "
+                f"does not support: inject the bean into an attribute instead"
+            )
+            return False
         name = f"micronaut_inject_{func_node.name}_{arg.arg}"
         annotation = ast.unparse(arg.annotation) if arg.annotation is not None else ""
         attribute = JavaAttributeDef(name, annotation, type_annotation, None, False, list(markers), None, False, None)
@@ -1297,6 +1310,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             self.current_class_attributes.append(attribute)
         else:
             self.current_script_attributes.append(attribute)
+        return True
 
     def _annotation_marker_decorators(self, node):
         """
@@ -2304,13 +2318,14 @@ class MicronautAstVisitor(ast.NodeVisitor):
             has_default = i >= num_no_defaults
             # a default that calls annotations (content_type: str = Header(), q: str = NotBlank() & Size(max=50))
             # is a marker: it annotates the parameter, which has no default on the Java side
+            injected = False
             markers = self._annotation_marker_decorators(default_value) if default_value is not None else None
             if markers:
                 decorators.extend(markers)
                 default_value = None
                 has_default = False
                 if any(marker.annotationName() == 'jakarta.inject.Inject' for marker in markers):
-                    self._declare_injected_argument(func_node, arg, type_annotation, markers)
+                    injected = self._declare_injected_argument(func_node, arg, type_annotation, markers)
             if default_value is not None:
                 try:
                     # Try to evaluate the value
@@ -2321,7 +2336,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Get parameter documentation
             param_doc = param_docs.get(arg_name, None)
 
-            arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc))
+            argument = ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc)
+            arguments.append(argument.withInjected(True) if injected else argument)
 
         vararg = func_node.args.vararg
         if vararg is not None:

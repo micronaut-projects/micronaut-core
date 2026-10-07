@@ -793,8 +793,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     private static boolean isInjectedArgument(ArgumentDef argument) {
-        return !argument.variadic() && argument.decorators().stream()
-            .anyMatch(decorator -> "jakarta.inject.Inject".equals(decorator.annotationName()));
+        return argument.injected();
     }
 
     /**
