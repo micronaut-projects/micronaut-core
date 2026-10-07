@@ -51,12 +51,15 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -65,6 +68,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -88,11 +92,20 @@ import java.util.stream.Stream;
  *     or {@link RouteBuilder} bean, or the factory producing one, whose method bodies are what declares
  *     the routes. A controller method's body is not, as its route comes from its annotations, and a
  *     change of those restarts the generation.</li>
+ *     <li>the development runtime redefines, in place, a {@link LocatedRoutes} class, or a class nested in one: the
+ *     router declares the routes of a located target once per {@link LocatedRoutes} instance and keeps them, so a
+ *     located target that is itself the instance, or an instance held by the routes, would keep serving the routes its
+ *     previous code declared.</li>
  *     <li>a server filter bean, a {@link ServerFilter} or a {@link Filter} one, is destroyed, such as by
  *     {@link WatchableBeanContext#recreate(Object)}: a filter route keeps the instance it resolved first, so the table
  *     is rebuilt for the next request, whose filter routes resolve the bean anew. A module that recreates a filter
  *     needs nothing else.</li>
+ *     <li>a {@link LocatedRoutes} bean is destroyed: the locator routes that return it hold the instance that went,
+ *     and the table of its routes, so the table is rebuilt for the next request, whose locator routes, declared
+ *     again, return the current bean.</li>
  * </ul>
+ * <p>A rebuild recreates the route builders, and with them the tables of the located routes they declared: no table
+ * of a {@link LocatedRoutes} instance survives it.</p>
  * <p>A restart needs none of this: the new generation's context builds a new router from its own classes.</p>
  *
  * @author graemerocher
@@ -113,9 +126,10 @@ public final class DevRouter implements Router {
     private volatile @Nullable Router router;
     private volatile @Nullable List<Integer> defaultPorts;
     private volatile int rebuilds;
-    // how many filter beans were destroyed, other than by a rebuild, and how many the route table was built after
-    private final AtomicInteger filtersDestroyed = new AtomicInteger();
-    private volatile int filtersSeen;
+    // how many filter and located-routes beans were destroyed, other than by a rebuild, and how many the route table was
+    // built after
+    private final AtomicInteger routeBeansDestroyed = new AtomicInteger();
+    private volatile int routeBeansSeen;
     private volatile @Nullable Thread rebuilding;
 
     /**
@@ -139,17 +153,18 @@ public final class DevRouter implements Router {
      */
     public Router current() {
         Router current = router;
-        if (current != null && filtersSeen == filtersDestroyed.get()) {
+        if (current != null && routeBeansSeen == routeBeansDestroyed.get()) {
             return current;
         }
         synchronized (lock) {
             current = router;
             if (current == null) {
-                filtersSeen = filtersDestroyed.get();
+                routeBeansSeen = routeBeansDestroyed.get();
                 current = resolve();
                 router = current;
-            } else if (filtersSeen != filtersDestroyed.get()) {
-                // a filter bean was destroyed since the table was built, and its routes hold the instance that went
+            } else if (routeBeansSeen != routeBeansDestroyed.get()) {
+                // a filter or located-routes bean was destroyed since the table was built, and its routes hold the instance
+                // that went
                 rebuild();
                 current = Objects.requireNonNull(router);
             }
@@ -179,7 +194,7 @@ public final class DevRouter implements Router {
             Router previous = router;
             // the filters destroyed so far are resolved anew by the routes of a new table, as are those the rebuild destroys;
             // should no table be built, they stay pending and the next request tries again
-            int destroyed = filtersDestroyed.get();
+            int destroyed = routeBeansDestroyed.get();
             rebuilding = Thread.currentThread();
             try {
                 // the router depends on the builders: recreating one destroys the router, and the builders
@@ -192,7 +207,7 @@ public final class DevRouter implements Router {
                     watchable.recreate(previous);
                 }
                 install(resolve());
-                filtersSeen = destroyed;
+                routeBeansSeen = destroyed;
                 rebuilds++;
                 LOG.debug("Rebuilt the route table in place");
             } catch (RuntimeException e) {
@@ -201,7 +216,7 @@ public final class DevRouter implements Router {
                 // can build now, or else through the previous router, whose table is still the one it built
                 try {
                     install(resolve());
-                    filtersSeen = destroyed;
+                    routeBeansSeen = destroyed;
                 } catch (RuntimeException again) {
                     LOG.debug("No router can be built until the routes are fixed; the previous routes stay", again);
                 }
@@ -212,13 +227,14 @@ public final class DevRouter implements Router {
     }
 
     /**
-     * Called when a server filter bean of the context is destroyed, such as by {@link WatchableBeanContext#recreate(Object)}:
-     * the next request is routed by a table rebuilt then, whose filter routes resolve the bean anew. Takes no lock, as the
-     * thread destroying the bean may hold the context's.
+     * Called when a server filter bean or a {@link LocatedRoutes} bean of the context is destroyed, such as by
+     * {@link WatchableBeanContext#recreate(Object)}: the next request is routed by a table rebuilt then, whose filter routes
+     * resolve the bean anew and whose locator routes return the current one. Takes no lock, as the thread destroying the
+     * bean may hold the context's.
      */
-    void filterDestroyed() {
+    void routeBeanDestroyed() {
         if (rebuilding != Thread.currentThread()) {
-            filtersDestroyed.incrementAndGet();
+            routeBeansDestroyed.incrementAndGet();
         }
     }
 
@@ -259,6 +275,58 @@ public final class DevRouter implements Router {
                 }
             }
         }
+        for (ClassChange classChange : change.changes()) {
+            if (classChange.kind() == ClassChange.Kind.MODIFIED && declaresLocatedRoutes(classChange.className())) {
+                // the tables of located routes are kept per instance: the rebuild drops them with the builders that made them
+                rebuild();
+                return;
+            }
+        }
+    }
+
+    /**
+     * Whether a class redefined in place is a {@link LocatedRoutes}, or nested in one, such as an anonymous class or a
+     * lambda's body declaring its routes, or declares a method that declares located routes, such as a superclass whose
+     * {@code routes(LocatedHttpRouteBuilder)} a {@link LocatedRoutes} inherits. Located routes are not beans the context
+     * knows, but instances the locators of the routes return, and a located target may be one, so the class is looked at
+     * itself; it is loaded, as it was just redefined, and not initialized.
+     *
+     * @param className The name of the class
+     * @return Whether its code may declare located routes
+     */
+    private boolean declaresLocatedRoutes(String className) {
+        ClassLoader loader = context.getClassLoader();
+        String name = className;
+        while (true) {
+            try {
+                Class<?> type = Class.forName(name, false, loader);
+                if (LocatedRoutes.class.isAssignableFrom(type) || declaresLocatedRouteMethod(type)) {
+                    return true;
+                }
+            } catch (ClassNotFoundException | LinkageError e) {
+                // a class of another loader, or one that went: not one of the routes of this context
+            }
+            int nested = name.lastIndexOf('$');
+            if (nested <= name.lastIndexOf('.') + 1) {
+                return false;
+            }
+            name = name.substring(0, nested);
+        }
+    }
+
+    /**
+     * @param type A class
+     * @return Whether it declares a method receiving the builder of located routes
+     */
+    private static boolean declaresLocatedRouteMethod(Class<?> type) {
+        for (Method method : type.getDeclaredMethods()) {
+            for (Class<?> parameter : method.getParameterTypes()) {
+                if (LocatedHttpRouteBuilder.class.isAssignableFrom(parameter)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -364,6 +432,12 @@ public final class DevRouter implements Router {
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         return current().findAllClosest(request);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        // the application's router filters the routes of a located target too, before their ambiguity is resolved
+        return current().findAllClosest(request, filter);
     }
 
     @Override
@@ -525,7 +599,7 @@ public final class DevRouter implements Router {
     }
 
     /**
-     * Tells the development router that a server filter bean was destroyed. It exists only beside that router, in
+     * Tells the development router that a server filter bean or a {@link LocatedRoutes} bean was destroyed. It exists only beside that router, in
      * development mode, and looks the router up among the beans already created, never creating it.
      */
     @Internal
@@ -533,11 +607,11 @@ public final class DevRouter implements Router {
     @Requires(classes = Router.class)
     @Requires(condition = DevelopmentMode.Active.class)
     @Requires(condition = DevRouter.NoPrimaryApplicationRouter.class)
-    static final class FilterDestroyedListener implements BeanDestroyedEventListener<Object> {
+    static final class RouteBeanDestroyedListener implements BeanDestroyedEventListener<Object> {
 
         private final BeanContext context;
 
-        FilterDestroyedListener(BeanContext context) {
+        RouteBeanDestroyedListener(BeanContext context) {
             this.context = context;
         }
 
@@ -546,9 +620,11 @@ public final class DevRouter implements Router {
             BeanDefinition<Object> definition = event.getBeanDefinition();
             // the filters the route table holds: a client filter declared with @Filter is left out of it
             if (definition.hasStereotype(ServerFilter.class)
-                || (definition.hasStereotype(Filter.class) && !HttpClientFilter.class.isAssignableFrom(definition.getBeanType()))) {
+                || (definition.hasStereotype(Filter.class) && !HttpClientFilter.class.isAssignableFrom(definition.getBeanType()))
+                // the located routes the locator routes return, and the tables built from them
+                || LocatedRoutes.class.isAssignableFrom(definition.getBeanType())) {
                 for (BeanRegistration<DevRouter> registration : context.getActiveBeanRegistrations(DevRouter.class)) {
-                    registration.getBean().filterDestroyed();
+                    registration.getBean().routeBeanDestroyed();
                 }
             }
         }

@@ -6,6 +6,7 @@ import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
@@ -19,6 +20,8 @@ import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteBuilder;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -208,6 +211,33 @@ class DevRouterTest {
     }
 
     @Test
+    void aRecreatedLocatedRoutesBeanServesTheNextRequestWithNoExplicitRebuild() throws IOException {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(
+            "spec.name", "DevRouterTest",
+            "dev-router.located", true,
+            "micronaut.server.port", -1,
+            DevelopmentMode.PROPERTY, true))) {
+            EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
+            DevRouter devRouter = context.getBean(DevRouter.class);
+            ShopRoutes first = context.getBean(ShopRoutes.class);
+            // the table of the instance is built when the first shop is located, and kept for every other shop
+            assertEquals("200 a-" + first.instance, get(server, "/dev-router/shops/a/id"));
+            assertEquals("200 b-" + first.instance, get(server, "/dev-router/shops/b/id"));
+
+            // what a module does when the configuration of the located routes changes
+            assertTrue(((WatchableBeanContext) context).recreate(first));
+            ShopRoutes second = context.getBean(ShopRoutes.class);
+            assertNotSame(first, second);
+
+            // the next request is located to the routes of the new instance: no table of the previous one is left
+            assertEquals("200 a-" + second.instance, get(server, "/dev-router/shops/a/id"));
+            assertEquals("200 b-" + second.instance, get(server, "/dev-router/shops/b/id"));
+            assertEquals(1, devRouter.rebuilds());
+            assertEquals("200 static", get(server, "/dev-router/static"));
+        }
+    }
+
+    @Test
     void anApplicationThatDeclaresAPrimaryRouterKeepsIt() throws IOException {
         try (ApplicationContext context = ApplicationContext.run(Map.of(
             "spec.name", "DevRouterTest",
@@ -333,6 +363,41 @@ class DevRouterTest {
         @ResponseFilter
         void tag(MutableHttpResponse<?> response) {
             response.header("X-Filter-Instance", String.valueOf(instance));
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DevRouterTest")
+    @Requires(property = "dev-router.located")
+    @Singleton
+    static class ShopRoutes implements LocatedRoutes<String> {
+        static final AtomicInteger CREATED = new AtomicInteger();
+
+        private final int instance = CREATED.incrementAndGet();
+
+        @Override
+        public Argument<String> targetType() {
+            return Argument.STRING;
+        }
+
+        @Override
+        public void routes(LocatedHttpRouteBuilder<String> routes) {
+            routes.GET("/id").handle((request, pathVariables, shop) -> text(shop + "-" + instance));
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DevRouterTest")
+    @Requires(property = "dev-router.located")
+    @Singleton
+    static class LocatingRoutes implements HttpRoutes {
+        private final ShopRoutes shopRoutes;
+
+        LocatingRoutes(ShopRoutes shopRoutes) {
+            this.shopRoutes = shopRoutes;
+        }
+
+        @Override
+        public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
+            routes.locate("/dev-router/shops/{shop}", (request, pathVariables) -> pathVariables.get("shop", String.class), shopRoutes);
         }
     }
 

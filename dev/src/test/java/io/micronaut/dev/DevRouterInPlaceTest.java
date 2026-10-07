@@ -118,6 +118,96 @@ class DevRouterInPlaceTest {
         }
     }
 
+    @Test
+    void aBodyOnlyEditOfLocatedRoutesRebuildsTheirTableInPlace() throws Exception {
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), application());
+        Files.writeString(src.resolve("ShopRoutes.java"), shopRoutes("/id", "shop-1"));
+        // the routes hold one instance of the located routes, whose table the router keeps once a shop is located
+        Files.writeString(src.resolve("Routes.java"), """
+            package app;
+            @jakarta.inject.Singleton
+            public class Routes implements io.micronaut.web.router.builder.HttpRoutes {
+                private final ShopRoutes shops = new ShopRoutes();
+                @Override
+                public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
+                    routes.locate("/shops/{shop}", (request, variables) -> variables.get("shop", String.class), shops);
+                }
+            }
+            """);
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
+        try {
+            assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
+            DevRouter router = context.getBean(DevRouter.class);
+            awaitServer(port);
+            assertEquals("200 a shop-1", get(port, "/shops/a/id"));
+
+            // only the located routes change: the instance is the same, the code declaring its routes is not
+            Files.writeString(src.resolve("ShopRoutes.java"), shopRoutes("/moved", "shop-2"));
+            runtime.reload();
+            assertEquals(1, runtime.redefinitions());
+            assertEquals(1, runtime.generation());
+            assertSame(context, runtime.context().orElseThrow());
+            assertEquals(1, router.rebuilds());
+            assertEquals("200 a shop-2", get(port, "/shops/a/moved"));
+            assertEquals("200 b shop-2", get(port, "/shops/b/moved"));
+            assertTrue(get(port, "/shops/a/id").startsWith("404 "));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aBodyOnlyEditOfAnInheritedLocatedRoutesMethodRebuildsTheirTableInPlace() throws Exception {
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), application());
+        // the superclass declares the routes, and is not itself located routes
+        Files.writeString(src.resolve("BaseShopRoutes.java"), baseShopRoutes("/id", "base-1"));
+        Files.writeString(src.resolve("ShopRoutes.java"), """
+            package app;
+            public class ShopRoutes extends BaseShopRoutes implements io.micronaut.web.router.builder.LocatedRoutes<String> {
+            }
+            """);
+        Files.writeString(src.resolve("Routes.java"), """
+            package app;
+            @jakarta.inject.Singleton
+            public class Routes implements io.micronaut.web.router.builder.HttpRoutes {
+                private final ShopRoutes shops = new ShopRoutes();
+                @Override
+                public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
+                    routes.locate("/shops/{shop}", (request, variables) -> variables.get("shop", String.class), shops);
+                }
+            }
+            """);
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
+        try {
+            assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
+            DevRouter router = context.getBean(DevRouter.class);
+            awaitServer(port);
+            assertEquals("200 a base-1", get(port, "/shops/a/id"));
+
+            Files.writeString(src.resolve("BaseShopRoutes.java"), baseShopRoutes("/moved", "base-2"));
+            runtime.reload();
+            assertEquals(1, runtime.redefinitions());
+            assertSame(context, runtime.context().orElseThrow());
+            assertEquals(1, router.rebuilds());
+            assertEquals("200 a base-2", get(port, "/shops/a/moved"));
+            assertTrue(get(port, "/shops/a/id").startsWith("404 "));
+        } finally {
+            runtime.close();
+        }
+    }
+
     private Path manifest() throws IOException {
         Path manifestFile = project.resolve("dev.properties");
         Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
@@ -155,6 +245,38 @@ class DevRouterInPlaceTest {
                 @Override
                 public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
                     routes.GET("%s", (request, variables) -> io.micronaut.http.HttpResponse.ok("%s").contentType("text/plain"));
+                }
+            }
+            """.formatted(path, body);
+    }
+
+    private static String shopRoutes(String path, String body) {
+        return """
+            package app;
+            public class ShopRoutes implements io.micronaut.web.router.builder.LocatedRoutes<String> {
+                @Override
+                public io.micronaut.core.type.Argument<String> targetType() {
+                    return io.micronaut.core.type.Argument.STRING;
+                }
+                @Override
+                public void routes(io.micronaut.web.router.builder.LocatedHttpRouteBuilder<String> routes) {
+                    routes.GET("%s").handle((request, variables, shop) ->
+                        io.micronaut.http.HttpResponse.ok(shop + " %s").contentType("text/plain"));
+                }
+            }
+            """.formatted(path, body);
+    }
+
+    private static String baseShopRoutes(String path, String body) {
+        return """
+            package app;
+            public abstract class BaseShopRoutes {
+                public io.micronaut.core.type.Argument<String> targetType() {
+                    return io.micronaut.core.type.Argument.STRING;
+                }
+                public void routes(io.micronaut.web.router.builder.LocatedHttpRouteBuilder<String> routes) {
+                    routes.GET("%s").handle((request, variables, shop) ->
+                        io.micronaut.http.HttpResponse.ok(shop + " %s").contentType("text/plain"));
                 }
             }
             """.formatted(path, body);
