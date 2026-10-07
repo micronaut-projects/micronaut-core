@@ -65,6 +65,7 @@ class ByteBodyElementsTest {
 
         @Override
         public void complete() {
+            // the words are complete with the last piece
         }
 
         @Override

@@ -40,7 +40,7 @@ import java.util.function.Function;
 final class JsonPieceReader<T> implements PieceReader<T> {
 
     private final JsonChunkedProcessor processor;
-    private final Function<ByteBuffer<?>, T> valueReader;
+    private final Function<ByteBuffer<?>, @Nullable T> valueReader;
     /**
      * The bytes of the values the pieces read so far complete, not polled yet.
      */
@@ -52,7 +52,7 @@ final class JsonPieceReader<T> implements PieceReader<T> {
      *                    JSON to read: a stream of values, or the elements of an array
      * @param valueReader Decodes the bytes of a value, and releases them
      */
-    JsonPieceReader(JsonChunkedProcessor processor, Function<ByteBuffer<?>, T> valueReader) {
+    JsonPieceReader(JsonChunkedProcessor processor, Function<ByteBuffer<?>, @Nullable T> valueReader) {
         this.processor = processor;
         this.valueReader = valueReader;
     }
@@ -84,7 +84,7 @@ final class JsonPieceReader<T> implements PieceReader<T> {
         if (value == null) {
             return null;
         }
-        T element = JsonChunkedProcessor.readReleasing(value, valueReader);
+        @Nullable T element = JsonChunkedProcessor.<@Nullable T>readReleasing(value, valueReader);
         if (element == null) {
             // null means that no element is available: a JSON null is not an element, as the
             // reactive readers refuse it

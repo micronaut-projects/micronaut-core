@@ -99,6 +99,7 @@ import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.ElementsStages;
 import io.micronaut.http.client.BodyPieces;
 import io.micronaut.http.client.ElementsResponse;
 import io.micronaut.http.client.SubscriberBodyElements;
