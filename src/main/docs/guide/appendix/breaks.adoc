@@ -19,7 +19,7 @@ That logging system, `io.micronaut.management.endpoint.loggers.impl.LogbackLoggi
 
 === The event streams of the HTTP client follow the Server-Sent Events specification (5.3)
 
-The `eventStream` methods of api:http.client.sse.SseClient[] in the Netty client now decode the body as the https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation[event stream interpretation] of the Server-Sent Events specification, like `exchangeEventStream` and the api:http.client.sse.AsyncSseClient[]. The body is still read as an event stream whatever the content type of the response, and an error status still fails the stream. A subscriber can observe these changes:
+The `eventStream` methods of api:http.client.sse.SseClient[] in the Netty client now decode the body as the https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation[event stream interpretation] of the Server-Sent Events specification, like `exchangeEventStream` and the server-sent events of the api:http.client.AsyncStreamingHttpClient[]. The body is still read as an event stream whatever the content type of the response, and an error status still fails the stream. A subscriber can observe these changes:
 
 * A comment line, such as a `: ping` heartbeat, is ignored. Previously a comment followed by a blank line was emitted as an event with empty data.
 * The `id` of an event carries over to the events that follow it until another `id` line, as the last event id of the specification. Previously only the event with the `id` line had an id.

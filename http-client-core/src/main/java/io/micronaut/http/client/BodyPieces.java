@@ -184,7 +184,7 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
                 return;
             }
             if (length > pending.length) {
-                pending = Arrays.copyOf(pending, (int) Math.min(Math.max(length, (long) pending.length * 2), Integer.MAX_VALUE - 8));
+                pending = Arrays.copyOf(pending, (int) Math.min(Math.max(length, (long) pending.length * 2), Integer.MAX_VALUE - 8L));
             }
             System.arraycopy(bytes, from, pending, pendingLength, count);
             pendingLength = (int) length;
