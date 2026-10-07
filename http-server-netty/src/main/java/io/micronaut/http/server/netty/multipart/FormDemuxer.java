@@ -20,6 +20,7 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
@@ -31,6 +32,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.SizeLimitTracker;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -45,11 +47,13 @@ import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.util.ByteProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +68,11 @@ import java.util.Optional;
 public final class FormDemuxer implements BufferConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(FormDemuxer.class);
     private final PostBodyDecoder decoder;
+    /**
+     * Finds the close delimiter of a multipart body, {@code null} for another body.
+     */
+    @Nullable
+    private final CloseDelimiter closeDelimiter;
     private final ByteBodyFactory byteBodyFactory;
     @Nullable
     private final EventLoop eventLoop;
@@ -82,7 +91,23 @@ public final class FormDemuxer implements BufferConsumer {
     private boolean decodeFailure = false;
 
     public FormDemuxer(PostBodyDecoder decoder, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
+        this(decoder, null, channel, fieldLimits, totalLimits, byteBody);
+    }
+
+    /**
+     * @param decoder           The decoder
+     * @param multipartBoundary The boundary of a multipart body, whose close delimiter must end
+     *                          the body: a body that ends before it, e.g. a truncated upload, fails
+     *                          like a malformed body. {@code null} for a body without one, e.g.
+     *                          URL-encoded data
+     * @param channel           The channel
+     * @param fieldLimits       The limits of a field
+     * @param totalLimits       The limits of the form
+     * @param byteBody          The body
+     */
+    public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
         this.decoder = decoder;
+        this.closeDelimiter = multipartBoundary == null ? null : new CloseDelimiter(multipartBoundary);
         this.fieldLimits = fieldLimits;
         if (byteBody instanceof AvailableByteBody abb) {
             // NettyBodyAnnotationBinder triggers this branch from outside the EventLoop sometimes,
@@ -232,7 +257,11 @@ public final class FormDemuxer implements BufferConsumer {
 
         unacknowledged += rb.readable();
         try {
-            decoder.add(NettyReadBufferFactory.toByteBuf(rb));
+            ByteBuf buf = NettyReadBufferFactory.toByteBuf(rb);
+            if (closeDelimiter != null) {
+                closeDelimiter.scan(buf);
+            }
+            decoder.add(buf);
             forwardOutput();
         } catch (Exception e) {
             handleDecoderException(e);
@@ -251,6 +280,12 @@ public final class FormDemuxer implements BufferConsumer {
             return;
         }
         forwardOutput();
+        if (closeDelimiter != null && !closeDelimiter.found()) {
+            // the decoder ends the last part with the end of the input: a truncated body, or one
+            // with another closing boundary, would be read as a shorter form
+            handleDecoderException(new HttpStatusException(HttpStatus.BAD_REQUEST, "The multipart body ended before its closing boundary"));
+            return;
+        }
         eof();
     }
 
@@ -288,6 +323,69 @@ public final class FormDemuxer implements BufferConsumer {
 
     private static RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
         return new IllegalStateException("Unexpected event " + event);
+    }
+
+    /**
+     * Finds the close delimiter of a multipart body ({@code CRLF--boundary--}) in the bytes of
+     * the body as they arrive, see RFC 2046, section 5.1.1. The boundary does not occur in the
+     * content of a part, so its first occurrence ends the body; the epilogue that may follow is
+     * ignored.
+     */
+    private static final class CloseDelimiter implements ByteProcessor {
+        private final byte[] pattern;
+        /**
+         * For each length of a match, the length of the longest proper prefix of the pattern
+         * that is also a suffix of the match (Knuth-Morris-Pratt).
+         */
+        private final int[] fallback;
+        /**
+         * The length of the current match. The first delimiter of a body that has no preamble is
+         * not preceded by a line break: the body starts as if it followed one.
+         */
+        private int matched = 2;
+        private boolean found;
+
+        CloseDelimiter(String boundary) {
+            pattern = ("\r\n--" + boundary + "--").getBytes(StandardCharsets.ISO_8859_1);
+            fallback = new int[pattern.length];
+            int k = 0;
+            for (int i = 1; i < pattern.length; i++) {
+                while (k > 0 && pattern[i] != pattern[k]) {
+                    k = fallback[k - 1];
+                }
+                if (pattern[i] == pattern[k]) {
+                    k++;
+                }
+                fallback[i] = k;
+            }
+        }
+
+        boolean found() {
+            return found;
+        }
+
+        void scan(ByteBuf buf) {
+            if (!found) {
+                buf.forEachByte(this);
+            }
+        }
+
+        @Override
+        public boolean process(byte value) {
+            int m = matched;
+            while (m > 0 && pattern[m] != value) {
+                m = fallback[m - 1];
+            }
+            if (pattern[m] == value) {
+                m++;
+            }
+            if (m == pattern.length) {
+                found = true;
+                return false;
+            }
+            matched = m;
+            return true;
+        }
     }
 
     private abstract static sealed class State {

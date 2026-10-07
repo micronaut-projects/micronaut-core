@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -11,6 +12,7 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -122,6 +124,56 @@ public class FormDemuxerTest {
         assertEquals("file", field.metadata().name());
         assertEquals(MediaType.of("application/pdf"), field.metadata().mediaType());
         content(field.byteBody()).noBackpressure();
+    }
+
+    @Test
+    public void multipartCloseDelimiterSplitAcrossWrites() {
+        String boundary = "b-b";
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields().subscribe(fields.noBackpressure());
+
+        // the content repeats parts of the delimiter, and every byte arrives on its own
+        String body = "--" + boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"a\"\r\n"
+            + "\r\n"
+            + "x\r\n-b-b--\r\n--b-\r\n"
+            + "--" + boundary + "--\r\nepilogue";
+        for (char c : body.toCharArray()) {
+            write(streamingBody.sharedBuffer(), String.valueOf(c));
+        }
+        RawFormField field = fields.queue.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        streamingBody.sharedBuffer().complete();
+
+        assertEquals("x\r\n-b-b--\r\n--b-", String.join("", data.queue));
+        assertNull(fields.error);
+        assertTrue(fields.complete);
+    }
+
+    @Test
+    public void multipartWithoutCloseDelimiter() {
+        String boundary = "b-b";
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields().subscribe(fields.noBackpressure());
+
+        write(streamingBody.sharedBuffer(), "--" + boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"a\"\r\n"
+            + "\r\n"
+            + "x\r\n"
+            + "--" + boundary + "\r\n");
+        RawFormField field = fields.queue.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        streamingBody.sharedBuffer().complete();
+
+        assertEquals("x", String.join("", data.queue));
+        HttpStatusException error = assertInstanceOf(HttpStatusException.class, fields.error);
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
     }
 
     @Test

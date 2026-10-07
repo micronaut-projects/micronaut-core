@@ -41,6 +41,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -193,9 +194,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return converted;
     }
 
-    private static <T> List<T> toListNow(Flux<T> flux) {
-        var sub = new Subscriber<T>() {
-            final List<T> list = new ArrayList<>();
+    private static List<RawFormField> toListNow(Flux<RawFormField> flux) {
+        var sub = new Subscriber<RawFormField>() {
+            final List<RawFormField> list = new ArrayList<>();
             boolean complete = false;
             @Nullable
             Throwable error = null;
@@ -206,7 +207,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             }
 
             @Override
-            public void onNext(T t) {
+            public void onNext(RawFormField t) {
                 list.add(t);
             }
 
@@ -224,6 +225,17 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         flux.subscribe(sub);
         if (!sub.complete) {
             throw new IllegalStateException("Flux did not finish immediately");
+        }
+        if (sub.error != null) {
+            // the fields read before the failure are not bound
+            for (RawFormField field : sub.list) {
+                field.close();
+            }
+        }
+        if (sub.error instanceof HttpStatusException e) {
+            // a malformed form, e.g. a multipart body without its closing boundary: answered
+            // with its status
+            throw e;
         }
         if (sub.error != null) {
             throw new IllegalStateException("Failed to load form fields", sub.error);
