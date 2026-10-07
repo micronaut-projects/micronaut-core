@@ -35,6 +35,7 @@ import io.micronaut.http.sse.Event;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * The events of the response of an {@link AsyncSseClient} exchange, decoded from the body bytes
@@ -65,6 +66,29 @@ public final class EventStreams {
                                                                    MessageBodyHandlerRegistry handlerRegistry,
                                                                    Argument<B> eventType,
                                                                    long maxBufferSize) {
+        return response(response, handlerRegistry, eventType, maxBufferSize, UnaryOperator.identity());
+    }
+
+    /**
+     * The response of an exchange whose body bytes the client received: the events of an event
+     * stream, decoded as they are read, or a body of another type, decoded whole as one event.
+     * The events take over the bytes of the response.
+     *
+     * @param response        The response, with a status that is not an error
+     * @param handlerRegistry The readers of the event data
+     * @param eventType       The event data type
+     * @param maxBufferSize   The maximum size of a line, and of the data of one event
+     * @param decorate        Decorates a failure of the events like the other failures of the
+     *                        client, e.g. with its service id
+     * @param <B>             The event data type
+     * @return The response, whose body is the events
+     */
+    public static <B> HttpResponse<BodyElements<Event<B>>> response(ByteBodyHttpResponse<?> response,
+                                                                   MessageBodyHandlerRegistry handlerRegistry,
+                                                                   Argument<B> eventType,
+                                                                   long maxBufferSize,
+                                                                   UnaryOperator<HttpClientException> decorate) {
+        Function<Throwable, Throwable> wrap = error -> wrap(error, decorate);
         CloseableByteBody body = response.byteBody().move();
         try {
             MediaType contentType = response.getContentType().orElse(null);
@@ -81,11 +105,11 @@ public final class EventStreams {
                         decoded.add(Event.of(event, reader.apply(event.getData())));
                     }
                     return decoded;
-                }, EventStreams::wrap);
+                }, wrap);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
-                elements = new SingleBodyElements<>(body, dataReader(handlerRegistry, eventType, mediaType, headers));
+                elements = new SingleBodyElements<>(body, dataReader(handlerRegistry, eventType, mediaType, headers), wrap);
             }
             return ElementsResponse.of(response, elements);
         } catch (RuntimeException e) {
@@ -101,7 +125,19 @@ public final class EventStreams {
      * @return The failure of the events
      */
     static Throwable wrap(Throwable error) {
-        return error instanceof HttpClientException ? error : new HttpClientException("Error consuming Server Sent Events: " + error.getMessage(), error);
+        return wrap(error, UnaryOperator.identity());
+    }
+
+    /**
+     * The failure of the events, an {@link HttpClientException} decorated like the other failures
+     * of the client.
+     *
+     * @param error    A failure to read or decode the events
+     * @param decorate Decorates the failure, e.g. with the service id of the client
+     * @return The failure of the events
+     */
+    static Throwable wrap(Throwable error, UnaryOperator<HttpClientException> decorate) {
+        return decorate.apply(error instanceof HttpClientException hce ? hce : new HttpClientException("Error consuming Server Sent Events: " + error.getMessage(), error));
     }
 
     private static <B> Function<byte[], B> dataReader(MessageBodyHandlerRegistry handlerRegistry,
