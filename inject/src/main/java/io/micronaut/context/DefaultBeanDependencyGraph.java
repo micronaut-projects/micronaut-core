@@ -23,6 +23,7 @@ import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.qualifiers.AnyQualifier;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -254,10 +255,29 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         // a segment is pushed with the target definition while the bean being created may be one member of an
         // @EachBean or @EachProperty set: the qualifier the context resolves it under tells the members apart
         Qualifier<?> dependentQualifier = segment.getDeclaringTypeQualifier();
-        if (dependentQualifier != null && !(dependent instanceof BeanDefinitionDelegate<?>) && !(dependent instanceof RuntimeBeanDefinition<?>)) {
+        if (dependentQualifier != null
+            && !(dependent instanceof BeanDefinitionDelegate<?>)
+            && !(dependent instanceof RuntimeBeanDefinition<?>)
+            && !isDeclaredQualifier(dependent, dependentQualifier)) {
             dependent = BeanDefinitionDelegate.create((BeanDefinition<Object>) dependent, (Qualifier<Object>) dependentQualifier);
         }
         return dependent;
+    }
+
+    /**
+     * Whether a bean is resolved under its own declared qualifier, as a {@code @Named} bean is: the singleton scope
+     * registers such a bean under its definition, not under a delegate, so its edges are recorded there too. The
+     * context resolves an {@code @Any} bean and the members of an {@code @EachBean} or {@code @EachProperty} set
+     * through delegates, whatever their qualifier.
+     *
+     * @param definition The definition of the bean being created
+     * @param qualifier The qualifier the bean is resolved under
+     * @return Whether the qualifier is the definition's own
+     */
+    private static boolean isDeclaredQualifier(BeanDefinition<?> definition, Qualifier<?> qualifier) {
+        return !definition.isIterable()
+            && !AnyQualifier.INSTANCE.equals(qualifier)
+            && qualifier.equals(definition.getDeclaredQualifier());
     }
 
     private static InjectionKind kindOf(BeanResolutionContext.Segment<?, ?> segment) {
