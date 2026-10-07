@@ -123,36 +123,93 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             body = baos.toByteArray();
         }
 
-        writeAttribute(output, COMMENT_PREFIX, event.getComment());
-        writeAttribute(output, ID_PREFIX, event.getId());
-        writeAttribute(output, EVENT_PREFIX, event.getName());
+        writeComment(output, event.getComment());
+        writeAttribute(output, ID_PREFIX, withoutLineBreaks(event.getId()));
+        writeAttribute(output, EVENT_PREFIX, withoutLineBreaks(event.getName()));
         Duration retry = event.getRetry();
         if (retry != null) {
             writeAttribute(output, RETRY_PREFIX, String.valueOf(retry.toMillis()));
         }
 
-        // Write the data
-        int start = 0;
-        while (start < body.length) {
-            int end = indexOf(body, (byte) '\n', start);
-            if (end == -1) {
-                end = body.length - 1;
-            }
-            output.write(DATA_PREFIX).write(body, start, end - start + 1);
-            start = end + 1;
-        }
+        writeData(output, body);
 
-        // Write new lines for event separation
-        output.write(NEWLINE).write(NEWLINE);
+        // the empty line that ends the event
+        output.write(NEWLINE);
     }
 
-    private static int indexOf(byte[] haystack, @SuppressWarnings("SameParameterValue") byte needle, int start) {
-        for (int i = start; i < haystack.length; i++) {
-            if (haystack[i] == needle) {
-                return i;
+    /**
+     * Write the data as one {@code data} line per line of the data, split on CRLF, LF and CR like
+     * a client splits the stream: a client joins the lines with LF. Data that is empty, or that
+     * ends with a line break, ends with an empty {@code data} line, so that the client receives
+     * the event, with the data as it was.
+     *
+     * @param output The output
+     * @param body   The data
+     */
+    private static void writeData(Output output, byte[] body) {
+        int start = 0;
+        int i = 0;
+        while (i < body.length) {
+            byte b = body[i];
+            if (b == '\r' || b == '\n') {
+                output.write(DATA_PREFIX).write(body, start, i - start).write(NEWLINE);
+                if (b == '\r' && i + 1 < body.length && body[i + 1] == '\n') {
+                    i++;
+                }
+                start = i + 1;
+            }
+            i++;
+        }
+        output.write(DATA_PREFIX).write(body, start, body.length - start).write(NEWLINE);
+    }
+
+    /**
+     * Write a comment as one comment line per line of the comment, split on CRLF, LF and CR, so
+     * that no line of the comment is read as a field.
+     *
+     * @param output  The output
+     * @param comment The comment
+     */
+    private static void writeComment(Output output, @Nullable String comment) {
+        if (comment == null) {
+            return;
+        }
+        int start = 0;
+        int i = 0;
+        int length = comment.length();
+        while (i < length) {
+            char c = comment.charAt(i);
+            if (c == '\r' || c == '\n') {
+                writeAttribute(output, COMMENT_PREFIX, comment.substring(start, i));
+                if (c == '\r' && i + 1 < length && comment.charAt(i + 1) == '\n') {
+                    i++;
+                }
+                start = i + 1;
+            }
+            i++;
+        }
+        writeAttribute(output, COMMENT_PREFIX, comment.substring(start));
+    }
+
+    /**
+     * The value of a single line field: a line break would end the field, and start another
+     * field or event of the text that follows it, so the line breaks are removed.
+     *
+     * @param value The value of the id or the name of the event
+     * @return The value without CR and LF
+     */
+    private static @Nullable String withoutLineBreaks(@Nullable String value) {
+        if (value == null || (value.indexOf('\r') < 0 && value.indexOf('\n') < 0)) {
+            return value;
+        }
+        StringBuilder builder = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c != '\r' && c != '\n') {
+                builder.append(c);
             }
         }
-        return -1;
+        return builder.toString();
     }
 
     /**

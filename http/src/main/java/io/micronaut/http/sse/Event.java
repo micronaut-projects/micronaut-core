@@ -83,7 +83,8 @@ public interface Event<T> {
     Event<T> retry(@Nullable Duration duration);
 
     /**
-     * Sets the id.
+     * Sets the id. The id is a single line: the server removes the line breaks (CR and LF) when it
+     * writes the event, so that the id cannot end the field and start another one.
      *
      * @param id The id to set
      * @return The event
@@ -91,7 +92,8 @@ public interface Event<T> {
     Event<T> id(@Nullable String id);
 
     /**
-     * Sets the event name.
+     * Sets the event name. The name is a single line: the server removes the line breaks (CR and
+     * LF) when it writes the event, so that the name cannot end the field and start another one.
      *
      * @param name The event name
      * @return The event
@@ -99,7 +101,7 @@ public interface Event<T> {
     Event<T> name(@Nullable String name);
 
     /**
-     * Sets the event comment.
+     * Sets the event comment. A comment of several lines is written as one comment line per line.
      *
      * @param comment The Event comment
      * @return The event
@@ -107,7 +109,9 @@ public interface Event<T> {
     Event<T> comment(@Nullable String comment);
 
     /**
-     * Constructs a new event for the given data.
+     * Constructs a new event for the given data. The server writes the data as one {@code data}
+     * line per line of the data (lines end with CRLF, LF or CR), which a client joins with LF; an
+     * event with empty data is still written, with an empty {@code data} line.
      *
      * @param data The data
      * @param <ET> The data type
