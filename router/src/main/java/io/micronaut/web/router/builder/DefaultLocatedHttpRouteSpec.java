@@ -239,6 +239,11 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     }
 
     @Override
+    public void resources(ResourceHandler resources) {
+        route.resources(resources);
+    }
+
+    @Override
     public void handleAsync(AsyncRequestHandler handler) {
         route.handleAsync(handler);
     }

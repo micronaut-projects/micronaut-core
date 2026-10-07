@@ -152,7 +152,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
     @Override
     public HttpRouteSpec route(HttpMethod method, String uri) {
         standardMethod(method);
-        return pending(method.name(), uri, (template, handler) -> List.of(route(method, template, handler.get())));
+        return pending(method.name(), uri, (template, handler) -> List.of(route(method, template, handler.get())), method == HttpMethod.GET);
     }
 
     @Override
@@ -176,7 +176,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
                 routes.add(route(method, template, handler.get()));
             }
             return routes;
-        });
+        }, declared.size() == 1 && declared.get(0) == HttpMethod.GET);
     }
 
     @Override
@@ -186,12 +186,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         // a standard method by its canonical name, a custom one by the given name
         String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
         return pending(name, uri, (template, handler) ->
-            List.of(grouped(assembly.addRoute(name, method, template, DEFAULT_CONSUMES, handle(handler.get())).settings())));
+            List.of(grouped(assembly.addRoute(name, method, template, DEFAULT_CONSUMES, handle(handler.get())).settings())), method == HttpMethod.GET);
     }
 
     @Override
     public HttpRouteSpec any(String uri) {
-        return pending("any", uri, this::anyMethod);
+        return pending("any", uri, this::anyMethod, false);
     }
 
     /**
@@ -200,13 +200,15 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @param methods Describes the methods of the route, for the messages
      * @param uri     The URI template of the route, relative to the prefix of the builder
      * @param routes  Adds the routes of a handler, given the URI template under the prefix
+     * @param getOnly Whether the route is a route of {@code GET} only
      * @return The spec of the pending route
      */
-    private HttpRouteSpec pending(String methods, String uri, BiFunction<String, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
+    private HttpRouteSpec pending(String methods, String uri, BiFunction<String, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
+                                  boolean getOnly) {
         String template = uri(uri);
         Class<?> bean = declaringBean;
         String description = methods + " " + template + (bean == null ? "" : " declared by " + beanName(bean));
-        PendingRoute route = new PendingRoute(this, handler -> routes.apply(template, handler), description);
+        PendingRoute route = new PendingRoute(this, template, routes, description, getOnly);
         pending.add(route);
         return new DefaultHttpRouteSpec(route);
     }
