@@ -74,9 +74,37 @@ class ExecutorRetentionSpec extends Specification {
         context.close()
     }
 
-    private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
+    void "a retained scheduled executor service keeps running through the graceful shutdown of the stopping context"() {
+        given:
+        Map<String, Object> scheduled = ['micronaut.executors.retained.type': 'scheduled', 'micronaut.executors.retained.core-pool-size': '1',
+                                         'micronaut.lifecycle.graceful-shutdown.enabled': 'true']
+        ApplicationContext first = start(List.of(), scheduled)
+        ExecutorService executor = first.getBean(ExecutorHolder).executor
+
+        when:
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining { ExecutorHolder.isAssignableFrom(it.beanType) }
+
+        then: "the graceful shutdown left it running"
+        retained*.bean.any { it.is(executor) }
+        !executor.shutdown
+
+        when:
+        ApplicationContext second = start(retained, scheduled)
+
+        then:
+        second.getBean(ExecutorService, Qualifiers.byName("retained")).is(executor)
+        executor.submit({ Thread.currentThread().name } as Callable<String>).get(10, TimeUnit.SECONDS).startsWith("retained-executor")
+
+        when: "a stop that retains nothing shuts it down gracefully"
+        second.close()
+
+        then:
+        executor.shutdown
+    }
+
+    private static ApplicationContext start(Collection<BeanRegistration<?>> retained, Map<String, Object> properties = ['micronaut.executors.retained.type': 'fixed', 'micronaut.executors.retained.number-of-threads': '1']) {
         return ApplicationContext.builder()
-            .properties(['spec.name': 'ExecutorRetentionSpec', 'micronaut.executors.retained.type': 'fixed', 'micronaut.executors.retained.number-of-threads': '1'])
+            .properties(['spec.name': 'ExecutorRetentionSpec'] + properties)
             .trackBeanDependencies(true)
             .retainedRegistrations(retained)
             .start()

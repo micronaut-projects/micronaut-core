@@ -293,6 +293,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @Nullable
     private volatile RetentionCriteria retentionCriteria;
+    /**
+     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided.
+     */
+    @Nullable
+    private Set<Object> retainedOnStopBeans;
     private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
     /**
      * Retained registrations this context has no definition for, destroyed once its listeners exist.
@@ -4308,6 +4313,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             stop();
         } finally {
             retentionCriteria = null;
+            retainedOnStopBeans = null;
         }
         List<BeanRegistration<?>> retained = List.copyOf(retainedOnStop);
         retainedOnStop.clear();
@@ -5246,10 +5252,43 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The retained instances, by identity; empty when no retention is in progress
      */
     private Set<Object> retainedBeans(List<BeanRegistration> registrations) {
-        RetentionCriteria criteria = retentionCriteria;
-        if (criteria == null) {
+        if (retentionCriteria == null) {
             return Set.of();
         }
+        // decided once, over the singletons as the stop found them: a singleton created while the context stops is not
+        // retained, and what a shutdown listener asked about is what is retained
+        Set<Object> retained = retainedOnStopBeans;
+        if (retained == null) {
+            retained = decideRetainedBeans(registrations);
+            retainedOnStopBeans = retained;
+        }
+        return retained;
+    }
+
+    /**
+     * Whether the {@link #stopRetaining(RetentionCriteria)} in progress keeps the given instance alive for the context
+     * that comes next, so that what the stop shuts down, such as the graceful shutdown of the
+     * {@link io.micronaut.context.event.ShutdownEvent}, leaves it running.
+     *
+     * @param bean The instance
+     * @return True when a retention is in progress and retains it
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public boolean isRetainedOnStop(Object bean) {
+        if (retentionCriteria == null) {
+            // no retention in progress: the common stop, which asks nothing more
+            return false;
+        }
+        synchronized (this) {
+            return retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations())).contains(bean);
+        }
+    }
+
+    private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
+        RetentionCriteria criteria = Objects.requireNonNull(retentionCriteria);
         Map<Object, AtomicBoolean> beans = new IdentityHashMap<>();
         for (BeanRegistration<?> registration : registrations) {
             if (registration.bean == null || !criteria.retain(registration)) {

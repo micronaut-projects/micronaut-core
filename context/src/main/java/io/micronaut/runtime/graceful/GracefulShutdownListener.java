@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime.graceful;
 
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
@@ -26,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -61,7 +63,11 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
         }
         Duration gracePeriod = config.getGracePeriod();
         try {
-            manager.shutdownGracefully()
+            // a context stopping for a restart in development mode leaves running what it retains for the next one
+            CompletionStage<?> shutdown = event.getSource() instanceof DefaultBeanContext context
+                ? manager.shutdownGracefully(capable -> !context.isRetainedOnStop(capable))
+                : manager.shutdownGracefully();
+            shutdown
                 .toCompletableFuture()
                 .get(gracePeriod.toMillis(), TimeUnit.MILLISECONDS);
 
