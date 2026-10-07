@@ -9,6 +9,7 @@ import io.micronaut.http.annotation.Produces
 import io.micronaut.http.body.DefaultMessageBodyHandlerRegistry
 import io.micronaut.http.body.MessageBodyWriter
 import io.micronaut.http.codec.CodecException
+import io.micronaut.json.body.JsonMessageHandler
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -56,8 +57,8 @@ class CustomBodyWriterSpec extends Specification {
 
         then:
         writer.isPresent()
-        // NettyJsonHandler allows any type, since the argument is generic, so it is chosen in this case
-        writer.get() instanceof NettyJsonHandler
+        // JsonMessageHandler allows any type, since the argument is generic, so it is chosen in this case
+        writer.get() instanceof JsonMessageHandler
     }
 
     static class A {
@@ -74,7 +75,7 @@ class CustomBodyWriterSpec extends Specification {
 
     @Singleton
     @Produces(MediaType.APPLICATION_JSON)
-    // Higher than NettyJsonHandler
+    // Higher than JsonMessageHandler
     @Order(-1)
     static class ABodyWriter implements MessageBodyWriter<A> {
 

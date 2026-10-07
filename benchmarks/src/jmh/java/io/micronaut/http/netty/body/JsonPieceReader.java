@@ -35,6 +35,9 @@ import java.util.function.Function;
  * The {@link PieceReader} of JSON, without Reactive Streams: the {@link JsonChunkedProcessor}
  * splits the pieces into the bytes of the values, and a value is decoded when it is polled.
  *
+ * <p>Benchmark baseline: a copy of the Netty implementation that the readers of json-core
+ * replaced in 5.3.0, kept to compare them.</p>
+ *
  * @param <T> The type of an element
  * @author Denis Stepanov
  * @since 5.3.0

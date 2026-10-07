@@ -33,6 +33,9 @@ import java.util.function.Function;
  * Adapted from JsonContentProcessor. This class takes input data and splits it up according to the
  * {@link #counter} configuration.
  *
+ * <p>Benchmark baseline: a copy of the Netty implementation that the readers of json-core
+ * replaced in 5.3.0, kept to compare them.</p>
+ *
  * @since 4.0.0
  * @author Jonas Konrad
  */

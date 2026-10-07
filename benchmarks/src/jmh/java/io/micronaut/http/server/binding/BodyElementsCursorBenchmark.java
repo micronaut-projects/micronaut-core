@@ -10,11 +10,11 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.ByteBodyElements;
-import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport.Book;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.JsonMessageHandler;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -53,13 +53,13 @@ public class BodyElementsCursorBenchmark {
 
     private final SimpleHttpHeaders headers = new SimpleHttpHeaders();
     private final ByteBodyFactory factory = ByteBodyFactory.createDefault(NettyByteBufferFactory.DEFAULT);
-    private NettyJsonHandler<Book> handler;
+    private JsonMessageHandler<Book> handler;
     private byte[][] pieces;
     private int elements;
 
     @Setup
     public void setup() {
-        handler = new NettyJsonHandler<>(JsonMapper.createDefault());
+        handler = new JsonMessageHandler<>(JsonMapper.createDefault());
         List<String> values = PieceReaderBenchmarkSupport.values(shape);
         elements = values.size();
         pieces = PieceReaderBenchmarkSupport.pieces(PieceReaderBenchmarkSupport.array(values), 8192);

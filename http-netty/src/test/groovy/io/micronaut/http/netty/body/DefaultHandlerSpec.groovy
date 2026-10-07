@@ -15,6 +15,7 @@ import io.micronaut.http.body.MessageBodyHandler
 import io.micronaut.http.body.StringBodyReader
 import io.micronaut.http.body.TextPlainObjectBodyReader
 import io.micronaut.http.codec.CodecException
+import io.micronaut.json.body.JsonMessageHandler
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -34,14 +35,14 @@ class DefaultHandlerSpec extends Specification {
 
         then:
             writer.isPresent()
-            writer.get() instanceof NettyJsonHandler
+            writer.get() instanceof JsonMessageHandler
 
         when:
             def reader = bodyHandlerRegistry.findReader(Argument.listOf(SomeBean), MediaType.ALL_TYPE)
 
         then:
             reader.isPresent()
-            reader.get() instanceof NettyJsonHandler
+            reader.get() instanceof JsonMessageHandler
     }
 
     void "test default writer / reader for missing type"() {

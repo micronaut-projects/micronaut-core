@@ -109,7 +109,7 @@ public final class PieceReaderBenchmarkSupport {
      * @param <T>            The element type
      * @return The elements
      */
-    public static <T> Publisher<T> legacyArrayElements(NettyJsonHandler<T> handler, Argument<T> type, Headers headers, Publisher<ByteBuffer<?>> input, long maxElementSize) {
+    public static <T> Publisher<T> legacyArrayElements(JsonMessageHandler<T> handler, Argument<T> type, Headers headers, Publisher<ByteBuffer<?>> input, long maxElementSize) {
         JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         processor.counter.unwrapTopLevelArray();
         return legacyProcess(processor, Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))

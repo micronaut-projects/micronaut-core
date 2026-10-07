@@ -25,6 +25,9 @@ import io.netty.buffer.ByteBuf;
  * For example, this class can recognize the separation between the two JSON objects in
  * {@code {"foo":"bar"} {"bar":"baz"}}.<br>
  * Public for fuzzing.
+ *
+ * <p>Benchmark baseline: a copy of the Netty implementation that the readers of json-core
+ * replaced in 5.3.0, kept to compare them.</p>
  */
 @SuppressWarnings({"BooleanMethodIsAlwaysInverted", "InnerAssignment"})
 @Internal

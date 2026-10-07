@@ -37,7 +37,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The reading of streamed JSON, the elements of an array and the values of a JSON stream, by the
- * JSON handlers of json-core, without Netty, compared with the Netty processor they replace.
+ * JSON handlers of json-core, without Netty, compared with the Netty processor they replaced,
+ * {@link NettyJsonBaseline}.
  *
  * <ul>
  *     <li>{@code smallManyPieces}: 2000 elements of about 60 bytes, in pieces of 256 bytes</li>
@@ -80,8 +81,8 @@ public class JsonStreamingReadBenchmark {
     public void setup() {
         JsonMapper mapper = JsonMapper.createDefault();
         if ("netty".equals(implementation)) {
-            arrayReader = new NettyJsonHandler<>(mapper);
-            streamReader = new NettyJsonStreamHandler<>(mapper);
+            arrayReader = new NettyJsonBaseline<>(mapper, false);
+            streamReader = (MessageBodyReader<List<Book>>) (MessageBodyReader<?>) new NettyJsonBaseline<>(mapper, true);
         } else {
             arrayReader = new JsonMessageHandler<>(mapper);
             streamReader = new JsonStreamMessageHandler<>(mapper);
