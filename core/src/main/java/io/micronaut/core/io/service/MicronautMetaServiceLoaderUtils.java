@@ -77,7 +77,7 @@ public final class MicronautMetaServiceLoaderUtils {
     // What ZipFile.Source.initCEN and checkAndAddEntry (JDK 25, 27) accept: a central directory of at most
     // ArraysSupport.SOFT_MAX_ARRAY_LENGTH bytes, entries that are stored or deflated and not encrypted, and the ZIP64
     // extra block, which the scan leaves to ZipFile
-    private static final long MAX_CEN_LENGTH = Integer.MAX_VALUE - 8;
+    private static final long MAX_CEN_LENGTH = Integer.MAX_VALUE - 8L;
     private static final int STORED = 0;
     private static final int DEFLATED = 8;
     private static final int ENCRYPTED_FLAG = 1;
@@ -332,7 +332,7 @@ public final class MicronautMetaServiceLoaderUtils {
     static List<String> scanCentralDirectory(File file, byte[] prefix, byte[] buffer) {
         try (RandomAccessFile zip = new RandomAccessFile(file, "r")) {
             long size = zip.length();
-            int tailLength = (int) Math.min(size, ZIP64_LOCATOR_SIZE + END_SIZE + MAX_VARIABLE_LENGTH);
+            int tailLength = (int) Math.min(size, (long) ZIP64_LOCATOR_SIZE + END_SIZE + MAX_VARIABLE_LENGTH);
             if (tailLength < END_SIZE) {
                 return null;
             }

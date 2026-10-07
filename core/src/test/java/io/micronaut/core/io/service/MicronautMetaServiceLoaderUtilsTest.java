@@ -529,7 +529,9 @@ class MicronautMetaServiceLoaderUtilsTest {
                 case COMMENT_WITH_BYTE_FF -> entry.setComment("comment");
                 case EXTRA_BLOCK_PAST_THE_FIELD -> entry.setExtra(extraBlock(0xCAFE, 4));
                 case ZIP64_BLOCK_WITHOUT_ZIP64_VALUES -> entry.setExtra(extraBlock(0xCAFE, 8));
-                default -> { }
+                default -> {
+                    // the other headers are changed in the bytes of the written jar, below
+                }
             }
             zip.putNextEntry(entry);
             zip.closeEntry();
