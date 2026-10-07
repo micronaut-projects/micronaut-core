@@ -63,6 +63,14 @@ public sealed interface GroovyNativeElement {
     }
 
     /**
+     * The owner of a method's return type, distinct from its thrown and nested types.
+     *
+     * @param annotatedNode The method node
+     */
+    record MethodReturn(MethodNode annotatedNode) implements GroovyNativeElement {
+    }
+
+    /**
      * The parameter element.
      *
      * @param annotatedNode The parameter element.

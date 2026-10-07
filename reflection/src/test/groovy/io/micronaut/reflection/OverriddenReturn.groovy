@@ -46,4 +46,9 @@ class OverriddenReturn extends AbstractReturnDeclarer implements ReturnDeclarer 
     @Executable
     void take(@Tag("param") String value) {
     }
+
+    @Executable
+    @Tag("from-void")
+    void noValue() {
+    }
 }

@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import groovy.lang.groovydoc.Groovydoc;
 import groovy.transform.PackageScope;
+import io.micronaut.ast.groovy.annotation.GroovyElementAnnotationMetadataFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NonNull;
@@ -151,6 +152,21 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         return newClassElement(getNativeType(), type, Collections.emptyMap(), new HashSet<>(), false, false);
     }
 
+    /**
+     * Creates a type use with an explicit owner, preserving its role through generic resolution.
+     *
+     * @param owner The owner of this type use
+     * @param type The type node
+     * @param genericsSpec The resolved type arguments
+     * @return The type element
+     */
+    @NonNull
+    protected final ClassElement newClassElement(@NonNull GroovyNativeElement owner,
+                                                 @NonNull ClassNode type,
+                                                 @NonNull Map<String, ClassElement> genericsSpec) {
+        return newClassElement(owner, type, genericsSpec, new HashSet<>(), false, false);
+    }
+
     @NonNull
     private ClassElement newClassElement(@Nullable GroovyNativeElement declaredElement,
                                          AnnotatedNode genericsOwner,
@@ -218,6 +234,11 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         }
         if (ClassHelper.isPrimitiveType(classNode)) {
             PrimitiveElement primitiveElement = PrimitiveElement.valueOf(classNode.getName());
+            if (declaredElement instanceof GroovyNativeElement.MethodReturn) {
+                var typeAnnotations = ((GroovyElementAnnotationMetadataFactory) elementAnnotationMetadataFactory)
+                    .buildTypeAnnotations(new GroovyNativeElement.ClassWithOwner(classNode, declaredElement));
+                return typeAnnotations.isEmpty() ? primitiveElement : primitiveElement.withTypeAnnotationMetadata(typeAnnotations);
+            }
             if (CollectionUtils.isNotEmpty(classNode.getTypeAnnotations())) {
                 // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
                 return primitiveElement.withTypeAnnotationMetadata(
@@ -226,11 +247,14 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             }
             return primitiveElement;
         }
-        if (classNode.isEnum()) {
-            return new GroovyEnumElement(visitorContext, new GroovyNativeElement.Class(classNode), elementAnnotationMetadataFactory);
-        }
-        if (classNode.isAnnotationDefinition()) {
-            return new GroovyAnnotationElement(visitorContext, new GroovyNativeElement.Class(classNode), elementAnnotationMetadataFactory);
+        if (classNode.isEnum() || classNode.isAnnotationDefinition()) {
+            GroovyNativeElement nativeElement = declaredElement instanceof GroovyNativeElement.MethodReturn
+                ? new GroovyNativeElement.ClassWithOwner(classNode, declaredElement)
+                : new GroovyNativeElement.Class(classNode);
+            if (classNode.isEnum()) {
+                return new GroovyEnumElement(visitorContext, nativeElement, elementAnnotationMetadataFactory);
+            }
+            return new GroovyAnnotationElement(visitorContext, nativeElement, elementAnnotationMetadataFactory);
         }
         Map<String, ClassElement> newTypeArguments;
         GroovyNativeElement groovyNativeElement;
