@@ -173,10 +173,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final RoutingInBoundHandler routingHandler;
     private final boolean isDefault;
     /**
-     * Whether {@link #stop()} or a failed {@link #start()} is still stopping the application
-     * context after releasing the server's lock. Guarded by the server's lock.
+     * Completes once a stop of the application context that {@link #stop()} or a failed
+     * {@link #start()} runs after releasing the server's lock has finished. Only replaced while
+     * holding the server's lock.
      */
-    private boolean stoppingApplicationContext;
+    private volatile CompletableFuture<Void> applicationContextStopped = CompletableFuture.completedFuture(null);
     private final ApplicationContext applicationContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
@@ -319,21 +320,34 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     public NettyEmbeddedServer start() {
         ServerStartupException failure;
-        synchronized (this) {
-            awaitApplicationContextStop();
-            try {
-                startInternal();
-                return this;
-            } catch (ServerStartupException e) {
-                failure = e;
-                stoppingApplicationContext = true;
+        CompletableFuture<Void> contextStopped;
+        while (true) {
+            CompletableFuture<Void> previousStop = applicationContextStopped;
+            // let a stop of the application context by this server finish first, so that it does
+            // not undo this start. Wait without the server's lock, the context stop stops this
+            // server, which takes it
+            previousStop.join();
+            synchronized (this) {
+                if (applicationContextStopped != previousStop) {
+                    // another stop started in the meantime
+                    continue;
+                }
+                try {
+                    startInternal();
+                    return this;
+                } catch (ServerStartupException e) {
+                    failure = e;
+                    contextStopped = new CompletableFuture<>();
+                    applicationContextStopped = contextStopped;
+                }
             }
+            break;
         }
         // a listener failed to bind and the server has stopped itself. The application context
         // is stopped only now that the server's lock is released: stopping the context stops
         // this server, so a concurrent context stop would otherwise wait for the server's lock
         // while holding the context's, and this thread for the context's while holding the server's
-        stopApplicationContext();
+        stopApplicationContext(contextStopped);
         throw failure;
     }
 
@@ -408,17 +422,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public NettyEmbeddedServer stop() {
-        boolean stopped;
+        CompletableFuture<Void> contextStopped = null;
         synchronized (this) {
-            stopped = stop(false);
-            if (stopped) {
-                // only set here: the context stop calls stop() again, which must not clear the flag
-                stoppingApplicationContext = true;
+            if (stop(false)) {
+                // only replaced here: the context stop calls stop() again, which stops nothing
+                contextStopped = new CompletableFuture<>();
+                applicationContextStopped = contextStopped;
             }
         }
-        if (stopped) {
+        if (contextStopped != null) {
             // outside the server's lock, see start()
-            stopApplicationContext();
+            stopApplicationContext(contextStopped);
         }
         return this;
     }
@@ -978,8 +992,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * Stop the application context if this is the default server, then let a waiting
      * {@link #start()} proceed. This must not be called while holding the server's lock: stopping
      * the context stops this server, which takes that lock.
+     *
+     * @param contextStopped Completed once the context is stopped
      */
-    private void stopApplicationContext() {
+    private void stopApplicationContext(CompletableFuture<Void> contextStopped) {
         try {
             if (isDefault && applicationContext.isRunning()) {
                 applicationContext.stop();
@@ -989,29 +1005,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 LOG.error("Error stopping Micronaut server: {}", e.getMessage(), e);
             }
         } finally {
-            synchronized (this) {
-                stoppingApplicationContext = false;
-                notifyAll();
-            }
-        }
-    }
-
-    /**
-     * Wait, while holding the server's lock, until a stop of the application context that this
-     * server started after releasing the lock has finished, so that a start is not undone by it.
-     * Waiting releases the lock, so the context can still stop this server in the meantime.
-     */
-    private void awaitApplicationContextStop() {
-        boolean interrupted = false;
-        while (stoppingApplicationContext) {
-            try {
-                wait();
-            } catch (InterruptedException e) {
-                interrupted = true;
-            }
-        }
-        if (interrupted) {
-            Thread.currentThread().interrupt();
+            contextStopped.complete(null);
         }
     }
 
