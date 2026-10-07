@@ -30,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * Adapts publishers to {@link CompletableFuture}s without a reactive library, for the
@@ -116,6 +117,33 @@ public final class CompletionStagePublishers {
             }
         });
         return result;
+    }
+
+    /**
+     * A publisher of the value of a stage, the reverse of {@link #first(Publisher, Object)} for
+     * the publisher methods that delegate to their {@link CompletionStage} counterparts. The
+     * stage is obtained once an item is requested, the publisher emits its value, or completes
+     * without an item when the value is {@code null}, and fails with the error of the stage
+     * without the {@link CompletionException} wrapper. Cancelling the subscription cancels the
+     * stage.
+     *
+     * @param stageSupplier The supplier of the stage, called for each subscription
+     * @param <T>           The value type
+     * @return A publisher of the value of the stage
+     */
+    public static <T> Publisher<T> toPublisher(Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier) {
+        return Publishers.fromCompletableFuture(() -> {
+            CompletableFuture<? extends @Nullable T> source = stageSupplier.get().toCompletableFuture();
+            CompletableFuture<T> result = new CompletableFuture<>();
+            source.whenComplete((value, throwable) -> {
+                if (throwable != null) {
+                    result.completeExceptionally(unwrap(throwable));
+                } else {
+                    result.complete(value);
+                }
+            });
+            return cancelling(source, result);
+        });
     }
 
     /**

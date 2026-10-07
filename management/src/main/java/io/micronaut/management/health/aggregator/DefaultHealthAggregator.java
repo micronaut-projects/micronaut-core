@@ -17,6 +17,7 @@ package io.micronaut.management.health.aggregator;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
@@ -31,11 +32,13 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 /**
@@ -71,22 +74,44 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
 
     @Override
     public Publisher<HealthResult> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
-        Flux<HealthResult> results = aggregateResults(indicators);
-        Mono<HealthResult> result = results.collectList().map(list -> {
-            HealthStatus overallStatus = calculateOverallStatus(list);
-            return buildResult(overallStatus, aggregateDetails(list), healthLevelOfDetail);
-        });
-        return result.flux();
+        return CompletionStagePublishers.toPublisher(() -> aggregateAsync(indicators, healthLevelOfDetail));
     }
 
     @Override
     public Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results) {
-        Mono<HealthResult> result = Flux.from(results).collectList().map(list -> {
-            HealthStatus overallStatus = calculateOverallStatus(list);
-            Object details = aggregateDetails(list);
-            return HealthResult.builder(name, overallStatus).details(details).build();
+        return CompletionStagePublishers.toPublisher(() -> {
+            CompletableFuture<List<HealthResult>> collected = CompletionStagePublishers.collect(results);
+            return CompletionStagePublishers.cancelling(collected, collected.thenApply(list -> aggregateResult(name, list)));
         });
-        return result.flux();
+    }
+
+    /**
+     * Combines the {@link HealthIndicator#getResultAsync()} stages of the indicators, without a
+     * publisher. The first indicator that fails fails the aggregation, and cancels the others.
+     *
+     * @param indicators The health indicators to aggregate.
+     * @param healthLevelOfDetail The {@link HealthLevelOfDetail}
+     * @return A {@link CompletionStage} completed with the aggregated response
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<HealthResult> aggregateAsync(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
+        CompletableFuture<List<HealthResult>> results = aggregateResultsAsync(indicators).toCompletableFuture();
+        return CompletionStagePublishers.cancelling(results, results.thenApply(list -> {
+            HealthStatus overallStatus = calculateOverallStatus(list);
+            return buildResult(overallStatus, aggregateDetails(list), healthLevelOfDetail);
+        }));
+    }
+
+    @Override
+    public CompletionStage<HealthResult> aggregateAsync(String name, List<HealthResult> results) {
+        return CompletableFuture.completedFuture(aggregateResult(name, results));
+    }
+
+    private HealthResult aggregateResult(String name, List<HealthResult> results) {
+        HealthStatus overallStatus = calculateOverallStatus(results);
+        Object details = aggregateDetails(results);
+        return HealthResult.builder(name, overallStatus).details(details).build();
     }
 
     /**
@@ -105,13 +130,50 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
     /**
      * @param indicators An array of {@link HealthIndicator}
      * @return The aggregated results from all health indicators
+     * @deprecated No longer called: {@link #aggregate(HealthIndicator[], HealthLevelOfDetail)} and
+     * {@link #aggregateAsync(HealthIndicator[], HealthLevelOfDetail)} collect the results with
+     * {@link #aggregateResultsAsync(HealthIndicator[])}, override that method instead.
      */
+    @Deprecated(since = "5.3.0")
     protected Flux<HealthResult> aggregateResults(HealthIndicator[] indicators) {
         return Flux.merge(
             Arrays.stream(indicators)
                 .map(HealthIndicator::getResult)
                 .collect(Collectors.toList())
         );
+    }
+
+    /**
+     * Collects the {@link HealthIndicator#getResultAsync()} results of the indicators, in the
+     * order of the indicators. An indicator that completes with {@code null} contributes no
+     * result. The first indicator that fails, or that throws, fails the result with its error,
+     * and the stages of the other indicators are cancelled. Cancelling the result cancels the
+     * stages.
+     *
+     * @param indicators An array of {@link HealthIndicator}
+     * @return A {@link CompletionStage} completed with the results from all health indicators
+     * @since 5.3.0
+     */
+    protected CompletionStage<List<HealthResult>> aggregateResultsAsync(HealthIndicator[] indicators) {
+        List<CompletionStage<List<HealthResult>>> stages = new ArrayList<>(indicators.length);
+        for (HealthIndicator indicator : indicators) {
+            stages.add(resultOf(indicator));
+        }
+        return CompletionStagePublishers.concat(stages);
+    }
+
+    /**
+     * @param indicator The indicator
+     * @return The result of the indicator as a list of at most one result
+     */
+    private static CompletableFuture<List<HealthResult>> resultOf(HealthIndicator indicator) {
+        CompletableFuture<@Nullable HealthResult> result;
+        try {
+            result = indicator.getResultAsync().toCompletableFuture();
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        return CompletionStagePublishers.cancelling(result, result.thenApply(r -> r == null ? List.of() : List.of(r)));
     }
 
     /**

@@ -15,7 +15,10 @@
  */
 package io.micronaut.management.endpoint.info;
 
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import org.reactivestreams.Publisher;
+
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>Aggregates all registered info sources into a single response.</p>
@@ -34,4 +37,20 @@ public interface InfoAggregator<T> {
      * @return A {@link Publisher} of <code>T</code>
      */
     Publisher<T> aggregate(InfoSource[] sources);
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #aggregate(InfoSource[])}, which the
+     * {@link InfoEndpoint} calls. By default, it adapts the first item emitted by
+     * {@link #aggregate(InfoSource[])}, and completes with {@code null} when the publisher
+     * completes without one. Cancelling the stage cancels the subscription. An aggregator that
+     * overrides this method should combine the {@link InfoSource#getSourceAsync()} stages of the
+     * sources, so that the sources that only implement {@link InfoSource#getSource()} keep working.
+     *
+     * @param sources an array of InfoSources
+     * @return A {@link CompletionStage} completed with the aggregated <code>T</code>
+     * @since 5.3.0
+     */
+    default CompletionStage<T> aggregateAsync(InfoSource[] sources) {
+        return CompletionStagePublishers.first(aggregate(sources), null);
+    }
 }

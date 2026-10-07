@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.health;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.management.endpoint.EndpointConfiguration;
@@ -31,7 +32,6 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
 import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 import java.security.Principal;
 import java.util.Arrays;
@@ -100,16 +100,14 @@ public class HealthEndpoint {
      * Return all health indicators.
      *
      * @param principal Authenticated user
-     * @return The health information as a {@link Mono}
+     * @return The health information as a single result {@link Publisher}
      */
     @Read
     @SingleResult
     public Publisher<HealthResult> getHealth(@Nullable Principal principal) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
 
-        return Mono.from(
-            healthAggregator.aggregate(healthIndicators, detail)
-        );
+        return CompletionStagePublishers.toPublisher(() -> healthAggregator.aggregateAsync(healthIndicators, detail));
     }
 
     /**
@@ -117,7 +115,7 @@ public class HealthEndpoint {
      *
      * @param principal Authenticated user
      * @param selector HealthEndpointSelector
-     * @return The health information as a {@link Mono}
+     * @return The health information as a single result {@link Publisher}
      */
     @Read
     @SingleResult
@@ -128,9 +126,7 @@ public class HealthEndpoint {
             default -> readinessHealthIndicators;
         };
 
-        return Mono.from(
-            healthAggregator.aggregate(indicators, detail)
-        );
+        return CompletionStagePublishers.toPublisher(() -> healthAggregator.aggregateAsync(indicators, detail));
     }
 
     /**

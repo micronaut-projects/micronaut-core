@@ -18,15 +18,18 @@ package io.micronaut.management.endpoint.info.source;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 /**
@@ -63,7 +66,12 @@ public class GitInfoSource implements PropertiesInfoSource {
     @Override
     public Publisher<PropertySource> getSource() {
         Optional<PropertySource> propertySource = supplier.get();
-        return propertySource.map(Flux::just).orElse(Flux.empty());
+        return propertySource.map(Publishers::just).orElseGet(Publishers::empty);
+    }
+
+    @Override
+    public CompletionStage<@Nullable PropertySource> getSourceAsync() {
+        return CompletableFuture.completedFuture(supplier.get().orElse(null));
     }
 
     private Optional<PropertySource> retrieveGitInfo() {

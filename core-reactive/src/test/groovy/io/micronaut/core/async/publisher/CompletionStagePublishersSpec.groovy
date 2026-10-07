@@ -199,4 +199,61 @@ class CompletionStagePublishersSpec extends Specification {
         CompletionStagePublishers.unwrap(new CompletionException(error)).is(error)
         CompletionStagePublishers.unwrap(error).is(error)
     }
+
+    void 'toPublisher obtains the stage on request and emits its value'() {
+        given:
+        def calls = new AtomicInteger()
+        def publisher = CompletionStagePublishers.toPublisher {
+            calls.incrementAndGet()
+            CompletableFuture.completedFuture('value')
+        }
+
+        expect:
+        calls.get() == 0
+        Flux.from(publisher).collectList().block() == ['value']
+        calls.get() == 1
+        Flux.from(publisher).collectList().block() == ['value']
+        calls.get() == 2
+    }
+
+    void 'toPublisher completes empty for a null value'() {
+        expect:
+        Flux.from(CompletionStagePublishers.toPublisher { CompletableFuture.completedFuture(null) }).collectList().block() == []
+    }
+
+    void 'toPublisher fails with the unwrapped error of the stage'() {
+        given:
+        def error = new IllegalStateException('boom')
+        def stage = CompletableFuture.supplyAsync { throw error }
+
+        when:
+        Mono.from(CompletionStagePublishers.toPublisher { stage }).block()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.is(error)
+    }
+
+    void 'toPublisher fails when the supplier throws'() {
+        given:
+        def error = new IllegalStateException('boom')
+
+        when:
+        Mono.from(CompletionStagePublishers.toPublisher { throw error }).block()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.is(error)
+    }
+
+    void 'cancelling the toPublisher subscription cancels the stage'() {
+        given:
+        def stage = new CompletableFuture<String>()
+
+        when:
+        Mono.from(CompletionStagePublishers.toPublisher { stage }).subscribe().dispose()
+
+        then:
+        stage.cancelled
+    }
 }

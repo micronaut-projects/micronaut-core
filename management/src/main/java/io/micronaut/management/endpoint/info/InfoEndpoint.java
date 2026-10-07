@@ -16,11 +16,11 @@
 package io.micronaut.management.endpoint.info;
 
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the application.</p>
@@ -61,6 +61,6 @@ public class InfoEndpoint {
     @Read
     @SingleResult
     Publisher getInfo() {
-        return Mono.from(infoAggregator.aggregate(infoSources));
+        return CompletionStagePublishers.toPublisher(() -> infoAggregator.aggregateAsync(infoSources));
     }
 }

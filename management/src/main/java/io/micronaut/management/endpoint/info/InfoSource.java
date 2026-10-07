@@ -16,8 +16,12 @@
 package io.micronaut.management.endpoint.info;
 
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.order.Ordered;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>Describes an source of info that will be retrieved by the {@link InfoEndpoint}.</p>
@@ -31,5 +35,21 @@ public interface InfoSource extends Ordered {
      * @return A publisher that returns a {@link PropertySource} containing data to be added to the endpoint response.
      */
     Publisher<PropertySource> getSource();
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #getSource()}, which the
+     * {@link InfoAggregator} calls. By default, it adapts the first {@link PropertySource} emitted
+     * by {@link #getSource()}, and completes with {@code null} when the publisher completes
+     * without one, which the aggregator handles as an empty property source. Cancelling the
+     * stage cancels the subscription. A source that provides its property source without a
+     * publisher overrides this method; a subclass of a built-in source that overrides
+     * {@link #getSource()} should override this method too.
+     *
+     * @return A {@link CompletionStage} completed with the {@link PropertySource} containing data to be added to the endpoint response, or with {@code null} when there is none
+     * @since 5.3.0
+     */
+    default CompletionStage<@Nullable PropertySource> getSourceAsync() {
+        return CompletionStagePublishers.first(getSource(), null);
+    }
 
 }

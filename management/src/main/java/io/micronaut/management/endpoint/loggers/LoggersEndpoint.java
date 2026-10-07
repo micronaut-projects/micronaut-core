@@ -17,6 +17,7 @@ package io.micronaut.management.endpoint.loggers;
 
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.management.endpoint.EndpointConfiguration;
@@ -27,7 +28,6 @@ import io.micronaut.management.endpoint.annotation.Sensitive;
 import io.micronaut.management.endpoint.annotation.Write;
 import jakarta.validation.constraints.NotBlank;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
@@ -77,12 +77,12 @@ public class LoggersEndpoint {
     }
 
     /**
-     * @return the loggers as a {@link Mono}
+     * @return the loggers as a single result {@link Publisher}
      */
     @Read
     @SingleResult
     public Publisher<Map<String, Object>> loggers() {
-        return Mono.from(loggersManager.getLoggers(loggingSystem));
+        return CompletionStagePublishers.toPublisher(() -> loggersManager.getLoggersAsync(loggingSystem));
     }
 
     /**
@@ -92,7 +92,7 @@ public class LoggersEndpoint {
     @Read
     @SingleResult
     public Publisher<Map<String, Object>> logger(@NotBlank @Selector String name) {
-        return Mono.from(loggersManager.getLogger(loggingSystem, name));
+        return CompletionStagePublishers.toPublisher(() -> loggersManager.getLoggerAsync(loggingSystem, name));
     }
 
     /**

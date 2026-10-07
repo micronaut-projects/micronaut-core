@@ -17,7 +17,7 @@ package io.micronaut.management.health.indicator.jdbc;
 
 import io.micronaut.context.annotation.Requires;
 import org.jspecify.annotations.Nullable;
-import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.jdbc.DataSourceResolver;
@@ -29,19 +29,21 @@ import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import javax.sql.DataSource;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display information about the jdbc
@@ -81,61 +83,88 @@ public class JdbcIndicator implements HealthIndicator {
         this.healthAggregator = healthAggregator;
     }
 
-    private Publisher<HealthResult> getResult(DataSource dataSource) {
+    private CompletableFuture<List<HealthResult>> getResultAsync(DataSource dataSource) {
         if (executorService == null) {
-            throw new IllegalStateException("I/O ExecutorService is null");
+            return CompletableFuture.failedFuture(new IllegalStateException("I/O ExecutorService is null"));
         }
-        return new AsyncSingleResultPublisher<>(executorService, () -> {
-            Optional<Throwable> throwable = Optional.empty();
-            Map<String, Object> details = null;
-            String key;
-            try (Connection connection = dataSource.getConnection()) {
-                if (connection.isValid(CONNECTION_TIMEOUT)) {
-                    DatabaseMetaData metaData = connection.getMetaData();
-                    key = metaData.getURL();
-                    details = new LinkedHashMap<>(1);
-                    details.put("database", metaData.getDatabaseProductName());
-                    details.put("version", metaData.getDatabaseProductVersion());
-                } else {
-                    throw new SQLException("Connection was not valid");
-                }
-            } catch (SQLException e) {
-                throwable = Optional.of(e);
-                try {
-                    String url = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
-                    if (url.startsWith("jdbc:")) {
-                        url = url.substring(5);
-                    }
-                    url = url.replaceFirst(";", "?");
-                    url = url.replaceAll(";", "&");
-                    URI uri = new URI(url);
-                    key = uri.getHost() + ":" + uri.getPort() + uri.getPath();
-                } catch (Exception n) {
-                    key = dataSource.getClass().getName() + "@" + Integer.toHexString(dataSource.hashCode());
-                }
-            }
+        try {
+            return CompletableFuture.supplyAsync(() -> List.of(getHealthResult(dataSource)), executorService);
+        } catch (RejectedExecutionException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
 
-            HealthResult.Builder builder = HealthResult.builder(key);
-            if (throwable.isPresent()) {
-                builder.exception(throwable.get());
-                builder.status(HealthStatus.DOWN);
+    private HealthResult getHealthResult(DataSource dataSource) {
+        Optional<Throwable> throwable = Optional.empty();
+        Map<String, Object> details = null;
+        String key;
+        try (Connection connection = dataSource.getConnection()) {
+            if (connection.isValid(CONNECTION_TIMEOUT)) {
+                DatabaseMetaData metaData = connection.getMetaData();
+                key = metaData.getURL();
+                details = new LinkedHashMap<>(1);
+                details.put("database", metaData.getDatabaseProductName());
+                details.put("version", metaData.getDatabaseProductVersion());
             } else {
-                builder.status(HealthStatus.UP);
-                builder.details(details);
+                throw new SQLException("Connection was not valid");
             }
-            return builder.build();
-        });
+        } catch (SQLException e) {
+            throwable = Optional.of(e);
+            try {
+                String url = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
+                if (url.startsWith("jdbc:")) {
+                    url = url.substring(5);
+                }
+                url = url.replaceFirst(";", "?");
+                url = url.replaceAll(";", "&");
+                URI uri = new URI(url);
+                key = uri.getHost() + ":" + uri.getPort() + uri.getPath();
+            } catch (Exception n) {
+                key = dataSource.getClass().getName() + "@" + Integer.toHexString(dataSource.hashCode());
+            }
+        }
+
+        HealthResult.Builder builder = HealthResult.builder(key);
+        if (throwable.isPresent()) {
+            builder.exception(throwable.get());
+            builder.status(HealthStatus.DOWN);
+        } else {
+            builder.status(HealthStatus.UP);
+            builder.details(details);
+        }
+        return builder.build();
     }
 
     @Override
     public Publisher<HealthResult> getResult() {
+        return CompletionStagePublishers.toPublisher(this::getResultAsync);
+    }
+
+    /**
+     * Checks each data source on the blocking executor, and aggregates the results with
+     * {@link HealthAggregator#aggregateAsync(String, List)}, without a publisher. Completes with
+     * {@code null} when there is no data source.
+     *
+     * @return A {@link CompletionStage} completed with the aggregated {@link HealthResult}
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable HealthResult> getResultAsync() {
         if (dataSources.length == 0) {
-            return Flux.empty();
+            return CompletableFuture.completedFuture(null);
         }
-        return healthAggregator.aggregate(NAME, Flux.merge(
-            Arrays.stream(dataSources)
-                .map(dataSourceResolver::resolve)
-                .map(this::getResult).collect(Collectors.toList())
-        ));
+        List<CompletionStage<List<HealthResult>>> stages = new ArrayList<>(dataSources.length);
+        for (DataSource dataSource : dataSources) {
+            DataSource resolved;
+            try {
+                resolved = dataSourceResolver.resolve(dataSource);
+            } catch (Exception e) {
+                stages.add(CompletableFuture.failedFuture(e));
+                continue;
+            }
+            stages.add(getResultAsync(resolved));
+        }
+        CompletableFuture<List<HealthResult>> results = CompletionStagePublishers.concat(stages);
+        return CompletionStagePublishers.cancelling(results, results.thenCompose(list -> healthAggregator.aggregateAsync(NAME, list)));
     }
 }

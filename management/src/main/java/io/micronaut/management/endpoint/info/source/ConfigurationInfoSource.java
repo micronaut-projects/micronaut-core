@@ -19,16 +19,19 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
 import io.micronaut.runtime.context.scope.Refreshable;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 /**
@@ -55,7 +58,12 @@ public class ConfigurationInfoSource implements InfoSource {
 
     @Override
     public Publisher<PropertySource> getSource() {
-        return Flux.just(supplier.get());
+        return Publishers.just(supplier.get());
+    }
+
+    @Override
+    public CompletionStage<@Nullable PropertySource> getSourceAsync() {
+        return CompletableFuture.completedFuture(supplier.get());
     }
 
     private MapPropertySource retrieveConfigurationInfo() {

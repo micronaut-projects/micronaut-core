@@ -26,12 +26,15 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display available load balancer URLs.
@@ -69,6 +72,15 @@ public class ServiceHttpClientHealthIndicator implements HealthIndicator {
         }
 
         return Publishers.just(determineServiceHealth());
+    }
+
+    @Override
+    public CompletionStage<@Nullable HealthResult> getResultAsync() {
+        if (!configuration.isHealthCheck()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        return CompletableFuture.completedFuture(determineServiceHealth());
     }
 
     private HealthResult determineServiceHealth() {
