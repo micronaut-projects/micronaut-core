@@ -40,13 +40,16 @@ import io.netty.util.concurrent.ThreadPerTaskExecutor;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -74,6 +77,11 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     private final List<TaskQueueInterceptor> taskQueueInterceptors;
 
     /**
+     * The groups that outlive this registry, development mode's, when this registry was handed any.
+     */
+    private volatile @Nullable RetainedEventLoopGroups retainedGroups;
+
+    /**
      * Default constructor.
      *
      * @param eventLoopGroupFactory The event loop group factory
@@ -93,7 +101,12 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
      */
     @PreDestroy
     void shutdown() {
+        RetainedEventLoopGroups retained = retainedGroups;
+        Set<EventLoopGroup> leftRunning = retained == null ? Set.of() : retained.release(new ArrayList<>(eventLoopGroups.keySet()));
         eventLoopGroups.forEach((eventLoopGroup, configuration) -> {
+            if (leftRunning.contains(eventLoopGroup)) {
+                return;
+            }
             try {
                 long quietPeriod = configuration.getShutdownQuietPeriod().toMillis();
                 long timeout = configuration.getShutdownTimeout().toMillis();
@@ -108,6 +121,30 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     }
 
     private EventLoopGroup createGroup(EventLoopGroupConfiguration configuration, String name, Executor executor) {
+        return createGroup(configuration, name, executor, false);
+    }
+
+    /**
+     * @param frameworkThreads Whether the group runs on the framework's own threads, rather than on those of an
+     * executor or thread factory bean, which may not outlive the context that created them
+     */
+    private EventLoopGroup createGroup(EventLoopGroupConfiguration configuration, String name, Executor executor, boolean frameworkThreads) {
+        if (frameworkThreads && !configuration.isLoomCarrier() && taskQueueInterceptors.isEmpty()) {
+            RetainedEventLoopGroups retained = beanLocator.findBean(RetainedEventLoopGroups.class).orElse(null);
+            if (retained != null) {
+                // development mode keeps the group across generations; what runs on it is each generation's own
+                retainedGroups = retained;
+                EventLoopGroup eventLoopGroup = retained.eventLoopGroup(name, configuration, eventLoopGroupFactory, () -> newGroup(configuration, name, executor));
+                eventLoopGroups.put(eventLoopGroup, configuration);
+                return eventLoopGroup;
+            }
+        }
+        EventLoopGroup eventLoopGroup = newGroup(configuration, name, executor);
+        eventLoopGroups.put(eventLoopGroup, configuration);
+        return eventLoopGroup;
+    }
+
+    private EventLoopGroup newGroup(EventLoopGroupConfiguration configuration, String name, Executor executor) {
         IoHandlerFactory ioHandlerFactory = eventLoopGroupFactory.createIoHandlerFactory(configuration);
         int nThreads = numThreads(configuration);
         EventLoopGroup eventLoopGroup;
@@ -132,7 +169,6 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
                 }
             };
         }
-        eventLoopGroups.put(eventLoopGroup, configuration);
         return eventLoopGroup;
     }
 
@@ -147,20 +183,18 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @BootstrapContextCompatible
     protected EventLoopGroup eventLoopGroup(EventLoopGroupConfiguration configuration) {
         String executorName = configuration.getExecutorName().orElse(null);
-        Executor executor;
         if (executorName != null) {
-            executor = beanLocator.findBean(Executor.class, Qualifiers.byName(executorName))
+            Executor executor = beanLocator.findBean(Executor.class, Qualifiers.byName(executorName))
                 .orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executorName));
-        } else {
-            ThreadFactory threadFactory = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()))
-                    .orElseGet(() ->  new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class)));
-            if (threadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory custom) {
-                threadFactory = custom.customizeForEventLoop();
-            }
-            executor = new ThreadPerTaskExecutor(threadFactory);
+            return createGroup(configuration, configuration.getName(), executor);
         }
-
-        return createGroup(configuration, configuration.getName(), executor);
+        ThreadFactory named = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName())).orElse(null);
+        ThreadFactory threadFactory = named != null ? named
+            : new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class));
+        if (threadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory custom) {
+            threadFactory = custom.customizeForEventLoop();
+        }
+        return createGroup(configuration, configuration.getName(), new ThreadPerTaskExecutor(threadFactory), named == null);
     }
 
     /**
@@ -175,10 +209,12 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @BootstrapContextCompatible
     @Bean(typed = { EventLoopGroup.class })
     protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
+        // the framework's thread factory, whose settings are the netty configuration's, rather than one of the application's
+        boolean frameworkThreads = threadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory;
         if (threadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory custom) {
             threadFactory = custom.customizeForEventLoop();
         }
-        return createGroup(new DefaultEventLoopGroupConfiguration(), EventLoopGroupConfiguration.DEFAULT, new ThreadPerTaskExecutor(threadFactory));
+        return createGroup(new DefaultEventLoopGroupConfiguration(), EventLoopGroupConfiguration.DEFAULT, new ThreadPerTaskExecutor(threadFactory), frameworkThreads);
     }
 
     @Override
