@@ -254,6 +254,13 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                     }
                     return;
                 }
+                synchronized (this) {
+                    if (cancelled) {
+                        // cancelled while the array was read: it is not delivered
+                        reading = false;
+                        break;
+                    }
+                }
                 if (s != null) {
                     s.onNext(bytes);
                 }
