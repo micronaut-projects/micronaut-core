@@ -29,6 +29,9 @@ dependencies {
     testImplementation(libs.jazzer.junit)
     testImplementation(libs.jazzer.api)
     testImplementation(libs.junit.jupiter.params)
+    // an independent parser of server-sent events, the oracle of the event stream writer
+    testImplementation(libs.okhttp.sse)
+    testImplementation(libs.okio)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group= "io.micronaut")
     }

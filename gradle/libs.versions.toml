@@ -55,6 +55,7 @@ native-gradle-plugin = "0.11.4"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
 okio = "3.18.2"
+okhttp = "4.12.0"
 slf4j = "2.0.17"
 smallrye = "6.9.2"
 spock = "2.4-groovy-5.0"
@@ -299,6 +300,7 @@ netty-tcnative = { module = 'io.netty:netty-tcnative' }
 netty-tcnative-boringssl = { module = 'io.netty:netty-tcnative-boringssl-static' }
 
 okio = { module = "com.squareup.okio:okio", version.ref="okio" }
+okhttp-sse = { module = "com.squareup.okhttp3:okhttp-sse", version.ref = "okhttp" }
 
 selenium-remote-driver = { module = "org.seleniumhq.selenium:selenium-remote-driver", version.ref = "selenium" }
 selenium-api = { module = "org.seleniumhq.selenium:selenium-api", version.ref = "selenium" }
