@@ -29,6 +29,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.ArrayDeque;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -173,7 +174,9 @@ public final class PieceReaders {
             try (piece) {
                 buffer = piece.toByteBuffer();
             }
-            return reader.apply(buffer);
+            // null means that no element is available: a piece read as null is refused, as
+            // Flux.map refuses it
+            return Objects.requireNonNull(reader.apply(buffer), "The reader of a piece returned null");
         }
 
         @Override

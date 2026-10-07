@@ -1,5 +1,6 @@
 package io.micronaut.http.netty.body;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
@@ -9,9 +10,13 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonSyntaxException;
+import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Signal;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 
@@ -54,6 +59,28 @@ class JsonBodyElementsTest {
             CompletionException failure = assertThrows(CompletionException.class, () -> next(elements));
             assertInstanceOf(JsonSyntaxException.class, failure.getCause());
         }
+    }
+
+    @Test
+    void theReactiveReaderEmitsTheValuesBeforeAMalformedValueThenFails() {
+        List<Signal<Integer>> signals = Flux.from(new NettyJsonHandler<Integer>(MAPPER).readChunked(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE,
+                new SimpleHttpHeaders(), Flux.just(NettyByteBufferFactory.DEFAULT.wrap(Unpooled.copiedBuffer("[1,2,}", StandardCharsets.UTF_8))), 1024))
+            .materialize()
+            .collectList()
+            .block();
+        assertEquals(List.of(1, 2), signals.stream().filter(Signal::isOnNext).map(Signal::get).toList());
+        assertInstanceOf(JsonSyntaxException.class, signals.getLast().getThrowable());
+    }
+
+    @Test
+    void theReactiveReaderFailsOnANullElement() {
+        List<Signal<Integer>> signals = Flux.from(new NettyJsonHandler<Integer>(MAPPER).readChunked(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE,
+                new SimpleHttpHeaders(), Flux.just(NettyByteBufferFactory.DEFAULT.wrap(Unpooled.copiedBuffer("[1,null,2]", StandardCharsets.UTF_8))), 1024))
+            .materialize()
+            .collectList()
+            .block();
+        assertEquals(List.of(1), signals.stream().filter(Signal::isOnNext).map(Signal::get).toList());
+        assertInstanceOf(CodecException.class, signals.getLast().getThrowable());
     }
 
     private static ByteBodyElements<Integer> elements(String json) {
