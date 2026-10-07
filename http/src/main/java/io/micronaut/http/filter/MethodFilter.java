@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -163,6 +164,7 @@ record MethodFilter<T>(FilterOrder order,
         boolean filtersException = false;
         ContinuationCreator continuationCreator = null;
         boolean reactiveContinuation = false;
+        String resultContinuationType = null;
         int mutableRequestIndex = -1;
         int[] bodyIndexes = null;
         for (int i = 0; i < arguments.length; i++) {
@@ -220,10 +222,12 @@ record MethodFilter<T>(FilterOrder order,
                     } else {
                         continuationCreator = ExecutionFlowContinuationImpl::new;
                     }
+                    resultContinuationType = "ExecutionFlow";
                     fulfilled[i] = ctx -> ctx.continuation;
                 } else if (continuationReturnType.isAsync() && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     // CompletionStage or CompletableFuture: the method result is handled like any other
                     continuationCreator = CompletionStageContinuationImpl::new;
+                    resultContinuationType = continuationReturnType.getType() == CompletableFuture.class ? "CompletableFuture" : "CompletionStage";
                     fulfilled[i] = ctx -> ctx.continuation;
                 } else if (isReactive(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     if (isReactive(returnType)) {
@@ -294,6 +298,11 @@ record MethodFilter<T>(FilterOrder order,
                 }
             }
         }
+        if (resultContinuationType != null && returnType.isVoid()) {
+            // the filter result is the response: a void method would complete the filter before
+            // the downstream produced it
+            throw new IllegalArgumentException(voidResultContinuationMessage(resultContinuationType));
+        }
         if (skipOnError) {
             filterCondition = filterCondition.and(ctx -> ctx.failure == null);
         } else if (filterCondition == FILTER_CONDITION_ALWAYS_TRUE) {
@@ -318,6 +327,18 @@ record MethodFilter<T>(FilterOrder order,
             isResponseFilter || continuationCreator != null ? -1 : mutableRequestIndex,
             bodyIndexes
         );
+    }
+
+    /**
+     * The message for a {@code void} filter method with a continuation that produces the response
+     * later, the same as the compile-time check of the filter.
+     *
+     * @param continuationType The simple name of the type the continuation produces
+     * @return The message
+     */
+    private static String voidResultContinuationMessage(String continuationType) {
+        return "A filter method with a FilterContinuation<" + continuationType + "<HttpResponse<?>>> must return the response, e.g. as "
+            + continuationType + "<HttpResponse<?>>: a void method completes before the downstream produced the response";
     }
 
     private static int[] append(int[] indexes, int index) {
@@ -1110,10 +1131,18 @@ record MethodFilter<T>(FilterOrder order,
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
             }
-            return downstreamFlow.<HttpResponse<?>>map(newFilterContext -> {
+            ExecutionFlow<HttpResponse<?>> responseFlow = downstreamFlow.map(newFilterContext -> {
                 filterContext = newFilterContext;
                 return Objects.requireNonNull(newFilterContext.response(), RESPONSE_MISSING_MESSAGE);
-            }).toCompletableFuture();
+            });
+            CompletableFuture<HttpResponse<?>> future = responseFlow.toCompletableFuture();
+            // cancelling the future is a hint to the downstream that the response is not needed
+            future.whenComplete((response, error) -> {
+                if (error instanceof CancellationException) {
+                    responseFlow.cancel();
+                }
+            });
+            return future;
         }
 
         @Override

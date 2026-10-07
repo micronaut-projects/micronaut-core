@@ -24,6 +24,7 @@ import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.client.tck.tests.ClientDisabledCondition;
 import io.micronaut.http.filter.FilterContinuation;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -82,6 +83,27 @@ public class ClientRequestFilterCompletionStageTest {
             .run();
     }
 
+    @Test
+    @ClientDisabledCondition.ClientDisabled(httpClient = ClientDisabledCondition.JDK) // the JDK client sends the request it was given, not the one a filter replaced
+    public void requestFilterContinuationCompletableFutureReplacesRequest() throws IOException {
+        // the replacement is another request, with another path: ignoring it would request a path
+        // that no route matches
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/client-completion-stage/replace"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/client-completion-stage/replaced replacement")
+                    .build());
+                Assertions.assertEquals(
+                    List.of("replace 200"),
+                    server.getApplicationContext().getBean(StageClientFilter.class).events
+                );
+            })
+            .run();
+    }
+
     @ClientFilter
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -107,6 +129,17 @@ public class ClientRequestFilterCompletionStageTest {
                     return response;
                 });
         }
+
+        @RequestFilter("/client-completion-stage/replace")
+        public CompletableFuture<HttpResponse<?>> replace(HttpRequest<?> request, FilterContinuation<CompletableFuture<HttpResponse<?>>> continuation) {
+            // another request to the same server
+            return continuation.request(HttpRequest.GET(request.getUri().resolve("/client-completion-stage/replaced")).header("foo", "replacement"))
+                .proceed()
+                .thenApply(response -> {
+                    events.add("replace " + response.code());
+                    return response;
+                });
+        }
     }
 
     @Controller("/client-completion-stage")
@@ -120,6 +153,11 @@ public class ClientRequestFilterCompletionStageTest {
         @Get("/future")
         public String future(HttpRequest<?> request) {
             return request.getHeaders().get("foo");
+        }
+
+        @Get("/replaced")
+        public String replaced(HttpRequest<?> request) {
+            return request.getPath() + " " + request.getHeaders().get("foo");
         }
     }
 }

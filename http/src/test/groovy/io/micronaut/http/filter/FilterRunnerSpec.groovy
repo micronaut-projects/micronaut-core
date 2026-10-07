@@ -6,6 +6,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.async.propagation.ReactorPropagation
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.execution.CompletableFutureExecutionFlow
+import io.micronaut.core.execution.DelayedExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.core.execution.ImperativeExecutionFlow
 import io.micronaut.core.propagation.PropagatedContext
@@ -28,6 +29,7 @@ import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.time.Duration
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
@@ -1416,6 +1418,59 @@ class FilterRunnerSpec extends Specification {
         then:
         result != null
         result.value == resp1
+    }
+
+    def 'a void method with a continuation that produces the response later is rejected'(Class<?> continuationType) {
+        when:
+        before(ReturnType.of(void), [Argument.of(FilterContinuation, continuationType)]) { FilterContinuation<?> continuation ->
+            continuation.proceed()
+        }
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains("A filter method with a FilterContinuation<" + continuationType.simpleName + "<HttpResponse<?>>> must return the response")
+
+        where:
+        continuationType << [ExecutionFlow, CompletionStage, CompletableFuture]
+    }
+
+    def 'a void method with a blocking or reactive continuation is accepted'(Argument<?> continuation) {
+        when:
+        def filter = before(ReturnType.of(void), [continuation]) { FilterContinuation<?> c -> }
+
+        then:
+        filter != null
+
+        where:
+        continuation << [Argument.of(FilterContinuation, HttpResponse), Argument.of(FilterContinuation, Publisher)]
+    }
+
+    def 'cancelling the future of a completion stage continuation cancels the downstream'() {
+        given:
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        boolean downstreamCancelled = false
+        downstream.onCancel { downstreamCancelled = true }
+        CompletableFuture<HttpResponse<?>> proceeded = null
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletableFuture)]) { FilterContinuation<CompletableFuture<HttpResponse<?>>> continuation ->
+                    proceeded = continuation.proceed()
+                    proceeded
+                }
+        ]
+
+        when:
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET("/"))
+        then:
+        proceeded != null
+        !proceeded.isDone()
+        !downstreamCancelled
+
+        when:
+        proceeded.cancel(false)
+        then:
+        downstreamCancelled
+        downstream.isCancelled()
+        result.tryCompleteError() instanceof CancellationException
     }
 
     def 'elements dropped by a response filter are closed by the runner'() {

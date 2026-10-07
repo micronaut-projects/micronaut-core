@@ -33,7 +33,12 @@ import io.micronaut.http.HttpRequest;
  * {@code FilterContinuation<Publisher<HttpResponse<?>>>}). With a stage, {@link #proceed()} will
  * not block, starts the downstream processing, and returns a stage that completes with its result.
  * With a reactive wrapper, {@link #proceed()} will not block, and downstream processing will
- * happen asynchronously (after the reactive stream is subscribed to).
+ * happen asynchronously (after the reactive stream is subscribed to).<br>
+ * A filter method with a {@link java.util.concurrent.CompletionStage} or an
+ * {@link io.micronaut.core.execution.ExecutionFlow} continuation must return the response (e.g. as a
+ * {@code CompletionStage<HttpResponse<?>>}), a {@code void} method is rejected. Cancelling the
+ * stage returned by {@link #proceed()} is a hint to the downstream that the response is no longer
+ * needed.
  *
  * @param <R> The type to return in {@link #proceed()}
  */
