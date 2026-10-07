@@ -17,6 +17,8 @@ package io.micronaut.http.client;
 
 import org.jspecify.annotations.Nullable;
 
+import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 
 /**
@@ -48,4 +50,38 @@ public interface ProxyHttpClientFactory {
      */
     ProxyHttpClient createProxyClient(@Nullable URL url, HttpClientConfiguration configuration);
 
+    /**
+     * Create a new {@link AsyncProxyHttpClient}. Note that this method should only be used
+     * outside the context of an application. Within Micronaut use {@link jakarta.inject.Inject}
+     * to inject a client instead
+     *
+     * @param url The base URL
+     * @return The client
+     * @since 5.3.0
+     */
+    default AsyncProxyHttpClient createAsyncProxyClient(@Nullable URI url) {
+        return createProxyClient(toUrl(url)).toAsyncProxy();
+    }
+
+    /**
+     * Create a new {@link AsyncProxyHttpClient} with the specified configuration. Note that this
+     * method should only be used outside the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url           The base URL
+     * @param configuration The client configuration
+     * @return The client
+     * @since 5.3.0
+     */
+    default AsyncProxyHttpClient createAsyncProxyClient(@Nullable URI url, HttpClientConfiguration configuration) {
+        return createProxyClient(toUrl(url), configuration).toAsyncProxy();
+    }
+
+    private static @Nullable URL toUrl(@Nullable URI uri) {
+        try {
+            return uri == null ? null : uri.toURL();
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
 }

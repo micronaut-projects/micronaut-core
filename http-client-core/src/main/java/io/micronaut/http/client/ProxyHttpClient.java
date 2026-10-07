@@ -57,6 +57,18 @@ public interface ProxyHttpClient {
     }
 
     /**
+     * The client whose responses complete a {@link java.util.concurrent.CompletionStage} instead
+     * of being emitted by a publisher. The default implementation adapts the reactive
+     * {@code proxy} methods.
+     *
+     * @return An {@link AsyncProxyHttpClient} backed by this client
+     * @since 5.3.0
+     */
+    default AsyncProxyHttpClient toAsyncProxy() {
+        return new AsyncOverReactiveProxyHttpClient(this);
+    }
+
+    /**
      * Create a new {@link ProxyHttpClient}.
      * Note that this method should only be used outside the context of a Micronaut application.
      * The returned {@link ProxyHttpClient} is not subject to dependency injection.
