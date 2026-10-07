@@ -67,11 +67,13 @@ class MissingBeanSpec extends Specification {
 
         expect:
             ctx.getBean(beanType)
+            ctx.findBeanDefinition(beanType).isPresent()
+            ctx.getBeanDefinitions(Object).any { it.beanType == beanType }
             ctx.getAllBeanDefinitions().any { it.beanType == beanType }
             ctx.getBeanDefinitions(Qualifiers.byStereotype("io.micronaut.inject.test.external.ExternalIndexed"))*.beanType == [beanType]
 
         cleanup:
-            ctx.close()
+            ctx?.close()
 
         where:
             beanType << [MissingIndexedTypeBean, MissingIndexedTypeGroovyBean]
@@ -88,10 +90,10 @@ class MissingBeanSpec extends Specification {
             MissingIndexedTypeContextBean.created
 
         cleanup:
-            ctx.close()
+            ctx?.close()
     }
 
-    void "a bean is found by its present indexed type when another one is missing"() {
+    void "a bean whose indexed type is missing is still found by its exposed types and stereotypes"() {
         given:
             ApplicationContext ctx = ApplicationContext.run(['spec.name': 'MissingAndPresentIndexedTypeBean'])
 
@@ -102,7 +104,7 @@ class MissingBeanSpec extends Specification {
             ctx.getBeanDefinitions(Qualifiers.byStereotype(PresentIndexed))*.beanType == [MissingAndPresentIndexedTypeBean]
 
         cleanup:
-            ctx.close()
+            ctx?.close()
     }
 
     void "a bean that fails to initialize is still found by its indexed type"() {
@@ -117,7 +119,7 @@ class MissingBeanSpec extends Specification {
             e.message == "Failed to initialize the bean [class io.micronaut.http.missing.classnotfound.MissingConstructorIndexedBean]: io/micronaut/inject/test/external/ExternalBean"
 
         cleanup:
-            ctx.close()
+            ctx?.close()
     }
 
 }
