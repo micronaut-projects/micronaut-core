@@ -172,6 +172,8 @@ class LegacyStreamCancellationTest {
 
         CompletableFuture<Object> first = new CompletableFuture<>();
         AtomicReference<Subscription> subscription = new AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        List<String> afterCancel = new java.util.concurrent.CopyOnWriteArrayList<>();
         publisher.subscribe(new Subscriber<Object>() {
             @Override
             public void onSubscribe(Subscription s) {
@@ -182,17 +184,24 @@ class LegacyStreamCancellationTest {
             @Override
             public void onNext(Object o) {
                 if (when == When.MID_BODY && first.complete(o)) {
+                    cancelled.set(true);
                     subscription.get().cancel();
                 }
             }
 
             @Override
             public void onError(Throwable t) {
+                if (cancelled.get()) {
+                    afterCancel.add("error " + t);
+                }
                 first.completeExceptionally(t);
             }
 
             @Override
             public void onComplete() {
+                if (cancelled.get()) {
+                    afterCancel.add("complete");
+                }
                 first.complete("complete");
             }
         });
@@ -202,6 +211,7 @@ class LegacyStreamCancellationTest {
             // the request reaches the server; the response or its first piece is still delayed
             Thread.sleep(400);
             assertTrue(!first.isDone(), () -> "the stream ended before it was cancelled: " + first);
+            cancelled.set(true);
             subscription.get().cancel();
         }
 
@@ -218,7 +228,9 @@ class LegacyStreamCancellationTest {
         assertEquals("pong", pong);
         boolean reused = REMOTES.get(id).equals(REMOTES.get(followId));
 
-        System.out.println("LEGACY-CANCEL " + api + " " + when + " server=" + signal + " reused=" + reused);
+        System.out.println("LEGACY-CANCEL " + api + " " + when + " server=" + signal + " reused=" + reused + " afterCancel=" + afterCancel);
+        // §1.8: no terminal signal once cancelled
+        assertEquals(List.of(), afterCancel, "signals after cancel");
         assertEquals(expectedServerSignal, signal, "what the server observed");
         if (expectedReuse != null) {
             assertEquals(expectedReuse, reused, "whether the connection was reused");
