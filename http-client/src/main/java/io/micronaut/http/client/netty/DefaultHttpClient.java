@@ -351,7 +351,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return nettyHttpClient.getMediaTypeCodecRegistry();
+        return Objects.requireNonNull(nettyHttpClient.getMediaTypeCodecRegistry());
     }
 
     /**

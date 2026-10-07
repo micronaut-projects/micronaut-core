@@ -22,7 +22,9 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -31,7 +33,6 @@ import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Objects;
@@ -48,6 +49,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         super(prototype);
     }
 
+    @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
     public JdkBlockingHttpClient(
         @Nullable
         LoadBalancer loadBalancer,
@@ -69,8 +71,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         JdkClientSslBuilder sslBuilder,
         CookieDecoder cookieDecoder
     ) {
-        super(
-            configuration.getLoggerName().map(LoggerFactory::getLogger).orElseGet(() -> LoggerFactory.getLogger(JdkBlockingHttpClient.class)),
+        this(new DefaultJdkHttpClient(
             loadBalancer,
             httpVersion,
             configuration,
@@ -78,21 +79,23 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
             filterResolver,
             clientFilterEntries,
             mediaTypeCodecRegistry,
-            messageBodyHandlerRegistry,
+            messageBodyHandlerRegistry == null ? JdkHttpClientFactory.createDefaultMessageBodyHandlerRegistry() : messageBodyHandlerRegistry,
             requestBinderRegistry,
             clientId,
             conversionService,
             sslBuilder,
             cookieDecoder
-        );
+        ).transport());
     }
 
     @Override
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                                                 @Nullable Argument<O> bodyType,
                                                                 @Nullable Argument<E> errorType) {
+        // the exchange of the client this client was made from
+        Argument<?> error = errorType == null ? HttpClient.DEFAULT_ERROR_TYPE : errorType;
         return Objects.requireNonNull(
-            exchangeImpl(request, bodyType).blockFirst(),
+            AbstractHttpClient.awaitFlow(http().exchangeFlow(request, bodyType, error)),
             "The blocking HTTP client returned no response"
         );
     }

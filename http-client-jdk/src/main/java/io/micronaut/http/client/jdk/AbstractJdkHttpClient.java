@@ -21,49 +21,36 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.BasicHttpAttributes;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
-import io.micronaut.http.client.ClientAttributes;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.filter.FilterRunner;
-import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.jspecify.annotations.Nullable;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import javax.net.ssl.SSLParameters;
 import java.io.IOException;
@@ -76,7 +63,6 @@ import java.net.PasswordAuthentication;
 import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
@@ -87,8 +73,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
-
-import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
+import java.util.concurrent.Flow;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletableFuture;
+import java.util.Objects;
+import java.nio.ByteBuffer;
 
 /**
  * Abstract implementation of {@link DefaultJdkHttpClient} that provides common functionality.
@@ -104,6 +93,14 @@ abstract class AbstractJdkHttpClient {
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
     public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
     public static final String WEIRD_ALPN_ERROR_MESSAGE = "The only supported ALPN modes are [" + HttpVersionSelection.ALPN_HTTP_1 + "] or [" + HttpVersionSelection.ALPN_HTTP_1 + "," + HttpVersionSelection.ALPN_HTTP_2 + "]";
+    /**
+     * Request attribute of a request of the raw client, see {@link JdkRawHttpClient}.
+     */
+    static final String RAW_ATTRIBUTE = "micronaut.http.client.jdk.raw";
+    /**
+     * Request attribute with the {@link UploadListener} of the body of a raw request.
+     */
+    static final String UPLOAD_LISTENER_ATTRIBUTE = "micronaut.http.client.jdk.raw.upload-listener";
     @Nullable
     protected final LoadBalancer loadBalancer;
     @Nullable
@@ -138,6 +135,12 @@ abstract class AbstractJdkHttpClient {
      * {@link io.micronaut.http.client.RawRequestOptions#isFollowRedirects()}.
      */
     final Supplier<HttpClient> rawNoRedirectClient;
+    /**
+     * The client whose pipeline sends the requests of this client: its filters, its redirects,
+     * the load balancing and the decoding of the responses are shared with the other clients.
+     */
+    @Nullable
+    DefaultJdkHttpClient http;
 
     protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
         this.loadBalancer = prototype.loadBalancer;
@@ -158,6 +161,7 @@ abstract class AbstractJdkHttpClient {
         this.cookieDecoder = prototype.cookieDecoder;
         this.mediaTypeCodecRegistry = prototype.mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = prototype.messageBodyHandlerRegistry;
+        this.http = prototype.http;
     }
 
     /**
@@ -223,11 +227,12 @@ abstract class AbstractJdkHttpClient {
             this.contextPath = null;
         }
 
-        HttpClient.Redirect redirect = configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER;
-        this.client = buildClient(redirect, true);
-        Supplier<HttpClient> rawNoRedirect = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));
-        this.rawClient = configuration.isFollowRedirects() ? SupplierUtil.memoized(() -> buildClient(redirect, false)) : rawNoRedirect;
-        this.rawNoRedirectClient = rawNoRedirect;
+        // the redirects are followed by the client pipeline, see AbstractHttpClient, with the
+        // configuration and the options of an exchange
+        this.client = buildClient(HttpClient.Redirect.NEVER, true);
+        Supplier<HttpClient> raw = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));
+        this.rawClient = raw;
+        this.rawNoRedirectClient = raw;
     }
 
     private HttpClient buildClient(HttpClient.Redirect redirect, boolean cookies) {
@@ -373,18 +378,6 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
-     * Convert the Micronaut request to a JDK request.
-     *
-     * @param request  The Micronaut request object
-     * @param bodyType The body type
-     * @param <I>      The body type
-     * @return A JDK request object
-     */
-    protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
-        return resolveRequestUri(request).map(uri -> toJdkRequest(uri, request, bodyType));
-    }
-
-    /**
      * Convert the Micronaut request to a JDK request for the given absolute URI.
      *
      * @param uri      The absolute URI to send the request to
@@ -393,57 +386,15 @@ abstract class AbstractJdkHttpClient {
      * @return A JDK request object
      */
     HttpRequest toJdkRequest(URI uri, io.micronaut.http.HttpRequest<?> request, @Nullable Argument<?> bodyType) {
+        if (request.getAttribute(RAW_ATTRIBUTE).isPresent()) {
+            return toRawJdkRequest(uri, request, bodyType);
+        }
         cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
             HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
             cookieManager.getCookieStore().add(uri, newCookie);
         }));
 
         return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
-    }
-
-    protected Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
-        return resolveTarget(request).map(ResolvedTarget::releasedUri);
-    }
-
-    /**
-     * Resolve the absolute URI of a request, and the service instance the load balancer selected
-     * for it if the request was load balanced.
-     *
-     * @param request The request
-     * @return The resolved target
-     */
-    Mono<ResolvedTarget> resolveTarget(io.micronaut.http.HttpRequest<?> request) {
-        if (request.getUri().getScheme() != null) {
-            // Full request URI, so use that
-            return Mono.just(new ResolvedTarget(request.getUri(), null));
-        }
-
-        // Otherwise, go and look it up via the LoadBalancer
-        return resolveURI(request);
-    }
-
-    /**
-     * The target of a request once the client filters ran, since a filter may have changed its
-     * URI: the request stays with the instance the load balancer selected as long as it goes to
-     * the same scheme, host and port, and the load balancer is not asked again.
-     *
-     * @param target  The target resolved before the filters ran
-     * @param request The request the filters passed on
-     * @return The target the request is sent to
-     */
-    Mono<ResolvedTarget> afterFilters(ResolvedTarget target, io.micronaut.http.HttpRequest<?> request) {
-        URI filtered = request.getUri();
-        if (filtered.equals(target.uri())) {
-            return Mono.just(target);
-        }
-        LoadBalancerSelection selection = target.selection();
-        if (filtered.getScheme() != null) {
-            return Mono.just(new ResolvedTarget(filtered, sameServer(filtered, target.uri()) ? selection : null));
-        }
-        if (selection == null) {
-            return resolveTarget(request);
-        }
-        return Mono.fromCallable(() -> new ResolvedTarget(resolveAgainst(selection.instance(), filtered), selection));
     }
 
     /**
@@ -464,51 +415,6 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
-     * @param instance   The service instance
-     * @param requestUri The relative request URI
-     * @return The request URI resolved against the instance, with the context path of the client
-     */
-    private URI resolveAgainst(ServiceInstance instance, URI requestUri) {
-        try {
-            return instance.resolve(ContextPathUtils.prepend(requestUri, contextPath));
-        } catch (URISyntaxException e) {
-            throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
-        }
-    }
-
-    /**
-     * @param request The request object
-     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
-     */
-    protected Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
-        return LoadBalancerKey.discriminator(request, configuration);
-    }
-
-    private <I> Mono<ResolvedTarget> resolveURI(io.micronaut.http.HttpRequest<I> request) {
-        URI requestURI = request.getUri();
-        if (loadBalancer == null) {
-            return Mono.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
-        }
-
-        LoadBalancer balancer = loadBalancer;
-        return Mono.from(loadBalancer.select(getLoadBalancerDiscriminator(request))).map(server -> {
-                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
-                Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
-                    mutableRequest.getHeaders().auth(authInfo.get());
-                }
-
-                try {
-                    return new ResolvedTarget(resolveAgainst(server, requestURI), selection);
-                } catch (RuntimeException e) {
-                    selection.release();
-                    throw e;
-                }
-            }
-        );
-    }
-
-    /**
      * Map an I/O failure of {@link HttpClient#sendAsync}: a request that was not sent, because the
      * connection could not be opened, is an {@link UnprocessedRequestException}, so that the caller
      * can send it again; a connection closed before the response arrived is a
@@ -519,7 +425,7 @@ abstract class AbstractJdkHttpClient {
      * @param e         The failure
      * @return The client exception
      */
-    HttpClientException sendError(@Nullable LoadBalancerSelection selection, URI uri, IOException e) {
+    HttpClientException sendError(@Nullable LoadBalancerSelection selection, @Nullable URI uri, IOException e) {
         return sendError(selection, uri, e, false);
     }
 
@@ -531,7 +437,7 @@ abstract class AbstractJdkHttpClient {
      *                        a body read by the JDK client
      * @return The client exception
      */
-    HttpClientException sendError(@Nullable LoadBalancerSelection selection, URI uri, IOException e, boolean headersReceived) {
+    HttpClientException sendError(@Nullable LoadBalancerSelection selection, @Nullable URI uri, IOException e, boolean headersReceived) {
         HttpClientException result;
         if (e instanceof HttpConnectTimeoutException) {
             result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + e.getMessage(), e);
@@ -555,7 +461,7 @@ abstract class AbstractJdkHttpClient {
             }
             result = new HttpClientException("Error sending request: " + e.getMessage(), e);
         }
-        if (result instanceof UnprocessedRequestException unprocessed) {
+        if (result instanceof UnprocessedRequestException unprocessed && uri != null) {
             unprocessed.setTarget(uri, selection == null ? null : selection.instance());
         }
         return result;
@@ -607,146 +513,198 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
-     * Convert the JDK response to a Micronaut response.
+     * The client of the shared pipeline.
      *
-     * @param netResponse The JDK response
-     * @param bodyType    The body type
-     * @param <O>         The body type
-     * @return A Micronaut response
+     * @return The client
      */
-    protected <O> HttpResponse<O> response(java.net.http.HttpResponse<byte[]> netResponse, @Nullable Argument<O> bodyType) {
-        return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
-    }
-
-    protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
-        return resolveTarget(request)
-            .flatMapMany(target -> Flux.from(applyFilterToResponsePublisher(request, target.uri(), responsePublisher(request, target, bodyType)))
-                // the selection ends with the exchange, also when a filter answered without it
-                .doFinally(signal -> releaseUnclaimed(target.selection())));
-    }
-
-    protected <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
-        io.micronaut.http.HttpRequest<I> request,
-        URI requestURI,
-        Publisher<R> responsePublisher
-    ) {
-        if (!(request instanceof MutableHttpRequest<?> mutRequest) || filterResolver == null) {
-            return responsePublisher;
-        }
-
-        mutRequest.uri(requestURI);
-        List<GenericHttpFilter> filters =
-            filterResolver.resolveFilters(request, clientFilterEntries);
-
-        FilterRunner.sortReverse(filters);
-
-        FilterRunner runner = new FilterRunner(filters) {
-            @Override
-            protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
-                try {
-                    return propagatedContext.propagate(() -> ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher));
-                } catch (Throwable e) {
-                    return ExecutionFlow.error(e);
-                }
-            }
-        };
-        return (Publisher<R>) Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher());
-    }
-
-    protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
-        io.micronaut.http.HttpRequest<?> request,
-        @Nullable Argument<O> bodyType
-    ) {
-        return Flux.defer(() -> resolveTarget(request).flatMapMany(target -> Flux.from(responsePublisher(request, target, bodyType))
-            .doFinally(signal -> releaseUnclaimed(target.selection()))));
+    DefaultJdkHttpClient http() {
+        return Objects.requireNonNull(http, "The client has no pipeline");
     }
 
     /**
-     * Send the request to the resolved target and publish the response. The target is resolved
-     * once, so that the instance a failure names is the instance the request was sent to.
+     * Send one request with the JDK client, without filters and without following redirects:
+     * the response body is streamed, and the outcome is reported to the load balancer once it
+     * ended.
      *
-     * @param request  The request
-     * @param target   The absolute URI to send the request to, and the service instance the load
-     *                 balancer selected for it, if any
-     * @param bodyType The body type
-     * @param <O>      The body type
-     * @return The response publisher
+     * @param request   The request, with an absolute URI
+     * @param selection The selection of the load balancer, or {@code null}
+     * @return The flow of the response
      */
-    <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
-        io.micronaut.http.HttpRequest<?> request,
-        ResolvedTarget target,
-        @Nullable Argument<O> bodyType
-    ) {
-        if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
-            ClientAttributes.setServiceId(request, clientId);
+    ExecutionFlow<JdkByteBodyResponse> sendRequest(MutableHttpRequest<?> request, @Nullable LoadBalancerSelection selection) {
+        HttpRequest httpRequest;
+        try {
+            httpRequest = toJdkRequest(request.getUri(), request, null);
+        } catch (RuntimeException e) {
+            return ExecutionFlow.error(e);
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+        }
+        if (log.isTraceEnabled()) {
+            HttpHeadersUtil.trace(log,
+                () -> httpRequest.headers().map().keySet(),
+                headerName -> httpRequest.headers().allValues(headerName));
+        }
+        // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
+        boolean raw = request.getAttribute(RAW_ATTRIBUTE).isPresent();
+        HttpClient httpClient = raw ? rawClient.get() : client;
+        if (!raw && request.getAttribute(AbstractHttpClient.BUFFER_RESPONSE).isPresent()) {
+            return sendBuffered(httpClient, httpRequest, selection);
+        }
+        BodySizeLimits limits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
+        // whether the headers arrived, so that a failure of the body is told from one before
+        AtomicBoolean headersReceived = new AtomicBoolean();
+        DelayedExecutionFlow<JdkByteBodyResponse> result = DelayedExecutionFlow.create();
+        CompletableFuture<java.net.http.HttpResponse<CloseableByteBody>> sent;
+        try {
+            sent = httpClient.sendAsync(httpRequest, responseInfo -> {
+                headersReceived.set(true);
+                // the end of the body reports the outcome, or releases the selection
+                if (selection != null) {
+                    selection.claim();
+                }
+                return new ByteBodySubscriber(limits, failure -> reportBodyEnd(selection, responseInfo.statusCode(), failure));
+            });
+        } catch (RuntimeException e) {
+            return ExecutionFlow.error(e);
+        }
+        sent.whenComplete((response, error) -> {
+            if (error == null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Client {} Received HTTP Response: {} {}", clientId, response.statusCode(), response.uri());
+                }
+                if (!result.tryComplete(new JdkByteBodyResponse(response, null, conversionService))) {
+                    response.body().close();
+                }
+                return;
+            }
+            Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+            Throwable mapped;
+            if (cause instanceof IOException io) {
+                mapped = sendError(selection, httpRequest.uri(), io, headersReceived.get());
+            } else if (cause instanceof InterruptedException) {
+                mapped = new HttpClientException("Error sending request: " + cause.getMessage(), cause);
+            } else {
+                mapped = cause;
+            }
+            result.tryCompleteExceptionally(mapped);
+        });
+        result.onCancel(() -> sent.cancel(true));
+        return result;
+    }
+
+    /**
+     * Send a request whose response body is read whole, into an array: the outcome is reported
+     * once the body is read.
+     */
+    private ExecutionFlow<JdkByteBodyResponse> sendBuffered(HttpClient httpClient, HttpRequest httpRequest, @Nullable LoadBalancerSelection selection) {
+        AtomicBoolean headersReceived = new AtomicBoolean();
+        DelayedExecutionFlow<JdkByteBodyResponse> result = DelayedExecutionFlow.create();
+        CompletableFuture<java.net.http.HttpResponse<byte[]>> sent;
+        try {
+            sent = httpClient.sendAsync(httpRequest, responseInfo -> {
+                headersReceived.set(true);
+                return java.net.http.HttpResponse.BodySubscribers.ofByteArray();
+            });
+        } catch (RuntimeException e) {
+            releaseUnclaimed(selection);
+            return ExecutionFlow.error(e);
+        }
+        sent.whenComplete((response, error) -> {
+            if (error == null) {
+                report(selection, response.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
+                if (log.isDebugEnabled()) {
+                    log.debug("Client {} Received HTTP Response: {} {}", clientId, response.statusCode(), response.uri());
+                }
+                result.tryComplete(new JdkByteBodyResponse(response, response.body(), conversionService));
+                return;
+            }
+            Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+            Throwable mapped;
+            if (cause instanceof IOException io) {
+                mapped = sendError(selection, httpRequest.uri(), io, headersReceived.get());
+            } else if (cause instanceof InterruptedException) {
+                mapped = new HttpClientException("Error sending request: " + cause.getMessage(), cause);
+            } else {
+                mapped = cause;
+            }
+            releaseUnclaimed(selection);
+            result.tryCompleteExceptionally(mapped);
+        });
+        result.onCancel(() -> sent.cancel(true));
+        return result;
+    }
+
+    /**
+     * The JDK request of a raw exchange: the request cookies are sent in its Cookie header, and
+     * must not reach the cookie store that is shared with the other clients of the same
+     * configuration, and the upload of its body is told to its listener, if any.
+     */
+    private HttpRequest toRawJdkRequest(URI uri, io.micronaut.http.HttpRequest<?> request, @Nullable Argument<?> bodyType) {
+        HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
+        HttpRequest built = builder.build();
+        UploadListener listener = request.getAttribute(UPLOAD_LISTENER_ATTRIBUTE, UploadListener.class).orElse(null);
+        HttpRequest.BodyPublisher publisher = built.bodyPublisher().orElse(null);
+        if (listener == null || publisher == null || publisher.contentLength() == 0) {
+            // no body, no upload: the whole exchange counts into the response timeout
+            return built;
+        }
+        // the response timeout of the options pauses from the start to the end of the upload of the
+        // body: the body publisher tells when the client takes it
+        return HttpRequest.newBuilder(built, (name, value) -> true)
+            .method(built.method(), new UploadListeningBodyPublisher(publisher, listener))
+            .build();
+    }
+
+    /**
+     * Notified of the upload of the body of a raw request.
+     *
+     * @param started  Completes when the upload starts
+     * @param uploaded Completes once the body was uploaded
+     */
+    record UploadListener(CompletableFuture<@Nullable Void> started, CompletableFuture<@Nullable Void> uploaded) {
+    }
+
+    /**
+     * A body publisher that tells its listener when the client takes the body, and when the
+     * body was uploaded.
+     *
+     * @param delegate The body publisher
+     * @param listener The listener
+     */
+    private record UploadListeningBodyPublisher(HttpRequest.BodyPublisher delegate, UploadListener listener)
+        implements HttpRequest.BodyPublisher {
+
+        @Override
+        public long contentLength() {
+            return delegate.contentLength();
         }
 
-        // built on subscription, so that any client filter changes are used
-        return Flux.defer(() -> afterFilters(target, request))
-            .flatMap(sent -> {
-                // whether the headers arrived, so that a failure of the body is told from one before
-                AtomicBoolean headersReceived = new AtomicBoolean();
-                return Mono.fromCallable(() -> toJdkRequest(sent.uri(), request, bodyType))
-                    .map(httpRequest -> {
-                        if (log.isDebugEnabled()) {
-                            log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
-                        }
-                        HttpHeadersUtil.trace(log,
-                            () -> httpRequest.headers().map().keySet(),
-                            headerName -> httpRequest.headers().allValues(headerName));
-                        return client.sendAsync(httpRequest, responseInfo -> {
-                            headersReceived.set(true);
-                            return java.net.http.HttpResponse.BodySubscribers.ofByteArray();
-                        });
-                    })
-                    .flatMap(Mono::fromCompletionStage)
-                    .onErrorMap(IOException.class, e -> sendError(sent.selection(), sent.uri(), e, headersReceived.get()))
-                    .doOnNext(netResponse -> report(sent.selection(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS))
-                    .doFinally(signal -> releaseUnclaimed(sent.selection()));
-            })
-            .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
-            .handle((netResponse, sink) -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            listener.started().complete(null);
+            delegate.subscribe(new Flow.Subscriber<ByteBuffer>() {
+                @Override
+                public void onSubscribe(Flow.Subscription subscription) {
+                    subscriber.onSubscribe(subscription);
                 }
-                boolean errorStatus = netResponse.statusCode() >= 400;
-                if (errorStatus && configuration.isExceptionOnErrorStatus()) {
-                    sink.error(HttpClientExceptionUtils.populateServiceId(
-                        new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(), response(netResponse, bodyType)),
-                        clientId,
-                        configuration
-                    ));
-                } else {
-                    sink.next(response(netResponse, bodyType));
+
+                @Override
+                public void onNext(ByteBuffer item) {
+                    subscriber.onNext(item);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    subscriber.onError(throwable);
+                }
+
+                @Override
+                public void onComplete() {
+                    subscriber.onComplete();
+                    listener.uploaded().complete(null);
                 }
             });
-    }
-
-    /**
-     * The absolute URI a request is sent to, and the service instance the load balancer selected
-     * for it, if the request was load balanced.
-     *
-     * @param uri      The absolute request URI
-     * @param selection The selection of the load balancer, or {@code null} if the request URI
-     *                  was absolute
-     */
-    record ResolvedTarget(URI uri, @Nullable LoadBalancerSelection selection) {
-
-        /**
-         * @return The selected instance, or {@code null} if the request URI was absolute
-         */
-        @Nullable ServiceInstance instance() {
-            return selection == null ? null : selection.instance();
-        }
-
-        /**
-         * @return The URI, for a caller that sends no exchange: the selection is released
-         */
-        URI releasedUri() {
-            if (selection != null) {
-                selection.release();
-            }
-            return uri;
         }
     }
 }
