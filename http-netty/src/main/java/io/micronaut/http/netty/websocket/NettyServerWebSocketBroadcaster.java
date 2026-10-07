@@ -28,10 +28,11 @@ import io.netty.util.Attribute;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 /**
@@ -75,28 +76,33 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
 
     @Override
     public <T> Publisher<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        return Flux.create(emitter -> {
-            try {
-                WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
-                webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                    Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                    NettyWebSocketSession s = attr.get();
-                    return s != null && s.isOpen() && filter.test(s);
-                }).addListener(future -> {
-                    if (!future.isSuccess()) {
-                        Throwable cause = extractBroadcastFailure(future.cause());
-                        if (cause != null) {
-                            emitter.error(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
-                            return;
-                        }
+        // each subscription broadcasts, as before
+        return Flux.defer(() -> Mono.fromFuture(() -> broadcastAsync(message, mediaType, filter), true));
+    }
+
+    @Override
+    public <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
+        CompletableFuture<T> broadcast = new CompletableFuture<>();
+        try {
+            WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
+            webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
+                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                NettyWebSocketSession s = attr.get();
+                return s != null && s.isOpen() && filter.test(s);
+            }).addListener(future -> {
+                if (!future.isSuccess()) {
+                    Throwable cause = extractBroadcastFailure(future.cause());
+                    if (cause != null) {
+                        broadcast.completeExceptionally(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
+                        return;
                     }
-                    emitter.next(message);
-                    emitter.complete();
-                });
-            } catch (Throwable e) {
-                emitter.error(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
-            }
-        }, FluxSink.OverflowStrategy.BUFFER);
+                }
+                broadcast.complete(message);
+            });
+        } catch (Throwable e) {
+            broadcast.completeExceptionally(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
+        }
+        return broadcast;
     }
 
     /**

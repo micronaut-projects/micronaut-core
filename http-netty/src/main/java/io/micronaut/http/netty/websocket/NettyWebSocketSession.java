@@ -30,7 +30,6 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
@@ -38,7 +37,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.util.Collection;
@@ -203,29 +202,8 @@ public class NettyWebSocketSession implements WebSocketSession {
         if (message == null) {
             return Flux.empty();
         }
-
-        return Flux.create(emitter -> {
-            if (!isOpen()) {
-                emitter.error(new WebSocketSessionException("Session closed"));
-            } else {
-                WebSocketFrame frame;
-                if (message instanceof WebSocketFrame socketFrame) {
-                    frame = socketFrame;
-                } else {
-                    frame = messageEncoder.encodeMessage(message, mediaType);
-                }
-
-                ChannelFuture channelFuture = channel.writeAndFlush(frame);
-                channelFuture.addListener(future -> {
-                    if (future.isSuccess()) {
-                        emitter.next(message);
-                        emitter.complete();
-                    } else {
-                        emitter.error(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
-                    }
-                });
-            }
-        }, FluxSink.OverflowStrategy.ERROR);
+        // each subscription sends, as before: a closed session fails the publisher, not the call
+        return Flux.defer(() -> Mono.fromFuture(() -> sendAsync(message, mediaType), true));
     }
 
     @Override
