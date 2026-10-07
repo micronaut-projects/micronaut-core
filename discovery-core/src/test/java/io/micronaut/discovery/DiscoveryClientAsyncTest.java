@@ -287,6 +287,7 @@ class DiscoveryClientAsyncTest {
 
         @Override
         public void close() {
+            // the test client holds no resources
         }
     }
 
@@ -335,6 +336,7 @@ class DiscoveryClientAsyncTest {
 
         @Override
         public void close() {
+            // the test client holds no resources
         }
     }
 }
