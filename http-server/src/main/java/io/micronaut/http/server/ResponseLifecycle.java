@@ -360,28 +360,45 @@ public abstract class ResponseLifecycle {
              * Only touched by the encoding of one element at a time.
              */
             private boolean first = true;
+            /**
+             * The class of the last element, with the type and the writer chosen for it: the
+             * elements of a body are mostly of one class, and the choice only depends on the
+             * class. Only touched by the encoding of one element at a time.
+             */
+            private @Nullable Class<?> lastClass;
+            private @Nullable Argument<Object> lastType;
+            private @Nullable MessageBodyWriter<Object> lastWriter;
 
             @Override
             @SuppressWarnings("unchecked")
             public ExecutionFlow<CloseableByteBody> encode(Object element) {
+                MessageBodyWriter<Object> writer = lastWriter;
+                Argument<Object> type = lastType;
+                if (writer != null && type != null && element.getClass() == lastClass) {
+                    return pieces.write(writer, type, finalMediaType, element);
+                }
                 if (routeInfo != null) {
                     // like mapToHttpContent: the writer of the route, for the declared type
-                    MessageBodyWriter<Object> writer = routeInfo.getMessageBodyWriter();
-                    Argument<Object> type = (Argument<Object>) routeInfo.getResponseBodyType();
+                    writer = routeInfo.getMessageBodyWriter();
+                    type = (Argument<Object>) routeInfo.getResponseBodyType();
                     if (writer == null || !type.isInstance(element) || !writer.isWriteable(type, finalMediaType)) {
                         type = Argument.ofInstance(element);
                         writer = wrap(messageBodyHandlerRegistry.getWriter(type, mediaTypes));
                     }
-                    return pieces.write(writer, type, finalMediaType, element);
-                }
-                Argument<Object> type = Argument.ofInstance(element);
-                if (first) {
-                    first = false;
-                    if (jsonMediaType && !isJsonFormattable(type)) {
-                        jsonFormattable.set(false);
+                } else {
+                    type = Argument.ofInstance(element);
+                    if (first) {
+                        first = false;
+                        if (jsonMediaType && !isJsonFormattable(type)) {
+                            jsonFormattable.set(false);
+                        }
                     }
+                    writer = messageBodyHandlerRegistry.getWriter(type, mediaTypes);
                 }
-                return pieces.write(messageBodyHandlerRegistry.getWriter(type, mediaTypes), type, finalMediaType, element);
+                lastClass = element.getClass();
+                lastType = type;
+                lastWriter = writer;
+                return pieces.write(writer, type, finalMediaType, element);
             }
 
             @Override

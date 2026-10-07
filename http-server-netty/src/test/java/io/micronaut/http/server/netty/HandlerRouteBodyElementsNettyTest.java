@@ -77,6 +77,18 @@ class HandlerRouteBodyElementsNettyTest {
     }
 
     @Test
+    void eachElementClassGetsItsOwnWriter() throws IOException {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1))) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
+            server.start();
+            // the writer of an element class is reused for the next element of that class only
+            String response = get(server, "/netty-elements/mixed");
+            assertTrue(response.startsWith("HTTP/1.1 200"), response);
+            assertEquals("worker,worker,ab,worker,c", chunks(response));
+        }
+    }
+
+    @Test
     void theServerEncodesAndClosesTheElements() throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
@@ -210,6 +222,9 @@ class HandlerRouteBodyElementsNettyTest {
                             CompletableFuture.completedFuture(elements.hasNext() ? Optional.of(elements.next()) : Optional.<Blocking>empty())))
                         .contentType(MediaType.TEXT_PLAIN_TYPE);
                 });
+                routes.GET("/netty-elements/mixed", (request, pathVariables) ->
+                    HttpResponse.ok(recorder.source("mixed", List.<Object>of(new Blocking(), new Blocking(), "a", "b,", new Blocking(), "c")))
+                        .contentType(MediaType.TEXT_PLAIN_TYPE));
                 routes.GET("/netty-elements/json")
                     .responseType(Argument.of(BodyElements.class, Integer.class))
                     .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("json", List.of(1, 2, 3))));
