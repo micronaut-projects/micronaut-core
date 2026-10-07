@@ -27,10 +27,13 @@ import io.micronaut.http.HttpRequest;
  * response has been received and processed by downstream filters.<br>
  * A continuation can either return the value immediately (e.g.
  * {@code FilterContinuation<HttpResponse<?>>}), in which case the call to {@link #proceed()} will
- * block, or it can return a reactive wrapper (e.g.
- * {@code FilterContinuation<Publisher<HttpResponse<?>>>}). With a reactive wrapper,
- * {@link #proceed()} will not block, and downstream processing will happen asynchronously (after
- * the reactive stream is subscribed to).
+ * block, or it can return a {@link java.util.concurrent.CompletionStage} (e.g.
+ * {@code FilterContinuation<CompletionStage<HttpResponse<?>>>}, or a
+ * {@link java.util.concurrent.CompletableFuture}), or a reactive wrapper (e.g.
+ * {@code FilterContinuation<Publisher<HttpResponse<?>>>}). With a stage, {@link #proceed()} will
+ * not block, starts the downstream processing, and returns a stage that completes with its result.
+ * With a reactive wrapper, {@link #proceed()} will not block, and downstream processing will
+ * happen asynchronously (after the reactive stream is subscribed to).
  *
  * @param <R> The type to return in {@link #proceed()}
  */
@@ -50,6 +53,10 @@ public interface FilterContinuation<R> {
      * is a failure. <b>Blocking netty event loop threads can lead to bugs, so any filter that
      * may block in the netty HTTP server should use
      * {@link io.micronaut.scheduling.annotation.ExecuteOn} to avoid running on the event loop.</b>
+     * <br>
+     * If {@link R} is a {@link java.util.concurrent.CompletionStage}, this method will return
+     * immediately, after starting the downstream processing, with a stage that completes with the
+     * downstream result.
      * <br>
      * If {@link R} is a reactive type, this method will return immediately. Downstream processing
      * will happen when the reactive stream is subscribed to, and the reactive stream will produce

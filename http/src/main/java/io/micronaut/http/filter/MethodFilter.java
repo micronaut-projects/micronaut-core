@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -219,6 +220,10 @@ record MethodFilter<T>(FilterOrder order,
                     } else {
                         continuationCreator = ExecutionFlowContinuationImpl::new;
                     }
+                    fulfilled[i] = ctx -> ctx.continuation;
+                } else if (continuationReturnType.isAsync() && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
+                    // CompletionStage or CompletableFuture: the method result is handled like any other
+                    continuationCreator = CompletionStageContinuationImpl::new;
                     fulfilled[i] = ctx -> ctx.continuation;
                 } else if (isReactive(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     if (isReactive(returnType)) {
@@ -1056,6 +1061,59 @@ record MethodFilter<T>(FilterOrder order,
                     });
                 }
             };
+        }
+
+        @Override
+        public FilterContext afterMethodContext() {
+            return filterContext;
+        }
+    }
+
+    /**
+     * Continuation implementation that yields a {@link CompletableFuture}, also for a continuation
+     * declared with a {@link CompletionStage}. Unlike a flow, a future runs the downstream when
+     * {@link #proceed()} is called.
+     */
+    private static final class CompletionStageContinuationImpl implements FilterContinuation<CompletableFuture<HttpResponse<?>>>,
+        InternalFilterContinuation<CompletableFuture<HttpResponse<?>>> {
+
+        private FilterContext filterContext;
+        private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
+        private final MutablePropagatedContext mutablePropagatedContext;
+
+        private CompletionStageContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                                FilterContext filterContext,
+                                                MutablePropagatedContext mutablePropagatedContext) {
+            this.downstream = downstream;
+            this.filterContext = filterContext;
+            this.mutablePropagatedContext = mutablePropagatedContext;
+        }
+
+        @Override
+        public FilterContinuation<CompletableFuture<HttpResponse<?>>> request(HttpRequest<?> request) {
+            filterContext = filterContext.withRequest(request);
+            return this;
+        }
+
+        @Override
+        public CompletableFuture<HttpResponse<?>> proceed() {
+            PropagatedContext propagatedContext = filterContext.propagatedContext();
+            PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
+            if (propagatedContext != mutatedPropagatedContext && mutatedPropagatedContext != null) {
+                filterContext = filterContext.withPropagatedContext(mutatedPropagatedContext);
+            } else {
+                filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
+            }
+            ExecutionFlow<FilterContext> downstreamFlow;
+            try {
+                downstreamFlow = downstream.apply(filterContext);
+            } catch (Exception e) {
+                return CompletableFuture.failedFuture(e);
+            }
+            return downstreamFlow.<HttpResponse<?>>map(newFilterContext -> {
+                filterContext = newFilterContext;
+                return Objects.requireNonNull(newFilterContext.response(), RESPONSE_MISSING_MESSAGE);
+            }).toCompletableFuture();
         }
 
         @Override
