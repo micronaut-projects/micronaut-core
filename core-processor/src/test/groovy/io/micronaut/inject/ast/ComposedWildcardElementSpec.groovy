@@ -53,4 +53,51 @@ class ComposedWildcardElementSpec extends Specification {
         then:
         thrown(IllegalArgumentException)
     }
+
+    void "test a wildcard delegates to its first upper bound"() {
+        given:
+        def superType = ClassElement.of(Object)
+        def typeArgument = ClassElement.of(String)
+        def upper = Mock(ClassElement) {
+            getSuperType() >> Optional.of(superType)
+            getInterfaces() >> [typeArgument]
+            getTypeArguments() >> [T: typeArgument]
+            getAllTypeArguments() >> ['test.Upper': [T: typeArgument]]
+            getBoundGenericTypes() >> [typeArgument]
+            isProtected() >> true
+            isPublic() >> false
+            getNativeType() >> 'native'
+            isAssignable(typeArgument) >> true
+        }
+        def wildcard = WildcardElement.of([upper], [])
+
+        expect:
+        wildcard.superType.get() == superType
+        wildcard.interfaces == [typeArgument]
+        wildcard.typeArguments == [T: typeArgument]
+        wildcard.allTypeArguments == ['test.Upper': [T: typeArgument]]
+        wildcard.boundGenericTypes == [typeArgument]
+        wildcard.isProtected()
+        !wildcard.isPublic()
+        wildcard.nativeType == 'native'
+        wildcard.genericNativeType.is(wildcard)
+        wildcard.isAssignable(typeArgument)
+    }
+
+    void "test a wildcard is neither an array nor an array component"() {
+        given:
+        def wildcard = WildcardElement.of([ClassElement.of(Object)], [])
+
+        when:
+        wildcard.toArray()
+
+        then:
+        thrown(UnsupportedOperationException)
+
+        when:
+        wildcard.fromArray()
+
+        then:
+        thrown(UnsupportedOperationException)
+    }
 }

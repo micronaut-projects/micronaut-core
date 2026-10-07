@@ -23,3 +23,5 @@ io.micronaut.kotlin.processing.annotations.AnnotationMemberDefaultsSpec$Defaults
 io.micronaut.kotlin.processing.annotations.NestedAnnotationDefaultsSpec$NestedDefaultsRecordingVisitor
 io.micronaut.inject.visitor.rounds.RoundsVisitor
 io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$ProducingVisitor
+io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$AggregatingVisitor
+io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$FailingRoundVisitor
