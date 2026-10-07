@@ -16,6 +16,7 @@
 package io.micronaut.runtime.server.watch.event;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.DevelopmentInactive;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.util.StringUtils;
@@ -40,7 +41,7 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @Requires(beans = EmbeddedApplication.class)
 @Requires(property = FileWatchConfiguration.RESTART, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-@Requires(condition = DevelopmentMode.Inactive.class)
+@DevelopmentInactive
 public class FileWatchRestartListener implements ApplicationEventListener<FileChangedEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileWatchRestartListener.class);

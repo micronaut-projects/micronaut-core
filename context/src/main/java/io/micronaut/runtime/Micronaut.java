@@ -86,7 +86,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         exitAllowed = null;
         printBanner();
         ApplicationContext applicationContext = super.build();
-
+        // set once handleStartupException handled a failure of the embedded application, whose exception is rethrown as is
+        boolean embeddedFailureHandled = false;
         try {
 
             // The training mode decides whether the context starts at all, so the switch is read before
@@ -228,6 +229,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     }
 
                 } catch (Throwable e) {
+                    embeddedFailureHandled = true;
                     handleStartupException(applicationContext.getEnvironment(), e);
                     Thread.currentThread().interrupt();
                 }
@@ -237,10 +239,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                 LOG.info("No embedded container found. Running as CLI application");
             }
             return applicationContext;
-        } catch (ApplicationStartupException e) {
-            // already reported by handleStartupException for the embedded application
-            throw e;
         } catch (Throwable e) {
+            if (embeddedFailureHandled && e instanceof ApplicationStartupException startupException) {
+                // already handled for the embedded application, exit handlers included: not a second time
+                throw startupException;
+            }
             handleStartupException(applicationContext.getEnvironment(), e);
             Thread.currentThread().interrupt();
             return applicationContext;
@@ -588,6 +591,13 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * asks for a forced exit. It may not while the {@link Environment#TEST test} environment is active,
      * because the test owns the JVM, and not in {@link DevelopmentMode development mode}, because the
      * development launcher owns it and keeps serving the previous version of the application instead.
+     *
+     * <p>{@link #start()} calls this once, as soon as the environment started, and keeps the answer for the rest of
+     * that start: a failure afterwards, including one handled by an overridden
+     * {@link #handleStartupException(Environment, Throwable)}, and a forced exit are judged by that answer, whatever
+     * environment they pass, because the failure may already have stopped the context and with it the environment's
+     * properties. Only a failure before the environment started calls this method with the environment given to
+     * {@code handleStartupException}. Each call of {@code start()} decides again.</p>
      *
      * @param environment The environment
      * @return True if the launcher may call {@code System.exit}

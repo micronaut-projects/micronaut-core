@@ -17,7 +17,11 @@ package io.micronaut.runtime
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.DevelopmentActive
+import io.micronaut.context.env.DevelopmentInactive
 import io.micronaut.context.env.DevelopmentMode
+import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.context.event.StartupEvent
 import io.micronaut.runtime.exceptions.ApplicationStartupException
 import io.micronaut.runtime.server.watch.event.FileWatchRestartListener
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration
@@ -98,16 +102,42 @@ class MicronautDevelopmentModeSpec extends Specification {
         e.cause.message == "start failed"
     }
 
-    void "the file watch restart listener is not active in development mode"() {
+    void "an ApplicationStartupException from outside the embedded application goes through the exit handlers"() {
         given:
-        ApplicationContext context = ApplicationContext.run(
+        AtomicReference<Throwable> mapped = new AtomicReference<>()
+
+        when: "a startup listener of the context fails, before any embedded application starts"
+        Micronaut.build()
+            .deduceEnvironment(false)
+            .properties(
+                'spec.name': 'MicronautDevelopmentModeSpec',
+                'spec.failing-listener': true,
+                (DevelopmentMode.PROPERTY): true)
+            .mapError(ApplicationStartupException, { Throwable t -> mapped.set(t); 3 })
+            .start()
+
+        then: "it is handled like any other failure: mapped to an exit code, then reported since the JVM may not exit"
+        def e = thrown(ApplicationStartupException)
+        mapped.get() instanceof ApplicationStartupException
+        mapped.get().message == "listener failed"
+        e.cause.is(mapped.get())
+    }
+
+    void "the file watch restart listener is not active in development mode, which the development annotations follow"() {
+        given:
+        Map<String, Object> properties = [
             'spec.name': 'MicronautDevelopmentModeSpec',
             'spec.server': true,
-            (FileWatchConfiguration.RESTART): true,
-            (DevelopmentMode.PROPERTY): devMode)
+            (FileWatchConfiguration.RESTART): true]
+        if (devMode != null) {
+            properties.put(DevelopmentMode.PROPERTY, devMode)
+        }
+        ApplicationContext context = ApplicationContext.run(properties)
 
         expect:
         context.containsBean(FileWatchRestartListener) == listenerPresent
+        context.containsBean(DevelopmentOnly) == !listenerPresent
+        context.containsBean(ProductionOnly) == listenerPresent
         DevelopmentMode.isEnabled(context.environment) == !listenerPresent
 
         cleanup:
@@ -119,6 +149,20 @@ class MicronautDevelopmentModeSpec extends Specification {
         true    | false
         'TRUE'  | false
         'no'    | true
+        'yes'   | true
+        null    | true
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'MicronautDevelopmentModeSpec')
+    @DevelopmentActive
+    static class DevelopmentOnly {
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'MicronautDevelopmentModeSpec')
+    @DevelopmentInactive
+    static class ProductionOnly {
     }
 
     @Singleton
@@ -158,6 +202,16 @@ class MicronautDevelopmentModeSpec extends Specification {
         ServerApplication stop() {
             running.set(false)
             return this
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'MicronautDevelopmentModeSpec')
+    @Requires(property = 'spec.failing-listener', value = 'true')
+    static class FailingStartupListener implements ApplicationEventListener<StartupEvent> {
+        @Override
+        void onApplicationEvent(StartupEvent event) {
+            throw new ApplicationStartupException("listener failed")
         }
     }
 
