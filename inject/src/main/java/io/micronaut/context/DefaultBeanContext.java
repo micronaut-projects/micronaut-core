@@ -88,6 +88,7 @@ import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.DisposableBeanDefinition;
@@ -4771,6 +4772,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * @return The prefixes, empty when no configuration change releases it
          */
         Set<String> invalidatedBy(BeanRegistration<?> registration);
+
+        /**
+         * Whether the restart replaces a class, so that a retained bean bound to it would keep the stopped generation
+         * of the application reachable and run its old code: a bean whose closure has a definition, an instance or a
+         * prototype it owns of such a class is not retained.
+         *
+         * @param type The class of a definition or an instance in the closure of a retained bean
+         * @return True when the class is replaced
+         */
+        default boolean isReplaced(Class<?> type) {
+            return false;
+        }
     }
 
     /**
@@ -5255,6 +5268,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 continue;
             }
+            // what it received is what it runs: a class the restart replaces, anywhere in the closure, would keep the old
+            // generation of the application running in it
+            Set<Object> examined = Collections.newSetFromMap(new IdentityHashMap<>());
+            BeanRegistration<?> replacing = null;
+            Class<?> replaced = null;
+            for (BeanRegistration<?> member : closure) {
+                replaced = replacedClassOf(member, criteria, invalidatedBy, examined);
+                if (replaced != null) {
+                    replacing = member;
+                    break;
+                }
+            }
+            if (replacing != null && replaced != null) {
+                if (LOG_LIFECYCLE.isWarnEnabled()) {
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} bound to the class [{}], which the restart replaces",
+                        registration.bean, replacing == registration ? "it is" : "the bean [" + replacing.bean + "] it holds is", replaced.getName());
+                }
+                continue;
+            }
             for (BeanRegistration<?> member : closure) {
                 beans.putIfAbsent(member.bean, new AtomicBoolean());
             }
@@ -5338,6 +5370,69 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
             if (bound != null) {
                 return bound;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The first class the restart replaces that a member of a retained bean's closure is bound to: its definition, its
+     * instance, the instance the bean created listeners received, and the prototypes it owns or received.
+     */
+    @Nullable
+    private Class<?> replacedClassOf(BeanRegistration<?> registration, RetentionCriteria criteria, Set<String> invalidatedBy, Set<Object> examined) {
+        if (!examined.add(registration)) {
+            return null;
+        }
+        Class<?> replaced = replacedClassOf(registration.beanDefinition, criteria, invalidatedBy, examined);
+        if (replaced != null) {
+            return replaced;
+        }
+        Object beforeListeners = registration instanceof BeanDisposingRegistration<?> disposing ? disposing.getBeforeListeners() : null;
+        for (Object instance : new Object[] {registration.bean, beforeListeners}) {
+            if (instance != null && criteria.isReplaced(instance.getClass())) {
+                return instance.getClass();
+            }
+        }
+        if (registration instanceof BeanDisposingRegistration<?> disposing) {
+            for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
+                if (isCoveredConfiguration(dependent.beanDefinition, invalidatedBy)) {
+                    continue;
+                }
+                replaced = replacedClassOf(dependent, criteria, invalidatedBy, examined);
+                if (replaced != null) {
+                    return replaced;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private Class<?> replacedClassOf(BeanDefinition<?> definition, RetentionCriteria criteria, Set<String> invalidatedBy, Set<Object> examined) {
+        if (!examined.add(definition)) {
+            return null;
+        }
+        BeanDefinition<?> generated = definition;
+        while (generated instanceof DelegatingBeanDefinition<?> delegating) {
+            generated = delegating.getTarget();
+        }
+        if (criteria.isReplaced(generated.getClass())) {
+            return generated.getClass();
+        }
+        if (criteria.isReplaced(definition.getBeanType())) {
+            return definition.getBeanType();
+        }
+        if (dependencyGraph != null) {
+            for (BeanDependencyGraph.BeanDependency edge : dependencyGraph.dependenciesOf(definition)) {
+                // a singleton it received is a member of the closure, examined as such
+                if (edge.lazy() || edge.dependency().isSingleton() || isCoveredConfiguration(edge.dependency(), invalidatedBy)) {
+                    continue;
+                }
+                Class<?> replaced = replacedClassOf(edge.dependency(), criteria, invalidatedBy, examined);
+                if (replaced != null) {
+                    return replaced;
+                }
             }
         }
         return null;
