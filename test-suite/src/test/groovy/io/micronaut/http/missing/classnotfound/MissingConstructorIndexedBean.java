@@ -29,4 +29,8 @@ public class MissingConstructorIndexedBean {
     public MissingConstructorIndexedBean(ExternalBean externalBean) {
         this.externalBean = externalBean;
     }
+
+    ExternalBean getExternalBean() {
+        return externalBean;
+    }
 }
