@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
@@ -163,7 +164,9 @@ public record PythonModuleMapping(
              */
             public JavaPackage {
                 Objects.requireNonNull(name, "name");
-                kinds = kinds == null ? Set.of() : Set.copyOf(kinds);
+                // sorted by declaration order: a Set.copyOf iterates in a per-JVM order, which would make the
+                // fingerprint of the mappings differ between runs
+                kinds = kinds == null ? Set.of() : Collections.unmodifiableSet(new TreeSet<>(kinds));
             }
 
             /**
@@ -189,6 +192,9 @@ public record PythonModuleMapping(
              */
             public JavaType {
                 Objects.requireNonNull(binaryName, BINARY_NAME);
+                if (alias != null && !IDENTIFIER.matcher(alias).matches()) {
+                    throw new IllegalArgumentException("Invalid Python name [" + alias + "] for the Java type [" + binaryName + "]");
+                }
             }
         }
 
@@ -314,7 +320,7 @@ public record PythonModuleMapping(
          * @return This builder
          */
         public Builder staticMethods(String binaryName, String... include) {
-            sources.add(new Source.StaticMethods(binaryName, Set.of(include)));
+            sources.add(new Source.StaticMethods(binaryName, new LinkedHashSet<>(List.of(include))));
             return this;
         }
 
@@ -327,7 +333,7 @@ public record PythonModuleMapping(
          * @return This builder
          */
         public Builder constants(String binaryName, String... include) {
-            sources.add(new Source.Constants(binaryName, Set.of(include)));
+            sources.add(new Source.Constants(binaryName, new LinkedHashSet<>(List.of(include))));
             return this;
         }
 

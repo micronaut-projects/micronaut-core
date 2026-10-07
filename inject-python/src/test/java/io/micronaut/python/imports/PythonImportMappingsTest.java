@@ -278,6 +278,79 @@ class PythonImportMappingsTest {
     }
 
     @Test
+    void preferBetweenContributionsNamesTheWinner() {
+        PythonModuleMapping micronautId = PythonModuleMapping.builder("pyronaut.data").javaType("io.micronaut.data.annotation.Id").build();
+        PythonModuleMapping jakartaId = PythonModuleMapping.builder("pyronaut.data").javaType("jakarta.persistence.Id").build();
+
+        // the contribution of higher precedence prefers the type of the other one
+        ResolvedModule higherPrefersOther = resolve(PythonImportMappings.of(List.of(
+            mapper(0, PythonModuleMapping.builder("pyronaut.data").javaType("io.micronaut.data.annotation.Id")
+                .prefer("Id", "jakarta.persistence.Id").build()),
+            mapper(10, jakartaId))), "pyronaut.data");
+        assertEquals("jakarta.persistence.Id", higherPrefersOther.members().get("Id").binaryName());
+
+        // the contribution of lower precedence prefers the type of the higher one
+        ResolvedModule lowerPrefersOther = resolve(PythonImportMappings.of(List.of(
+            mapper(0, micronautId),
+            mapper(10, PythonModuleMapping.builder("pyronaut.data").javaType("jakarta.persistence.Id")
+                .prefer("Id", "io.micronaut.data.annotation.Id").build()))), "pyronaut.data");
+        assertEquals("io.micronaut.data.annotation.Id", lowerPrefersOther.members().get("Id").binaryName());
+
+        // a prefer naming neither candidate is an error
+        PythonImportMappings neither = PythonImportMappings.of(List.of(
+            mapper(0, PythonModuleMapping.builder("pyronaut.data").javaType("io.micronaut.data.annotation.Id")
+                .prefer("Id", "com.example.Id").build()),
+            mapper(10, jakartaId)));
+        PythonImportMappings.Resolver resolver = neither.resolver(index);
+        PythonImportMappingException e = assertThrows(PythonImportMappingException.class, () -> resolver.resolve("pyronaut.data"));
+        assertTrue(e.getMessage().contains("com.example.Id"), e.getMessage());
+    }
+
+    @Test
+    void fingerprintDoesNotDependOnDeclarationOrder() {
+        PythonModuleMapping first = PythonModuleMapping.builder("pyronaut.http")
+            .javaPackage("io.micronaut.http", TypeKind.ANNOTATION, TypeKind.ENUM, TypeKind.CLASS)
+            .build();
+        PythonModuleMapping second = PythonModuleMapping.builder("pyronaut.http")
+            .javaPackage("io.micronaut.http", TypeKind.CLASS, TypeKind.ANNOTATION, TypeKind.ENUM)
+            .build();
+
+        assertEquals(mappings(first).fingerprint(), mappings(second).fingerprint());
+        assertEquals("[ANNOTATION, ENUM, CLASS]", ((PythonModuleMapping.Source.JavaPackage) first.sources().getFirst()).kinds().toString());
+    }
+
+    @Test
+    void includesKeepTheirOrderAndAllowRepeats() {
+        PythonModuleMapping mapping = PythonModuleMapping.builder("pyronaut.http")
+            .staticMethods("io.micronaut.http.HttpResponse", "ok", "notFound", "ok")
+            .build();
+
+        assertEquals("[ok, notFound]", ((PythonModuleMapping.Source.StaticMethods) mapping.sources().getFirst()).include().toString());
+    }
+
+    @Test
+    void excludeAppliesToNestedModules() {
+        ResolvedModule http = resolve(mappings(PythonModuleMapping.builder("pyronaut.http")
+            .javaPackage("io.micronaut.http.annotation")
+            .exclude("client")
+            .build(), PythonModuleMapping.builder("pyronaut.http.client")
+            .javaPackage("io.micronaut.http.client.annotation")
+            .build()), "pyronaut.http");
+
+        assertFalse(http.members().containsKey("client"));
+    }
+
+    @Test
+    void aliasesAreValidatedAndKeywordSafe() {
+        assertThrows(IllegalArgumentException.class, () -> new PythonModuleMapping.Source.JavaType("io.micronaut.http.HttpResponse", "bad-name"));
+        ResolvedModule http = resolve(mappings(PythonModuleMapping.builder("pyronaut.http")
+            .javaType("io.micronaut.http.HttpResponse", "import")
+            .build()), "pyronaut.http");
+
+        assertEquals("io.micronaut.http.HttpResponse", http.members().get("import_").binaryName());
+    }
+
+    @Test
     void keywordNamesGainUnderscore() {
         index.statics("io.micronaut.http.HttpResponse", "import");
         ResolvedModule http = resolve(mappings(PythonModuleMapping.builder("pyronaut.http")

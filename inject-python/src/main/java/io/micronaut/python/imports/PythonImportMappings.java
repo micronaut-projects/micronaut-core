@@ -167,7 +167,9 @@ public final class PythonImportMappings {
     }
 
     /**
-     * A digest of every mapping, which changes whenever what any module may resolve to changes.
+     * A digest of every mapping, stable across runs, which changes whenever a mapping changes. What a module resolves
+     * to also depends on the {@link ClassIndex} it is resolved against, so a cache of resolved modules keys on the
+     * class path as well.
      *
      * @return The hexadecimal digest
      */
@@ -195,6 +197,10 @@ public final class PythonImportMappings {
      */
     public Resolver resolver(ClassIndex index) {
         return new Resolver(index);
+    }
+
+    private static boolean names(Member member, String preferred) {
+        return member.binaryName().equals(preferred) || member.target().equals(preferred);
     }
 
     private static String inactiveReason(String module, PythonModuleMapping mapping) {
@@ -238,7 +244,6 @@ public final class PythonImportMappings {
     public final class Resolver {
         private final ClassIndex index;
         private final Map<String, ResolvedModule> resolved = new LinkedHashMap<>();
-        private final Set<String> resolving = new LinkedHashSet<>();
 
         private Resolver(ClassIndex index) {
             this.index = index;
@@ -268,16 +273,10 @@ public final class PythonImportMappings {
             if (cached != null) {
                 return Optional.of(cached);
             }
-            if (!resolving.add(module)) {
-                throw new PythonImportMappingException(PYTHON_MODULE + module + "] is nested in itself");
-            }
-            try {
-                ResolvedModule result = resolveModule(module, mappings);
-                resolved.put(module, result);
-                return Optional.of(result);
-            } finally {
-                resolving.remove(module);
-            }
+            // a module resolves its nested modules only, never an enclosing one, so this cannot recurse into itself
+            ResolvedModule result = resolveModule(module, mappings);
+            resolved.put(module, result);
+            return Optional.of(result);
         }
 
         private ResolvedModule resolveModule(String module, List<PythonModuleMapping> mappings) {
@@ -307,22 +306,36 @@ public final class PythonImportMappings {
                         owners.put(member.name(), mapping);
                     } else if (!existing.target().equals(member.target())) {
                         PythonModuleMapping owner = Objects.requireNonNull(owners.get(member.name()));
-                        if (owner.prefer().containsKey(member.name())) {
-                            clashes.add(new Clash(member.name(), List.of(existing, member), existing, "prefer of the contribution of higher precedence"));
-                        } else if (mapping.prefer().containsKey(member.name())) {
-                            clashes.add(new Clash(member.name(), List.of(existing, member), member, "prefer of the contribution of lower precedence"));
-                            members.put(member.name(), member);
-                            owners.put(member.name(), mapping);
-                        } else {
+                        // the contribution of higher precedence decides first; a prefer must name one of the two
+                        String preferred = owner.prefer().get(member.name());
+                        String preferredBy = "prefer of the contribution of higher precedence";
+                        if (preferred == null) {
+                            preferred = mapping.prefer().get(member.name());
+                            preferredBy = "prefer of the contribution of lower precedence";
+                        }
+                        if (preferred == null) {
                             errors.add(PYTHON_MODULE + module + "] has contributions binding [" + member.name() + "] to both ["
                                 + existing.target() + "] and [" + member.target() + "]: declare prefer(\"" + member.name()
                                 + "\", ...) in one of them, or let one replace the other");
+                        } else if (names(existing, preferred)) {
+                            clashes.add(new Clash(member.name(), List.of(existing, member), existing, preferredBy));
+                        } else if (names(member, preferred)) {
+                            clashes.add(new Clash(member.name(), List.of(existing, member), member, preferredBy));
+                            members.put(member.name(), member);
+                            owners.put(member.name(), mapping);
+                        } else {
+                            errors.add(PYTHON_MODULE + module + "] prefers [" + preferred + "] for [" + member.name()
+                                + "], which is none of its contributions' candidates [" + existing.target() + ", " + member.target() + "]");
                         }
                     }
                 }
             }
             if (active) {
-                addNestedModules(module, members, clashes);
+                Set<String> excluded = new LinkedHashSet<>();
+                for (PythonModuleMapping mapping : mappings) {
+                    excluded.addAll(mapping.exclude());
+                }
+                addNestedModules(module, members, clashes, excluded);
             }
             if (!errors.isEmpty()) {
                 throw new PythonImportMappingException(String.join(System.lineSeparator(), errors));
@@ -331,13 +344,16 @@ public final class PythonImportMappings {
             return new ResolvedModule(module, documentation, sorted, clashes, active, active ? null : inactiveReason);
         }
 
-        private void addNestedModules(String module, Map<String, Member> members, List<Clash> clashes) {
+        private void addNestedModules(String module, Map<String, Member> members, List<Clash> clashes, Set<String> excluded) {
             String prefix = module + '.';
             for (String candidate : contributions.keySet()) {
                 if (!candidate.startsWith(prefix) || candidate.indexOf('.', prefix.length()) >= 0) {
                     continue;
                 }
                 String name = candidate.substring(prefix.length());
+                if (excluded.contains(name)) {
+                    continue;
+                }
                 Member nested = new Member(name, Kind.MODULE, candidate, null);
                 Member existing = members.get(name);
                 if (existing != null) {
@@ -435,7 +451,7 @@ public final class PythonImportMappings {
                     }
                 }
                 case Source.JavaType javaType -> index.type(javaType.binaryName()).ifPresent(type ->
-                    members.add(new Member(javaType.alias() != null ? javaType.alias() : pythonName(type.simpleName()), kindOf(type), type.binaryName(), null)));
+                    members.add(new Member(pythonName(javaType.alias() != null ? javaType.alias() : type.simpleName()), kindOf(type), type.binaryName(), null)));
                 case Source.StaticMethods staticMethods -> {
                     if (index.type(staticMethods.binaryName()).isPresent()) {
                         for (String method : new LinkedHashSet<>(index.staticMethods(staticMethods.binaryName()))) {
