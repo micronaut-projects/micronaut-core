@@ -60,6 +60,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Handler for WebSocket clients.
@@ -92,8 +93,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      */
     private final AtomicBoolean connectSettled = new AtomicBoolean();
     private volatile boolean connectCancelled;
-    @Nullable
-    private volatile Channel channel;
+    private final AtomicReference<@Nullable Channel> channel = new AtomicReference<>();
     @Nullable
     private final Duration handshakeTimeout;
     @Nullable
@@ -161,7 +161,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private void cancelConnect() {
         connectCancelled = true;
         if (connectSettled.compareAndSet(false, true)) {
-            Channel ch = channel;
+            Channel ch = channel.get();
             if (ch != null) {
                 ch.close();
             }
@@ -197,7 +197,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
-        channel = ctx.channel();
+        channel.set(ctx.channel());
         if (connectCancelled) {
             // cancelled before the handler was added
             ctx.close();
@@ -397,7 +397,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         if (session != null && session.isOpen()) {
             session.close(CloseReason.GOING_AWAY);
         } else {
-            Channel ch = channel;
+            Channel ch = channel.get();
             if (ch != null) {
                 ch.close();
             }
