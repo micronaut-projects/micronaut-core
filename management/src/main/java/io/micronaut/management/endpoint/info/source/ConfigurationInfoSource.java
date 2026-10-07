@@ -25,13 +25,10 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
 import io.micronaut.runtime.context.scope.Refreshable;
-import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 /**
@@ -59,11 +56,6 @@ public class ConfigurationInfoSource implements InfoSource {
     @Override
     public Publisher<PropertySource> getSource() {
         return Publishers.just(supplier.get());
-    }
-
-    @Override
-    public CompletionStage<@Nullable PropertySource> getSourceAsync() {
-        return CompletableFuture.completedFuture(supplier.get());
     }
 
     private MapPropertySource retrieveConfigurationInfo() {

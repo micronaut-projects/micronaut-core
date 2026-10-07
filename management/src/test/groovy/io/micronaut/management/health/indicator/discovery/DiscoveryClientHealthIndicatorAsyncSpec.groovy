@@ -23,10 +23,10 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
                 foo: [ServiceInstance.of('foo', new URI('http://foo:8080'))],
                 bar: [ServiceInstance.of('bar', new URI('http://bar:8080')), ServiceInstance.of('bar', new URI('http://bar:8081'))]
         ])
-        def indicator = new DiscoveryClientHealthIndicator(client)
+        def indicator = new AsyncDiscoveryClientHealthIndicator(client)
 
         when:
-        HealthResult async = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult async = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
         HealthResult published = Mono.from(indicator.result).block()
 
         then:
@@ -44,7 +44,7 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
                 [foo: CompletableFuture.completedFuture([ServiceInstance.of('foo', new URI('http://foo:8080'))])])
 
         when:
-        HealthResult result = new DiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult result = new AsyncDiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         result.name == 'async'
@@ -59,7 +59,7 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
         DiscoveryClient composite = new FailingCompositeClient(child)
 
         when:
-        HealthResult result = new DiscoveryClientHealthIndicator(composite).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult result = new AsyncDiscoveryClientHealthIndicator(composite).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         result.status == HealthStatus.UP
@@ -72,8 +72,8 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
                 [foo: CompletableFuture.failedFuture(error)])
 
         when:
-        HealthResult async = new DiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
-        HealthResult published = Mono.from(new DiscoveryClientHealthIndicator(client).result).block()
+        HealthResult async = new AsyncDiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
+        HealthResult published = Mono.from(new AsyncDiscoveryClientHealthIndicator(client).result).block()
 
         then:
         async.name == 'failing'
@@ -96,11 +96,46 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
         }
 
         when:
-        HealthResult result = new DiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult result = new AsyncDiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         result.status == HealthStatus.DOWN
         result.details == [error: 'java.lang.IllegalStateException: thrown']
+    }
+
+    void 'a subclass of the indicator that overrides getResult is called through it'() {
+        given:
+        def indicator = new DiscoveryClientHealthIndicator(new AsyncOnlyClient('async', new CompletableFuture<List<String>>(), [:])) {
+            @Override
+            Publisher<HealthResult> getResult() {
+                return Mono.just(HealthResult.builder('overridden', HealthStatus.UP).build())
+            }
+        }
+
+        expect:
+        indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)*.name == ['overridden']
+    }
+
+    void 'cancelling the publisher of the indicator cancels the discovery client'() {
+        given:
+        def cancelled = new java.util.concurrent.atomic.AtomicInteger()
+        DiscoveryClient publisherClient = new PublisherOnlyClient('publisher', [:]) {
+            @Override
+            Publisher<List<String>> getServiceIds() {
+                return Mono.<List<String>> never().doOnCancel { cancelled.incrementAndGet() }
+            }
+        }
+        def pending = new CompletableFuture<List<String>>()
+        DiscoveryClient asyncClient = new AsyncOnlyClient('async', pending, [:])
+
+        when:
+        Mono.from(new DiscoveryClientHealthIndicator(publisherClient).result).subscribe().dispose()
+        Mono.from(new AsyncDiscoveryClientHealthIndicator(publisherClient).result).subscribe().dispose()
+        new AsyncDiscoveryClientHealthIndicator(asyncClient).resultAsync.toCompletableFuture().cancel(false)
+
+        then:
+        cancelled.get() == 2
+        pending.cancelled
     }
 
     static class PublisherOnlyClient implements DiscoveryClient {

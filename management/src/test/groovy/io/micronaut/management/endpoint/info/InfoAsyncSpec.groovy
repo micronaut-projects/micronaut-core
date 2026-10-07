@@ -5,6 +5,7 @@ import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.io.ResourceResolver
+import io.micronaut.management.endpoint.info.impl.AsyncInfoAggregator
 import io.micronaut.management.endpoint.info.impl.ReactiveInfoAggregator
 import io.micronaut.management.endpoint.info.source.BuildInfoSource
 import io.micronaut.management.endpoint.info.source.ConfigurationInfoSource
@@ -22,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class InfoAsyncSpec extends Specification {
 
-    ReactiveInfoAggregator aggregator = new ReactiveInfoAggregator()
+    ReactiveInfoAggregator aggregator = new AsyncInfoAggregator()
 
     void 'the default getSourceAsync adapts the first property source of the publisher'() {
         given:
@@ -141,6 +142,89 @@ class InfoAsyncSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    void 'a subclass of the aggregator that overrides aggregate is called through it by the default aggregateAsync'() {
+        given:
+        def calls = new java.util.concurrent.atomic.AtomicInteger()
+        ReactiveInfoAggregator custom = new ReactiveInfoAggregator() {
+            @Override
+            Publisher<Map<String, Object>> aggregate(InfoSource[] sources) {
+                calls.incrementAndGet()
+                return Mono.just([custom: true] as Map<String, Object>)
+            }
+        }
+
+        expect:
+        custom.aggregateAsync([] as InfoSource[]).toCompletableFuture().get(5, TimeUnit.SECONDS) == [custom: true]
+        calls.get() == 1
+    }
+
+    void 'a subclass of the aggregator that overrides aggregateResults is called through it by aggregate and aggregateAsync'() {
+        given:
+        def calls = new java.util.concurrent.atomic.AtomicInteger()
+        ReactiveInfoAggregator custom = new ReactiveInfoAggregator() {
+            @Override
+            protected Flux<Map.Entry<Integer, PropertySource>> aggregateResults(InfoSource[] sources) {
+                calls.incrementAndGet()
+                return Flux.just(Map.entry(0, new MapPropertySource('replaced', [replaced: true])) as Map.Entry<Integer, PropertySource>)
+            }
+        }
+        InfoSource[] sources = [new AsyncSource(CompletableFuture.completedFuture(new MapPropertySource('one', [a: 1])))]
+
+        expect:
+        custom.aggregateAsync(sources).toCompletableFuture().get(5, TimeUnit.SECONDS) == [replaced: true]
+        Mono.from(custom.aggregate(sources)).block() == [replaced: true]
+        calls.get() == 2
+    }
+
+    void 'subclasses of the built-in sources that override getSource are called through it'() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        def resolver = context.getBean(ResourceResolver)
+        def git = new GitInfoSource(resolver, 'git.properties') {
+            @Override
+            Publisher<PropertySource> getSource() {
+                return Mono.just(new MapPropertySource('overridden', [o: 1]) as PropertySource)
+            }
+        }
+        def build = new BuildInfoSource(resolver, 'META-INF/build-info.properties') {
+            @Override
+            Publisher<PropertySource> getSource() {
+                return Mono.just(new MapPropertySource('overridden', [o: 2]) as PropertySource)
+            }
+        }
+
+        expect:
+        git.sourceAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).name == 'overridden'
+        build.sourceAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).get('o') == 2
+
+        cleanup:
+        context.close()
+    }
+
+    void 'cancelling the publisher of the aggregation cancels the sources'() {
+        given:
+        def cancelled = new java.util.concurrent.atomic.AtomicInteger()
+        def pending = new CompletableFuture<PropertySource>()
+        InfoSource[] publisherOnly = [new PublisherOnlySource(Mono.<PropertySource> never().doOnCancel { cancelled.incrementAndGet() })]
+        InfoSource[] async = [new AsyncSource(pending)]
+
+        when:
+        Mono.from(new ReactiveInfoAggregator().aggregate(publisherOnly)).subscribe().dispose()
+        Mono.from(aggregator.aggregate(publisherOnly)).subscribe().dispose()
+        Mono.from(aggregator.aggregate(async)).subscribe().dispose()
+
+        then:
+        cancelled.get() == 2
+        pending.cancelled
+    }
+
+    void 'the default bean is the aggregator that combines the stages'() {
+        expect:
+        ApplicationContext.run(['endpoints.info.enabled': true]).withCloseable {
+            it.getBean(InfoAggregator).getClass().name == 'io.micronaut.management.endpoint.info.impl.AsyncInfoAggregator'
+        }
     }
 
     static class PublisherOnlySource implements InfoSource {

@@ -15,51 +15,44 @@
  */
 package io.micronaut.management.health.indicator.jdbc;
 
-import io.micronaut.context.annotation.Requires;
 import org.jspecify.annotations.Nullable;
-import io.micronaut.core.async.publisher.CompletionStagePublishers;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.jdbc.DataSourceResolver;
-import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import javax.sql.DataSource;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.stream.Collectors;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display information about the jdbc
  * status.
  *
+ * <p>The bean checks the data sources and aggregates their results without a publisher. This
+ * class only implements the publisher method, so that a subclass that overrides it, and replaces
+ * the bean, is called through it by the default {@link #getResultAsync()}.</p>
+ *
  * @author James Kleeh
  * @since 1.0
  */
-@Singleton
-@Requires(beans = HealthEndpoint.class)
-@Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = StringUtils.FALSE)
-@Requires(classes = DataSourceResolver.class)
-@Requires(beans = DataSource.class)
 public class JdbcIndicator implements HealthIndicator {
 
-    private static final String NAME = "jdbc";
+    static final String NAME = "jdbc";
     private static final int CONNECTION_TIMEOUT = 3;
 
     private final ExecutorService executorService;
@@ -83,18 +76,20 @@ public class JdbcIndicator implements HealthIndicator {
         this.healthAggregator = healthAggregator;
     }
 
-    private CompletableFuture<List<HealthResult>> getResultAsync(DataSource dataSource) {
+    private Publisher<HealthResult> getResult(DataSource dataSource) {
         if (executorService == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("I/O ExecutorService is null"));
+            throw new IllegalStateException("I/O ExecutorService is null");
         }
-        try {
-            return CompletableFuture.supplyAsync(() -> List.of(getHealthResult(dataSource)), executorService);
-        } catch (RejectedExecutionException e) {
-            return CompletableFuture.failedFuture(e);
-        }
+        return new AsyncSingleResultPublisher<>(executorService, () -> checkDataSource(dataSource));
     }
 
-    private HealthResult getHealthResult(DataSource dataSource) {
+    /**
+     * Checks a data source, blocking.
+     *
+     * @param dataSource The data source
+     * @return The result of the data source
+     */
+    final HealthResult checkDataSource(DataSource dataSource) {
         Optional<Throwable> throwable = Optional.empty();
         Map<String, Object> details = null;
         String key;
@@ -137,34 +132,13 @@ public class JdbcIndicator implements HealthIndicator {
 
     @Override
     public Publisher<HealthResult> getResult() {
-        return CompletionStagePublishers.toPublisher(this::getResultAsync);
-    }
-
-    /**
-     * Checks each data source on the blocking executor, and aggregates the results with
-     * {@link HealthAggregator#aggregateAsync(String, List)}, without a publisher. Completes with
-     * {@code null} when there is no data source.
-     *
-     * @return A {@link CompletionStage} completed with the aggregated {@link HealthResult}
-     * @since 5.3.0
-     */
-    @Override
-    public CompletionStage<@Nullable HealthResult> getResultAsync() {
         if (dataSources.length == 0) {
-            return CompletableFuture.completedFuture(null);
+            return Flux.empty();
         }
-        List<CompletionStage<List<HealthResult>>> stages = new ArrayList<>(dataSources.length);
-        for (DataSource dataSource : dataSources) {
-            DataSource resolved;
-            try {
-                resolved = dataSourceResolver.resolve(dataSource);
-            } catch (Exception e) {
-                stages.add(CompletableFuture.failedFuture(e));
-                continue;
-            }
-            stages.add(getResultAsync(resolved));
-        }
-        CompletableFuture<List<HealthResult>> results = CompletionStagePublishers.concat(stages);
-        return CompletionStagePublishers.cancelling(results, results.thenCompose(list -> healthAggregator.aggregateAsync(NAME, list)));
+        return healthAggregator.aggregate(NAME, Flux.merge(
+            Arrays.stream(dataSources)
+                .map(dataSourceResolver::resolve)
+                .map(this::getResult).collect(Collectors.toList())
+        ));
     }
 }

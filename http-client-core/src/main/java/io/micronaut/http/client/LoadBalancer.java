@@ -21,11 +21,12 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.loadbalance.AsyncFixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.OutlierEjectionState;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
@@ -52,9 +53,9 @@ public interface LoadBalancer {
      * {@link #select(Object)}, and cancels the subscription once it arrives or once the returned
      * stage is cancelled. The stage completes with {@code null} when the publisher completes
      * without an instance, which the clients handle as they handle an empty publisher.
-     * A load balancer that can select without a publisher overrides this method; a subclass of
-     * a built-in load balancer that overrides {@link #select(Object)} should override this
-     * method too.
+     * A load balancer that can select without a publisher overrides this method. The built-in
+     * load balancer classes do not, so that a subclass that overrides {@link #select(Object)} is
+     * selected through it; the load balancers the framework creates select without a publisher.
      *
      * @param discriminator An object used to discriminate the server to select. Usually the service ID
      * @return A stage completed with the selected {@link ServiceInstance}, or with the error of the selection
@@ -163,7 +164,11 @@ public interface LoadBalancer {
      */
     @Deprecated
     static LoadBalancer fixed(URL url) {
-        return new FixedLoadBalancer(url);
+        try {
+            return new AsyncFixedLoadBalancer(url.toURI());
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Illegal URI", e);
+        }
     }
 
     /**
@@ -173,7 +178,7 @@ public interface LoadBalancer {
      * @return The {@link LoadBalancer}
      */
     static LoadBalancer fixed(URI uri) {
-        return new FixedLoadBalancer(uri);
+        return new AsyncFixedLoadBalancer(uri);
     }
 
     /**

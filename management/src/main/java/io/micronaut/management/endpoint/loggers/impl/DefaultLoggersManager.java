@@ -31,8 +31,6 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 /**
@@ -57,16 +55,6 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
     public Publisher<Map<String, Object>> getLogger(ManagedLoggingSystem loggingSystem,
                                                     String name) {
         return Publishers.just(getLoggerData(loggingSystem.getLogger(name)));
-    }
-
-    @Override
-    public CompletionStage<Map<String, Object>> getLoggersAsync(ManagedLoggingSystem loggingSystem) {
-        return CompletableFuture.completedFuture(loggers(loggingSystem));
-    }
-
-    @Override
-    public CompletionStage<Map<String, Object>> getLoggerAsync(ManagedLoggingSystem loggingSystem, @NotBlank String name) {
-        return CompletableFuture.completedFuture(getLoggerData(loggingSystem.getLogger(name)));
     }
 
     private static Map<String, Object> loggers(ManagedLoggingSystem loggingSystem) {

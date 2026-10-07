@@ -1,6 +1,7 @@
 package io.micronaut.management.health.aggregator
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.async.publisher.CompletionStagePublishers
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.health.HealthStatus
 import io.micronaut.management.endpoint.health.HealthLevelOfDetail
@@ -28,7 +29,7 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
     ApplicationContext context = ApplicationContext.run(['micronaut.application.name': 'foo'])
 
     @Shared
-    DefaultHealthAggregator aggregator = new DefaultHealthAggregator(context.getBean(ApplicationConfiguration))
+    DefaultHealthAggregator aggregator = new AsyncHealthAggregator(context.getBean(ApplicationConfiguration))
 
     void 'aggregateAsync combines the async results and the publisher-only indicators'() {
         given:
@@ -157,9 +158,9 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         def calls = new AtomicInteger()
         HealthIndicator[] indicators = [new AsyncIndicator(null) {
             @Override
-            CompletionStage<HealthResult> getResultAsync() {
+            CompletionStage<List<HealthResult>> getResultAsync() {
                 calls.incrementAndGet()
-                return CompletableFuture.completedFuture(HealthResult.builder('a', HealthStatus.UP).build())
+                return CompletableFuture.completedFuture([HealthResult.builder('a', HealthStatus.UP).build()])
             }
         }]
 
@@ -238,6 +239,98 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         named.details == [names: ['one']]
     }
 
+    void 'aggregateAsync keeps all the results of an indicator that emits several'() {
+        given:
+        HealthIndicator[] indicators = [
+                new PublisherOnlyIndicator(Flux.just(
+                        HealthResult.builder('one', HealthStatus.UP).build(),
+                        HealthResult.builder('two', HealthStatus.DOWN).build()
+                )),
+                new AsyncIndicator(CompletableFuture.completedFuture(HealthResult.builder('three', HealthStatus.UP).build()))
+        ]
+
+        when:
+        HealthResult result = aggregator.aggregateAsync(indicators, HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)
+                .toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult published = Mono.from(new DefaultHealthAggregator(context.getBean(ApplicationConfiguration))
+                .aggregate(indicators.take(1) as HealthIndicator[], HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)).block()
+
+        then:
+        (result.details as Map).keySet() == ['one', 'two', 'three'] as Set
+        result.status == HealthStatus.DOWN
+        (published.details as Map).keySet() == ['one', 'two'] as Set
+    }
+
+    void 'a subclass that overrides aggregate is called through it by the default aggregateAsync'() {
+        given:
+        def calls = new AtomicInteger()
+        DefaultHealthAggregator custom = new DefaultHealthAggregator(context.getBean(ApplicationConfiguration)) {
+            @Override
+            Publisher<HealthResult> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
+                calls.incrementAndGet()
+                return Mono.just(HealthResult.builder('custom', HealthStatus.UP).build())
+            }
+
+            @Override
+            Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results) {
+                calls.incrementAndGet()
+                return Mono.just(HealthResult.builder('custom-' + name, HealthStatus.UP).build())
+            }
+        }
+
+        expect:
+        custom.aggregateAsync(indicators([HealthStatus.DOWN]), HealthLevelOfDetail.STATUS).toCompletableFuture().get(5, TimeUnit.SECONDS).name == 'custom'
+        custom.aggregateAsync('jdbc', []).toCompletableFuture().get(5, TimeUnit.SECONDS).name == 'custom-jdbc'
+        calls.get() == 2
+    }
+
+    void 'a subclass that overrides aggregateResults is called through it by aggregate and aggregateAsync'() {
+        given:
+        def calls = new AtomicInteger()
+        DefaultHealthAggregator custom = new DefaultHealthAggregator(context.getBean(ApplicationConfiguration)) {
+            @Override
+            protected Flux<HealthResult> aggregateResults(HealthIndicator[] indicators) {
+                calls.incrementAndGet()
+                return Flux.just(HealthResult.builder('replaced', HealthStatus.UP).build())
+            }
+        }
+
+        when:
+        HealthResult async = custom.aggregateAsync(indicators([HealthStatus.DOWN]), HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)
+                .toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult published = Mono.from(custom.aggregate(indicators([HealthStatus.DOWN]), HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)).block()
+
+        then:
+        (async.details as Map).keySet() == ['replaced'] as Set
+        async.status == HealthStatus.UP
+        (published.details as Map).keySet() == ['replaced'] as Set
+        calls.get() == 2
+    }
+
+    void 'cancelling the publisher of the aggregation cancels the indicators'() {
+        given:
+        def cancelled = new AtomicInteger()
+        def pending = new CompletableFuture<HealthResult>()
+        HealthIndicator[] publisherOnly = [new PublisherOnlyIndicator(Mono.<HealthResult> never().doOnCancel { cancelled.incrementAndGet() })]
+        HealthIndicator[] async = [new AsyncIndicator(pending)]
+
+        when:
+        Mono.from(new DefaultHealthAggregator(context.getBean(ApplicationConfiguration)).aggregate(publisherOnly, HealthLevelOfDetail.STATUS)).subscribe().dispose()
+        Mono.from(aggregator.aggregate(publisherOnly, HealthLevelOfDetail.STATUS)).subscribe().dispose()
+        Mono.from(aggregator.aggregate(async, HealthLevelOfDetail.STATUS)).subscribe().dispose()
+
+        then:
+        cancelled.get() == 2
+        pending.cancelled
+    }
+
+    void 'the default bean is the aggregator that combines the stages'() {
+        expect:
+        ApplicationContext.run(['endpoints.health.enabled': true]).withCloseable {
+            it.getBean(HealthAggregator) instanceof AsyncHealthAggregator
+        }
+    }
+
     private static HealthIndicator[] indicators(List<HealthStatus> statuses) {
         int i = 0
         return statuses.collect { status ->
@@ -258,8 +351,8 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         }
 
         @Override
-        CompletionStage<HealthResult> getResultAsync() {
-            return future
+        CompletionStage<List<HealthResult>> getResultAsync() {
+            return CompletionStagePublishers.cancelling(future, future.thenApply { [it] })
         }
     }
 
@@ -289,7 +382,7 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         }
 
         @Override
-        CompletionStage<HealthResult> getResultAsync() {
+        CompletionStage<List<HealthResult>> getResultAsync() {
             throw error
         }
     }

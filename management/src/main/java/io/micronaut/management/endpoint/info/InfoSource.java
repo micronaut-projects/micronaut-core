@@ -42,8 +42,8 @@ public interface InfoSource extends Ordered {
      * by {@link #getSource()}, and completes with {@code null} when the publisher completes
      * without one, which the aggregator handles as an empty property source. Cancelling the
      * stage cancels the subscription. A source that provides its property source without a
-     * publisher overrides this method; a subclass of a built-in source that overrides
-     * {@link #getSource()} should override this method too.
+     * publisher overrides this method. The built-in source classes do not, so that a subclass
+     * that overrides {@link #getSource()} is called through it.
      *
      * @return A {@link CompletionStage} completed with the {@link PropertySource} containing data to be added to the endpoint response, or with {@code null} when there is none
      * @since 5.3.0

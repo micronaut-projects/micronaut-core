@@ -24,9 +24,9 @@ import io.micronaut.management.health.indicator.annotation.Readiness;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.graceful.GracefulShutdownManager;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -56,8 +56,8 @@ final class GracefulShutdownHealthIndicator implements HealthIndicator, Graceful
     }
 
     @Override
-    public CompletionStage<@Nullable HealthResult> getResultAsync() {
-        return CompletableFuture.completedFuture(healthResult());
+    public CompletionStage<List<HealthResult>> getResultAsync() {
+        return CompletableFuture.completedFuture(List.of(healthResult()));
     }
 
     private HealthResult healthResult() {

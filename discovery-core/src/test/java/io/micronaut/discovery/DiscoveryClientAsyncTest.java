@@ -15,7 +15,12 @@
  */
 package io.micronaut.discovery;
 
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
+import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -24,6 +29,7 @@ import reactor.core.publisher.Mono;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -87,7 +93,7 @@ class DiscoveryClientAsyncTest {
     void theCompositeConcatenatesTheClientsInOrder() {
         AsyncClient first = new AsyncClient("first");
         AsyncClient second = new AsyncClient("second");
-        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(first, second);
+        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(first, second);
 
         CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("myService").toCompletableFuture();
         // the service ID is hyphenated, like for the publisher
@@ -107,7 +113,7 @@ class DiscoveryClientAsyncTest {
 
     @Test
     void theCompositeAdaptsClientsThatOnlyHavePublishers() {
-        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(
+        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(
             new PublisherClient("one", Publishers.just(List.of(A)), Publishers.just(List.of("one"))),
             new PublisherClient("empty", Publishers.empty(), Publishers.empty()),
             new PublisherClient("two", Publishers.just(List.of(B)), Publishers.just(List.of("two")))
@@ -123,7 +129,7 @@ class DiscoveryClientAsyncTest {
     void oneFailingClientFailsTheCompositeAndCancelsTheOthers() {
         AsyncClient first = new AsyncClient("first");
         AsyncClient second = new AsyncClient("second");
-        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(first, second);
+        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(first, second);
         IllegalStateException error = new IllegalStateException("boom");
 
         CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("my-service").toCompletableFuture();
@@ -134,7 +140,7 @@ class DiscoveryClientAsyncTest {
         assertTrue(first.instances.get(0).isCancelled());
         // the publisher fails too
         PublisherClient failing = new PublisherClient("failing", Mono.error(error), Mono.error(error));
-        DiscoveryClient publishers = new DefaultCompositeDiscoveryClient(new PublisherClient("ok", Publishers.just(List.of(A)), Publishers.just(List.of())), failing);
+        DiscoveryClient publishers = new AsyncCompositeDiscoveryClient(new PublisherClient("ok", Publishers.just(List.of(A)), Publishers.just(List.of())), failing);
         assertSame(error, assertThrows(IllegalStateException.class, () -> Mono.from(publishers.getInstances("my-service")).block()));
         e = assertThrows(ExecutionException.class, () -> publishers.getInstancesAsync("my-service").toCompletableFuture().get());
         assertSame(error, e.getCause());
@@ -144,7 +150,7 @@ class DiscoveryClientAsyncTest {
     void cancellingTheCompositeCancelsTheClients() {
         AsyncClient first = new AsyncClient("first");
         AsyncClient second = new AsyncClient("second");
-        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(first, second);
+        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(first, second);
 
         composite.getServiceIdsAsync().toCompletableFuture().cancel(false);
 
@@ -154,7 +160,7 @@ class DiscoveryClientAsyncTest {
 
     @Test
     void aCompositeWithoutClientsIsEmpty() {
-        DiscoveryClient composite = new DefaultCompositeDiscoveryClient();
+        DiscoveryClient composite = new AsyncCompositeDiscoveryClient();
 
         assertEquals(List.of(), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
         assertEquals(List.of(), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
@@ -173,6 +179,93 @@ class DiscoveryClientAsyncTest {
 
         assertEquals(List.of(A), composite.getInstancesAsync("my-service").toCompletableFuture().join());
         assertEquals(1, calls.get());
+    }
+
+    @Test
+    void aDefaultCompositeSubclassThatOverridesThePublishersIsCalledThroughThem() {
+        AtomicInteger instancesCalls = new AtomicInteger();
+        AtomicInteger serviceIdsCalls = new AtomicInteger();
+        // the stages of the client must not be used, the subclass decides
+        AsyncClient client = new AsyncClient("async");
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(client) {
+            @Override
+            public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+                instancesCalls.incrementAndGet();
+                return Publishers.just(List.of(C));
+            }
+
+            @Override
+            public Publisher<List<String>> getServiceIds() {
+                serviceIdsCalls.incrementAndGet();
+                return Publishers.just(List.of("custom"));
+            }
+        };
+
+        assertEquals(List.of(C), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of("custom"), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        assertEquals(1, instancesCalls.get());
+        assertEquals(1, serviceIdsCalls.get());
+        assertTrue(client.requested.isEmpty());
+    }
+
+    @Test
+    void theCompositeWithOneClientReturnsItsStage() {
+        AsyncClient client = new AsyncClient("only");
+        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(client);
+
+        CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("myService").toCompletableFuture();
+
+        assertEquals(List.of("my-service"), client.requested);
+        assertSame(client.instances.get(0), instances);
+    }
+
+    @Test
+    void cancellingThePublisherOfTheCompositeCancelsTheClients() {
+        AtomicInteger cancelled = new AtomicInteger();
+        PublisherClient never = new PublisherClient("never",
+            Flux.<List<ServiceInstance>>never().doOnCancel(cancelled::incrementAndGet),
+            Flux.<List<String>>never().doOnCancel(cancelled::incrementAndGet));
+        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(never, new PublisherClient("other", Flux.never(), Flux.never()));
+
+        Flux.from(composite.getInstances("my-service")).subscribe().dispose();
+        Flux.from(composite.getServiceIds()).subscribe().dispose();
+
+        assertEquals(2, cancelled.get());
+    }
+
+    @Test
+    void theDefaultBeanCombinesTheStages() {
+        try (ApplicationContext context = ApplicationContext.run()) {
+            assertTrue(context.getBean(DiscoveryClient.class) instanceof AsyncCompositeDiscoveryClient);
+            assertTrue(context.getBean(DefaultCompositeDiscoveryClient.class) instanceof AsyncCompositeDiscoveryClient);
+        }
+    }
+
+    @Test
+    void aReplacementOfTheDefaultCompositeIsCalledThroughItsPublishers() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "DiscoveryClientAsyncTest"))) {
+            DiscoveryClient discoveryClient = context.getBean(DiscoveryClient.class);
+            assertTrue(discoveryClient instanceof ReplacedCompositeDiscoveryClient);
+            assertEquals(List.of(C), discoveryClient.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
+        }
+    }
+
+    /**
+     * A subclass that replaces the default composite, as the caching composite of micronaut-cache does.
+     */
+    @Primary
+    @Singleton
+    @Replaces(DefaultCompositeDiscoveryClient.class)
+    @Requires(property = "spec.name", value = "DiscoveryClientAsyncTest")
+    static class ReplacedCompositeDiscoveryClient extends DefaultCompositeDiscoveryClient {
+        ReplacedCompositeDiscoveryClient() {
+            super(new DiscoveryClient[0]);
+        }
+
+        @Override
+        public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+            return Publishers.just(List.of(C));
+        }
     }
 
     private record PublisherClient(String name, Publisher<List<ServiceInstance>> instances, Publisher<List<String>> serviceIds) implements DiscoveryClient {

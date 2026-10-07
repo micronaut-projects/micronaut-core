@@ -46,7 +46,7 @@ public class DiscoveryClientLoadBalancerFactory {
      * @return The {@link LoadBalancer}
      */
     public LoadBalancer create(String serviceID) {
-        return new DiscoveryClientRoundRobinLoadBalancer(serviceID, discoveryClient);
+        return new AsyncDiscoveryClientRoundRobinLoadBalancer(serviceID, discoveryClient);
     }
 
     /**

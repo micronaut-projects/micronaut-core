@@ -56,6 +56,25 @@ class LoggersManagerAsyncSpec extends Specification {
         manager.getLoggerAsync(loggingSystem, 'foo').toCompletableFuture().get(5, TimeUnit.SECONDS) == 'foo'
     }
 
+    void 'a subclass of the default loggers manager that overrides the publishers is called through them'() {
+        given:
+        def manager = new DefaultLoggersManager() {
+            @Override
+            Publisher<Map<String, Object>> getLoggers(ManagedLoggingSystem system) {
+                return Mono.just([custom: 'loggers'] as Map<String, Object>)
+            }
+
+            @Override
+            Publisher<Map<String, Object>> getLogger(ManagedLoggingSystem system, String name) {
+                return Mono.just([custom: name] as Map<String, Object>)
+            }
+        }
+
+        expect:
+        manager.getLoggersAsync(loggingSystem).toCompletableFuture().get(5, TimeUnit.SECONDS) == [custom: 'loggers']
+        manager.getLoggerAsync(loggingSystem, 'foo').toCompletableFuture().get(5, TimeUnit.SECONDS) == [custom: 'foo']
+    }
+
     static class TestLoggingSystem implements ManagedLoggingSystem {
         @Override
         Collection<LoggerConfiguration> getLoggers() {

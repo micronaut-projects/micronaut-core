@@ -17,9 +17,9 @@ package io.micronaut.management.health.indicator;
 
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.order.Ordered;
-import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import java.util.List;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -39,18 +39,18 @@ public interface HealthIndicator extends Ordered {
 
     /**
      * The {@link CompletionStage} counterpart of {@link #getResult()}, which the
-     * {@link io.micronaut.management.health.aggregator.HealthAggregator} and the health monitor
-     * call. By default, it adapts the first {@link HealthResult} emitted by {@link #getResult()},
-     * and completes with {@code null} when the publisher completes without one, in which case the
-     * indicator contributes no result. Cancelling the stage cancels the subscription.
-     * An indicator that computes its result without a publisher overrides this method; a
-     * subclass of a built-in indicator that overrides {@link #getResult()} should override this
-     * method too.
+     * {@link io.micronaut.management.health.aggregator.HealthAggregator} calls. By default, it
+     * collects all the {@link HealthResult}s emitted by {@link #getResult()}, as the aggregator
+     * always merged them: an indicator may emit several results, or none, in which case it
+     * contributes no result. Cancelling the stage cancels the subscription.
+     * An indicator that computes its results without a publisher overrides this method. The
+     * built-in indicator classes do not, so that a subclass that overrides {@link #getResult()} is
+     * called through it.
      *
-     * @return A {@link CompletionStage} completed with the {@link HealthResult}, or with {@code null} when there is none
+     * @return A {@link CompletionStage} completed with the {@link HealthResult}s, in the order they were emitted
      * @since 5.3.0
      */
-    default CompletionStage<@Nullable HealthResult> getResultAsync() {
-        return CompletionStagePublishers.first(getResult(), null);
+    default CompletionStage<List<HealthResult>> getResultAsync() {
+        return CompletionStagePublishers.collect(getResult());
     }
 }

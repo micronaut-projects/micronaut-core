@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -85,6 +86,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
@@ -491,8 +493,21 @@ abstract class AbstractJdkHttpClient {
         }
 
         LoadBalancer balancer = loadBalancer;
-        // a selection that is not complete yet is cancelled with the subscription
-        return Mono.fromCompletionStage(() -> balancer.selectAsync(getLoadBalancerDiscriminator(request))).map(server -> {
+        // a selection that is not complete yet is cancelled with the subscription. The selection
+        // is made in the propagated context of the subscriber, so that a load balancer or a
+        // discovery client with publishers finds it in its Reactor context, as it did when its
+        // publisher was part of this chain
+        return Mono.deferContextual(contextView -> {
+            Object discriminator = getLoadBalancerDiscriminator(request);
+            PropagatedContext propagatedContext = ReactorPropagation.findPropagatedContext(contextView).orElse(null);
+            CompletionStage<ServiceInstance> selection;
+            if (propagatedContext == null || propagatedContext.isBound()) {
+                selection = balancer.selectAsync(discriminator);
+            } else {
+                selection = propagatedContext.propagate(() -> balancer.selectAsync(discriminator));
+            }
+            return Mono.fromCompletionStage(selection);
+        }).map(server -> {
                 LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {

@@ -28,6 +28,7 @@ import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -40,6 +41,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.
@@ -53,6 +55,10 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     private final ConversionService conversionService;
     private final FunctionDiscoveryClient discoveryClient;
     private final FunctionInvokerChooser functionInvokerChooser;
+    /**
+     * The function name of each method, which does not change.
+     */
+    private final Map<ExecutableMethod<?, ?>, String> functionNames = new ConcurrentHashMap<>();
 
     /**
      * Constructor.
@@ -83,8 +89,9 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
             body = parameterValueMap;
         }
 
-        String functionName = context.stringValue(AnnotationUtil.NAMED)
-            .orElse(NameUtils.hyphenate(context.getMethodName(), true));
+        String functionName = functionNames.computeIfAbsent(context.getExecutableMethod(), method ->
+            method.stringValue(AnnotationUtil.NAMED).orElseGet(() -> NameUtils.hyphenate(method.getMethodName(), true))
+        );
 
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {

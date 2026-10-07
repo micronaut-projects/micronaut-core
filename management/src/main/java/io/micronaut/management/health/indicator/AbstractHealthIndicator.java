@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.health.indicator;
 
-import io.micronaut.core.async.publisher.CompletionStagePublishers;
+import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Inject;
@@ -23,10 +23,7 @@ import jakarta.inject.Named;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
 
 /**
  * <p>A base health indicator class to extend from that catches exceptions thrown from the
@@ -56,26 +53,7 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
         if (executorService == null) {
             throw new IllegalStateException("I/O ExecutorService is null");
         }
-        return CompletionStagePublishers.toPublisher(this::getResultAsync);
-    }
-
-    /**
-     * Runs {@link #getHealthResult()} on the blocking executor, without a publisher.
-     *
-     * @return A {@link CompletionStage} completed with the result of {@link #getHealthResult()}
-     * @since 5.3.0
-     */
-    @Override
-    public CompletionStage<@Nullable HealthResult> getResultAsync() {
-        ExecutorService executor = executorService;
-        if (executor == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("I/O ExecutorService is null"));
-        }
-        try {
-            return CompletableFuture.supplyAsync(this::getHealthResult, executor);
-        } catch (RejectedExecutionException e) {
-            return CompletableFuture.failedFuture(e);
-        }
+        return new AsyncSingleResultPublisher<>(executorService, this::getHealthResult);
     }
 
     /**

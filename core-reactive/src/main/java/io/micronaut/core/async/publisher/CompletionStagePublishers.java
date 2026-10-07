@@ -16,10 +16,13 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.CoreSubscriber;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,11 +40,17 @@ import java.util.function.Supplier;
  * {@link CompletionStage} counterparts of the publisher based SPIs. Each future subscribes to its
  * publisher right away, and cancelling the future cancels the subscription.
  *
+ * <p>A publisher is subscribed to in the {@link PropagatedContext} of the caller, as a thread-local
+ * and, when Reactor is present, in the Reactor context, and its signals are handled in that context,
+ * so that the continuations of the future run in it.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 public final class CompletionStagePublishers {
+
+    private static final boolean REACTOR_PRESENT = isReactorPresent();
 
     private CompletionStagePublishers() {
     }
@@ -122,7 +131,7 @@ public final class CompletionStagePublishers {
     /**
      * A publisher of the value of a stage, the reverse of {@link #first(Publisher, Object)} for
      * the publisher methods that delegate to their {@link CompletionStage} counterparts. The
-     * stage is obtained once an item is requested, the publisher emits its value, or completes
+     * stage is obtained once per subscription, when an item is first requested, the publisher emits its value, or completes
      * without an item when the value is {@code null}, and fails with the error of the stage
      * without the {@link CompletionException} wrapper. Cancelling the subscription cancels the
      * stage.
@@ -132,18 +141,7 @@ public final class CompletionStagePublishers {
      * @return A publisher of the value of the stage
      */
     public static <T> Publisher<T> toPublisher(Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier) {
-        return Publishers.fromCompletableFuture(() -> {
-            CompletableFuture<? extends @Nullable T> source = stageSupplier.get().toCompletableFuture();
-            CompletableFuture<T> result = new CompletableFuture<>();
-            source.whenComplete((value, throwable) -> {
-                if (throwable != null) {
-                    result.completeExceptionally(unwrap(throwable));
-                } else {
-                    result.complete(value);
-                }
-            });
-            return cancelling(source, result);
-        });
+        return new StagePublisher<>(stageSupplier);
     }
 
     /**
@@ -175,6 +173,17 @@ public final class CompletionStagePublishers {
         return throwable;
     }
 
+    @SuppressWarnings("ConstantValue")
+    private static boolean isReactorPresent() {
+        try {
+            // resolving the class literal fails when Reactor, an optional dependency, is absent
+            Class<?> type = CoreSubscriber.class;
+            return type != null;
+        } catch (LinkageError e) {
+            return false;
+        }
+    }
+
     private static void cancelAll(List<? extends CompletableFuture<?>> futures) {
         for (CompletableFuture<?> future : futures) {
             future.cancel(false);
@@ -188,9 +197,149 @@ public final class CompletionStagePublishers {
             }
         });
         try {
-            publisher.subscribe(subscriber);
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+            if (propagatedContext.isEmpty()) {
+                publisher.subscribe(subscriber);
+            } else if (REACTOR_PRESENT) {
+                // a Reactor publisher finds the context in its Reactor context, as it did when it
+                // was subscribed to by a Reactor chain of the caller
+                ReactivePropagation.propagate(propagatedContext, publisher).subscribe(subscriber);
+            } else {
+                publisher.subscribe(new PropagatingSubscriber<>(propagatedContext, subscriber));
+            }
         } catch (Throwable e) {
             future.completeExceptionally(e);
+        }
+    }
+
+    /**
+     * Handles the signals of a publisher in a propagated context, without Reactor.
+     *
+     * @param propagatedContext The context
+     * @param actual            The subscriber
+     * @param <T>               The item type
+     */
+    private record PropagatingSubscriber<T>(PropagatedContext propagatedContext,
+                                            Subscriber<T> actual) implements Subscriber<T> {
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            run(() -> actual.onSubscribe(s));
+        }
+
+        @Override
+        public void onNext(T t) {
+            run(() -> actual.onNext(t));
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            run(() -> actual.onError(t));
+        }
+
+        @Override
+        public void onComplete() {
+            run(actual::onComplete);
+        }
+
+        private void run(Runnable signal) {
+            if (propagatedContext.isBound()) {
+                signal.run();
+            } else {
+                propagatedContext.propagate(signal);
+            }
+        }
+    }
+
+    /**
+     * The publisher of {@link #toPublisher(Supplier)}.
+     *
+     * @param stageSupplier The supplier of the stage, called once per subscription
+     * @param <T>           The value type
+     */
+    private record StagePublisher<T>(
+        Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier) implements Publishers.MicronautPublisher<T> {
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+            subscriber.onSubscribe(new StageSubscription<>(stageSupplier, subscriber));
+        }
+    }
+
+    /**
+     * The subscription to the value of a stage. The stage is obtained on the first request, and
+     * its value is emitted once.
+     *
+     * @param <T> The value type
+     */
+    private static final class StageSubscription<T> implements Subscription {
+        private static final int NEW = 0;
+        private static final int REQUESTED = 1;
+        private static final int DONE = 2;
+
+        private final Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier;
+        private final Subscriber<? super T> subscriber;
+        private final AtomicInteger state = new AtomicInteger(NEW);
+        @Nullable
+        @SuppressWarnings("java:S3077") // the future is not modified, volatile only publishes it to cancel()
+        private volatile CompletableFuture<? extends @Nullable T> future;
+
+        StageSubscription(Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier, Subscriber<? super T> subscriber) {
+            this.stageSupplier = stageSupplier;
+            this.subscriber = subscriber;
+        }
+
+        @Override
+        public void request(long n) {
+            if (n <= 0) {
+                if (state.getAndSet(DONE) != DONE) {
+                    subscriber.onError(new IllegalArgumentException("Cannot request a non-positive number"));
+                }
+                return;
+            }
+            if (!state.compareAndSet(NEW, REQUESTED)) {
+                // the stage is obtained once, whatever the requests
+                return;
+            }
+            CompletableFuture<? extends @Nullable T> source;
+            try {
+                source = Objects.requireNonNull(stageSupplier.get(), "The stage supplier returned null").toCompletableFuture();
+            } catch (Throwable e) {
+                if (state.compareAndSet(REQUESTED, DONE)) {
+                    subscriber.onError(e);
+                }
+                return;
+            }
+            future = source;
+            if (state.get() == DONE) {
+                // cancelled while the stage was obtained
+                source.cancel(false);
+                return;
+            }
+            source.whenComplete((value, throwable) -> {
+                if (!state.compareAndSet(REQUESTED, DONE)) {
+                    return;
+                }
+                if (throwable != null) {
+                    subscriber.onError(unwrap(throwable));
+                } else {
+                    if (value != null) {
+                        subscriber.onNext(value);
+                    }
+                    subscriber.onComplete();
+                }
+            });
+        }
+
+        @Override
+        public void cancel() {
+            if (state.getAndSet(DONE) != DONE) {
+                CompletableFuture<? extends @Nullable T> f = future;
+                if (f != null) {
+                    f.cancel(false);
+                }
+            }
         }
     }
 

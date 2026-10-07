@@ -18,8 +18,10 @@ import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem
 import io.micronaut.management.endpoint.loggers.impl.DefaultLoggersManager
 import io.micronaut.management.health.aggregator.DefaultHealthAggregator
 import io.micronaut.management.health.aggregator.HealthAggregator
+import io.micronaut.management.health.indicator.AbstractHealthIndicator
 import io.micronaut.management.health.indicator.HealthIndicator
 import io.micronaut.management.health.indicator.HealthResult
+import io.micronaut.runtime.ApplicationConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
@@ -94,6 +96,58 @@ class AsyncSpiEndpointSpec extends Specification {
         server.close()
     }
 
+    void 'the health endpoint reports every result of an indicator, and an AbstractHealthIndicator that overrides getResult'() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                          : 'AsyncSpiEndpointSpec.overrides',
+                'endpoints.health.sensitive'         : false,
+                'endpoints.health.details-visible'   : 'ANONYMOUS',
+                'endpoints.health.disk-space.enabled': false
+        ])
+        BlockingHttpClient client = server.applicationContext.createBean(HttpClient, server.URL).toBlocking()
+
+        when:
+        Map body = client.retrieve('/health', Map)
+
+        then:
+        body.details.first.status == 'UP'
+        body.details.second.status == 'UP'
+        body.details.overridden.status == 'UP'
+        body.details.overridden.details == [overridden: true]
+
+        cleanup:
+        client.close()
+        server.close()
+    }
+
+    void 'the health endpoint calls a replaced aggregator subclass through #method'() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                          : 'AsyncSpiEndpointSpec.aggregator',
+                'aggregator.override'                : method,
+                'endpoints.health.sensitive'         : false,
+                'endpoints.health.details-visible'   : 'ANONYMOUS',
+                'endpoints.health.disk-space.enabled': false
+        ])
+        BlockingHttpClient client = server.applicationContext.createBean(HttpClient, server.URL).toBlocking()
+
+        when:
+        Map body = client.retrieve('/health', Map)
+
+        then:
+        body.name == expectedName
+        body.details.keySet() == expectedDetails as Set
+
+        cleanup:
+        client.close()
+        server.close()
+
+        where:
+        method             | expectedName          | expectedDetails
+        'aggregate'        | 'subclassAggregate'   | ['custom']
+        'aggregateResults' | 'application'         | ['replacedResult']
+    }
+
     private static exchange(BlockingHttpClient client, String uri) {
         try {
             return client.exchange(uri, Map)
@@ -117,9 +171,9 @@ class AsyncSpiEndpointSpec extends Specification {
         }
 
         @Override
-        CompletionStage<HealthResult> getResultAsync() {
+        CompletionStage<List<HealthResult>> getResultAsync() {
             return CompletableFuture.supplyAsync {
-                HealthResult.builder('asyncOnly', status).details([native: true]).build()
+                [HealthResult.builder('asyncOnly', status).details([native: true]).build()]
             }
         }
     }
@@ -130,6 +184,66 @@ class AsyncSpiEndpointSpec extends Specification {
         @Override
         Publisher<HealthResult> getResult() {
             return Mono.just(HealthResult.builder('publisherOnly', HealthStatus.UP).details([publisher: true]).build())
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'AsyncSpiEndpointSpec.overrides')
+    static class MultipleResultsIndicator implements HealthIndicator {
+        @Override
+        Publisher<HealthResult> getResult() {
+            return Flux.just(
+                    HealthResult.builder('first', HealthStatus.UP).build(),
+                    HealthResult.builder('second', HealthStatus.UP).build()
+            )
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'AsyncSpiEndpointSpec.overrides')
+    static class OverridingAbstractIndicator extends AbstractHealthIndicator<Map<String, Object>> {
+        @Override
+        Publisher<HealthResult> getResult() {
+            return Mono.just(HealthResult.builder('overridden', HealthStatus.UP).details([overridden: true]).build())
+        }
+
+        @Override
+        protected Map<String, Object> getHealthInformation() {
+            throw new UnsupportedOperationException('getResult is overridden')
+        }
+
+        @Override
+        protected String getName() {
+            return 'overridden'
+        }
+    }
+
+    @Singleton
+    @Replaces(DefaultHealthAggregator)
+    @Requires(property = 'spec.name', value = 'AsyncSpiEndpointSpec.aggregator')
+    static class SubclassHealthAggregator extends DefaultHealthAggregator {
+        final String override
+
+        SubclassHealthAggregator(ApplicationConfiguration applicationConfiguration,
+                                 @io.micronaut.context.annotation.Value('${aggregator.override}') String override) {
+            super(applicationConfiguration)
+            this.override = override
+        }
+
+        @Override
+        Publisher<HealthResult> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
+            if (override == 'aggregate') {
+                return Mono.just(HealthResult.builder('subclassAggregate', HealthStatus.UP).details([custom: [status: 'UP']]).build())
+            }
+            return super.aggregate(indicators, healthLevelOfDetail)
+        }
+
+        @Override
+        protected Flux<HealthResult> aggregateResults(HealthIndicator[] indicators) {
+            if (override == 'aggregateResults') {
+                return Flux.just(HealthResult.builder('replacedResult', HealthStatus.UP).build())
+            }
+            return super.aggregateResults(indicators)
         }
     }
 

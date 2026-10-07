@@ -24,12 +24,9 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 /**
@@ -67,11 +64,6 @@ public class BuildInfoSource implements PropertiesInfoSource {
     public Publisher<PropertySource> getSource() {
         Optional<PropertySource> propertySource = supplier.get();
         return propertySource.map(Publishers::just).orElseGet(Publishers::empty);
-    }
-
-    @Override
-    public CompletionStage<@Nullable PropertySource> getSourceAsync() {
-        return CompletableFuture.completedFuture(supplier.get().orElse(null));
     }
 
     private Optional<PropertySource> retrieveBuildInfo() {
