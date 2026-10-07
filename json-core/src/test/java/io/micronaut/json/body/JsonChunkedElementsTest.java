@@ -1,4 +1,4 @@
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -30,7 +30,7 @@ class JsonChunkedElementsTest {
 
     @Test
     void eachElementOfAnArrayIsACollection() {
-        NettyJsonHandler<List<Integer>> handler = new NettyJsonHandler<>(MAPPER);
+        JsonMessageHandler<List<Integer>> handler = new JsonMessageHandler<>(MAPPER);
         ByteBuf input = buffer("[[1,2],[3,4]]");
 
         List<List<Integer>> lists = Flux.from(handler.readChunked(NUMBERS, MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024))
@@ -43,7 +43,7 @@ class JsonChunkedElementsTest {
 
     @Test
     void eachValueOfAStreamIsACollection() {
-        NettyJsonStreamHandler<List<Integer>> handler = new NettyJsonStreamHandler<>(MAPPER);
+        JsonStreamMessageHandler<List<Integer>> handler = new JsonStreamMessageHandler<>(MAPPER);
         ByteBuf input = buffer("[1,2]\n[3,4]\n");
 
         List<List<Integer>> lists = Flux.from(handler.readChunked(NUMBERS, MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024))
@@ -56,7 +56,7 @@ class JsonChunkedElementsTest {
 
     @Test
     void aCollectionReadWithoutALimitIsStillTheWholeArray() {
-        NettyJsonHandler<List<Integer>> handler = new NettyJsonHandler<>(MAPPER);
+        JsonMessageHandler<List<Integer>> handler = new JsonMessageHandler<>(MAPPER);
         ByteBuf input = buffer("[1,2,3]");
 
         List<List<Integer>> lists = Flux.from(handler.readChunked(NUMBERS, MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input))))
@@ -70,7 +70,7 @@ class JsonChunkedElementsTest {
 
     @Test
     void theBufferOfAnElementThatDoesNotDecodeIsReleased() {
-        NettyJsonHandler<Map> handler = new NettyJsonHandler<>(MAPPER);
+        JsonMessageHandler<Map> handler = new JsonMessageHandler<>(MAPPER);
         ByteBuf input = buffer("[{\"a\":1},[1],{\"b\":2}]");
 
         assertThrows(RuntimeException.class, () -> Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024))
@@ -82,7 +82,7 @@ class JsonChunkedElementsTest {
 
     @Test
     void theBufferOfAStreamValueThatDoesNotDecodeIsReleased() {
-        NettyJsonStreamHandler<Map> handler = new NettyJsonStreamHandler<>(MAPPER);
+        JsonStreamMessageHandler<Map> handler = new JsonStreamMessageHandler<>(MAPPER);
         ByteBuf input = buffer("{\"a\":1}\n[1]\n{\"b\":2}\n");
 
         assertThrows(RuntimeException.class, () -> Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024))

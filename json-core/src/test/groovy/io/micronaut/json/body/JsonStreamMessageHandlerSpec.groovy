@@ -1,4 +1,4 @@
-package io.micronaut.http.netty.body
+package io.micronaut.json.body
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory
 import io.micronaut.context.ApplicationContext
@@ -10,7 +10,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 
-class NettyJsonStreamHandlerSpec extends Specification {
+class JsonStreamMessageHandlerSpec extends Specification {
     def parse(Class<? extends ChunkedMessageBodyReader<?>> readerType, Argument<?> type, String input, Object expected) {
         given:
         def ctx = ApplicationContext.run()
@@ -29,10 +29,10 @@ class NettyJsonStreamHandlerSpec extends Specification {
 
         where:
         readerType             | type                    | input              | expected
-        NettyJsonHandler       | Argument.STRING         | '["foo","bar"]'    | ["foo", "bar"]
-        NettyJsonHandler       | Argument.listOf(String) | '["foo","bar"]'    | [["foo", "bar"]]
-        NettyJsonStreamHandler | Argument.STRING         | '"foo"\n"bar"'     | ["foo", "bar"]
-        NettyJsonStreamHandler | Argument.listOf(String) | '["foo"]\n["bar"]' | [["foo"], ["bar"]]
+        JsonMessageHandler       | Argument.STRING         | '["foo","bar"]'    | ["foo", "bar"]
+        JsonMessageHandler       | Argument.listOf(String) | '["foo","bar"]'    | [["foo", "bar"]]
+        JsonStreamMessageHandler | Argument.STRING         | '"foo"\n"bar"'     | ["foo", "bar"]
+        JsonStreamMessageHandler | Argument.listOf(String) | '["foo"]\n["bar"]' | [["foo"], ["bar"]]
     }
 
     def "a JSON null in a JSON stream read as a list is not an element"() {

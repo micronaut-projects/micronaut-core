@@ -1,4 +1,4 @@
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
@@ -63,7 +63,7 @@ class JsonBodyElementsTest {
 
     @Test
     void theReactiveReaderEmitsTheValuesBeforeAMalformedValueThenFails() {
-        List<Signal<Integer>> signals = Flux.from(new NettyJsonHandler<Integer>(MAPPER).readChunked(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE,
+        List<Signal<Integer>> signals = Flux.from(new JsonMessageHandler<Integer>(MAPPER).readChunked(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE,
                 new SimpleHttpHeaders(), Flux.just(NettyByteBufferFactory.DEFAULT.wrap(Unpooled.copiedBuffer("[1,2,}", StandardCharsets.UTF_8))), 1024))
             .materialize()
             .collectList()
@@ -74,7 +74,7 @@ class JsonBodyElementsTest {
 
     @Test
     void theReactiveReaderFailsOnANullElement() {
-        List<Signal<Integer>> signals = Flux.from(new NettyJsonHandler<Integer>(MAPPER).readChunked(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE,
+        List<Signal<Integer>> signals = Flux.from(new JsonMessageHandler<Integer>(MAPPER).readChunked(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE,
                 new SimpleHttpHeaders(), Flux.just(NettyByteBufferFactory.DEFAULT.wrap(Unpooled.copiedBuffer("[1,null,2]", StandardCharsets.UTF_8))), 1024))
             .materialize()
             .collectList()
@@ -85,7 +85,7 @@ class JsonBodyElementsTest {
 
     private static ByteBodyElements<Integer> elements(String json) {
         return new ByteBodyElements<>(BODIES.copyOf(json, StandardCharsets.UTF_8),
-            new NettyJsonHandler<Integer>(MAPPER).openPieceReader(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), 1024),
+            new JsonMessageHandler<Integer>(MAPPER).openPieceReader(Argument.of(Integer.class), MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), 1024),
             e -> e);
     }
 
