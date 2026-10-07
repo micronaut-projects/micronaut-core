@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -96,6 +97,10 @@ public final class PythonTypeResolver {
     private static ClassElement resolvePythonTypeToJava(TypeRef typeRef, PythonVisitorContext visitorContext, Map<String, ClassElement> boundGenerics) {
         if (typeRef == null) {
             return ClassElement.of(Object.class);
+        }
+        if (typeRef.nativeException()) {
+            // Keep the native Python ancestry at runtime, exposing a Throwable wrapper to Java.
+            return visitorContext.getClassElement(RuntimeException.class).orElse(ClassElement.of(RuntimeException.class));
         }
 
         String name = typeRef.name();
@@ -286,6 +291,8 @@ public final class PythonTypeResolver {
             case "bytes", "bytearray" -> PrimitiveElement.BYTE.toArray();
             case "str" ->
                 visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
+            case "decimal.Decimal" ->
+                visitorContext.getClassElement(BigDecimal.class).orElse(ClassElement.of(BigDecimal.class));
             case "date", "datetime.date" ->
                 visitorContext.getClassElement(LocalDate.class).orElse(ClassElement.of(LocalDate.class));
             case "time", "datetime.time" ->

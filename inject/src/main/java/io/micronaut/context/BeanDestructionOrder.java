@@ -53,14 +53,13 @@ public final class BeanDestructionOrder {
         if (!visited.add(registration)) {
             return;
         }
-        if (registration instanceof DependentBeanProvider provider) {
-            for (BeanRegistration<?> owned : provider.dependentBeans()) {
-                collectDependencyRegistrations(owned, visited);
-            }
+        for (BeanRegistration<?> owned : registration.dependentBeans()) {
+            collectDependencyRegistrations(owned, visited);
         }
-        if (registration instanceof BeanDisposingRegistration<?> disposing) {
+        DefaultBeanDependencies dependencies = registration.getDependencies();
+        if (dependencies != null) {
             // Shared registrations remain owned by their scopes and form leaves of this consumer's tree.
-            visited.addAll(disposing.getDependencies().requiredBeans());
+            visited.addAll(dependencies.requiredBeans());
         }
         if (registration.getBean() instanceof InterceptedBeanProxy<?> proxy && proxy.hasCachedInterceptedTarget()) {
             BeanRegistration<?> target = proxy.interceptedTargetRegistration();

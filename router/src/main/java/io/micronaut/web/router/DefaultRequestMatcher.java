@@ -22,6 +22,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RouteConditions;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -64,5 +66,18 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
             }
         }
         return true;
+    }
+
+    /**
+     * @return The declarative conditions of the route, normalized, in the order they are evaluated
+     * @see UriRouteInfo#getConditions()
+     */
+    public List<RouteCondition> getConditions() {
+        for (Predicate<HttpRequest<?>> predicate : predicates) {
+            if (predicate instanceof RouteConditions.RoutePredicate routePredicate) {
+                return RouteConditions.conjuncts(routePredicate.condition());
+            }
+        }
+        return List.of();
     }
 }

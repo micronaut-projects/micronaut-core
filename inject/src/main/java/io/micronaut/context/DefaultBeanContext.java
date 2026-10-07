@@ -115,13 +115,11 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.AbstractMap;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -132,7 +130,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -247,7 +244,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final CustomScopeRegistry customScopeRegistry;
     // the interceptors of targets this context holds no registration for, by the definition of the target
-    private final Map<Object, UnownedInterceptorSelection> unownedInterceptorSelections = new ConcurrentHashMap<>();
     private final BeanResolutionCustomizer beanResolutionCustomizer;
     private final RuntimeBeanDefinition<BeanDependencyResolver> dependencyResolverDefinition = RuntimeBeanDefinition
         .<BeanDependencyResolver>builder(BeanDependencyResolver.class, () -> new DefaultBeanDependencyResolver(this))
@@ -495,10 +491,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 destroySingletons(stragglers, processed);
             }
 
-            // the interceptors of targets this context holds no registration for have no other owner. They go last,
-            // so that a singleton calling such a target as it is destroyed is still intercepted by them
-            destroyUnownedInterceptorSelections();
-
             if (checkEnabledBeans != null) {
                 checkEnabledBeans.cancel(true);
             }
@@ -627,8 +619,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
+        return getBeanRegistration(null, definition, beanType);
+    }
+
+    /**
+     * Resolves the given definition as the given bean type, as {@link #getBeanRegistration(BeanDefinition, Argument)}
+     * does, on behalf of the bean the resolution context resolves for: a bean the resolution creates that has no
+     * scope of its own is recorded as a dependent of the resolution context, as one a lookup by type creates is.
+     *
+     * @param resolutionContext The resolution context, or {@code null}
+     * @param definition        The bean definition
+     * @param beanType          The potentially parameterized bean type to resolve the definition as
+     * @param <T>               The bean type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    final <T> BeanRegistration<T> getBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                      BeanDefinition<? extends T> definition,
+                                                      Argument<T> beanType) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
         ArgumentUtils.requireNonNull("beanType", beanType);
         // resolved as the requested type, of which the definition's own type is a subtype
@@ -639,7 +650,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!isInjectableCandidate(resolvedBeanType, beanDefinition)) {
             throw new NoSuchBeanException(beanType, null, "The bean definition [" + beanDefinition + "] is not a candidate for that type.");
         }
-        BeanRegistration<T> registration = resolveBeanRegistration(null, beanDefinition, resolvedBeanType, beanDefinition.getDeclaredQualifier());
+        BeanRegistration<T> registration = resolveBeanRegistration(resolutionContext, beanDefinition, resolvedBeanType, beanDefinition.getDeclaredQualifier());
         if (registration.bean == null) {
             // only a nullable definition gets here: any other fails to instantiate when it produces no bean
             registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
@@ -1125,6 +1136,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         );
     }
 
+    @Override
+    public <T> T createBean(BeanDefinition<T> definition, @Nullable Object... args) {
+        ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
+        try (BeanResolutionContext resolutionContext = newResolutionContext(definition, null)) {
+            return doCreateBeanWithArguments(resolutionContext, definition, Argument.of(definition.getBeanType()), null, args);
+        }
+    }
+
     private <T> T doCreateBeanWithArguments(BeanResolutionContext resolutionContext,
                                             BeanDefinition<T> definition,
                                             Argument<T> beanType,
@@ -1277,14 +1296,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Override
     public <T> void destroyDependentBean(BeanRegistration<T> registration) {
         ArgumentUtils.requireNonNull("registration", registration);
-        if (registration instanceof BeanDisposingRegistration<T> disposingRegistration && !disposingRegistration.markDestroyed()) {
-            // closed, or destroyed as a dependent, already
-            return;
-        }
         destroyBean(registration, true);
     }
 
     private <T> void destroyBean(BeanRegistration<T> registration, boolean dependent) {
+        if (registration instanceof BeanDisposingRegistration<?> disposing && !disposing.beginDestruction()) {
+            return;
+        }
         try (DefaultBeanResolutionContext resolutionContext =
                  new DefaultBeanResolutionContext(this, registration.getBeanDefinition(), null, true)) {
             destroyRegistration(resolutionContext, registration, dependent);
@@ -1319,20 +1337,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
             if (definition instanceof DisposableBeanDefinition<T> disposable) {
-                disposeBeanSafely(resolutionContext, disposable, registration, beanToDestroy);
+                disposeWithLogging(resolutionContext, disposable, registration, beanToDestroy);
             }
-            if (beanToDestroy instanceof LifeCycle<?> cycle && !dependent) {
-                destroyLifeCycleBean(cycle, definition);
-            }
+            stopLifecycleIfRequired(beanToDestroy, definition, dependent);
         } catch (RuntimeException | Error failure) {
-            closeRegistration(registration, failure);
+            releaseDependents(registration, failure);
             throw failure;
         }
-        closeRegistration(registration, null);
+        releaseDependents(registration, null);
         triggerBeanDestroyedListeners(definition, beanToDestroy);
     }
 
-    private <T> void disposeBeanSafely(DefaultBeanResolutionContext resolutionContext,
+    private <T> void disposeWithLogging(DefaultBeanResolutionContext resolutionContext,
                                        DisposableBeanDefinition<T> definition,
                                        BeanRegistration<T> registration, T beanToDestroy) {
         try {
@@ -1345,10 +1361,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @SuppressWarnings("java:S1181") // Preserve a destruction failure and attach cleanup Errors instead of replacing it.
-    private void closeRegistration(BeanRegistration<?> registration, @Nullable Throwable failure) {
+    private void releaseDependents(BeanRegistration<?> registration, @Nullable Throwable failure) {
         try {
             if (registration instanceof BeanDisposingRegistration<?> disposing) {
-                disposing.takeSelection();
                 disposing.getDependencies().close(this);
             } else {
                 registration.close();
@@ -1360,6 +1375,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (failure != cleanup) {
                 failure.addSuppressed(cleanup);
             }
+        }
+    }
+
+    private <T> void stopLifecycleIfRequired(T bean, BeanDefinition<T> definition, boolean dependent) {
+        if (bean instanceof LifeCycle<?> cycle && !dependent) {
+            destroyLifeCycleBean(cycle, definition);
         }
     }
 
@@ -1388,20 +1409,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                  DisposableBeanDefinition<T> definition,
                                  BeanRegistration<T> registration,
                                  T beanToDestroy) {
-        List<BeanRegistration<?>> dependents = registration instanceof DependentBeanProvider provider
-            ? provider.dependentBeans()
-            : Collections.emptyList();
-        List<?> interceptorRegistrations = registration instanceof BeanDisposingRegistration<?> disposingRegistration
-            ? disposingRegistration.getInterceptorRegistrations()
-            : null;
+        List<BeanRegistration<?>> dependents = registration.dependentBeans();
+        InterceptorCandidates candidates = registration instanceof BeanDisposingRegistration<?> disposingRegistration
+            ? disposingRegistration.getInterceptorCandidates()
+            : InterceptorCandidates.Unresolved.INSTANCE;
         if (!dependents.isEmpty()) {
             resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
         }
-        if (interceptorRegistrations != null && !interceptorRegistrations.isEmpty()) {
-            resolutionContext.setAttribute(
-                BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS,
-                interceptorRegistrations
-            );
+        if (candidates instanceof InterceptorCandidates.Resolved resolved) {
+            // An explicitly resolved empty set must also prevent discovery during destruction.
+            resolutionContext.setBeanInterceptors(definition, resolved.registrations());
         }
         definition.dispose(resolutionContext, this, beanToDestroy);
     }
@@ -1460,10 +1477,44 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return bean;
     }
 
+    @SuppressWarnings("java:S1181") // Remove the scoped target even when a dependent fails with an Error, then rethrow it.
     private <T> void destroyProxyTargetBean(BeanRegistration<T> registration, boolean dependent) {
         BeanDefinition<T> proxyTargetBeanDefinition = findProxyTargetBeanDefinition(registration.beanDefinition)
             .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
         Optional<CustomScope<?>> declaredScope = customScopeRegistry.findDeclaredScope(proxyTargetBeanDefinition);
+        if (registration.bean instanceof InterceptedBeanProxy<?> proxy
+            && proxy.$beanDependencies() != null) {
+            // The proxy retains the original owner even if the caller only retained the bean instance.
+            // Its prototype target and advice are ordinary dependents; scoped and swapped-in targets are borrowed.
+            Throwable failure = null;
+            try {
+                proxy.$beanDependencies().close();
+            } catch (RuntimeException | Error e) {
+                failure = e;
+            } finally {
+                proxy.clearCachedInterceptedTarget();
+            }
+            if (!dependent && declaredScope.isPresent()) {
+                // Runs even when a dependent failed to be destroyed, or the scope would keep the target alive.
+                // Removal by definition waits for a creation in flight, so a target about to be published is not missed.
+                try {
+                    declaredScope.get().remove(proxyTargetBeanDefinition);
+                } catch (RuntimeException | Error e) {
+                    if (failure == null) {
+                        failure = e;
+                    } else {
+                        failure.addSuppressed(e);
+                    }
+                }
+            }
+            if (failure instanceof RuntimeException exception) {
+                throw exception;
+            }
+            if (failure instanceof Error error) {
+                throw error;
+            }
+            return;
+        }
         List<BeanRegistration<?>> proxyDependents = registration instanceof BeanDisposingRegistration<?> disposingRegistration
             ? disposingRegistration.dependentBeans()
             : null;
@@ -1504,9 +1555,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     if (targetRegistration instanceof BeanDisposingRegistration<T> disposingTargetRegistration && targetRegistration.bean == interceptedTarget) {
                         // resolved after the proxy was created, so not among its dependents: destroyed through its own
                         // registration, with the interceptors created for it, unless it was destroyed already
-                        if (disposingTargetRegistration.markDestroyed()) {
-                            destroyBean(targetRegistration);
-                        }
+                        destroyBean(targetRegistration);
                         interceptedProxy.clearCachedInterceptedTarget();
                     }
                 }
@@ -1557,12 +1606,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // the dependents created with a target a lazy proxy caches are kept on the context the proxy retains
             targetDependents = takeCachedProxyTargetDependents(proxyRegistration);
         } else if (tracked instanceof BeanDisposingRegistration<?> trackedRegistration) {
-            if (!trackedRegistration.markDestroyed()) {
+            if (!trackedRegistration.beginDestruction()) {
                 // destroyed already: only the dependents of the proxy are left
                 return false;
             }
             targetDependents = trackedRegistration.dependentBeans();
-            targetInterceptorRegistrations = trackedRegistration.getInterceptorRegistrations();
+            targetInterceptorRegistrations = trackedRegistration.getInterceptorCandidates().legacyRegistrations();
         } else {
             return false;
         }
@@ -1851,6 +1900,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                  BeanDefinition<T> definition,
                                                                  Argument<T> beanType,
                                                                  @Nullable Qualifier<T> qualifier) {
+        if (resolutionContext instanceof AbstractBeanResolutionContext retained
+            && retained.isLazyProxyTarget() && retained.lazyProxyDependencies != null
+            && definition.booleanValue(AROUND_TYPE, "cacheableLazyTarget").orElse(false)
+            && isUnscoped(definition)) {
+            return retained.lazyProxyDependencies.resolve(this, null, resolution -> {
+                resolution.copyStateFrom(retained);
+                return resolveTargetRegistration(resolution, definition, beanType, qualifier);
+            });
+        }
+        return resolveTargetRegistration(resolutionContext, definition, beanType, qualifier);
+    }
+
+    private <T> BeanRegistration<T> resolveTargetRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                              BeanDefinition<T> definition,
+                                                              Argument<T> beanType,
+                                                              @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> registration = Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier, true));
         if (registration.bean == null) {
             registration = resolveNullBeanRegistration(beanType, beanType, registration);
@@ -3673,61 +3738,66 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 path.pushBeanCreate(definition, resolvedBeanType);
             }
             try {
-                List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
-                BeanRegistration<T> beanRegistration;
+                AbstractBeanResolutionContext creatingContext = context instanceof AbstractBeanResolutionContext creating ? creating : null;
+                BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
+                BeanCreationState creation = creatingContext == null
+                    ? new BeanCreationState(definition, List.of()) : creatingContext.beginCreation(definition);
                 try {
-                    T bean;
-                    if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                        bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                    } else {
-                        throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
-                    }
-                    List<?> interceptorRegistrations = null;
-                    if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                        Object value = registrations.remove(definition);
-                        if (value instanceof List<?> list) {
-                            interceptorRegistrations = list;
+                    List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
+                    BeanRegistration<T> beanRegistration;
+                    try {
+                        T bean;
+                        if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                            bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
+                        } else {
+                            throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                         }
-                    }
-                    bean = postBeanCreated(context, definition, beanType, qualifier, bean);
-                    if (customizeNull && bean == null) {
-                        bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
-                    }
+                        InterceptorCandidates interceptorCandidates = creation.lifecycleInterceptorCandidates();
+                        if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                            Object value = registrations.remove(definition);
+                            if (value instanceof List<?> list) {
+                                interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                            }
+                        }
+                        bean = postBeanCreated(context, definition, beanType, qualifier, bean);
+                        if (customizeNull && bean == null) {
+                            bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
+                        }
 
-                    BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
-                    if (dependentFactoryBean != null) {
-                        destroyBean(dependentFactoryBean);
+                        BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
+                        if (dependentFactoryBean != null) {
+                            destroyBean(dependentFactoryBean);
+                        }
+                        Qualifier<T> registrationQualifier = qualifier;
+                        if (registrationQualifier == null) {
+                            registrationQualifier = definition.getDeclaredQualifier();
+                        }
+                        BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
+                        List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
+                        beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
+                            dependentBeans, interceptorCandidates, creation.dependencies);
+                    } catch (RuntimeException | Error e) {
+                        destroyDependentsOfFailedBean(context, e);
+                        destroyCreatedBeans(creation.dependencies.takeDependents(), e);
+                        context.pushDependentBeans(parentDependentBeans);
+                        throw e;
                     }
-                    Qualifier<T> registrationQualifier = qualifier;
-                    if (registrationQualifier == null) {
-                        registrationQualifier = definition.getDeclaredQualifier();
+                    if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
+                        && context instanceof AbstractBeanResolutionContext creating
+                        && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
+                        // the context a lazy proxy retains holds what is created with the target it caches
+                        disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
                     }
-                    BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
-                    List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                    beanRegistration = BeanRegistration.of(
-                        this,
-                        beanKey,
-                        definition,
-                        bean,
-                        dependentBeans,
-                        interceptorRegistrations
-                    );
-                } catch (RuntimeException | Error e) {
-                    destroyDependentsOfFailedBean(context, e);
                     context.pushDependentBeans(parentDependentBeans);
-                    throw e;
+                    if (dependent) {
+                        context.addDependentBean(beanRegistration);
+                    }
+                    return beanRegistration;
+                } finally {
+                    if (creatingContext != null) {
+                        creatingContext.creationState = previousCreation;
+                    }
                 }
-                if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
-                    && context instanceof AbstractBeanResolutionContext creating
-                    && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
-                    // the context a lazy proxy retains holds what is created with the target it caches
-                    disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
-                }
-                context.pushDependentBeans(parentDependentBeans);
-                if (dependent) {
-                    context.addDependentBean(beanRegistration);
-                }
-                return beanRegistration;
             } finally {
                 if (isNewPath) {
                     path.close();
@@ -4072,76 +4142,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
-     * @param key The key
-     * @return The selection this context keeps for targets it holds no registration for, or {@code null}
-     */
-    @Nullable
-    Object keptUnownedInterceptors(Object key) {
-        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
-        return kept == null ? null : kept.selection;
-    }
-
-    /**
-     * Returns the interceptors this context keeps for targets it holds no registration for, see
-     * {@link RegisteredBeanInterceptors#selectUnowned(BeanLocator, Object, Argument, Qualifier, Function)}.
-     *
-     * <p>The interceptors no scope holds that a selection is computed from are created for it, and this context is
-     * their only owner: they are destroyed when it stops, or at once when the selection fails or another thread kept
-     * its own first.</p>
-     *
-     * @param key             The key
-     * @param interceptorType The interceptor type
-     * @param binding         The interceptor binding qualifier
-     * @param selector        Computes the selection from the registrations of the interceptors
-     * @param <I>             The interceptor type
-     * @param <S>             The selection type
-     * @return The selection
-     */
-    @SuppressWarnings("unchecked")
-    <I, S> S selectUnownedInterceptors(Object key,
-                                       Argument<I> interceptorType,
-                                       @Nullable Qualifier<I> binding,
-                                       Function<Collection<BeanRegistration<I>>, S> selector) {
-        UnownedInterceptorSelection kept = unownedInterceptorSelections.get(key);
-        if (kept == null) {
-            // A context-owned selection uses the same transaction as a registered target. Only the winning
-            // selection survives; failure and a lost race release their dependents through the same owner.
-            BeanDependencies dependencies = new BeanDependencies();
-            S value = dependencies.resolve(this, null, resolution ->
-                selector.apply(resolution.getInterceptorRegistrations(interceptorType, binding)));
-            UnownedInterceptorSelection selection = new UnownedInterceptorSelection(value, dependencies);
-            boolean published = false;
-            try {
-                synchronized (unownedInterceptorSelections) {
-                    // Shutdown can start after resolution committed but before the context took ownership.
-                    dependencies.checkOpen(this);
-                    kept = unownedInterceptorSelections.putIfAbsent(key, selection);
-                    published = kept == null;
-                }
-                if (published) {
-                    return value;
-                }
-            } finally {
-                if (!published) {
-                    destroyCreatedBeans(dependencies.takeDependents(), null);
-                }
-            }
-        }
-        return (S) kept.selection;
-    }
-
-    private void destroyUnownedInterceptorSelections() {
-        List<UnownedInterceptorSelection> selections;
-        synchronized (unownedInterceptorSelections) {
-            selections = new ArrayList<>(unownedInterceptorSelections.values());
-            unownedInterceptorSelections.clear();
-        }
-        for (UnownedInterceptorSelection selection : selections) {
-            destroyCreatedBeans(selection.dependencies.takeDependents(), null);
-        }
-    }
-
-    /**
      * Destroys beans created for something that does not, or no longer, own them, the last created first.
      *
      * @param created The registrations of the beans
@@ -4178,14 +4178,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private record UnownedInterceptorSelection(Object selection, BeanDependencies dependencies) {
-    }
-
     /**
      * Whether no scope holds a bean of the given definition: a prototype, one with no scope, or one of a scope
      * nothing implements, which is created for whoever asks for it.
      */
-    private boolean isUnscoped(BeanDefinition<?> definition) {
+    boolean isUnscoped(BeanDefinition<?> definition) {
         if (definition.isSingleton()) {
             return false;
         }
@@ -4476,7 +4473,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     BeanRegistration<BeanDependencyResolver> newDependencyGroupRegistration(@Nullable DefaultBeanResolutionContext destructionContext) {
         return BeanRegistration.of(this, BeanIdentifier.of(BeanDependencyResolver.class.getName()),
-            dependencyResolverDefinition, new DefaultBeanDependencyResolver(this, new BeanDependencies(destructionContext)));
+            dependencyResolverDefinition, new DefaultBeanDependencyResolver(this, new DefaultBeanDependencies(destructionContext)));
     }
 
     boolean isContextConfigured() {
@@ -4491,13 +4488,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!visited.add(registration)) {
             return;
         }
-        if (registration instanceof BeanDisposingRegistration<?> disposing) {
-            disposing.getDependencies().stopResolving();
+        DefaultBeanDependencies dependencies = registration.getDependencies();
+        if (dependencies != null) {
+            dependencies.stopResolving();
         }
-        if (registration instanceof DependentBeanProvider provider) {
-            for (BeanRegistration<?> owned : provider.dependentBeans()) {
-                stopDependencyResolution(owned, visited);
-            }
+        for (BeanRegistration<?> owned : registration.dependentBeans()) {
+            stopDependencyResolution(owned, visited);
         }
         if (registration.getBean() instanceof InterceptedBeanProxy<?> proxy && proxy.hasCachedInterceptedTarget()
             && findProxyTargetBeanDefinition(registration.getBeanDefinition()).map(this::isUnscoped).orElse(false)) {

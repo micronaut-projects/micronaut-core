@@ -235,10 +235,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public static boolean canHaveBody(HttpResponseStatus status) {
         // All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
-        // responses do not include a message body
-        return !(status == HttpResponseStatus.CONTINUE || status == HttpResponseStatus.SWITCHING_PROTOCOLS ||
-            status == HttpResponseStatus.PROCESSING || status == HttpResponseStatus.NO_CONTENT ||
-            status == HttpResponseStatus.NOT_MODIFIED);
+        // responses do not include a message body. Compare codes: a status with a custom reason
+        // phrase is not the canonical HttpResponseStatus constant.
+        int code = status.code();
+        return !(code >= 100 && code < 200 || code == 204 || code == 304);
     }
 
     /**
@@ -1101,6 +1101,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void attachment(Object attachment) {
             this.attachment = attachment;
+        }
+
+        @Override
+        public Runnable whenAbandoned(Runnable callback) {
+            // an HTTP/1.1 request is abandoned with its connection
+            ChannelFuture closeFuture = requiredCtx().channel().closeFuture();
+            ChannelFutureListener listener = future -> callback.run();
+            closeFuture.addListener(listener);
+            return () -> closeFuture.removeListener(listener);
         }
 
         /**

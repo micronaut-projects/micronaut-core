@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer
 
 import groovy.transform.PackageScope
+import io.micronaut.aop.internal.InterceptorChainFactoryBean
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanDefinitionsProvider
@@ -299,16 +300,14 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         [values.tags, values.levels, values.details].every { java.lang.reflect.Array.getLength(it) == 0 }
     }
 
-    void "an array of classes that is given no element is described where the definition holds one of class values"() {
+    void "an array of classes that is given no element is described as one of class values"() {
         expect:
-        undescribed.contains('test.$Untyped$Definition') ||
-            emptyArrayOf(descriptor('Untyped').qualifiers()[0].values.types, AnnotationClassValue)
+        emptyArrayOf(descriptor('Untyped').qualifiers()[0].values.types, AnnotationClassValue)
     }
 
-    void "an array of an annotation of the class path that is given no element is described where the definition holds one of annotation values"() {
+    void "an array of an annotation of the class path that is given no element is described as one of annotation values"() {
         expect:
-        undescribed.contains('test.$Unrequired$Definition') ||
-            emptyArrayOf(descriptor('Unrequired').qualifiers()[0].values.requirements, AnnotationValue)
+        emptyArrayOf(descriptor('Unrequired').qualifiers()[0].values.requirements, AnnotationValue)
     }
 
     void "the conditions that are checked before the definition is loaded are described in their order"() {
@@ -447,7 +446,7 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
      */
     @PackageScope
     List<BeanDefinitionReference<?>> runtimeReferences(ClassLoader classLoader) {
-        return [new InterceptorRegistryBean(), new BeanProviderDefinition(), new JakartaProviderBeanDefinition(), new ApplicationEventPublisherFactory<>()]
+        return [new InterceptorChainFactoryBean(), new InterceptorRegistryBean(), new BeanProviderDefinition(), new JakartaProviderBeanDefinition(), new ApplicationEventPublisherFactory<>()]
     }
 
     /**

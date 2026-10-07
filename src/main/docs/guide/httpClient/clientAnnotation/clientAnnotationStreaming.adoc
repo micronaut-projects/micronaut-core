@@ -86,3 +86,28 @@ To define a client that consumes the events, define a method that processes `Med
 snippet::io.micronaut.docs.sse.HeadlineClient[tags="class", indent=0, title="SSE Client"]
 
 The generic type of the `Flux` can be either an api:http.sse.Event[], in which case you will receive the full event object, or a POJO, in which case you will receive only the data contained within the event converted from JSON.
+
+==== Responses that are either a Single Body or an Event Stream
+
+Some protocols let the server decide, per request, whether to answer with a single body or with an event stream. For example, with the https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http[MCP Streamable HTTP transport] the client sends `Accept: application/json, text/event-stream`, and the server answers either with one JSON message or with `text/event-stream`. The client also reads response headers such as `Mcp-Session-Id`.
+
+The `exchangeEventStream` methods of api:http.client.sse.SseClient[] serve these protocols. They emit each event wrapped in an api:http.HttpResponse[] that exposes the status and the headers of the response:
+
+[source,java]
+----
+MutableHttpRequest<String> request = HttpRequest.POST("/mcp", message)
+    .contentType(MediaType.APPLICATION_JSON_TYPE)
+    .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE); // <1>
+
+Flux<String> messages = Flux.from(sseClient.exchangeEventStream(request, Argument.STRING, Argument.STRING)) // <2>
+    .doOnNext(response -> response.getHeaders().findFirst("Mcp-Session-Id").ifPresent(sessionId::set)) // <3>
+    .mapNotNull(HttpResponse::body) // <4>
+    .map(Event::getData);
+----
+
+<1> The `Accept` header of the request is kept, since it accepts `text/event-stream`. Otherwise `text/event-stream` is added to it
+<2> When the response is `text/event-stream`, each event is emitted as soon as it arrives, and its data is decoded from JSON. Otherwise the whole body is decoded with the content type of the response and emitted as a single event
+<3> Each emitted response carries the status and the headers
+<4> When the body holds no event, for example for a `202 Accepted` response, a single response without a body is emitted
+
+When the response has an error status, the publisher fails with an api:http.client.exceptions.HttpClientResponseException[] whose response carries the error body, decoded into the given error type, instead of completing empty.

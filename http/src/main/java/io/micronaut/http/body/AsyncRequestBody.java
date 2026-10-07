@@ -210,7 +210,7 @@ public interface AsyncRequestBody {
      * @throws IllegalArgumentException if the type is a reactive or asynchronous type, or an
      * {@link java.io.InputStream}
      */
-    <T> CompletionStage<@Nullable T> body(Argument<T> type);
+    <T extends @Nullable Object> CompletionStage<@Nullable T> body(Argument<T> type);
 
     /**
      * Read the whole body as text, in the charset of the request (the charset of its content

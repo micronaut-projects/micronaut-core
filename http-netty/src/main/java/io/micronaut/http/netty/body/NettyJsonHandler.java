@@ -34,7 +34,6 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
-import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -158,8 +157,13 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
-    public MessageBodyWriter<T> createSpecific(Argument<T> type) {
+    public NettyJsonHandler<T> createSpecific(Argument<T> type) {
         return new NettyJsonHandler<>(jsonMessageHandler.createSpecific(type));
+    }
+
+    @Override
+    public NettyJsonHandler<T> createSpecificReader(Argument<T> type) {
+        return createSpecific(type);
     }
 
     @Override
