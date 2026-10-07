@@ -107,10 +107,26 @@ public final class EventStreamDecoder {
      * @throws ContentLengthExceededException if a line or the data of an event exceeds the limit
      */
     public List<Event<byte[]>> decode(byte[] bytes, int offset, int length) {
+        List<Event<byte[]>> events = new ArrayList<>(2);
+        decode(bytes, offset, length, events::add);
+        return events;
+    }
+
+    /**
+     * Decode the next piece of the stream, like {@link #decode(byte[], int, int)}. Each event is
+     * handed to the consumer as soon as its blank line is read, so the events before a line that
+     * exceeds the limit are handed out before the failure.
+     *
+     * @param bytes  The array of the piece
+     * @param offset The offset of the piece in the array
+     * @param length The length of the piece
+     * @param out    Takes the events the piece completes
+     * @throws ContentLengthExceededException if a line or the data of an event exceeds the limit
+     */
+    public void decode(byte[] bytes, int offset, int length, Consumer<? super Event<byte[]>> out) {
         int end = offset + length;
         // eight bytes at a time, without reflection
         ByteBuffer words = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
-        List<Event<byte[]>> events = null;
         int start = offset;
         while (true) {
             int i = lineEnd(bytes, words, start, end);

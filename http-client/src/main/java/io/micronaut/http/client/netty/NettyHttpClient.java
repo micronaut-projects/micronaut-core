@@ -104,7 +104,6 @@ import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.ElementsStages;
 import io.micronaut.http.client.BodyPieces;
 import io.micronaut.http.client.ElementsResponse;
-import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
@@ -754,6 +753,21 @@ final class NettyHttpClient implements
         return value;
     }
 
+    /**
+     * Starts the exchange of a reactive stream once the subscriber has its subscription, as the
+     * reactive client always did: a subscription cancelled in {@code onSubscribe} sends nothing.
+     * Unlike {@link Flux#defer}, which starts it before the subscriber is called.
+     *
+     * @param exchange Starts the exchange
+     * @param <T>      The element type
+     * @return The elements of the exchange
+     */
+    private static <T> Flux<T> afterSubscribe(Supplier<? extends Publisher<T>> exchange) {
+        // not a scalar source, which flatMapMany would map before the subscriber is called
+        return Mono.<Boolean>create(sink -> sink.onRequest(n -> sink.success(Boolean.TRUE)))
+            .flatMapMany(ignored -> exchange.get());
+    }
+
     private static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
         return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
     }
@@ -782,7 +796,7 @@ final class NettyHttpClient implements
         // the exchange of the async client: the events are decoded by its piece reader as they are
         // requested, and each one is wrapped in the response
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return new MicronautFlux<>(Flux.defer(() -> toMono(exchangeEventStreamFlow(request, eventType, errorType), propagatedContext)
+        return new MicronautFlux<>(afterSubscribe(() -> toMono(exchangeEventStreamFlow(request, eventType, errorType), propagatedContext)
             .flatMapMany(response -> {
                 BodyElements<Event<B>> events = Objects.requireNonNull(response.body(), "The response has no events");
                 return Flux.from(new BodyElementsPublisher<>(events))
@@ -816,7 +830,7 @@ final class NettyHttpClient implements
      */
     <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         return exchangeElementsFlow(request, errorType, true,
-            response -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), NettyEventStreamReader::new));
+            response -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate));
     }
 
     /**
