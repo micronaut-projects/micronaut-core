@@ -130,66 +130,51 @@ public final class EventStreams {
     }
 
     /**
-     * Accept an event stream: the {@code Accept} header of the request is kept when it accepts
-     * {@code text/event-stream}, otherwise {@code text/event-stream} is added to it.
+     * The events of the response of {@code SseClient#eventStream}: the body is read as an event
+     * stream whatever its content type, as that method always read it. A failure to read the
+     * body is an {@link HttpClientException}, decorated like the other failures of the client,
+     * and a failure to decode the data of an event is the failure of the reader of the data, as
+     * it is.
      *
-     * @param request The request, changed when it is mutable
-     */
-    public static void acceptEvents(HttpRequest<?> request) {
-        if (!(request instanceof MutableHttpRequest<?> mutableRequest)) {
-            return;
-        }
-        for (MediaType accepted : mutableRequest.getHeaders().accept()) {
-            if (accepted.matches(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                return;
-            }
-        }
-        // keep what the caller accepts, such as application/json, and accept an event stream too
-        mutableRequest.getHeaders().add(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
-    }
-
-    /**
-     * The response of an exchange whose body is read as its pieces: the events of an event
-     * stream, decoded as the pieces are read, or a body of another type, decoded whole as one
-     * event. The data is decoded with the default {@link JsonMapper}; a {@code String} or a
-     * {@code byte[]} is taken as it is. The events take over the pieces of the response.
-     *
-     * @param response      The response, with a status that is not an error
-     * @param eventType     The event data type
-     * @param maxBufferSize The maximum size of a line, of the data of one event, and of a body
-     *                      that is not an event stream
-     * @param <B>           The event data type
+     * @param response        The response, with a status that is not an error
+     * @param handlerRegistry The readers of the event data
+     * @param eventType       The event data type
+     * @param maxBufferSize   The maximum size of a line, and of the data of one event
+     * @param decorate        Decorates a failure of the events like the other failures of the
+     *                        client, e.g. with its service id
+     * @param <B>             The event data type
      * @return The response, whose body is the events
      */
-    public static <B> HttpResponse<BodyElements<Event<B>>> response(HttpResponse<BodyElements<ByteBuffer<?>>> response,
-                                                                   Argument<B> eventType,
-                                                                   long maxBufferSize) {
-        BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no elements");
-        MediaType contentType = response.getContentType().orElse(null);
-        boolean events = contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType);
-        return ElementsResponse.of(response, new PieceEvents<>(pieces, events ? new EventStreamDecoder(maxBufferSize) : null, defaultReader(eventType), maxBufferSize));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <B> Function<byte[], B> defaultReader(Argument<B> eventType) {
-        if (eventType.getType() == String.class) {
-            return data -> (B) new String(data, StandardCharsets.UTF_8);
+    public static <B> HttpResponse<BodyElements<Event<B>>> eventStreamResponse(ByteBodyHttpResponse<?> response,
+                                                                              MessageBodyHandlerRegistry handlerRegistry,
+                                                                              Argument<B> eventType,
+                                                                              long maxBufferSize,
+                                                                              UnaryOperator<HttpClientException> decorate) {
+        Function<Throwable, Throwable> wrap = error -> error instanceof DataDecodeFailure failure && failure.getCause() != null
+            ? failure.getCause()
+            : wrap(error, decorate);
+        CloseableByteBody body = response.byteBody().move();
+        try {
+            MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
+            HttpHeaders headers = response.getHeaders();
+            Function<byte[], B> rawFailures = data -> {
+                B decoded;
+                try {
+                    decoded = reader.read(eventType, MediaType.APPLICATION_JSON_TYPE, headers, new ByteArrayInputStream(data));
+                } catch (RuntimeException e) {
+                    throw new DataDecodeFailure(e);
+                }
+                if (decoded == null) {
+                    // as the events were mapped with Objects.requireNonNull
+                    throw new DataDecodeFailure(new NullPointerException("Event data decoded to null for type " + eventType));
+                }
+                return decoded;
+            };
+            return ElementsResponse.of(response, new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), rawFailures), wrap));
+        } catch (RuntimeException e) {
+            body.close();
+            throw e;
         }
-        if (eventType.getType() == byte[].class) {
-            return data -> (B) data;
-        }
-        return data -> {
-            B decoded;
-            try {
-                decoded = DefaultJsonMapper.INSTANCE.readValue(data, eventType);
-            } catch (IOException e) {
-                throw new HttpClientException("Error decoding the data of an event: " + e.getMessage(), e);
-            }
-            if (decoded == null) {
-                throw new HttpClientException("Event data decoded to null for type " + eventType);
-            }
-            return decoded;
-        };
     }
 
     /**
@@ -248,7 +233,7 @@ public final class EventStreams {
     }
 
     /**
-     * The default mapper, created when it is first needed.
+     * A failure to decode the data of an event, which {@code eventStream} reports as it is.
      */
     private static final class DefaultJsonMapper {
         static final JsonMapper INSTANCE = JsonMapper.createDefault();
@@ -389,6 +374,13 @@ public final class EventStreams {
         @Override
         protected void release() {
             pieces.close();
+        }
+    }
+
+    /** A failure to decode event data, preserved for the publisher API. */
+    private static final class DataDecodeFailure extends RuntimeException {
+        DataDecodeFailure(RuntimeException cause) {
+            super(cause.getMessage(), cause, false, false);
         }
     }
 

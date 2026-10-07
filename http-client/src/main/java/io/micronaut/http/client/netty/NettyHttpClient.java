@@ -644,7 +644,8 @@ final class NettyHttpClient implements
     }
 
     /**
-     * The events of {@link #eventStream}: the request accepts only an event stream.
+     * The events of {@link #eventStream}: the request accepts only an event stream, and the body
+     * is read as one, whatever its content type, as it always was.
      *
      * @param request   The request
      * @param eventType The event data type
@@ -655,7 +656,7 @@ final class NettyHttpClient implements
      */
     private <I, B> Publisher<Event<B>> eventStreamOrError(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, @Nullable Argument<?> errorType) {
         return elements(() -> exchangeElementsFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType, AcceptEvents.ONLY, shouldBufferErrorBody(errorType),
-            (req, response) -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize())));
+            (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)));
     }
 
     @Override
@@ -726,12 +727,8 @@ final class NettyHttpClient implements
      */
     private <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
         return exchangeElementsFlow(request, errorType, AcceptEvents.AS_IS, shouldBufferErrorBody(errorType),
-            (req, response) -> {
-                CloseableByteBody body = response.byteBody().move();
-                return ElementsResponse.of(response, isAcceptEvents(req)
-                    ? BodyPieces.lines(body, sizeLimits().maxBufferSize())
-                    : BodyPieces.elements(body));
-            });
+            (req, response) -> ElementsResponse.of(response,
+                new StreamedBodyPieces(response.byteBody().move(), isAcceptEvents(req), sizeLimits().maxBufferSize())));
     }
 
     /**
@@ -863,7 +860,24 @@ final class NettyHttpClient implements
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> errorType) {
-        return elements(() -> dataStreamFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType));
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return Flux.defer(() -> toMono(dataStreamFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
+            .flatMapMany(response -> pieces(Objects.requireNonNull(response.body(), "The response has no body"))));
+    }
+
+    /**
+     * The pieces of the body of {@link #dataStream} and {@link #exchangeStream}: Netty buffers,
+     * released after {@code onNext} unless the subscriber retained them.
+     *
+     * @param elements The pieces
+     * @return The publisher of the pieces
+     */
+    private static Publisher<ByteBuffer<?>> pieces(BodyElements<ByteBuffer<?>> elements) {
+        if (elements instanceof StreamedBodyPieces streamed) {
+            return streamed.publisher();
+        }
+        // e.g. the empty body of a response without one
+        return new BodyElementsPublisher<>(elements);
     }
 
     @Override
@@ -877,7 +891,7 @@ final class NettyHttpClient implements
         return Flux.defer(() -> toMono(dataStreamFlow(request, errorType), propagatedContext)
             .flatMapMany(response -> {
                 BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
-                return Flux.from(new BodyElementsPublisher<>(pieces))
+                return Flux.from(pieces(pieces))
                     .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<ByteBuffer<?>>(response, piece));
             }));
     }
