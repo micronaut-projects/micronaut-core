@@ -916,7 +916,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      *
      * @param typeMirror The type mirror
      */
-    private record TypeMirrorKey(TypeMirror typeMirror) {
+    record TypeMirrorKey(TypeMirror typeMirror) {
 
         @Override
         public boolean equals(Object o) {
