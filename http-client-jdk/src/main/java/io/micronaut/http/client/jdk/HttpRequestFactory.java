@@ -27,6 +27,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.RawHttpRequestWrapper;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import reactor.adapter.JdkFlowAdapter;

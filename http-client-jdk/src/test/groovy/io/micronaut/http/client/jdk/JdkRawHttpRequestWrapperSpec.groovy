@@ -1,6 +1,7 @@
 package io.micronaut.http.client.jdk
 
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.http.client.RawHttpRequestWrapper
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.body.CloseableByteBody
