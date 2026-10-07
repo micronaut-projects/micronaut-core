@@ -48,6 +48,7 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.sse.Event;
+import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelFactory;
@@ -482,6 +483,11 @@ public class DefaultHttpClient implements
     @Override
     public AsyncRawHttpClient toAsyncRaw() {
         return nettyHttpClient.toAsyncRaw();
+    }
+
+    @Override
+    public AsyncWebSocketClient toAsyncWebSocket() {
+        return nettyHttpClient.toAsyncWebSocket();
     }
 
     @Override

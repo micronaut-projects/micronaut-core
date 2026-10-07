@@ -122,6 +122,7 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -1093,20 +1094,48 @@ final class NettyHttpClient implements
 
     @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
-        setupConversionService(request);
-        return connectWebSocketOnSubscribe(() -> resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, null)));
+        return connectWebSocketOnSubscribe(() -> connectFlow(clientEndpointType, request));
     }
 
     @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
+        return connectWebSocketOnSubscribe(() -> connectFlow(clientEndpointType, parameters));
+    }
+
+    @Override
+    public AsyncWebSocketClient toAsyncWebSocket() {
+        return new NettyAsyncWebSocketClient(this);
+    }
+
+    /**
+     * The websocket connect of {@link #connect(Class, MutableHttpRequest)}, without Reactor.
+     *
+     * @param clientEndpointType The endpoint type
+     * @param request            The request that establishes the connection
+     * @param <T>                The endpoint type
+     * @return The flow of the endpoint, once the handshake completes
+     */
+    <T extends AutoCloseable> ExecutionFlow<T> connectFlow(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
+        setupConversionService(request);
+        return resolveRequestURI(request)
+            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, null));
+    }
+
+    /**
+     * The websocket connect of {@link #connect(Class, Map)}, without Reactor.
+     *
+     * @param clientEndpointType The endpoint type
+     * @param parameters         The URI parameters of the endpoint
+     * @param <T>                The endpoint type
+     * @return The flow of the endpoint, once the handshake completes
+     */
+    <T extends AutoCloseable> ExecutionFlow<T> connectFlow(Class<T> clientEndpointType, Map<String, Object> parameters) {
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
         String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
         uri = UriTemplate.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
-        return connectWebSocketOnSubscribe(() -> resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, webSocketBean)));
-
+        return resolveRequestURI(request)
+            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, webSocketBean));
     }
 
     @Override
