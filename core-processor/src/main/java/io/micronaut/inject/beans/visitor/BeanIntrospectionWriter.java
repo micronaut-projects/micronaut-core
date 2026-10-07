@@ -136,7 +136,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "buildTypeHierarchy");
 
     private static final java.lang.reflect.Constructor<?> BEAN_TYPE_HIERARCHY_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
-        GeneratedBeanTypeHierarchy.class, Class.class, AnnotationClassValue[].class, int[][].class, int[].class, BeanIntrospection.class);
+        GeneratedBeanTypeHierarchy.class, Class.class, AnnotationClassValue[].class, int[][].class, int[][].class, BeanIntrospection.class);
 
     private static final java.lang.reflect.Method GET_BP_INDEXED_SUBSET_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class);
@@ -1168,7 +1168,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 MethodDef.override(BUILD_TYPE_HIERARCHY_METHOD)
                     .build((aThis, methodParameters) -> ClassTypeDef.of(GeneratedBeanTypeHierarchy.class).instantiate(
                         BEAN_TYPE_HIERARCHY_CONSTRUCTOR, ExpressionDef.constant(beanType), hierarchy.types(), hierarchy.superTypes(),
-                        hierarchy.declaredMethods(), aThis).returning())
+                        hierarchy.methodLevels(), aThis).returning())
             );
         }
 

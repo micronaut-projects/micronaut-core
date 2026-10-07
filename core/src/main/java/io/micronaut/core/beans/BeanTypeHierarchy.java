@@ -29,8 +29,9 @@ import java.util.Optional;
  * super classes and interfaces of that, then its interfaces and theirs, each once. {@link Object} is reported
  * as a super class, it is not described itself. A type whose class cannot be loaded at runtime is left out.</p>
  *
- * <p>The {@link BeanIntrospection#getBeanMethods() bean methods} of the introspection are told apart into the
- * ones the type declares itself, overrides included, and the ones it inherits.</p>
+ * <p>Each {@link BeanIntrospection#getBeanMethods() bean method} of the introspection knows its declaring levels:
+ * the type declaring it and every type of the hierarchy declaring a method it overrides, whether or not that
+ * method is a bean method. A bean method the introspected type does not declare is inherited.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -73,6 +74,15 @@ public interface BeanTypeHierarchy {
     List<Class<?>> getInterfaces(Class<?> type);
 
     /**
+     * The declaring levels of a bean method: the type declaring it, then every type of the hierarchy declaring a
+     * method it overrides, nearest first. A level that is an interface is one {@link Class#isInterface()} tells.
+     *
+     * @param method A bean method of the introspection
+     * @return The declaring types, empty for a method that is not a bean method of the introspection
+     */
+    List<Class<?>> getDeclaringTypes(BeanMethod<?, ?> method);
+
+    /**
      * @return The bean methods of the introspection the introspected type declares itself, overrides included
      */
     List<BeanMethod<?, ?>> getDeclaredMethods();
@@ -84,6 +94,7 @@ public interface BeanTypeHierarchy {
      * @return True if the type declares it, false if it inherits it
      */
     default boolean isDeclared(BeanMethod<?, ?> method) {
-        return getDeclaredMethods().contains(method);
+        List<Class<?>> levels = getDeclaringTypes(method);
+        return !levels.isEmpty() && levels.get(0) == getBeanType();
     }
 }

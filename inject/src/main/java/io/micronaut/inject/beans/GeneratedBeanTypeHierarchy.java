@@ -54,10 +54,11 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
     private final Class<?> beanType;
     private final AnnotationClassValue<?>[] typeValues;
     private final int[][] superTypes;
-    private final int[] declaredMethodIndexes;
+    private final int[][] methodLevels;
     private final BeanIntrospection<?> introspection;
     private volatile @Nullable List<BeanMethod<?, ?>> declaredMethods;
     private volatile @Nullable Map<Class<?>, TypeEntry> types;
+    private volatile Class<?> @Nullable [] classes;
 
     /**
      * The hierarchy as the generated introspection describes it.
@@ -67,16 +68,17 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
      * @param superTypes For each type, the indexes into {@code types} of the types it extends and implements
      * itself: the super class first, {@link #NO_SUPERCLASS} for an interface and {@link #OBJECT_SUPERCLASS} for
      * a class extending {@link Object}, then the interfaces
-     * @param declaredMethods The indexes, in the bean methods of the introspection, of the ones the type declares
+     * @param methodLevels For each bean method of the introspection, in their order, the indexes into {@code types}
+     * of its declaring levels: the type declaring it, then the types declaring a method it overrides, nearest first
      * @param introspection The introspection describing the type
      */
     @UsedByGeneratedCode
     public GeneratedBeanTypeHierarchy(Class<?> beanType, AnnotationClassValue<?>[] types, int[][] superTypes,
-                                      int[] declaredMethods, BeanIntrospection<?> introspection) {
+                                      int[][] methodLevels, BeanIntrospection<?> introspection) {
         this.beanType = beanType;
         this.typeValues = types;
         this.superTypes = superTypes;
-        this.declaredMethodIndexes = declaredMethods;
+        this.methodLevels = methodLevels;
         this.introspection = introspection;
     }
 
@@ -108,13 +110,38 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
     }
 
     @Override
+    public List<Class<?>> getDeclaringTypes(BeanMethod<?, ?> method) {
+        int index = indexOf(method);
+        if (index < 0) {
+            return List.of();
+        }
+        Class<?>[] resolved = classes();
+        List<Class<?>> levels = new ArrayList<>(methodLevels[index].length);
+        for (int level : methodLevels[index]) {
+            if (resolved[level] != null) {
+                levels.add(resolved[level]);
+            }
+        }
+        return Collections.unmodifiableList(levels);
+    }
+
+    @Override
+    public boolean isDeclared(BeanMethod<?, ?> method) {
+        int index = indexOf(method);
+        // the introspected type is the first of the types
+        return index >= 0 && methodLevels[index].length > 0 && methodLevels[index][0] == 0;
+    }
+
+    @Override
     public List<BeanMethod<?, ?>> getDeclaredMethods() {
         List<BeanMethod<?, ?>> resolved = declaredMethods;
         if (resolved == null) {
             List<? extends BeanMethod<?, ?>> beanMethods = List.copyOf(introspection.getBeanMethods());
-            List<BeanMethod<?, ?>> declared = new ArrayList<>(declaredMethodIndexes.length);
-            for (int index : declaredMethodIndexes) {
-                declared.add(beanMethods.get(index));
+            List<BeanMethod<?, ?>> declared = new ArrayList<>();
+            for (int i = 0; i < beanMethods.size(); i++) {
+                if (methodLevels[i].length > 0 && methodLevels[i][0] == 0) {
+                    declared.add(beanMethods.get(i));
+                }
             }
             resolved = Collections.unmodifiableList(declared);
             declaredMethods = resolved;
@@ -122,14 +149,34 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
         return resolved;
     }
 
+    private int indexOf(BeanMethod<?, ?> method) {
+        int i = 0;
+        for (BeanMethod<?, ?> beanMethod : introspection.getBeanMethods()) {
+            if (beanMethod == method) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
+    }
+
+    private Class<?>[] classes() {
+        Class<?>[] resolved = classes;
+        if (resolved == null) {
+            // each type is loaded once, here, and found by its index after that
+            resolved = new Class<?>[typeValues.length];
+            for (int i = 0; i < typeValues.length; i++) {
+                resolved[i] = typeValues[i].getType().orElse(null);
+            }
+            classes = resolved;
+        }
+        return resolved;
+    }
+
     private Map<Class<?>, TypeEntry> types() {
         Map<Class<?>, TypeEntry> resolved = types;
         if (resolved == null) {
-            // each type is loaded once, here, and found by its index after that
-            Class<?>[] classes = new Class<?>[typeValues.length];
-            for (int i = 0; i < typeValues.length; i++) {
-                classes[i] = typeValues[i].getType().orElse(null);
-            }
+            Class<?>[] classes = classes();
             Map<Class<?>, TypeEntry> map = new LinkedHashMap<>();
             for (int i = 0; i < classes.length; i++) {
                 Class<?> type = classes[i];
@@ -159,7 +206,7 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
 
     @Override
     public String toString() {
-        return "BeanTypeHierarchy{" + beanType.getName() + ", types=" + types().keySet() + ", declaredMethods=" + Arrays.toString(declaredMethodIndexes) + '}';
+        return "BeanTypeHierarchy{" + beanType.getName() + ", types=" + types().keySet() + ", methodLevels=" + Arrays.deepToString(methodLevels) + '}';
     }
 
     private record TypeEntry(@Nullable Class<?> superclass, List<Class<?>> interfaces) {

@@ -75,6 +75,13 @@ class Child extends Base<String> implements Titled, Comparable<Child> {
         !hierarchy.isDeclared(methods.getName)
         !hierarchy.isDeclared(methods.inherited)
 
+        and: 'the declaring levels of each, nearest first: an unconstrained super declaration included'
+        hierarchy.getDeclaringTypes(methods.value) == [child, base]
+        hierarchy.getDeclaringTypes(methods.own) == [child]
+        hierarchy.getDeclaringTypes(methods.getName) == [base, named]
+        hierarchy.getDeclaringTypes(methods.inherited) == [base]
+        hierarchy.getDeclaringTypes(methods.getName).collect { it.isInterface() } == [false, true]
+
         and: 'read once'
         introspection.getTypeHierarchy().get().is(hierarchy)
     }

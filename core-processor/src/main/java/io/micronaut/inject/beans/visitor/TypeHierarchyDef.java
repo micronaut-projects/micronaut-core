@@ -25,22 +25,25 @@ import io.micronaut.sourcegen.model.TypeDef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
  * The expressions of the arguments of the {@link GeneratedBeanTypeHierarchy} an introspection generates. Every
- * type is written once and referenced by its index: depth first, the super class before the interfaces. The
- * bean methods the bean type declares itself are referenced by their index among the bean methods.
+ * type is written once and referenced by its index: depth first, the super class before the interfaces. Each
+ * bean method lists its declaring levels by those indexes: the type declaring it, then the types declaring a
+ * method it overrides.
  *
  * @param types The types, each once
  * @param superTypes For each type, the indexes of the types it extends and implements
- * @param declaredMethods The indexes of the bean methods the bean type declares itself
+ * @param methodLevels For each bean method, the indexes of its declaring levels
  * @author Denis Stepanov
  * @since 5.3.0
  */
-record TypeHierarchyDef(ExpressionDef types, ExpressionDef superTypes, ExpressionDef declaredMethods) {
+record TypeHierarchyDef(ExpressionDef types, ExpressionDef superTypes, ExpressionDef methodLevels) {
 
     /**
      * Builds the expressions describing the hierarchy of a bean type.
@@ -73,19 +76,32 @@ record TypeHierarchyDef(ExpressionDef types, ExpressionDef superTypes, Expressio
             superTypes.add(TypeDef.Primitive.INT.array().instantiate(parents));
         }
 
-        List<ExpressionDef> declaredMethods = new ArrayList<>();
-        for (int i = 0; i < beanMethods.size(); i++) {
-            if (beanMethods.get(i).getDeclaringType().getName().equals(beanClassElement.getName())) {
-                declaredMethods.add(ExpressionDef.constant(i));
-            }
+        List<ExpressionDef> methodLevels = new ArrayList<>(beanMethods.size());
+        for (MethodElement method : beanMethods) {
+            // the declaring type, then the types declaring a method it overrides, nearest first, each once; Object
+            // is no level of the table
+            Set<Integer> levels = new LinkedHashSet<>();
+            collectLevels(method, table, levels);
+            methodLevels.add(TypeDef.Primitive.INT.array().instantiate(
+                levels.stream().<ExpressionDef>map(ExpressionDef::constant).toList()));
         }
 
         return new TypeHierarchyDef(
             ClassTypeDef.of(AnnotationClassValue.class).array().instantiate(
                 table.keySet().stream().map(loadClassValueExpressionFn).toList()),
             TypeDef.Primitive.INT.array(2).instantiate(superTypes),
-            TypeDef.Primitive.INT.array().instantiate(declaredMethods)
+            TypeDef.Primitive.INT.array(2).instantiate(methodLevels)
         );
+    }
+
+    private static void collectLevels(MethodElement method, Map<String, Integer> table, Set<Integer> levels) {
+        Integer level = table.get(method.getDeclaringType().getName());
+        if (level != null && !levels.add(level)) {
+            return;
+        }
+        for (MethodElement overridden : method.getOverriddenMethods()) {
+            collectLevels(overridden, table, levels);
+        }
     }
 
     /**
