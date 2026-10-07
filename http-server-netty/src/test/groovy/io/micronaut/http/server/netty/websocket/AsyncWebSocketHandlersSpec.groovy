@@ -139,6 +139,26 @@ class AsyncWebSocketHandlersSpec extends Specification {
         stageClient?.close()
     }
 
+    void "the reactive send writes once subscribed, and a cancel after that does not take the message back, as before"() {
+        given:
+        StageClient stageClient = connect('cancel-send')
+
+        when:
+        def unsubscribed = stageClient.session.send('unsubscribed')
+        Flux.from(stageClient.session.send('cancelled')).subscribe().dispose()
+        Flux.from(stageClient.session.send('last')).blockLast()
+
+        then: 'the echo server replies to the messages that were sent'
+        unsubscribed != null
+        conditions.eventually {
+            stageClient.handled.containsAll(['cancelled', 'last'])
+        }
+        !stageClient.handled.contains('unsubscribed')
+
+        cleanup:
+        stageClient?.close()
+    }
+
     private StageClient connect(String room) {
         return Flux.from(client.connect(StageClient, "/async-handlers/$room")).blockFirst()
     }
