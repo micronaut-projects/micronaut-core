@@ -102,7 +102,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         if (!borrowed.isEmpty()) {
             removeAttribute(PROXY_INTERCEPTORS);
         }
-        BeanCreationState state = new BeanCreationState(definition, borrowed);
+        BeanCreationState state = new BeanCreationState(definition, borrowed, creationState);
         creationState = state;
         return state;
     }
@@ -110,6 +110,23 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public @Nullable BeanDependencyGroup getBeanDependencyGroup() {
         return creationState == null ? null : new DefaultBeanDependencyResolver(context, creationState.dependencies);
+    }
+
+    @Override
+    public @Nullable BeanDependencyResolver getDependencyResolver() {
+        Segment<?, ?> segment = path.peek();
+        if (segment == null) {
+            return null;
+        }
+        BeanDefinition<?> owner = segment.getDeclaringType();
+        // The bean the segment injects into is still being created, with the creation of the bean being injected
+        // nested in it.
+        for (BeanCreationState state = creationState; state != null; state = state.parent) {
+            if (state.definition.equals(owner)) {
+                return new DefaultBeanDependencyResolver(context, state.dependencies);
+            }
+        }
+        return null;
     }
 
     @Override

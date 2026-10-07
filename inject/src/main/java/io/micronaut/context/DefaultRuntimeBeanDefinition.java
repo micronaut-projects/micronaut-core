@@ -281,7 +281,22 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
                 resolved[i] = resolveInjectionPoint(resolutionContext, injectionPoints[i]);
             }
         }
-        return beanFactory.apply(new DefaultCreationContext(resolutionContext, resolved));
+        return beanFactory.apply(new DefaultCreationContext(resolutionContext, resolved, creationDependencies(resolutionContext)));
+    }
+
+    /**
+     * The owner of the bean the given context is creating, as a resolver, if that bean is the one of this
+     * definition. The same owner is held by the registration of the bean once the creation completes.
+     *
+     * @param resolutionContext The resolution context of the creation
+     * @return The resolver, or {@code null} if the context does not track the creation of this bean
+     */
+    private @Nullable BeanDependencyResolver creationDependencies(BeanResolutionContext resolutionContext) {
+        if (resolutionContext instanceof AbstractBeanResolutionContext creating
+            && creating.creationState != null && creating.creationState.definition.equals(this)) {
+            return new DefaultBeanDependencyResolver(creating.context, creating.creationState.dependencies);
+        }
+        return null;
     }
 
     /**
@@ -315,8 +330,9 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
      * @param resolutionContext The resolution context of the disposal
      * @return The disposal context
      */
-    RuntimeBeanDefinition.DisposalContext newDisposalContext(BeanResolutionContext resolutionContext) {
-        return new ResolutionLookupContext(resolutionContext);
+    DisposalLookupContext newDisposalContext(BeanResolutionContext resolutionContext,
+                                             Supplier<BeanDependencyGroup> dependencies) {
+        return new DisposalLookupContext(resolutionContext, dependencies);
     }
 
     /**
@@ -370,7 +386,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
      * it cannot be satisfied. The segment is a constructor argument segment for lack of anything more accurate: an
      * undeclared lookup has no injection point of its own to name.</p>
      */
-    private class ResolutionLookupContext implements RuntimeBeanDefinition.DisposalContext {
+    private abstract class ResolutionLookupContext implements RuntimeBeanDefinition.LookupContext {
         protected final BeanResolutionContext resolutionContext;
 
         ResolutionLookupContext(BeanResolutionContext resolutionContext) {
@@ -412,15 +428,60 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     }
 
     /**
+     * Implementation of {@link RuntimeBeanDefinition.DisposalContext} over the resolution context of one disposal.
+     * The group of its resolver is opened on first use and closed by the disposal once the disposer returns.
+     */
+    final class DisposalLookupContext extends ResolutionLookupContext implements RuntimeBeanDefinition.DisposalContext {
+        private final Supplier<BeanDependencyGroup> groupFactory;
+        private @Nullable BeanDependencyGroup group;
+
+        DisposalLookupContext(BeanResolutionContext resolutionContext, Supplier<BeanDependencyGroup> groupFactory) {
+            super(resolutionContext);
+            this.groupFactory = groupFactory;
+        }
+
+        @Override
+        public BeanDependencyResolver getDependencies() {
+            BeanDependencyGroup current = group;
+            if (current == null) {
+                current = groupFactory.get();
+                group = current;
+            }
+            return current;
+        }
+
+        /**
+         * Destroys what the resolver created and not destroyed already.
+         */
+        void close() {
+            BeanDependencyGroup current = group;
+            if (current != null) {
+                current.close();
+            }
+        }
+    }
+
+    /**
      * Implementation of {@link RuntimeBeanDefinition.CreationContext} over the resolution context of one
      * creation and the beans resolved for the declared injection points.
      */
     private final class DefaultCreationContext extends ResolutionLookupContext implements RuntimeBeanDefinition.CreationContext {
         private final Object[] resolved;
+        private final @Nullable BeanDependencyResolver dependencies;
 
-        DefaultCreationContext(BeanResolutionContext resolutionContext, Object[] resolved) {
+        DefaultCreationContext(BeanResolutionContext resolutionContext, Object[] resolved,
+                               @Nullable BeanDependencyResolver dependencies) {
             super(resolutionContext);
             this.resolved = resolved;
+            this.dependencies = dependencies;
+        }
+
+        @Override
+        public BeanDependencyResolver getDependencies() {
+            if (dependencies == null) {
+                throw new UnsupportedOperationException("The bean is not created through a context that tracks its dependents");
+            }
+            return dependencies;
         }
 
         @Override
@@ -498,6 +559,17 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
 
         @Override
         public T dispose(BeanContext context, T bean) {
+            return dispose(context, bean, context::createDependencyGroup);
+        }
+
+        @Override
+        public T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+            // the context the container destroys a bean with permits resolution during shutdown, for this invocation
+            return dispose(context, bean, resolutionContext instanceof DefaultBeanResolutionContext destruction
+                ? destruction::newDependencyGroup : context::createDependencyGroup);
+        }
+
+        private T dispose(BeanContext context, T bean, Supplier<BeanDependencyGroup> dependencies) {
             BiConsumer<BeanContext, T> contextDisposer = disposer;
             if (contextDisposer != null) {
                 contextDisposer.accept(context, bean);
@@ -505,18 +577,18 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
             }
             BiConsumer<RuntimeBeanDefinition.DisposalContext, T> resolvingDisposer = Objects.requireNonNull(injectedDisposer);
             try (DefaultBeanResolutionContext disposalContext = new DefaultBeanResolutionContext(context, this)) {
+                DisposalLookupContext lookupContext = newDisposalContext(disposalContext, dependencies);
                 try {
-                    resolvingDisposer.accept(newDisposalContext(disposalContext), bean);
+                    resolvingDisposer.accept(lookupContext, bean);
                 } finally {
-                    destroyDependents(context, disposalContext.getAndResetDependentBeans());
+                    try {
+                        destroyDependents(context, disposalContext.getAndResetDependentBeans());
+                    } finally {
+                        lookupContext.close();
+                    }
                 }
             }
             return bean;
-        }
-
-        @Override
-        public T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-            return dispose(context, bean);
         }
 
         /**

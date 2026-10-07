@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,10 +35,18 @@ final class BeanCreationState {
     final BeanDefinition<?> definition;
     final DefaultBeanDependencies dependencies = new DefaultBeanDependencies();
     final List<BeanRegistration<?>> proxyInterceptors;
+    /** The creation this one is nested in on the same resolution context, which resumes when this one ends. */
+    final @Nullable BeanCreationState parent;
 
     BeanCreationState(BeanDefinition<?> definition, List<BeanRegistration<?>> proxyInterceptors) {
+        this(definition, proxyInterceptors, null);
+    }
+
+    BeanCreationState(BeanDefinition<?> definition, List<BeanRegistration<?>> proxyInterceptors,
+                      @Nullable BeanCreationState parent) {
         this.definition = definition;
         this.proxyInterceptors = proxyInterceptors;
+        this.parent = parent;
     }
 
     InterceptorCandidates lifecycleInterceptorCandidates() {
