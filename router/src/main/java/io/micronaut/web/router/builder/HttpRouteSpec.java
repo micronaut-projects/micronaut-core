@@ -245,4 +245,31 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @since 5.3.0
      */
     void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response);
+
+    /**
+     * End a {@code GET} route with a handler of the resources under its URI, the URI prefix, e.g.
+     * the static resources of the HTTP server:
+     * {@code routes.GET("/assets").resources(StaticResources.classpath("public"))} serves
+     * {@code GET /assets/css/site.css} from {@code public/css/site.css} on the classpath, and
+     * {@code GET /assets} from the index file.
+     *
+     * <p>It routes {@code GET prefix/{+path}}, where {@code path} is the
+     * {@link ResourceHandler#pathVariable()}, the path of the resource relative to the prefix, and
+     * {@code GET prefix}, without the variable, to the handler. The trailing slashes of the prefix
+     * are ignored. The routes have implicit {@code HEAD} routes, like any {@code GET} route, and
+     * are ordinary routes: the more specific routes of controllers and handlers under the prefix
+     * take precedence. The settings of the route, e.g. its filters, conditions, order and
+     * attributes, apply to both. In a group, the prefix follows the prefix of the group, e.g.
+     * {@code group.GET("").resources(...)} at the prefix of the group, and the filters and the
+     * executor of the group apply, not its media types: the handler decides the media type of
+     * each resource.</p>
+     *
+     * @param resources The handler of the resources
+     * @throws IllegalStateException    if the route was already ended, or is not a route of
+     *                                  {@code GET} only
+     * @throws IllegalArgumentException if the path variable of the handler is not a plain name, or
+     *                                  the URI has a query or a fragment
+     * @since 5.3.0
+     */
+    void resources(ResourceHandler resources);
 }

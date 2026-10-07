@@ -182,6 +182,11 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
+    public void resources(ResourceHandler resources) {
+        route.endResources(route.terminal(resources, "resources"));
+    }
+
+    @Override
     public void handleAsync(AsyncRequestHandler handler) {
         AsyncRequestHandler checked = route.terminal(handler, HANDLER);
         route.end(() -> HandlerMethod.of(checked), null, 0);

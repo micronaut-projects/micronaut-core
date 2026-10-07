@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.resource;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.CollectionUtils;
@@ -84,33 +85,57 @@ public class StaticResourceResolver {
             String mapping = entry.getKey();
             if (!loaders.isEmpty() && pathMatcher != null && pathMatcher.matches(mapping, resourcePath)) {
                 String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
-                //A request to the root of the mapping
-                if (StringUtils.isEmpty(path)) {
-                    path = INDEX_PAGE;
-                }
-                if (path.startsWith("/")) {
-                    path = path.substring(1);
-                }
-                for (ResourceLoader loader : loaders) {
-                    Optional<URL> resource = loader.getResource(path);
-                    if (resource.isPresent()) {
-                        return resource;
-                    } else {
-                        if (path.indexOf('.') == -1) {
-                            if (!path.endsWith("/")) {
-                                path = path + "/";
-                            }
-                            path += INDEX_PAGE;
-                            resource = loader.getResource(path);
-                            if (resource.isPresent()) {
-                                return resource;
-                            }
-                        }
-                    }
+                Optional<URL> resource = resolve(loaders, path, INDEX_PAGE);
+                if (resource.isPresent()) {
+                    return resource;
                 }
             }
         }
 
+        return Optional.empty();
+    }
+
+    /**
+     * Resolves the path of a resource, relative to the base of the resource loaders, to a URL: the
+     * first loader that has the resource provides it. An empty path is the index page, and a path
+     * without an extension that no loader has, e.g. a directory, is tried with the index page
+     * under it.
+     *
+     * @param loaders   The resource loaders, tried in order
+     * @param path      The path of the resource, relative to the base of the loaders
+     * @param indexPage The name of the index page, or {@code null} for none
+     * @return The URL of the resource, if a loader has it
+     * @since 5.3.0
+     */
+    @Internal
+    public static Optional<URL> resolve(List<ResourceLoader> loaders, String path, @Nullable String indexPage) {
+        if (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+        boolean root = StringUtils.isEmpty(path);
+        if (root) {
+            //A request to the root of the mapping
+            if (indexPage == null) {
+                return Optional.empty();
+            }
+            path = indexPage;
+        }
+        String indexPath = null;
+        if (!root && indexPage != null && path.indexOf('.') == -1) {
+            indexPath = (path.endsWith("/") ? path : path + "/") + indexPage;
+        }
+        for (ResourceLoader loader : loaders) {
+            Optional<URL> resource = loader.getResource(path);
+            if (resource.isPresent()) {
+                return resource;
+            }
+            if (indexPath != null) {
+                resource = loader.getResource(indexPath);
+                if (resource.isPresent()) {
+                    return resource;
+                }
+            }
+        }
         return Optional.empty();
     }
 }
