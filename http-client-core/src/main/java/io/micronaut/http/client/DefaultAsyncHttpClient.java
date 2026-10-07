@@ -51,7 +51,8 @@ final class DefaultAsyncHttpClient implements AsyncStreamingHttpClient {
     public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request,
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {
-        return client.exchangeFlow(request, bodyType, errorType).toCompletableFuture();
+        // cancelling the future cancels the exchange, as the future of a reactive exchange does
+        return ElementsFutures.result(client.exchangeFlow(request, bodyType, errorType));
     }
 
     @Override

@@ -26,7 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
- * The futures of the streaming exchanges of the async clients: cancelling one before the result
+ * The futures of the exchanges of the async clients: cancelling one before the result
  * arrived cancels the exchange, and a result that arrives anyway is closed.
  *
  * @author Denis Stepanov
@@ -59,6 +59,15 @@ final class ElementsFutures {
      */
     static <T> CompletableFuture<BodyElements<T>> elements(ExecutionFlow<HttpResponse<BodyElements<T>>> flow) {
         return toFuture(flow.map(response -> Objects.requireNonNull(response.body(), "The response has no elements")), BodyElements::close);
+    }
+
+    /**
+     * @param flow The flow of a response whose body was read whole
+     * @param <R>  The type of the result
+     * @return The future of the result: cancelling it cancels the exchange
+     */
+    static <R> CompletableFuture<R> result(ExecutionFlow<R> flow) {
+        return toFuture(flow, result -> { });
     }
 
     private static <R> CompletableFuture<R> toFuture(ExecutionFlow<R> flow, Consumer<R> discard) {
