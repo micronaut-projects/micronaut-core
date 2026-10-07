@@ -1,3 +1,6 @@
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+
 plugins {
     id("io.micronaut.build.internal.convention-base")
     id("io.micronaut.build.internal.convention-python")
@@ -83,6 +86,45 @@ jmh {
     duplicateClassesStrategy = DuplicatesStrategy.WARN
 }
 
+// The fat jar keeps every copy of a duplicated entry, so a service loader would only see the first
+// META-INF/services file of each name. The service files are merged into one file per service.
+val mergedServices = layout.buildDirectory.dir("jmh-merged-services")
+val mergeJmhServices = tasks.register("mergeJmhServices") {
+    val classpath = configurations.named("jmhRuntimeClasspath")
+    val jmhOutput = sourceSets.named("jmh").map { it.output }
+    val mainOutput = sourceSets.named("main").map { it.output }
+    inputs.files(classpath, jmhOutput, mainOutput)
+    outputs.dir(mergedServices)
+    doLast {
+        val services = sortedMapOf<String, LinkedHashSet<String>>()
+        fun add(name: String, text: String) {
+            val lines = services.getOrPut(name) { LinkedHashSet() }
+            text.lineSequence().map(String::trim).filter { it.isNotEmpty() && !it.startsWith("#") }.forEach(lines::add)
+        }
+        (jmhOutput.get().files + mainOutput.get().files + classpath.get().files).forEach { root ->
+            if (root.isDirectory) {
+                root.resolve("META-INF/services").listFiles()?.filter { it.isFile }?.forEach { add(it.name, it.readText()) }
+            } else if (root.isFile && root.name.endsWith(".jar")) {
+                val zip = ZipFile(root)
+                try {
+                    for (entry: ZipEntry in zip.entries().toList()) {
+                        val name: String = entry.name
+                        if (!entry.isDirectory && name.startsWith("META-INF/services/") && name.indexOf('/', "META-INF/services/".length) < 0) {
+                            add(name.substringAfterLast('/'), zip.getInputStream(entry).bufferedReader().readText())
+                        }
+                    }
+                } finally {
+                    zip.close()
+                }
+            }
+        }
+        val dir = mergedServices.get().asFile.resolve("META-INF/services")
+        dir.deleteRecursively()
+        dir.mkdirs()
+        services.forEach { (name, lines) -> dir.resolve(name).writeText(lines.joinToString("\n", postfix = "\n")) }
+    }
+}
+
 tasks {
     processJmhResources {
         duplicatesStrategy = DuplicatesStrategy.WARN
@@ -91,6 +133,15 @@ tasks {
     named<Jar>("jmhJar") {
         isZip64 = true
         manifest.attributes["Multi-Release"] = "true"
+        dependsOn(mergeJmhServices)
+        val mergedDir = mergedServices.get().asFile
+        // the merged files replace every copy of the service files of the classpath
+        eachFile {
+            if (path.startsWith("META-INF/services/") && !file.toPath().startsWith(mergedDir.toPath())) {
+                exclude()
+            }
+        }
+        from(mergedServices)
     }
 }
 
