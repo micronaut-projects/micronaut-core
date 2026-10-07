@@ -1116,17 +1116,49 @@ final class NettyHttpClient implements
 
     /**
      * Run the websocket connect for every subscription, like the other request methods.
+     * Cancelling the subscription before the endpoint is delivered cancels the connect, which
+     * closes the connection. An endpoint that completes at the same time as the cancel is
+     * discarded by Reactor, and its connection is closed too. A cancel after the endpoint was
+     * delivered (for example {@code Mono.from(flux)}) leaves the connection open.
      *
      * @param connect Starts the connect
      * @param <T> The client endpoint type
      * @return A Flux, as before: callers may use Flux operators on the returned publisher
      */
-    private static <T> Flux<T> connectWebSocketOnSubscribe(Supplier<ExecutionFlow<T>> connect) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> Flux<T> connectWebSocketOnSubscribe(Supplier<ExecutionFlow<NettyWebSocketClientHandler<T>>> connect) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.from(ReactivePropagation.propagate(propagatedContext, ReactiveExecutionFlow.toPublisher(connect)));
+        Mono<NettyWebSocketClientHandler<T>> handlers = Mono.<NettyWebSocketClientHandler<T>>create(sink -> {
+            ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
+            try {
+                flow = connect.get();
+            } catch (Throwable e) {
+                sink.error(e);
+                return;
+            }
+            AtomicBoolean completed = new AtomicBoolean();
+            flow.onComplete((handler, error) -> {
+                completed.set(true);
+                if (error != null) {
+                    sink.error(error);
+                } else if (handler != null) {
+                    // after a cancel, Reactor discards the handler: see doOnDiscard below
+                    sink.success(handler);
+                } else {
+                    sink.success();
+                }
+            });
+            sink.onCancel(() -> {
+                if (!completed.get()) {
+                    flow.cancel();
+                }
+            });
+        }).doOnDiscard((Class) NettyWebSocketClientHandler.class, handler -> ((NettyWebSocketClientHandler<?>) handler).closeUnclaimed());
+        return Flux.from(ReactivePropagation.propagate(propagatedContext, handlers))
+            .map(NettyWebSocketClientHandler::getClientEndpoint);
     }
 
-    private <T> ExecutionFlow<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
+    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
         RequestKey requestKey;
         try {
             requestKey = new RequestKey(this, uri);
@@ -1167,14 +1199,16 @@ final class NettyHttpClient implements
             requestBinderRegistry,
             mediaTypeCodecRegistry,
             handlerRegistry,
-            conversionService);
+            conversionService,
+            // the handshake response is read like any other response
+            configuration.getReadTimeout().orElse(null));
 
         if (!isRunning()) {
             return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
         }
 
         return connectionManager.connectForWebsocket(requestKey, handler)
-            .then(handler::getHandshakeCompletedFlow);
+            .then(() -> handler.getHandshakeCompletedFlow().map(endpoint -> handler));
     }
 
     private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(PropagatedContext propagatedContext, MutableHttpRequest<I> request, Argument<?> errorType, ResolvedTarget target) {
