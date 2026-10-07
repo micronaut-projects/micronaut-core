@@ -185,4 +185,9 @@ final class DefaultGenericPlaceholder<T>
     public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return new DefaultGenericPlaceholder<>(getType(), name, variableName, annotationMetadata, getTypeParameters(), bounds, resolved);
     }
+
+    @Override
+    public Argument<T> withTypeParameters(Argument<?>... typeParameters) {
+        return new DefaultGenericPlaceholder<>(getType(), name, variableName, getAnnotationMetadata(), typeParameters, bounds, resolved);
+    }
 }

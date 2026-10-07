@@ -204,6 +204,15 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
+    public Argument<T> withTypeParameters(Argument<?>... typeParameters) {
+        if (isRawType()) {
+            // a subclass, such as the arguments the bean context wraps, may answer raw without being a DefaultRawArgument
+            return new DefaultRawArgument<>(type, name, annotationMetadata, typeParameters);
+        }
+        return new DefaultArgument<>(type, name, annotationMetadata, initializeTypeParameters(typeParameters), typeParameters, isTypeVar);
+    }
+
+    @Override
     public boolean isTypeVariable() {
         return isTypeVar;
     }
