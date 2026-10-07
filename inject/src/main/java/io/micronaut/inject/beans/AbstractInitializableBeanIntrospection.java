@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanTypeHierarchy;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanPropertyMember;
@@ -103,6 +104,10 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Nullable
     private IntrospectionBuilderData builderData;
+
+    @SuppressWarnings("java:S3077") // an immutable value: a racing read computes an equal one
+    private volatile @Nullable BeanTypeHierarchy typeHierarchy;
+    private volatile boolean typeHierarchyRead;
 
     protected AbstractInitializableBeanIntrospection(Class<B> beanType,
                                                      @Nullable AnnotationMetadata annotationMetadata,
@@ -983,6 +988,16 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
+    }
+
+    @Override
+    public Optional<BeanTypeHierarchy> getTypeHierarchy() {
+        // read once: the recorded hierarchy loads the classes it names
+        if (!typeHierarchyRead) {
+            typeHierarchy = BeanTypeHierarchy.of(beanType, annotationMetadata).orElse(null);
+            typeHierarchyRead = true;
+        }
+        return Optional.ofNullable(typeHierarchy);
     }
 
     @Override

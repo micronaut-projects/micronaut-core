@@ -243,6 +243,26 @@ public @interface Introspected {
     boolean constructors() default false;
 
     /**
+     * Whether the introspection describes the hierarchy of the type, exposed via
+     * {@link io.micronaut.core.beans.BeanIntrospection#getTypeHierarchy()}: every super class and interface the
+     * type has, with the super class and the interfaces each of them declares, and the methods the type itself
+     * declares, whether or not they are described as bean methods.
+     *
+     * <p>This is required by specifications such as Jakarta Bean Validation that apply what a super type or an
+     * interface declares on its own terms, and need to know whether a type declares a method or inherits it,
+     * without reading the classes reflectively.</p>
+     *
+     * <p>Defaults to {@code false} since the additional metadata increases the size of the generated
+     * introspection. Has no effect when {@link #annotationMetadata()} is {@code false}, since the hierarchy is
+     * recorded in the annotation metadata of the introspection.</p>
+     *
+     * @return True if the hierarchy of the type should be described
+     * @since 5.3.0
+     */
+    @Experimental
+    boolean hierarchy() default false;
+
+    /**
      * Configuration for an introspection builder.
      */
     @Documented
