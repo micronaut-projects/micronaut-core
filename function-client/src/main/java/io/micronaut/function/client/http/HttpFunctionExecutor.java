@@ -28,25 +28,27 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClient;
 import jakarta.annotation.PreDestroy;
-import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
 import java.net.URI;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link io.micronaut.function.executor.FunctionExecutor} that uses a {@link io.micronaut.http.client.HttpClient} to execute a remote function definition.
+ *
+ * <p>The bean invokes the functions asynchronously with the
+ * {@link io.micronaut.http.client.AsyncHttpClient} of the HTTP client, without Reactive Streams.
+ * This class only implements {@link #invoke(FunctionDefinition, Object, Argument)}, so that a
+ * subclass that overrides it, and replaces the bean, is called through it by the default
+ * {@link #invokeAsync(FunctionDefinition, Object, Argument)}.</p>
  *
  * @param <I> input type
  * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
 public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closeable, FunctionInvokerChooser {
 
     private final ConversionService conversionService;
@@ -70,7 +72,8 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
     public O invoke(FunctionDefinition definition, @Nullable I input, Argument<O> outputType) {
         Class<O> outputJavaType = outputType.getType();
         if (outputType.isAsync()) {
-            // a CompletionStage or a CompletableFuture of the result
+            // a CompletionStage or a CompletableFuture of the result, from invokeAsync, which
+            // invokes this method for a publisher unless the bean overrides it
             return (O) invokeAsync(definition, input, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)).toCompletableFuture();
         }
         MutableHttpRequest<?> request = toRequest(definition, input, outputJavaType);
@@ -86,24 +89,6 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
     }
 
     /**
-     * Invoke the function with the {@link io.micronaut.http.client.AsyncHttpClient} of the HTTP
-     * client, without Reactive Streams.
-     */
-    @Override
-    public <T> CompletionStage<@Nullable T> invokeAsync(FunctionDefinition definition, @Nullable I input, Argument<T> valueType) {
-        MutableHttpRequest<?> request;
-        try {
-            request = toRequest(definition, input, valueType.getType());
-        } catch (RuntimeException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-        if (valueType.isVoid()) {
-            return httpClient.toAsync().exchange(request).thenApply(response -> null);
-        }
-        return httpClient.toAsync().retrieve(request, valueType);
-    }
-
-    /**
      * The request that invokes the function.
      *
      * @param definition     The definition
@@ -111,7 +96,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
      * @param outputJavaType The type of the result
      * @return The request
      */
-    private MutableHttpRequest<?> toRequest(FunctionDefinition definition, @Nullable I input, Class<?> outputJavaType) {
+    final MutableHttpRequest<?> toRequest(FunctionDefinition definition, @Nullable I input, Class<?> outputJavaType) {
         URI uri = definition.getURI().orElseThrow(() -> new FunctionNotFoundException(definition.getName()));
         MutableHttpRequest<?> request;
         if (input == null) {

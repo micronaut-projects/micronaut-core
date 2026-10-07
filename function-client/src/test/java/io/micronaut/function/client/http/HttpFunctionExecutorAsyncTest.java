@@ -37,11 +37,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -57,12 +60,14 @@ class HttpFunctionExecutorAsyncTest {
     private ApplicationContext context;
     private HttpFunctionExecutor<Object, Object> executor;
     private final AtomicInteger calls = new AtomicInteger();
+    private final List<String> accepts = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/max", exchange -> {
             calls.incrementAndGet();
+            accepts.add(String.valueOf(exchange.getRequestHeaders().getFirst("Accept")));
             byte[] body = "42".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "text/plain");
             exchange.sendResponseHeaders(200, body.length);
@@ -72,7 +77,7 @@ class HttpFunctionExecutorAsyncTest {
         });
         server.start();
         context = ApplicationContext.run();
-        executor = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null));
+        executor = new AsyncHttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null));
     }
 
     @AfterEach
@@ -137,6 +142,50 @@ class HttpFunctionExecutorAsyncTest {
         };
         ExecutionException e = assertThrows(ExecutionException.class, () -> invoker.invokeAsync(definition("/any"), null, Argument.STRING).toCompletableFuture().get());
         assertEquals(boom, e.getCause());
+    }
+
+    @Test
+    void invokeAsyncSendsTheRequestOfThePublisherOfTheValue() throws Exception {
+        HttpFunctionExecutor<Object, Object> publisherOnly = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null));
+        try {
+            // what the CompletionStage path of the function client sent: the request for a publisher
+            Object published = Mono.from((Publisher<?>) publisherOnly.invoke(definition("/max"), null, (Argument) Argument.of(Publisher.class, String.class))).block();
+            assertEquals("42", published);
+            assertEquals("42", executor.invokeAsync(definition("/max"), null, Argument.STRING).toCompletableFuture().get(10, TimeUnit.SECONDS));
+            assertEquals("42", publisherOnly.invokeAsync(definition("/max"), null, Argument.STRING).toCompletableFuture().get(10, TimeUnit.SECONDS));
+        } finally {
+            publisherOnly.close();
+        }
+
+        assertEquals(3, accepts.size());
+        assertFalse(accepts.get(0).contains("text/plain"), accepts.get(0));
+        assertEquals(accepts.get(0), accepts.get(1));
+        assertEquals(accepts.get(0), accepts.get(2));
+    }
+
+    @Test
+    void aSubclassThatOverridesInvokeIsCalledThroughItByInvokeAsync() throws Exception {
+        AtomicInteger invoked = new AtomicInteger();
+        HttpFunctionExecutor<Object, Object> subclass = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null)) {
+            @Override
+            public Object invoke(FunctionDefinition definition, Object input, Argument<Object> outputType) {
+                invoked.incrementAndGet();
+                assertEquals(Publisher.class, outputType.getType());
+                return Mono.just("overridden");
+            }
+        };
+        try {
+            assertEquals("overridden", subclass.invokeAsync(definition("/max"), null, Argument.STRING).toCompletableFuture().get(10, TimeUnit.SECONDS));
+        } finally {
+            subclass.close();
+        }
+        assertEquals(1, invoked.get());
+        assertEquals(0, calls.get());
+    }
+
+    @Test
+    void theDefaultBeanInvokesWithoutAPublisher() {
+        assertInstanceOf(AsyncHttpFunctionExecutor.class, context.getBean(HttpFunctionExecutor.class));
     }
 
     private FunctionInvoker<Object, Object> publisherInvoker(Publisher<?> publisher) {
