@@ -387,7 +387,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * @param outboundAccess The access to the connection
      * @param failure        The failure of the write, which keeps the failure of this one
      */
-    private static void writeFallbackResponse(OutboundAccess outboundAccess, Throwable failure) {
+    static void writeFallbackResponse(OutboundAccess outboundAccess, Throwable failure) {
         try {
             outboundAccess.closeAfterWrite();
             outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
