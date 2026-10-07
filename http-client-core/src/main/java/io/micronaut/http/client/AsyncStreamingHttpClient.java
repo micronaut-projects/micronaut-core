@@ -91,8 +91,8 @@ public interface AsyncStreamingHttpClient extends AsyncHttpClient {
      * the response arrived
      */
     default <I> CompletionStage<BodyElements<ByteBuffer<?>>> dataStream(HttpRequest<I> request, Argument<?> errorType) {
-        return exchangeStream(request, errorType)
-            .thenApply(response -> Objects.requireNonNull(response.body(), "The response has no elements"));
+        return ElementsStages.mapResponse(exchangeStream(request, errorType),
+            response -> Objects.requireNonNull(response.body(), "The response has no elements"));
     }
 
     /**

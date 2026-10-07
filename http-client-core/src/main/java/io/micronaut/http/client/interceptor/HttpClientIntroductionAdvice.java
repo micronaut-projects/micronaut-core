@@ -63,6 +63,7 @@ import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.ElementsResponse;
+import io.micronaut.http.client.ElementsStages;
 import io.micronaut.http.client.MappedBodyElements;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -726,10 +727,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Argument<Object> dataArgument = (Argument<Object>) (events ? elementArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : elementArgument);
             Function<BodyElements<Event<Object>>, BodyElements<?>> elements = events ? e -> e : e -> MappedBodyElements.map(e, Event::getData);
             if (exchange) {
-                return asyncSseClient.exchangeEventStream(request, dataArgument, errorType)
-                    .thenApply(response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
+                return ElementsStages.mapResponse(asyncSseClient.exchangeEventStream(request, dataArgument, errorType),
+                    response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
             }
-            return asyncSseClient.eventStream(request, dataArgument, errorType).thenApply(elements);
+            return ElementsStages.mapElements(asyncSseClient.eventStream(request, dataArgument, errorType), elements);
         }
         if (!(httpClient instanceof StreamingHttpClient streamingHttpClient)) {
             return CompletableFuture.failedStage(new ConfigurationException("The HTTP client " + httpClient.getClass().getName()
@@ -755,10 +756,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 elementType + " is registered"));
         }
         if (exchange) {
-            return asyncStreamingHttpClient.exchangeStream(request, errorType)
-                .thenApply(response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
+            return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeStream(request, errorType),
+                response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
         }
-        return asyncStreamingHttpClient.dataStream(request, errorType).thenApply(elements);
+        return ElementsStages.mapElements(asyncStreamingHttpClient.dataStream(request, errorType), elements);
     }
 
     private CompletionStage<?> httpClientResponseStage(AsyncHttpClient asyncHttpClient,

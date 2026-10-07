@@ -23,6 +23,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.client.ElementsStages;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.sse.Event;
 
@@ -143,8 +144,8 @@ public interface AsyncSseClient extends Closeable {
         if (request instanceof MutableHttpRequest<?> mutableRequest) {
             mutableRequest.getHeaders().set(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
         }
-        return exchangeEventStream(request, eventType, errorType)
-            .thenApply(response -> Objects.requireNonNull(response.body(), "The response has no elements"));
+        return ElementsStages.mapResponse(exchangeEventStream(request, eventType, errorType),
+            response -> Objects.requireNonNull(response.body(), "The response has no elements"));
     }
 
     /**
