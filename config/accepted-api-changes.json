@@ -1401,5 +1401,225 @@
     "type": "io.micronaut.http.client.StreamingHttpClient",
     "member": "Method io.micronaut.http.client.StreamingHttpClient.jsonStream(io.micronaut.http.HttpRequest)",
     "reason": "jsonStream(HttpRequest) is now a default method, existing implementations keep working"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Constructor io.micronaut.http.netty.body.$NettyJsonHandler$Definition()",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Constructor io.micronaut.http.netty.body.$NettyJsonHandler$Definition(java.lang.Class,io.micronaut.context.AbstractInitializableBeanDefinition$MethodOrFieldReference)",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.beans.BeanInfo",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.context.BeanContextConfigurable",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanType",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.InstantiatableBeanDefinition",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.context.EnvironmentConfigurable",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanContextConditional",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.InjectableBeanDefinition",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.order.Ordered",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataDelegate",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.naming.Named",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadata",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.QualifiedBeanType",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.type.ArgumentCoercible",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanDefinition",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanDefinitionReference",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Constructor io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition()",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Constructor io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition(java.lang.Class,io.micronaut.context.AbstractInitializableBeanDefinition$MethodOrFieldReference)",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataProvider",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.beans.BeanInfo",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.context.BeanContextConfigurable",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanType",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.InstantiatableBeanDefinition",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.context.EnvironmentConfigurable",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationSource",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanContextConditional",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.InjectableBeanDefinition",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.order.Ordered",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadataDelegate",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.naming.Named",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.annotation.AnnotationMetadata",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.QualifiedBeanType",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.core.type.ArgumentCoercible",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanDefinition",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.$NettyJsonStreamHandler$Definition",
+    "member": "Implemented interface io.micronaut.inject.BeanDefinitionReference",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.JsonCounter",
+    "member": "Constructor io.micronaut.http.netty.body.JsonCounter()",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.JsonCounter$BufferRegion",
+    "member": "Constructor io.micronaut.http.netty.body.JsonCounter$BufferRegion(long,long)",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.NettyJsonHandler",
+    "member": "Constructor io.micronaut.http.netty.body.NettyJsonHandler(io.micronaut.json.JsonMapper)",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
+  },
+  {
+    "type": "io.micronaut.http.netty.body.NettyJsonStreamHandler",
+    "member": "Constructor io.micronaut.http.netty.body.NettyJsonStreamHandler(io.micronaut.json.JsonMapper)",
+    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
   }
 ]
