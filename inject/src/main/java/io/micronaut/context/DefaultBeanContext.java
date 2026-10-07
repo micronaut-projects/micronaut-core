@@ -197,8 +197,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * The thread running {@link #stop()} until the singletons are destroyed. Lookups made on it are made on behalf
      * of a shutdown event listener or a destruction callback, and may resolve through existing dependency groups.
      */
+    @SuppressWarnings("java:S3077") // only the reference is published and compared with the current thread
     private volatile @Nullable Thread shutdownThread;
     /** The thread publishing the {@link ShutdownEvent}, whose listeners may open new dependency groups. */
+    @SuppressWarnings("java:S3077") // only the reference is published and compared with the current thread
     private volatile @Nullable Thread shutdownEventThread;
     /** What dependency groups created during shutdown, destroyed before it completes. Confined to the shutdown thread. */
     private final List<ShutdownDependent> shutdownDependents = new ArrayList<>();
