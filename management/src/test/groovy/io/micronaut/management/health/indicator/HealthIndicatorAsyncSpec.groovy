@@ -26,26 +26,24 @@ class HealthIndicatorAsyncSpec extends Specification {
     @AutoCleanup('shutdownNow')
     ExecutorService executor = Executors.newSingleThreadExecutor { r -> new Thread(r, 'health-check-thread') }
 
-    void 'the default getResultAsync adapts the first result of the publisher'() {
+    void 'the default getResultAsync collects all the results of the publisher'() {
         given:
-        def cancelled = new AtomicBoolean()
         HealthIndicator indicator = new PublisherOnlyIndicator(Flux.just(
                 HealthResult.builder('first', HealthStatus.UP).build(),
                 HealthResult.builder('second', HealthStatus.DOWN).build()
-        ).doOnCancel { cancelled.set(true) })
+        ))
 
         when:
-        HealthResult result = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        List<HealthResult> results = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
 
         then:
-        result.name == 'first'
-        result.status == HealthStatus.UP
-        cancelled.get()
+        results*.name == ['first', 'second']
+        results*.status == [HealthStatus.UP, HealthStatus.DOWN]
     }
 
-    void 'the default getResultAsync completes with null for an empty publisher'() {
+    void 'the default getResultAsync completes without a result for an empty publisher'() {
         expect:
-        new PublisherOnlyIndicator(Publishers.empty()).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS) == null
+        new PublisherOnlyIndicator(Publishers.empty()).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS) == []
     }
 
     void 'the default getResultAsync fails with the error of the publisher'() {
@@ -78,7 +76,7 @@ class HealthIndicatorAsyncSpec extends Specification {
         indicator.executorService = executor
 
         when:
-        HealthResult result = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult result = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         result.name == 'test'
@@ -94,7 +92,7 @@ class HealthIndicatorAsyncSpec extends Specification {
         indicator.executorService = executor
 
         when:
-        HealthResult async = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        HealthResult async = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
         HealthResult publisher = Mono.from(indicator.result).block()
 
         then:
@@ -104,7 +102,7 @@ class HealthIndicatorAsyncSpec extends Specification {
         publisher.details == async.details
     }
 
-    void 'AbstractHealthIndicator getResult emits the result of getResultAsync lazily'() {
+    void 'AbstractHealthIndicator getResult runs the check lazily'() {
         given:
         def indicator = new TestIndicator(details: [a: 1], status: HealthStatus.UP)
         indicator.executorService = executor
@@ -131,7 +129,7 @@ class HealthIndicatorAsyncSpec extends Specification {
         indicator.executorService = executor
 
         expect:
-        indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS) == null
+        indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS) == []
         Flux.from(indicator.result).collectList().block() == []
     }
 
@@ -149,17 +147,16 @@ class HealthIndicatorAsyncSpec extends Specification {
         e.is(error)
     }
 
-    void 'AbstractHealthIndicator without an executor fails the stage and throws from getResult'() {
+    void 'AbstractHealthIndicator without an executor throws from getResult, as it always did'() {
         given:
         def indicator = new TestIndicator(details: [:], status: HealthStatus.UP)
 
         when:
-        indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)
+        indicator.resultAsync
 
         then:
-        def e = thrown(ExecutionException)
-        e.cause instanceof IllegalStateException
-        e.cause.message == 'I/O ExecutorService is null'
+        def e = thrown(IllegalStateException)
+        e.message == 'I/O ExecutorService is null'
 
         when:
         indicator.result
@@ -190,9 +187,9 @@ class HealthIndicatorAsyncSpec extends Specification {
         def graceful = context.getBean(GracefulShutdownHealthIndicator)
 
         when:
-        HealthResult readyAsync = serviceReady.resultAsync.toCompletableFuture().getNow(null)
+        HealthResult readyAsync = serviceReady.resultAsync.toCompletableFuture().getNow(null).first()
         HealthResult ready = Mono.from(serviceReady.result).block()
-        HealthResult gracefulAsync = graceful.resultAsync.toCompletableFuture().getNow(null)
+        HealthResult gracefulAsync = graceful.resultAsync.toCompletableFuture().getNow(null).first()
         HealthResult gracefulResult = Mono.from(graceful.result).block()
 
         then:
@@ -210,7 +207,7 @@ class HealthIndicatorAsyncSpec extends Specification {
         context.getBean(GracefulShutdownManager).shutdownGracefully()
 
         then:
-        graceful.resultAsync.toCompletableFuture().getNow(null).status == HealthStatus.DOWN
+        graceful.resultAsync.toCompletableFuture().getNow(null)*.status == [HealthStatus.DOWN]
 
         cleanup:
         context.close()
@@ -226,16 +223,16 @@ class HealthIndicatorAsyncSpec extends Specification {
         def indicator = context.getBean(ServiceHttpClientHealthIndicator)
 
         when:
-        HealthResult async = indicator.resultAsync.toCompletableFuture().getNow(null)
+        List<HealthResult> async = indicator.resultAsync.toCompletableFuture().getNow(null)
         List<HealthResult> published = Flux.from(indicator.result).collectList().block()
 
         then:
         if (healthCheck) {
-            assert async.name == 'foo'
-            assert async.status == HealthStatus.UP
+            assert async*.name == ['foo']
+            assert async*.status == [HealthStatus.UP]
             assert published*.status == [HealthStatus.UP]
         } else {
-            assert async == null
+            assert async.empty
             assert published.empty
         }
 
@@ -244,6 +241,55 @@ class HealthIndicatorAsyncSpec extends Specification {
 
         where:
         healthCheck << [true, false]
+    }
+
+    void 'a subclass of AbstractHealthIndicator that overrides getResult is called through it, without an executor'() {
+        given:
+        def indicator = new TestIndicator() {
+            @Override
+            Publisher<HealthResult> getResult() {
+                return Mono.just(HealthResult.builder('overridden', HealthStatus.UP).build())
+            }
+        }
+
+        expect:
+        indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)*.name == ['overridden']
+        indicator.calls == 0
+    }
+
+    void 'subclasses of the built-in indicators that override getResult are called through it'() {
+        given:
+        ApplicationContext context = ApplicationContext.run(['micronaut.application.name': 'foo'])
+        def serviceReady = new ServiceReadyHealthIndicator(context.getBean(ApplicationConfiguration)) {
+            @Override
+            Publisher<HealthResult> getResult() {
+                return Mono.just(HealthResult.builder('overridden', HealthStatus.UP).build())
+            }
+        }
+
+        expect:
+        serviceReady.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)*.name == ['overridden']
+
+        cleanup:
+        context.close()
+    }
+
+    void 'cancelling the stage of AbstractHealthIndicator cancels the check that has not started'() {
+        given:
+        def busy = new java.util.concurrent.CountDownLatch(1)
+        executor.execute { busy.await(5, TimeUnit.SECONDS) }
+        def indicator = new TestIndicator(details: [:], status: HealthStatus.UP)
+        indicator.executorService = executor
+
+        when:
+        def stage = indicator.resultAsync.toCompletableFuture()
+        stage.cancel(false)
+        busy.countDown()
+        // the check would run after the busy task
+        executor.submit({ } as Runnable).get(5, TimeUnit.SECONDS)
+
+        then:
+        indicator.calls == 0
     }
 
     static class PublisherOnlyIndicator implements HealthIndicator {

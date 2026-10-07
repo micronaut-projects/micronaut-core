@@ -31,10 +31,11 @@ class JdbcIndicatorAsyncSpec extends Specification {
         JdbcIndicator indicator = context.getBean(JdbcIndicator)
 
         when:
-        HealthResult async = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS)
+        HealthResult async = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS).first()
         HealthResult published = Mono.from(indicator.result).block()
 
         then:
+        indicator instanceof AsyncJdbcIndicator
         async.name == 'jdbc'
         async.status == HealthStatus.UP
         async.details.'jdbc:h2:mem:asyncOneDb'.status == HealthStatus.UP
@@ -51,10 +52,10 @@ class JdbcIndicatorAsyncSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run()
         DataSource failing = [getConnection: { -> throw new SQLException('no connection') }] as DataSource
-        def indicator = new JdbcIndicator(executor, [failing] as DataSource[], null, context.getBean(HealthAggregator))
+        def indicator = new AsyncJdbcIndicator(executor, [failing] as DataSource[], null, context.getBean(HealthAggregator))
 
         when:
-        HealthResult result = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS)
+        HealthResult result = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS).first()
 
         then:
         result.name == 'jdbc'
@@ -68,10 +69,10 @@ class JdbcIndicatorAsyncSpec extends Specification {
 
     void 'without data sources the indicator has no result'() {
         given:
-        def indicator = new JdbcIndicator(executor, new DataSource[0], null, Mock(HealthAggregator))
+        def indicator = new AsyncJdbcIndicator(executor, new DataSource[0], null, Mock(HealthAggregator))
 
         expect:
-        indicator.resultAsync.toCompletableFuture().getNow(HealthResult.builder('pending').build()) == null
+        indicator.resultAsync.toCompletableFuture().getNow(null) == []
         Flux.from(indicator.result).collectList().block() == []
     }
 
@@ -91,14 +92,27 @@ class JdbcIndicatorAsyncSpec extends Specification {
                 }
             }
         }
-        def indicator = new JdbcIndicator(executor, [failing, failing] as DataSource[], null, publisherOnly)
+        def indicator = new AsyncJdbcIndicator(executor, [failing, failing] as DataSource[], null, publisherOnly)
 
         when:
-        HealthResult result = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS)
+        HealthResult result = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS).first()
 
         then:
         result.name == 'jdbc'
         result.status == HealthStatus.UNKNOWN
         result.details == [count: 2]
+    }
+
+    void 'a subclass of the indicator that overrides getResult is called through it'() {
+        given:
+        def indicator = new JdbcIndicator(executor, new DataSource[0], null, Mock(HealthAggregator)) {
+            @Override
+            Publisher<HealthResult> getResult() {
+                return Mono.just(HealthResult.builder('overridden', HealthStatus.UP).build())
+            }
+        }
+
+        expect:
+        indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)*.name == ['overridden']
     }
 }

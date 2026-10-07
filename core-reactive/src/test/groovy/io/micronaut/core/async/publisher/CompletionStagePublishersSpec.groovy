@@ -342,4 +342,75 @@ class CompletionStagePublishersSpec extends Specification {
             this.value = value
         }
     }
+
+    void 'toPublisher obtains the stage once per subscription, whatever the requests'() {
+        given:
+        def calls = new AtomicInteger()
+        def publisher = CompletionStagePublishers.toPublisher {
+            calls.incrementAndGet()
+            new CompletableFuture<String>()
+        }
+        def received = []
+        org.reactivestreams.Subscription subscription
+
+        when:
+        publisher.subscribe(new org.reactivestreams.Subscriber<String>() {
+            void onSubscribe(org.reactivestreams.Subscription s) { subscription = s }
+            void onNext(String s) { received << s }
+            void onError(Throwable t) { received << t }
+            void onComplete() { received << 'complete' }
+        })
+
+        then:
+        calls.get() == 0
+
+        when:
+        subscription.request(1)
+        subscription.request(1)
+        subscription.request(Long.MAX_VALUE)
+
+        then:
+        calls.get() == 1
+        received.isEmpty()
+    }
+
+    void 'toPublisher emits the value once, for requests made before and after completion'() {
+        given:
+        def stage = new CompletableFuture<String>()
+        def received = []
+        org.reactivestreams.Subscription subscription
+        CompletionStagePublishers.toPublisher { stage }.subscribe(new org.reactivestreams.Subscriber<String>() {
+            void onSubscribe(org.reactivestreams.Subscription s) { subscription = s }
+            void onNext(String s) { received << s }
+            void onError(Throwable t) { received << t }
+            void onComplete() { received << 'complete' }
+        })
+
+        when:
+        subscription.request(1)
+        stage.complete('value')
+        subscription.request(1)
+
+        then:
+        received == ['value', 'complete']
+    }
+
+    void 'toPublisher fails a non-positive request without obtaining the stage'() {
+        given:
+        def received = []
+        def calls = new AtomicInteger()
+        CompletionStagePublishers.toPublisher {
+            calls.incrementAndGet()
+            CompletableFuture.completedFuture('value')
+        }.subscribe(new org.reactivestreams.Subscriber<String>() {
+            void onSubscribe(org.reactivestreams.Subscription s) { s.request(-1) }
+            void onNext(String s) { received << s }
+            void onError(Throwable t) { received << t.class }
+            void onComplete() { received << 'complete' }
+        })
+
+        expect:
+        received == [IllegalArgumentException]
+        calls.get() == 0
+    }
 }

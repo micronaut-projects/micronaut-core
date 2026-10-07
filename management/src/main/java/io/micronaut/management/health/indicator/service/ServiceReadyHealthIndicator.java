@@ -30,11 +30,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} that signals when the service is ready to
@@ -73,11 +69,6 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
     @Override
     public Publisher<HealthResult> getResult() {
         return Publishers.just(healthResult());
-    }
-
-    @Override
-    public CompletionStage<@Nullable HealthResult> getResultAsync() {
-        return CompletableFuture.completedFuture(healthResult());
     }
 
     private HealthResult healthResult() {

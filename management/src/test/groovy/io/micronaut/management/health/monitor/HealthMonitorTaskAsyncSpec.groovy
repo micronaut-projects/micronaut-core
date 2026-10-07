@@ -91,7 +91,7 @@ class HealthMonitorTaskAsyncSpec extends Specification {
             }
 
             @Override
-            CompletionStage<HealthResult> getResultAsync() {
+            CompletionStage<List<HealthResult>> getResultAsync() {
                 throw new IllegalStateException('thrown')
             }
         }
