@@ -9,6 +9,7 @@ class BeanTypeHierarchySpec extends AbstractKotlinCompilerSpec {
         def introspection = buildBeanIntrospection('test.Child', '''
 package test
 
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 
 interface Named {
@@ -20,16 +21,19 @@ interface Titled : Named {
 }
 
 abstract class Base<T> : Named, java.io.Serializable {
+    @Executable
     override fun name(): String = "base"
+    @Executable
     abstract fun value(input: T): T
 }
 
 @Introspected(hierarchy = true)
 open class Child : Base<String>(), Titled {
     override fun title(): String = "title"
+    @Executable
     override fun value(input: String): String = input
-    fun arrays(ints: IntArray, names: Array<Array<String>>) { }
-    private fun notVisible() { }
+    @Executable
+    fun own(ints: IntArray) { }
 }
 ''')
         def hierarchy = introspection.getTypeHierarchy().orElseThrow()
@@ -38,6 +42,7 @@ open class Child : Base<String>(), Titled {
         def base = loader.loadClass('test.Base')
         def named = loader.loadClass('test.Named')
         def titled = loader.loadClass('test.Titled')
+        def methods = introspection.beanMethods.collectEntries { [it.name, it] }
 
         expect:
         hierarchy.types == [child, base, named, Serializable, titled]
@@ -47,11 +52,9 @@ open class Child : Base<String>(), Titled {
         hierarchy.getInterfaces(child) == [titled]
         hierarchy.getInterfaces(base) == [named, Serializable]
         hierarchy.getInterfaces(titled) == [named]
-        hierarchy.declaresMethod('title')
-        hierarchy.declaresMethod('value', String)
-        hierarchy.declaresMethod('arrays', int[], String[][])
-        !hierarchy.declaresMethod('name')
-        !hierarchy.declaresMethod('notVisible')
+        hierarchy.isDeclared(methods.value)
+        hierarchy.isDeclared(methods.own)
+        !hierarchy.isDeclared(methods.name)
     }
 
     void "an introspection does not describe the hierarchy by default"() {

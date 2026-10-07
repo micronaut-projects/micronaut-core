@@ -245,8 +245,8 @@ public @interface Introspected {
     /**
      * Whether the introspection describes the hierarchy of the type, exposed via
      * {@link io.micronaut.core.beans.BeanIntrospection#getTypeHierarchy()}: every super class and interface the
-     * type has, with the super class and the interfaces each of them declares, and the methods the type itself
-     * declares, whether or not they are described as bean methods.
+     * type has, with the super class and the interfaces each of them declares, and which of the bean methods the
+     * type declares itself rather than inherits.
      *
      * <p>This is required by specifications such as Jakarta Bean Validation that apply what a super type or an
      * interface declares on its own terms, and need to know whether a type declares a method or inherits it,

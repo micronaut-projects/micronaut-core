@@ -8,9 +8,9 @@ class BeanTypeHierarchySpec extends AbstractTypeElementSpec {
     private static final String SOURCE = '''
 package test;
 
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Introspected;
 import java.io.Serializable;
-import java.util.List;
 
 interface Named {
     String getName();
@@ -21,19 +21,23 @@ interface Titled extends Named {
 }
 
 abstract class Base<T> implements Named, Serializable {
+    @Executable
     public String getName() { return "base"; }
+    @Executable
     public abstract T value(T in);
+    @Executable
+    public void inherited() { }
 }
 
 @Introspected(hierarchy = true)
 class Child extends Base<String> implements Titled, Comparable<Child> {
     private String title;
     public String getTitle() { return title; }
+    @Executable
     public String value(String in) { return in; }
+    @Executable
+    public void own(int[] ints) { }
     public int compareTo(Child other) { return 0; }
-    public void arrays(int[] ints, String[][] names, List<String>[] lists) { }
-    public static void notAnInstanceMethod() { }
-    private void notVisible() { }
 }
 '''
 
@@ -46,6 +50,7 @@ class Child extends Base<String> implements Titled, Comparable<Child> {
         def base = loader.loadClass('test.Base')
         def named = loader.loadClass('test.Named')
         def titled = loader.loadClass('test.Titled')
+        def methods = introspection.beanMethods.collectEntries { [it.name, it] }
 
         expect: 'every type once, depth first: the super class and its super types, then the interfaces'
         hierarchy.beanType == child
@@ -62,17 +67,13 @@ class Child extends Base<String> implements Titled, Comparable<Child> {
         hierarchy.getInterfaces(titled) == [named]
         hierarchy.getInterfaces(String) == []
 
-        and: 'the instance methods the type declares that are not private, erased'
-        hierarchy.declaresMethod('getTitle')
-        hierarchy.declaresMethod('value', String)
-        hierarchy.declaresMethod('compareTo', child)
-        hierarchy.declaresMethod('arrays', int[], String[][], List[])
-        hierarchy.findDeclaredMethod('arrays', int[], String[][], List[]).get().returnTypeName() == 'void'
-        hierarchy.findDeclaredMethod('value', String).get().returnTypeName() == 'java.lang.String'
-        !hierarchy.declaresMethod('getName')
-        !hierarchy.declaresMethod('notAnInstanceMethod')
-        !hierarchy.declaresMethod('notVisible')
-        !hierarchy.declaresMethod('value', Object)
+        and: 'the bean methods the type declares itself, an override included, and the ones it inherits'
+        methods.keySet() == ['getName', 'value', 'inherited', 'own'] as Set
+        hierarchy.declaredMethods*.name as Set == ['value', 'own'] as Set
+        hierarchy.isDeclared(methods.value)
+        hierarchy.isDeclared(methods.own)
+        !hierarchy.isDeclared(methods.getName)
+        !hierarchy.isDeclared(methods.inherited)
 
         and: 'read once'
         introspection.getTypeHierarchy().get().is(hierarchy)
@@ -112,7 +113,7 @@ class Bare implements Runnable {
         then:
         introspection.annotationMetadata.isEmpty()
         hierarchy.types == [introspection.beanType, Runnable]
-        hierarchy.declaresMethod('run')
+        hierarchy.declaredMethods.isEmpty()
     }
 
     void "an imported type is described when the import asks for it"() {
@@ -138,7 +139,5 @@ class Target extends Thread {
         then:
         hierarchy.types == [target, Thread, Runnable]
         hierarchy.getSuperclass(Thread).get() == Object
-        hierarchy.declaresMethod('work', long)
-        !hierarchy.declaresMethod('run')
     }
 }

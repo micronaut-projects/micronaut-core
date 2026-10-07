@@ -18,14 +18,14 @@ BeanTypeHierarchy hierarchy = introspection.getTypeHierarchy().orElseThrow();
 hierarchy.getTypes();                           // [Book, Publication, ..., Comparable]
 hierarchy.getSuperclass(Book.class);            // Optional[Publication]
 hierarchy.getInterfaces(Book.class);            // [Comparable]
-hierarchy.declaresMethod("compareTo", Book.class); // true
+hierarchy.isDeclared(method);              // whether Book declares a bean method itself
 ----
 
 api:core.beans.BeanTypeHierarchy[] exposes:
 
 * `getTypes()` - the type and every super class and interface of it, each once, depth first: the super class and its super types, then the interfaces and theirs. `Object` is reported as a super class but not described itself.
 * `getSuperclass(type)` and `getInterfaces(type)` - what a type of the hierarchy extends and implements itself
-* `getDeclaredMethods()`, `findDeclaredMethod(name, parameterTypes)` and `declaresMethod(name, parameterTypes)` - the instance methods the type declares that are not private, whether or not they are bean methods, matched by their erased signature without loading the parameter types
+* `getDeclaredMethods()` and `isDeclared(method)` - which of the bean methods of the introspection the type declares itself, overrides included; the others it inherits
 
 The hierarchy is the one the compiler saw. A type whose class cannot be loaded at runtime is left out.
 
