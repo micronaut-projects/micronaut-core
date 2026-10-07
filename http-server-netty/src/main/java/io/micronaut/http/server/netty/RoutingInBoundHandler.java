@@ -362,6 +362,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
                         u.addSuppressed(t);
                     }
                     t = u;
+                    // the response may not have reached the connection: the client would wait
+                    // for it until it times out
+                    writeFallbackResponse(outboundAccess, u);
                 }
                 if (t != null) {
                     LOG.warn("Failed to build error response", t);
@@ -372,6 +375,24 @@ public final class RoutingInBoundHandler implements RequestHandler {
             // anyway to ensure the request is closed
             outboundAccess.closeAfterWrite();
             outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE), NettyByteBodyFactory.empty());
+        }
+    }
+
+    /**
+     * Answer with an empty {@code 500} response and close the connection, after writing the
+     * response failed, e.g. with an {@link Error} of a buffer allocation. If the response was
+     * already handed to the connection, this write is refused, and the response goes on as it
+     * was.
+     *
+     * @param outboundAccess The access to the connection
+     * @param failure        The failure of the write, which keeps the failure of this one
+     */
+    private static void writeFallbackResponse(OutboundAccess outboundAccess, Throwable failure) {
+        try {
+            outboundAccess.closeAfterWrite();
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
+        } catch (Throwable e) {
+            failure.addSuppressed(e);
         }
     }
 
