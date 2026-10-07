@@ -43,6 +43,7 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClientRegistry;
+import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
@@ -325,6 +326,29 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Parameter @Nullable HttpClientConfiguration configuration,
             BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
+    }
+
+    /**
+     * Creates an {@link AsyncHttpClient} for the given injection point: the
+     * {@link io.micronaut.http.client.HttpClient#toAsync() async view} of the client that a
+     * {@code HttpClient} injection point gets.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncHttpClient asyncHttpClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsync();
     }
 
     /**
