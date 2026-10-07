@@ -15,33 +15,20 @@
  */
 package io.micronaut.discovery;
 
-import io.micronaut.context.annotation.Primary;
-import jakarta.inject.Inject;
-import io.micronaut.core.async.publisher.CompletionStagePublishers;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.ArrayUtils;
-import jakarta.inject.Singleton;
-
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled.
  *
- * <p>It combines the {@link CompletionStage}s of the discovery clients for
- * {@link #getInstancesAsync(String)} and {@link #getServiceIdsAsync()}, without a publisher: the
- * lists are concatenated in the order of the clients, and the first client that fails fails the
- * result, like the publishers of {@link #getInstances(String)} and {@link #getServiceIds()}.
- * A subclass that overrides those publisher methods should override their counterparts too.</p>
+ * <p>The bean is an {@link AsyncCompositeDiscoveryClient}, which combines the
+ * {@link java.util.concurrent.CompletionStage}s of the discovery clients without a publisher.
+ * This class only implements the publisher methods, so that a subclass that overrides them, and
+ * replaces the bean, is called through them by the default
+ * {@link #getInstancesAsync(String)} and {@link #getServiceIdsAsync()}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Primary
-@Singleton
 public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
 
     /**
@@ -49,7 +36,6 @@ public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
      *
      * @param discoveryClients The Discovery clients used for service discovery
      */
-    @Inject
     public DefaultCompositeDiscoveryClient(List<DiscoveryClient> discoveryClients) {
         super(discoveryClients.toArray(new DiscoveryClient[0]));
     }
@@ -61,32 +47,5 @@ public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
      */
     public DefaultCompositeDiscoveryClient(DiscoveryClient... discoveryClients) {
         super(discoveryClients);
-    }
-
-    @Override
-    public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
-        DiscoveryClient[] discoveryClients = getDiscoveryClients();
-        if (ArrayUtils.isEmpty(discoveryClients)) {
-            return CompletableFuture.completedFuture(Collections.emptyList());
-        }
-        String hyphenated = NameUtils.hyphenate(serviceId);
-        List<CompletionStage<List<ServiceInstance>>> stages = new ArrayList<>(discoveryClients.length);
-        for (DiscoveryClient discoveryClient : discoveryClients) {
-            stages.add(discoveryClient.getInstancesAsync(hyphenated));
-        }
-        return CompletionStagePublishers.concat(stages);
-    }
-
-    @Override
-    public CompletionStage<List<String>> getServiceIdsAsync() {
-        DiscoveryClient[] discoveryClients = getDiscoveryClients();
-        if (ArrayUtils.isEmpty(discoveryClients)) {
-            return CompletableFuture.completedFuture(Collections.emptyList());
-        }
-        List<CompletionStage<List<String>>> stages = new ArrayList<>(discoveryClients.length);
-        for (DiscoveryClient discoveryClient : discoveryClients) {
-            stages.add(discoveryClient.getServiceIdsAsync());
-        }
-        return CompletionStagePublishers.concat(stages);
     }
 }

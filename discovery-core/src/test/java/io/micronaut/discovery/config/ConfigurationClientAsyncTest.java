@@ -87,7 +87,7 @@ class ConfigurationClientAsyncTest {
     @Test
     void theCompositeConcatenatesTheClientsInOrder() {
         AsyncClient first = new AsyncClient();
-        DefaultCompositeConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
+        DefaultCompositeConfigurationClient composite = new AsyncCompositeConfigurationClient(new ConfigurationClient[] {
             first,
             new PublisherClient(Flux.just(THREE))
         });
@@ -102,7 +102,7 @@ class ConfigurationClientAsyncTest {
     void oneFailingClientFailsTheComposite() {
         AsyncClient first = new AsyncClient();
         IllegalStateException error = new IllegalStateException("boom");
-        DefaultCompositeConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
+        DefaultCompositeConfigurationClient composite = new AsyncCompositeConfigurationClient(new ConfigurationClient[] {
             first,
             new PublisherClient(Mono.error(error))
         });
@@ -119,9 +119,34 @@ class ConfigurationClientAsyncTest {
 
     @Test
     void aCompositeWithoutClientsIsEmpty() {
-        DefaultCompositeConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[0]);
+        DefaultCompositeConfigurationClient composite = new AsyncCompositeConfigurationClient(new ConfigurationClient[0]);
 
         assertEquals(List.of(), composite.getPropertySourcesAsync(environment).toCompletableFuture().getNow(null));
+    }
+
+    @Test
+    void aDefaultCompositeSubclassThatOverridesThePublisherIsCalledThroughIt() {
+        AtomicInteger calls = new AtomicInteger();
+        AsyncClient client = new AsyncClient();
+        ConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[] {client}) {
+            @Override
+            public Publisher<PropertySource> getPropertySources(Environment environment) {
+                calls.incrementAndGet();
+                return Flux.just(THREE, ONE);
+            }
+        };
+
+        assertEquals(List.of(THREE, ONE), composite.getPropertySourcesAsync(environment).toCompletableFuture().getNow(null));
+        assertEquals(1, calls.get());
+        assertTrue(client.futures.isEmpty());
+    }
+
+    @Test
+    void theDefaultBeanCombinesTheStages() {
+        try (ApplicationContext ctx = ApplicationContext.run()) {
+            assertTrue(ctx.getBean(ConfigurationClient.class) instanceof AsyncCompositeConfigurationClient);
+            assertTrue(ctx.getBean(DefaultCompositeConfigurationClient.class) instanceof AsyncCompositeConfigurationClient);
+        }
     }
 
     private record PublisherClient(Publisher<PropertySource> propertySources) implements ConfigurationClient {

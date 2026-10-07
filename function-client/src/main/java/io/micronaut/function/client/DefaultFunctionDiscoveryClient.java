@@ -15,7 +15,6 @@
  */
 package io.micronaut.function.client;
 
-import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.DiscoveryClient;
@@ -23,26 +22,26 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.health.HealthStatus;
-import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  * Default implementation of the {@link FunctionDiscoveryClient} interface.
  *
+ * <p>The bean is an {@link AsyncFunctionDiscoveryClient}, which looks the functions up without a
+ * publisher. This class only implements the publisher method, so that a subclass that overrides
+ * it, and replaces the bean, is called through it by the default
+ * {@link #getFunctionAsync(String)}.</p>
+ *
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
 public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
 
     private final DiscoveryClient discoveryClient;
@@ -84,44 +83,21 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
     }
 
     /**
-     * Finds a function for the given function name, among the functions this client was created
-     * with, then among the instances of every service of the discovery client: the first
-     * instance that is up and that offers the function, in the order of the service IDs.
-     *
      * @param functionName The function name
-     * @return A {@link CompletionStage} completed with the {@link FunctionDefinition}, or with a {@link FunctionNotFoundException} if no function is found
-     * @since 5.3.0
+     * @return The function this client was created with, or {@code null}
      */
-    @Override
-    public CompletionStage<FunctionDefinition> getFunctionAsync(String functionName) {
-        FunctionDefinition definition = functionDefinitionMap.get(functionName);
-        if (definition != null) {
-            return CompletableFuture.completedFuture(definition);
-        }
-        CompletableFuture<List<String>> serviceIds = discoveryClient.getServiceIdsAsync().toCompletableFuture();
-        return CompletionStagePublishers.cancelling(serviceIds, serviceIds.thenCompose(ids -> {
-            List<CompletionStage<List<ServiceInstance>>> stages = new ArrayList<>(ids.size());
-            for (String id : ids) {
-                stages.add(discoveryClient.getInstancesAsync(id));
-            }
-            return CompletionStagePublishers.concat(stages);
-        }).thenApply(instances -> {
-            for (ServiceInstance instance : instances) {
-                if (isFunctionInstance(instance, functionName)) {
-                    return toFunctionDefinition(instance, functionName);
-                }
-            }
-            throw new FunctionNotFoundException(functionName);
-        }));
+    @Nullable
+    final FunctionDefinition findLocalFunction(String functionName) {
+        return functionDefinitionMap.get(functionName);
     }
 
-    private static boolean isFunctionInstance(ServiceInstance instance, String functionName) {
+    static boolean isFunctionInstance(ServiceInstance instance, String functionName) {
         boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
         return isAvailable && instance.getMetadata().names().stream()
             .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
     }
 
-    private static FunctionDefinition toFunctionDefinition(ServiceInstance instance, String functionName) {
+    static FunctionDefinition toFunctionDefinition(ServiceInstance instance, String functionName) {
         Optional<String> uri = instance.getMetadata().get(LocalFunctionRegistry.FUNCTION_PREFIX + functionName, String.class);
         if (uri.isPresent()) {
             URI resolvedURI = instance.getURI().resolve(uri.get());
