@@ -28,12 +28,14 @@ import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormFieldFlows;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Mono;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * Binder for {@link RawFormField}.
@@ -66,9 +68,9 @@ public final class RawFormFieldArgumentBinder implements TypedRequestArgumentBin
         Argument<RawFormField> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        CompletableFuture<RawFormField> future = Mono.from(formFactory.get().getOrCreateCompleter(fchr)
-                .subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)))
-            .toFuture();
+        CompletableFuture<@Nullable RawFormField> future = FormFieldFlows.first(formFactory.get().getOrCreateCompleter(fchr)
+                .subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)),
+            Function.identity());
 
         BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
 

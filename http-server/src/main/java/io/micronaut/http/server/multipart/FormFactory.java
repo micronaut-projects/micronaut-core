@@ -43,7 +43,6 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.io.Closeable;
 import java.io.File;
@@ -175,7 +174,7 @@ public final class FormFactory {
             return ExecutionFlow.error(new HttpStatusException(HttpStatus.BAD_REQUEST, "Field [" + formField.metadata().name() + "] was expected to be a file upload, but is missing a file name"));
         }
         ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), request.byteBodyFactory().readBufferFactory());
-        Flux.from(formField.byteBody().toReadBufferPublisher()).subscribe(tds);
+        formField.byteBody().toReadBufferPublisher().subscribe(tds);
         request.addDisposalResource(tds::cleanup);
         return tds.result;
     }
