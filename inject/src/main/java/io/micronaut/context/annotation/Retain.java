@@ -66,6 +66,10 @@ public @interface Retain {
      * creates it again from the changed configuration, so that a changed connection URL produces a new
      * pool. A data source would name {@code datasources}, for example.
      *
+     * <p>A configuration bean the retained bean received under one of these prefixes, or under a prefix within one,
+     * does not keep it from being retained, and is not retained with it: each generation binds it again. The bean
+     * must therefore copy the values it needs, and not keep the configuration bean.</p>
+     *
      * @return The configuration prefixes, empty when no configuration change releases the bean
      */
     String[] invalidatedBy() default {};

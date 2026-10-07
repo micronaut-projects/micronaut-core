@@ -83,7 +83,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -1084,7 +1083,7 @@ public final class DevRuntime implements Closeable {
                 LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
             }
             if (old instanceof DefaultBeanContext defaultBeanContext && old.isRunning()) {
-                retained = defaultBeanContext.stopRetaining(retentionCriteria(retentionPredicate(old, configurationChange)));
+                retained = defaultBeanContext.stopRetaining(retentionCriteria(old, configurationChange));
             } else if (old.isRunning()) {
                 old.stop();
             }
@@ -1142,51 +1141,53 @@ public final class DevRuntime implements Closeable {
         }
     }
 
-    private Predicate<BeanRegistration<?>> retentionPredicate(ApplicationContext old, @Nullable ConfigurationChange configurationChange) {
+    /**
+     * What a restart retains: what a policy retains, unless a change touched a prefix one of them declares for it, or a
+     * bean it holds or received is of a class of a generation, which the restart replaces and the bean would keep
+     * running. The prefixes the policies declare for a bean are also those under which a configuration bean it received
+     * is not retained with it, but bound again by the next generation.
+     */
+    private DefaultBeanContext.RetentionCriteria retentionCriteria(ApplicationContext old, @Nullable ConfigurationChange configurationChange) {
         List<BeanRetentionPolicy> policies = new ArrayList<>(old.getBeansOfType(BeanRetentionPolicy.class));
         if (manifest.retainAnnotated()) {
             // what the modules declare with @Retain, read from the definitions
             policies.add(AnnotatedBeanRetentionPolicy.INSTANCE);
         }
         OrderUtil.sort(policies);
-        return registration -> {
-            if (isStale(registration)) {
-                return false;
-            }
-            // every policy that retains the bean has a say: a pool kept across a changed URL would be the old pool,
-            // so a touched prefix any of them declares for the bean drops it, and none declaring one keeps it
-            boolean retained = false;
-            for (BeanRetentionPolicy policy : policies) {
-                if (!policy.retain(registration)) {
-                    continue;
-                }
-                retained = true;
-                if (configurationChange != null) {
-                    for (String prefix : policy.observedConfigurationPrefixes(registration)) {
-                        if (configurationChange.touches(prefix)) {
-                            return false;
-                        }
-                    }
-                }
-            }
-            return retained;
-        };
-    }
-
-    /**
-     * What a restart retains: what the predicate retains, unless a bean it holds or received is of a class of a
-     * generation, which the restart replaces and the bean would keep running.
-     */
-    private static DefaultBeanContext.RetentionCriteria retentionCriteria(Predicate<BeanRegistration<?>> retain) {
         return new DefaultBeanContext.RetentionCriteria() {
             @Override
             public boolean retain(BeanRegistration<?> registration) {
-                return retain.test(registration);
+                if (isStale(registration)) {
+                    return false;
+                }
+                // every policy that retains the bean has a say: a pool kept across a changed URL would be the old pool,
+                // so a touched prefix any of them declares for the bean drops it, and none declaring one keeps it
+                boolean retained = false;
+                for (BeanRetentionPolicy policy : policies) {
+                    if (!policy.retain(registration)) {
+                        continue;
+                    }
+                    retained = true;
+                    if (configurationChange != null) {
+                        for (String prefix : policy.observedConfigurationPrefixes(registration)) {
+                            if (configurationChange.touches(prefix)) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return retained;
             }
 
             @Override
             public Set<String> invalidatedBy(BeanRegistration<?> registration) {
-                return Set.of();
+                Set<String> prefixes = new LinkedHashSet<>();
+                for (BeanRetentionPolicy policy : policies) {
+                    if (policy.retain(registration)) {
+                        prefixes.addAll(policy.observedConfigurationPrefixes(registration));
+                    }
+                }
+                return prefixes;
             }
 
             @Override
