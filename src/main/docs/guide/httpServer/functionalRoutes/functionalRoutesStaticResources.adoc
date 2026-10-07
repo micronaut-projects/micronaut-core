@@ -1,0 +1,52 @@
+The terminal `resources(...)` ends a `GET` route with a handler of the resources under its URI: the route serves the files of a directory, or the resources of a package of the classpath, under a URI prefix. api:http.server.routes.StaticResources[] is the handler of the HTTP server for static resources.
+
+snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="resources", indent=0, title="Serving static resources under a prefix"]
+
+<1> A `GET` route declares the URI prefix of the resources.
+<2> The settings of the route are declared before the terminal, like for any route: here a filter, but also `where(...)`, `order(...)`, `attribute(...)`, `port(...)` or `executeOn(...)`. They apply to every resource of the route.
+<3> `StaticResources.classpath(base)` serves the resources under a package of the classpath, inside jars too: `GET /assets/css/site.css` answers `functional-static/assets/css/site.css`.
+<4> `cacheControl(...)` sets the `Cache-Control` header of the resources, here for files whose names change with their content. Without it, the header is the one of the files of the server, see `micronaut.server.responses.file`.
+<5> `StaticResources.fileSystem(directory)` serves the files under a directory of the file system: `GET /site/hello.txt` answers the file `hello.txt` of the directory. Symbolic links that lead outside the directory are not followed.
+
+The route registers two routes to the handler: `GET prefix`, which answers the index file of the directory, and `GET prefix/{+path}`, which answers the resource at `path`, relative to the prefix. Trailing slashes of the prefix are ignored. Like any `GET` route they have implicit `HEAD` routes, and they are ordinary routes: a more specific route of a controller or a handler under the prefix takes precedence.
+
+A route of resources is declared in a group like any other route. `GET("")` serves the resources at the prefix of the group:
+
+snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", indent=0, title="Static resources in a group"]
+
+<1> The media types of the group do not apply to a route of resources: the content type of each resource follows its file name, here `text/html` for `index.html`, although the group produces JSON.
+<2> The executor of the group applies, so the resources are read on the blocking executor.
+<3> The filters of the group apply to the route of resources, like to the other routes of the group.
+<4> `GET /manual` answers `index.html` of `functional-static/manual`.
+
+==== Options
+
+`StaticResources` is immutable: each option returns a copy.
+
+* `classpath(base)`, `fileSystem(directory)` (a `String` or a `Path`), `of(locations...)` with the locations of `micronaut.router.static-resources`, e.g. `classpath:public` and `file:/var/www`, and `of(resourceLoaders...)`. With several locations, the first one that has a resource answers it.
+* `indexFile(name)`: the file answered for the prefix itself and for a path without an extension that is a directory, `index.html` by default; `null` for none, then such a request is answered with `404`.
+* `cacheControl(value)`: the `Cache-Control` header of the resources.
+* `pathVariable(name)`: the name of the path variable of the path of the resource, `path` by default.
+
+==== Responses
+
+A file of the file system is answered as a api:http.server.types.files.SystemFile[], and any other resource, e.g. in a jar, as a api:http.server.types.files.StreamedFile[], so they are answered like the files of `micronaut.router.static-resources`:
+
+* the content type follows the extension of the file name;
+* the response has a `Last-Modified` header, and a request with a matching `If-Modified-Since` header is answered with `304`;
+* a `Range` request for a file of the file system is answered with `206`;
+* a `HEAD` request is answered with the headers, without reading the resource.
+
+A request for a resource that no location has, or for a directory without an index file, is answered with `404`. So is a path that tries to leave the base: a `.` or `..` segment, a backslash, an absolute path, or a percent-encoded dot, slash or backslash, e.g. `/assets/%2e%2e/secret.txt` or `/assets/..%2fsecret.txt`.
+
+==== The rules of a route of resources
+
+* `resources(...)` ends a route of `GET` only, e.g. `GET(uri)` or `route(HttpMethod.GET, uri)`. On any other route, e.g. `POST(uri)`, `any(uri)` or a route of `GET` and `POST`, it throws an `IllegalStateException` while the routes are built, so the application fails at startup. It throws one too on a route already ended by another terminal.
+* The URI of the route is a prefix: it has no query or fragment, and the path variable of the handler is a plain name. Otherwise the route fails with an `IllegalArgumentException`.
+* The media types of its groups do not apply, but their filters, executor, conditions, order, port, annotations and attributes do.
+
+==== Static resources of the configuration
+
+The static resources of the configuration, `micronaut.router.static-resources` (see <<staticResources, Serving Static Resources>>), and the routes of resources share the resolution of a path to a resource, api:web.router.resource.StaticResourceResolver[]: the order of the locations, the index file of a directory and the content type are the same.
+
+Use the configuration to serve static resources without code, e.g. to change the locations per environment. Use a route of resources to give them the settings of a route: filters, conditions, an order, a port, an executor or a `Cache-Control` header, or to declare them with the other functional routes of a group.
