@@ -116,6 +116,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
 
             @Override
             public void close() {
+                // the test client holds no resources
             }
         }, new FunctionDefinitionProvider[0]);
         assertThrows(FunctionNotFoundException.class, () -> Mono.from(publisherClient.getFunction("max")).block());
@@ -274,6 +275,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
 
         @Override
         public void close() {
+            // the test client holds no resources
         }
     }
 }
