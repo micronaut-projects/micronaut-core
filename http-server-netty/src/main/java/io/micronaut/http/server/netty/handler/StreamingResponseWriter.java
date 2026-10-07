@@ -185,12 +185,25 @@ final class StreamingResponseWriter implements BufferConsumer, PieceAccumulator.
      */
     private void openSink(@Nullable List<ReadBuffer> data) {
         state = Open.INSTANCE;
-        sink.open();
-        if (data != null) {
-            for (ReadBuffer buf : data) {
-                // a piece that follows a dispose from within a write is released by the accumulator
-                accumulator.add(NettyReadBufferFactory.toByteBuf(buf));
+        // the writer owns each early piece until it is handed to the accumulator
+        int handedOver = 0;
+        try {
+            sink.open();
+            if (data != null) {
+                while (handedOver < data.size()) {
+                    ReadBuffer buf = data.get(handedOver++);
+                    // a piece that follows a dispose from within a write is released by the accumulator
+                    accumulator.add(NettyReadBufferFactory.toByteBuf(buf));
+                }
             }
+        } catch (Throwable t) {
+            // the state is not Pending anymore, so nothing else releases the remaining pieces
+            if (data != null) {
+                for (int i = handedOver; i < data.size(); i++) {
+                    data.get(i).close();
+                }
+            }
+            throw t;
         }
         if (!started) {
             started = true;

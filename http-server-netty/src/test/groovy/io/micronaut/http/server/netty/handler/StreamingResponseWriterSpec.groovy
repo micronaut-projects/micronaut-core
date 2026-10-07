@@ -338,6 +338,72 @@ class StreamingResponseWriterSpec extends Specification {
         writer.done
     }
 
+    def 'early data is released when opening the sink throws'() {
+        given:
+        def failure = new IllegalArgumentException("invalid header")
+        def sink = new RecordingSink() {
+            @Override
+            void open() {
+                throw failure
+            }
+        }
+        def writer = new StreamingResponseWriter(loop, sink)
+        writer.attach(new PipeliningServerHandlerSpec.RecordingUpstream())
+        def a = Unpooled.copiedBuffer("a", StandardCharsets.UTF_8)
+        def b = Unpooled.copiedBuffer("b", StandardCharsets.UTF_8)
+        Throwable thrown = null
+
+        when:
+        onLoop {
+            writer.add(piece(a))
+            writer.add(piece(b))
+            try {
+                writer.open()
+            } catch (Throwable t) {
+                thrown = t
+            }
+            writer.dispose()
+        }
+
+        then:
+        thrown.is(failure)
+        a.refCnt() == 0
+        b.refCnt() == 0
+        sink.responseWritten == 1
+        writer.done
+    }
+
+    def 'early data not yet replayed is released when a sink write throws during the replay'() {
+        given:
+        def failure = new IllegalStateException("write failed")
+        def sink = new RecordingSink()
+        sink.afterWrite = { throw failure }
+        def writer = new StreamingResponseWriter(loop, sink)
+        writer.attach(new PipeliningServerHandlerSpec.RecordingUpstream())
+        def large = Unpooled.buffer(2048).writeZero(2048)
+        def rest = Unpooled.copiedBuffer("rest", StandardCharsets.UTF_8)
+        Throwable thrown = null
+
+        when:
+        onLoop {
+            writer.add(piece(large))
+            writer.add(piece(rest))
+            try {
+                writer.open()
+            } catch (Throwable t) {
+                thrown = t
+            }
+            writer.dispose()
+        }
+
+        then:
+        thrown.is(failure)
+        sink.sizes == [2048]
+        large.refCnt() == 0
+        rest.refCnt() == 0
+        writer.done
+    }
+
     def 'an error after completion is ignored, and data after completion is released'() {
         given:
         def sink = new RecordingSink()
