@@ -3,12 +3,14 @@ package io.micronaut.http.ssl;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
+import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PemParserTest {
     @Test
@@ -175,5 +177,99 @@ class PemParserTest {
         assertEquals(
             new BigInteger("6EC088783D85D75D19573648292499FBDEAE6AC230D4B98C03EE4E3DEC73D206", 16),
             key.getS());
+    }
+
+    @Test
+    public void certificatesWithExplanatoryText() throws Exception {
+        // Distro CA bundles (NixOS, Debian) put the CA name on a line before each certificate.
+        // RFC 7468 section 2: text outside of the encapsulation boundaries is ignored.
+        List<Object> items = new PemParser(null, null).loadPem("""
+            # Subject: CN=Test CA 1
+            First CA
+            ========
+            -----BEGIN CERTIFICATE-----
+            MIIBfjCCASWgAwIBAgIUFdB184Ztg40/v/06MuvsGKMZaNswCgYIKoZIzj0EAwIw
+            FDESMBAGA1UEAwwJVGVzdCBDQSAxMCAXDTI2MTAwNzE5NDIxN1oYDzIxMjYwOTEz
+            MTk0MjE3WjAUMRIwEAYDVQQDDAlUZXN0IENBIDEwWTATBgcqhkjOPQIBBggqhkjO
+            PQMBBwNCAAQGkMO2cQwf353bDifnOjreHmePPi52TiY7z0tIiQdwVFD7l+SYqj/S
+            Un/uFpO/lICnhbFW08TOd1kfjaxBTWzco1MwUTAdBgNVHQ4EFgQU4aYhRYUV73xa
+            KajswY+Dyh7V8D4wHwYDVR0jBBgwFoAU4aYhRYUV73xaKajswY+Dyh7V8D4wDwYD
+            VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiAptCeuJIQSQesiW3XMxMvV
+            s7Da7Zo73JwobtxQcnHC1gIgRzCC+iNC2DlE+knc1DJILlNzNQxwFZhbT1SeHy7d
+            X2E=
+            -----END CERTIFICATE-----
+
+            Second CA
+            ========
+            -----BEGIN CERTIFICATE-----
+            MIIBfzCCASWgAwIBAgIUT2B1JURk8RDtUn5ruoypAH7sobYwCgYIKoZIzj0EAwIw
+            FDESMBAGA1UEAwwJVGVzdCBDQSAyMCAXDTI2MTAwNzE5NDIxN1oYDzIxMjYwOTEz
+            MTk0MjE3WjAUMRIwEAYDVQQDDAlUZXN0IENBIDIwWTATBgcqhkjOPQIBBggqhkjO
+            PQMBBwNCAAR4so5BX0EdleRbRKO6LWa4V7ozQbWCN1/6H6AOVB10wpptz/I4Yqlw
+            BrNtLItEyCPxLzT8mkvin4QyPLjB7oxzo1MwUTAdBgNVHQ4EFgQU8xD8MsOLDU5q
+            k0OAy+WYgz6MfLcwHwYDVR0jBBgwFoAU8xD8MsOLDU5qk0OAy+WYgz6MfLcwDwYD
+            VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNIADBFAiEA/Nspevw1FQ5dqbzdIyHZ
+            Q3oai+tEb4tgmPsg4CS/hR8CIF1RKMcQbYcdMU4lx+9M+OqMsOoAegyA/4m7QjK0
+            ez20
+            -----END CERTIFICATE-----
+            end of bundle
+            """);
+        assertEquals(2, items.size());
+        assertEquals("CN=Test CA 1", assertInstanceOf(X509Certificate.class, items.get(0)).getSubjectX500Principal().getName());
+        assertEquals("CN=Test CA 2", assertInstanceOf(X509Certificate.class, items.get(1)).getSubjectX500Principal().getName());
+    }
+
+    @Test
+    public void textWithoutPemBlockIsNotPem() {
+        PemParser.NotPemException e = assertThrows(PemParser.NotPemException.class, () -> new PemParser(null, null).loadPem("just some text"));
+        assertEquals("Missing start tag", e.getMessage());
+    }
+
+    @Test
+    public void blankInputIsEmptyPem() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> new PemParser(null, null).loadPem(" \n\t"));
+        assertEquals("PEM file empty", e.getMessage());
+    }
+
+    @Test
+    public void unterminatedBlockAfterCertificateIsInvalid() {
+        String pem = """
+            -----BEGIN CERTIFICATE-----
+            MIIBfjCCASWgAwIBAgIUFdB184Ztg40/v/06MuvsGKMZaNswCgYIKoZIzj0EAwIw
+            FDESMBAGA1UEAwwJVGVzdCBDQSAxMCAXDTI2MTAwNzE5NDIxN1oYDzIxMjYwOTEz
+            MTk0MjE3WjAUMRIwEAYDVQQDDAlUZXN0IENBIDEwWTATBgcqhkjOPQIBBggqhkjO
+            PQMBBwNCAAQGkMO2cQwf353bDifnOjreHmePPi52TiY7z0tIiQdwVFD7l+SYqj/S
+            Un/uFpO/lICnhbFW08TOd1kfjaxBTWzco1MwUTAdBgNVHQ4EFgQU4aYhRYUV73xa
+            KajswY+Dyh7V8D4wHwYDVR0jBBgwFoAU4aYhRYUV73xaKajswY+Dyh7V8D4wDwYD
+            VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiAptCeuJIQSQesiW3XMxMvV
+            s7Da7Zo73JwobtxQcnHC1gIgRzCC+iNC2DlE+knc1DJILlNzNQxwFZhbT1SeHy7d
+            X2E=
+            -----END CERTIFICATE-----
+            -----BEGIN CERTIFICATE-----
+            MIIBfzCCASWgAwIBAgIUT2B1JURk8RDtUn5ruoypAH7sobYwCgYIKoZIzj0EAwIw
+            """;
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> new PemParser(null, null).loadPem(pem));
+        assertEquals("Invalid PEM", e.getMessage());
+    }
+
+    @Test
+    public void mismatchedEndLabelIsInvalid() {
+        String pem = """
+            -----BEGIN CERTIFICATE-----
+            AAAA
+            -----END PRIVATE KEY-----
+            """;
+        PemParser.NotPemException e = assertThrows(PemParser.NotPemException.class, () -> new PemParser(null, null).loadPem(pem));
+        assertEquals("Invalid PEM", e.getMessage());
+    }
+
+    @Test
+    public void invalidBase64IsRejected() {
+        String pem = """
+            -----BEGIN CERTIFICATE-----
+            !!!!
+            -----END CERTIFICATE-----
+            """;
+        assertThrows(IllegalArgumentException.class, () -> new PemParser(null, null).loadPem(pem));
     }
 }

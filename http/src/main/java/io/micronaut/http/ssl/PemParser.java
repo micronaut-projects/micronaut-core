@@ -76,20 +76,11 @@ record PemParser(
      * at all
      */
     List<Object> loadPem(String pem) throws GeneralSecurityException, IllegalArgumentException, NotPemException {
-        // PEM is a sequence of base64 encoded DER objects delimited by -----BEGIN/END lines
+        // PEM is a sequence of base64 encoded DER objects delimited by -----BEGIN/END lines.
+        // As per RFC 7468 section 2, any other text between or around them is ignored.
         List<Object> list = new ArrayList<>();
-        int i = 0;
-        while (i < pem.length()) {
-            if (Character.isWhitespace(pem.charAt(i))) {
-                i++;
-                continue;
-            } else if (!pem.startsWith(START, i)) {
-                if (list.isEmpty()) {
-                    throw new NotPemException("Missing start tag");
-                } else {
-                    throw invalidPem(false);
-                }
-            }
+        int i = pem.indexOf(START);
+        while (i != -1) {
             i += START.length();
             int labelEnd = pem.indexOf(DASHES, i);
             if (labelEnd == -1) {
@@ -107,12 +98,15 @@ record PemParser(
             String contentString = pem.substring(i, sectionEnd)
                 .replace("\r", "")
                 .replace("\n", "");
-            i = sectionEnd + trailer.length();
+            i = pem.indexOf(START, sectionEnd + trailer.length());
             byte[] content = Base64.getDecoder().decode(contentString);
             list.addAll(decoder.decode(content));
         }
         if (list.isEmpty()) {
-            throw new IllegalArgumentException("PEM file empty");
+            if (pem.isBlank()) {
+                throw new IllegalArgumentException("PEM file empty");
+            }
+            throw new NotPemException("Missing start tag");
         }
         return list;
     }
