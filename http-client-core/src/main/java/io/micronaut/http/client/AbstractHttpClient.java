@@ -1236,14 +1236,16 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     /**
      * The pieces of the body of {@link #dataStream} and {@link #exchangeStream}: the lines of an
-     * event stream that the request accepts, or the pieces of the body as they are read.
+     * event stream that the request accepts, or the pieces of the body as they are read. As a
+     * publisher, the body is read as it arrives, with the bytes that wait for the subscriber
+     * limited by {@code max-content-length}.
      *
      * @param body  The body, which the pieces take over
      * @param lines Whether the body is split into the lines of an event stream
      * @return The pieces of the body
      */
     protected BodyElements<ByteBuffer<?>> streamPieces(CloseableByteBody body, boolean lines) {
-        return lines ? BodyPieces.lines(body, sizeLimits().maxBufferSize()) : BodyPieces.elements(body);
+        return new StreamedPieces(body, lines, sizeLimits().maxBufferSize());
     }
 
     /**
@@ -1254,6 +1256,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The publisher of the pieces, for one subscriber
      */
     protected Publisher<ByteBuffer<?>> streamPiecesPublisher(BodyElements<ByteBuffer<?>> pieces) {
+        if (pieces instanceof StreamedPieces streamed) {
+            return streamed.publisher();
+        }
+        // e.g. the empty body of a response without one
         return publisher(pieces);
     }
 
@@ -1412,11 +1418,17 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return Flux.defer(() -> toMono(exchangeEventStreamFlow(propagatedContext, toMutableRequest(request), eventType, errorType), propagatedContext)
             .flatMapMany(response -> {
                 BodyElements<Event<B>> events = Objects.requireNonNull(response.body(), "The response has no events");
-                return Flux.from(new BodyElementsPublisher<>(events))
-                    .map(event -> (HttpResponse<Event<B>>) new ElementResponse<Event<B>>(response, event))
+                return Flux.from(publisher(events))
+                    .map(event -> (HttpResponse<Event<B>>) new ElementResponse<>(response, event))
                     // without an event, the status and the headers of the response are still of interest
-                    .switchIfEmpty(Mono.fromSupplier(() -> new ElementResponse<Event<B>>(response, null)));
+                    .switchIfEmpty(Mono.fromSupplier(() -> new ElementResponse<>(response, null)));
             }));
+    }
+
+    @Override
+    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request) {
+        return Flux.from(eventStreamOrError(request, Argument.of(byte[].class), null))
+            .map(event -> Event.of(event, (ByteBuffer<?>) byteBufferFactory().wrap(event.getData())));
     }
 
     @Override
@@ -1426,13 +1438,23 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     @Override
     public <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        return elements(() -> exchangeEventStreamFlow(request, eventType, errorType));
+        return eventStreamOrError(request, eventType, errorType);
     }
 
-    @Override
-    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request) {
-        return Flux.from(eventStream(request, Argument.of(byte[].class)))
-            .map(event -> Event.of(event, (ByteBuffer<?>) byteBufferFactory().wrap(event.getData())));
+    /**
+     * The events of {@link #eventStream}: the request accepts only an event stream, and the body
+     * is read as one, whatever its content type, as it always was.
+     *
+     * @param request   The request
+     * @param eventType The event data type
+     * @param errorType The error type, or {@code null} if the error body is not read
+     * @param <I>       The request body type
+     * @param <B>       The event data type
+     * @return The events
+     */
+    private <I, B> Publisher<Event<B>> eventStreamOrError(HttpRequest<I> request, Argument<B> eventType, @Nullable Argument<?> errorType) {
+        return elements(() -> exchangeElementsFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType, AcceptEvents.ONLY, shouldBufferErrorBody(errorType),
+            (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)));
     }
 
     // ---- streams
@@ -1444,7 +1466,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(HttpRequest<I> request, @Nullable Argument<?> errorType) {
-        return elements(() -> exchangeStreamFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType));
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return Flux.defer(() -> toMono(dataStreamFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
+            .flatMapMany(response -> streamPiecesPublisher(Objects.requireNonNull(response.body(), "The response has no body"))));
     }
 
     @Override
@@ -1456,10 +1480,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(exchangeStreamFlow(request, errorType), propagatedContext)
+        return Flux.defer(() -> toMono(dataStreamFlow(request, errorType), propagatedContext)
             .flatMapMany(response -> {
                 BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
-                return Flux.from(new BodyElementsPublisher<>(pieces))
+                return Flux.from(streamPiecesPublisher(pieces))
                     .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<ByteBuffer<?>>(response, piece));
             }));
     }
@@ -1491,17 +1515,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             })), propagatedContext).flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
     }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public <I> Publisher<Map<String, Object>> jsonStream(HttpRequest<I> request) {
-        return (Publisher) jsonStream(request, Map.class);
-    }
-
-    @Override
-    public <I, O> Publisher<O> jsonStream(HttpRequest<I> request, Class<O> type) {
-        return jsonStream(request, Argument.of(type));
-    }
-
     /**
      * The elements of the body of a response, as a publisher.
      *
@@ -1509,10 +1522,22 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <T>      The type of an element
      * @return The elements
      */
-    private static <T> Publisher<T> elements(java.util.function.Supplier<ExecutionFlow<HttpResponse<BodyElements<T>>>> exchange) {
+    private static <T> Publisher<T> elements(Supplier<ExecutionFlow<HttpResponse<BodyElements<T>>>> exchange) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return Flux.defer(() -> toMono(exchange.get(), propagatedContext)
-            .flatMapMany(response -> Flux.from(new BodyElementsPublisher<>(Objects.requireNonNull(response.body(), "The response has no elements")))));
+            .flatMapMany(response -> Flux.from(publisher(Objects.requireNonNull(response.body(), "The response has no elements")))));
+    }
+
+    /**
+     * @param elements The elements of a response body
+     * @param <T>      The element type
+     * @return The elements as a publisher: pushed by the piece reader where the elements are read
+     * from the body, else pulled one at a time
+     */
+    private static <T> Publisher<T> publisher(BodyElements<T> elements) {
+        return elements instanceof ByteBodyElements<T> byteBody
+            ? byteBody.toPublisher()
+            : new BodyElementsPublisher<>(elements);
     }
 
     // ---- flows

@@ -16,6 +16,7 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import javax.net.ssl.SSLSession;
 import java.net.URI;
@@ -23,6 +24,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Arrays;
 import java.util.Optional;
 
 /**
@@ -68,5 +70,20 @@ record BufferedJdkResponse(HttpResponse<?> response, byte[] body) implements Htt
     @Override
     public HttpClient.Version version() {
         return response.version();
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        return o instanceof BufferedJdkResponse other && response.equals(other.response) && Arrays.equals(body, other.body);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * response.hashCode() + Arrays.hashCode(body);
+    }
+
+    @Override
+    public String toString() {
+        return "BufferedJdkResponse[response=" + response + ", body=" + body.length + " bytes]";
     }
 }

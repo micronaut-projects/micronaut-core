@@ -47,7 +47,6 @@ import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
-import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.DefaultAsyncOverRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
@@ -184,8 +183,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     /**
      * Creates an {@link AsyncStreamingHttpClient} based on the {@literal java.net.http.*} HTTP
      * Client, which is also the {@link io.micronaut.http.client.AsyncHttpClient}: the
-     * {@link io.micronaut.http.client.HttpClient#toAsync() async view} of the client that a
-     * {@code HttpClient} injection point gets.
+     * {@link io.micronaut.http.client.StreamingHttpClient#toAsyncStreaming() async view} of the
+     * client that a {@code HttpClient} injection point gets, which also reads server-sent events.
      *
      * @param injectionPoint The injection point
      * @param loadBalancer   The load balancer
@@ -204,32 +203,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         @Parameter @Nullable HttpClientConfiguration configuration,
         BeanContext beanContext
     ) {
-        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsync();
-    }
-
-    /**
-     * Creates an {@link AsyncSseClient} based on the {@literal java.net.http.*} HTTP Client: the
-     * {@link io.micronaut.http.client.sse.SseClient#toAsyncSse() async view} of the client that a
-     * {@code HttpClient} injection point gets.
-     *
-     * @param injectionPoint The injection point
-     * @param loadBalancer   The load balancer
-     * @param configuration  The configuration
-     * @param beanContext    The bean context
-     * @return An async SSE client
-     * @since 5.3.0
-     */
-    @Bean
-    @BootstrapContextCompatible
-    @Primary
-    @Order(2) // If both this and the netty client are present, netty is the default.
-    AsyncSseClient asyncSseClient(
-        @Nullable InjectionPoint<?> injectionPoint,
-        @Parameter @Nullable LoadBalancer loadBalancer,
-        @Parameter @Nullable HttpClientConfiguration configuration,
-        BeanContext beanContext
-    ) {
-        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncSse();
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncStreaming();
     }
 
     /**

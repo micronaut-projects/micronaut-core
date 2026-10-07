@@ -516,7 +516,7 @@ abstract class AbstractJdkHttpClient {
      *
      * @return The client
      */
-    DefaultJdkHttpClient http() {
+    DefaultJdkHttpClient pipelineClient() {
         return Objects.requireNonNull(http, "The client has no pipeline");
     }
 

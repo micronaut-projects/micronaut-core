@@ -8,7 +8,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.AsyncHttpClient
 import io.micronaut.http.client.AsyncStreamingHttpClient
-import io.micronaut.http.client.sse.AsyncSseClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
@@ -46,7 +45,6 @@ class JdkAsyncHttpClientInjectionSpec extends Specification {
     void "the async client beans are the views of the JDK client"() {
         expect:
         server.applicationContext.getBean(AsyncStreamingHttpClient).getClass().simpleName == 'DefaultAsyncHttpClient'
-        server.applicationContext.getBean(AsyncSseClient) != null
     }
 
     void "an async client injected with @Client resolves relative requests against its URL"() {

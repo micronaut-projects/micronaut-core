@@ -80,6 +80,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     @Override
+    @SuppressWarnings("java:S2095") // the request wrapper only holds the body, which the exchange releases
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
         // null is equivalent to an empty body
         CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().createEmpty()) : requestBody;
@@ -93,11 +94,12 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         }
         // the body is released however the exchange ends, also when the JDK client never reads
         // it, e.g. because the connection was refused or the request is a GET
-        return Mono.defer(() -> Mono.from(ReactiveExecutionFlow.toPublisher(http().rawExchangeFlow(rawRequest, blockedThread))))
+        return Mono.defer(() -> Mono.from(ReactiveExecutionFlow.toPublisher(pipelineClient().rawExchangeFlow(rawRequest, blockedThread))))
             .doFinally(signal -> body.close());
     }
 
     @Override
+    @SuppressWarnings("java:S2095") // the request wrapper only holds the body, which the exchange releases
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
         Objects.requireNonNull(options, "options");
         MutableHttpRequest<?> rawRequest;
@@ -180,7 +182,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         }
         UploadListener uploads = listener;
         Mono<MutableHttpResponse<?>> response = Mono.defer(() -> {
-            ExecutionFlow<HttpResponse<?>> flow = http().rawExchangeFlow(request, null);
+            ExecutionFlow<HttpResponse<?>> flow = pipelineClient().rawExchangeFlow(request, null);
             if (uploads != null) {
                 flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), uploads.started(), uploads.uploaded());
             }

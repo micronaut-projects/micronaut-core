@@ -49,7 +49,8 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         super(prototype);
     }
 
-    @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
+    // too many parameters; the client keeps the transport of the pipeline, which is never closed, see close()
+    @SuppressWarnings({"java:S107", "checkstyle:parameternumber", "java:S2095"})
     public JdkBlockingHttpClient(
         @Nullable
         LoadBalancer loadBalancer,
@@ -95,7 +96,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         // the exchange of the client this client was made from
         Argument<?> error = errorType == null ? HttpClient.DEFAULT_ERROR_TYPE : errorType;
         return Objects.requireNonNull(
-            AbstractHttpClient.awaitFlow(http().exchangeFlow(request, bodyType, error)),
+            AbstractHttpClient.awaitFlow(pipelineClient().exchangeFlow(request, bodyType, error)),
             "The blocking HTTP client returned no response"
         );
     }
