@@ -1,0 +1,288 @@
+package io.micronaut.http.client.loadbalance
+
+import io.micronaut.core.async.publisher.Publishers
+import io.micronaut.discovery.DiscoveryClient
+import io.micronaut.discovery.ServiceInstance
+import io.micronaut.discovery.StaticServiceInstanceList
+import io.micronaut.discovery.exceptions.NoAvailableServiceException
+import io.micronaut.health.HealthStatus
+import io.micronaut.http.client.LoadBalancer
+import org.jspecify.annotations.Nullable
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import spock.lang.Specification
+
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.atomic.AtomicInteger
+
+class LoadBalancerSelectAsyncSpec extends Specification {
+
+    static final ServiceInstance ONE = ServiceInstance.of('svc', URI.create('http://one:8080'))
+    static final ServiceInstance TWO = ServiceInstance.of('svc', URI.create('http://two:8080'))
+
+    void 'the default selectAsync adapts the first instance of select'() {
+        given:
+        def discriminators = []
+        LoadBalancer loadBalancer = { discriminator ->
+            discriminators << discriminator
+            Flux.just(ONE, TWO)
+        } as LoadBalancer
+
+        expect:
+        loadBalancer.selectAsync('key').toCompletableFuture().getNow(null).is(ONE)
+        loadBalancer.selectAsync().toCompletableFuture().getNow(null).is(ONE)
+        discriminators == ['key', null]
+    }
+
+    void 'the default selectAsync completes with null when select is empty'() {
+        given:
+        LoadBalancer loadBalancer = { discriminator -> Publishers.empty() } as LoadBalancer
+
+        when:
+        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+
+        then:
+        future.isDone()
+        !future.isCompletedExceptionally()
+        future.getNow(ONE) == null
+    }
+
+    void 'the default selectAsync fails with the error of select'() {
+        when:
+        LoadBalancer.empty().selectAsync(null).toCompletableFuture().get()
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof NoAvailableServiceException
+        e.cause.message == 'No available services for ID: Load balancer contains no servers'
+    }
+
+    void 'cancelling the default selectAsync cancels the subscription to select'() {
+        given:
+        def cancelled = new AtomicInteger()
+        LoadBalancer loadBalancer = { discriminator -> Flux.never().doOnCancel(() -> cancelled.incrementAndGet()) } as LoadBalancer
+
+        when:
+        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+
+        then:
+        !future.isDone()
+
+        when:
+        future.cancel(false)
+
+        then:
+        cancelled.get() == 1
+    }
+
+    void 'the fixed load balancer selects its instance right away'() {
+        given:
+        def loadBalancer = new FixedLoadBalancer(URI.create('http://fixed:8080/ctx'))
+
+        when:
+        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+
+        then:
+        future.getNow(null).is(loadBalancer.serviceInstance)
+        loadBalancer.selectAsync().toCompletableFuture().getNow(null).is(loadBalancer.serviceInstance)
+    }
+
+    void 'the service instance list load balancer selects right away, round robin'() {
+        given:
+        def loadBalancer = new ServiceInstanceListRoundRobinLoadBalancer(
+                new StaticServiceInstanceList('svc', [URI.create('http://one:8080'), URI.create('http://two:8080')]))
+
+        when:
+        def hosts = (1..4).collect { loadBalancer.selectAsync(null).toCompletableFuture().getNow(null).URI.host }
+
+        then:
+        hosts == ['one', 'two', 'one', 'two']
+    }
+
+    void 'the service instance list load balancer fails the stage when no instance is available'() {
+        given:
+        def loadBalancer = new ServiceInstanceListRoundRobinLoadBalancer(new StaticServiceInstanceList('svc', []))
+
+        when:
+        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+
+        then:
+        future.isCompletedExceptionally()
+
+        when:
+        future.get()
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof NoAvailableServiceException
+        e.cause.message == 'No available services for ID: svc'
+    }
+
+    void 'the discovery client load balancer selects from getInstancesAsync'() {
+        given:
+        def discoveryClient = new AsyncOnlyDiscoveryClient()
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+
+        when:
+        def first = loadBalancer.selectAsync(null).toCompletableFuture()
+
+        then:
+        !first.isDone()
+        discoveryClient.requested == ['svc']
+
+        when:
+        discoveryClient.futures[0].complete([ONE, TWO])
+
+        then:
+        first.getNow(null).is(ONE)
+
+        when:
+        def second = loadBalancer.selectAsync(null).toCompletableFuture()
+        discoveryClient.futures[1].complete([ONE, TWO])
+
+        then:
+        second.getNow(null).is(TWO)
+    }
+
+    void 'the discovery client load balancer skips the instances that are down'() {
+        given:
+        def down = ServiceInstance.builder('svc', URI.create('http://down:8080')).status(HealthStatus.DOWN).build()
+        def discoveryClient = new AsyncOnlyDiscoveryClient()
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+
+        when:
+        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+        discoveryClient.futures[0].complete([down, TWO])
+
+        then:
+        future.getNow(null).is(TWO)
+    }
+
+    void 'the discovery client load balancer fails when no instance is available'() {
+        given:
+        def discoveryClient = new AsyncOnlyDiscoveryClient()
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+
+        when:
+        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+        discoveryClient.futures[0].complete([])
+        future.get()
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof NoAvailableServiceException
+        e.cause.message == 'No available services for ID: svc'
+    }
+
+    void 'the discovery client load balancer fails with the error of the discovery client'() {
+        given:
+        def discoveryClient = new AsyncOnlyDiscoveryClient()
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def error = new IllegalStateException('discovery down')
+
+        when:
+        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+        discoveryClient.futures[0].completeExceptionally(error)
+        future.get()
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause.is(error)
+    }
+
+    void 'cancelling the discovery client selection cancels the lookup'() {
+        given:
+        def discoveryClient = new AsyncOnlyDiscoveryClient()
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+
+        when:
+        loadBalancer.selectAsync(null).toCompletableFuture().cancel(false)
+
+        then:
+        discoveryClient.futures[0].isCancelled()
+    }
+
+    void 'the discovery client load balancer adapts a discovery client that only has publishers'() {
+        given:
+        DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient(instances: [ONE])
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+
+        expect:
+        loadBalancer.selectAsync(null).toCompletableFuture().getNow(null).is(ONE)
+        Flux.from(loadBalancer.select(null)).blockFirst().is(ONE)
+    }
+
+    void 'the discovery client load balancer fails when the publisher of the discovery client is empty'() {
+        given:
+        DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient(instances: null)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+
+        when:
+        loadBalancer.selectAsync(null).toCompletableFuture().get()
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof NoAvailableServiceException
+    }
+
+    /**
+     * Fails the publisher methods, so that only the stages can serve.
+     */
+    static class AsyncOnlyDiscoveryClient implements DiscoveryClient {
+        final List<String> requested = []
+        final List<CompletableFuture<List<ServiceInstance>>> futures = []
+
+        @Override
+        Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+            throw new UnsupportedOperationException('publisher')
+        }
+
+        @Override
+        Publisher<List<String>> getServiceIds() {
+            throw new UnsupportedOperationException('publisher')
+        }
+
+        @Override
+        CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+            requested << serviceId
+            def future = new CompletableFuture<List<ServiceInstance>>()
+            futures << future
+            return future
+        }
+
+        @Override
+        String getDescription() {
+            'async-only'
+        }
+
+        @Override
+        void close() {
+        }
+    }
+
+    static class PublisherOnlyDiscoveryClient implements DiscoveryClient {
+        @Nullable
+        List<ServiceInstance> instances
+
+        @Override
+        Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+            instances == null ? Publishers.empty() : Publishers.just(instances)
+        }
+
+        @Override
+        Publisher<List<String>> getServiceIds() {
+            Publishers.just(['svc'])
+        }
+
+        @Override
+        String getDescription() {
+            'publisher-only'
+        }
+
+        @Override
+        void close() {
+        }
+    }
+}

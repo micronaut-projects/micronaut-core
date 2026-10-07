@@ -28,6 +28,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link LoadBalancer} that resolves a fixed URI.
@@ -65,6 +67,11 @@ public class FixedLoadBalancer implements LoadBalancer  {
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return publisher;
+    }
+
+    @Override
+    public CompletionStage<ServiceInstance> selectAsync(@Nullable Object discriminator) {
+        return CompletableFuture.completedFuture(serviceInstance);
     }
 
     /**

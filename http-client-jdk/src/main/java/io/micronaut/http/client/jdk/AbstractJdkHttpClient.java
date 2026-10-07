@@ -491,7 +491,8 @@ abstract class AbstractJdkHttpClient {
         }
 
         LoadBalancer balancer = loadBalancer;
-        return Mono.from(loadBalancer.select(getLoadBalancerDiscriminator(request))).map(server -> {
+        // a selection that is not complete yet is cancelled with the subscription
+        return Mono.fromCompletionStage(() -> balancer.selectAsync(getLoadBalancerDiscriminator(request))).map(server -> {
                 LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {

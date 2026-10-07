@@ -17,8 +17,12 @@ package io.micronaut.discovery.config;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.naming.Described;
 import org.reactivestreams.Publisher;
+
+import java.util.List;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A Configuration client is responsible for reading configuration for configuration servers.
@@ -50,4 +54,17 @@ public interface ConfigurationClient extends Described {
      * @return A {@link Publisher} that emits zero or many {@link PropertySource} instances discovered for the given environment
      */
     Publisher<PropertySource> getPropertySources(Environment environment);
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #getPropertySources(Environment)}. By
+     * default, it collects all the {@link PropertySource} instances emitted by
+     * {@link #getPropertySources(Environment)}. Cancelling the stage cancels the subscription.
+     *
+     * @param environment The environment
+     * @return A {@link CompletionStage} completed with the {@link PropertySource} instances discovered for the given environment
+     * @since 5.3.0
+     */
+    default CompletionStage<List<PropertySource>> getPropertySourcesAsync(Environment environment) {
+        return CompletionStagePublishers.collect(getPropertySources(environment));
+    }
 }

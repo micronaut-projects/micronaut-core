@@ -19,13 +19,17 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.util.ArrayUtils;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 /**
@@ -65,6 +69,26 @@ public class DefaultCompositeConfigurationClient implements ConfigurationClient 
             .collect(Collectors.toList());
 
         return Flux.merge(publishers);
+    }
+
+    /**
+     * The property sources of all the configuration clients, in the order of the clients. The
+     * first client that fails fails the result, like the publisher of
+     * {@link #getPropertySources(Environment)}.
+     *
+     * @param environment The environment
+     * @return A {@link CompletionStage} completed with the {@link PropertySource} instances of all the clients
+     */
+    @Override
+    public CompletionStage<List<PropertySource>> getPropertySourcesAsync(Environment environment) {
+        if (ArrayUtils.isEmpty(configurationClients)) {
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+        List<CompletionStage<List<PropertySource>>> stages = new ArrayList<>(configurationClients.length);
+        for (ConfigurationClient configurationClient : configurationClients) {
+            stages.add(configurationClient.getPropertySourcesAsync(environment));
+        }
+        return CompletionStagePublishers.concat(stages);
     }
 
     @Override

@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
@@ -28,6 +29,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Interface to abstract server selection. Allows plugging in load balancing strategies.
@@ -43,6 +45,24 @@ public interface LoadBalancer {
      * @return The selected {@link ServiceInstance}
      */
     Publisher<ServiceInstance> select(@Nullable Object discriminator);
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #select(Object)}, which the HTTP clients
+     * call to select an instance. By default, it adapts the first instance emitted by
+     * {@link #select(Object)}, and cancels the subscription once it arrives or once the returned
+     * stage is cancelled. The stage completes with {@code null} when the publisher completes
+     * without an instance, which the clients handle as they handle an empty publisher.
+     * A load balancer that can select without a publisher overrides this method; a subclass of
+     * a built-in load balancer that overrides {@link #select(Object)} should override this
+     * method too.
+     *
+     * @param discriminator An object used to discriminate the server to select. Usually the service ID
+     * @return A stage completed with the selected {@link ServiceInstance}, or with the error of the selection
+     * @since 5.3.0
+     */
+    default CompletionStage<ServiceInstance> selectAsync(@Nullable Object discriminator) {
+        return CompletionStagePublishers.first(select(discriminator), null);
+    }
 
     /**
      * Report the outcome of an exchange with an instance this load balancer selected, so that
@@ -121,6 +141,17 @@ public interface LoadBalancer {
      */
     default Publisher<ServiceInstance> select() {
         return select(null);
+    }
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #select()}.
+     *
+     * @return A stage completed with the selected {@link ServiceInstance}
+     * @see #selectAsync(Object)
+     * @since 5.3.0
+     */
+    default CompletionStage<ServiceInstance> selectAsync() {
+        return selectAsync(null);
     }
 
     /**

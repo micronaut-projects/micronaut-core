@@ -19,6 +19,7 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
@@ -30,12 +31,14 @@ import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.
@@ -82,20 +85,18 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         String functionName = context.stringValue(AnnotationUtil.NAMED)
             .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
-        var functionDefinition = Flux.from(discoveryClient.getFunction(functionName));
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER -> {
+                    var functionDefinition = Flux.from(discoveryClient.getFunction(functionName));
                     return interceptedMethod.handleResult(invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue()));
                 }
                 case COMPLETION_STAGE -> {
-                    return interceptedMethod.handleResult(toCompletableFuture(
-                        invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue())
-                    ));
+                    return interceptedMethod.handleResult(invokeFnAsync(body, functionName, interceptedMethod.returnTypeValue()));
                 }
                 case SYNCHRONOUS -> {
-                    FunctionDefinition def = functionDefinition.blockFirst();
+                    FunctionDefinition def = join(discoveryClient.getFunctionAsync(functionName).toCompletableFuture());
                     if (def == null) {
                         throw new FunctionNotFoundException(functionName);
                     }
@@ -125,10 +126,56 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         }).switchIfEmpty(Mono.error(() -> new FunctionNotFoundException(functionName))).flux();
     }
 
-    private CompletableFuture<Object> toCompletableFuture(Flux<Object> flowable) {
-        var completableFuture = new CompletableFuture<>();
-        flowable.next().subscribe(completableFuture::complete, completableFuture::completeExceptionally, () -> completableFuture.complete(null));
+    /**
+     * Invoke the function once the discovery client found it, and complete with the first item
+     * of the publisher of the invoker. The future is completed with the errors as they are, not
+     * wrapped in a {@link CompletionException}.
+     */
+    private CompletableFuture<@Nullable Object> invokeFnAsync(@Nullable Object body, String functionName, Argument<?> valueType) {
+        var completableFuture = new CompletableFuture<@Nullable Object>();
+        discoveryClient.getFunctionAsync(functionName).thenCompose(def -> {
+            if (def == null) {
+                throw new FunctionNotFoundException(functionName);
+            }
+            FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+            Publisher<Object> result = Objects.requireNonNull(
+                (Publisher<Object>) functionInvoker.invoke(
+                    def,
+                    body,
+                    Argument.of(Publisher.class, valueType)
+                ),
+                "The function invoker returned no publisher"
+            );
+            return CompletionStagePublishers.first(result, null);
+        }).whenComplete((value, throwable) -> {
+            if (throwable != null) {
+                completableFuture.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
+            } else if (value == null) {
+                completableFuture.completeExceptionally(new FunctionNotFoundException(functionName));
+            } else {
+                completableFuture.complete(value);
+            }
+        });
         return completableFuture;
+    }
+
+    /**
+     * Wait for a future and throw its error as it is, a checked exception as a blocking
+     * subscription to a publisher would throw it.
+     */
+    private static <T> T join(CompletableFuture<T> future) {
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            Throwable cause = CompletionStagePublishers.unwrap(e);
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw Exceptions.propagate(cause);
+        }
     }
 
 }

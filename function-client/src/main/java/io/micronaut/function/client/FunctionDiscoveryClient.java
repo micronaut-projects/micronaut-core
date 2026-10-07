@@ -15,7 +15,10 @@
  */
 package io.micronaut.function.client;
 
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import org.reactivestreams.Publisher;
+
+import java.util.concurrent.CompletionStage;
 
 /**
  * An interface for discovery functions, either remote or local.
@@ -32,4 +35,18 @@ public interface FunctionDiscoveryClient {
      * @return A {@link Publisher} that emits the {@link java.net.URI} of the function or a {@link io.micronaut.function.client.exceptions.FunctionNotFoundException} if no function is found
      */
     Publisher<FunctionDefinition> getFunction(String functionName);
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #getFunction(String)}. By default, it
+     * adapts the first {@link FunctionDefinition} emitted by {@link #getFunction(String)}, and
+     * completes with {@code null} when the publisher completes without one. Cancelling the stage
+     * cancels the subscription.
+     *
+     * @param functionName The function name
+     * @return A {@link CompletionStage} completed with the {@link FunctionDefinition}, or with a {@link io.micronaut.function.client.exceptions.FunctionNotFoundException} if no function is found
+     * @since 5.3.0
+     */
+    default CompletionStage<FunctionDefinition> getFunctionAsync(String functionName) {
+        return CompletionStagePublishers.first(getFunction(functionName), null);
+    }
 }

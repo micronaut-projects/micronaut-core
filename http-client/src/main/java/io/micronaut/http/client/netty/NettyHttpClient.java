@@ -20,10 +20,12 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -1640,8 +1642,8 @@ final class NettyHttpClient implements
             selected = ExecutionFlow.just(fixed.getServiceInstance());
         } else {
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
-            // without a Reactor chain
-            selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
+            // without an asynchronous chain
+            selected = toFlow(loadBalancer.selectAsync(getLoadBalancerDiscriminator(request)).toCompletableFuture());
         }
 
         LoadBalancer balancer = loadBalancer;
@@ -1660,6 +1662,29 @@ final class NettyHttpClient implements
                 }
             }
         );
+    }
+
+    /**
+     * The flow of a selection of the load balancer. A selection that is not complete yet is
+     * cancelled when the flow is.
+     *
+     * @param future The selection
+     * @return The flow
+     */
+    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<ServiceInstance> future) {
+        if (future.isDone()) {
+            return CompletableFutureExecutionFlow.just(future);
+        }
+        DelayedExecutionFlow<ServiceInstance> flow = DelayedExecutionFlow.create();
+        future.whenComplete((instance, throwable) -> {
+            if (throwable != null) {
+                flow.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
+            } else {
+                flow.complete(instance);
+            }
+        });
+        flow.onCancel(() -> future.cancel(false));
+        return flow;
     }
 
     private <R extends HttpResponse<?>> ExecutionFlow<R> handleStreamHttpError(

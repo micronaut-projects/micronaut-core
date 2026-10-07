@@ -15,11 +15,16 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>A {@link io.micronaut.http.client.LoadBalancer} that uses the {@link DiscoveryClient} and a
@@ -67,5 +72,11 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return Publishers.map(discoveryClient.getInstances(serviceID), instances -> getNextAvailable(instances, discriminator));
+    }
+
+    @Override
+    public CompletionStage<ServiceInstance> selectAsync(@Nullable Object discriminator) {
+        CompletableFuture<List<ServiceInstance>> instances = discoveryClient.getInstancesAsync(serviceID).toCompletableFuture();
+        return CompletionStagePublishers.cancelling(instances, instances.thenApply(list -> getNextAvailable(list, discriminator)));
     }
 }
