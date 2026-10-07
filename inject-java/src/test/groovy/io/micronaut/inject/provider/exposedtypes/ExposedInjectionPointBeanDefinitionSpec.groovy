@@ -2,6 +2,7 @@ package io.micronaut.inject.provider.exposedtypes
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanDefinitionsProvider
+import io.micronaut.context.exceptions.BeanDestructionException
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
@@ -52,6 +53,7 @@ class ExposedInjectionPointBeanDefinitionSpec extends Specification {
         definition.getTypeArguments(Lookup.name)*.name == ["T"]
         definition.getTypeArguments(AutoCloseable.name).isEmpty()
         definition.getTypeArguments(Comparable.name).isEmpty()
+        definition.getTypeArguments((String) null).isEmpty()
     }
 
     void "a disposable definition closes what it built when the bean it was injected into is destroyed"() {
@@ -88,5 +90,33 @@ class ExposedInjectionPointBeanDefinitionSpec extends Specification {
         new MaybeDefinition().annotationMetadata.hasDeclaredAnnotation("jakarta.annotation.Nullable")
         consumer.present.injectedAt() == "present"
         consumer.absent == null
+    }
+
+    void "a disposable definition given its annotation metadata disposes of a bean handed to it"() {
+        given:
+        AnnotationMetadata metadata = new MaybeDefinition().annotationMetadata
+        AnyObjectDefinition definition = new AnyObjectDefinition(metadata)
+        Object plain = new Object()
+        Handle<Object> handle = new Handle<>("handed")
+
+        expect:
+        definition.annotationMetadata.is(metadata)
+        definition.dispose(context, plain).is(plain)
+        definition.dispose(context, handle).is(handle)
+        handle.isClosed()
+    }
+
+    void "a bean that fails to close fails its disposal"() {
+        given:
+        AnyObjectDefinition definition = new AnyObjectDefinition(AnnotationMetadata.EMPTY_METADATA)
+        AutoCloseable failing = { throw new IOException("cannot close") } as AutoCloseable
+
+        when:
+        definition.dispose(context, failing)
+
+        then:
+        BeanDestructionException e = thrown()
+        e.cause instanceof IOException
+        e.cause.message == "cannot close"
     }
 }
