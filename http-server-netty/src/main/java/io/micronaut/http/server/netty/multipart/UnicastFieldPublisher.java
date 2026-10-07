@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -51,8 +52,7 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
     private final Runnable onSubscribe;
     private final Runnable onCancel;
 
-    @Nullable
-    private volatile Subscriber<? super T> subscriber;
+    private final AtomicReference<@Nullable Subscriber<? super T>> subscriber = new AtomicReference<>();
     private volatile boolean subscriptionDelivered;
     private volatile boolean done;
     @Nullable
@@ -61,8 +61,7 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
      * The failure of a request for no item, delivered instead of the items, see rule 3.9 of the
      * reactive streams specification.
      */
-    @Nullable
-    private volatile IllegalArgumentException invalidRequest;
+    private final AtomicReference<@Nullable IllegalArgumentException> invalidRequest = new AtomicReference<>();
     private volatile boolean cancelled;
 
     /**
@@ -128,7 +127,7 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
             s.onError(new IllegalStateException("UnicastFieldPublisher allows only a single Subscriber"));
             return;
         }
-        subscriber = s;
+        subscriber.set(s);
         try {
             onSubscribe.run();
         } catch (Throwable e) {
@@ -149,8 +148,8 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
     public void request(long n) {
         if (n <= 0) {
             // rule 3.9: the subscriber is failed, and the subscription is cancelled
-            if (invalidRequest == null) {
-                invalidRequest = new IllegalArgumentException("Rule 3.9 of the reactive streams specification: the number of requested items must be positive, but was " + n);
+            if (invalidRequest.get() == null) {
+                invalidRequest.set(new IllegalArgumentException("Rule 3.9 of the reactive streams specification: the number of requested items must be positive, but was " + n));
             }
             drain(null);
             return;
@@ -184,7 +183,7 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
         }
         int missed = 1;
         while (true) {
-            Subscriber<? super T> s = subscriber;
+            Subscriber<? super T> s = subscriber.get();
             if (subscriptionDelivered && s != null) {
                 drainTo(s);
                 return;
@@ -238,7 +237,7 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
             discardAll();
             return true;
         }
-        IllegalArgumentException invalid = invalidRequest;
+        IllegalArgumentException invalid = invalidRequest.get();
         if (invalid != null) {
             // like a cancellation of the subscriber, which is then failed
             cancelled = true;
@@ -277,10 +276,12 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
 
         @Override
         public void request(long n) {
+            // the subscription of a refused subscriber delivers nothing
         }
 
         @Override
         public void cancel() {
+            // the subscription of a refused subscriber delivers nothing
         }
     }
 }

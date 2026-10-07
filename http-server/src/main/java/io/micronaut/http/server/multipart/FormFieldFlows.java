@@ -208,10 +208,8 @@ public final class FormFieldFlows {
         private final Consumer<? super T> discard;
         private final Consumer<? super R> onValue;
         private final Consumer<@Nullable Throwable> onDone;
-        @Nullable
-        private volatile Subscription upstream;
-        @Nullable
-        private volatile ExecutionFlow<? extends R> running;
+        private final AtomicReference<@Nullable Subscription> upstream = new AtomicReference<>();
+        private final AtomicReference<@Nullable ExecutionFlow<? extends R>> running = new AtomicReference<>();
 
         /**
          * @param complete Completes an item
@@ -234,11 +232,11 @@ public final class FormFieldFlows {
 
         @Override
         public void onSubscribe(Subscription s) {
-            if (upstream != null) {
+            if (upstream.get() != null) {
                 s.cancel();
                 return;
             }
-            upstream = s;
+            upstream.set(s);
             if (state.compareAndSet(State.INITIAL, State.REQUESTED)) {
                 s.request(1);
             } else if (state.get() == State.CANCELLED) {
@@ -259,16 +257,16 @@ public final class FormFieldFlows {
                 flow = Objects.requireNonNull(complete.apply(item), "The mapper returned a null flow");
             } catch (Throwable e) {
                 discard.accept(item);
-                stopWithError(e, Objects.requireNonNull(upstream)::cancel);
+                stopWithError(e, Objects.requireNonNull(upstream.get())::cancel);
                 return;
             }
             if (flow.tryComplete() == null) {
                 // cancelled with the reading while it runs
-                running = flow;
+                running.set(flow);
             }
             flow.onComplete((value, e) -> {
                 if (e != null) {
-                    stopWithError(e, Objects.requireNonNull(upstream)::cancel);
+                    stopWithError(e, Objects.requireNonNull(upstream.get())::cancel);
                 } else {
                     if (value != null) {
                         innerNext(value);
@@ -317,7 +315,7 @@ public final class FormFieldFlows {
                 case TERMINATED -> cancelRunning();
                 default -> {
                     cancelRunning();
-                    Subscription s = upstream;
+                    Subscription s = upstream.get();
                     if (s != null) {
                         s.cancel();
                     }
@@ -326,7 +324,7 @@ public final class FormFieldFlows {
         }
 
         private void cancelRunning() {
-            ExecutionFlow<? extends R> flow = running;
+            ExecutionFlow<? extends R> flow = running.get();
             if (flow != null) {
                 flow.cancel();
             }
@@ -340,13 +338,13 @@ public final class FormFieldFlows {
         }
 
         private void innerComplete() {
-            running = null;
+            running.set(null);
             while (true) {
                 State previous = Objects.requireNonNull(state.get());
                 switch (previous) {
                     case ACTIVE -> {
                         if (state.compareAndSet(previous, State.REQUESTED)) {
-                            Objects.requireNonNull(upstream).request(1);
+                            Objects.requireNonNull(upstream.get()).request(1);
                             return;
                         }
                     }
