@@ -18,6 +18,7 @@ package io.micronaut.scheduling.io.watch;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -25,9 +26,11 @@ import java.util.Objects;
 /**
  * One changed file or directory.
  *
- * <p>Several events for the same path within one quiet period are coalesced into one change: a file
+ * <p>Several events for the same path within one quiet period, or while the listener of a registration is
+ * still working on its previous batch, are coalesced into one change: a file
  * created and then modified is reported as created, a file modified and then deleted as deleted, and a
- * file deleted and then created again as modified.</p>
+ * file deleted and then created again as modified. A file created and then deleted is not reported at all,
+ * since no listener was told it existed.</p>
  *
  * @param path The absolute path of the file or directory
  * @param type The kind of change
@@ -53,11 +56,14 @@ public record FileChange(Path path, WatchEventType type) {
      * Coalesces a later event for the same path into this change.
      *
      * @param later The type of the later event
-     * @return The change that describes both events
+     * @return The change that describes both events, or null when they cancel out
      */
-    FileChange merge(WatchEventType later) {
+    @Nullable FileChange merge(WatchEventType later) {
+        if (type == WatchEventType.CREATE && later == WatchEventType.DELETE) {
+            return null;
+        }
         WatchEventType merged = switch (type) {
-            case CREATE -> later == WatchEventType.DELETE ? WatchEventType.DELETE : WatchEventType.CREATE;
+            case CREATE -> WatchEventType.CREATE;
             case MODIFY -> later;
             case DELETE -> later == WatchEventType.DELETE ? WatchEventType.DELETE : WatchEventType.MODIFY;
         };

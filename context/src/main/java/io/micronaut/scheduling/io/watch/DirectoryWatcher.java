@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
 import org.jspecify.annotations.NullMarked;
@@ -27,6 +28,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.ClosedWatchServiceException;
+import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,14 +40,22 @@ import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * A {@link FileWatcher} over one {@link WatchService}, usable with or without an application context.
@@ -54,6 +64,10 @@ import java.util.function.Consumer;
  * cover it, reports absolute paths, coalesces the events of one save into one {@link FileChangeBatch}
  * per registration after a {@link Builder#quietPeriod(Duration) quiet period}, registers directories
  * created after the registration, and skips hidden directories.</p>
+ *
+ * <p>Listeners run on the watch thread. A registration whose listener returned a stage that has not completed yet
+ * receives no batch until it has: the changes meanwhile are merged into the batch delivered after it, while the
+ * other registrations keep receiving theirs.</p>
  *
  * <p>The way a directory is registered with the service is pluggable through a
  * {@link WatchKeyRegistrar}, because the native macOS service of {@code micronaut-runtime-osx}
@@ -78,10 +92,19 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     private final Duration checkInterval;
     private final Duration quietPeriod;
     private final String threadName;
-    private final Runnable closeAction;
+    private final boolean closeWatchServiceOnClose;
     private final AtomicBoolean active = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final List<DirectoryRegistration> registrations = new CopyOnWriteArrayList<>();
+    /**
+     * Registrations whose stage completed while changes were held back for them, for the watch thread to deliver.
+     */
+    private final ConcurrentLinkedQueue<DirectoryRegistration> ready = new ConcurrentLinkedQueue<>();
+    /**
+     * How many stages returned by listeners are pending. While any is, the watch thread polls at least every quiet
+     * period, so that changes held back for it are delivered soon after it completes.
+     */
+    private final AtomicInteger pendingStages = new AtomicInteger();
     /**
      * Watched directories by absolute path. Guarded by {@code this}.
      */
@@ -103,13 +126,13 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     private long lastEventNanos;
     private @Nullable Thread thread;
 
-    private DirectoryWatcher(Builder builder) {
-        this.watchService = Objects.requireNonNull(builder.watchService, "watchService");
+    private DirectoryWatcher(Builder builder, WatchService watchService) {
+        this.watchService = watchService;
         this.registrar = builder.registrar;
         this.checkInterval = builder.checkInterval;
         this.quietPeriod = builder.quietPeriod;
         this.threadName = builder.threadName;
-        this.closeAction = builder.closeAction != null ? builder.closeAction : this::closeWatchService;
+        this.closeWatchServiceOnClose = builder.closeWatchServiceOnClose;
     }
 
     /**
@@ -119,7 +142,17 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      * @return The builder
      */
     public static Builder builder(WatchService watchService) {
-        return new Builder(watchService);
+        return new Builder(Objects.requireNonNull(watchService, "watchService"));
+    }
+
+    /**
+     * A builder for a watcher over a new {@link WatchService} of the default file system, which the watcher creates
+     * when it is built and closes when it is closed.
+     *
+     * @return The builder
+     */
+    public static Builder builder() {
+        return new Builder(null);
     }
 
     /**
@@ -164,14 +197,17 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     /**
      * @return The watch service the watcher polls
      */
-    public WatchService getWatchService() {
+    WatchService getWatchService() {
         return watchService;
     }
 
     @Override
-    public Registration watch(Path root, WatchOptions options, Consumer<FileChangeBatch> listener) {
+    public FileWatcher.WatchRequest directory(Path root) {
         ArgumentUtils.requireNonNull("root", root);
-        ArgumentUtils.requireNonNull("options", options);
+        return new Request(root);
+    }
+
+    private FileWatcherRegistration registerRoot(Path root, WatchFilter filter, Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener) {
         ArgumentUtils.requireNonNull("listener", listener);
         if (closed.get()) {
             throw new IllegalStateException("The watcher is closed");
@@ -187,7 +223,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             if (closed.get()) {
                 throw new IllegalStateException("The watcher is closed");
             }
-            DirectoryRegistration registration = new DirectoryRegistration(absoluteRoot, options, listener, sequence);
+            DirectoryRegistration registration = new DirectoryRegistration(absoluteRoot, filter, listener, sequence);
             registrations.add(registration);
             try {
                 registerTree(absoluteRoot, registration, null);
@@ -196,7 +232,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 throw new UncheckedIOException("Cannot watch " + absoluteRoot, e);
             }
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Watching {} ({})", absoluteRoot, options.recursive() ? "recursive" : "non-recursive");
+                LOG.debug("Watching {} ({})", absoluteRoot, filter.recursive() ? "recursive" : "non-recursive");
             }
             return registration;
         }
@@ -218,22 +254,23 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      *
      * @return The directories
      */
+    @Internal
     public synchronized List<Path> watchedDirectories() {
         return List.copyOf(directories.keySet());
     }
 
     /**
-     * Stops the watch thread, closes every registration and runs the close action, which closes the
-     * watch service unless the builder replaced it.
+     * Stops the watch thread, closes every registration and, unless the builder said
+     * {@link Builder#closeWatchServiceOnClose(boolean) otherwise}, the watch service. Once it returned no listener is
+     * called again.
      */
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
             active.set(false);
+            List<DirectoryRegistration> closing;
             synchronized (this) {
-                for (DirectoryRegistration registration : registrations) {
-                    registration.deactivate();
-                }
+                closing = List.copyOf(registrations);
                 registrations.clear();
                 for (WatchedDirectory directory : directories.values()) {
                     directory.key.cancel();
@@ -241,7 +278,14 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 directories.clear();
                 directoriesByKey.clear();
             }
-            closeAction.run();
+            // outside the watcher's lock: a listener under way may itself call the watcher
+            for (DirectoryRegistration registration : closing) {
+                registration.deactivate();
+            }
+            ready.clear();
+            if (closeWatchServiceOnClose) {
+                closeWatchService();
+            }
             Thread watchThread = this.thread;
             if (watchThread != null && watchThread != Thread.currentThread()) {
                 watchThread.interrupt();
@@ -263,13 +307,17 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         while (active.get()) {
             try {
                 long timeout = pending.isEmpty() ? checkInterval.toMillis() : Math.max(1, millisUntilDue());
-                WatchKey key = watchService.poll(timeout, TimeUnit.MILLISECONDS);
+                if (pendingStages.get() > 0 || !ready.isEmpty()) {
+                    timeout = ready.isEmpty() ? Math.max(1, Math.min(timeout, quietPeriod.toMillis())) : 0;
+                }
+                WatchKey key = timeout == 0 ? watchService.poll() : watchService.poll(timeout, TimeUnit.MILLISECONDS);
                 if (key != null) {
                     drain(key);
                 }
                 if (!pending.isEmpty() && millisUntilDue() <= 0) {
                     flush();
                 }
+                deliverReady();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
@@ -349,7 +397,13 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         if (existing == null) {
             pending.put(path, new PendingChange(new FileChange(path, type), recordedAt));
         } else {
-            pending.put(path, new PendingChange(existing.change().merge(type), recordedAt));
+            FileChange merged = existing.change().merge(type);
+            if (merged == null) {
+                // created and deleted again: no listener was told the path existed
+                pending.remove(path);
+            } else {
+                pending.put(path, new PendingChange(merged, recordedAt));
+            }
         }
     }
 
@@ -362,7 +416,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             return;
         }
         for (DirectoryRegistration registration : registrations) {
-            if (registration.options().recursive()
+            if (registration.filter.recursive()
                 && registration.isActive()
                 && registration.covers(created)
                 && registration.acceptsDirectory(created)) {
@@ -401,13 +455,23 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 }
             }
             if (!matching.isEmpty()) {
-                registration.deliver(new FileChangeBatch(registration.root(), matching));
+                registration.offer(matching);
             }
         }
     }
 
+    /**
+     * Delivers the changes held back for registrations whose stage completed meanwhile.
+     */
+    private void deliverReady() {
+        DirectoryRegistration registration;
+        while ((registration = ready.poll()) != null) {
+            registration.deliverHeld();
+        }
+    }
+
     private void registerTree(Path start, DirectoryRegistration registration, @Nullable Consumer<Path> visitedFile) throws IOException {
-        if (!registration.options().recursive()) {
+        if (!registration.filter.recursive()) {
             register(start, registration);
             return;
         }
@@ -517,14 +581,14 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      * Builds a {@link DirectoryWatcher}.
      */
     public static final class Builder {
-        private final WatchService watchService;
+        private final @Nullable WatchService watchService;
         private WatchKeyRegistrar registrar = defaultRegistrar();
         private Duration checkInterval = Duration.ofMillis(300);
         private Duration quietPeriod = Duration.ofMillis(120);
         private String threadName = "micronaut-filewatch-thread";
-        private @Nullable Runnable closeAction;
+        private boolean closeWatchServiceOnClose = true;
 
-        private Builder(WatchService watchService) {
+        private Builder(@Nullable WatchService watchService) {
             this.watchService = watchService;
         }
 
@@ -565,22 +629,31 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
 
         /**
-         * Replaces closing the watch service when the watcher closes. The native macOS service must
-         * not be closed, because closing it has crashed the JVM.
+         * Whether closing the watcher closes the watch service, which it does by default. A service the caller owns,
+         * or the native macOS service, closing which has crashed the JVM, is left open with {@code false}.
          *
-         * @param closeAction What to run instead
+         * @param closeWatchServiceOnClose Whether to close the service with the watcher
          * @return This builder
          */
-        public Builder closeAction(Runnable closeAction) {
-            this.closeAction = Objects.requireNonNull(closeAction, "closeAction");
+        public Builder closeWatchServiceOnClose(boolean closeWatchServiceOnClose) {
+            this.closeWatchServiceOnClose = closeWatchServiceOnClose;
             return this;
         }
 
         /**
          * @return The watcher, not yet started
+         * @throws UncheckedIOException if the builder creates the watch service and that fails
          */
         public DirectoryWatcher build() {
-            return new DirectoryWatcher(this);
+            WatchService service = watchService;
+            if (service == null) {
+                try {
+                    service = FileSystems.getDefault().newWatchService();
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Cannot create a watch service", e);
+                }
+            }
+            return new DirectoryWatcher(this, service);
         }
     }
 
@@ -598,17 +671,66 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
     }
 
-    private final class DirectoryRegistration implements Registration {
+    /**
+     * A request of {@link #directory(Path)}; every terminal operation registers a snapshot of it.
+     */
+    private final class Request implements FileWatcher.WatchRequest {
         private final Path root;
-        private final WatchOptions options;
-        private final Consumer<FileChangeBatch> listener;
-        private final long since;
-        private final AtomicBoolean registrationActive = new AtomicBoolean(true);
-        private final List<WatchedDirectory> directories = new CopyOnWriteArrayList<>();
+        private boolean recursive = true;
+        private final Set<String> includes = new LinkedHashSet<>();
+        private final Set<String> excludes = new LinkedHashSet<>();
 
-        DirectoryRegistration(Path root, WatchOptions options, Consumer<FileChangeBatch> listener, long since) {
+        Request(Path root) {
             this.root = root;
-            this.options = options;
+        }
+
+        @Override
+        public FileWatcher.WatchRequest recursive(boolean recursive) {
+            this.recursive = recursive;
+            return this;
+        }
+
+        @Override
+        public FileWatcher.WatchRequest include(String... globs) {
+            includes.addAll(Arrays.asList(globs));
+            return this;
+        }
+
+        @Override
+        public FileWatcher.WatchRequest exclude(String... globs) {
+            excludes.addAll(Arrays.asList(globs));
+            return this;
+        }
+
+        @Override
+        public FileWatcherRegistration watchAsync(Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener) {
+            return registerRoot(root, new WatchFilter(recursive, includes, excludes), listener);
+        }
+    }
+
+    private final class DirectoryRegistration implements FileWatcherRegistration {
+        private final Path root;
+        private final WatchFilter filter;
+        private final Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener;
+        private final long since;
+        private volatile boolean registrationActive = true;
+        private final List<WatchedDirectory> directories = new CopyOnWriteArrayList<>();
+        /**
+         * Changes that arrived while the listener's stage was pending, merged by path. Guarded by {@code this}.
+         */
+        private final Map<Path, FileChange> held = new LinkedHashMap<>();
+        /**
+         * Whether a batch was handed to the listener whose stage has not completed. Guarded by {@code this}.
+         */
+        private boolean inFlight;
+        /**
+         * The thread calling the listener right now, which {@link #close()} waits for. Guarded by {@code this}.
+         */
+        private @Nullable Thread delivering;
+
+        DirectoryRegistration(Path root, WatchFilter filter, Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener, long since) {
+            this.root = root;
+            this.filter = filter;
             this.listener = listener;
             this.since = since;
         }
@@ -619,18 +741,13 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
 
         @Override
-        public WatchOptions options() {
-            return options;
-        }
-
-        @Override
         public boolean isActive() {
-            return registrationActive.get();
+            return registrationActive;
         }
 
         @Override
         public void close() {
-            if (registrationActive.compareAndSet(true, false)) {
+            if (deactivate()) {
                 synchronized (DirectoryWatcher.this) {
                     registrations.remove(this);
                     unregister(this);
@@ -638,15 +755,37 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             }
         }
 
-        void deactivate() {
-            registrationActive.set(false);
+        /**
+         * Stops deliveries and waits for a call of the listener under way, unless that call is the caller.
+         *
+         * @return Whether this call deactivated the registration
+         */
+        boolean deactivate() {
+            boolean deactivated;
+            synchronized (this) {
+                deactivated = registrationActive;
+                registrationActive = false;
+                held.clear();
+                boolean interrupted = false;
+                while (delivering != null && delivering != Thread.currentThread()) {
+                    try {
+                        wait();
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
+                }
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            return deactivated;
         }
 
         boolean covers(Path absolute) {
             if (!absolute.startsWith(root)) {
                 return false;
             }
-            if (options.recursive()) {
+            if (filter.recursive()) {
                 return true;
             }
             Path parent = absolute.getParent();
@@ -663,7 +802,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 return false;
             }
             Path parent = absolute.getParent();
-            return parent != null && owns(parent) && options.accepts(root.relativize(absolute));
+            return parent != null && owns(parent) && filter.accepts(root.relativize(absolute));
         }
 
         private boolean owns(Path directory) {
@@ -676,16 +815,110 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
 
         boolean acceptsDirectory(Path absoluteDirectory) {
-            return !options.excludesDirectory(root.relativize(absoluteDirectory));
+            return !filter.excludesDirectory(root.relativize(absoluteDirectory));
         }
 
-        void deliver(FileChangeBatch batch) {
-            try {
-                listener.accept(batch);
-            } catch (RuntimeException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("File watch listener for {} failed: {}", root, e.getMessage(), e);
+        /**
+         * Hands the changes to the listener, or holds them back while its stage is pending. Called on the watch thread.
+         */
+        void offer(List<FileChange> changes) {
+            synchronized (this) {
+                if (!registrationActive) {
+                    return;
                 }
+                if (inFlight) {
+                    for (FileChange change : changes) {
+                        hold(change);
+                    }
+                    return;
+                }
+                inFlight = true;
+            }
+            dispatch(changes);
+        }
+
+        /**
+         * Delivers what was held back while the stage was pending. Called on the watch thread.
+         */
+        void deliverHeld() {
+            List<FileChange> changes;
+            synchronized (this) {
+                if (!registrationActive || held.isEmpty()) {
+                    inFlight = false;
+                    held.clear();
+                    return;
+                }
+                changes = List.copyOf(held.values());
+                held.clear();
+            }
+            dispatch(changes);
+        }
+
+        private void hold(FileChange change) {
+            FileChange existing = held.get(change.path());
+            if (existing == null) {
+                held.put(change.path(), change);
+                return;
+            }
+            FileChange merged = existing.merge(change.type());
+            if (merged == null) {
+                held.remove(change.path());
+            } else {
+                held.put(change.path(), merged);
+            }
+        }
+
+        private void dispatch(List<FileChange> changes) {
+            synchronized (this) {
+                if (!registrationActive) {
+                    inFlight = false;
+                    return;
+                }
+                delivering = Thread.currentThread();
+            }
+            CompletionStage<?> stage = null;
+            try {
+                stage = listener.apply(new FileChangeBatch(root, changes));
+            } catch (RuntimeException e) {
+                logFailure(e);
+            } finally {
+                synchronized (this) {
+                    delivering = null;
+                    notifyAll();
+                }
+            }
+            if (stage == null) {
+                completed();
+                return;
+            }
+            pendingStages.incrementAndGet();
+            stage.whenComplete((ignored, failure) -> {
+                pendingStages.decrementAndGet();
+                if (failure != null) {
+                    logFailure(failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure);
+                }
+                completed();
+            });
+        }
+
+        /**
+         * The listener's work for the last batch is done, on whichever thread completed its stage.
+         */
+        private void completed() {
+            synchronized (this) {
+                if (!registrationActive || held.isEmpty()) {
+                    inFlight = false;
+                    held.clear();
+                    return;
+                }
+            }
+            // still in flight: the watch thread delivers the held changes, so that listeners only ever run there
+            ready.add(this);
+        }
+
+        private void logFailure(Throwable failure) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("File watch listener for {} failed: {}", root, failure.getMessage(), failure);
             }
         }
     }
