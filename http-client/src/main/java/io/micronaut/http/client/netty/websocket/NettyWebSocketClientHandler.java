@@ -27,6 +27,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
@@ -50,11 +51,15 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Handler for WebSocket clients.
@@ -81,6 +86,18 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private Argument<?> clientBodyArgument;
     @Nullable
     private Argument<?> clientPongArgument;
+    /**
+     * Set once the endpoint was handed to {@link #completion}, or the connect was cancelled
+     * before that: exactly one of the two wins.
+     */
+    private final AtomicBoolean connectSettled = new AtomicBoolean();
+    private volatile boolean connectCancelled;
+    @Nullable
+    private volatile Channel channel;
+    @Nullable
+    private final Duration handshakeTimeout;
+    @Nullable
+    private ScheduledFuture<?> handshakeTimeoutTask;
 
     /**
      * Default constructor.
@@ -101,12 +118,54 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             MessageBodyHandlerRegistry messageBodyHandlerRegistry,
             ConversionService conversionService) {
+        this(request, webSocketBean, handshaker, requestBinderRegistry, mediaTypeCodecRegistry, messageBodyHandlerRegistry, conversionService, null);
+    }
+
+    /**
+     * Constructor with a handshake timeout.
+     *
+     * @param request                    The originating request that created the WebSocket.
+     * @param webSocketBean              The WebSocket client bean.
+     * @param handshaker                 The handshaker
+     * @param requestBinderRegistry      The request binder registry
+     * @param mediaTypeCodecRegistry     The media type codec registry
+     * @param messageBodyHandlerRegistry The handler registry
+     * @param conversionService          The conversionService
+     * @param handshakeTimeout           How long to wait for the handshake response once connected,
+     *                                   or {@code null} to wait without a limit
+     * @since 5.3.0
+     */
+    public NettyWebSocketClientHandler(
+            MutableHttpRequest<?> request,
+            WebSocketBean<T> webSocketBean,
+            final WebSocketClientHandshaker handshaker,
+            RequestBinderRegistry requestBinderRegistry,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+            ConversionService conversionService,
+            @Nullable Duration handshakeTimeout) {
         super(requestBinderRegistry, mediaTypeCodecRegistry, messageBodyHandlerRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null, conversionService);
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.tryMatch(request.getPath());
+        this.handshakeTimeout = handshakeTimeout;
+        completion.onCancel(this::cancelConnect);
+    }
+
+    /**
+     * The connect was cancelled: close the connection unless the endpoint was already handed over.
+     * Runs on the cancelling thread.
+     */
+    private void cancelConnect() {
+        connectCancelled = true;
+        if (connectSettled.compareAndSet(false, true)) {
+            Channel ch = channel;
+            if (ch != null) {
+                ch.close();
+            }
+        }
     }
 
     @Override
@@ -138,6 +197,12 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
+        channel = ctx.channel();
+        if (connectCancelled) {
+            // cancelled before the handler was added
+            ctx.close();
+            return;
+        }
         if (ctx.channel().isActive()) {
             channelActive(ctx);
         }
@@ -145,6 +210,18 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
+        if (connectCancelled) {
+            ctx.close();
+            return;
+        }
+        if (handshakeTimeout != null && !handshakeTimeout.isNegative() && !handshakeTimeout.isZero() && handshakeTimeoutTask == null) {
+            handshakeTimeoutTask = ctx.executor().schedule(() -> {
+                if (!handshaker.isHandshakeComplete()
+                    && completion.tryCompleteExceptionally(new ReadTimeoutException())) {
+                    ctx.close();
+                }
+            }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
+        }
         handshaker.handshake(ctx.channel()).addListener(future -> {
             if (future.isSuccess()) {
                 ctx.channel().config().setAutoRead(true);
@@ -159,6 +236,11 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         final Channel ch = ctx.channel();
         if (!handshaker.isHandshakeComplete()) {
+            cancelHandshakeTimeout();
+            if (connectCancelled) {
+                // the connect was cancelled and the channel is closing: the endpoint is not opened
+                return;
+            }
             // web socket client connected
             FullHttpResponse res = (FullHttpResponse) msg;
             this.handshakeResponse = res;
@@ -225,9 +307,10 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             callOpenMethod(ctx).onComplete((v, t) -> {
                 if (t != null) {
                     completion.tryCompleteExceptionally(new WebSocketSessionException("Error opening WebSocket client session: " + t.getMessage(), t));
-                } else {
+                } else if (connectSettled.compareAndSet(false, true)) {
                     completion.tryComplete(targetBean);
                 }
+                // else: the connect was cancelled while the open method ran, the channel is closing
             });
             return;
         }
@@ -260,6 +343,20 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         };
     }
 
+    private void cancelHandshakeTimeout() {
+        ScheduledFuture<?> task = handshakeTimeoutTask;
+        if (task != null) {
+            handshakeTimeoutTask = null;
+            task.cancel(false);
+        }
+    }
+
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        cancelHandshakeTimeout();
+        super.handlerRemoved(ctx);
+    }
+
     @Override
     public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
         completion.tryCompleteExceptionally(cause);
@@ -275,6 +372,36 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      */
     public final ExecutionFlow<T> getHandshakeCompletedFlow() {
         return completion;
+    }
+
+    /**
+     * The client endpoint bean of this connection.
+     *
+     * @return The client endpoint
+     * @since 5.3.0
+     */
+    public final T getClientEndpoint() {
+        return genericWebSocketBean.getTarget();
+    }
+
+    /**
+     * Close the connection of an endpoint that the connect completed with, but that nobody
+     * received because the connect was cancelled at the same time. Unlike the endpoint's own
+     * {@link AutoCloseable#close()}, this closes the session even for an endpoint class that does
+     * not close it.
+     *
+     * @since 5.3.0
+     */
+    public final void closeUnclaimed() {
+        NettyWebSocketSession session = clientSession;
+        if (session != null && session.isOpen()) {
+            session.close(CloseReason.GOING_AWAY);
+        } else {
+            Channel ch = channel;
+            if (ch != null) {
+                ch.close();
+            }
+        }
     }
 
     @Override

@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.websocket.AsyncWebSocketClient;
 
 import java.util.Map;
@@ -58,14 +59,14 @@ final class NettyAsyncWebSocketClient implements AsyncWebSocketClient {
         client.close();
     }
 
-    private static <T extends AutoCloseable> CompletionStage<T> toStage(ExecutionFlow<T> flow) {
+    private static <T extends AutoCloseable> CompletionStage<T> toStage(ExecutionFlow<NettyWebSocketClientHandler<T>> flow) {
         ConnectFuture<T> future = new ConnectFuture<>(flow);
-        flow.onComplete((endpoint, error) -> {
+        flow.onComplete((handler, error) -> {
             if (error != null) {
                 future.completeExceptionally(error);
-            } else if (endpoint != null && !future.complete(endpoint)) {
+            } else if (handler != null && !future.complete(handler.getClientEndpoint())) {
                 // cancelled while the handshake completed: nobody waits for this endpoint
-                closeQuietly(endpoint);
+                closeQuietly(handler.getClientEndpoint());
             }
         });
         return future;
@@ -85,9 +86,9 @@ final class NettyAsyncWebSocketClient implements AsyncWebSocketClient {
      * @param <T> The endpoint type
      */
     private static final class ConnectFuture<T> extends CompletableFuture<T> {
-        private final ExecutionFlow<T> flow;
+        private final ExecutionFlow<?> flow;
 
-        ConnectFuture(ExecutionFlow<T> flow) {
+        ConnectFuture(ExecutionFlow<?> flow) {
             this.flow = flow;
         }
 
