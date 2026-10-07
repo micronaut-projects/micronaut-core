@@ -41,10 +41,12 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
+import io.micronaut.http.body.stream.ForeignBufferReleaser;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -101,15 +103,57 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
      */
     private final @Nullable Argument<?> specificType;
     private final JsonMapper specificMapper;
+    /**
+     * Releases the buffers of the runtime that a Reactor input of {@link #readChunked} discards,
+     * or {@code null} if the runtime has none that need it.
+     */
+    private final @Nullable ForeignBufferReleaser bufferReleaser;
 
     public JsonMessageHandler(JsonMapper jsonMapper) {
-        this(jsonMapper, null, jsonMapper);
+        this(jsonMapper, (ForeignBufferReleaser) null);
     }
 
-    private JsonMessageHandler(JsonMapper jsonMapper, @Nullable Argument<?> specificType, JsonMapper specificMapper) {
+    /**
+     * @param jsonMapper     The mapper
+     * @param bufferReleaser Releases the buffers of the runtime that a Reactor input of
+     *                       {@link #readChunked} discards, e.g. Netty buffers, or {@code null}
+     * @since 5.3.0
+     */
+    @Inject
+    public JsonMessageHandler(JsonMapper jsonMapper, @Nullable ForeignBufferReleaser bufferReleaser) {
+        this(jsonMapper, null, jsonMapper, bufferReleaser);
+    }
+
+    private JsonMessageHandler(JsonMapper jsonMapper, @Nullable Argument<?> specificType, JsonMapper specificMapper, @Nullable ForeignBufferReleaser bufferReleaser) {
         this.jsonMapper = jsonMapper;
         this.specificType = specificType;
         this.specificMapper = specificMapper;
+        this.bufferReleaser = bufferReleaser;
+    }
+
+    /**
+     * @return The releaser of the buffers of the runtime, or {@code null}
+     */
+    @Nullable ForeignBufferReleaser bufferReleaser() {
+        return bufferReleaser;
+    }
+
+    /**
+     * The elements a piece reader reads from the buffers of a body, which are shared with the
+     * values, not copied.
+     *
+     * @param input          The buffers of the body
+     * @param reader         The reader
+     * @param bufferReleaser Releases a buffer of the runtime that the input discards, or
+     *                       {@code null}
+     * @param <E>            The type of an element
+     * @return The publisher of the elements
+     */
+    static <E> Publisher<E> publisherOfBuffers(Publisher<ByteBuffer<?>> input, PieceReader<E> reader, @Nullable ForeignBufferReleaser bufferReleaser) {
+        if (bufferReleaser == null) {
+            return PieceReaders.publisherOfBuffers(input, reader, SharedReadBuffer::adapt);
+        }
+        return PieceReaders.publisherOfBuffers(input, reader, SharedReadBuffer::adapt, bufferReleaser::release);
     }
 
     /**
@@ -132,7 +176,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
 
     @Override
     public JsonMessageHandler<T> createSpecific(Argument<T> type) {
-        return new JsonMessageHandler<>(jsonMapper, type, jsonMapper.createSpecific(type));
+        return new JsonMessageHandler<>(jsonMapper, type, jsonMapper.createSpecific(type), bufferReleaser);
     }
 
     @Override
@@ -194,7 +238,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
             // Publisher<T> is unwrapped
             processor.counter.unwrapTopLevelArray();
         }
-        return PieceReaders.publisherOfBuffers(input, new JsonPieceReader<>(processor, value -> readValue(type, value)), SharedReadBuffer::adapt);
+        return publisherOfBuffers(input, new JsonPieceReader<>(processor, value -> readValue(type, value)), bufferReleaser);
     }
 
     /**
@@ -206,7 +250,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
         // the buffers of the input are shared with the values, not copied
-        return PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), SharedReadBuffer::adapt);
+        return publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), bufferReleaser);
     }
 
     /**
@@ -306,7 +350,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
 
     @Override
     public CustomizableJsonHandler customize(JsonFeatures jsonFeatures) {
-        return new JsonMessageHandler<>(jsonMapper.cloneWithFeatures(jsonFeatures));
+        return new JsonMessageHandler<>(jsonMapper.cloneWithFeatures(jsonFeatures), bufferReleaser);
     }
 
     /**

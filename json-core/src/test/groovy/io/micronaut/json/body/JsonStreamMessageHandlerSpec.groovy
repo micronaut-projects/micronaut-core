@@ -38,7 +38,7 @@ class JsonStreamMessageHandlerSpec extends Specification {
     def "a JSON null in a JSON stream read as a list is not an element"() {
         given:
         def ctx = ApplicationContext.run()
-        def reader = ctx.getBean(NettyJsonStreamHandler)
+        def reader = ctx.getBean(JsonStreamMessageHandler)
 
         when:
         def buf = NettyByteBufferFactory.DEFAULT.wrap('1 null 2'.getBytes(StandardCharsets.UTF_8))
@@ -54,7 +54,7 @@ class JsonStreamMessageHandlerSpec extends Specification {
     def "a JSON stream without a null is read as a list"() {
         given:
         def ctx = ApplicationContext.run()
-        def reader = ctx.getBean(NettyJsonStreamHandler)
+        def reader = ctx.getBean(JsonStreamMessageHandler)
 
         when:
         def buf = NettyByteBufferFactory.DEFAULT.wrap('1 2 3'.getBytes(StandardCharsets.UTF_8))

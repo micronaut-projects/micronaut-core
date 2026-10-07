@@ -76,7 +76,7 @@ final class JsonPieceReader<T> implements PieceReader<T> {
         if (value == null) {
             return null;
         }
-        T element;
+        @Nullable T element;
         try {
             element = valueReader.apply(value);
         } finally {

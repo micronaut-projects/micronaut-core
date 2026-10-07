@@ -37,8 +37,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The reading of streamed JSON, the elements of an array and the values of a JSON stream, by the
- * JSON handlers of json-core, without Netty, compared with the Netty processor they replaced,
- * {@link NettyJsonBaseline}.
+ * JSON handlers of json-core.
  *
  * <ul>
  *     <li>{@code smallManyPieces}: 2000 elements of about 60 bytes, in pieces of 256 bytes</li>
@@ -60,9 +59,6 @@ public class JsonStreamingReadBenchmark {
     private static final Argument<Book> BOOK = Argument.of(Book.class);
     private static final NettyReadBufferFactory READ_BUFFERS = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
 
-    @Param({"netty", "generic"})
-    String implementation;
-
     @Param({"smallManyPieces", "largeSpanning", "singleArray"})
     String scenario;
 
@@ -80,13 +76,8 @@ public class JsonStreamingReadBenchmark {
     @SuppressWarnings("unchecked")
     public void setup() {
         JsonMapper mapper = JsonMapper.createDefault();
-        if ("netty".equals(implementation)) {
-            arrayReader = new NettyJsonBaseline<>(mapper, false);
-            streamReader = (MessageBodyReader<List<Book>>) (MessageBodyReader<?>) new NettyJsonBaseline<>(mapper, true);
-        } else {
-            arrayReader = new JsonMessageHandler<>(mapper);
-            streamReader = new JsonStreamMessageHandler<>(mapper);
-        }
+        arrayReader = new JsonMessageHandler<>(mapper);
+        streamReader = new JsonStreamMessageHandler<>(mapper);
         List<String> values = PieceReaderBenchmarkSupport.values("largeSpanning".equals(scenario) ? "large" : "small");
         elements = values.size();
         byte[] array = PieceReaderBenchmarkSupport.array(values);

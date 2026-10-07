@@ -2,25 +2,15 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.Headers;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.json.JsonMapper;
-import io.micronaut.json.body.JsonMessageHandler;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Inputs of the piece reader benchmarks, and the reactive JSON reading of the Netty handlers as it
@@ -98,44 +88,6 @@ public final class PieceReaderBenchmarkSupport {
     }
 
     /**
-     * The reactive reading of the elements of a JSON array of the Netty JSON handler before the
-     * piece readers: the processor splits a {@link Flux} of buffers.
-     *
-     * @param handler        The handler, which decodes an element
-     * @param type           The element type
-     * @param headers        The headers
-     * @param input          The input
-     * @param maxElementSize The limit of an element
-     * @param <T>            The element type
-     * @return The elements
-     */
-    public static <T> Publisher<T> legacyArrayElements(JsonMessageHandler<T> handler, Argument<T> type, Headers headers, Publisher<ByteBuffer<?>> input, long maxElementSize) {
-        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
-        processor.counter.unwrapTopLevelArray();
-        return legacyProcess(processor, Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))
-            .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> handler.read(type, MediaType.APPLICATION_JSON_TYPE, headers, value)));
-    }
-
-    /**
-     * The reading of a JSON stream bound as a list before the piece readers: the elements of the
-     * reactive reader, collected by blocking.
-     *
-     * @param mapper The mapper
-     * @param type   The element type
-     * @param body   The body
-     * @param <T>    The element type
-     * @return The elements
-     */
-    public static <T> List<T> legacyStreamList(JsonMapper mapper, Argument<T> type, Headers headers, ByteBuffer<?> body) {
-        JsonMessageHandler<T> handler = new JsonMessageHandler<>(mapper);
-        JsonChunkedProcessor processor = new JsonChunkedProcessor();
-        return Objects.requireNonNull(legacyProcess(processor, Flux.just(body).map(JsonChunkedProcessor::nettyBuffer))
-            .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> handler.read(type, MediaType.APPLICATION_JSON_STREAM_TYPE, headers, value)))
-            .collectList()
-            .block());
-    }
-
-    /**
      * A subscriber that requests one element at a time, like a cursor, or all of them.
      *
      * @param <T> The element type
@@ -192,32 +144,4 @@ public final class PieceReaderBenchmarkSupport {
         }
     }
 
-    /**
-     * The processing of the JSON values of a body as it was before the piece readers.
-     */
-    private static Flux<ByteBuffer<?>> legacyProcess(JsonChunkedProcessor processor, Flux<ByteBuf> input) {
-        return Flux.concat(input
-                .concatMap(b -> Flux.<ByteBuffer<?>>create(s -> {
-                    try {
-                        processor.feed(b, s::next);
-                        s.complete();
-                    } catch (IOException | ContentLengthExceededException e) {
-                        s.error(e);
-                    } finally {
-                        b.release();
-                    }
-                })), Flux.create(s -> {
-                try {
-                    processor.finish(s::next);
-                    s.complete();
-                } catch (Throwable e) {
-                    s.error(e);
-                }
-            }))
-            // also when the subscriber cancels, e.g. a reader that stops before the last element:
-            // the partial element and the elements and input not delivered yet are released
-            .doFinally(signal -> processor.discard())
-            .doOnDiscard(ByteBuffer.class, JsonChunkedProcessor::release)
-            .doOnDiscard(ByteBuf.class, ByteBuf::release);
-    }
 }

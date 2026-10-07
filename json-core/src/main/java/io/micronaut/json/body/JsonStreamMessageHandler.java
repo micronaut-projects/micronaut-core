@@ -37,10 +37,11 @@ import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
-import io.micronaut.http.body.stream.PieceReaders;
+import io.micronaut.http.body.stream.ForeignBufferReleaser;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -71,13 +72,23 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
         this(new JsonMessageHandler<>(jsonMapper));
     }
 
+    /**
+     * @param jsonMapper     The mapper
+     * @param bufferReleaser Releases the buffers of the runtime that a Reactor input of
+     *                       {@link #readChunked} discards, e.g. Netty buffers, or {@code null}
+     */
+    @Inject
+    public JsonStreamMessageHandler(JsonMapper jsonMapper, @Nullable ForeignBufferReleaser bufferReleaser) {
+        this(new JsonMessageHandler<>(jsonMapper, bufferReleaser));
+    }
+
     private JsonStreamMessageHandler(JsonMessageHandler<T> jsonMessageHandler) {
         this.jsonMessageHandler = jsonMessageHandler;
     }
 
     @Override
     public CustomizableJsonHandler customize(JsonFeatures jsonFeatures) {
-        return new JsonStreamMessageHandler<>(jsonMessageHandler.getJsonMapper().cloneWithFeatures(jsonFeatures));
+        return new JsonStreamMessageHandler<>(jsonMessageHandler.getJsonMapper().cloneWithFeatures(jsonFeatures), jsonMessageHandler.bufferReleaser());
     }
 
     @Override
@@ -113,7 +124,12 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
         for (int i = 0; i < values.size(); i++) {
             ReadBuffer value = values.get(i);
             try {
-                elements.add(jsonMessageHandler.readValue(elementType, value));
+                T element = jsonMessageHandler.readValue(elementType, value);
+                if (element == null) {
+                    // a JSON null is not an element, as the reactive readers refuse it
+                    throw new CodecException("A JSON null is not an element of a JSON array or stream");
+                }
+                elements.add(element);
             } catch (RuntimeException e) {
                 values.subList(i + 1, values.size()).forEach(ReadBuffer::close);
                 throw e;
@@ -138,7 +154,7 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
         // the buffers of the input are shared with the values, not copied
-        return PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), SharedReadBuffer::adapt);
+        return JsonMessageHandler.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), jsonMessageHandler.bufferReleaser());
     }
 
     @Override

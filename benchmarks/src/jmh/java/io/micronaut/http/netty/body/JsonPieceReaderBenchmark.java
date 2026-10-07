@@ -68,16 +68,6 @@ public class JsonPieceReaderBenchmark {
     }
 
     @Benchmark
-    public int arrayLegacyFluxOneByOne() {
-        return subscribe(PieceReaderBenchmarkSupport.legacyArrayElements(arrayHandler, BOOK, headers, PieceReaderBenchmarkSupport.buffers(arrayPieces), Long.MAX_VALUE), true);
-    }
-
-    @Benchmark
-    public int arrayLegacyFluxUnbounded() {
-        return subscribe(PieceReaderBenchmarkSupport.legacyArrayElements(arrayHandler, BOOK, headers, PieceReaderBenchmarkSupport.buffers(arrayPieces), Long.MAX_VALUE), false);
-    }
-
-    @Benchmark
     public int arrayBridgeOneByOne() {
         return subscribe(arrayHandler.readChunked(BOOK, MediaType.APPLICATION_JSON_TYPE, headers, PieceReaderBenchmarkSupport.buffers(arrayPieces), Long.MAX_VALUE), true);
     }
@@ -103,12 +93,6 @@ public class JsonPieceReaderBenchmark {
             }
         }
         return check(count);
-    }
-
-    @Benchmark
-    public int streamListLegacyBlock() {
-        return check(PieceReaderBenchmarkSupport.legacyStreamList(mapper, BOOK, headers,
-            NettyByteBufferFactory.DEFAULT.wrap(Unpooled.wrappedBuffer(stream))).size());
     }
 
     @Benchmark
