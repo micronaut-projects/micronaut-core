@@ -40,4 +40,30 @@ class ApplicationContextBuilderMainClassLoaderSpec extends Specification {
         explicit.close()
         child.close()
     }
+
+    void "a main class whose loader does not see the default loader's classes leaves the default loader"() {
+        given: "a main class of a parent of the default loader, and one of a loader beside it"
+        Class<?> parentMain = java.sql.Driver
+        def beside = new io.micronaut.inject.annotation.AnnotationTypeClassLoaderSpec.OwnCopy()
+        Class<?> besideMain = beside.define(io.micronaut.inject.annotation.Reloaded.name)
+
+        expect:
+        parentMain.classLoader != null
+        isAncestor(parentMain.classLoader, ApplicationContext.classLoader)
+        ApplicationContext.builder().mainClass(parentMain).classLoader == ApplicationContext.classLoader
+        ApplicationContext.builder().mainClass(besideMain).classLoader == ApplicationContext.classLoader
+
+        and: "the main class still supplies the package to scan"
+        ApplicationContext.builder().mainClass(besideMain).@packages.contains('io.micronaut.inject.annotation')
+
+    }
+
+    private static boolean isAncestor(ClassLoader ancestor, ClassLoader loader) {
+        for (ClassLoader current = loader; current != null; current = current.parent) {
+            if (current.is(ancestor)) {
+                return true
+            }
+        }
+        return false
+    }
 }

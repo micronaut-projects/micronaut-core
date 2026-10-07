@@ -427,8 +427,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             // The configurers were service-loaded when the builder was made, from the thread context loader:
             // a launcher whose main class lives in a loader of its own sets that loader as the context loader
             // before it builds, so the configurers of that loader are found as well
-            if (!explicitClassLoader && mainClass.getClassLoader() != null) {
-                this.classLoader = mainClass.getClassLoader();
+            // Only a loader that sees the default one's classes is adopted: the default loader itself or one of its
+            // descendants, never a parent, which would lose the classes only the default loader sees
+            ClassLoader mainClassLoader = mainClass.getClassLoader();
+            if (!explicitClassLoader && mainClassLoader != null && delegatesTo(mainClassLoader, this.classLoader)) {
+                this.classLoader = mainClassLoader;
             }
             String name = mainClass.getPackage().getName();
             if (StringUtils.isNotEmpty(name)) {
@@ -436,6 +439,18 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             }
         }
         return this;
+    }
+
+    private static boolean delegatesTo(ClassLoader loader, @Nullable ClassLoader ancestor) {
+        if (ancestor == null) {
+            return true;
+        }
+        for (ClassLoader current = loader; current != null; current = current.getParent()) {
+            if (current == ancestor) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
