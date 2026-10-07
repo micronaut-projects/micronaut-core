@@ -15,8 +15,13 @@
  */
 package io.micronaut.function.client;
 
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * @param <I> input type
@@ -36,4 +41,31 @@ public interface FunctionInvoker<I, O> {
      */
     @Nullable
     O invoke(FunctionDefinition definition, @Nullable I input, Argument<O> outputType);
+
+    /**
+     * Invoke the given function definition for the given input, completing with the result of
+     * the expected type. The default implementation asks {@link #invoke} for a
+     * {@link Publisher} of the result, and completes with its first item, or {@code null} if it
+     * completes empty.
+     *
+     * @param definition The definition
+     * @param input      The input
+     * @param valueType  The type of the result
+     * @param <T>        The type of the result
+     * @return A stage that completes with the result
+     * @since 5.3.0
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    default <T> CompletionStage<@Nullable T> invokeAsync(FunctionDefinition definition, @Nullable I input, Argument<T> valueType) {
+        Publisher<T> result;
+        try {
+            result = (Publisher<T>) invoke(definition, input, (Argument) Argument.of(Publisher.class, valueType));
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        if (result == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("The function invoker returned no publisher"));
+        }
+        return CompletionStagePublishers.first(result, null);
+    }
 }

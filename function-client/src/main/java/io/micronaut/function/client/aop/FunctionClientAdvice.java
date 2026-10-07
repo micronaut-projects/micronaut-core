@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.
@@ -138,15 +139,8 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 throw new FunctionNotFoundException(functionName);
             }
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-            Publisher<Object> result = Objects.requireNonNull(
-                (Publisher<Object>) functionInvoker.invoke(
-                    def,
-                    body,
-                    Argument.of(Publisher.class, valueType)
-                ),
-                "The function invoker returned no publisher"
-            );
-            return CompletionStagePublishers.first(result, null);
+            // an invoker that only returns publishers is adapted by the default invokeAsync
+            return (CompletionStage<@Nullable Object>) functionInvoker.invokeAsync(def, body, valueType);
         }).whenComplete((value, throwable) -> {
             if (throwable != null) {
                 completableFuture.completeExceptionally(CompletionStagePublishers.unwrap(throwable));

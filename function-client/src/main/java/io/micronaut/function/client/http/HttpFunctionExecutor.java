@@ -35,6 +35,8 @@ import org.reactivestreams.Publisher;
 import java.io.Closeable;
 import java.net.URI;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link io.micronaut.function.executor.FunctionExecutor} that uses a {@link io.micronaut.http.client.HttpClient} to execute a remote function definition.
@@ -64,39 +66,66 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
 
     @Override
     @Nullable
+    @SuppressWarnings("unchecked")
     public O invoke(FunctionDefinition definition, @Nullable I input, Argument<O> outputType) {
-        Optional<URI> opt = definition.getURI();
-        if (opt.isEmpty()) {
-            throw new FunctionNotFoundException(definition.getName());
-        } else {
-            URI uri = opt.get();
-            MutableHttpRequest<?> request;
-            if (input == null) {
-                request = HttpRequest.GET(uri.toString());
-            } else {
-                request = HttpRequest.POST(uri.toString(), input);
-            }
-
-            if (input != null && ClassUtils.isJavaLangType(input.getClass())) {
-                request.contentType(MediaType.TEXT_PLAIN_TYPE);
-            }
-
-            Class<O> outputJavaType = outputType.getType();
-
-            if (ClassUtils.isJavaLangType(outputJavaType)) {
-                request.accept(MediaType.TEXT_PLAIN_TYPE);
-            }
-
-            if (Publishers.isConvertibleToPublisher(outputJavaType)) {
-                Publisher<?> publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
-                return Publishers.convertPublisher(conversionService, publisher, outputJavaType);
-            } else if (outputType.isVoid()) {
-                httpClient.toBlocking().exchange(request);
-                return null;
-            } else {
-                return httpClient.toBlocking().retrieve(request, outputType);
-            }
+        Class<O> outputJavaType = outputType.getType();
+        if (outputType.isAsync()) {
+            // a CompletionStage or a CompletableFuture of the result
+            return (O) invokeAsync(definition, input, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)).toCompletableFuture();
         }
+        MutableHttpRequest<?> request = toRequest(definition, input, outputJavaType);
+        if (Publishers.isConvertibleToPublisher(outputJavaType)) {
+            Publisher<?> publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
+            return Publishers.convertPublisher(conversionService, publisher, outputJavaType);
+        } else if (outputType.isVoid()) {
+            httpClient.toBlocking().exchange(request);
+            return null;
+        } else {
+            return httpClient.toBlocking().retrieve(request, outputType);
+        }
+    }
+
+    /**
+     * Invoke the function with the {@link io.micronaut.http.client.AsyncHttpClient} of the HTTP
+     * client, without Reactive Streams.
+     */
+    @Override
+    public <T> CompletionStage<@Nullable T> invokeAsync(FunctionDefinition definition, @Nullable I input, Argument<T> valueType) {
+        MutableHttpRequest<?> request;
+        try {
+            request = toRequest(definition, input, valueType.getType());
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        if (valueType.isVoid()) {
+            return httpClient.toAsync().exchange(request).thenApply(response -> null);
+        }
+        return httpClient.toAsync().retrieve(request, valueType);
+    }
+
+    /**
+     * The request that invokes the function.
+     *
+     * @param definition     The definition
+     * @param input          The input
+     * @param outputJavaType The type of the result
+     * @return The request
+     */
+    private MutableHttpRequest<?> toRequest(FunctionDefinition definition, @Nullable I input, Class<?> outputJavaType) {
+        URI uri = definition.getURI().orElseThrow(() -> new FunctionNotFoundException(definition.getName()));
+        MutableHttpRequest<?> request;
+        if (input == null) {
+            request = HttpRequest.GET(uri.toString());
+        } else {
+            request = HttpRequest.POST(uri.toString(), input);
+        }
+        if (input != null && ClassUtils.isJavaLangType(input.getClass())) {
+            request.contentType(MediaType.TEXT_PLAIN_TYPE);
+        }
+        if (ClassUtils.isJavaLangType(outputJavaType)) {
+            request.accept(MediaType.TEXT_PLAIN_TYPE);
+        }
+        return request;
     }
 
     @SuppressWarnings("unchecked")
