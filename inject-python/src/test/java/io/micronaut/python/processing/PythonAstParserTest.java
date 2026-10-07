@@ -2419,6 +2419,166 @@ class ProductMappers:
     }
 
     @Test
+    void testDataclassFieldValidationMetadata() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+
+            @dataclass
+            class Contact:
+                name: str = field(metadata={"validation": {"not_blank": True}})
+            """)) {
+            ClassDef contact = environment.classes().get("Contact");
+            var field = contact.attributes().getFirst();
+            assertEquals(List.of("jakarta.validation.constraints.NotBlank"),
+                field.decorators().stream().map(DecoratorDef::annotationName).toList());
+            assertFalse(field.hasDefaultValue(), "metadata-only field() is required");
+            assertFalse(contact.constructor().arguments().arguments().getFirst().hasDefaultValue());
+        }
+    }
+
+    @Test
+    void testDataclassFieldMetadataDefaultsAndImportIdentity() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            import dataclasses as dc
+            from dataclasses import dataclass as data, field as f
+            from other_package import field as other_field, dataclass as other_dataclass
+            from micronaut.core.annotation import Introspected as Inspect
+
+            SHARED_METADATA = {"validation": {"not_blank": {"message": "required"}}}
+
+            @dc.dataclass
+            class Contact:
+                name: str = dc.field(metadata={"help": object(), "validation": {"not_blank": True}})
+                optional: str | None = f(default=None, metadata={"validation": {"not_blank": False}})
+                label: str = f(default="ready", metadata={"validation": {"size": {"min": 1}}})
+                tags: list[str] = f(default_factory=list, metadata={"validation": {"not_empty": True}})
+                foreign: str = other_field(metadata={"validation": {"not_blank": True}})
+
+            @data
+            class ThirdParty:
+                first: str = f(metadata=OTHER_LIBRARY_METADATA)
+                second: str = f(metadata={**OTHER_LIBRARY_METADATA})
+                third: str = f(**options)
+                fourth: str = f(**{"metadata": {"validation": {"not_blank": True}}})
+                fifth: str = f(metadata=SHARED_METADATA)
+                sixth: str = f(metadata={**{"validation": {"not_blank": True}}})
+                seventh: str = f(**{**{"metadata": {"validation": {"not_blank": True}}}})
+
+            @Inspect(excludes=["secret"])
+            @data(frozen=True)
+            class Configured:
+                secret: str
+
+            @other_dataclass
+            class Foreign:
+                name: str = f(metadata={"validation": {"not_blank": True}})
+
+            class Plain:
+                name: str = f(metadata={"validation": {"not_blank": True}})
+            """)) {
+            var contact = environment.classes().get("Contact");
+            var fields = contact.attributes();
+            assertEquals(List.of(false, true, true, true, true), fields.stream().map(a -> a.hasDefaultValue()).toList());
+            assertNull(fields.get(1).value());
+            assertEquals("ready", fields.get(2).value());
+            assertEquals("list", fields.get(3).defaultFactoryName());
+            assertTrue(fields.get(4).decorators().isEmpty(), "other libraries' field helpers do not carry Jakarta constraints");
+            assertEquals(List.of(false, true, true, true, true), contact.constructor().arguments().arguments().stream().map(a -> a.hasDefaultValue()).toList());
+            assertEquals(1, contact.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).count());
+            var configured = environment.classes().get("Configured");
+            assertTrue(configured.frozenDataclass());
+            assertEquals("dataclass", configured.decorators().stream().filter(d -> d.annotationName().equals("dataclasses.dataclass")).findFirst().orElseThrow().name());
+            assertEquals(1, configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).count());
+            assertEquals(List.of("secret"), configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).findFirst().orElseThrow().members().get("excludes"));
+            var thirdPartyFields = environment.classes().get("ThirdParty").attributes();
+            assertTrue(thirdPartyFields.subList(0, 3).stream().allMatch(a -> a.decorators().isEmpty()));
+            assertFalse(thirdPartyFields.get(3).hasDefaultValue());
+            assertEquals("jakarta.validation.constraints.NotBlank", thirdPartyFields.get(3).decorators().getFirst().annotationName());
+            assertEquals("required", thirdPartyFields.get(4).decorators().getFirst().members().get("message"));
+            assertEquals("jakarta.validation.constraints.NotBlank", thirdPartyFields.get(5).decorators().getFirst().annotationName());
+            assertEquals("jakarta.validation.constraints.NotBlank", thirdPartyFields.get(6).decorators().getFirst().annotationName());
+            for (String name : List.of("Foreign", "Plain")) {
+                var ordinary = environment.classes().get(name);
+                assertTrue(ordinary.decorators().stream().noneMatch(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")));
+                assertTrue(ordinary.attributes().getFirst().decorators().isEmpty());
+                assertNull(ordinary.constructor());
+            }
+        }
+    }
+
+    @Test
+    void testDataclassFieldMetadataStandardConstraintCatalog() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+
+            @dataclass
+            class AllConstraints:
+                value: str = field(metadata={"validation": {
+                    "not_blank": {"message": "required"}, "not_null": True, "null": True, "not_empty": True,
+                    "size": {"min": 1, "max": 20}, "min": 0, "max": 9,
+                    "decimal_min": "0.001", "decimal_max": {"value": "9.99", "inclusive": False},
+                    "positive": True, "positive_or_zero": True, "negative": True, "negative_or_zero": True,
+                    "digits": {"integer": 2, "fraction": 3},
+                    "pattern": {"regexp": "[a-z]+", "flags": ["CASE_INSENSITIVE"]},
+                    "email": {"regexp": ".*example.com"}, "assert_true": True, "assert_false": True,
+                    "past": True, "past_or_present": True, "future": True, "future_or_present": True, "valid": True
+                }})
+            """)) {
+            var decorators = environment.classes().get("AllConstraints").attributes().getFirst().decorators();
+            assertEquals(23, decorators.size());
+            assertEquals(23, decorators.stream().map(DecoratorDef::annotationName).distinct().count());
+            assertTrue(decorators.stream().allMatch(d -> d.annotationName().startsWith("jakarta.validation.")));
+            assertEquals(0, decorators.stream().filter(d -> d.name().equals("Min")).findFirst().orElseThrow().members().get("value"));
+            assertEquals("0.001", decorators.stream().filter(d -> d.name().equals("DecimalMin")).findFirst().orElseThrow().members().get("value"));
+            assertEquals(List.of("CASE_INSENSITIVE"), decorators.stream().filter(d -> d.name().equals("Pattern")).findFirst().orElseThrow().members().get("flags"));
+            assertNull(decorators.stream().filter(d -> d.name().equals("Valid")).findFirst().orElseThrow().repeatedName());
+        }
+    }
+
+    @Test
+    void testDataclassFieldMetadataRejectsMalformedValidation() {
+        Map<String, String> errors = Map.ofEntries(
+                Map.entry("{\"validation\": {\"not_blanc\": True}}", "Unknown dataclass field validation constraint [not_blanc]"),
+                Map.entry("{\"validation\": {\"not_blank\": 1}}", "requires a boolean or member dictionary"),
+                Map.entry("{\"validation\": {\"min\": True}}", "Missing required member [value]"),
+                Map.entry("{\"validation\": {\"digits\": {\"integer\": 2}}}", "Missing required member [fraction]"),
+                Map.entry("{\"validation\": {\"size\": {\"minimum\": 1}}}", "Unknown member [minimum]"),
+                Map.entry("{\"validation\": {\"valid\": {\"message\": \"invalid\"}}}", "Unknown member [message]"),
+                Map.entry("{\"validation\": {\"pattern\": []}}", "requires a boolean or member dictionary"),
+                Map.entry("{\"validation\": {\"pattern\": [{\"regexp\": \"x\"}, {\"regexp\": \"y\"}]}}", "requires a boolean or member dictionary"),
+                Map.entry("{\"validation\": {\"valid\": [{}]}}", "requires a boolean or member dictionary"),
+                Map.entry("{\"validation\": {\"pattern\": {\"regexp\": build_pattern()}}}", "must be a compile-time constant"),
+                Map.entry("{\"validation\": {\"pattern\": {\"regexp\": dynamic_pattern}}}", "must be a compile-time constant"),
+                Map.entry("{\"validation\": {\"not_blank\": {\"message\": dynamic_message}}}", "must be a compile-time constant"),
+                Map.entry("{\"validation\": {\"pattern\": {\"regexp\": \"x\", \"flags\": [build_flag()]}}}", "must be a compile-time constant"),
+                Map.entry("{\"validation\": constraints}", "must be a literal dictionary"),
+                Map.entry("{\"validation\": {**constraints}}", "literal string keys without dictionary expansion"),
+                Map.entry("{\"validation\": {\"not_blank\": True, \"not_blank\": False}}", "Duplicate dataclass field"),
+                Map.entry("{\"validation\": {\"min\": {\"value\": None}}}", "Invalid value for member [value]"),
+                Map.entry("{\"validation\": {\"pattern\": {\"regexp\": None}}}", "Invalid value for member [regexp]"),
+                Map.entry("{\"validation\": {\"pattern\": {\"regexp\": \"x\", \"flags\": [\"NOT_A_FLAG\"]}}}", "Invalid value for member [flags]"),
+                Map.entry("{\"validation\": {\"decimal_min\": {\"value\": 0.1}}}", "Invalid value for member [value]"),
+                Map.entry("{\"validation\": {\"size\": {\"min\": False}}}", "Invalid value for member [min]"),
+                Map.entry("{\"validation\": {\"decimal_min\": {\"value\": \"0\", \"inclusive\": \"false\"}}}", "Invalid value for member [inclusive]")
+            );
+        errors.forEach((metadata, expected) -> {
+            PythonAstParser pythonProcessor = new PythonAstParser();
+            try (var context = pythonProcessor.context()) {
+                var exception = assertThrows(Exception.class, () -> pythonProcessor.parse("""
+                    from dataclasses import dataclass, field
+                    @dataclass
+                    class Contact:
+                        name: str = field(metadata=%s)
+                    """.formatted(metadata)), metadata);
+                assertTrue(exception.getMessage().contains(expected), () -> metadata + ": " + exception.getMessage());
+            }
+        });
+    }
+
+    @Test
     void testDataclassDefaultFactoryConstructorArgumentParsing() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""

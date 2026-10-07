@@ -15,6 +15,69 @@ class OrderedTest:
 <1> The class `MethodOrderer.OrderAnnotation` is the `value` of the annotation, as `@TestMethodOrder(MethodOrderer.OrderAnnotation.class)` is in Java
 <2> A bare decorator is the annotation without members
 
+== Dataclass Field Validation
+
+Python dataclasses can declare validation constraints through the standard-library `field(metadata=...)` extension point, without importing constraint annotations:
+
+[source,python]
+----
+from dataclasses import dataclass, field
+
+@dataclass
+class Contact:
+    name: str = field(metadata={
+        "validation": {
+            "not_blank": True,
+            "size": {"min": 1, "max": 80, "message": "Use 1 to 80 characters"},
+        }
+    })
+----
+
+The compiler generates introspection for Python dataclasses automatically; an explicit `@Introspected(...)` is only needed to customize its configuration. This does not add serialization or database-mapping annotations.
+
+The compiler reads literal validation metadata and supported compile-time constants; it does not execute expressions to determine annotation values. It translates the `validation` dictionary to the existing Jakarta validation metadata. Use Micronaut Validation to enforce it at validation boundaries; ordinary Python construction such as `Contact("")` does not run validation automatically. A metadata-only field remains a required constructor argument. Explicit `default` and `default_factory` values keep their dataclass meaning.
+
+Set a constraint to `True` to enable its defaults, or `False` to disable it. A dictionary supplies annotation options. Constraints with required options must provide them; for example, `"min": {"value": 0}`. Numeric zero is a bound, not a disabled constraint. `"assert_false": True` enables the constraint requiring a false value.
+
+[%header,cols="2,3"]
+|===
+|Constraint keys |Additional options
+
+|`not_blank`, `not_empty`, `not_null`, `null`
+|None
+
+|`positive`, `positive_or_zero`, `negative`, `negative_or_zero`
+|None
+
+|`assert_true`, `assert_false`
+|None
+
+|`past`, `past_or_present`, `future`, `future_or_present`
+|None
+
+|`size`
+|`min`, `max`
+
+|`min`, `max`
+|Required integer `value`; an integer shorthand such as `"min": 0` is also supported
+
+|`decimal_min`, `decimal_max`
+|Required string `value`, optional `inclusive`; a string shorthand such as `"decimal_min": "0.01"` is also supported
+
+|`digits`
+|Required `integer` and `fraction`
+
+|`pattern`
+|Required `regexp`, optional `flags`; a string shorthand such as `"pattern": "[A-Z]+"` is also supported
+
+|`email`
+|`regexp`, `flags`
+|===
+
+Constraint options also include `message`, `groups`, and `payload`. Regular expressions and flags retain Jakarta/Java semantics, not Python `re` semantics; flag names are strings such as `"CASE_INSENSITIVE"`. Temporal, null, and whitespace checks likewise use the existing validators, without coercing or stripping Python values. Repeating a constraint with a list of member dictionaries is not supported.
+
+Use `"valid": True` for cascaded validation of an introspected nested object; `valid` has no constraint options. Unknown constraint names, unknown options, missing required options, and malformed recognized validation metadata are compilation errors. Other metadata namespaces are left alone. Method parameters continue to use `Annotated[...]` metadata.
+
 == Custom Annotations
 
 A custom annotation is a function returning a decorator, itself decorated with the annotations that make up its stereotype. Its parameters are the annotation members and their defaults the member defaults. It is applied like a generated decorator, bare or called, in the module that defines it and in modules that import it:
