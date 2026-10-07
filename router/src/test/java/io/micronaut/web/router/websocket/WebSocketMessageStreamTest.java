@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.websocket;
 
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -153,6 +154,88 @@ class WebSocketMessageStreamTest {
         stream.discard();
         assertTrue(done(unread));
         assertTrue(done(stream.offer("after")));
+    }
+
+    @Test
+    void theMessagesASubscriberThatCancelsDoesNotReceiveAreReleased() {
+        WebSocketMessageStream<Counted> stream = new WebSocketMessageStream<>(Runnable::run, error -> {
+            throw new AssertionError("unexpected", error);
+        });
+        Counted received = new Counted();
+        Counted unread = new Counted();
+        Counted after = new Counted();
+        List<Counted> signals = new ArrayList<>();
+        Subscription[] subscription = new Subscription[1];
+        stream.subscribe(new Subscriber<>() {
+            @Override
+            public void onSubscribe(Subscription s) {
+                subscription[0] = s;
+            }
+
+            @Override
+            public void onNext(Counted message) {
+                signals.add(message);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                // not expected
+            }
+
+            @Override
+            public void onComplete() {
+                // not expected
+            }
+        });
+        subscription[0].request(1);
+        stream.offer(received);
+        stream.offer(unread);
+        subscription[0].cancel();
+        stream.offer(after);
+        assertEquals(List.of(received), signals);
+        // the subscriber owns what it received
+        assertEquals(1, received.refCnt);
+        assertEquals(0, unread.refCnt);
+        assertEquals(0, after.refCnt);
+    }
+
+    @Test
+    void theMessagesDiscardedWithoutASubscriberOrAfterTheCloseAreReleased() {
+        List<Object> released = new ArrayList<>();
+        WebSocketMessageStream<Object> stream = new WebSocketMessageStream<>(Runnable::run, error -> {
+            throw new AssertionError("unexpected", error);
+        }, released::add);
+        stream.offer("unread");
+        stream.discard();
+        stream.offer("after");
+        assertEquals(List.of("unread", "after"), released);
+
+        Counted late = new Counted();
+        WebSocketMessageStream<Counted> closed = new WebSocketMessageStream<>(Runnable::run, error -> {
+            throw new AssertionError("unexpected", error);
+        });
+        closed.complete();
+        closed.offer(late);
+        assertEquals(0, late.refCnt);
+    }
+
+    /**
+     * A reference counted message.
+     */
+    private static final class Counted implements ReferenceCounted {
+        private int refCnt = 1;
+
+        @Override
+        public ReferenceCounted retain() {
+            refCnt++;
+            return this;
+        }
+
+        @Override
+        public boolean release() {
+            refCnt--;
+            return refCnt == 0;
+        }
     }
 
     private static WebSocketMessageStream<String> stream() {

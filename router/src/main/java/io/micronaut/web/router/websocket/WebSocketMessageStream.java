@@ -16,6 +16,7 @@
 package io.micronaut.web.router.websocket;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -50,6 +51,7 @@ final class WebSocketMessageStream<T> implements Publisher<T>, Subscription {
 
     private final Executor executor;
     private final Consumer<Throwable> errors;
+    private final Consumer<? super T> release;
     private final Queue<Pending<T>> queue = new ConcurrentLinkedQueue<>();
     private final AtomicLong requested = new AtomicLong();
     /**
@@ -75,8 +77,29 @@ final class WebSocketMessageStream<T> implements Publisher<T>, Subscription {
      * @param errors   Handles a subscriber that fails a signal, like the error of a handler
      */
     WebSocketMessageStream(Executor executor, Consumer<Throwable> errors) {
+        this(executor, errors, WebSocketMessageStream::releaseCounted);
+    }
+
+    /**
+     * @param executor Signals the subscriber
+     * @param errors   Handles a subscriber that fails a signal, like the error of a handler
+     * @param release  Releases a message that no subscriber receives, e.g. a reference counted buffer
+     */
+    WebSocketMessageStream(Executor executor, Consumer<Throwable> errors, Consumer<? super T> release) {
         this.executor = executor;
         this.errors = errors;
+        this.release = release;
+    }
+
+    /**
+     * Release a message that is {@link ReferenceCounted}: nobody else does once it is discarded.
+     *
+     * @param message The message
+     */
+    static void releaseCounted(@Nullable Object message) {
+        if (message instanceof ReferenceCounted counted) {
+            counted.release();
+        }
     }
 
     /**
@@ -87,6 +110,8 @@ final class WebSocketMessageStream<T> implements Publisher<T>, Subscription {
      */
     CompletionStage<?> offer(T message) {
         if (cancelled || completed) {
+            // nobody receives it
+            discarded(message);
             return WebSocketRouteMethod.DONE;
         }
         Pending<T> pending = new Pending<>(message, new CompletableFuture<>());
@@ -227,7 +252,19 @@ final class WebSocketMessageStream<T> implements Publisher<T>, Subscription {
     private void discardAll() {
         Pending<T> pending;
         while ((pending = queue.poll()) != null) {
-            pending.delivered().complete(null);
+            try {
+                discarded(pending.message());
+            } finally {
+                pending.delivered().complete(null);
+            }
+        }
+    }
+
+    private void discarded(T message) {
+        try {
+            release.accept(message);
+        } catch (RuntimeException e) {
+            errors.accept(e);
         }
     }
 

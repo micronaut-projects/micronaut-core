@@ -276,7 +276,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             routeEndpoint.connected(serverSession, executor, error -> {
                 ChannelHandlerContext handlerCtx = channel.pipeline().context(this);
                 exceptionCaught(handlerCtx == null ? ctx : handlerCtx, error);
-            });
+            }, NettyServerWebSocketHandler::releaseDiscarded);
         }
         callOpenMethod(ctx).onComplete((v, t) -> {
             if (t != null) {
@@ -303,6 +303,20 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error publishing WebSocket opened event: " + e.getMessage(), e);
             }
+        }
+    }
+
+    /**
+     * Release a message of a stream of messages that no subscriber receives: a frame or a buffer
+     * of the connection.
+     */
+    private static void releaseDiscarded(Object message) {
+        if (message instanceof io.netty.util.ReferenceCounted counted) {
+            if (counted.refCnt() > 0) {
+                counted.release();
+            }
+        } else if (message instanceof io.micronaut.core.io.buffer.ReferenceCounted counted) {
+            counted.release();
         }
     }
 

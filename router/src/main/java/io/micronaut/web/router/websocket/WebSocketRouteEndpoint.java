@@ -204,8 +204,21 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      *                 stage of its {@link WebSocketMessageStreamHandler}, like the error of a handler
      */
     public void connected(WebSocketSession session, Executor executor, Consumer<Throwable> errors) {
+        connected(session, executor, errors, WebSocketMessageStream::releaseCounted);
+    }
+
+    /**
+     * A connection opened, before its open handler is called.
+     *
+     * @param session  The session of the connection
+     * @param executor Runs the handlers of the route, see {@link #connected(WebSocketSession, Executor, Consumer)}
+     * @param errors   Handles an error of the connection outside of its handlers
+     * @param release  Releases a message of the stream of the messages that no subscriber
+     *                 receives, e.g. a reference counted buffer of the server
+     */
+    public void connected(WebSocketSession session, Executor executor, Consumer<Throwable> errors, Consumer<Object> release) {
         if (streaming) {
-            connections.put(session, new Connection(new WebSocketMessageStream<>(executor, errors), executor, errors));
+            connections.put(session, new Connection(new WebSocketMessageStream<>(executor, errors, release), executor, errors));
         }
     }
 
