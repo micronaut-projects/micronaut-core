@@ -17,16 +17,11 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -34,39 +29,29 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.core.util.functional.ThrowingFunction;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableByteBodyHttpResponse;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.AvailableByteBody;
-import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CharSequenceBodyWriter;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
-import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.body.PieceReader;
-import io.micronaut.http.body.stream.BodyElementsPublisher;
 import io.micronaut.http.body.stream.BodyPublishers;
-import io.micronaut.http.body.stream.ByteBodyElements;
-import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.body.WritableBodyWriter;
-import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
-import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -89,28 +74,13 @@ import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
-import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
-import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
-import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
-import io.micronaut.http.client.AsyncHttpClient;
-import io.micronaut.http.client.AsyncStreamingHttpClient;
-import io.micronaut.http.client.ElementsStages;
-import io.micronaut.http.client.BodyPieces;
-import io.micronaut.http.client.ElementsResponse;
-import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.context.ContextPathUtils;
-import io.micronaut.http.exceptions.BufferLengthExceededException;
-import io.micronaut.http.filter.FilterRunner;
-import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
-import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
@@ -120,11 +90,9 @@ import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
-import io.micronaut.http.sse.Event;
+import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
-import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
@@ -168,7 +136,6 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -179,28 +146,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -209,7 +169,7 @@ import java.util.function.Supplier;
  */
 @SuppressWarnings("FileLength")
 @Internal
-final class NettyHttpClient implements
+final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyResponse> implements
     WebSocketClient,
     HttpClient,
     StreamingHttpClient,
@@ -218,12 +178,6 @@ final class NettyHttpClient implements
     RawHttpClient,
     Closeable,
     AutoCloseable {
-
-    /**
-     * Request attribute that disables decompression for one exchange, see
-     * {@link RawRequestOptions#isDecompress()}.
-     */
-    static final String NO_DECOMPRESSION = "micronaut.http.client.raw.no-decompression";
 
     /**
      * Request attribute of a request that may switch the connection to another protocol, see
@@ -243,12 +197,6 @@ final class NettyHttpClient implements
     static final String UPLOAD_LISTENER = "micronaut.http.client.raw.upload-listener";
 
     /**
-     * Request attribute with the {@link RawRequestOptions#getReadIdleTimeout() read idle timeout}
-     * of an exchange.
-     */
-    static final String READ_IDLE_TIMEOUT = "micronaut.http.client.raw.read-idle-timeout";
-
-    /**
      * Default logger, use {@link #log} where possible.
      */
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(NettyHttpClient.class);
@@ -258,123 +206,185 @@ final class NettyHttpClient implements
     private static final AttributeKey<Boolean> REQUEST_SENT = AttributeKey.valueOf(NettyHttpClient.class, "requestSent");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
-    private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
-    /**
-     * Request attribute that disables following redirects for one exchange, see
-     * {@link RawRequestOptions#isFollowRedirects()}.
-     */
-    private static final String NO_FOLLOW_REDIRECTS = "micronaut.http.client.raw.no-follow-redirects";
 
-    private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     private ConnectionManager connectionManager;
 
-    private MessageBodyHandlerRegistry handlerRegistry;
-    private final Supplier<DefaultHttpHeaders> redirectSameOriginPreserveBodyHeaders =
-        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(false, true));
-    private final Supplier<DefaultHttpHeaders> redirectCrossOriginPreserveBodyHeaders =
-        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(true, true));
-    private final Supplier<DefaultHttpHeaders> redirectSameOriginNonPreserveBodyHeaders =
-        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(false, false));
-    private final Supplier<DefaultHttpHeaders> redirectCrossOriginNonPreserveBodyHeaders =
-        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(true, false));
-    private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
-    @Nullable
-    private final LoadBalancer loadBalancer;
-    private final HttpClientConfiguration configuration;
-    /**
-     * Size limits for response bodies, derived from {@link #configuration} once.
-     */
-    private final BodySizeLimits sizeLimits;
-    @Nullable
-    private final String contextPath;
-    private final Charset defaultCharset;
-    private final Logger log;
-    private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
-    /**
-     * {@code true} when the default resolver is used and no filter entry applies to this client,
-     * so per-request filter resolution and sorting can be skipped.
-     */
-    private final boolean noFilters;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
-    @Nullable
-    private final String informationalServiceId;
-    private final ConversionService conversionService;
     @Nullable
     private final ExecutorService blockingExecutor;
     @Nullable
     private final LifecycleListener lifecycleListener;
 
     NettyHttpClient(NettyHttpClientBuilder builder) {
-        this.loadBalancer = builder.loadBalancer;
-        this.configuration = builder.configuration == null ? new DefaultHttpClientConfiguration() : builder.configuration;
-        this.sizeLimits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
-        this.defaultCharset = configuration.getDefaultCharset();
-        if (StringUtils.isNotEmpty(builder.contextPath)) {
-            if (builder.contextPath.charAt(0) != '/') {
-                builder.contextPath = '/' + builder.contextPath;
-            }
-            this.contextPath = builder.contextPath;
-        } else {
-            this.contextPath = null;
-        }
-
-        this.mediaTypeCodecRegistry = builder.codecRegistry == null ? createDefaultMediaTypeRegistry() : builder.codecRegistry;
-        this.handlerRegistry = builder.handlerRegistry == null ? createDefaultMessageBodyHandlerRegistry() : builder.handlerRegistry;
-        this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
-        if (builder.filterResolver == null) {
-            builder.filters();
-        }
-        this.filterResolver = Objects.requireNonNull(builder.filterResolver);
-        if (builder.clientFilterEntries != null) {
-            this.clientFilterEntries = builder.clientFilterEntries;
-        } else {
-            this.clientFilterEntries = filterResolver.resolveFilterEntries(
-                new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
-            );
-        }
-        this.noFilters = clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
+        super(
+            configuration(builder),
+            DEFAULT_LOG,
+            builder.contextPath,
+            builder.loadBalancer,
+            builder.codecRegistry == null ? createDefaultMediaTypeRegistry() : builder.codecRegistry,
+            builder.handlerRegistry == null ? createDefaultMessageBodyHandlerRegistry() : builder.handlerRegistry,
+            filterResolver(builder),
+            builder.clientFilterEntries,
+            builder.conversionService,
+            builder.informationalServiceId
+        );
         this.webSocketRegistry = builder.webSocketBeanRegistry;
-        this.conversionService = builder.conversionService;
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
-        this.informationalServiceId = builder.informationalServiceId;
         this.blockingExecutor = builder.blockingExecutor;
         this.lifecycleListener = builder.lifecycleListener;
 
         this.connectionManager = new ConnectionManager(log, configuration, builder);
     }
 
+    private static HttpClientConfiguration configuration(NettyHttpClientBuilder builder) {
+        return builder.configuration == null ? new DefaultHttpClientConfiguration() : builder.configuration;
+    }
+
+    private static HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver(NettyHttpClientBuilder builder) {
+        if (builder.filterResolver == null) {
+            builder.filters();
+        }
+        return Objects.requireNonNull(builder.filterResolver);
+    }
+
+    @Override
+    protected ScheduledExecutorService scheduler() {
+        return connectionManager.getGroup();
+    }
+
+    @Override
+    protected ByteBufferFactory<?, ?> byteBufferFactory() {
+        return byteBufferFactory;
+    }
+
+    @Override
+    protected boolean isSameOrigin(URI first, URI second) {
+        return new RequestKey(this, first).equals(new RequestKey(this, second));
+    }
+
+    @Override
+    protected @Nullable HttpClientException mapReadFailure(Throwable cause) {
+        if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+            // a Netty read timeout fires before the response headers arrive
+            return decorate(new ReadTimeoutException(false));
+        }
+        return null;
+    }
+
     static NettyHttpClientBuilder newBuilder() {
         return new NettyHttpClientBuilder();
     }
 
-    /**
-     * @param request The request
-     * @return Whether the request accepts {@code text/event-stream} only
-     */
-    private static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
-        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
-        return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
+    @Override
+    public BlockingHttpClient toBlocking() {
+        return new BlockingHttpClient() {
+
+            @Override
+            public void close() {
+                NettyHttpClient.this.close();
+            }
+
+            @Override
+            public <I, O, E> HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
+                if (!configuration.isAllowBlockEventLoop() && Thread.currentThread() instanceof FastThreadLocalThread) {
+                    throw new HttpClientException("""
+                        You are trying to run a BlockingHttpClient operation on a netty event \
+                        loop thread. This is a common cause for bugs: Event loops should \
+                        never be blocked. You can either mark your controller as \
+                        @ExecuteOn(TaskExecutors.BLOCKING), or use the reactive HTTP client \
+                        to resolve this bug. There is also a configuration option to \
+                        disable this check if you are certain a blocking operation is fine \
+                        here.""");
+                }
+                if (Schedulers.isInNonBlockingThread()) {
+                    // same check (and message) as reactor's block(), which this client used before
+                    throw new IllegalStateException("block()/blockFirst()/blockLast() are blocking, which is not supported in thread " + Thread.currentThread().getName());
+                }
+                try {
+                    return Objects.requireNonNull(awaitFlow(exchangeFlow(request, bodyType, errorType, Thread.currentThread())),
+                        "The blocking HTTP client returned a null response");
+                    // We don't have to release client response buffer
+                } catch (HttpClientException e) {
+                    if (configuration.isBlockingCallerStackTrace()) {
+                        throw customizeBlockingException(e);
+                    }
+                    throw e;
+                }
+            }
+
+            @Override
+            public <I, O, E> O retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+                // mostly copied from super method, but with customizeException
+
+                HttpResponse<O> response = exchange(request, bodyType, errorType);
+                if (HttpStatus.class.isAssignableFrom(bodyType.getType())) {
+                    return (O) response.getStatus();
+                } else {
+                    Optional<O> body = response.getBody();
+                    if (body.isEmpty() && response.getBody(Argument.of(byte[].class)).isPresent()) {
+                        throw decorate(new HttpClientResponseException(
+                            "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
+                            response
+                        ));
+                    } else {
+                        return body.orElseThrow(() -> decorate(new HttpClientResponseException(
+                            "Empty body",
+                            response
+                        )));
+                    }
+                }
+            }
+
+            @Override
+            public boolean isRunning() {
+                return NettyHttpClient.this.isRunning();
+            }
+
+            @Override
+            public BlockingHttpClient start() {
+                return NettyHttpClient.this.start().toBlocking();
+            }
+
+            @Override
+            public BlockingHttpClient stop() {
+                return NettyHttpClient.this.stop().toBlocking();
+            }
+        };
     }
 
     /**
-     * @param request The request
-     * @return Whether the request accepts {@code text/event-stream}, possibly among other types
+     * Rewrite the stack trace of an exception thrown from a blocking client call so that it points
+     * to the code that made the call rather than to the Netty event loop (or the request-timeout
+     * scheduler) where the exception was actually constructed. Without this, exceptions such as
+     * {@link ReadTimeoutException} carry a stack trace that does not mention the caller at all.
+     *
+     * <p>This method is only ever called on the thread that performed the blocking call, right
+     * after the blocking await (see {@link #awaitFlow(ExecutionFlow)}) has unwound, so the current
+     * thread's stack trace is exactly the caller chain. The original execution stack trace is
+     * preserved as a suppressed exception for debugging.
+     *
+     * @param exception the exception thrown from the blocking call
+     * @param <E>        the exception type
+     * @return the same exception, with its stack trace pointing at the caller
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/12655">gh-12655</a>
      */
-    /**
-     * @return The configuration used by this client
-     */
-    public HttpClientConfiguration getConfiguration() {
-        return configuration;
-    }
-
-    /**
-     * @return The client-specific logger name
-     */
-    public Logger getLog() {
-        return log;
+    private static <E extends HttpClientException> E customizeBlockingException(E exception) {
+        StackTraceElement[] origin = exception.getStackTrace();
+        if (origin.length > 0) {
+            BlockingClientExecutionTrace originTrace = new BlockingClientExecutionTrace();
+            originTrace.setStackTrace(origin);
+            exception.addSuppressed(originTrace);
+        }
+        // We are back on the thread that made the blocking call; its stack points to the caller.
+        // Drop Thread.getStackTrace() (index 0) and this method's frame (index 1).
+        StackTraceElement[] caller = Thread.currentThread().getStackTrace();
+        if (caller.length > 2) {
+            exception.setStackTrace(Arrays.copyOfRange(caller, 2, caller.length));
+        }
+        return exception;
     }
 
     /**
@@ -433,427 +443,6 @@ final class NettyHttpClient implements
             connectionManager.refresh();
         }
         return this;
-    }
-
-    /**
-     * Internal accessor used by {@link DefaultHttpClient} compatibility layer.
-     *
-     * @return The {@link MediaTypeCodecRegistry} used by this client
-     */
-    @Internal
-    MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return mediaTypeCodecRegistry;
-    }
-
-    /**
-     * Sets the {@link MediaTypeCodecRegistry} used by this client.
-     *
-     * @param mediaTypeCodecRegistry The registry to use. Should not be null
-     */
-    @Internal
-    void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-        if (mediaTypeCodecRegistry != null) {
-            this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        }
-    }
-
-    /**
-     * Get the handler registry for this client.
-     *
-     * @return The handler registry
-     */
-    @Internal
-    MessageBodyHandlerRegistry getHandlerRegistry() {
-        return handlerRegistry;
-    }
-
-    /**
-     * Set the handler registry for this client.
-     *
-     * @param handlerRegistry The handler registry
-     */
-    @Internal
-    void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
-        this.handlerRegistry = handlerRegistry;
-    }
-
-    @Override
-    public BlockingHttpClient toBlocking() {
-        return new BlockingHttpClient() {
-
-            @Override
-            public void close() {
-                NettyHttpClient.this.close();
-            }
-
-            @Override
-            public <I, O, E> HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
-                if (!configuration.isAllowBlockEventLoop() && Thread.currentThread() instanceof FastThreadLocalThread) {
-                    throw new HttpClientException("""
-                        You are trying to run a BlockingHttpClient operation on a netty event \
-                        loop thread. This is a common cause for bugs: Event loops should \
-                        never be blocked. You can either mark your controller as \
-                        @ExecuteOn(TaskExecutors.BLOCKING), or use the reactive HTTP client \
-                        to resolve this bug. There is also a configuration option to \
-                        disable this check if you are certain a blocking operation is fine \
-                        here.""");
-                }
-                if (Schedulers.isInNonBlockingThread()) {
-                    // same check (and message) as reactor's block(), which this client used before
-                    throw new IllegalStateException("block()/blockFirst()/blockLast() are blocking, which is not supported in thread " + Thread.currentThread().getName());
-                }
-                BlockHint blockHint = BlockHint.willBlockThisThread();
-                try {
-                    return Objects.requireNonNull(awaitFlow(exchangeFlow(request, bodyType, errorType, blockHint)),
-                        "The blocking HTTP client returned a null response");
-                    // We don't have to release client response buffer
-                } catch (HttpClientException e) {
-                    if (configuration.isBlockingCallerStackTrace()) {
-                        throw customizeBlockingException(e);
-                    }
-                    throw e;
-                }
-            }
-
-            @Override
-            public <I, O, E> O retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-                // mostly copied from super method, but with customizeException
-
-                HttpResponse<O> response = exchange(request, bodyType, errorType);
-                if (HttpStatus.class.isAssignableFrom(bodyType.getType())) {
-                    return (O) response.getStatus();
-                } else {
-                    Optional<O> body = response.getBody();
-                    if (body.isEmpty() && response.getBody(Argument.of(byte[].class)).isPresent()) {
-                        throw decorate(new HttpClientResponseException(
-                            "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
-                            response
-                        ));
-                    } else {
-                        return body.orElseThrow(() -> decorate(new HttpClientResponseException(
-                            "Empty body",
-                            response
-                        )));
-                    }
-                }
-            }
-
-            @Override
-            public boolean isRunning() {
-                return NettyHttpClient.this.isRunning();
-            }
-
-            @Override
-            public BlockingHttpClient start() {
-                return NettyHttpClient.this.start().toBlocking();
-            }
-
-            @Override
-            public BlockingHttpClient stop() {
-                return NettyHttpClient.this.stop().toBlocking();
-            }
-        };
-    }
-
-    private <I> MutableHttpRequest<?> toMutableRequest(io.micronaut.http.HttpRequest<I> request) {
-        return MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request);
-    }
-
-    @Override
-    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http.HttpRequest<I> request) {
-        return Flux.from(eventStreamOrError(request, Argument.of(byte[].class), null))
-            .map(event -> Event.of(event, (ByteBuffer<?>) byteBufferFactory.wrap(event.getData())));
-    }
-
-    /**
-     * Wait for the given flow to complete on the calling thread. Errors are reported the same way
-     * as reactor's {@code Mono.block()}: checked exceptions are wrapped using
-     * {@link Exceptions#propagate(Throwable)}, and a suppressed exception carrying the stack trace
-     * of the calling thread is added. If the thread is interrupted, the flow is cancelled.
-     *
-     * @param flow The flow to wait for
-     * @param <T>  The value type
-     * @return The flow value
-     */
-    @Nullable
-    private static <T> T awaitFlow(ExecutionFlow<T> flow) {
-        T value;
-        Throwable error;
-        ImperativeExecutionFlow<T> complete = flow.tryComplete();
-        if (complete != null) {
-            value = complete.getValue();
-            error = complete.getError();
-        } else {
-            BlockingFlowListener<T> listener = new BlockingFlowListener<>();
-            flow.onComplete(listener);
-            try {
-                listener.await();
-            } catch (InterruptedException e) {
-                flow.cancel();
-                Thread.currentThread().interrupt();
-                throw Exceptions.propagate(e);
-            }
-            value = listener.value;
-            error = listener.error;
-        }
-        if (error != null) {
-            RuntimeException re = Exceptions.propagate(error);
-            // the error usually comes from the event loop, keep the stack trace of the caller
-            re.addSuppressed(new Exception("#block terminated with an error"));
-            throw re;
-        }
-        return value;
-    }
-
-    /**
-     * Starts the exchange of a reactive stream once the subscriber has its subscription, as the
-     * reactive client always did: a subscription cancelled in {@code onSubscribe} sends nothing.
-     * Unlike {@link Flux#defer}, which starts it before the subscriber is called.
-     *
-     * @param exchange Starts the exchange
-     * @param <T>      The element type
-     * @return The elements of the exchange
-     */
-    private static <T> Flux<T> afterSubscribe(Supplier<? extends Publisher<T>> exchange) {
-        // not a scalar source, which flatMapMany would map before the subscriber is called
-        return Mono.<Boolean>create(sink -> sink.onRequest(n -> sink.success(Boolean.TRUE)))
-            .flatMapMany(ignored -> exchange.get());
-    }
-
-    private static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
-        return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
-    }
-
-    @Override
-    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType) {
-        return eventStream(request, eventType, DEFAULT_ERROR_TYPE);
-    }
-
-    @Override
-    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        return eventStreamOrError(request, eventType, errorType);
-    }
-
-    /**
-     * The events of {@link #eventStream}: the request accepts only an event stream, and the body
-     * is read as one, whatever its content type, as it always was.
-     *
-     * @param request   The request
-     * @param eventType The event data type
-     * @param errorType The error type, or {@code null} if the error body is not read
-     * @param <I>       The request body type
-     * @param <B>       The event data type
-     * @return The events
-     */
-    private <I, B> Publisher<Event<B>> eventStreamOrError(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, @Nullable Argument<?> errorType) {
-        setupConversionService(request);
-        if (request instanceof MutableHttpRequest<?> httpRequest) {
-            // replace, rather than add to, what the caller accepts: a server that may answer with another type, such
-            // as JSON, would otherwise do so, and the body would yield no event
-            httpRequest.getHeaders().set(io.micronaut.http.HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
-        }
-        // as it always did, the event stream sends the request with the context of the subscriber
-        return afterSubscribe(() -> {
-            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-            return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
-                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
-                .flatMapMany(NettyHttpClient::elements);
-        });
-    }
-
-    @Override
-    public <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        // the exchange of the async client: the events are decoded by its piece reader as they are
-        // requested, and each one is wrapped in the response. The request is sent with the
-        // context of the caller
-        setupConversionService(request);
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(exchangeEventStreamFlow(propagatedContext, toMutableRequest(request), eventType, errorType), propagatedContext)
-            .flatMapMany(response -> {
-                BodyElements<Event<B>> events = Objects.requireNonNull(response.body(), "The response has no events");
-                return Flux.from(new BodyElementsPublisher<>(events))
-                    .map(event -> (HttpResponse<Event<B>>) new ElementResponse<>(response, event))
-                    // without an event, the status and the headers of the response are still of interest
-                    .switchIfEmpty(Mono.fromSupplier(() -> new ElementResponse<>(response, null)));
-            }));
-    }
-
-    @Override
-    public AsyncHttpClient toAsync() {
-        return new DefaultAsyncHttpClient(this);
-    }
-
-    @Override
-    public AsyncStreamingHttpClient toAsyncStreaming() {
-        return new DefaultAsyncHttpClient(this);
-    }
-
-    /**
-     * The {@link #exchangeEventStream} of {@link DefaultAsyncHttpClient}, without Reactor.
-     * The flow completes with the status and the headers of the response, and its events are read
-     * from the response body as they are pulled.
-     *
-     * @param request   The request
-     * @param eventType The event data type
-     * @param errorType The error type
-     * @param <I>       The request body type
-     * @param <B>       The event data type
-     * @return The flow of the response, whose body is the events
-     */
-    <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        setupConversionService(request);
-        return exchangeEventStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), eventType, errorType);
-    }
-
-    private <B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<B> eventType, Argument<?> errorType) {
-        EventStreams.acceptEvents(request);
-        return exchangeElementsFlow(propagatedContext, request, errorType, true,
-            (req, response) -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate));
-    }
-
-    /**
-     * The {@link #exchangeStream} of {@link DefaultAsyncHttpClient}, without Reactor: the pieces of
-     * the response body are read as they are pulled.
-     *
-     * @param request   The request
-     * @param errorType The error type
-     * @param <I>       The request body type
-     * @return The flow of the response, whose body is the pieces of the response body
-     */
-    <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
-        setupConversionService(request);
-        return exchangeElementsFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), errorType, true,
-            (req, response) -> ElementsResponse.of(response, BodyPieces.elements(response.byteBody().move())));
-    }
-
-    /**
-     * The pieces of {@link #dataStream} and {@link #exchangeStream}: the body of an event stream
-     * that the request accepts is split into lines, and the error body is read per the
-     * configuration.
-     *
-     * @param propagatedContext The context the request is sent with
-     * @param request           The request
-     * @param errorType         The error type
-     * @return The flow of the response, whose body is the pieces of the response body
-     */
-    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<?> errorType) {
-        return exchangeElementsFlow(propagatedContext, request, errorType, shouldBufferErrorBody(errorType),
-            (req, response) -> ElementsResponse.of(response,
-                new StreamedBodyPieces(response.byteBody().move(), isAcceptEvents(req), sizeLimits().maxBufferSize())));
-    }
-
-    /**
-     * The {@link #jsonStream} of {@link DefaultAsyncHttpClient}, without Reactor: the elements are
-     * split from the pieces of the body and decoded by the piece reader of the JSON reader as they
-     * are pulled.
-     *
-     * @param request   The request
-     * @param type      The type of an element
-     * @param errorType The error type
-     * @param <I>       The request body type
-     * @param <O>       The type of an element
-     * @return The flow of the response, whose body is the elements
-     */
-    <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
-        setupConversionService(request);
-        return jsonStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), type, errorType, true);
-    }
-
-    /**
-     * @param propagatedContext The context the request is sent with
-     * @param request           The request
-     * @param type              The type of an element
-     * @param errorType         The error type
-     * @param bufferErrorBody   Whether the error body is read, to be decoded into the error type
-     * @param <O>               The type of an element
-     * @return The flow of the response, whose body is the elements
-     */
-    private <O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<O> type, Argument<?> errorType, boolean bufferErrorBody) {
-        return exchangeElementsFlow(propagatedContext, request, errorType, bufferErrorBody, (req, response) -> {
-            // could also be application/json, in which case the elements of an array are read
-            MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
-            if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
-                throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
-            }
-            CloseableByteBody body = response.byteBody().move();
-            io.micronaut.http.HttpHeaders headers = response.getHeaders();
-            // an element is decoded in memory: it is limited like buffered content
-            long maxElementSize = sizeLimits().maxBufferSize();
-            // without Reactor: the pieces are split into elements as they are pulled
-            PieceReader<O> pieceReader = PieceReaders.open(reader, type, mediaType, headers, maxElementSize);
-            return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity()));
-        });
-    }
-
-    /**
-     * An exchange whose response body is read as elements as they are pulled, without Reactor.
-     * The flow completes with the status and the headers of the response. An error status fails
-     * it with the error body decoded into the error type, as for {@link #exchange}.
-     *
-     * @param propagatedContext The context the request is sent with, which the filters see: the
-     *                          context of the caller of the client
-     * @param mutableRequest    The request, with its conversion service and Accept header set up
-     * @param errorType         The error type
-     * @param bufferErrorBody   Whether the error body is read, to be decoded into the error type,
-     *                          else the error has the status and the headers only
-     * @param elements          The response with the elements of the body, taking over the body
-     * @param <T>               The type of an element
-     * @return The flow of the response, whose body is the elements
-     */
-    private <T> ExecutionFlow<HttpResponse<BodyElements<T>>> exchangeElementsFlow(PropagatedContext propagatedContext,
-                                                                                MutableHttpRequest<?> mutableRequest,
-                                                                                Argument<?> errorType,
-                                                                                boolean bufferErrorBody,
-                                                                                BiFunction<io.micronaut.http.HttpRequest<?>, NettyClientByteBodyResponse, HttpResponse<BodyElements<T>>> elements) {
-        // the last response with elements, closed if a filter replaces it
-        AtomicReference<@Nullable HttpResponse<BodyElements<T>>> created = new AtomicReference<>();
-        return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
-            propagatedContext,
-            null,
-            mutableRequest.uri(target.uri()),
-            target.selection(),
-            (req, resp) -> {
-                if (resp.code() >= 400 && !bufferErrorBody) {
-                    // The error body will never be consumed by the caller, so discard it right
-                    // away. Otherwise the connection would stay reserved until the read timeout.
-                    resp.close();
-                    return ExecutionFlow.error(decorate(new HttpClientResponseException(resp.reason(), toBodilessResponse(resp))));
-                }
-                if (resp.code() >= 400) {
-                    // the error body is decoded into the error type, as for exchange
-                    return InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
-                        .flatMap(av -> handleExchangeResponse(null, errorType, resp, av));
-                }
-                if (!hasBody(resp)) {
-                    // no element
-                    resp.close();
-                    @SuppressWarnings("unchecked")
-                    BodyElements<T> none = (BodyElements<T>) (BodyElements<?>) BodyPieces.elements(NettyByteBodyFactory.empty());
-                    return ExecutionFlow.just(ElementsResponse.of(resp, none));
-                }
-                try {
-                    HttpResponse<BodyElements<T>> withElements = elements.apply(req, resp);
-                    created.set(withElements);
-                    return ExecutionFlow.just(withElements);
-                } catch (RuntimeException e) {
-                    resp.close();
-                    return ExecutionFlow.error(e);
-                }
-            }
-        )).flatMap(response -> {
-            if (!(response.getBody().orElse(null) instanceof BodyElements<?>)) {
-                HttpResponse<BodyElements<T>> replaced = created.getAndSet(null);
-                if (replaced != null) {
-                    // nobody reads them: the connection is released
-                    ElementsStages.closeElements(replaced);
-                }
-                return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without elements. Do not replace the response in client filters for streaming requests"));
-            }
-            @SuppressWarnings("unchecked")
-            HttpResponse<BodyElements<T>> result = (HttpResponse<BodyElements<T>>) response;
-            return ExecutionFlow.just(result);
-        });
     }
 
     @Override
@@ -928,87 +517,7 @@ final class NettyHttpClient implements
     }
 
     @Override
-    public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
-        return Flux.defer(() -> toMono(exchangeFlow(request, bodyType, errorType, null), PropagatedContext.getOrEmpty()).flux())
-            // some tests expect flux...
-            ;
-    }
-
-    /**
-     * The exchange request.
-     *
-     * @param request   The request
-     * @param bodyType  The body argument
-     * @param errorType The error argument
-     * @param <I>       The request type
-     * @param <O>       The body type
-     * @param <E>       The error type
-     * @return The execution flow
-     */
-    public <I, O, E> ExecutionFlow<HttpResponse<O>> exchangeFlow(io.micronaut.http.HttpRequest<I> request,
-                                                                 @Nullable Argument<O> bodyType,
-                                                                 Argument<E> errorType) {
-        return exchangeFlow(request, bodyType, errorType, null);
-    }
-
-    private <I, O, E> ExecutionFlow<HttpResponse<O>> exchangeFlow(io.micronaut.http.HttpRequest<I> request,
-                                                                  @Nullable Argument<O> bodyType,
-                                                                  Argument<E> errorType,
-                                                                  @Nullable BlockHint blockHint) {
-        setupConversionService(request);
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        // if a connection is available immediately, we can use its executor for the timeout
-        // instead of a random executor for the whole group
-        AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(connectionManager.getGroup());
-        // whether a response arrived whose body is still read, to tell a request timeout while
-        // the body is read from one before the response; cleared once the body ended
-        AtomicBoolean headersReceived = new AtomicBoolean();
-        ExecutionFlow<HttpResponse<O>> flow = resolveRequestURI(request).flatMap(target -> {
-            MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(target.uri());
-            //noinspection unchecked
-            return sendRequestWithRedirects(
-                propagatedContext,
-                scheduler,
-                blockHint,
-                mutableRequest,
-                target.selection(),
-                (req, resp) -> {
-                    headersReceived.set(true);
-                    return InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> {
-                            headersReceived.set(false);
-                            return ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t));
-                        })
-                        .flatMap(av -> {
-                            headersReceived.set(false);
-                            return handleExchangeResponse(bodyType, errorType, resp, av);
-                        });
-                }
-            ).map(r -> (HttpResponse<O>) r);
-        });
-
-        Duration requestTimeout = configuration.getRequestTimeout();
-        if (requestTimeout == null) {
-            // for compatibility
-            requestTimeout = configuration.getReadTimeout()
-                .filter(d -> !d.isNegative())
-                .map(d -> d.plusSeconds(1)).orElse(null);
-        }
-        if (requestTimeout != null) {
-            if (!requestTimeout.isNegative()) {
-                flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
-                    .onErrorResume(throwable -> {
-                        if (throwable instanceof TimeoutException) {
-                            return ExecutionFlow.error(decorate(new ReadTimeoutException(headersReceived.get())));
-                        }
-                        return ExecutionFlow.error(throwable);
-                    });
-            }
-        }
-        return flow;
-    }
-
-    private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
+    protected <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> fullResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
         FullHttpResponse fullHttpResponse;
         try {
@@ -1060,35 +569,6 @@ final class NettyHttpClient implements
             ));
             return ExecutionFlow.error(clientResponseError);
         }
-    }
-
-    @Override
-    public <I, O, E> Publisher<O> retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        setupConversionService(request);
-        // mostly same as default impl, but with exception customization
-        Flux<HttpResponse<O>> exchange = Flux.from(exchange(request, bodyType, errorType));
-        if (bodyType.getType() == void.class) {
-            // exchange() returns a HttpResponse<Void>, we can't map the Void body properly, so just drop it and complete
-            return (Publisher<O>) exchange.ignoreElements();
-        }
-        return exchange.map(response -> {
-            if (bodyType.getType() == HttpStatus.class) {
-                return (O) response.getStatus();
-            } else {
-                Optional<O> body = response.getBody();
-                if (body.isEmpty() && response.getBody(byte[].class).isPresent()) {
-                    throw decorate(new HttpClientResponseException(
-                        "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
-                        response
-                    ));
-                } else {
-                    return body.orElseThrow(() -> decorate(new HttpClientResponseException(
-                        "Empty body",
-                        response
-                    )));
-                }
-            }
-        });
     }
 
     @Override
@@ -1226,66 +706,6 @@ final class NettyHttpClient implements
         return mutableRequest;
     }
 
-    private void setupConversionService(io.micronaut.http.HttpRequest<?> httpRequest) {
-        if (httpRequest instanceof ConversionServiceAware aware) {
-            aware.setConversionService(conversionService);
-        }
-    }
-
-    /**
-     * @param request The request
-     * @param <I>     The input type
-     * @return A flow with the resolved target
-     */
-    <I> ExecutionFlow<ResolvedTarget> resolveRequestURI(io.micronaut.http.HttpRequest<I> request) {
-        return resolveRequestURI(request, true);
-    }
-
-    /**
-     * @param request            The request
-     * @param includeContextPath Whether to prepend the client context path
-     * @param <I>                The input type
-     * @return A flow with the resolved target
-     */
-    <I> ExecutionFlow<ResolvedTarget> resolveRequestURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
-        URI requestURI = request.getUri();
-        if (requestURI.getScheme() != null) {
-            // if the request URI includes a scheme then it is fully qualified so use the direct server
-            return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
-        } else {
-            return resolveURI(request, includeContextPath);
-        }
-    }
-
-    /**
-     * @param parentRequest The parent request
-     * @param request       The redirect location request
-     * @param <I>           The input type
-     * @return A flow with the resolved target
-     */
-    <I> ExecutionFlow<ResolvedTarget> resolveRedirectURI(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request) {
-        URI requestURI = request.getUri();
-        if (requestURI.getScheme() != null) {
-            // if the request URI includes a scheme then it is fully qualified so use the direct server
-            return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
-        } else {
-            if (parentRequest == null || parentRequest.getUri().getHost() == null) {
-                return resolveURI(request, false);
-            } else {
-                URI redirectedURI = parentRequest.getUri().resolve(requestURI).normalize();
-                return ExecutionFlow.just(new ResolvedTarget(redirectedURI, null));
-            }
-        }
-    }
-
-    /**
-     * @param request The request object
-     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
-     */
-    Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
-        return LoadBalancerKey.discriminator(request, configuration);
-    }
-
     /**
      * @param request             The request
      * @param nettyRequestBuilder The netty builder of the request, from
@@ -1378,80 +798,87 @@ final class NettyHttpClient implements
         }
     }
 
-    /**
-     * A form or multipart body that is already encoded is written as is, like any other raw body.
-     *
-     * @param bodyValue The body value
-     * @return Whether the body is already encoded
-     */
-    private static boolean isEncodedFormBody(Object bodyValue) {
-        return bodyValue instanceof CharSequence || bodyValue instanceof byte[] || bodyValue instanceof ByteBuffer<?>;
-    }
+    private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, ExecutionFlow<HttpResponse<?>> publisher) {
+        if (errorType != null) {
+            return publisher.onErrorResume(clientException -> {
+                if (clientException instanceof HttpClientResponseException exception) {
+                    final HttpResponse<?> response = exception.getResponse();
+                    if (response instanceof NettyStreamedHttpResponse<?> streamedResponse) {
+                        DelayedExecutionFlow<HttpResponse<?>> delayed = DelayedExecutionFlow.create();
+                        final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
+                        nettyResponse.subscribe(new Subscriber<>() {
+                            final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
+                            final long maxBufferSize = sizeLimits().maxBufferSize();
+                            @Nullable
+                            Subscription s;
+                            boolean done;
 
-    void completeExceptionallySafe(DelayedExecutionFlow<?> flow, Throwable exc) {
-        if (!flow.tryCompleteExceptionally(exc)) {
-            log.debug("Client exception suppressed because response flow already completed", exc);
-        }
-    }
+                            @Override
+                            public void onSubscribe(Subscription s) {
+                                this.s = s;
+                                s.request(1);
+                            }
 
-    /**
-     * Whether the body of an error response of a streaming call should be read and attached to
-     * the {@link HttpClientResponseException}.
-     *
-     * @param errorType The error type
-     * @return {@code true} if the error body should be buffered
-     */
-    private boolean shouldBufferErrorBody(@Nullable Argument<?> errorType) {
-        return errorType != null && (errorType != HttpClient.DEFAULT_ERROR_TYPE || configuration.isBufferErrorBodyForStreaming());
-    }
+                            @Override
+                            public void onNext(HttpContent httpContent) {
+                                if (done) {
+                                    httpContent.release();
+                                    return;
+                                }
+                                long length = (long) buffer.readableBytes() + httpContent.content().readableBytes();
+                                if (length > maxBufferSize) {
+                                    httpContent.release();
+                                    Objects.requireNonNull(s).cancel();
+                                    onError(new ContentLengthExceededException(maxBufferSize, length));
+                                    return;
+                                }
+                                buffer.addComponent(true, httpContent.content());
+                                Objects.requireNonNull(s).request(1);
+                            }
 
-    /**
-     * The response of an error whose body is not read: the status and the headers.
-     *
-     * @param resp The response, whose body is discarded
-     * @param <B>  The body type
-     * @return The response without a body
-     */
-    private <B> MutableHttpResponse<B> toBodilessResponse(NettyClientByteBodyResponse resp) {
-        DefaultStreamedHttpResponse nettyResponse = new DefaultStreamedHttpResponse(
-            resp.nettyResponse.protocolVersion(),
-            resp.nettyResponse.status(),
-            resp.getHeaders().getNettyHeaders(),
-            Publishers.empty()
-        );
-        return new NettyStreamedHttpResponse<>(nettyResponse, conversionService);
-    }
+                            @Override
+                            public void onError(Throwable t) {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
+                                buffer.release();
+                                completeExceptionallySafe(delayed, t);
+                            }
 
-    private <I> ExecutionFlow<ResolvedTarget> resolveURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
-        URI requestURI = request.getUri();
-        if (loadBalancer == null) {
-            return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
-        }
-        ExecutionFlow<ServiceInstance> selected;
-        if (loadBalancer instanceof FixedLoadBalancer fixed) {
-            selected = ExecutionFlow.just(fixed.getServiceInstance());
-        } else {
-            // a synchronous balancer (round-robin) completes right away, so the request proceeds
-            // without a Reactor chain
-            selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
-        }
-
-        LoadBalancer balancer = loadBalancer;
-        return selected.map(server -> {
-                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
-                Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
-                    httpRequest.getHeaders().auth(authInfo.get());
+                            @Override
+                            public void onComplete() {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
+                                try {
+                                    FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
+                                    boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;
+                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, hasErrorType ? (Argument<Object>) errorType : null, hasErrorType, conversionService);
+                                    completeExceptionallySafe(delayed, decorate(new HttpClientResponseException(
+                                        fullHttpResponse.status().reasonPhrase(),
+                                        null,
+                                        fullNettyClientHttpResponse,
+                                        hasErrorType ? new HttpClientErrorDecoder() {
+                                            @Override
+                                            public Argument<?> getErrorType(MediaType mediaType) {
+                                                return errorType;
+                                            }
+                                        } : HttpClientErrorDecoder.DEFAULT
+                                    )));
+                                } finally {
+                                    buffer.release();
+                                }
+                            }
+                        });
+                        return delayed;
+                    }
                 }
-
-                try {
-                    return new ResolvedTarget(server.resolve(includeContextPath ? ContextPathUtils.prepend(requestURI, contextPath) : requestURI), selection);
-                } catch (URISyntaxException e) {
-                    selection.release();
-                    throw decorate(new HttpClientException("Failed to construct the request URI", e));
-                }
-            }
-        );
+                return ExecutionFlow.error(clientException);
+            });
+        }
+        return publisher;
     }
 
     @Override
@@ -1491,10 +918,9 @@ final class NettyHttpClient implements
      */
     ExecutionFlow<HttpResponse<?>> rawExchangeFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
         try {
-            BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
             if (options == null) {
                 RawHttpRequestWrapper<?> rawRequest = new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
-                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockHint, rawRequest));
+                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockedThread, rawRequest));
             }
             RawHttpRequestWrapper<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
@@ -1506,7 +932,7 @@ final class NettyHttpClient implements
             }
             return RawHttpClientSupport.withResponseTimeout(rawRequest.keepReplacedBody(sendRawExchange(
                 propagatedContext,
-                blockHint,
+                blockedThread,
                 rawRequest
             )), options.getResponseTimeout(), uploadStarted, uploaded, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
@@ -1520,17 +946,17 @@ final class NettyHttpClient implements
      * first, like the URI of any other request.
      *
      * @param propagatedContext The propagated context
-     * @param blockHint         The block hint, if any
+     * @param blockedThread     The thread that blocks on the response, if any
      * @param rawRequest        The raw request
      * @return The response flow
      */
-    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable BlockHint blockHint, MutableHttpRequest<?> rawRequest) {
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
         if (rawRequest.getUri().getScheme() != null) {
-            return sendRequestWithRedirects(propagatedContext, blockHint, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
+            return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }
         return resolveRequestURI(rawRequest).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
-            blockHint,
+            blockedThread,
             rawRequest.uri(target.uri()),
             target.selection(),
             (req, resp) -> ExecutionFlow.just(resp)
@@ -1555,102 +981,15 @@ final class NettyHttpClient implements
         }
     }
 
-    private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
-        PropagatedContext propagatedContext,
-        @Nullable BlockHint blockHint,
-        MutableHttpRequest<?> request,
-        @Nullable LoadBalancerSelection selection,
-        BiFunction<MutableHttpRequest<?>, NettyClientByteBodyResponse, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
-    ) {
-        return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockHint, request, selection, readResponse);
-    }
-
-    /**
-     * This is the high-level request method. It sits above {@link #sendRawRequest} and handles
-     * things like filters, error handling, response parsing, request writing.
-     *
-     * @param propagatedContext  The context propagated from the original client call
-     * @param preferredScheduler A reference holding the preferred scheduler for timeouts. This is
-     *                           replaced by the connection event loop ASAP so that callers can take
-     *                           advantage of locality
-     * @param blockHint          The optional block hint
-     * @param request            The request to send. Must have resolved absolute URI (see {@link #resolveURI})
-     * @param selection          The selection of the load balancer for the request, or
-     *                           {@code null} if the request was not load balanced. It is
-     *                           released when the exchange ends without reporting an outcome
-     * @param readResponse       Function that reads the response from the raw
-     *                           {@link NettyClientByteBodyResponse} representation. This is run exactly
-     *                           once, but if there is a redirect, it potentially runs with a different
-     *                           request than the original (which is why it has a request parameter)
-     * @return A mono containing the response
-     */
-    private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
+    @Override
+    protected ExecutionFlow<NettyClientByteBodyResponse> send(
         PropagatedContext propagatedContext,
         AtomicReference<ScheduledExecutorService> preferredScheduler,
-        @Nullable BlockHint blockHint,
+        @Nullable Thread blockedThread,
         MutableHttpRequest<?> request,
-        @Nullable LoadBalancerSelection selection,
-        BiFunction<MutableHttpRequest<?>, NettyClientByteBodyResponse, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
+        @Nullable LoadBalancerSelection selection
     ) {
-        if (informationalServiceId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
-            ClientAttributes.setServiceId(request, informationalServiceId);
-        }
-
-        List<GenericHttpFilter> filters;
-        if (noFilters) {
-            filters = List.of();
-        } else {
-            filters = filterResolver.resolveFilters(request, clientFilterEntries);
-            FilterRunner.sortReverse(filters);
-        }
-
-        FilterRunner runner = new FilterRunner(filters) {
-            @Override
-            protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
-                try {
-                    return propagatedContext.propagate(() -> sendRequestWithRedirectsNoFilter(
-                        propagatedContext,
-                        preferredScheduler,
-                        blockHint,
-                        MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request),
-                        selection,
-                        readResponse
-                    ));
-                } catch (Throwable e) {
-                    return ExecutionFlow.error(e);
-                }
-            }
-        };
-        ExecutionFlow<HttpResponse<?>> flow = runner.run(request, propagatedContext);
-        if (selection == null) {
-            return flow;
-        }
-        // the selection ends with the exchange, whether it was sent, failed before, was
-        // cancelled, or a filter answered without it: unless the response handling took it over
-        DelayedExecutionFlow<HttpResponse<?>> released = DelayedExecutionFlow.create();
-        flow.onComplete((response, failure) -> {
-            selection.releaseUnclaimed();
-            if (failure != null) {
-                released.completeExceptionally(failure);
-            } else {
-                released.complete(response);
-            }
-        });
-        released.onCancel(() -> {
-            flow.cancel();
-            selection.releaseUnclaimed();
-        });
-        return released;
-    }
-
-    private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirectsNoFilter(
-        PropagatedContext propagatedContext,
-        AtomicReference<ScheduledExecutorService> preferredScheduler,
-        @Nullable BlockHint blockHint,
-        MutableHttpRequest<?> request,
-        @Nullable LoadBalancerSelection selection,
-        BiFunction<MutableHttpRequest<?>, NettyClientByteBodyResponse, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
-    ) {
+        BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
         RequestKey requestKey;
         try {
             requestKey = new RequestKey(this, request.getUri());
@@ -1705,54 +1044,6 @@ final class NettyHttpClient implements
 
                 // send the raw request
                 return sendRawRequestAllowingRetry(poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
-            })
-            .flatMap(byteBodyResponse -> {
-                // handle redirects or map the response bytes
-
-                int code = byteBodyResponse.code();
-                HttpHeaders nettyHeaders = byteBodyResponse.getHeaders().getNettyHeaders();
-                if (code > 300 && code < 400 && configuration.isFollowRedirects() && request.getAttribute(NO_FOLLOW_REDIRECTS).isEmpty() && nettyHeaders.contains(HttpHeaderNames.LOCATION)) {
-                    byteBodyResponse.close();
-                    String location = nettyHeaders.get(HttpHeaderNames.LOCATION);
-
-                    MutableHttpRequest<Object> redirectRequest;
-                    boolean isRedirectWithBody = code == 307 || code == 308;
-                    boolean isQueryRedirect = (code == 301 || code == 302) && request.getMethod() == io.micronaut.http.HttpMethod.QUERY;
-                    boolean preserveBody = isRedirectWithBody || isQueryRedirect;
-                    if (preserveBody) {
-                        redirectRequest = io.micronaut.http.HttpRequest.create(request.getMethod(), location);
-                        request.getBody().ifPresent(redirectRequest::body);
-                    } else {
-                        redirectRequest = io.micronaut.http.HttpRequest.GET(location);
-                    }
-                    int redirectCount = request.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
-                    if (redirectCount > configuration.getMaxRedirects()) {
-                        return ExecutionFlow.error(decorate(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount)));
-                    }
-                    redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
-                    // the per-exchange options apply to the whole exchange, redirects included
-                    request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
-                    request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirectRequest.setAttribute(READ_IDLE_TIMEOUT, timeout));
-                    return resolveRedirectURI(request, redirectRequest)
-                        .flatMap(target -> {
-                            setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
-                            return sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(target.uri()), target.selection(), readResponse);
-                        })
-                        .onErrorResume(e -> {
-                            // the body went to the server that redirected, it is not unsent
-                            if (e instanceof UnprocessedRequestException unprocessed) {
-                                unprocessed.markBodySent();
-                            }
-                            return ExecutionFlow.error(e);
-                        });
-                } else {
-                    io.micronaut.http.HttpHeaders headers = byteBodyResponse.getHeaders();
-                    if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Response Received ({}) for Request: {} {}", byteBodyResponse.code(), request.getMethodName(), request.getUri());
-                        HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
-                    }
-                    return readResponse.apply(request, byteBodyResponse);
-                }
             });
     }
 
@@ -2227,87 +1518,6 @@ final class NettyHttpClient implements
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
-    <E extends HttpClientException> E decorate(E exc) {
-        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
-    }
-
-    /**
-     * Rewrite the stack trace of an exception thrown from a blocking client call so that it points
-     * to the code that made the call rather than to the Netty event loop (or the request-timeout
-     * scheduler) where the exception was actually constructed. Without this, exceptions such as
-     * {@link ReadTimeoutException} carry a stack trace that does not mention the caller at all.
-     *
-     * <p>This method is only ever called on the thread that performed the blocking call, right
-     * after the blocking await (see {@link #awaitFlow(ExecutionFlow)}) has unwound, so the current
-     * thread's stack trace is exactly the caller chain. The original execution stack trace is
-     * preserved as a suppressed exception for debugging.
-     *
-     * @param exception the exception thrown from the blocking call
-     * @param <E>        the exception type
-     * @return the same exception, with its stack trace pointing at the caller
-     * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/12655">gh-12655</a>
-     */
-    private static <E extends HttpClientException> E customizeBlockingException(E exception) {
-        StackTraceElement[] origin = exception.getStackTrace();
-        if (origin.length > 0) {
-            BlockingClientExecutionTrace originTrace = new BlockingClientExecutionTrace();
-            originTrace.setStackTrace(origin);
-            exception.addSuppressed(originTrace);
-        }
-        // We are back on the thread that made the blocking call; its stack points to the caller.
-        // Drop Thread.getStackTrace() (index 0) and this method's frame (index 1).
-        StackTraceElement[] caller = Thread.currentThread().getStackTrace();
-        if (caller.length > 2) {
-            exception.setStackTrace(Arrays.copyOfRange(caller, 2, caller.length));
-        }
-        return exception;
-    }
-
-    /**
-     * Map a failure of a response, before or after its headers, to a client exception. The
-     * outcome for the load balancer is not reported here: the {@link ClientExchange}
-     * reports it, see {@link #failureOutcome}.
-     *
-     * @param finalRequest The request
-     * @param instance     The service instance the load balancer selected, or {@code null}
-     * @param cause        The failure
-     * @return The client exception
-     */
-    HttpClientException handleResponseError(io.micronaut.http.HttpRequest<?> finalRequest, @Nullable ServiceInstance instance, Throwable cause) {
-        String message = cause.getMessage();
-        if (message == null) {
-            message = cause.getClass().getSimpleName();
-        }
-        if (log.isTraceEnabled()) {
-            log.trace("HTTP Client exception ({}) occurred for request : {} {}",
-                message, finalRequest.getMethodName(), finalRequest.getUri());
-        }
-
-        HttpClientException result;
-        if (cause instanceof io.micronaut.http.exceptions.ContentLengthExceededException clee) {
-            result = decorate(new ContentLengthExceededException(Objects.requireNonNull(clee.getMessage(), "Content length exceeded")));
-        } else if (cause instanceof BufferLengthExceededException blee) {
-            result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
-        } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-            // a Netty read timeout fires before the response headers arrive
-            result = decorate(new ReadTimeoutException(false));
-        } else if (cause instanceof ReadTimeoutException rte) {
-            // already mapped (e.g. a body timeout from the request-timeout path), keep it as-is
-            result = rte;
-        } else if (cause instanceof HttpClientException hce) {
-            result = decorate(hce);
-        } else {
-            result = decorate(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
-        }
-        if (result instanceof UnprocessedRequestException unprocessed) {
-            unprocessed.setTarget(finalRequest.getUri(), instance);
-            if (unprocessed.getServiceId() == null) {
-                decorate(unprocessed);
-            }
-        }
-        return result;
-    }
-
     /**
      * Classify a failure to get a connection for a request: a connection pool acquire timeout
      * fails the flow with a plain {@link TimeoutException}, but no byte of the request was sent.
@@ -2399,93 +1609,6 @@ final class NettyHttpClient implements
         return failure;
     }
 
-    /**
-     * Report the outcome of an exchange to the load balancer that selected its instance, if any.
-     *
-     * @param selection The selection of the load balancer, or {@code null}
-     * @param outcome   The outcome
-     */
-    static void report(@Nullable LoadBalancerSelection selection, LoadBalancer.Outcome outcome) {
-        if (selection != null) {
-            selection.report(outcome);
-        }
-    }
-
-    /**
-     * Release the selection of the load balancer, if any, unless an outcome was reported already.
-     *
-     * @param selection The selection of the load balancer, or {@code null}
-     */
-    static void releaseSelection(@Nullable LoadBalancerSelection selection) {
-        if (selection != null) {
-            selection.release();
-        }
-    }
-
-    private void setRedirectHeaders(io.micronaut.http.HttpRequest<?> request,
-                                    MutableHttpRequest<Object> redirectRequest,
-                                    boolean preserveBody) {
-        if (request == null) {
-            return;
-        }
-        boolean sameOrigin;
-        try {
-            sameOrigin = new RequestKey(this, request.getUri())
-                .equals(new RequestKey(this, redirectRequest.getUri()));
-        } catch (Exception e) {
-            // fallback
-            sameOrigin = false;
-        }
-        DefaultHttpHeaders headersToBlock = resolveRedirectFilteredHeaders(!sameOrigin, preserveBody);
-        for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
-            String headerName = originalHeader.getKey();
-            if (headersToBlock.contains(headerName)) {
-                continue;
-            }
-            final List<String> originalHeaderValue = originalHeader.getValue();
-            if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
-                for (String value : originalHeaderValue) {
-                    if (value != null) {
-                        redirectRequest.header(headerName, value);
-                    }
-                }
-            }
-        }
-    }
-
-    private DefaultHttpHeaders resolveRedirectFilteredHeaders(boolean crossOrigin, boolean preserveBody) {
-        if (crossOrigin) {
-            return preserveBody ? redirectCrossOriginPreserveBodyHeaders.get() : redirectCrossOriginNonPreserveBodyHeaders.get();
-        }
-        return preserveBody ? redirectSameOriginPreserveBodyHeaders.get() : redirectSameOriginNonPreserveBodyHeaders.get();
-    }
-
-    private DefaultHttpHeaders buildRedirectFilteredHeaders(boolean crossOrigin, boolean preserveBody) {
-        DefaultHttpHeaders headers = new DefaultHttpHeaders();
-        for (String header : configuration.getRedirectAlwaysFilteredHeaders()) {
-            headers.add(header, "");
-        }
-        if (crossOrigin) {
-            for (String header : configuration.getRedirectCrossOriginFilteredHeaders()) {
-                headers.add(header, "");
-            }
-        }
-        if (!preserveBody) {
-            for (String header : configuration.getRedirectAdditionalNonPreserveBodyFilteredHeaders()) {
-                headers.add(header, "");
-            }
-        }
-        return headers;
-    }
-
-    BodySizeLimits sizeLimits() {
-        return sizeLimits;
-    }
-
-    ConversionService conversionService() {
-        return conversionService;
-    }
-
     private static <O, E> boolean shouldConvertWithBodyType(io.netty.handler.codec.http.HttpResponse msg,
                                                             HttpClientConfiguration configuration,
                                                             @Nullable Argument<O> bodyType,
@@ -2534,20 +1657,6 @@ final class NettyHttpClient implements
         } else {
             return decorate(new HttpClientResponseException(status.reasonPhrase(), response));
         }
-    }
-
-    private static boolean hasBody(HttpResponse<?> response) {
-        if (response.code() >= HttpStatus.CONTINUE.getCode() && response.code() < HttpStatus.OK.getCode()) {
-            return false;
-        }
-
-        if (response.code() == HttpResponseStatus.NO_CONTENT.code() ||
-            response.code() == HttpResponseStatus.NOT_MODIFIED.code()) {
-            return false;
-        }
-
-        OptionalLong contentLength = response.getHeaders().contentLength();
-        return contentLength.isEmpty() || contentLength.getAsLong() != 0;
     }
 
     /**
@@ -2633,34 +1742,6 @@ final class NettyHttpClient implements
     }
 
     /**
-     * The absolute URI a request is sent to, and the service instance the load balancer selected
-     * for it, if the request was load balanced.
-     *
-     * @param uri      The absolute request URI
-     * @param selection The selection of the load balancer, or {@code null} if the request URI
-     *                  was absolute
-     */
-    record ResolvedTarget(URI uri, @Nullable LoadBalancerSelection selection) {
-
-        /**
-         * @return The selected instance, or {@code null} if the request URI was absolute
-         */
-        @Nullable ServiceInstance instance() {
-            return selection == null ? null : selection.instance();
-        }
-
-        /**
-         * @return The URI, for a caller that sends no exchange: the selection is released
-         */
-        URI releasedUri() {
-            if (selection != null) {
-                selection.release();
-            }
-            return uri;
-        }
-    }
-
-    /**
      * Notified of the upload of the body of a request.
      *
      * @param started  Run when the upload of the body starts
@@ -2687,30 +1768,6 @@ final class NettyHttpClient implements
          * @param client The client
          */
         void onStop(NettyHttpClient client);
-    }
-
-    /**
-     * Completion listener that a blocking caller waits on, see {@link #awaitFlow(ExecutionFlow)}.
-     *
-     * @param <T> The value type
-     */
-    private static final class BlockingFlowListener<T> extends CountDownLatch implements BiConsumer<T, @Nullable Throwable> {
-        @Nullable
-        T value;
-        @Nullable
-        Throwable error;
-
-        BlockingFlowListener() {
-            super(1);
-        }
-
-        @Override
-        public void accept(T value, @Nullable Throwable error) {
-            // the count down publishes these fields to the waiting thread
-            this.value = value;
-            this.error = error;
-            countDown();
-        }
     }
 
     /**

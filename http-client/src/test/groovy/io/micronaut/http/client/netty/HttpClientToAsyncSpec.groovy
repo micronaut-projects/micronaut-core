@@ -197,7 +197,7 @@ class HttpClientToAsyncSpec extends Specification {
                 DefaultHttpClient defaultHttpClient = DefaultHttpClient.builder()
                         .uri(server.URI)
                         .build()
-                def asyncNetty = new DefaultAsyncHttpClient(defaultHttpClient.getNettyHttpClient())
+                def asyncNetty = defaultHttpClient.getNettyHttpClient().toAsync()
                 return [async: asyncNetty, cleanup: { ->
                     try {
                         asyncNetty.close()
