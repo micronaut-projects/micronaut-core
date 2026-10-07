@@ -141,6 +141,50 @@ class UnicastFieldPublisherTest {
     }
 
     @Test
+    void aRequestForNoItemFailsTheSubscriber() {
+        List<String> discarded = new ArrayList<>();
+        AtomicInteger cancels = new AtomicInteger();
+        UnicastFieldPublisher<String> publisher = new UnicastFieldPublisher<>(discarded::add, () -> {
+        }, cancels::incrementAndGet);
+        publisher.offer("a");
+        Recorder<String> recorder = new Recorder<>();
+        publisher.subscribe(recorder);
+        recorder.subscription.request(0);
+        // rule 3.9: the subscriber is failed, and the subscription is cancelled
+        assertInstanceOf(IllegalArgumentException.class, recorder.error);
+        assertEquals(1, cancels.get());
+        assertEquals(List.of("a"), discarded);
+        assertTrue(recorder.items.isEmpty());
+
+        // refused afterwards, and nothing is signalled anymore
+        assertFalse(publisher.offer("b"));
+        recorder.subscription.request(1);
+        assertTrue(recorder.items.isEmpty());
+        assertFalse(recorder.complete);
+    }
+
+    @Test
+    void aNegativeRequestDuringOnSubscribeFailsTheSubscriber() {
+        UnicastFieldPublisher<String> publisher = new UnicastFieldPublisher<>(s -> {
+        }, () -> {
+        }, () -> {
+        });
+        publisher.offer("a");
+        Recorder<String> recorder = new Recorder<>() {
+            @Override
+            public void onSubscribe(Subscription s) {
+                super.onSubscribe(s);
+                s.request(-1);
+                // not signalled during onSubscribe
+                assertNull(error);
+            }
+        };
+        publisher.subscribe(recorder);
+        assertInstanceOf(IllegalArgumentException.class, recorder.error);
+        assertTrue(recorder.items.isEmpty());
+    }
+
+    @Test
     void refusesASecondSubscriber() {
         AtomicInteger starts = new AtomicInteger();
         UnicastFieldPublisher<String> publisher = new UnicastFieldPublisher<>(s -> {

@@ -234,6 +234,20 @@ class FormFieldFlowsTest {
     }
 
     @Test
+    void concatCancelledBeforeTheSubscriptionCancelsIt() {
+        Source<String> source = new Source<>();
+        AtomicBoolean finished = new AtomicBoolean();
+        FormFieldFlows.Concat<String, Integer> concat = new FormFieldFlows.Concat<>(s -> ExecutionFlow.just(s.length()), s -> {
+        }, v -> {
+        }, e -> finished.set(true));
+        concat.cancel();
+        source.subscribe(concat);
+        assertTrue(source.cancelled);
+        assertEquals(0, source.requested);
+        assertFalse(finished.get());
+    }
+
+    @Test
     void concatValueMayCancel() {
         Source<String> source = new Source<>();
         AtomicReference<FormFieldFlows.Concat<String, Integer>> self = new AtomicReference<>();

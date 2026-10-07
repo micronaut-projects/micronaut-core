@@ -405,7 +405,7 @@ public final class FormFactory {
                 // all in-memory
                 CompletedFileUpload cfu = CompletedFileUpload.ofMemory(metadata, bufferFactory.compose(Objects.requireNonNull(memory)));
                 if (closeResource.compareAndSet(null, cfu)) {
-                    result.complete(cfu);
+                    completeResult(cfu);
                 } else {
                     // The request ended while the part was arriving: release its content.
                     result.completeExceptionally(concurrentClose(cfu));
@@ -435,14 +435,30 @@ public final class FormFactory {
                     CompletedFileUpload cfu = CompletedFileUpload.ofFile(metadata, ps.path, total);
                     if (!closeResource.compareAndSet(ps.path, cfu)) {
                         result.tryCompleteExceptionally(concurrentClose(cfu));
-                    } else if (!result.tryComplete(cfu)) {
-                        try {
-                            cfu.close();
-                        } catch (IOException e) {
-                            LOG.debug("Failed to close cancelled CompletedFileUpload", e);
-                        }
+                    } else {
+                        completeResult(cfu);
                     }
                 }, diskWriteExecutor);
+            }
+        }
+
+        /**
+         * Complete the result with the upload. When the result was cancelled, nobody waits for
+         * the upload anymore: it is released now, not when the request ends.
+         *
+         * @param cfu The upload, the close resource
+         */
+        private void completeResult(CompletedFileUpload cfu) {
+            if (!result.isCancelled() && result.tryComplete(cfu)) {
+                return;
+            }
+            // released once: the end of the request no longer closes it
+            if (closeResource.compareAndSet(cfu, CLOSED_SENTINEL)) {
+                try {
+                    cfu.close();
+                } catch (IOException e) {
+                    LOG.debug("Failed to close cancelled CompletedFileUpload", e);
+                }
             }
         }
 

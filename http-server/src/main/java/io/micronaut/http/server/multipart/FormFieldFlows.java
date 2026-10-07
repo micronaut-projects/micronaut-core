@@ -241,6 +241,9 @@ public final class FormFieldFlows {
             upstream = s;
             if (state.compareAndSet(State.INITIAL, State.REQUESTED)) {
                 s.request(1);
+            } else if (state.get() == State.CANCELLED) {
+                // cancelled before the subscription arrived: the cancellation did not reach it
+                s.cancel();
             }
         }
 

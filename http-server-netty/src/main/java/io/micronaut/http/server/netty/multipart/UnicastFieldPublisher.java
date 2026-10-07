@@ -33,7 +33,9 @@ import java.util.function.Consumer;
  * requested, without a bound. Items are offered by one producer at a time, while the subscriber
  * may request and cancel from any thread. The termination is delivered once the buffered items
  * were delivered. The items that are buffered when the subscriber cancels, and those offered
- * afterwards, are discarded.
+ * afterwards, are discarded. A request for no item (or a negative number) fails the subscriber
+ * with an {@link IllegalArgumentException} and cancels the subscription, as rule 3.9 of the
+ * reactive streams specification requires.
  *
  * @param <T> The type of the items
  * @author Denis Stepanov
@@ -55,6 +57,12 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
     private volatile boolean done;
     @Nullable
     private Throwable error;
+    /**
+     * The failure of a request for no item, delivered instead of the items, see rule 3.9 of the
+     * reactive streams specification.
+     */
+    @Nullable
+    private volatile IllegalArgumentException invalidRequest;
     private volatile boolean cancelled;
 
     /**
@@ -140,6 +148,11 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
     @Override
     public void request(long n) {
         if (n <= 0) {
+            // rule 3.9: the subscriber is failed, and the subscription is cancelled
+            if (invalidRequest == null) {
+                invalidRequest = new IllegalArgumentException("Rule 3.9 of the reactive streams specification: the number of requested items must be positive, but was " + n);
+            }
+            drain(null);
             return;
         }
         requested.getAndUpdate(old -> {
@@ -223,6 +236,18 @@ final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
                 discard.accept(item);
             }
             discardAll();
+            return true;
+        }
+        IllegalArgumentException invalid = invalidRequest;
+        if (invalid != null) {
+            // like a cancellation of the subscriber, which is then failed
+            cancelled = true;
+            onCancel.run();
+            if (item != null) {
+                discard.accept(item);
+            }
+            discardAll();
+            s.onError(invalid);
             return true;
         }
         if (d && empty) {
