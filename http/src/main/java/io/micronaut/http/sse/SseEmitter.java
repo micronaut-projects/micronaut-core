@@ -62,7 +62,11 @@ import java.util.function.Consumer;
  * <p>The queue is bounded: a send while sixteen times the high-water mark are already queued fails
  * with a {@link io.micronaut.http.exceptions.StreamOverflowException}, and ends the stream,
  * since the client would otherwise miss events. A sender that awaits its sends never reaches the
- * bound.</p>
+ * bound. A sender that does not, e.g. one that calls {@link #send(Event)} for every message of a
+ * source that does not wait, fails a client that reads slower than it sends once 1 MiB is queued
+ * with the default high-water mark of 64 KiB: such a sender checks {@link #isWritable()} and
+ * drops or coalesces events, or raises the bound with {@link #highWaterMark(int)} (or
+ * {@code micronaut.server.responses.stream.high-water-mark}) if its bursts are bounded.</p>
  *
  * <h2>Threads</h2>
  * <p>All methods can be called from any thread. The events are written in the order their sends
@@ -79,7 +83,10 @@ import java.util.function.Consumer;
 public interface SseEmitter {
 
     /**
-     * Send an event.
+     * Send an event. The send does not wait: wait for the returned stage (or use
+     * {@link #sendAndAwait(Event)}) to pace the sender to the client. Sends that do not wait queue
+     * the events of a slow client until the queue overflows and the stream fails, see the class
+     * documentation.
      *
      * @param event The event
      * @return Completes when the event was queued below the high-water mark (see the class

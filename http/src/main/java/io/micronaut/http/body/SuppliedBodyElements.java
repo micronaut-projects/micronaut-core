@@ -75,7 +75,11 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
                 result.completeExceptionally(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
             } else {
                 // no optional is the end too
-                result.complete(Objects.requireNonNullElse(value, Optional.empty()));
+                Optional<T> present = Objects.requireNonNullElse(value, Optional.empty());
+                if (!result.complete(present)) {
+                    // the elements were closed meanwhile: nobody takes the element
+                    present.ifPresent(BodyElementsLoop::discard);
+                }
             }
         });
         return result;

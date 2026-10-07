@@ -207,16 +207,31 @@ final class DefaultSseEmitter implements SseEmitter {
     public CompletionStage<Void> comment(String comment) {
         Objects.requireNonNull(comment, "comment");
         StringBuilder text = new StringBuilder(comment.length() + 4);
-        for (String line : comment.split("\r\n|\r|\n", -1)) {
-            text.append(':');
-            if (!line.isEmpty()) {
-                text.append(' ').append(line);
+        // one comment line per line of the comment, whichever line break ends it
+        int start = 0;
+        int length = comment.length();
+        for (int i = 0; i < length; i++) {
+            char c = comment.charAt(i);
+            if (c == '\r' || c == '\n') {
+                appendCommentLine(text, comment, start, i);
+                if (c == '\r' && i + 1 < length && comment.charAt(i + 1) == '\n') {
+                    i++;
+                }
+                start = i + 1;
             }
-            text.append('\n');
         }
+        appendCommentLine(text, comment, start, length);
         text.append('\n');
         active = true;
         return write(bodyFactory.readBufferFactory().copyOf(text, StandardCharsets.UTF_8));
+    }
+
+    private static void appendCommentLine(StringBuilder text, String comment, int start, int end) {
+        text.append(':');
+        if (end > start) {
+            text.append(' ').append(comment, start, end);
+        }
+        text.append('\n');
     }
 
     private CompletionStage<Void> write(ReadBuffer data) {

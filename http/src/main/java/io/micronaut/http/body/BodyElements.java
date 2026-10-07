@@ -77,7 +77,9 @@ import java.util.function.Supplier;
  * closing are different: at the end of the body, {@link #next()} completes with an empty
  * optional and {@link #forEach} completes normally, while closing during an operation completes
  * that operation with a {@link java.util.concurrent.CancellationException}, and an operation
- * started after closing throws an {@link IllegalStateException}. The elements of a request body
+ * started after closing throws an {@link IllegalStateException}. An element that the elements of
+ * {@link #of} produce after they were closed is not delivered: it is closed if it is
+ * {@link AutoCloseable}, e.g. a {@link CloseableByteBody}. The elements of a request body
  * are closed when the method that read them completed, see {@link AsyncRequestBody}, unless they
  * are the body of its response; closing them discards the rest of the body.</p>
  *

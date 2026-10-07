@@ -98,6 +98,16 @@ class DefaultSseEmitterTest {
     }
 
     @Test
+    void everyLineOfACommentIsACommentLine() throws Exception {
+        HttpResponse<?> response = response(start(HttpRequest.GET("/events"), events -> {
+            events.comment("a\r\nb\rc\n\nd\n");
+        }, null));
+        String text = read(response).received();
+        // CRLF, CR and LF end a line, as a client reads them
+        assertEquals(": a\n: b\n: c\n:\n: d\n:\n\n", text);
+    }
+
+    @Test
     void theResponseCarriesTheEventsAndTheHeaders() throws Exception {
         MutableHttpRequest<?> request = HttpRequest.GET("/events").header("Last-Event-ID", "41");
         AtomicReference<SseEmitter> emitter = new AtomicReference<>();

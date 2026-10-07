@@ -76,6 +76,36 @@ class BodyElementsTest {
     }
 
     @Test
+    void ofClosesAnElementProducedAfterClosing() {
+        CompletableFuture<Optional<AutoCloseable>> pending = new CompletableFuture<>();
+        BodyElements<AutoCloseable> elements = BodyElements.of(() -> pending);
+        CompletableFuture<Optional<AutoCloseable>> waiting = elements.next().toCompletableFuture();
+        elements.closeAsync();
+        assertThrows(CancellationException.class, waiting::join);
+        // nobody takes the element anymore
+        AtomicInteger closed = new AtomicInteger();
+        pending.complete(Optional.of(closed::incrementAndGet));
+        assertEquals(1, closed.get());
+    }
+
+    @Test
+    void ofForEachClosesAnElementProducedAfterClosing() {
+        CompletableFuture<Optional<AutoCloseable>> pending = new CompletableFuture<>();
+        BodyElements<AutoCloseable> elements = BodyElements.of(() -> pending);
+        AtomicInteger consumed = new AtomicInteger();
+        CompletableFuture<Void> loop = elements.forEach(element -> {
+            consumed.incrementAndGet();
+            return CompletableFuture.completedFuture(null);
+        }).toCompletableFuture();
+        elements.closeAsync();
+        assertThrows(CancellationException.class, loop::join);
+        AtomicInteger closed = new AtomicInteger();
+        pending.complete(Optional.of(closed::incrementAndGet));
+        assertEquals(1, closed.get());
+        assertEquals(0, consumed.get());
+    }
+
+    @Test
     void ofClosingCancelsForEach() {
         BodyElements<String> elements = BodyElements.of(CompletableFuture::new);
         CompletableFuture<Void> each = elements.forEach(element -> CompletableFuture.completedFuture(null)).toCompletableFuture();

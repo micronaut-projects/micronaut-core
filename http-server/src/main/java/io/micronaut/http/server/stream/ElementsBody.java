@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -65,6 +66,14 @@ final class ElementsBody {
      */
     private final AtomicReference<@Nullable PieceForwarder> forwarding = new AtomicReference<>();
     /**
+     * The arrivals of the step that runs and of the loop that started it, see {@link #loop()}.
+     */
+    private final AtomicInteger handOff = new AtomicInteger();
+    /**
+     * Called when the step that runs finished: continues the loop if the loop already returned.
+     */
+    private final StepDone stepDone;
+    /**
      * Only changed by the owner of {@link #pulling}.
      */
     private boolean first = true;
@@ -76,6 +85,11 @@ final class ElementsBody {
         this.encoder = encoder;
         this.context = PropagatedContext.getOrEmpty();
         this.stream = new BodyStream(factory, context, highWaterMark, false);
+        this.stepDone = proceed -> {
+            if (proceed && handOff.getAndIncrement() == 1) {
+                context.propagate(this::loop);
+            }
+        };
     }
 
     /**
@@ -117,14 +131,11 @@ final class ElementsBody {
                 return;
             }
             // the second of the step and this loop to get here continues the pull: this loop if
-            // the step completed synchronously, instead of recursing, else the completing thread
-            AtomicBoolean handOff = new AtomicBoolean();
-            step(proceed -> {
-                if (proceed && handOff.getAndSet(true)) {
-                    context.propagate(this::loop);
-                }
-            });
-            if (!handOff.getAndSet(true)) {
+            // the step completed synchronously, instead of recursing, else the completing thread.
+            // One step runs at a time, so one counter serves every step
+            handOff.set(0);
+            step(stepDone);
+            if (handOff.getAndIncrement() == 0) {
                 return;
             }
         }

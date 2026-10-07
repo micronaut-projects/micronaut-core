@@ -181,6 +181,21 @@ public class HandlerRouteBodyElementsTest {
     }
 
     @Test
+    void headRequestHasTheContentTypeOfTheGetRequest() throws Exception {
+        try (ServerUnderTest server = server()) {
+            // a route that sets no content type: the elements are written as JSON
+            HttpResponse<String> get = server.exchange(HttpRequest.GET("/elements/json"), String.class);
+            assertEquals(MediaType.APPLICATION_JSON, get.getHeaders().get(HttpHeaders.CONTENT_TYPE));
+            HttpResponse<String> head = server.exchange(HttpRequest.HEAD("/elements/json"), String.class);
+            assertEquals(HttpStatus.OK, head.getStatus());
+            assertEquals(MediaType.APPLICATION_JSON, head.getHeaders().get(HttpHeaders.CONTENT_TYPE));
+            // a controller: the media type it produces
+            HttpResponse<String> controller = server.exchange(HttpRequest.HEAD("/controller-elements"), String.class);
+            assertEquals(MediaType.APPLICATION_JSON, controller.getHeaders().get(HttpHeaders.CONTENT_TYPE));
+        }
+    }
+
+    @Test
     void slowReaderPausesTheSource() throws Exception {
         try (ServerUnderTest server = server();
              Socket socket = connect(server)) {

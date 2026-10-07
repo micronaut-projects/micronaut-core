@@ -145,15 +145,17 @@ final class BodyStream implements BufferConsumer.Upstream {
      */
     void highWaterMark(int bytes) {
         checkHighWaterMark(bytes);
-        Effects effects = new Effects();
+        Effects effects;
         lock.lock();
         try {
             highWaterMark = bytes;
-            releaseWaiters(effects);
+            effects = releaseWaiters(null);
         } finally {
             lock.unlock();
         }
-        effects.run();
+        if (effects != null) {
+            effects.run();
+        }
     }
 
     private static int checkHighWaterMark(int bytes) {
@@ -171,7 +173,9 @@ final class BodyStream implements BufferConsumer.Upstream {
      * closed or overflows
      */
     CompletionStage<Void> write(ReadBuffer data) {
-        Effects effects = new Effects();
+        // a write that neither closes the stream nor completes a stage only needs a drain: no
+        // effects are allocated for it
+        Effects effects = null;
         CompletionStage<Void> result;
         lock.lock();
         try {
@@ -187,12 +191,14 @@ final class BodyStream implements BufferConsumer.Upstream {
                 data.close();
                 Throwable overflow = new StreamOverflowException("The client does not read the stream fast enough: "
                     + (written - consumed) + " bytes are queued, the limit is " + limit + " bytes (sixteen times the high-water mark). The stream was closed");
+                effects = new Effects();
                 closeLocked(State.FAILED, overflow, overflow, effects);
                 submitLocked(() -> buffer.error(overflow), effects);
                 result = CompletableFuture.failedStage(overflow);
             } else {
                 written += n;
-                submitLocked(() -> buffer.add(data), effects);
+                // queued under the lock: the tasks run in the order of the writes
+                tasks.add(() -> buffer.add(data));
                 if (written - consumed < highWaterMark) {
                     result = DONE;
                 } else {
@@ -204,7 +210,11 @@ final class BodyStream implements BufferConsumer.Upstream {
         } finally {
             lock.unlock();
         }
-        effects.run();
+        if (effects != null) {
+            effects.run();
+        } else {
+            scheduleDrain();
+        }
         return result;
     }
 
@@ -388,17 +398,19 @@ final class BodyStream implements BufferConsumer.Upstream {
 
     @Override
     public void onBytesConsumed(long bytesConsumed) {
-        Effects effects = new Effects();
+        Effects effects;
         lock.lock();
         try {
             long c = consumed + bytesConsumed;
             // saturate: a downstream that asks for everything passes Long.MAX_VALUE
             consumed = c < consumed ? Long.MAX_VALUE : c;
-            releaseWaiters(effects);
+            effects = releaseWaiters(null);
         } finally {
             lock.unlock();
         }
-        effects.run();
+        if (effects != null) {
+            effects.run();
+        }
     }
 
     @Override
@@ -425,15 +437,29 @@ final class BodyStream implements BufferConsumer.Upstream {
         effects.run();
     }
 
-    private void releaseWaiters(Effects effects) {
+    /**
+     * Release the writes that are below the high-water mark now, and tell a pulling producer.
+     *
+     * @param effects The effects so far, or {@code null}
+     * @return The effects, or {@code null} if there are none: allocated only when needed, since
+     * the connection reports what it took for every write
+     */
+    private @Nullable Effects releaseWaiters(@Nullable Effects effects) {
         Waiter waiter;
         while ((waiter = waiters.peek()) != null && waiter.end - consumed < highWaterMark) {
             waiters.poll();
+            if (effects == null) {
+                effects = new Effects();
+            }
             effects.complete(waiter.future);
         }
         if (demandListener != null && state == State.OPEN && written - consumed < highWaterMark) {
+            if (effects == null) {
+                effects = new Effects();
+            }
             effects.demand = demandListener;
         }
+        return effects;
     }
 
     private void closeLocked(State newState, Throwable writeCause, @Nullable Throwable callbackCause, Effects effects) {
@@ -466,6 +492,15 @@ final class BodyStream implements BufferConsumer.Upstream {
         // queued under the lock: the tasks run in the order of the writes
         tasks.add(task);
         effects.drain = true;
+    }
+
+    private void scheduleDrain() {
+        if (pendingTasks.getAndIncrement() == 0) {
+            // always a new task, also on an event loop: the caller may be inside a call of the
+            // buffer, which must not be reentered. The default buffer runs the task on this
+            // thread, and serializes the calls itself
+            executor.execute(this::drain);
+        }
     }
 
     private void drain() {
@@ -539,11 +574,8 @@ final class BodyStream implements BufferConsumer.Upstream {
         }
 
         void run() {
-            if (drain && pendingTasks.getAndIncrement() == 0) {
-                // always a new task, also on an event loop: the caller may be inside a call of
-                // the buffer, which must not be reentered. The default buffer runs the task on
-                // this thread, and serializes the calls itself
-                executor.execute(BodyStream.this::drain);
+            if (drain) {
+                scheduleDrain();
             }
             if (completed == null && failed == null && callbacks == null && demand == null) {
                 return;

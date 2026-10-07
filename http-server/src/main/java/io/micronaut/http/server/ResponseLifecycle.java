@@ -200,6 +200,10 @@ public abstract class ResponseLifecycle {
                 // executor discarded the body it moved aside already
                 ResponseStreams.discard(elements);
             }
+            if (headBody instanceof BodyElements<?>) {
+                // the headers of a GET request: the media type the elements are written with
+                bodyElementsMediaType(nettyRequest, response, routeInfo(response));
+            }
             return encodeNoBody(response);
         } else if (body != null) {
             return encodeBody(nettyRequest, response, body);
@@ -235,9 +239,7 @@ public abstract class ResponseLifecycle {
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeBody(HttpRequest<?> nettyRequest,
                                                                        MutableHttpResponse<?> response,
                                                                        Object body) {
-        Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
-        // usually this is a UriRouteInfo, avoid scalability issues here
-        @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
+        final RouteInfo<Object> routeInfo = routeInfo(response);
 
         if (isImplicitlyEmptyBody(body)) {
             response.body(null);
@@ -290,6 +292,36 @@ public abstract class ResponseLifecycle {
     }
 
     /**
+     * The media type the elements of a {@link BodyElements} body are written with: the content
+     * type of the response, else the default of the route, else JSON. The response gets it as its
+     * content type, also the response to a HEAD request, which has the headers of a GET request.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param routeInfo The route, if any
+     * @return The media type
+     */
+    private MediaType bodyElementsMediaType(HttpRequest<?> request, MutableHttpResponse<?> response, @Nullable RouteInfo<Object> routeInfo) {
+        MediaType mediaType = response.getContentType().orElse(null);
+        if (mediaType == null) {
+            mediaType = routeInfo != null ? routeExecutor.resolveDefaultResponseContentType(request, routeInfo) : MediaType.APPLICATION_JSON_TYPE;
+            response.contentType(mediaType);
+        }
+        return mediaType;
+    }
+
+    /**
+     * @param response The response
+     * @return The route that produced it, if any
+     */
+    @SuppressWarnings("unchecked")
+    private static @Nullable RouteInfo<Object> routeInfo(HttpResponse<?> response) {
+        Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
+        // usually this is a UriRouteInfo, avoid scalability issues here
+        return (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
+    }
+
+    /**
      * Stream the elements of a {@link BodyElements} body without Reactive Streams: like the
      * elements of a publisher body ({@link #mapToHttpContent}), each written with the writer of
      * its type for the media type of the response, and framed as a JSON array for a JSON media
@@ -309,11 +341,7 @@ public abstract class ResponseLifecycle {
                                                                                    MutableHttpResponse<?> response,
                                                                                    BodyElements<?> elements,
                                                                                    @Nullable RouteInfo<Object> routeInfo) {
-        MediaType mediaType = response.getContentType().orElse(null);
-        if (mediaType == null) {
-            mediaType = routeInfo != null ? routeExecutor.resolveDefaultResponseContentType(request, routeInfo) : MediaType.APPLICATION_JSON_TYPE;
-            response.contentType(mediaType);
-        }
+        MediaType mediaType = bodyElementsMediaType(request, response, routeInfo);
         MediaType finalMediaType = mediaType;
         boolean jsonMediaType = MediaType.EXTENSION_JSON.equals(mediaType.getExtension());
         if (MediaType.TEXT_EVENT_STREAM_TYPE.matches(mediaType)) {

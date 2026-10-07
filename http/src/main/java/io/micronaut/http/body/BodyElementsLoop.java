@@ -17,6 +17,8 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -41,6 +43,8 @@ import java.util.function.Supplier;
  */
 @Internal
 final class BodyElementsLoop<T> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(BodyElementsLoop.class);
 
     private final Supplier<? extends CompletionStage<Optional<T>>> next;
     private final Function<? super T, ? extends CompletionStage<?>> consumer;
@@ -105,6 +109,12 @@ final class BodyElementsLoop<T> {
                 done.accept(false);
                 return;
             }
+            if (result.isDone()) {
+                // the elements were closed meanwhile: nobody takes the element
+                discard(present.get());
+                done.accept(false);
+                return;
+            }
             CompletionStage<?> consumed;
             try {
                 consumed = Objects.requireNonNull(consumer.apply(present.get()), "The consumer returned no stage");
@@ -122,6 +132,22 @@ final class BodyElementsLoop<T> {
                 }
             });
         });
+    }
+
+    /**
+     * Release an element that is produced after the elements were closed, if it holds
+     * resources, e.g. a {@link ByteBody}.
+     *
+     * @param element The element
+     */
+    static void discard(Object element) {
+        if (element instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                LOG.debug("Failed to close an element produced after the elements were closed", e);
+            }
+        }
     }
 
     private void finish(@Nullable Throwable error) {
