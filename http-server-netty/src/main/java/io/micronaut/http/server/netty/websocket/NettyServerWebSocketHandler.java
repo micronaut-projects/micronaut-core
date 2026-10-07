@@ -285,8 +285,16 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             opening = true;
             // the handlers of the route run on its executor, the event loop by default, with the
             // upgrade request as the current request
-            Executor handlerExecutor = routeExecutor == ImmediateExecutor.INSTANCE ? channel.eventLoop() : Objects.requireNonNull(routeExecutor);
-            Executor executor = command -> handlerExecutor.execute(() -> ServerRequestContext.with(originatingRequest, command));
+            boolean onEventLoop = routeExecutor == ImmediateExecutor.INSTANCE;
+            Executor handlerExecutor = onEventLoop ? channel.eventLoop() : Objects.requireNonNull(routeExecutor);
+            Executor executor = command -> {
+                if (onEventLoop && channel.eventLoop().inEventLoop()) {
+                    // already on the executor of the route: no task per message
+                    ServerRequestContext.with(originatingRequest, command);
+                } else {
+                    handlerExecutor.execute(() -> ServerRequestContext.with(originatingRequest, command));
+                }
+            };
             routeEndpoint.connected(serverSession, executor, error -> {
                 ChannelHandlerContext handlerCtx = channel.pipeline().context(this);
                 exceptionCaught(handlerCtx == null ? ctx : handlerCtx, error);
