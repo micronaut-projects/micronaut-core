@@ -4255,8 +4255,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * environment, its event publisher or its conversion service, because those would keep resolving
      * through this stopped context; without the graph the predicate answers for all of that.
      * When the graph is recorded, a bean that a {@link io.micronaut.context.event.BeanCreatedEventListener} replaced,
-     * by a wrapper that may hold this context, is retained as the listeners received it, and the adopting context
-     * wraps it again with its own listeners; the wrapper is dropped, neither destroyed nor announced.
+     * by a wrapper that may hold this context, is retained as the listeners received it; the wrapper is dropped, neither
+     * destroyed nor announced. The adopting context runs its own listeners on every retained bean, as the bean's
+     * creation would have, so a listener that configures what it receives must be idempotent.
      * Whoever holds the returned registrations destroys them eventually, through the context that adopted
      * them or {@link #destroyBean(BeanRegistration)}.</p>
      *
@@ -4431,12 +4432,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             interceptorRegistrations = rebindInterceptors(disposing.getInterceptorCandidates().legacyRegistrations(), owned, dependents);
         }
         // a retained registration carries the instance as the listeners received it when they replaced it: that one is
-        // registered, and wrapped again by this context's listeners once they are initialized
+        // registered, and this context's listeners run on it once they are initialized, whether or not the previous
+        // context's listeners replaced it
         BeanRegistration<T> adopted = BeanRegistration.of(this, original.getIdentifier(), definition, registration.getBean(), dependents, interceptorRegistrations);
         singletonScope.registerSingletonBean(adopted, definition.getDeclaredQualifier());
-        if (registration instanceof RetainedRegistration<T> retained && retained.wrapAgain) {
-            adoptedToWrap.add(adopted);
-        }
+        adoptedToWrap.add(adopted);
         // the prototypes the instance owns are one set however many registrations it is adopted under
         boolean firstRegistration = adoptedRetainedBeans.add(original.bean);
         if (dependencyGraph != null && registration instanceof RetainedRegistration<T> retained) {
@@ -4459,13 +4459,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
-     * Wraps the adopted instances that bean created listeners replaced in the previous context with this context's
-     * listeners, as their creation would have: a wrapper bound to the stopped context, such as one holding its bean
-     * locator, is made again bound to this one, around the same retained instance. The listeners run on the instance
-     * they received before; one that configures rather than replaces what it receives sees it again, and the state of
-     * the replacement the previous context had is not carried over. Between the adoption and this, while the context is
-     * configured, the instance is registered as the listeners received it, as a bean created then would be, since the
-     * listeners only apply once they are initialized.
+     * Applies this context's bean created listeners to every adopted instance, as its creation would have: a listener
+     * the application changed since the previous context applies to a retained bean too, and a wrapper bound to the
+     * stopped context, such as one holding its bean locator, is made again bound to this one, around the same retained
+     * instance. The listeners run on the instance they received before, never on the previous context's replacement,
+     * whose state is not carried over: a listener that configures rather than replaces what it receives sees the
+     * retained instance again, so it must be idempotent. Between the adoption and this, while the context is configured,
+     * the instance is registered as the listeners received it, as a bean created then would be, since the listeners
+     * only apply once they are initialized.
      */
     private void wrapAdoptedRegistrations() {
         if (adoptedToWrap.isEmpty()) {
@@ -4473,18 +4474,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         List<BeanRegistration<?>> adopted = adoptedToWrap;
         adoptedToWrap = new ArrayList<>();
+        boolean replaced = false;
         for (BeanRegistration<?> registration : adopted) {
-            wrapAdopted(registration);
+            replaced |= wrapAdopted(registration);
         }
-        // a collection of beans resolved since the adoption holds the instances as they were adopted
-        singletonBeanRegistrations.clear();
+        if (replaced) {
+            // a collection of beans resolved since the adoption holds the instances as they were adopted
+            singletonBeanRegistrations.clear();
+        }
     }
 
-    private <T> void wrapAdopted(BeanRegistration<T> adopted) {
+    /**
+     * @return Whether the adopted registration was replaced by one of what the listeners returned
+     */
+    private <T> boolean wrapAdopted(BeanRegistration<T> adopted) {
         BeanDefinition<T> definition = adopted.beanDefinition;
         if (singletonScope.findBeanRegistration(definition) != adopted) {
             // destroyed or replaced since it was adopted, by what configured this context
-            return;
+            return false;
         }
         T instance = adopted.bean;
         T wrapped;
@@ -4504,7 +4511,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             created = context.getAndResetDependentBeans();
         }
         if (wrapped == instance && created.isEmpty()) {
-            return;
+            return false;
         }
         List<BeanRegistration<?>> dependents = new ArrayList<>(adopted.dependentBeans());
         dependents.addAll(created);
@@ -4519,6 +4526,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Wrapped adopted bean [{}] again as [{}]", instance, wrapped);
         }
+        return true;
     }
 
     @SuppressWarnings("unchecked")
@@ -4719,11 +4727,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * Shared by the registrations of one instance, so a launcher destroying them all destroys it once.
          */
         private final AtomicBoolean destroyed;
-        /**
-         * Whether the bean is the instance the bean created listeners received, which replaced it with one bound to
-         * the stopped context: the adopting context wraps it again with its own listeners.
-         */
-        private final boolean wrapAgain;
 
         RetainedRegistration(BeanRegistration<T> original, List<BeanDependencyGraph.BeanDependency> dependencies, AtomicBoolean destroyed,
                              @Nullable T beforeListeners) {
@@ -4731,7 +4734,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             this.original = original;
             this.dependencies = dependencies;
             this.destroyed = destroyed;
-            this.wrapAgain = beforeListeners != null;
         }
 
         @Override
