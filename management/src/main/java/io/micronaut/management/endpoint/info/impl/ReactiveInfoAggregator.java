@@ -56,6 +56,7 @@ public class ReactiveInfoAggregator implements InfoAggregator<Map<String, Object
      * @param list The property sources, keyed by the index of their source
      * @return The properties, the earlier sources having priority
      */
+    @SuppressWarnings("java:S2095") // the resolver only holds the property sources while their properties are collected
     static Map<String, Object> toProperties(List<Map.Entry<Integer, PropertySource>> list) {
         var resolver = new PropertySourcePropertyResolver();
         list.stream()

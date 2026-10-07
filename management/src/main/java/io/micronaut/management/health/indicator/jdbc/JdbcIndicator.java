@@ -111,7 +111,7 @@ public class JdbcIndicator implements HealthIndicator {
                     url = url.substring(5);
                 }
                 url = url.replaceFirst(";", "?");
-                url = url.replaceAll(";", "&");
+                url = url.replace(";", "&");
                 URI uri = new URI(url);
                 key = uri.getHost() + ":" + uri.getPort() + uri.getPath();
             } catch (Exception n) {
