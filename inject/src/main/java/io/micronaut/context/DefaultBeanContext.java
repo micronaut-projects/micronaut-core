@@ -249,6 +249,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         .<BeanDependencyResolver>builder(BeanDependencyResolver.class, () -> new DefaultBeanDependencyResolver(this))
         .build();
 
+    private final RuntimeBeanDefinition<InterceptionTarget> interceptionTargetDefinition = RuntimeBeanDefinition
+        .<InterceptionTarget>builder(InterceptionTarget.class, () -> {
+            throw new NoSuchBeanException(InterceptionTarget.class);
+        })
+        .build();
+
     private @Nullable BeanDefinitionValidator beanValidator;
     private @Nullable List<BeanConfiguration> beanConfigurationsList;
 
@@ -3188,6 +3194,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 Argument.of(BeanDependencyResolver.class), null, dependencyResolverDefinition, true);
             return resolver;
         }
+        if (beanClass == InterceptionTarget.class) {
+            // any qualifier is ignored: the qualifier of an enclosing @EachBean is carried to the interceptor
+            @SuppressWarnings("unchecked")
+            BeanRegistration<T> target = (BeanRegistration<T>) provideInterceptionTarget(resolutionContext, throwNoSuchBean);
+            return target;
+        }
         if (InjectionPoint.class.isAssignableFrom(beanClass)) {
             return provideInjectionPoint(resolutionContext, beanType, qualifier, throwNoSuchBean);
         }
@@ -4116,21 +4128,47 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             return getBeanRegistrations(resolutionContext, interceptorType, binding);
         }
         List<BeanRegistration<I>> registrations = new ArrayList<>(candidates.size());
+        BeanDefinition<?> interceptedDefinition = resolutionContext.interceptedDefinition();
         // when the creation of one fails, the ones created before it stay the dependents of the resolution context
         for (BeanDefinition<I> candidate : candidates) {
             BeanRegistration<I> existing = isUnscoped(candidate) ? resolutionContext.findInterceptor(candidate) : null;
             if (existing != null) {
                 registrations.add(existing);
-            } else {
+            } else if (isUnscoped(candidate)) {
                 int created = registrations.size();
-                addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
-                if (isUnscoped(candidate)) {
-                    markCreatedAsInterceptors(registrations.subList(created, registrations.size()));
+                AbstractBeanResolutionContext.InterceptorCreation outer = resolutionContext.interceptorCreation;
+                resolutionContext.interceptorCreation = interceptedDefinition == null ? null
+                    : new AbstractBeanResolutionContext.InterceptorCreation(candidate, interceptedDefinition);
+                try {
+                    addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
+                } finally {
+                    resolutionContext.interceptorCreation = outer;
                 }
+                markCreatedAsInterceptors(registrations.subList(created, registrations.size()));
+            } else {
+                addCandidateToList(resolutionContext, candidate, interceptorType, binding, registrations);
             }
         }
         registrations.sort(OrderUtil.ORDERED_COMPARATOR);
         return registrations;
+    }
+
+    /**
+     * Provides the bean the interceptor being created is created for, see {@link InterceptionTarget}.
+     */
+    private @Nullable BeanRegistration<InterceptionTarget> provideInterceptionTarget(@Nullable BeanResolutionContext resolutionContext,
+                                                                                    boolean throwNoSuchBean) {
+        BeanDefinition<?> target = resolutionContext instanceof AbstractBeanResolutionContext context
+            ? context.findInterceptionTarget() : null;
+        if (target == null) {
+            if (throwNoSuchBean) {
+                throw new NoSuchBeanException(Argument.of(InterceptionTarget.class), null,
+                    "It is only available to an unscoped interceptor the container creates for an intercepted bean.");
+            }
+            return null;
+        }
+        return BeanRegistration.of(this, BeanIdentifier.of(InterceptionTarget.class.getName()), interceptionTargetDefinition,
+            new DefaultInterceptionTarget(target));
     }
 
     private static <I> void markCreatedAsInterceptors(List<BeanRegistration<I>> created) {
@@ -5116,5 +5154,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         public String toString() {
             return method.toString();
         }
+    }
+
+    /**
+     * The bean an interceptor is created for.
+     *
+     * @param definition The definition of the bean
+     */
+    private record DefaultInterceptionTarget(BeanDefinition<?> definition) implements InterceptionTarget {
     }
 }
