@@ -117,6 +117,75 @@ class NettyStopDeadlockSpec extends Specification {
         }
     }
 
+    void 'a start from a shutdown listener of the stopping context does not wait for that stop'() {
+        given:
+        NettyHttpServer server = (NettyHttpServer) ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'NettyStopDeadlockSpec'
+        ])
+        ApplicationContext ctx = server.applicationContext
+        AtomicReference<Throwable> startFailure = new AtomicReference<>()
+        ContextShutdownHook.action = {
+            ContextShutdownHook.action = null
+            try {
+                server.start()
+            } catch (Throwable t) {
+                startFailure.set(t)
+            }
+        }
+        Thread stopThread = new Thread({ server.stop() }, 'server-stop')
+        stopThread.daemon = true
+
+        when:
+        stopThread.start()
+        stopThread.join(TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS))
+
+        then: 'the context stop goes on and stops the restarted server too'
+        !stopThread.alive
+        startFailure.get() == null
+        !ctx.running
+        !server.running
+
+        cleanup:
+        if (!stopThread.alive) {
+            ctx.stop()
+        }
+    }
+
+    void 'a concurrent stop returns once the application context is stopped'() {
+        given:
+        NettyHttpServer server = (NettyHttpServer) ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'NettyStopDeadlockSpec'
+        ])
+        ApplicationContext ctx = server.applicationContext
+        AtomicReference<Boolean> contextRunningAfterSecondStop = new AtomicReference<>()
+        Thread secondStop = new Thread({
+            server.stop()
+            contextRunningAfterSecondStop.set(ctx.running)
+        }, 'second-stop')
+        secondStop.daemon = true
+        ContextShutdownHook.action = {
+            ContextShutdownHook.action = null
+            // the first stop is stopping the context: stop the server from another thread too
+            secondStop.start()
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (secondStop.alive && secondStop.state != Thread.State.WAITING && System.nanoTime() < deadline) {
+                Thread.sleep(10)
+            }
+        }
+
+        when:
+        server.stop()
+        secondStop.join(TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS))
+
+        then:
+        !secondStop.alive
+        contextRunningAfterSecondStop.get() == false
+        !ctx.running
+
+        cleanup:
+        ctx.stop()
+    }
+
     private static void stopUnlessDeadlocked(ApplicationContext ctx, Map result) {
         // a deadlocked context thread still holds the context's lock, stopping it here would hang too
         if (result == null || !((Thread) result.contextThread).alive) {
