@@ -1617,9 +1617,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         public void fail(Throwable t) {
             if (LOG.isWarnEnabled()) {
                 if (initialMessage == null) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
+                    LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", t);
                 } else {
-                    LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
+                    LOG.warn("The streamed response body failed before the response was written. The error cannot be forwarded to the client.", t);
                 }
             }
             // detach the handler before discarding it, so that the discard does not happen a

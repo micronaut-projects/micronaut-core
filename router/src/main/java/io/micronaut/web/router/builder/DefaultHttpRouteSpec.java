@@ -48,6 +48,8 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
 
     private static final String RESPONSE = "response";
 
+    private static final MediaType[] EVENT_STREAM = {MediaType.TEXT_EVENT_STREAM_TYPE};
+
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class);
 
     private final PendingRoute route;
@@ -236,6 +238,31 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
             // the server finds the endpoint in the attribute of the route
             settings -> settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket),
             RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
+    }
+
+    @Override
+    public void sse(SseHandler handler) {
+        SseHandler checked = route.terminal(handler, HANDLER);
+        endSse(route, () -> HandlerMethod.of(checked), null, 0);
+    }
+
+    /**
+     * End a server-sent events route: it produces {@code text/event-stream}, its own type and not
+     * the type its group produces, or the types it declared, which must include it.
+     *
+     * @param route   The route
+     * @param handler Creates the handler method of a route
+     * @param init    Gives a route the other settings of the terminal, or {@code null}
+     * @param own     The other settings of the terminal, which the routes do not inherit from their groups
+     */
+    static void endSse(PendingRoute route, Supplier<HandlerMethod<?>> handler, @Nullable Consumer<RouteSettings> init, int own) {
+        route.producesIncluding(MediaType.TEXT_EVENT_STREAM_TYPE, "sse");
+        route.end(handler, settings -> {
+            settings.produces(EVENT_STREAM);
+            if (init != null) {
+                init.accept(settings);
+            }
+        }, own | RouteGroupDefaults.PRODUCES_SETTING);
     }
 
     /**

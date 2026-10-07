@@ -205,6 +205,7 @@ httpServer:
     functionalRoutesRespond: Responses Without a Handler
     functionalRoutesBody: Reading the Request Body
     functionalRoutesForms: Forms and File Uploads
+    functionalRoutesStreaming: Server-Sent Events and Streamed Responses
     functionalRoutesGroups: Route Groups and Path Prefixes
     functionalRoutesFilters: Route, Group and Server Filters
     functionalRoutesConditions: Conditions, Order, Ports and Attributes
