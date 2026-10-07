@@ -3,6 +3,7 @@ package io.micronaut.http.client.websocket
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.client.exceptions.ReadTimeoutException
+import io.micronaut.websocket.AsyncWebSocketClient
 import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
@@ -116,6 +118,133 @@ class WebSocketConnectCancelSpec extends Specification {
         client?.close()
         ctx?.close()
         server?.close()
+    }
+
+    void 'cancelling the async connect during the handshake closes the connection with #adapter'() {
+        given:
+        RawWebSocketServer server = new RawWebSocketServer(false)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
+        AsyncWebSocketClient async = adapter == 'netty' ? client.toAsyncWebSocket() : reactiveOnly(client).toAsyncWebSocket()
+        OpenedEndpoints opened = ctx.getBean(OpenedEndpoints)
+
+        when:
+        CompletableFuture<SlowOpenClient> future = async.connect(SlowOpenClient, '/ws').toCompletableFuture()
+        server.awaitUpgradeRequest()
+
+        then:
+        future.cancel(true)
+        future.isCancelled()
+        server.awaitClosed()
+        opened.slowOpens.isEmpty()
+
+        cleanup:
+        async?.close()
+        ctx?.close()
+        server?.close()
+
+        where:
+        adapter << ['netty', 'reactive adapter']
+    }
+
+    /**
+     * Only the reactive connect methods: {@link WebSocketClient#toAsyncWebSocket()} adapts them.
+     */
+    private static WebSocketClient reactiveOnly(WebSocketClient client) {
+        return new WebSocketClient() {
+            @Override
+            def <T extends AutoCloseable> org.reactivestreams.Publisher<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
+                return client.connect(clientEndpointType, request)
+            }
+
+            @Override
+            def <T extends AutoCloseable> org.reactivestreams.Publisher<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
+                return client.connect(clientEndpointType, parameters)
+            }
+
+            @Override
+            void close() {
+                client.close()
+            }
+        }
+    }
+
+    void 'cancelling the async connect while the open method runs closes the connection of an endpoint that does not close its session'() {
+        given:
+        RawWebSocketServer server = new RawWebSocketServer(true)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
+        AsyncWebSocketClient async = client.toAsyncWebSocket()
+        OpenedEndpoints opened = ctx.getBean(OpenedEndpoints)
+
+        when:
+        CompletableFuture<SlowOpenClient> future = async.connect(SlowOpenClient, '/ws').toCompletableFuture()
+        server.awaitUpgradeRequest()
+        CompletableFuture<?> openStage = opened.slowOpens.poll(10, TimeUnit.SECONDS)
+
+        then:
+        openStage != null
+        future.cancel(true)
+        server.awaitClosed()
+
+        cleanup:
+        openStage?.complete(null)
+        async?.close()
+        ctx?.close()
+        server?.close()
+    }
+
+    void 'the async connect of a delivered endpoint keeps the connection open'() {
+        given:
+        RawWebSocketServer server = new RawWebSocketServer(true)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
+        AsyncWebSocketClient async = client.toAsyncWebSocket()
+
+        when:
+        CompletableFuture<CancelClient> future = async.connect(CancelClient, '/ws').toCompletableFuture()
+        CancelClient endpoint = future.get(10, TimeUnit.SECONDS)
+
+        then: 'a cancel after the completion changes nothing'
+        !future.cancel(true)
+        endpoint.session.open
+        !server.closedWithin(500)
+
+        cleanup:
+        endpoint?.close()
+        async?.close()
+        ctx?.close()
+        server?.close()
+    }
+
+    void 'the async connect with parameters of a class that is not a client websocket fails the stage'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        WebSocketClient client = ctx.createBean(WebSocketClient, URI.create('http://127.0.0.1:1'))
+        AsyncWebSocketClient async = client.toAsyncWebSocket()
+
+        when:
+        CompletionStage<NotAWebSocket> stage = async.connect(NotAWebSocket, [:])
+
+        then: 'no exception is thrown, the stage fails'
+        stage != null
+
+        when:
+        stage.toCompletableFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        ExecutionException e = thrown()
+        e.cause != null
+
+        cleanup:
+        async?.close()
+        ctx?.close()
+    }
+
+    static class NotAWebSocket implements AutoCloseable {
+        @Override
+        void close() {
+        }
     }
 
     @Singleton

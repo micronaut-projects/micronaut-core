@@ -46,12 +46,26 @@ final class NettyAsyncWebSocketClient implements AsyncWebSocketClient {
 
     @Override
     public <T extends AutoCloseable> CompletionStage<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
-        return toStage(client.connectFlow(clientEndpointType, request));
+        ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
+        try {
+            flow = client.connectFlow(clientEndpointType, request);
+        } catch (RuntimeException e) {
+            // a failed stage, like any other connect failure
+            return CompletableFuture.failedFuture(e);
+        }
+        return toStage(flow);
     }
 
     @Override
     public <T extends AutoCloseable> CompletionStage<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
-        return toStage(client.connectFlow(clientEndpointType, parameters));
+        ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
+        try {
+            flow = client.connectFlow(clientEndpointType, parameters);
+        } catch (RuntimeException e) {
+            // for example a class that is not a client websocket: a failed stage, not an exception
+            return CompletableFuture.failedFuture(e);
+        }
+        return toStage(flow);
     }
 
     @Override
@@ -65,19 +79,12 @@ final class NettyAsyncWebSocketClient implements AsyncWebSocketClient {
             if (error != null) {
                 future.completeExceptionally(error);
             } else if (handler != null && !future.complete(handler.getClientEndpoint())) {
-                // cancelled while the handshake completed: nobody waits for this endpoint
-                closeQuietly(handler.getClientEndpoint());
+                // cancelled while the handshake completed: nobody waits for this endpoint. Close
+                // the session itself: the close method of a concrete endpoint class may not
+                handler.closeUnclaimed();
             }
         });
         return future;
-    }
-
-    private static void closeQuietly(AutoCloseable endpoint) {
-        try {
-            endpoint.close();
-        } catch (Exception e) {
-            // the connect was cancelled
-        }
     }
 
     /**
