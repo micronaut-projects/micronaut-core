@@ -17,6 +17,8 @@ package io.micronaut.websocket;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.client.HttpClientConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Map;
@@ -83,4 +85,31 @@ public interface AsyncWebSocketClient extends AutoCloseable {
 
     @Override
     void close();
+
+    /**
+     * Create a new {@link AsyncWebSocketClient}.
+     * Note that this method should only be used outside the context of a Micronaut application.
+     * The returned client is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param uri The base URI
+     * @return The client
+     */
+    static AsyncWebSocketClient create(@Nullable URI uri) {
+        return WebSocketClientFactoryResolver.getFactory().createAsyncWebSocketClient(uri);
+    }
+
+    /**
+     * Create a new {@link AsyncWebSocketClient} with the specified configuration. Note that this
+     * method should only be used outside the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param uri           The base URI
+     * @param configuration The client configuration
+     * @return The client
+     */
+    static AsyncWebSocketClient create(@Nullable URI uri, HttpClientConfiguration configuration) {
+        return WebSocketClientFactoryResolver.getFactory().createAsyncWebSocketClient(uri, configuration);
+    }
 }

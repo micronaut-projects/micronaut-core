@@ -99,4 +99,30 @@ public interface WebSocketClientFactory {
         }
     }
 
+    /**
+     * Create a new {@link AsyncWebSocketClient}. Note that this method should only be used outside
+     * the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a
+     * client instead
+     *
+     * @param uri The base URI
+     * @return The client
+     * @since 5.3.0
+     */
+    default AsyncWebSocketClient createAsyncWebSocketClient(@Nullable URI uri) {
+        return createWebSocketClient(uri).toAsyncWebSocket();
+    }
+
+    /**
+     * Create a new {@link AsyncWebSocketClient} with the specified configuration. Note that this
+     * method should only be used outside the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param uri           The base URI
+     * @param configuration The client configuration
+     * @return The client
+     * @since 5.3.0
+     */
+    default AsyncWebSocketClient createAsyncWebSocketClient(@Nullable URI uri, HttpClientConfiguration configuration) {
+        return createWebSocketClient(uri, configuration).toAsyncWebSocket();
+    }
 }

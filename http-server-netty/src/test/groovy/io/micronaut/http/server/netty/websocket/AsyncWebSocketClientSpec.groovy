@@ -1,11 +1,15 @@
 package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.AsyncWebSocketClient
 import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.exceptions.WebSocketClientException
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -51,10 +55,10 @@ class AsyncWebSocketClientSpec extends Specification {
         cleanup:
         fred?.close()
         bob?.close()
-        async.close()
+        closeUnlessInjected(client, async)
 
         where:
-        client << ['netty', 'reactive adapter']
+        client << ['netty', 'reactive adapter', 'injected']
     }
 
     void "a failed connect completes the stage exceptionally with #client"() {
@@ -69,10 +73,10 @@ class AsyncWebSocketClientSpec extends Specification {
         e.cause instanceof WebSocketClientException
 
         cleanup:
-        async.close()
+        closeUnlessInjected(client, async)
 
         where:
-        client << ['netty', 'reactive adapter']
+        client << ['netty', 'reactive adapter', 'injected']
     }
 
     void "cancelling the connect cancels the stage with #client"() {
@@ -95,7 +99,22 @@ class AsyncWebSocketClientSpec extends Specification {
         client << ['netty', 'reactive adapter']
     }
 
+    void "the injected client is the bean of the default client"() {
+        expect:
+        embeddedServer.applicationContext.getBean(AsyncWebSocketClient) != null
+        embeddedServer.applicationContext.getBean(InjectedClients).client != null
+    }
+
+    private static void closeUnlessInjected(String client, AsyncWebSocketClient async) {
+        if (client != 'injected') {
+            async.close()
+        }
+    }
+
     private AsyncWebSocketClient asyncClient(String client) {
+        if (client == 'injected') {
+            return embeddedServer.applicationContext.getBean(InjectedClients).client
+        }
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         if (client == 'netty') {
             return wsClient.toAsyncWebSocket()
@@ -118,5 +137,13 @@ class AsyncWebSocketClientSpec extends Specification {
             }
         }
         return reactiveOnly.toAsyncWebSocket()
+    }
+
+    @Requires(property = 'spec.name', value = 'SimpleTextWebSocketSpec')
+    @Singleton
+    static class InjectedClients {
+        @Inject
+        @Client('/')
+        AsyncWebSocketClient client
     }
 }
