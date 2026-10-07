@@ -39,7 +39,7 @@ public class ServiceInstanceListLoadBalancerFactory {
      * @return The {@link LoadBalancer}
      */
     public LoadBalancer create(ServiceInstanceList serviceInstanceList) {
-        return new ServiceInstanceListRoundRobinLoadBalancer(serviceInstanceList);
+        return new AsyncServiceInstanceListRoundRobinLoadBalancer(serviceInstanceList);
     }
 
     /**

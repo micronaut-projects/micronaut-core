@@ -1,5 +1,8 @@
 package io.micronaut.core.async.publisher
 
+import io.micronaut.core.async.propagation.ReactorPropagation
+import io.micronaut.core.propagation.PropagatedContext
+import io.micronaut.core.propagation.PropagatedContextElement
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
@@ -9,6 +12,8 @@ import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+import java.time.Duration
 
 class CompletionStagePublishersSpec extends Specification {
 
@@ -255,5 +260,86 @@ class CompletionStagePublishersSpec extends Specification {
 
         then:
         stage.cancelled
+    }
+
+    void 'first subscribes with the propagated context in the Reactor context and as a thread-local'() {
+        given:
+        def element = new TestElement('request')
+        def seenInSubscribe = new AtomicReference<String>()
+        def publisher = Mono.deferContextual { view ->
+            seenInSubscribe.set(PropagatedContext.find().flatMap { it.find(TestElement) }.map { it.value }.orElse('none'))
+            Mono.just(ReactorPropagation.findContextElement(view, TestElement).map { it.value }.orElse('none'))
+        }
+
+        when:
+        def scope = PropagatedContext.getOrEmpty().plus(element).propagate()
+        CompletableFuture<String> future
+        try {
+            future = CompletionStagePublishers.first(publisher, null)
+        } finally {
+            scope.close()
+        }
+
+        then:
+        future.getNow(null) == 'request'
+        seenInSubscribe.get() == 'request'
+    }
+
+    void 'collect subscribes with the propagated context in the Reactor context'() {
+        given:
+        def element = new TestElement('request')
+        def publisher = Flux.deferContextual { view ->
+            Flux.just(ReactorPropagation.findContextElement(view, TestElement).map { it.value }.orElse('none'), 'second')
+        }
+
+        when:
+        def scope = PropagatedContext.getOrEmpty().plus(element).propagate()
+        CompletableFuture<List<String>> future
+        try {
+            future = CompletionStagePublishers.collect(publisher)
+        } finally {
+            scope.close()
+        }
+
+        then:
+        future.getNow(null) == ['request', 'second']
+    }
+
+    void 'a publisher that completes on another thread completes the future in the propagated context'() {
+        given:
+        def element = new TestElement('request')
+        def publisher = Mono.delay(Duration.ofMillis(10)).map { 'value' }
+
+        when:
+        def scope = PropagatedContext.getOrEmpty().plus(element).propagate()
+        CompletableFuture<String> future
+        try {
+            future = CompletionStagePublishers.first(publisher, null)
+        } finally {
+            scope.close()
+        }
+        def seen = future.thenApply { PropagatedContext.find().flatMap { it.find(TestElement) }.map { it.value }.orElse('none') }
+
+        then:
+        seen.get() == 'request'
+    }
+
+    void 'without a propagated context the publisher is subscribed to as it is'() {
+        given:
+        def publisher = Mono.deferContextual { view ->
+            Mono.just(ReactorPropagation.findPropagatedContext(view).isPresent())
+        }
+
+        expect:
+        !PropagatedContext.exists()
+        CompletionStagePublishers.first(publisher, null).getNow(null) == false
+    }
+
+    static class TestElement implements PropagatedContextElement {
+        final String value
+
+        TestElement(String value) {
+            this.value = value
+        }
     }
 }

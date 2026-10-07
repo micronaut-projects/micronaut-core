@@ -16,10 +16,13 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.CoreSubscriber;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,11 +40,17 @@ import java.util.function.Supplier;
  * {@link CompletionStage} counterparts of the publisher based SPIs. Each future subscribes to its
  * publisher right away, and cancelling the future cancels the subscription.
  *
+ * <p>A publisher is subscribed to in the {@link PropagatedContext} of the caller, as a thread-local
+ * and, when Reactor is present, in the Reactor context, and its signals are handled in that context,
+ * so that the continuations of the future run in it.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 public final class CompletionStagePublishers {
+
+    private static final boolean REACTOR_PRESENT = isReactorPresent();
 
     private CompletionStagePublishers() {
     }
@@ -175,6 +184,17 @@ public final class CompletionStagePublishers {
         return throwable;
     }
 
+    @SuppressWarnings("ConstantValue")
+    private static boolean isReactorPresent() {
+        try {
+            // resolving the class literal fails when Reactor, an optional dependency, is absent
+            Class<?> type = CoreSubscriber.class;
+            return type != null;
+        } catch (LinkageError e) {
+            return false;
+        }
+    }
+
     private static void cancelAll(List<? extends CompletableFuture<?>> futures) {
         for (CompletableFuture<?> future : futures) {
             future.cancel(false);
@@ -188,9 +208,57 @@ public final class CompletionStagePublishers {
             }
         });
         try {
-            publisher.subscribe(subscriber);
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+            if (propagatedContext.isEmpty()) {
+                publisher.subscribe(subscriber);
+            } else if (REACTOR_PRESENT) {
+                // a Reactor publisher finds the context in its Reactor context, as it did when it
+                // was subscribed to by a Reactor chain of the caller
+                ReactivePropagation.propagate(propagatedContext, publisher).subscribe(subscriber);
+            } else {
+                publisher.subscribe(new PropagatingSubscriber<>(propagatedContext, subscriber));
+            }
         } catch (Throwable e) {
             future.completeExceptionally(e);
+        }
+    }
+
+    /**
+     * Handles the signals of a publisher in a propagated context, without Reactor.
+     *
+     * @param propagatedContext The context
+     * @param actual            The subscriber
+     * @param <T>               The item type
+     */
+    private record PropagatingSubscriber<T>(PropagatedContext propagatedContext,
+                                            Subscriber<T> actual) implements Subscriber<T> {
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            run(() -> actual.onSubscribe(s));
+        }
+
+        @Override
+        public void onNext(T t) {
+            run(() -> actual.onNext(t));
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            run(() -> actual.onError(t));
+        }
+
+        @Override
+        public void onComplete() {
+            run(actual::onComplete);
+        }
+
+        private void run(Runnable signal) {
+            if (propagatedContext.isBound()) {
+                signal.run();
+            } else {
+                propagatedContext.propagate(signal);
+            }
         }
     }
 

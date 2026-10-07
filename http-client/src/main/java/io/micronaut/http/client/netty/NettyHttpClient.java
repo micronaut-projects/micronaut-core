@@ -90,7 +90,7 @@ import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
-import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.loadbalance.AsyncFixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.multipart.MultipartBody;
@@ -1638,12 +1638,13 @@ final class NettyHttpClient implements
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
         ExecutionFlow<ServiceInstance> selected;
-        if (loadBalancer instanceof FixedLoadBalancer fixed) {
+        if (loadBalancer instanceof AsyncFixedLoadBalancer fixed) {
+            // only the built-in one: a subclass of FixedLoadBalancer may override select
             selected = ExecutionFlow.just(fixed.getServiceInstance());
         } else {
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
             // without an asynchronous chain
-            selected = toFlow(loadBalancer.selectAsync(getLoadBalancerDiscriminator(request)).toCompletableFuture());
+            selected = toFlow(loadBalancer.selectAsync(getLoadBalancerDiscriminator(request)).toCompletableFuture(), PropagatedContext.getOrEmpty());
         }
 
         LoadBalancer balancer = loadBalancer;
@@ -1666,25 +1667,36 @@ final class NettyHttpClient implements
 
     /**
      * The flow of a selection of the load balancer. A selection that is not complete yet is
-     * cancelled when the flow is.
+     * cancelled when the flow is, and completes the flow in the propagated context of the
+     * request, so that the steps of the flow run in it, as they did with the publisher of the
+     * selection.
      *
-     * @param future The selection
+     * @param future            The selection
+     * @param propagatedContext The propagated context of the request
      * @return The flow
      */
-    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<ServiceInstance> future) {
+    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<ServiceInstance> future, PropagatedContext propagatedContext) {
         if (future.isDone()) {
             return CompletableFutureExecutionFlow.just(future);
         }
         DelayedExecutionFlow<ServiceInstance> flow = DelayedExecutionFlow.create();
         future.whenComplete((instance, throwable) -> {
-            if (throwable != null) {
-                flow.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
+            if (propagatedContext.isEmpty() || propagatedContext.isBound()) {
+                complete(flow, instance, throwable);
             } else {
-                flow.complete(instance);
+                propagatedContext.propagate(() -> complete(flow, instance, throwable));
             }
         });
         flow.onCancel(() -> future.cancel(false));
         return flow;
+    }
+
+    private static void complete(DelayedExecutionFlow<ServiceInstance> flow, @Nullable ServiceInstance instance, @Nullable Throwable throwable) {
+        if (throwable != null) {
+            flow.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
+        } else {
+            flow.complete(instance);
+        }
     }
 
     private <R extends HttpResponse<?>> ExecutionFlow<R> handleStreamHttpError(
