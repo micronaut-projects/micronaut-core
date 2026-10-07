@@ -347,11 +347,11 @@ public final class PythonImportMappings {
         private void addNestedModules(String module, Map<String, Member> members, List<Clash> clashes, Set<String> excluded) {
             String prefix = module + '.';
             for (String candidate : contributions.keySet()) {
-                if (!candidate.startsWith(prefix) || candidate.indexOf('.', prefix.length()) >= 0) {
-                    continue;
-                }
-                String name = candidate.substring(prefix.length());
-                if (excluded.contains(name)) {
+                // a module directly nested in this one, not excluded from it
+                String name = candidate.startsWith(prefix) && candidate.indexOf('.', prefix.length()) < 0
+                    ? candidate.substring(prefix.length())
+                    : null;
+                if (name == null || excluded.contains(name)) {
                     continue;
                 }
                 Member nested = new Member(name, Kind.MODULE, candidate, null);
