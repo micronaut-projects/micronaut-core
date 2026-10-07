@@ -79,8 +79,11 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      */
     private final AbstractJdkHttpClient transport;
     /**
-     * The JDK client of the transport, shared by the blocking clients.
+     * The JDK client of the transport, shared by the blocking clients. Not read here: it keeps the
+     * field the clients had before the transport was split off, which JdkBlockingHttpClientReuseSpec
+     * reads to check that a blocking client reuses the JDK client of its parent.
      */
+    @SuppressWarnings({"unused", "FieldCanBeLocal"})
     private final java.net.http.HttpClient client;
 
     @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
