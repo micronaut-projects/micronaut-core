@@ -89,10 +89,17 @@ final class PendingRoute {
      * other route is dropped and the terminal fails.
      *
      * @return The URI template, under the prefix
-     * @throws IllegalStateException if the route is not a route of {@code GET} only, or has media
-     *                               types or a response type
+     * @throws IllegalStateException if the route is not a route of {@code GET} only, is a located
+     *                               route, or has media types or a response type
      */
     String webSocketTemplate() {
+        if (builder.located()) {
+            // the server finds the WebSocket route of an upgrade request among the routes it
+            // knows when it starts, not among the routes of the targets located per request
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is a located route: a WebSocket route is a route of an HttpRoutes bean");
+        }
         String template = getTemplate;
         if (template == null) {
             drop();

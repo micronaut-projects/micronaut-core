@@ -30,6 +30,8 @@ snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="filter", inde
 
 The conditions of `where(...)`, the order and the port select the route like for any other request: of the WebSocket routes that match an upgrade request, the closest one is upgraded, then the one of the lowest order. A `GET` request to a WebSocket route that is not an upgrade is answered with `400`.
 
+A WebSocket route is a route of an `HttpRoutes` bean: the server finds the route of an upgrade request among the routes it knows when it starts, so a located route, see <<functionalRoutesLocators, Locator Routes>>, cannot be a WebSocket route, and declaring one fails with an `IllegalStateException`.
+
 A WebSocket route has no media types and no response type: the media types of its groups do not apply to it, and `consumes(...)`, `produces(...)` or `responseType(...)` on the route itself fail with an `IllegalStateException`. A message handler declares the type of its messages instead.
 
 === Streams

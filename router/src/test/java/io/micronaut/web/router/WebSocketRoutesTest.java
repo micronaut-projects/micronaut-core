@@ -29,6 +29,7 @@ import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import io.micronaut.web.router.websocket.WebSocketMessageHandler;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
@@ -272,6 +273,20 @@ class WebSocketRoutesTest {
             // the route is dropped
             assertNull(router.findClosest(HttpRequest.GET("/typed")));
         }
+    }
+
+    @Test
+    void aLocatedRouteIsNotAWebSocketRoute() {
+        AtomicReference<IllegalStateException> error = new AtomicReference<>();
+        LocatedRoutes<?> located = TestLocatedRoutes.of(target -> {
+            target.GET("/plain").respond(io.micronaut.http.HttpResponse.ok());
+            error.set(assertThrows(IllegalStateException.class, () -> target.GET("/ws").webSocket(ws -> ws.onOpen((session, request) -> null))));
+        });
+        Router router = router(routes -> routes.locate("/targets/{id}", (request, pathVariables) -> "target", target -> located));
+        // the located routes are declared, the WebSocket route is dropped
+        assertNotNull(router.findClosest(HttpRequest.GET("/targets/1/plain")));
+        assertNull(router.findClosest(HttpRequest.GET("/targets/1/ws")));
+        assertTrue(error.get().getMessage().contains("is a located route"), error.get().getMessage());
     }
 
     @Test
