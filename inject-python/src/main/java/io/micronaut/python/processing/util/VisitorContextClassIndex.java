@@ -99,16 +99,22 @@ public final class VisitorContextClassIndex implements ClassIndex {
     }
 
     private static TypeInfo typeInfo(ClassElement element) {
+        String name = element.getName();
+        boolean publicType = element.isPublic();
+        boolean internal = element.hasDeclaredAnnotation(INTERNAL);
+        boolean enumType = element.isEnum();
+        boolean interfaceType = element.isInterface();
         TypeKind kind;
+        // an annotation type is an interface too, so it is told apart first
         if (PythonAnnotationTypes.isAnnotationType(element)) {
             kind = TypeKind.ANNOTATION;
-        } else if (element.isEnum()) {
+        } else if (enumType) {
             kind = TypeKind.ENUM;
-        } else if (element.isInterface()) {
+        } else if (interfaceType) {
             kind = TypeKind.INTERFACE;
         } else {
             kind = TypeKind.CLASS;
         }
-        return new TypeInfo(element.getName(), kind, element.isPublic(), element.hasDeclaredAnnotation(INTERNAL));
+        return new TypeInfo(name, kind, publicType, internal);
     }
 }
