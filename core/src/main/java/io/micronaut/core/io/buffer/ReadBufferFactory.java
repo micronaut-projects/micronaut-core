@@ -37,6 +37,12 @@ import java.nio.charset.Charset;
  */
 public class ReadBufferFactory {
     private static final ReadBufferFactory INSTANCE = new ReadBufferFactory();
+    private static final ReadBufferFactory UNTRACKED = new ReadBufferFactory() {
+        @Override
+        public ReadBuffer adapt(ByteBuffer nioBuffer) {
+            return new NioReadBuffer(nioBuffer, false);
+        }
+    };
 
     /**
      * Internal constructor. Extension is only allowed in micronaut-core.
@@ -52,6 +58,19 @@ public class ReadBufferFactory {
      */
     public static ReadBufferFactory getJdkFactory() {
         return INSTANCE;
+    }
+
+    /**
+     * Get a {@link ReadBufferFactory} like {@link #getJdkFactory()}, whose buffers are not leak
+     * tracked: for heap data that holds no resource, created on threads that do not belong to
+     * the code that uses it, such as the threads of the JDK HTTP client.
+     *
+     * @return The factory
+     * @since 5.3.0
+     */
+    @Internal
+    public static ReadBufferFactory getUntrackedJdkFactory() {
+        return UNTRACKED;
     }
 
     /**

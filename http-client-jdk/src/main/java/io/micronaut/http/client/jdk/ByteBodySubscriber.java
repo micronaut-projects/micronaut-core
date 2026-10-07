@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.DelayedSubscriber;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReactiveByteBufferByteBody;
@@ -47,7 +48,12 @@ import java.util.function.Consumer;
  */
 @Internal
 final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableByteBody> {
-    private static final ByteBodyFactory BODY_FACTORY = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+    /**
+     * The pieces are heap buffers that hold no resource, made on the threads of the JDK client:
+     * they are not leak tracked.
+     */
+    private static final ByteBodyFactory BODY_FACTORY = new ByteBodyFactory(ByteArrayBufferFactory.INSTANCE, ReadBufferFactory.getUntrackedJdkFactory()) {
+    };
 
     private final DelayedSubscriber<ReadBuffer> defer = new DelayedSubscriber<>();
     private final CloseableByteBody mapped;
