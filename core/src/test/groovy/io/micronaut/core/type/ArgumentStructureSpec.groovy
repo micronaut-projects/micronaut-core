@@ -90,6 +90,42 @@ class ArgumentStructureSpec extends Specification {
         'a wildcard of an array'     | upper(type(String[]))                                 | true     | false      | false
     }
 
+    @Unroll
+    void "#description is a variable or an array of one: #expected"() {
+        expect:
+        argument.isUnresolvedTypeVariableOrArrayOfOne() == expected
+
+        where:
+        description                  | argument                                              | expected
+        'a variable'                 | variable('T')                                         | true
+        'a bounded variable'         | variable('T', type(Number), type(Comparable))         | true
+        'a recursive variable'       | recursive('T')                                        | true
+        'T[]'                        | Argument.ofTypeVariable(Object[], null, 'T')          | true
+        'T[][]'                      | Argument.ofTypeVariable(Object[][], null, 'T')        | true
+        'the array of a variable'    | variable('T', type(Number)).arrayType()               | true
+        'a class'                    | type(String)                                          | false
+        'an array'                   | type(String[])                                        | false
+        'List<T>'                    | type(List, variable('T'))                             | false
+        'List<T>[]'                  | type(List[], variable('T'))                           | false
+        'a resolved variable'        | resolved(Integer, 'T')                                | false
+        'a resolved array'           | resolved(String[], 'T')                               | false
+        'an unbounded wildcard'      | unbounded()                                           | false
+        'a wildcard of an array'     | upper(type(String[]))                                 | false
+    }
+
+    void "an array of a variable is not the variable, but its component is"() {
+        given:
+        Argument<?> array = Argument.ofTypeVariable(Number[][], null, 'T', null, null, [type(Number)] as Argument[])
+
+        expect:
+        !array.isUnresolvedTypeVariable()
+        array.isUnresolvedTypeVariableOrArrayOfOne()
+        !array.componentType().isUnresolvedTypeVariable()
+        array.componentType().isUnresolvedTypeVariableOrArrayOfOne()
+        array.componentType().componentType().isUnresolvedTypeVariable()
+        array.componentType().componentType().isUnresolvedTypeVariableOrArrayOfOne()
+    }
+
     void "a wildcard and a resolved variable are still placeholders, which is why the shape is asked separately"() {
         expect:
         unbounded() instanceof GenericPlaceholder

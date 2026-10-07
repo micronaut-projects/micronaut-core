@@ -189,6 +189,18 @@ class TwoBounds<T extends Comparable<U>, U extends Number & Runnable> {
         'type'                         | 'String'                                        | false    | false    | false
     }
 
+    void "a compiled variable and a compiled array of one are variables or arrays of one, and nothing else is"() {
+        given:
+        Set<String> expected = ['arrayOfRecursive', 'arrayOfSeveral', 'arrayOfNone', 'arrayOfArrays',
+                                'recursiveVariable', 'severalVariable', 'noneVariable'] as Set
+
+        expect:
+        first.findAll { name, argument -> argument.isUnresolvedTypeVariableOrArrayOfOne() }.keySet() == expected
+        first.recursiveNestedAndArray.typeParameters[1].isUnresolvedTypeVariableOrArrayOfOne()
+        !first.recursiveNestedAndArray.typeParameters[1].isUnresolvedTypeVariable()
+        !first.unbounded.typeParameters[0].isUnresolvedTypeVariableOrArrayOfOne()
+    }
+
     void "the type arguments are told apart too"() {
         expect:
         first.unbounded.typeParameters[0].isWildcard()

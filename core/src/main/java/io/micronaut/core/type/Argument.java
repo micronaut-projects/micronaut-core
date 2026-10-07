@@ -209,7 +209,8 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * ({@link GenericPlaceholder#isResolved()}) and for an array of a variable, {@code T[]}, which is an array
      * whose {@link #componentType()} is the variable. An argument that answers {@code true} is a
      * {@link GenericPlaceholder}; its {@link #getType()} is the type the variable erases to. See
-     * {@link #isWildcard()} for how the shapes of an argument are told apart.</p>
+     * {@link #isWildcard()} for how the shapes of an argument are told apart, and
+     * {@link #isUnresolvedTypeVariableOrArrayOfOne()} to take an array of a variable along with it.</p>
      *
      * <p>A placeholder built by hand with {@link #ofTypeVariable(Class, String)} for a type resolved in place of a
      * variable, or compiled before {@link GenericPlaceholder#isResolved()} was recorded, is taken for the variable
@@ -224,6 +225,27 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
             && !(this instanceof WildcardArgument<?>)
             && !placeholder.isResolved()
             && !getType().isArray();
+    }
+
+    /**
+     * Whether this argument stands for a type variable left unresolved where the argument was written, or for an
+     * array of one of any dimension: the {@code T} of {@code List<T>}, {@code T[]} and {@code T[][]}. An array of
+     * a variable is a {@link GenericPlaceholder} of that variable whose {@link #getType()} is the array of the type
+     * the variable erases to, and {@link #isUnresolvedTypeVariable()} answers {@code false} for it.
+     *
+     * <p>It is {@code false} for a wildcard, for a type resolved in place of a variable
+     * ({@link GenericPlaceholder#isResolved()}) and for a type that only has a variable among its type arguments,
+     * {@code List<T>} or {@code List<T>[]}. Use it where an array of a variable is no more a class than the variable
+     * is, as for {@link java.lang.reflect.GenericArrayType}.</p>
+     *
+     * @return Whether this argument is an unresolved type variable or an array of one
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isUnresolvedTypeVariableOrArrayOfOne() {
+        return this instanceof GenericPlaceholder<?> placeholder
+            && !(this instanceof WildcardArgument<?>)
+            && !placeholder.isResolved();
     }
 
     /**
