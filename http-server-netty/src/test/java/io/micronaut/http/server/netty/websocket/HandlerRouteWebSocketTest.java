@@ -474,6 +474,14 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
+    void aStreamSentByTheCloseHandlerSendsNothingAfterTheCloseOfThePeer() throws Exception {
+        Client client = connect("/ws/close-send-all");
+        client.close(1000, "done");
+        assertEquals(Set.of("late cancelled", "late sent all false"), Set.of(event(), event()));
+        assertNull(client.messages.poll(200, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
     void pingsReadAtOnceAreAllAnswered() throws Exception {
         try (RawClient raw = new RawClient(server.getPort(), "/ws/burst")) {
             raw.write(concat(RawClient.frame(0x9, "one"), RawClient.frame(0x9, "two"), RawClient.frame(0x9, "three")));
@@ -1204,6 +1212,10 @@ class HandlerRouteWebSocketTest {
                         log.add("unbounded close " + reason.getCode());
                         return null;
                     }));
+                routes.GET("/ws/close-send-all").webSocket(ws -> ws
+                    .onMessage(String.class, (session, message) -> null)
+                    .onClose((session, reason) -> session.sendAllAsync(new Ticks("late", 2, true, log))
+                        .thenAccept(all -> log.add("late sent all " + all))));
                 routes.GET("/ws/close-discards").webSocket(ws -> ws
                     .onMessage(String.class, (session, message) -> {
                         log.add("start " + message);

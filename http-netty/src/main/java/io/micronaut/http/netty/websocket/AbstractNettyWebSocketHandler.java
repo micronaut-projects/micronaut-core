@@ -550,6 +550,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {
         CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
+        getSession().markCloseReceived();
         handleCloseReason(ctx, cr, true);
     }
 
