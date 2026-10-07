@@ -130,6 +130,78 @@ def module_bound_names(tree: ast.Module) -> Set[str]:
     return names
 
 
+SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef,
+               ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+
+
+def _bound_by(node: ast.AST, names: Set[str]):
+    """Adds the names a node binds in the scope it belongs to, without entering nested scopes."""
+    if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+        names.add(node.id)
+    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        names.add(node.name)
+    elif isinstance(node, (ast.Import, ast.ImportFrom)):
+        for alias in node.names:
+            if alias.name != '*':
+                names.add(alias.asname or alias.name.split('.')[0])
+    elif isinstance(node, ast.ExceptHandler) and node.name:
+        names.add(node.name)
+    elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+        names.add(node.name)
+    elif isinstance(node, ast.MatchMapping) and node.rest:
+        names.add(node.rest)
+
+
+def scope_bindings(body: List[ast.AST]) -> Set[str]:
+    """The names the statements of one scope bind, minus those declared global or nonlocal."""
+    names: Set[str] = set()
+    declared: Set[str] = set()
+    pending = list(body)
+    while pending:
+        node = pending.pop()
+        _bound_by(node, names)
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            declared.update(node.names)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            # the decorators, defaults and annotations belong to this scope, the body does not
+            pending.extend(node.decorator_list)
+            if isinstance(node, ast.ClassDef):
+                pending.extend(node.bases)
+                pending.extend(class_keyword.value for class_keyword in node.keywords)
+            else:
+                pending.extend(d for d in node.args.defaults + node.args.kw_defaults if d is not None)
+            continue
+        if isinstance(node, SCOPE_NODES):
+            continue
+        pending.extend(ast.iter_child_nodes(node))
+    return names - declared
+
+
+def parameter_names(arguments: ast.arguments) -> Set[str]:
+    parameters = arguments.posonlyargs + arguments.args + arguments.kwonlyargs
+    names = {parameter.arg for parameter in parameters}
+    if arguments.vararg:
+        names.add(arguments.vararg.arg)
+    if arguments.kwarg:
+        names.add(arguments.kwarg.arg)
+    return names
+
+
+def module_rebindings(tree: ast.Module, facades: FacadeRegistry) -> Set[str]:
+    """
+    The names the module binds at module level other than through a facade import: they shadow what a facade
+    import binds, as a definition after a star import shadows its name.
+    """
+    statements = [
+        statement for statement in tree.body
+        if not (isinstance(statement, ast.ImportFrom) and statement.module and (
+            facades.get(statement.module) is not None
+            or any(facades.get(f'{statement.module}.{alias.name}') is not None for alias in statement.names)))
+        and not (isinstance(statement, ast.Import) and any(facades.get(alias.name) is not None for alias in statement.names))
+    ]
+    return scope_bindings(statements)
+
+
 class FacadeImportRewriter:
     """
     Rewrites the facade imports and references of a module's compile-time tree to Java imports and references.
@@ -160,6 +232,8 @@ class FacadeImportRewriter:
         self.type_locals: Dict[str, str] = {}
         self.generated_imports: List[ast.stmt] = []
         self.bound_names: Set[str] = set()
+        # the names the module binds at module level besides its facade imports
+        self.module_rebound: Set[str] = set()
         self.star_imports_java = False
 
     # ----------------------------------------------------------------------------------------------------
@@ -169,6 +243,7 @@ class FacadeImportRewriter:
         if not self._imports_facades(tree):
             return tree
         self.bound_names = module_bound_names(tree)
+        self.module_rebound = module_rebindings(tree, self.facades)
         _ImportPass(self).visit(tree)
         _ReferencePass(self).visit(tree)
         if self.generated_imports:
@@ -286,7 +361,9 @@ class _ImportPass(ast.NodeTransformer):
             for alias in node.names:
                 if alias.name == '*':
                     for member in facade.members.values():
-                        replacements.extend(self._bind(member.name, member, node))
+                        # a name the module binds itself shadows the one a star import binds
+                        if member.name not in rewriter.module_rebound:
+                            replacements.extend(self._bind(member.name, member, node))
                     continue
                 member = facade.members.get(alias.name)
                 if member is None:
@@ -349,13 +426,92 @@ class _ImportPass(ast.NodeTransformer):
 
 
 class _ReferencePass(ast.NodeTransformer):
-    """Rewrites the references to facade members."""
+    """
+    Rewrites the references to facade members, following Python's scopes: a name a function, a lambda, a
+    comprehension or a class body binds itself (a parameter, a local, a ``for`` target, ...) is not the facade
+    member of the same name, nor is a name the module rebinds.
+    """
 
     def __init__(self, rewriter: FacadeImportRewriter):
         self.rewriter = rewriter
+        # the enclosing scopes, innermost last: (is a class body, the names it binds)
+        self.scopes: List[tuple] = []
+
+    def shadowed(self, name: str) -> bool:
+        for index in range(len(self.scopes) - 1, -1, -1):
+            class_body, names = self.scopes[index]
+            # a class body's names are visible in the class body only, not in the functions nested in it
+            if class_body and index != len(self.scopes) - 1:
+                continue
+            if name in names:
+                return True
+        return name in self.rewriter.module_rebound
+
+    def _in_scope(self, class_body: bool, names: Set[str], visit):
+        self.scopes.append((class_body, names))
+        try:
+            return visit()
+        finally:
+            self.scopes.pop()
+
+    def _visit_list(self, nodes):
+        result = []
+        for node in nodes:
+            visited = self.visit(node)
+            if visited is None:
+                continue
+            if isinstance(visited, list):
+                result.extend(visited)
+            else:
+                result.append(visited)
+        return result
+
+    def _visit_arguments(self, arguments: ast.arguments):
+        # defaults and annotations are evaluated in the enclosing scope
+        arguments.defaults = self._visit_list(arguments.defaults)
+        arguments.kw_defaults = [self.visit(d) if d is not None else None for d in arguments.kw_defaults]
+        for parameter in arguments.posonlyargs + arguments.args + arguments.kwonlyargs + [arguments.vararg, arguments.kwarg]:
+            if parameter is not None and parameter.annotation is not None:
+                parameter.annotation = self.visit(parameter.annotation)
+
+    def _visit_function(self, node):
+        node.decorator_list = self._visit_list(node.decorator_list)
+        self._visit_arguments(node.args)
+        if node.returns is not None:
+            node.returns = self.visit(node.returns)
+        names = parameter_names(node.args) | scope_bindings(node.body)
+        node.body = self._in_scope(False, names, lambda: self._visit_list(node.body))
+        return node
+
+    visit_FunctionDef = _visit_function
+    visit_AsyncFunctionDef = _visit_function
+
+    def visit_Lambda(self, node: ast.Lambda):
+        self._visit_arguments(node.args)
+        node.body = self._in_scope(False, parameter_names(node.args), lambda: self.visit(node.body))
+        return node
+
+    def visit_ClassDef(self, node: ast.ClassDef):
+        node.decorator_list = self._visit_list(node.decorator_list)
+        node.bases = self._visit_list(node.bases)
+        node.keywords = self._visit_list(node.keywords)
+        node.body = self._in_scope(True, scope_bindings(node.body), lambda: self._visit_list(node.body))
+        return node
+
+    def _visit_comprehension(self, node):
+        names: Set[str] = set()
+        for generator in node.generators:
+            for target in ast.walk(generator.target):
+                _bound_by(target, names)
+        return self._in_scope(False, names, lambda: self.generic_visit(node))
+
+    visit_ListComp = _visit_comprehension
+    visit_SetComp = _visit_comprehension
+    visit_DictComp = _visit_comprehension
+    visit_GeneratorExp = _visit_comprehension
 
     def visit_Name(self, node: ast.Name):
-        if isinstance(node.ctx, ast.Load):
+        if isinstance(node.ctx, ast.Load) and not self.shadowed(node.id):
             member = self.rewriter.member_bindings.get(node.id)
             if member is not None:
                 return ast.copy_location(self.rewriter.reference_to(member), node)
@@ -373,6 +529,8 @@ class _ReferencePass(ast.NodeTransformer):
             return self.generic_visit(node)
         rewriter = self.rewriter
         root = current.id
+        if self.shadowed(root):
+            return self.generic_visit(node)
         bound = rewriter.module_bindings.get(root)
         if bound is None:
             if root in rewriter.unbound_facade_names and root not in rewriter.bound_names:
