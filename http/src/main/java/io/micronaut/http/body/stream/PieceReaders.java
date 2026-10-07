@@ -30,6 +30,7 @@ import org.reactivestreams.Publisher;
 
 import java.util.ArrayDeque;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -73,6 +74,26 @@ public final class PieceReaders {
                                                       PieceReader<T> reader,
                                                       Function<ByteBuffer<?>, ReadBuffer> adapter) {
         return new PieceReaderPublisher<>(input, adapter, PieceReaders::release, reader);
+    }
+
+    /**
+     * The elements a piece reader reads from the buffers of a body, as a publisher without
+     * Reactor.
+     *
+     * @param input          The buffers of the body
+     * @param reader         The reader of the pieces, which the publisher takes over
+     * @param adapter        The read buffer of a buffer, which takes it over
+     * @param foreignDiscard Releases an object that a Reactor input discards and that is
+     *                       neither a {@link ReadBuffer} nor a Micronaut
+     *                       {@link ReferenceCounted}, e.g. a Netty buffer
+     * @param <T>            The type of an element
+     * @return The publisher of the elements, for one subscriber
+     */
+    public static <T> Publisher<T> publisherOfBuffers(Publisher<ByteBuffer<?>> input,
+                                                      PieceReader<T> reader,
+                                                      Function<ByteBuffer<?>, ReadBuffer> adapter,
+                                                      Consumer<Object> foreignDiscard) {
+        return new PieceReaderPublisher<>(input, adapter, PieceReaders::release, reader, foreignDiscard);
     }
 
     /**

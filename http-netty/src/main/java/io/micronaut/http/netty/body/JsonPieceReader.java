@@ -23,6 +23,8 @@ import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.codec.CodecException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -69,6 +71,18 @@ final class JsonPieceReader<T> implements PieceReader<T> {
      */
     static ReadBuffer adapt(ByteBuffer<?> buffer) {
         return READ_BUFFERS.adapt(buffer);
+    }
+
+    /**
+     * Releases a Netty object that a Reactor input of a chunked reader discards, e.g. a buffer
+     * it held before it was mapped to a piece.
+     *
+     * @param object The discarded object
+     */
+    static void discardForeign(Object object) {
+        if (object instanceof ReferenceCounted counted && counted.refCnt() > 0) {
+            ReferenceCountUtil.safeRelease(counted);
+        }
     }
 
     @Override

@@ -53,6 +53,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     private final Publisher<I> input;
     private final Function<? super I, ReadBuffer> adapter;
     private final Consumer<? super I> discard;
+    private final Consumer<Object> foreignDiscard;
     private final PieceReader<T> reader;
 
     private final AtomicBoolean subscribed = new AtomicBoolean();
@@ -89,10 +90,25 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      * @param reader  The reader of the pieces, which the publisher takes over
      */
     PieceReaderPublisher(Publisher<I> input, Function<? super I, ReadBuffer> adapter, Consumer<? super I> discard, PieceReader<T> reader) {
+        this(input, adapter, discard, reader, object -> { });
+    }
+
+    /**
+     * @param input          The pieces of the body
+     * @param adapter        The buffer of a piece, which takes it over
+     * @param discard        Releases a piece that is not read
+     * @param reader         The reader of the pieces, which the publisher takes over
+     * @param foreignDiscard Releases another object that a Reactor input discards, e.g. a Netty
+     *                       buffer it held before mapping it to a piece: this module does not
+     *                       know Netty, so the Netty modules pass the release of its reference
+     *                       counted objects
+     */
+    PieceReaderPublisher(Publisher<I> input, Function<? super I, ReadBuffer> adapter, Consumer<? super I> discard, PieceReader<T> reader, Consumer<Object> foreignDiscard) {
         this.input = input;
         this.adapter = adapter;
         this.discard = discard;
         this.reader = reader;
+        this.foreignDiscard = foreignDiscard;
     }
 
     @Override
@@ -146,7 +162,10 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     /**
      * The pieces a Reactor input still holds when it is cancelled are discarded with the
      * discard hook of the context of its subscriber: interop only, nothing of Reactor is on the
-     * path of the elements.
+     * path of the elements. A {@link ReadBuffer} is closed and a Micronaut
+     * {@link ReferenceCounted} is released here; any other object, such as a Netty buffer that
+     * an operator held before it was mapped to a piece, is passed to the foreign discard of the
+     * publisher, which the Netty modules set to release Netty reference counted objects.
      *
      * @return The context with the discard hook
      */
@@ -155,12 +174,13 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         return Operators.enableOnDiscard(Context.empty(), this::discardObject);
     }
 
-    @SuppressWarnings("unchecked")
     private void discardObject(Object piece) {
         if (piece instanceof ReadBuffer readBuffer) {
             readBuffer.close();
         } else if (piece instanceof ReferenceCounted counted) {
             counted.release();
+        } else {
+            foreignDiscard.accept(piece);
         }
     }
 
@@ -172,7 +192,6 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
 
     @Override
     public void onNext(I next) {
-        pieceRequested = false;
         if (!piece.compareAndSet(null, next)) {
             // §1.1: more pieces than requested
             discard.accept(next);
@@ -258,6 +277,8 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                 }
                 I next = piece.getAndSet(null);
                 if (next != null) {
+                    // the request is answered when the drain takes the piece, not in onNext: only the drain touches the flag
+                    pieceRequested = false;
                     if (readerFailure == null) {
                         try {
                             reader.read(adapter.apply(next));
@@ -323,7 +344,13 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      */
     private void terminate(boolean cancelUpstream) {
         done = true;
+        T last = held;
         held = null;
+        if (last != null) {
+            // an element the end of the input completed, not emitted: e.g. a reference counted
+            // buffer
+            discardObject(last);
+        }
         reader.close();
         if (cancelUpstream) {
             upstreamCancelRequested = true;

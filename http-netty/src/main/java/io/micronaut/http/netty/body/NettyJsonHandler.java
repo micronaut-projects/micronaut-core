@@ -89,7 +89,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
             // Publisher<T> is unwrapped
             processor.counter.unwrapTopLevelArray();
         }
-        return PieceReaders.publisherOfBuffers(input, new JsonPieceReader<>(processor, value -> read(type, mediaType, httpHeaders, value)), JsonPieceReader::adapt);
+        return PieceReaders.publisherOfBuffers(input, new JsonPieceReader<>(processor, value -> read(type, mediaType, httpHeaders, value)), JsonPieceReader::adapt, JsonPieceReader::discardForeign);
     }
 
     /**
@@ -100,7 +100,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
      */
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
-        return PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), JsonPieceReader::adapt);
+        return PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), JsonPieceReader::adapt, JsonPieceReader::discardForeign);
     }
 
     /**
