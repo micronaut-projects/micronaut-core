@@ -24,6 +24,9 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 /**
@@ -48,6 +51,11 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
     private @Nullable Subscription subscription;
     private boolean requested;
     private boolean inputEnded;
+    /**
+     * The input could not be read, or completed: it ended, and the elements the reader holds
+     * are delivered before this failure.
+     */
+    private @Nullable Throwable inputFailure;
     private boolean done;
 
     /**
@@ -72,6 +80,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
      */
     private void drain() {
         T element = null;
+        CompletableFuture<Optional<T>> read = null;
         Throwable failure = null;
         boolean end = false;
         boolean subscribe = false;
@@ -85,14 +94,22 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
             } catch (Throwable e) {
                 failure = e;
                 done = true;
-                s = subscription;
+                s = inputEnded ? null : subscription;
                 reader.close();
             }
-            if (element == null && failure == null) {
+            if (element != null) {
+                // taken with the element: a completion that arrives before the element is
+                // handed over finds no read to end
+                read = takeWaiting();
+            } else if (failure == null) {
                 if (inputEnded) {
-                    end = true;
                     done = true;
                     reader.close();
+                    if (inputFailure != null) {
+                        failure = inputFailure;
+                    } else {
+                        end = true;
+                    }
                 } else if (requested) {
                     // a piece is on its way
                     return;
@@ -114,7 +131,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
             }
             fail(wrap.apply(failure));
         } else if (element != null) {
-            push(element);
+            Objects.requireNonNull(read).complete(Optional.of(element));
         } else if (end) {
             end();
         } else if (subscribe) {
@@ -161,29 +178,25 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
 
     @Override
     public void onNext(ReadBuffer piece) {
-        Throwable failure = null;
         Subscription s = null;
         synchronized (this) {
             requested = false;
-            if (done) {
+            if (done || inputEnded) {
                 piece.close();
                 return;
             }
             try {
                 reader.read(piece);
             } catch (Throwable e) {
-                failure = e;
-                done = true;
+                // the values the piece completed before the failure are delivered first, as
+                // the reactive readers deliver them
+                inputFailure = e;
+                inputEnded = true;
                 s = subscription;
-                reader.close();
             }
         }
-        if (failure != null) {
-            if (s != null) {
-                s.cancel();
-            }
-            fail(wrap.apply(failure));
-            return;
+        if (s != null) {
+            s.cancel();
         }
         drain();
     }
@@ -191,7 +204,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
     @Override
     public void onError(Throwable t) {
         synchronized (this) {
-            if (done) {
+            if (done || inputEnded) {
                 return;
             }
             done = true;
@@ -202,23 +215,17 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
 
     @Override
     public void onComplete() {
-        Throwable failure = null;
         synchronized (this) {
-            if (done) {
+            if (done || inputEnded) {
                 return;
             }
+            inputEnded = true;
             try {
                 reader.complete();
-                inputEnded = true;
             } catch (Throwable e) {
-                failure = e;
-                done = true;
-                reader.close();
+                // e.g. the input ends inside a value: the values before it are delivered first
+                inputFailure = e;
             }
-        }
-        if (failure != null) {
-            fail(wrap.apply(failure));
-            return;
         }
         drain();
     }

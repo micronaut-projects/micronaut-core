@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.codec.CodecException;
 import io.netty.buffer.ByteBuf;
 import org.jspecify.annotations.Nullable;
 
@@ -80,7 +81,16 @@ final class JsonPieceReader<T> implements PieceReader<T> {
     @Override
     public @Nullable T poll() {
         ByteBuffer<?> value = values.poll();
-        return value == null ? null : JsonChunkedProcessor.readReleasing(value, valueReader);
+        if (value == null) {
+            return null;
+        }
+        T element = JsonChunkedProcessor.readReleasing(value, valueReader);
+        if (element == null) {
+            // null means that no element is available: a JSON null is not an element, as the
+            // reactive readers refuse it
+            throw new CodecException("A JSON null is not an element of a JSON array or stream");
+        }
+        return element;
     }
 
     @Override
