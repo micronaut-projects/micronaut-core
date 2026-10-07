@@ -37,6 +37,7 @@ final class SingleBodyElements<B> extends PulledBodyElements<Event<B>> {
 
     private final CloseableByteBody body;
     private final Function<byte[], B> reader;
+    private final Function<Throwable, Throwable> wrap;
 
     // guarded by this
     private boolean started;
@@ -44,10 +45,12 @@ final class SingleBodyElements<B> extends PulledBodyElements<Event<B>> {
     /**
      * @param body   The body
      * @param reader Decodes the body
+     * @param wrap   The failure of the events, from a failure to read or decode the body
      */
-    SingleBodyElements(CloseableByteBody body, Function<byte[], B> reader) {
+    SingleBodyElements(CloseableByteBody body, Function<byte[], B> reader, Function<Throwable, Throwable> wrap) {
         this.body = body;
         this.reader = reader;
+        this.wrap = wrap;
     }
 
     @Override
@@ -61,7 +64,7 @@ final class SingleBodyElements<B> extends PulledBodyElements<Event<B>> {
         // bounded by the buffer limit of the body
         InternalByteBody.bufferFlow(body).onComplete((available, error) -> {
             if (error != null) {
-                fail(EventStreams.wrap(error));
+                fail(wrap.apply(error));
                 return;
             }
             try (CloseableAvailableByteBody bytes = available) {
@@ -70,7 +73,7 @@ final class SingleBodyElements<B> extends PulledBodyElements<Event<B>> {
                 }
                 end();
             } catch (Throwable e) {
-                fail(EventStreams.wrap(e));
+                fail(wrap.apply(e));
             }
         });
     }
