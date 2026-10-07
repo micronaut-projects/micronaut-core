@@ -58,10 +58,12 @@ class ByteBodyElementsEdgeCaseTest {
 
             @Override
             public void onError(Throwable t) {
+                // nothing to do in this test
             }
 
             @Override
             public void onComplete() {
+                // nothing to do in this test
             }
         });
         Assertions.assertTrue(subscribed.get());

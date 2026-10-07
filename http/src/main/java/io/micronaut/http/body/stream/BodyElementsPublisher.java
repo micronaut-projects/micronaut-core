@@ -31,6 +31,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -71,7 +72,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
     /**
      * @param elements The elements, which the publisher takes over
      * @param discard  Releases an element that arrives once the subscription was cancelled, or
-     *                 {@code null} if an element holds nothing to release
+     *                 {@code null} to release a {@link ReferenceCounted} one
      */
     public BodyElementsPublisher(BodyElements<T> elements, @Nullable Consumer<? super T> discard) {
         this.elements = elements;
@@ -162,14 +163,24 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         }
     }
 
-    private void onRead(@Nullable Optional<T> element, @Nullable Throwable error) {
-        Subscriber<? super T> subscriber = downstream;
-        if (cancelled || subscriber == null) {
-            // the read was in flight when the subscription was cancelled: nobody takes the element
-            if (discard != null && element != null && element.isPresent()) {
-                discard.accept(element.get());
+    private void emit(Subscriber<? super T> subscriber) {
+        Arrival<T> arrival = arrived.getAndSet(null);
+        if (arrival != null) {
+            reading = false;
+            if (arrival.error != null) {
+                done = true;
+                Throwable error = arrival.error;
+                subscriber.onError(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
+                return;
             }
-            return;
+            Optional<T> element = Objects.requireNonNullElse(arrival.element, Optional.empty());
+            if (element.isEmpty()) {
+                done = true;
+                subscriber.onComplete();
+                return;
+            }
+            produced();
+            subscriber.onNext(element.get());
         }
         while (!reading && !cancelled && requested.get() > 0) {
             T available;

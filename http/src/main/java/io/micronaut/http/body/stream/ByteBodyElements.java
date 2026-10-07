@@ -87,8 +87,28 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
      * @param body The body, which the elements take over
      * @return The pieces, each of which its consumer closes
      */
+    @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
     public static ByteBodyElements<ReadBuffer> readBuffers(CloseableByteBody body) {
         return new ByteBodyElements<>(body, new ReadBufferPieces(), Function.identity());
+    }
+
+    /**
+     * The elements as a publisher for the reactive API: the elements are pushed as the pieces of
+     * the body are read, by a lock-free publisher without a future per element. These elements
+     * can no longer be pulled.
+     *
+     * @return The publisher of the elements, for one subscriber
+     */
+    public Publisher<T> toPublisher() {
+        synchronized (this) {
+            if (subscribed || done) {
+                throw new IllegalStateException("The elements were read already");
+            }
+            subscribed = true;
+            done = true;
+        }
+        Publisher<T> elements = PieceReaders.publisher(InternalByteBody.toUnbufferedReadBufferPublisher(body), reader);
+        return Flux.from(elements).onErrorMap(wrap::apply);
     }
 
     @Override
