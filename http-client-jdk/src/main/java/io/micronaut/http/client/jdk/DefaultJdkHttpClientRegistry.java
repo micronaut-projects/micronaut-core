@@ -269,6 +269,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     @BootstrapContextCompatible
     @Primary
     @Order(2) // If both this and the netty client are present, netty is the default.
+    @SuppressWarnings("java:S2095") // the async proxy wraps the raw client, which shares the pipeline of the client bean
     AsyncProxyHttpClient asyncProxyHttpClient(
         @Nullable InjectionPoint<?> injectionPoint,
         @Parameter @Nullable LoadBalancer loadBalancer,

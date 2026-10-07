@@ -497,11 +497,6 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public AsyncSseClient toAsyncSse() {
-        return asyncSseClient;
-    }
-
-    @Override
     public Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request) {
         return nettyHttpClient.proxy(request);
     }
