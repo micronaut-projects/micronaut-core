@@ -87,9 +87,23 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     private static final int WRITE_BUFFER_SIZE = 8192;
 
     private final JsonMapper jsonMapper;
+    /**
+     * The type this handler is specialized for, see {@link #createSpecific(Argument)}, or
+     * {@code null}. Only this exact argument is read and written with {@link #specificMapper}; a
+     * specialized mapper may not be called with any other type, so every other argument goes
+     * through the general {@link #jsonMapper}.
+     */
+    private final @Nullable Argument<?> specificType;
+    private final JsonMapper specificMapper;
 
     public JsonMessageHandler(JsonMapper jsonMapper) {
+        this(jsonMapper, null, jsonMapper);
+    }
+
+    private JsonMessageHandler(JsonMapper jsonMapper, @Nullable Argument<?> specificType, JsonMapper specificMapper) {
         this.jsonMapper = jsonMapper;
+        this.specificType = specificType;
+        this.specificMapper = specificMapper;
     }
 
     /**
@@ -112,7 +126,16 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
 
     @Override
     public JsonMessageHandler<T> createSpecific(Argument<T> type) {
-        return new JsonMessageHandler<>(jsonMapper.createSpecific(type));
+        return new JsonMessageHandler<>(jsonMapper, type, jsonMapper.createSpecific(type));
+    }
+
+    @Override
+    public JsonMessageHandler<T> createSpecificReader(Argument<T> type) {
+        return createSpecific(type);
+    }
+
+    private JsonMapper mapper(Argument<?> type) {
+        return type == specificType ? specificMapper : jsonMapper;
     }
 
     @Override
@@ -120,7 +143,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         T decoded;
         try {
-            decoded = jsonMapper.readValue(byteBuffer, type);
+            decoded = mapper(type).readValue(byteBuffer, type);
         } catch (IOException e) {
             throw decorateRead(type, e);
         }
@@ -134,7 +157,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     @Nullable
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
-            return jsonMapper.readValue(inputStream, type);
+            return mapper(type).readValue(inputStream, type);
         } catch (IOException e) {
             throw decorateRead(type, e);
         }
@@ -169,7 +192,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<T> httpResponse, Argument<T> type, MediaType mediaType, T object) throws CodecException {
         httpResponse.getHeaders().contentTypeIfMissing(mediaType);
         try {
-            return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> jsonMapper.writeValue(s, object)));
+            return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> mapper(type).writeValue(s, object)));
         } catch (CodecException e) {
             throw e;
         } catch (IOException | RuntimeException e) {
@@ -195,7 +218,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
             // passes through unchanged, so these pieces are written one at a time
             return ResponseBodyWriter.super.openPieceWriter(bodyFactory, request, response, type, mediaType);
         }
-        return new JsonPieceWriter<>(bodyFactory, jsonMapper, type);
+        return new JsonPieceWriter<>(bodyFactory, mapper(type), type);
     }
 
     /**
@@ -207,7 +230,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
             // the value is already a JSON document, write it through unchanged
             outputStream.write(charSequence.toString().getBytes(MessageBodyWriter.findCharset(mediaType, headers).orElse(StandardCharsets.UTF_8)));
         } else {
-            jsonMapper.writeValue(outputStream, type, object);
+            mapper(type).writeValue(outputStream, type, object);
         }
     }
 

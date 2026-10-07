@@ -67,4 +67,55 @@ public final class ServerRequestBody {
         }
         return null;
     }
+
+    /**
+     * The first server request of the given request, whose body a filter may have set: the
+     * request itself, or the server request it wraps.
+     *
+     * @param request The request
+     * @return The server request, or {@code null} if there is none
+     */
+    public static @Nullable ServerHttpRequest<?> serverRequest(HttpRequest<?> request) {
+        HttpRequest<?> current = request;
+        while (true) {
+            if (current instanceof ServerHttpRequest<?> server) {
+                return server;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Whether a filter set the body of the given request, even to {@code null}: its body is then
+     * the object the filter set, and not the bytes of the server request, which are never read.
+     * The first request that gives access to the bytes it was received with, see
+     * {@link DirectByteBodyAccess}, walking the wrappers, answers: it has none once the body was
+     * replaced. A wrapper met before it that {@link HttpRequestWrapper#replacesBody replaced the
+     * body} set it too, e.g. one that returns a sanitized body, unless it is a server request
+     * with bytes of its own.
+     *
+     * @param request The request
+     * @return {@code true} if the body was set
+     */
+    public static boolean isBodySet(HttpRequest<?> request) {
+        HttpRequest<?> current = request;
+        while (true) {
+            if (current instanceof DirectByteBodyAccess access) {
+                return access.byteBodyDirect() == null;
+            }
+            if (!(current instanceof ServerHttpRequest<?>) && HttpRequestWrapper.replacesBody(current)) {
+                // e.g. a wrapper a filter continued with that returns a sanitized body, like of()
+                return true;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return false;
+            }
+        }
+    }
 }

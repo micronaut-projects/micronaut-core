@@ -34,7 +34,6 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
-import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -42,7 +41,6 @@ import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
-import io.netty.buffer.ByteBuf;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -90,12 +88,25 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
             // Publisher<T> is unwrapped
             processor.counter.unwrapTopLevelArray();
         }
-        return processor.process(Flux.from(input).map(bb -> {
-            if (!(bb.asNativeBuffer() instanceof ByteBuf buf)) {
-                throw new IllegalArgumentException("Only netty buffers are supported");
-            }
-            return buf;
-        })).map(bb -> read(type, mediaType, httpHeaders, bb));
+        return read(processor, type, mediaType, httpHeaders, input);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A top-level JSON array is always unwrapped: each of its elements is read as the given
+     * type, a collection too, e.g. {@code [[1,2],[3,4]]} as two lists.</p>
+     */
+    @Override
+    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
+        processor.counter.unwrapTopLevelArray();
+        return read(processor, type, mediaType, httpHeaders, input);
+    }
+
+    private Flux<T> read(JsonChunkedProcessor processor, Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        return processor.process(Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))
+            .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> read(type, mediaType, httpHeaders, value)));
     }
 
     @Override
@@ -146,8 +157,13 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
-    public MessageBodyWriter<T> createSpecific(Argument<T> type) {
+    public NettyJsonHandler<T> createSpecific(Argument<T> type) {
         return new NettyJsonHandler<>(jsonMessageHandler.createSpecific(type));
+    }
+
+    @Override
+    public NettyJsonHandler<T> createSpecificReader(Argument<T> type) {
+        return createSpecific(type);
     }
 
     @Override

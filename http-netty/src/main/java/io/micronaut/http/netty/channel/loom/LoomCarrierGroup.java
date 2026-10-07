@@ -36,6 +36,7 @@ import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
 import jakarta.inject.Singleton;
 import jdk.jfr.Enabled;
 import jdk.jfr.Event;
+import jdk.jfr.FlightRecorder;
 import jdk.jfr.StackTrace;
 
 import java.util.ArrayDeque;
@@ -61,6 +62,15 @@ import java.util.function.Consumer;
 @Internal
 @Experimental
 public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
+    /**
+     * Whether a Flight Recorder was seen, for {@link #isJfrRecorderInitialized()}. Deliberately a
+     * plain field, not {@code volatile} or an {@code AtomicBoolean}: it is read on every carrier
+     * task and loop tick, {@link FlightRecorder#isInitialized()} never reverts, and a thread that
+     * reads a stale {@code false} only makes one more call to that method, which is itself a
+     * volatile read.
+     */
+    private static boolean jfrRecorderSeen;
+
     List<Runner> runners;
 
     private LoomCarrierGroup(Factory factory, int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
@@ -83,6 +93,38 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         Thread.Builder.OfVirtual builder = Thread.ofVirtual().name(name);
         builderModifier.accept(builder);
         return builder.unstarted(task);
+    }
+
+    /**
+     * Whether the JFR events of the carrier may be recorded now. This is {@code false} in a native
+     * image, when the {@code jdk.jfr} module is not in the runtime, and while no Flight Recorder
+     * exists. It never initializes an event class.
+     * <p>
+     * HotSpot registers a JFR event class with the Flight Recorder when the class is initialized,
+     * and the first registration sets up JFR's metadata, even when nothing is recording. Every way
+     * of starting a recording creates the Flight Recorder first, so the event classes are
+     * initialized, and their event types registered, by the first carrier task or loop tick after
+     * a Flight Recorder exists. A recording that enables an event by name before then still gets
+     * the events. A task that is already scheduled when a recording enables the event produces no
+     * event.
+     * <p>
+     * The HTTP server handlers of http-server-netty have a copy of this check in their own package
+     * ({@code JfrSupport}), so that neither is public API.
+     *
+     * @return {@code true} if a Flight Recorder exists, so that JFR event classes may be used
+     */
+    private static boolean isJfrRecorderInitialized() {
+        if (!NativeImageUtils.JFR_AVAILABLE) {
+            return false;
+        }
+        if (jfrRecorderSeen) {
+            return true;
+        }
+        if (FlightRecorder.isInitialized()) {
+            jfrRecorderSeen = true;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -338,7 +380,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             while (!delegate.isTerminated()) {
                 boolean ioContinuationScheduled = this.ioContinuationScheduled;
-                if (!ioContinuationScheduled) {
+                // Only park when there is no other work: continuations left over from the last
+                // time slice, or queued without an unpark (e.g. by a virtual thread mounted on this
+                // carrier), would otherwise wait for the IO thread. If the IO thread is itself
+                // blocked on a monitor that one of those continuations has to release, nothing
+                // would ever unpark the carrier.
+                if (!ioContinuationScheduled && localLoomQueue.isEmpty() && globalLoomQueue.isEmpty()) {
                     LockSupport.park();
                     ioContinuationScheduled = this.ioContinuationScheduled;
                 }
@@ -526,7 +573,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             // JFR
             ContinuationScheduled scheduled;
-            if (NativeImageUtils.JFR_AVAILABLE && ContinuationScheduled.INSTANCE.isEnabled()) {
+            if (isJfrRecorderInitialized() && ContinuationScheduled.INSTANCE.isEnabled()) {
                 scheduled = new ContinuationScheduled();
                 long hash = System.identityHashCode(command);
                 scheduled.hashCode = hash;
@@ -618,7 +665,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         private void tick(int type) {
-            if (NativeImageUtils.JFR_AVAILABLE && LoopTick.INSTANCE.isEnabled()) {
+            if (isJfrRecorderInitialized() && LoopTick.INSTANCE.isEnabled()) {
                 LoopTick tick = new LoopTick();
                 tick.loopIndex = id;
                 tick.type = type;

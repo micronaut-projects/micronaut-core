@@ -21,6 +21,7 @@ import io.micronaut.inject.BeanIdentifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * The disposing bean registration.
@@ -32,62 +33,106 @@ import java.util.List;
 @Internal
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
     private final BeanContext beanContext;
-    private final java.util.concurrent.atomic.AtomicBoolean closed =
-        new java.util.concurrent.atomic.AtomicBoolean();
     @Nullable
-    private final List<BeanRegistration<?>> dependents;
-    @Nullable
-    private final List<?> interceptorRegistrations;
+    @SuppressWarnings("java:S3077") // set once as the proxy is registered; only its own volatile field is read through it
+    private volatile AbstractBeanResolutionContext proxyTargetContext;
+    // whether this bean was created as an interceptor of the bean it is a dependent of
+    private volatile boolean createdAsInterceptor;
 
+    @SuppressWarnings("unchecked") // Adapt the registration compatibility boundary once.
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
-                              List<BeanRegistration<?>> dependents,
+                              @Nullable List<BeanRegistration<?>> dependents,
                               @Nullable List<?> interceptorRegistrations) {
-        super(identifier, beanDefinition, createdBean);
-        this.beanContext = beanContext;
-        this.dependents = dependents;
-        this.interceptorRegistrations = interceptorRegistrations;
+        this(beanContext, identifier, beanDefinition, createdBean, dependents,
+            interceptorRegistrations == null ? InterceptorCandidates.Unresolved.INSTANCE
+                : new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) interceptorRegistrations), new DefaultBeanDependencies());
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
-                              @Nullable List<?> interceptorRegistrations) {
-        super(identifier, beanDefinition, createdBean);
+                              @Nullable List<BeanRegistration<?>> dependents,
+                              InterceptorCandidates interceptorCandidates,
+                              DefaultBeanDependencies dependencies) {
+        super(identifier, beanDefinition, createdBean, dependencies);
         this.beanContext = beanContext;
-        this.dependents = null;
-        this.interceptorRegistrations = interceptorRegistrations;
+        // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
+        // duplicate registrations or add them back to an owner that was already destroyed.
+        if ((getDependencies() == dependencies || createdBean instanceof DefaultBeanDependencyResolver)
+            && !getDependencies().initialize(dependents, interceptorCandidates)
+            && beanContext instanceof DefaultBeanContext context) {
+            // The owner was destroyed before its creation completed and released what it held then. Dependents
+            // created with the bean would be attached to an owner that no longer destroys anything.
+            context.destroyCreatedBeans(dependents, null);
+        }
     }
 
     @Override
     public void close() {
-        // idempotent, as AutoCloseable asks an implementation to be: destroying a bean runs its pre-destroy
-        // listeners, its @PreDestroy and its disposer, and a registration closed twice — by a
-        // try-with-resources and an explicit close, or by two owners that each believe they hold it — must
-        // not run them twice
-        if (closed.compareAndSet(false, true)) {
+        // Closing and direct context destruction share one claim, so the callbacks run once. The default context
+        // takes the claim itself as it destroys the registration; for any other context it is taken here.
+        boolean claimedByContext = beanContext instanceof DefaultBeanContext;
+        if (claimedByContext || beginDestruction()) {
             beanContext.destroyBean(this);
         }
     }
 
+    /**
+     * @return The resolution context a lazy proxy retains to resolve its target, or {@code null} if the bean is
+     * not such a proxy
+     */
     @Nullable
-    public List<BeanRegistration<?>> getDependents() {
-        return dependents;
+    AbstractBeanResolutionContext getProxyTargetContext() {
+        return proxyTargetContext;
+    }
+
+    void setProxyTargetContext(@Nullable AbstractBeanResolutionContext proxyTargetContext) {
+        this.proxyTargetContext = proxyTargetContext;
+    }
+
+    /**
+     * Claims destruction before callbacks run, so that closing or destroying the registration again does nothing.
+     *
+     * @return {@code true} if the registration had not been closed or marked before
+     */
+    boolean beginDestruction() {
+        return getDependencies().beginDestruction();
     }
 
     @Override
     public List<BeanRegistration<?>> dependentBeans() {
-        return dependents == null ? List.of() : List.copyOf(dependents);
+        return super.dependentBeans();
+    }
+
+    @Override
+    DefaultBeanDependencies getDependencies() {
+        return Objects.requireNonNull(super.getDependencies());
     }
 
     /**
-     * @return The interceptor registrations selected while this bean was created, or {@code null}
+     * @return The interceptor candidate state retained while this bean was created
      */
-    @Nullable
-    List<?> getInterceptorRegistrations() {
-        return interceptorRegistrations;
+    InterceptorCandidates getInterceptorCandidates() {
+        return getDependencies().interceptorCandidates();
+    }
+
+    /**
+     * Marks this bean as created to intercept the bean it is a dependent of, so that every interception point of
+     * that bean finds it again, see {@link BeanResolutionContext#getInterceptorRegistrations}. An interceptor a bean
+     * injects is a dependent of it too, but carries no mark.
+     */
+    void markCreatedAsInterceptor() {
+        createdAsInterceptor = true;
+    }
+
+    /**
+     * @return Whether this bean was created to intercept the bean it is a dependent of
+     */
+    boolean isCreatedAsInterceptor() {
+        return createdAsInterceptor;
     }
 }

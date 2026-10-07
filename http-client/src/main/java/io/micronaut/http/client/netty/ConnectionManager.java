@@ -345,6 +345,26 @@ public class ConnectionManager {
     /**
      * For testing.
      *
+     * @return Number of per-host connection pools currently registered
+     */
+    @SuppressWarnings("unused")
+    final int poolCount() {
+        return pools.size();
+    }
+
+    /**
+     * For testing.
+     *
+     * @return The live map of per-host connection pools
+     */
+    @SuppressWarnings("unused")
+    final Map<NettyHttpClient.RequestKey, PoolHolder> pools() {
+        return pools;
+    }
+
+    /**
+     * For testing.
+     *
      * @return Number of running requests
      * @since 4.0.0
      */
@@ -532,7 +552,16 @@ public class ConnectionManager {
      * @return A mono that will complete once the channel is ready for transmission
      */
     public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
-        return pools.computeIfAbsent(requestKey, rk -> createPool(rk, group)).acquire(blockHint, preferredScheduler);
+        while (true) {
+            PoolHolder holder = pools.computeIfAbsent(requestKey, rk -> createPool(rk, group));
+            ExecutionFlow<PoolHandle> flow = holder.acquire(blockHint, preferredScheduler);
+            if (flow != null) {
+                return flow;
+            }
+            // the pool retired concurrently because it became unused. Make sure it's gone from
+            // the map and try again with a fresh pool.
+            pools.remove(requestKey, holder);
+        }
     }
 
     /**
@@ -1273,7 +1302,7 @@ public class ConnectionManager {
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
-        private PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler) {
+        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler) {
             this.http2 = http2;
             this.channel = channel;
             this.responseHandler = responseHandler;
@@ -1358,8 +1387,21 @@ public class ConnectionManager {
             };
         }
 
+        /**
+         * Acquire a connection from this pool.
+         *
+         * @param blockHint          Optional information about what threads are blocked for this
+         *                           connection request
+         * @param preferredScheduler Reference to set to the preferred scheduler
+         * @return The flow that completes with the connection, or {@code null} if this pool has
+         * been retired and a new pool must be used instead
+         */
+        @Nullable
         ExecutionFlow<PoolHandle> acquire(@Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
             Pool.PendingRequest sink = pool.createPendingRequest(blockHint);
+            if (sink == null) {
+                return null;
+            }
             sink.dispatch();
             if (preferredScheduler != null) {
                 EventExecutor destPool = sink.likelyEventLoop();
@@ -1383,6 +1425,12 @@ public class ConnectionManager {
         @Override
         public Throwable wrapError(@Nullable Throwable error) {
             return NettyHttpClient.connectError(error);
+        }
+
+        @Override
+        public void onPoolRetired() {
+            // two-arg remove, so that a newer pool for the same key is not removed
+            pools.remove(requestKey, this);
         }
 
         @Override

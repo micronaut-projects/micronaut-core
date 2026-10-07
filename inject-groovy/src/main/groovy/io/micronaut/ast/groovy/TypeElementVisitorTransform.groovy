@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyGeneratedSourceFiles
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
@@ -71,8 +72,12 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
      * {@code @Canonical} or {@code @Immutable} class before its constructors and methods exist. The visiting is
      * therefore deferred to a phase operation for CANONICALIZATION: registered from an earlier phase, the compiler
      * appends it after every operation of that phase, the local transforms included, and it still runs before the
-     * operation {@link InjectTransform} registers from within CANONICALIZATION. The operation is registered once per
-     * compilation unit and processes every source unit of the compilation, the ones queued later included.
+     * operation writing the bean definitions. The operations are registered once per compilation unit and process
+     * every source unit of the compilation, the ones queued later included.
+     *
+     * <p>The bean definitions and the queueing of the generated sources are registered here as well, in that order,
+     * so that all three run in CANONICALIZATION ahead of the check of the source queue that ends the phase: the
+     * generated classes then exist before the hand-written sources are type checked, in INSTRUCTION_SELECTION.</p>
      */
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -84,6 +89,8 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         if (ast.getNodeMetaData(TypeElementVisitorTransform) == null) {
             ast.putNodeMetaData(TypeElementVisitorTransform, Boolean.TRUE)
             compilationUnit.addNewPhaseOperation({ SourceUnit sourceUnit -> visitTypes(sourceUnit) } as CompilationUnit.ISourceUnitOperation, Phases.CANONICALIZATION)
+            InjectTransform.registerInjection(compilationUnit)
+            GroovyGeneratedSourceFiles.registerCanonicalizationQueue(compilationUnit)
         }
     }
 

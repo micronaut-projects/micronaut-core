@@ -24,6 +24,7 @@ import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
+import io.micronaut.aop.internal.InterceptorChainFactoryBean
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
@@ -331,6 +332,7 @@ class Test {
      */
     List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {
         return [
+                new InterceptorChainFactoryBean(),
                 new InterceptorRegistryBean(),
                 new BeanProviderDefinition(),
                 new JakartaProviderBeanDefinition(),

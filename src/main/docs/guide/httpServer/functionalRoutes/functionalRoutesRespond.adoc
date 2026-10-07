@@ -1,0 +1,30 @@
+The terminal `respond(...)` ends a route that answers with a fixed or computed response, without a handler function reading the request: a static body and status, a redirect, a constant health answer, or a response built from the path variables only.
+
+snippet::io.micronaut.docs.server.functional.RespondRoutes[tags="imports,clazz", indent=0, title="Routes that respond without a handler"]
+
+<1> A response given as a value, copied when the route is declared.
+<2> A `respond` route is an ordinary route: the server filters, the filters of its groups and its own filters run, and so do its conditions, its constraints, the error routes and CORS.
+<3> A redirect is a response like any other.
+<4> A `Supplier` creates a new response for each request.
+<5> A `Function` creates the response from the api:http.PathVariables[] of the matched route: it never receives the request.
+<6> Any creator declares the route, here for another method.
+
+The terminal has three forms:
+
+* `respond(HttpResponse)` answers with a response given as a value;
+* `respond(Supplier<HttpResponse>)` answers with the response the supplier creates for each request;
+* `respond(Function<PathVariables, HttpResponse>)` answers with the response the function creates from the path variables of each request.
+
+They end a route declared like the other routes, by any creator, e.g. `GET(uri)` or `route(HttpMethod, uri)`, so `where(...)`, `constrain(...)`, `order(...)`, `port(...)`, `attribute(...)`, `annotate(...)` and the route filters apply to them, given before the terminal. A `GET` route has an implicit `HEAD` route, which answers `HEAD` requests with the headers of the response and no body, and a request with another method is answered with `405`, as for any route.
+
+=== Each request gets its own response
+
+The server and the filters change the response they answer with, e.g. a filter adds a header. So a response given as a value is never shared between requests: the route copies its status, reason, headers and attributes when it is declared, and answers each request with a new response built from the copy. The body object is the one exception: the responses share it, so it must not change, e.g. a `String`, a `byte[]` that is not modified, or a record. A body that is consumed when it is written, such as a Netty `ByteBuf` or a `Publisher` that can be subscribed to once, cannot be shared: use a `Supplier` that creates it for each request. A `Supplier` or a `Function` must also return a new response for each request.
+
+=== Media types, threads and errors
+
+A `respond` route never reads the body of the request, so it consumes any content type, whatever its group consumes, and the content type of a response given as a value is what the route produces; a response without a content type produces what its group produces: a request that accepts only `text/plain` is answered by a route whose response is `text/plain`. The body is written by the message body writers, as for a handler route. A response given as a value runs no code of the application: it is answered on the event loop, like a route with `nonBlocking()`, whatever the executor of its group. A `Supplier` or a `Function` runs on the executor of the route, given with `executeOn(...)`, or else of its group, and on the event loop when neither has one: then it must not block. A `Supplier` or a `Function` that throws is answered by the error routes, and one that returns `null` like a handler that returns `null`.
+
+=== When to use a handler instead
+
+Use `respond` when the answer does not depend on the request, or only on its path variables: it documents that the request is not read, and it skips the argument binding of a handler. Use a handler function, see <<functionalRoutesDeclaring, Declaring Routes>>, as soon as the answer needs the request: its headers, query parameters, cookies, body or attributes, or the principal of Micronaut Security. A `respond` route still goes through the filters and the router like any route.

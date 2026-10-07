@@ -168,14 +168,15 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public JsonMapper createSpecific(Argument<?> type) {
-        JacksonDatabindMapper jacksonDatabindMapper = new JacksonDatabindMapper(this, type, allowViews);
         if (allowViews) {
             Class<?> viewClass = type.getAnnotationMetadata().classValue(JsonView.class).orElse(null);
             if (viewClass != null) {
-                return jacksonDatabindMapper.cloneWithViewClass(viewClass);
+                // the reader needs the type, with the view, e.g. for a body read with a view; the
+                // writer writes with the view whatever the type of the value
+                return new JacksonDatabindMapper(this, createReader(type), objectMapper.writerWithView(viewClass));
             }
         }
-        return jacksonDatabindMapper;
+        return new JacksonDatabindMapper(this, type, allowViews);
     }
 
     /**

@@ -64,8 +64,17 @@ public final class StringIntMap {
     }
 
     public int get(String key, int def) {
-        int i = probe(key);
-        return i < 0 ? def : values[i];
+        int i = key.hashCode() & mask;
+        while (true) {
+            String candidate = keys[i];
+            if (candidate == null) {
+                return def;
+            }
+            if (candidate.equals(key)) {
+                return values[i];
+            }
+            i = (i + 1) & mask;
+        }
     }
 
     public void put(String key, int value) {

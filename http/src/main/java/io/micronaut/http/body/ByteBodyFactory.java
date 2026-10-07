@@ -227,7 +227,9 @@ public class ByteBodyFactory {
     /**
      * Create a new {@link ByteBody} that wraps the given buffer, but also check the buffer size
      * against the given size limits. If the buffer is too large, this will return a streaming body
-     * with an error. If that is not the case, this will return a normal available body.
+     * with an error. If that is not the case, this will return a normal available body. A buffer
+     * that is only larger than the buffer limit can still be streamed by a reader that does not
+     * hold it, see {@link BaseSharedBuffer#setKeepInitialBytes()}.
      *
      * @param bodySizeLimits The size limits
      * @param buf            The buffer
@@ -242,7 +244,15 @@ public class ByteBodyFactory {
             BufferConsumer.Upstream upstream = bytesConsumed -> {
             };
             StreamingBody streamingBody = createStreamingBody(bodySizeLimits, upstream);
-            streamingBody.sharedBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
+            if (readable > bodySizeLimits.maxBodySize()) {
+                streamingBody.sharedBuffer.add(buf); // this will trigger the exception for exceeded body size
+            } else {
+                // the bytes are all there: a reader that streams them without holding them gets
+                // them, any other reader fails with the buffer limit
+                streamingBody.sharedBuffer.setKeepInitialBytes();
+                streamingBody.sharedBuffer.add(buf);
+                streamingBody.sharedBuffer.complete();
+            }
             return streamingBody.rootBody;
         } else {
             return adapt(buf);

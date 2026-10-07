@@ -168,4 +168,19 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
             Objects.requireNonNull(beanType, BEAN_TYPE);
         }
     }
+
+    /**
+     * {@link io.micronaut.context.annotation.ResolveWith} injection point, resolved by a
+     * {@link io.micronaut.context.BeanInjectionProvider}.
+     *
+     * @param <K> The element kind
+     * @since 5.3.0
+     */
+    record ProviderInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K providerType) implements BeanDefinitionInjectionPoint<K> {
+        public ProviderInjectionPoint {
+            Objects.requireNonNull(type, TYPE_MEMBER);
+            Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
+            Objects.requireNonNull(providerType, "providerType");
+        }
+    }
 }

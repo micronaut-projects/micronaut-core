@@ -48,6 +48,10 @@ public final class AnnotationConvertersRegistrar implements TypeConverterRegistr
         });
 
         conversionService.addConverter(io.micronaut.core.annotation.AnnotationValue[].class, Object[].class, (object, targetType, context) -> {
+            if (object.length == 0 && targetType.isArray()) {
+                // an array stored empty is an empty array of the type asked for, not a missing value
+                return Optional.of((Object[]) Array.newInstance(targetType.getComponentType(), 0));
+            }
             List<Annotation> result = new ArrayList<>();
             Class<? extends Annotation> annotationClass = null;
             for (io.micronaut.core.annotation.AnnotationValue annotationValue : object) {

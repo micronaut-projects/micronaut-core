@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -676,6 +677,7 @@ public final class PythonCoercion {
     private static @Nullable Object coerceStandardTypeToContext(@Nullable Object value, Context context) {
         return switch (value) {
             case null -> null;
+            case BigDecimal decimal -> standardTypeHelper(context).execute("decimal", decimal.toString());
             case LocalDate localDate ->
                 standardTypeHelper(context).execute("date", localDate.toString());
             case LocalTime localTime ->
@@ -730,6 +732,47 @@ public final class PythonCoercion {
             }
             return result;
         });
+    }
+
+    /**
+     * Coerce the dependencies a pooled bean is constructed with into a context.
+     *
+     * <p>As {@link #coerceArgumentsToContext} except for a dependency that is a Python bean of a
+     * single context: a singleton, or anything else that is not pooled. Such a bean cannot be
+     * reconstructed elsewhere -- there is one Python object and it belongs to its own context -- so
+     * the Java wrapper is passed instead, and calls through it return to the context that owns it.
+     * Rebuilding it is not merely unsupported, it is wrong: two contexts would hold two objects
+     * where the application asked for one.
+     *
+     * <p>This is the same choice module injection makes for the same reason, and it is what the
+     * compile-time warning about a pooled type depending on a singleton Python bean is naming: the
+     * dependency works, and the work behind it runs in one context however many the pool has.
+     *
+     * @param context The target context
+     * @param args The dependencies, already resolved by injection
+     * @return The arguments to construct with
+     */
+    public static Object[] coerceDependenciesToContext(Context context, Object[] args) {
+        Object[] pinned = null;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof ValueCoercible && !(args[i] instanceof PooledValueCoercible)) {
+                if (pinned == null) {
+                    pinned = args.clone();
+                }
+                // a placeholder the coercion leaves alone, replaced with the wrapper below
+                pinned[i] = null;
+            }
+        }
+        if (pinned == null) {
+            return coerceArgumentsToContext(context, args);
+        }
+        Object[] coerced = coerceArgumentsToContext(context, pinned);
+        for (int i = 0; i < args.length; i++) {
+            if (pinned[i] == null && args[i] != null) {
+                coerced[i] = args[i];
+            }
+        }
+        return coerced;
     }
 
     /**
@@ -935,10 +978,10 @@ public final class PythonCoercion {
     }
 
     /**
-     * Convert a constructor argument of a startup-context object for the replayed constructor in an event-loop
-     * context: Python beans and host beans as async members, other values as a constructor call converts them.
+     * Convert a constructor argument of an instance whose class declares coroutine methods: Python beans and host
+     * beans as async members, other values as a constructor call converts them.
      *
-     * @param context The event-loop context
+     * @param context The context the instance is created in
      * @param value The Java constructor argument
      * @return The context-local argument
      */

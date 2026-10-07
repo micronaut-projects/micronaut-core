@@ -44,9 +44,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * This class handles the concurrent aspects of pooling for {@link ConnectionManager}.
@@ -68,12 +68,12 @@ final class Pool49 implements Pool {
     private final List<LocalPoolPair> localPools;
 
     /**
-     * Number of pending requests. This is used to enforce
+     * Number of pending acquire permits held by {@link PendingRequest}s. This is used to enforce
      * {@link HttpClientConfiguration.ConnectionPoolConfiguration#getMaxPendingAcquires()}. If
      * there is no limit, this field is {@code null} to save on atomic operations.
      */
     @Nullable
-    private final LongAdder globalPending;
+    private final AtomicInteger globalPending;
     /**
      * Connection statistics shared between all local pools, e.g. number of open HTTP/2
      * connections. These are used to enforce most limits from the
@@ -100,7 +100,7 @@ final class Pool49 implements Pool {
         }
         this.localPools = List.copyOf(localPoolsByLoop.values());
         if (connectionPoolConfiguration.getMaxPendingAcquires() != Integer.MAX_VALUE) {
-            globalPending = new LongAdder();
+            globalPending = new AtomicInteger();
         } else {
             globalPending = null;
         }
@@ -139,8 +139,67 @@ final class Pool49 implements Pool {
     }
 
     @Override
-    public Pool.PendingRequest createPendingRequest(@Nullable BlockHint blockHint) {
-        return new PendingRequest(blockHint);
+    public Pool.@Nullable PendingRequest createPendingRequest(@Nullable BlockHint blockHint) {
+        // count the acquire as active before anything else, so that the pool cannot retire
+        // while the request is being set up and dispatched
+        while (true) {
+            GlobalStats oldStats = globalStats.get();
+            if (oldStats.retired) {
+                return null;
+            }
+            if (globalStats.compareAndSet(oldStats, oldStats.addActiveAcquireCount(1))) {
+                break;
+            }
+        }
+        try {
+            return new PendingRequest(blockHint);
+        } catch (RuntimeException e) {
+            onAcquireDone();
+            throw e;
+        }
+    }
+
+    /**
+     * Called exactly once for every request created by {@link #createPendingRequest} when it is
+     * completed, failed or cancelled.
+     */
+    private void onAcquireDone() {
+        updateStatsAndMaybeRetire(s -> s.addActiveAcquireCount(-1));
+    }
+
+    /**
+     * Update the {@link #globalStats} with the given function, and retire this pool if it becomes
+     * unused, i.e. it has no connections, no pending connections and no active acquires.
+     *
+     * @param update The update function. Must not set {@link GlobalStats#retired}
+     */
+    private void updateStatsAndMaybeRetire(UnaryOperator<GlobalStats> update) {
+        while (true) {
+            GlobalStats oldStats = globalStats.get();
+            GlobalStats newStats = update.apply(oldStats);
+            boolean retire = !newStats.retired && newStats.isUnused();
+            if (retire) {
+                newStats = newStats.retire();
+            }
+            if (globalStats.compareAndSet(oldStats, newStats)) {
+                if (retire) {
+                    if (log.isTraceEnabled()) {
+                        log.trace("Retiring unused pool");
+                    }
+                    listener.onPoolRetired();
+                }
+                return;
+            }
+        }
+    }
+
+    /**
+     * For testing.
+     *
+     * @return Whether this pool has been retired
+     */
+    boolean isRetired() {
+        return globalStats.get().retired;
     }
 
     @Override
@@ -232,8 +291,9 @@ final class Pool49 implements Pool {
     private boolean openConnectionStep1() {
         while (true) {
             GlobalStats oldStats = globalStats.get();
-            if (limitsHit(oldStats)) {
-                // just add to the pending request queue
+            if (oldStats.retired || limitsHit(oldStats)) {
+                // just add to the pending request queue. A retired pool has no requests left
+                // that could use a new connection, and must not open any.
                 return false;
             }
             if (!globalStats.compareAndSet(oldStats, oldStats.addPendingConnectionCount(1))) {
@@ -550,7 +610,8 @@ final class Pool49 implements Pool {
          */
         void onNewConnectionFailure(Throwable error) {
             assert loop.inEventLoop();
-            globalStats.updateAndGet(s -> s.addPendingConnectionCount(-1)); // TODO: is this called for websockets?
+            // cannot retire here if a request is still waiting: it counts as an active acquire
+            updateStatsAndMaybeRetire(s -> s.addPendingConnectionCount(-1)); // TODO: is this called for websockets?
             localPendingConnections--;
 
             if (!failOne(localPendingRequests, error) && !failOne(globalPendingRequests, error)) {
@@ -753,19 +814,14 @@ final class Pool49 implements Pool {
 
             poolPair.localPendingConnections--;
 
-            GlobalStats oldStats;
-            while (true) {
-                oldStats = globalStats.get();
-                GlobalStats newStats = oldStats.addPendingConnectionCount(-1);
-                if (this instanceof Http2PoolEntry) {
-                    newStats = newStats.addHttp2ConnectionCount(1);
-                } else {
-                    newStats = newStats.addHttp1ConnectionCount(1);
-                }
-                if (globalStats.weakCompareAndSetPlain(oldStats, newStats)) {
-                    break;
-                }
-            }
+            // The entry was made available before this accounting, so the request it was
+            // dispatched to may already have closed it again. Check for retirement here as well,
+            // otherwise such a pool would stay registered with zero counts.
+            boolean http2 = this instanceof Http2PoolEntry;
+            updateStatsAndMaybeRetire(s -> {
+                GlobalStats newStats = s.addPendingConnectionCount(-1);
+                return http2 ? newStats.addHttp2ConnectionCount(1) : newStats.addHttp1ConnectionCount(1);
+            });
 
             // since we decreased the pending connection count, another pool may have an
             // opportunity to open a connection.
@@ -802,7 +858,7 @@ final class Pool49 implements Pool {
             checkInEventLoop();
             poolPair.http1.removeAvailable(this);
             if (poolPair.http1.connections.remove(this)) {
-                globalStats.updateAndGet(s -> s.addHttp1ConnectionCount(-1));
+                updateStatsAndMaybeRetire(s -> s.addHttp1ConnectionCount(-1));
                 openGlobalConnectionIfNecessary();
             }
         }
@@ -869,7 +925,7 @@ final class Pool49 implements Pool {
             checkInEventLoop();
             markUnavailable();
             if (poolPair.http2.connections.remove(this)) {
-                globalStats.updateAndGet(s -> s.addHttp2ConnectionCount(-1));
+                updateStatsAndMaybeRetire(s -> s.addHttp2ConnectionCount(-1));
                 openGlobalConnectionIfNecessary();
             }
         }
@@ -935,26 +991,50 @@ final class Pool49 implements Pool {
      * @param seenHttp2              If {@code true}, we've seen an HTTP/2 connection through the
      *                               lifetime of this pool, meaning we should follow configured
      *                               HTTP/2 connection count limits
+     * @param activeAcquireCount     Number of requests that were created by
+     *                               {@link #createPendingRequest} and are not yet completed,
+     *                               failed or cancelled
+     * @param retired                If {@code true}, this pool was unused at some point and has
+     *                               been retired. It will not accept any new requests or open new
+     *                               connections
      */
     private record GlobalStats(
         int http1ConnectionCount,
         int http2ConnectionCount,
         int pendingConnectionCount,
         boolean seenHttp1,
-        boolean seenHttp2
+        boolean seenHttp2,
+        int activeAcquireCount,
+        boolean retired
     ) {
-        static final GlobalStats EMPTY = new GlobalStats(0, 0, 0, false, false);
+        static final GlobalStats EMPTY = new GlobalStats(0, 0, 0, false, false, 0, false);
 
         GlobalStats addHttp1ConnectionCount(int n) {
-            return new GlobalStats(http1ConnectionCount + n, http2ConnectionCount, pendingConnectionCount, true, seenHttp2);
+            return new GlobalStats(http1ConnectionCount + n, http2ConnectionCount, pendingConnectionCount, true, seenHttp2, activeAcquireCount, retired);
         }
 
         GlobalStats addHttp2ConnectionCount(int n) {
-            return new GlobalStats(http1ConnectionCount, http2ConnectionCount + n, pendingConnectionCount, seenHttp1, true);
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount + n, pendingConnectionCount, seenHttp1, true, activeAcquireCount, retired);
         }
 
         GlobalStats addPendingConnectionCount(int n) {
-            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, pendingConnectionCount + n, seenHttp1, seenHttp2);
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, pendingConnectionCount + n, seenHttp1, seenHttp2, activeAcquireCount, retired);
+        }
+
+        GlobalStats addActiveAcquireCount(int n) {
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, pendingConnectionCount, seenHttp1, seenHttp2, activeAcquireCount + n, retired);
+        }
+
+        GlobalStats retire() {
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, pendingConnectionCount, seenHttp1, seenHttp2, activeAcquireCount, true);
+        }
+
+        /**
+         * @return {@code true} if there are no connections, pending connections or active
+         * acquires, so this pool can be retired
+         */
+        boolean isUnused() {
+            return http1ConnectionCount == 0 && http2ConnectionCount == 0 && pendingConnectionCount == 0 && activeAcquireCount == 0;
         }
     }
 
@@ -986,6 +1066,10 @@ final class Pool49 implements Pool {
          * the request.
          */
         private volatile LocalPoolPair destPool;
+        /**
+         * {@code true} while this request holds a permit of {@link #globalPending}.
+         */
+        private final AtomicBoolean permitHeld = new AtomicBoolean();
         private int debugId;
 
         PendingRequest(@Nullable BlockHint blockHint) {
@@ -1004,15 +1088,14 @@ final class Pool49 implements Pool {
          * removes it from the pending queues so that it never receives a connection.
          */
         private void onCancelled() {
+            releasePermit();
             if (!compareAndSet(false, true)) {
                 return;
-            }
-            if (globalPending != null) {
-                globalPending.decrement();
             }
             if (log.isTraceEnabled()) {
                 log.trace("{}: Cancelled", this);
             }
+            onAcquireDone();
             globalPendingRequests.remove(this);
             LocalPoolPair pool = destPool;
             if (pool != null) {
@@ -1049,23 +1132,56 @@ final class Pool49 implements Pool {
          */
         @Override
         public void dispatch() {
-            if (globalPending != null && globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
+            if (globalPending != null && !acquirePermit(globalPending)) {
                 tryCompleteExceptionally(new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "Cannot acquire connection, exceeded max pending acquires configuration", null));
                 return;
             }
             if (log.isTraceEnabled()) {
                 log.trace("{}: Starting dispatch, preferred pool {}", this, preferredPool);
             }
-            if (globalPending != null) {
-                globalPending.increment();
-            }
 
             redispatch();
         }
 
         /**
+         * Reserve a permit of {@link #globalPending} for this request.
+         *
+         * @param counter The {@link #globalPending} counter
+         * @return {@code false} if the limit is reached
+         */
+        private boolean acquirePermit(AtomicInteger counter) {
+            int limit = connectionPoolConfiguration.getMaxPendingAcquires();
+            while (true) {
+                int current = counter.get();
+                if (current >= limit) {
+                    return false;
+                }
+                if (counter.compareAndSet(current, current + 1)) {
+                    break;
+                }
+            }
+            permitHeld.set(true);
+            if (get() || sink.isCancelled()) {
+                // completed or cancelled before the permit was recorded
+                releasePermit();
+            }
+            return true;
+        }
+
+        /**
+         * Release the permit of {@link #globalPending} held by this request, if any. Only the
+         * first call after the permit was acquired has an effect.
+         */
+        private void releasePermit() {
+            AtomicInteger counter = globalPending;
+            if (counter != null && permitHeld.compareAndSet(true, false)) {
+                counter.decrementAndGet();
+            }
+        }
+
+        /**
          * Attempt to redispatch this connection. Unlike {@link #dispatch()}, can be called
-         * multiple times, because it doesn't increase {@link #globalPending}.
+         * multiple times, because it doesn't acquire a permit of {@link #globalPending}.
          */
         @Override
         public void redispatch() {
@@ -1202,9 +1318,8 @@ final class Pool49 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                if (globalPending != null) {
-                    globalPending.decrement();
-                }
+                releasePermit();
+                onAcquireDone();
                 sink.completeExceptionally(t);
                 return true;
             } else {
@@ -1215,9 +1330,9 @@ final class Pool49 implements Pool {
         @Override
         public boolean tryComplete(ConnectionManager.PoolHandle value) {
             if (compareAndSet(false, true)) {
-                if (globalPending != null) {
-                    globalPending.decrement();
-                }
+                releasePermit();
+                // the connection is still open at this point, so this never retires the pool
+                onAcquireDone();
                 if (sink.isCancelled()) {
                     return false;
                 }

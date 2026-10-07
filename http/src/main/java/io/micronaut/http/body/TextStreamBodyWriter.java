@@ -72,7 +72,10 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
     @Override
     public MessageBodyWriter<T> createSpecific(Argument<T> type) {
-        return new TextStreamBodyWriter<>(registry, registry.findWriter(getBodyType(type), JSON_TYPE_LIST).orElse(null));
+        Argument<Object> bodyType = getBodyType(type);
+        return new TextStreamBodyWriter<>(registry, registry.findWriter(bodyType, JSON_TYPE_LIST)
+            .map(writer -> writer.createSpecific(bodyType))
+            .orElse(null));
     }
 
     @SuppressWarnings("unchecked")

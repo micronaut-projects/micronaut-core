@@ -91,6 +91,22 @@ public @interface Around {
     boolean cacheableLazyTarget() default false;
 
     /**
+     * <p>If {@link #proxyTarget()} is set to <code>true</code> then one can optionally set <code>lazyInterceptorsPerTarget</code>
+     * to true, in which case the proxy resolves its interceptors for each target it fronts rather than once, as it is
+     * constructed.</p>
+     *
+     * <p>By default the proxy intercepts every target with the interceptors it resolved for itself. With this set, a
+     * non-singleton interceptor is the target's own: the instance created with the target, which also intercepts its
+     * construction, post-construct and pre-destroy, or one created for it on the first call, and destroyed with the target.
+     * A lazy proxy, such as a scoped proxy, therefore intercepts each target it resolves with that target's instance.
+     * Singleton interceptors are shared as before.</p>
+     *
+     * @return True if the proxy should resolve its interceptors for each target
+     * @since 5.3.0
+     */
+    boolean lazyInterceptorsPerTarget() default false;
+
+    /**
      * Sets the {@link io.micronaut.aop.Around.ProxyTargetConstructorMode}. See the
      * javadoc for {@link io.micronaut.aop.Around.ProxyTargetConstructorMode} for more information.
      *
