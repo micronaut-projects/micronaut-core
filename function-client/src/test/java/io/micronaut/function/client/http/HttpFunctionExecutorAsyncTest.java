@@ -146,15 +146,12 @@ class HttpFunctionExecutorAsyncTest {
 
     @Test
     void invokeAsyncSendsTheRequestOfThePublisherOfTheValue() throws Exception {
-        HttpFunctionExecutor<Object, Object> publisherOnly = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null));
-        try {
+        try (HttpFunctionExecutor<Object, Object> publisherOnly = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null))) {
             // what the CompletionStage path of the function client sent: the request for a publisher
             Object published = Mono.from((Publisher<?>) publisherOnly.invoke(definition("/max"), null, (Argument) Argument.of(Publisher.class, String.class))).block();
             assertEquals("42", published);
             assertEquals("42", executor.invokeAsync(definition("/max"), null, Argument.STRING).toCompletableFuture().get(10, TimeUnit.SECONDS));
             assertEquals("42", publisherOnly.invokeAsync(definition("/max"), null, Argument.STRING).toCompletableFuture().get(10, TimeUnit.SECONDS));
-        } finally {
-            publisherOnly.close();
         }
 
         assertEquals(3, accepts.size());
@@ -166,18 +163,15 @@ class HttpFunctionExecutorAsyncTest {
     @Test
     void aSubclassThatOverridesInvokeIsCalledThroughItByInvokeAsync() throws Exception {
         AtomicInteger invoked = new AtomicInteger();
-        HttpFunctionExecutor<Object, Object> subclass = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null)) {
+        try (HttpFunctionExecutor<Object, Object> subclass = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null)) {
             @Override
             public Object invoke(FunctionDefinition definition, Object input, Argument<Object> outputType) {
                 invoked.incrementAndGet();
                 assertEquals(Publisher.class, outputType.getType());
                 return Mono.just("overridden");
             }
-        };
-        try {
+        }) {
             assertEquals("overridden", subclass.invokeAsync(definition("/max"), null, Argument.STRING).toCompletableFuture().get(10, TimeUnit.SECONDS));
-        } finally {
-            subclass.close();
         }
         assertEquals(1, invoked.get());
         assertEquals(0, calls.get());
