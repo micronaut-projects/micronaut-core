@@ -24,7 +24,6 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Vetoed;
-import io.micronaut.core.beans.BeanTypeHierarchy;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
@@ -57,7 +56,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -198,7 +196,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 }
                 int introspectionIndex = index.getAndIncrement();
                 processBuilderDefinition(ce, context, ce.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage, true);
-                describeHierarchy(ce, introspected, metadata);
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                     targetPackage,
                     element.getName(),
@@ -209,6 +206,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
 
+                describeHierarchy(writer, ce, introspected);
                 processElement(
                     metadata,
                     members,
@@ -233,7 +231,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         }
                         int introspectionIndex = j++;
                         processBuilderDefinition(classElement, context, classElement.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage, true);
-                        describeHierarchy(classElement, introspected, metadata);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                             targetPackage,
                             element.getName(),
@@ -245,6 +242,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         );
 
 
+                        describeHierarchy(writer, classElement, introspected);
                         processElement(metadata,
                             members,
                             indexedAnnotations,
@@ -258,7 +256,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
         } else {
             processBuilderDefinition(element, context, introspected, 0, targetPackage, element.hasAnnotation(ImportedClass.class));
-            describeHierarchy(element, introspected, metadata);
             final BeanIntrospectionWriter writer;
             if (element.hasAnnotation(ImportedClass.class)) {
                 ClassElement originatingElement = context.getClassElement(element.stringValue(ImportedClass.class, "originatingElement").orElseThrow()).orElseThrow();
@@ -280,6 +277,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
             }
+            describeHierarchy(writer, element, introspected);
             processElement(metadata, members, indexedAnnotations, element, writer, ignoreSettersWithDifferingType, isDescribeConstructors(element, introspected), context);
         }
     }
@@ -289,84 +287,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     /**
-     * Records the hierarchy of a type in its annotation metadata, which the introspection carries and
-     * {@link io.micronaut.core.beans.BeanIntrospection#getTypeHierarchy()} reads, when the type asks for it.
-     * It is recorded before the writer captures the metadata.
+     * Has the introspection describe the hierarchy of the type when the type asks for it.
      */
-    private static void describeHierarchy(ClassElement ce, AnnotationValue<Introspected> introspected, boolean metadata) {
-        if (!metadata
-            || !ce.findAnnotation(Introspected.class).orElse(introspected).booleanValue("hierarchy").orElse(false)
-            || ce.hasAnnotation(BeanTypeHierarchy.ANNOTATION_NAME)) {
-            return;
+    private static void describeHierarchy(BeanIntrospectionWriter writer, ClassElement ce, AnnotationValue<Introspected> introspected) {
+        if (ce.findAnnotation(Introspected.class).orElse(introspected).booleanValue("hierarchy").orElse(false)) {
+            writer.describeHierarchy();
         }
-        Map<String, AnnotationValue<?>> types = new LinkedHashMap<>();
-        describeType(ce, types);
-        AnnotationValue<?>[] methods = ce.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance()).stream()
-            .filter(method -> !method.isPrivate() && !method.isSynthetic())
-            .map(method -> AnnotationValue.builder(BeanTypeHierarchy.METHOD_NAME)
-                .member(BeanTypeHierarchy.MEMBER_NAME, method.getName())
-                .member(BeanTypeHierarchy.MEMBER_PARAMETERS, Arrays.stream(method.getParameters())
-                    .map(parameter -> new AnnotationClassValue<>(erasedName(parameter.getType())))
-                    .toArray(AnnotationClassValue<?>[]::new))
-                .member(BeanTypeHierarchy.MEMBER_RETURN_TYPE, new AnnotationClassValue<>(erasedName(method.getReturnType())))
-                .build())
-            .toArray(AnnotationValue<?>[]::new);
-        ce.annotate(BeanTypeHierarchy.ANNOTATION_NAME, builder -> builder
-            .member(BeanTypeHierarchy.MEMBER_TYPES, types.values().toArray(AnnotationValue<?>[]::new))
-            .member(BeanTypeHierarchy.MEMBER_METHODS, methods));
-    }
-
-    /**
-     * Describes a type and, depth first, its super class and its interfaces, each once. Object is named as a super
-     * class, it is not described.
-     */
-    private static void describeType(ClassElement type, Map<String, AnnotationValue<?>> types) {
-        if (types.containsKey(type.getName()) || type.getName().equals(Object.class.getName())) {
-            return;
-        }
-        AnnotationValueBuilder<Annotation> value = AnnotationValue.builder(BeanTypeHierarchy.TYPE_NAME)
-            .member(BeanTypeHierarchy.MEMBER_TYPE, new AnnotationClassValue<>(type.getName()))
-            .member(BeanTypeHierarchy.MEMBER_INTERFACES, type.getInterfaces().stream()
-                .map(anInterface -> new AnnotationClassValue<>(anInterface.getName()))
-                .toArray(AnnotationClassValue<?>[]::new));
-        Optional<ClassElement> superType = type.isInterface() ? Optional.empty() : type.getSuperType();
-        if (!type.isInterface()) {
-            // a class extending Object directly reports no super type
-            value.member(BeanTypeHierarchy.MEMBER_SUPERCLASS,
-                new AnnotationClassValue<>(superType.map(ClassElement::getName).orElse(Object.class.getName())));
-        }
-        types.put(type.getName(), value.build());
-        superType.ifPresent(parent -> describeType(parent, types));
-        type.getInterfaces().forEach(anInterface -> describeType(anInterface, types));
-    }
-
-    /**
-     * The name {@link Class#getName()} gives the erasure of a type: an array is named by its descriptor.
-     */
-    private static String erasedName(ClassElement type) {
-        if (!type.isArray()) {
-            return type.getName();
-        }
-        ClassElement component = type;
-        StringBuilder name = new StringBuilder();
-        while (component.isArray()) {
-            name.append('[');
-            component = component.fromArray();
-        }
-        if (!component.isPrimitive()) {
-            return name.append('L').append(component.getName()).append(';').toString();
-        }
-        return name.append(switch (component.getName()) {
-            case "boolean" -> 'Z';
-            case "byte" -> 'B';
-            case "char" -> 'C';
-            case "short" -> 'S';
-            case "int" -> 'I';
-            case "long" -> 'J';
-            case "float" -> 'F';
-            case "double" -> 'D';
-            default -> throw new IllegalStateException("Unknown primitive type: " + component.getName());
-        }).toString();
     }
 
     private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, boolean useLongBuilderName) {

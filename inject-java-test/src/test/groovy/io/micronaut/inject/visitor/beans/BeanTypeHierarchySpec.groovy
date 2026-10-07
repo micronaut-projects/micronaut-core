@@ -95,6 +95,26 @@ class Plain implements Runnable {
         !introspection.getTypeHierarchy().isPresent()
     }
 
+    void "the hierarchy is generated into the introspection, not its annotation metadata"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Bare', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(hierarchy = true, annotationMetadata = false)
+class Bare implements Runnable {
+    public void run() { }
+}
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+
+        then:
+        introspection.annotationMetadata.isEmpty()
+        hierarchy.types == [introspection.beanType, Runnable]
+        hierarchy.declaresMethod('run')
+    }
+
     void "an imported type is described when the import asks for it"() {
         when:
         def loader = buildClassLoader('test.Imports', '''

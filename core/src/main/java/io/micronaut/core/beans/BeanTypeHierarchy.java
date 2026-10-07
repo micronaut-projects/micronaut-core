@@ -16,13 +16,11 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
-import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,13 +30,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The hierarchy of an introspected type, described at compile time when the type is introspected with
+ * The hierarchy of an introspected type, generated at compile time when the type is introspected with
  * {@link io.micronaut.core.annotation.Introspected#hierarchy()}: every super class and interface of the type,
  * with the super class and the interfaces each of them declares, and the methods the type itself declares.
  *
  * <p>The types are those the compiler saw: the type itself first, then, depth first, its super class and the
  * super classes and interfaces of that, then its interfaces and theirs, each once. {@link Object} is reported
- * as a super class, it is not described itself. A type whose class cannot be loaded at runtime is left out.</p>
+ * as a super class, it is not described itself. A type whose class cannot be loaded at runtime is left out.
+ * The classes are loaded when the types are first asked for.</p>
  *
  * <p>The declared methods are the instance methods the type declares that are not private, whether or not the
  * introspection describes them as {@link BeanMethod bean methods}, without the methods it inherits.</p>
@@ -49,99 +48,24 @@ import java.util.Optional;
 @Experimental
 public final class BeanTypeHierarchy {
 
-    /**
-     * The annotation the annotation processor records the hierarchy in. It names no class: a processor resolving an
-     * annotation by its name finds none and keeps the recorded values as they are.
-     */
-    @Internal
-    public static final String ANNOTATION_NAME = "io.micronaut.core.beans.internal.TypeHierarchy";
-    /**
-     * The member of {@link #ANNOTATION_NAME} listing the types, each an annotation of {@link #TYPE_NAME}.
-     */
-    @Internal
-    public static final String MEMBER_TYPES = "types";
-    /**
-     * The member of {@link #ANNOTATION_NAME} listing the declared methods, each an annotation of
-     * {@link #METHOD_NAME}.
-     */
-    @Internal
-    public static final String MEMBER_METHODS = "methods";
-    /**
-     * The annotation describing one type: {@link #MEMBER_TYPE}, {@link #MEMBER_SUPERCLASS} and
-     * {@link #MEMBER_INTERFACES}.
-     */
-    @Internal
-    public static final String TYPE_NAME = "io.micronaut.core.beans.internal.TypeHierarchyType";
-    /**
-     * The annotation describing one declared method: {@link #MEMBER_NAME}, {@link #MEMBER_PARAMETERS} and
-     * {@link #MEMBER_RETURN_TYPE}.
-     */
-    @Internal
-    public static final String METHOD_NAME = "io.micronaut.core.beans.internal.TypeHierarchyMethod";
-    /** The described type. */
-    @Internal
-    public static final String MEMBER_TYPE = "type";
-    /** The super class of a described type, absent for an interface. */
-    @Internal
-    public static final String MEMBER_SUPERCLASS = "superclass";
-    /** The interfaces a described type declares. */
-    @Internal
-    public static final String MEMBER_INTERFACES = "interfaces";
-    /** The name of a declared method. */
-    @Internal
-    public static final String MEMBER_NAME = "name";
-    /** The erased parameter types of a declared method. */
-    @Internal
-    public static final String MEMBER_PARAMETERS = "parameters";
-    /** The erased return type of a declared method. */
-    @Internal
-    public static final String MEMBER_RETURN_TYPE = "returnType";
-
     private final Class<?> beanType;
-    private final Map<Class<?>, TypeEntry> types;
+    private final TypeRef[] typeRefs;
     private final List<DeclaredMethod> declaredMethods;
-
-    private BeanTypeHierarchy(Class<?> beanType, Map<Class<?>, TypeEntry> types, List<DeclaredMethod> declaredMethods) {
-        this.beanType = beanType;
-        this.types = types;
-        this.declaredMethods = declaredMethods;
-    }
+    private volatile @Nullable Map<Class<?>, TypeEntry> types;
 
     /**
-     * Reads the hierarchy the annotation processor recorded in the annotation metadata of an introspection.
+     * The hierarchy as the generated introspection describes it.
      *
      * @param beanType The introspected type
-     * @param metadata The annotation metadata of its introspection
-     * @return The hierarchy, or empty if none was recorded
+     * @param typeRefs The types, the introspected one first
+     * @param declaredMethods The methods the introspected type declares
      */
-    public static Optional<BeanTypeHierarchy> of(Class<?> beanType, AnnotationMetadata metadata) {
-        AnnotationValue<Annotation> recorded = metadata.getAnnotation(ANNOTATION_NAME);
-        if (recorded == null) {
-            return Optional.empty();
-        }
-        Map<Class<?>, TypeEntry> types = new LinkedHashMap<>();
-        for (AnnotationValue<Annotation> entry : recorded.getAnnotations(MEMBER_TYPES)) {
-            Class<?> type = entry.annotationClassValue(MEMBER_TYPE).flatMap(AnnotationClassValue::getType).orElse(null);
-            if (type == null) {
-                continue;
-            }
-            Class<?> superclass = entry.annotationClassValue(MEMBER_SUPERCLASS)
-                .flatMap(AnnotationClassValue::getType).orElse(null);
-            List<Class<?>> interfaces = new ArrayList<>();
-            for (AnnotationClassValue<?> anInterface : entry.annotationClassValues(MEMBER_INTERFACES)) {
-                anInterface.getType().ifPresent(interfaces::add);
-            }
-            types.put(type, new TypeEntry(superclass, Collections.unmodifiableList(interfaces)));
-        }
-        List<DeclaredMethod> methods = new ArrayList<>();
-        for (AnnotationValue<Annotation> method : recorded.getAnnotations(MEMBER_METHODS)) {
-            methods.add(new DeclaredMethod(
-                method.stringValue(MEMBER_NAME).orElse(""),
-                Arrays.stream(method.annotationClassValues(MEMBER_PARAMETERS)).map(AnnotationClassValue::getName).toList(),
-                method.annotationClassValue(MEMBER_RETURN_TYPE).map(AnnotationClassValue::getName).orElse(void.class.getName())
-            ));
-        }
-        return Optional.of(new BeanTypeHierarchy(beanType, Collections.unmodifiableMap(types), Collections.unmodifiableList(methods)));
+    @Internal
+    @UsedByGeneratedCode
+    public BeanTypeHierarchy(Class<?> beanType, TypeRef[] typeRefs, DeclaredMethod[] declaredMethods) {
+        this.beanType = beanType;
+        this.typeRefs = typeRefs;
+        this.declaredMethods = List.of(declaredMethods);
     }
 
     /**
@@ -155,7 +79,7 @@ public final class BeanTypeHierarchy {
      * @return The introspected type and every super class and interface of it, each once, {@link Object} aside
      */
     public List<Class<?>> getTypes() {
-        return List.copyOf(types.keySet());
+        return List.copyOf(types().keySet());
     }
 
     /**
@@ -163,7 +87,7 @@ public final class BeanTypeHierarchy {
      * @return Whether the type is the introspected type or one of its super types
      */
     public boolean contains(Class<?> type) {
-        return types.containsKey(type);
+        return types().containsKey(type);
     }
 
     /**
@@ -173,7 +97,7 @@ public final class BeanTypeHierarchy {
      * @return The super class, empty for an interface, for {@link Object} and for a type outside the hierarchy
      */
     public Optional<Class<?>> getSuperclass(Class<?> type) {
-        TypeEntry entry = types.get(type);
+        TypeEntry entry = types().get(type);
         return entry == null ? Optional.empty() : Optional.ofNullable(entry.superclass());
     }
 
@@ -184,7 +108,7 @@ public final class BeanTypeHierarchy {
      * @return The interfaces, empty for a type outside the hierarchy
      */
     public List<Class<?>> getInterfaces(Class<?> type) {
-        TypeEntry entry = types.get(type);
+        TypeEntry entry = types().get(type);
         return entry == null ? List.of() : entry.interfaces();
     }
 
@@ -222,12 +146,51 @@ public final class BeanTypeHierarchy {
         return findDeclaredMethod(name, parameterTypes).isPresent();
     }
 
+    private Map<Class<?>, TypeEntry> types() {
+        Map<Class<?>, TypeEntry> resolved = types;
+        if (resolved == null) {
+            Map<Class<?>, TypeEntry> map = new LinkedHashMap<>();
+            for (TypeRef ref : typeRefs) {
+                Class<?> type = ref.type().getType().orElse(null);
+                if (type == null) {
+                    continue;
+                }
+                List<Class<?>> interfaces = new ArrayList<>(ref.interfaces().length);
+                for (AnnotationClassValue<?> anInterface : ref.interfaces()) {
+                    anInterface.getType().ifPresent(interfaces::add);
+                }
+                AnnotationClassValue<?> superclass = ref.superclass();
+                map.put(type, new TypeEntry(
+                    superclass == null ? null : superclass.getType().orElse(null),
+                    Collections.unmodifiableList(interfaces)));
+            }
+            resolved = Collections.unmodifiableMap(map);
+            types = resolved;
+        }
+        return resolved;
+    }
+
     @Override
     public String toString() {
-        return "BeanTypeHierarchy{" + beanType.getName() + ", types=" + types.keySet() + ", methods=" + declaredMethods + '}';
+        return "BeanTypeHierarchy{" + beanType.getName() + ", types=" + types().keySet() + ", methods=" + declaredMethods + '}';
     }
 
     private record TypeEntry(@Nullable Class<?> superclass, List<Class<?>> interfaces) {
+    }
+
+    /**
+     * A type of the hierarchy as the generated introspection names it, resolved when it is first read.
+     *
+     * @param type The type
+     * @param superclass The super class it declares, {@code null} for an interface
+     * @param interfaces The interfaces it declares
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @SuppressWarnings("java:S6218") // never compared: read once into the hierarchy
+    public record TypeRef(AnnotationClassValue<?> type,
+                          @Nullable AnnotationClassValue<?> superclass,
+                          AnnotationClassValue<?>[] interfaces) {
     }
 
     /**
@@ -241,6 +204,28 @@ public final class BeanTypeHierarchy {
      */
     @Experimental
     public record DeclaredMethod(String name, List<String> parameterTypeNames, String returnTypeName) {
+
+        /**
+         * The method as the generated introspection describes it.
+         *
+         * @param name The method name
+         * @param parameterTypeNames The names of the erased parameter types
+         * @param returnTypeName The name of the erased return type
+         */
+        @Internal
+        @UsedByGeneratedCode
+        public DeclaredMethod(String name, String[] parameterTypeNames, String returnTypeName) {
+            this(name, Arrays.asList(parameterTypeNames), returnTypeName);
+        }
+
+        /**
+         * @param name The method name
+         * @param parameterTypeNames The names of the erased parameter types
+         * @param returnTypeName The name of the erased return type
+         */
+        public DeclaredMethod {
+            parameterTypeNames = List.copyOf(parameterTypeNames);
+        }
 
         /**
          * Whether this is the method of the given name and erased parameter types.

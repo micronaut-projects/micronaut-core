@@ -252,9 +252,8 @@ public @interface Introspected {
      * interface declares on its own terms, and need to know whether a type declares a method or inherits it,
      * without reading the classes reflectively.</p>
      *
-     * <p>Defaults to {@code false} since the additional metadata increases the size of the generated
-     * introspection. Has no effect when {@link #annotationMetadata()} is {@code false}, since the hierarchy is
-     * recorded in the annotation metadata of the introspection.</p>
+     * <p>Defaults to {@code false} since the generated introspection grows by the code describing the
+     * hierarchy. The hierarchy is built when it is first asked for.</p>
      *
      * @return True if the hierarchy of the type should be described
      * @since 5.3.0

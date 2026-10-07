@@ -29,4 +29,4 @@ api:core.beans.BeanTypeHierarchy[] exposes:
 
 The hierarchy is the one the compiler saw. A type whose class cannot be loaded at runtime is left out.
 
-IMPORTANT: `hierarchy` defaults to `false` because the additional metadata increases the size of the generated introspection. It is recorded in the annotation metadata of the introspection, so it has no effect when `annotationMetadata` is set to `false`.
+IMPORTANT: `hierarchy` defaults to `false` because the generated introspection grows by the code describing the hierarchy. The hierarchy is built, and its classes loaded, when it is first asked for.

@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanTypeHierarchy;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -130,6 +131,18 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
     private static final java.lang.reflect.Method GET_TYPE_ARGUMENTS_MAP_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getTypeArgumentsMap");
+
+    private static final java.lang.reflect.Method BUILD_TYPE_HIERARCHY_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "buildTypeHierarchy");
+
+    private static final java.lang.reflect.Constructor<?> BEAN_TYPE_HIERARCHY_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        BeanTypeHierarchy.class, Class.class, BeanTypeHierarchy.TypeRef[].class, BeanTypeHierarchy.DeclaredMethod[].class);
+
+    private static final java.lang.reflect.Constructor<?> TYPE_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        BeanTypeHierarchy.TypeRef.class, AnnotationClassValue.class, AnnotationClassValue.class, AnnotationClassValue[].class);
+
+    private static final java.lang.reflect.Constructor<?> DECLARED_METHOD_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        BeanTypeHierarchy.DeclaredMethod.class, String.class, String[].class, String.class);
 
     private static final java.lang.reflect.Method GET_BP_INDEXED_SUBSET_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class);
@@ -307,6 +320,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      * then reports that it separates the declarations.
      */
     private boolean membersDescribed;
+    private boolean hierarchyDescribed;
     private VisitorContext visitorContext;
 
     /**
@@ -517,6 +531,14 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      */
     void describeMembers() {
         this.membersDescribed = true;
+    }
+
+    /**
+     * Marks the hierarchy of the bean type as described: the introspection builds its
+     * {@link BeanIntrospection#getTypeHierarchy() type hierarchy}.
+     */
+    void describeHierarchy() {
+        this.hierarchyDescribed = true;
     }
 
     private List<BeanPropertyMemberData> visitPropertyMembers(List<PropertyMemberDef> members,
@@ -1144,10 +1166,105 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                     .build((aThis, methodParameters) -> thisType.getStaticField(typeArgumentsField).returning())
             );
         }
+        if (hierarchyDescribed) {
+            classDefBuilder.addMethod(
+                MethodDef.override(BUILD_TYPE_HIERARCHY_METHOD)
+                    .build((aThis, methodParameters) -> newTypeHierarchy(loadClassValueExpressionFn).returning())
+            );
+        }
 
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         return classDefBuilder.build();
+    }
+
+    /**
+     * Builds the expression creating the hierarchy of the bean type: every type once, depth first, the super
+     * class before the interfaces, and the instance methods the bean type declares that are not private.
+     *
+     * @param loadClassValueExpressionFn The load type expression fn
+     * @return The expression
+     */
+    private ExpressionDef newTypeHierarchy(Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        Map<String, ClassElement> types = new LinkedHashMap<>();
+        collectHierarchy(beanClassElement, types);
+        ClassTypeDef classValueType = ClassTypeDef.of(AnnotationClassValue.class);
+        List<ExpressionDef> typeRefs = new ArrayList<>(types.size());
+        for (ClassElement type : types.values()) {
+            ExpressionDef superclass = type.isInterface()
+                ? ExpressionDef.nullValue()
+                // a class extending Object directly reports no super type
+                : loadClassValueExpressionFn.apply(type.getSuperType().map(ClassElement::getName).orElse(Object.class.getName()));
+            typeRefs.add(ClassTypeDef.of(BeanTypeHierarchy.TypeRef.class).instantiate(
+                TYPE_REF_CONSTRUCTOR,
+                loadClassValueExpressionFn.apply(type.getName()),
+                superclass,
+                classValueType.array().instantiate(type.getInterfaces().stream()
+                    .map(anInterface -> loadClassValueExpressionFn.apply(anInterface.getName()))
+                    .toList())
+            ));
+        }
+        List<ExpressionDef> methods = beanClassElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance()).stream()
+            .filter(method -> !method.isPrivate() && !method.isSynthetic())
+            .<ExpressionDef>map(method -> ClassTypeDef.of(BeanTypeHierarchy.DeclaredMethod.class).instantiate(
+                DECLARED_METHOD_CONSTRUCTOR,
+                ExpressionDef.constant(method.getName()),
+                TypeDef.STRING.array().instantiate(Arrays.stream(method.getParameters())
+                    .<ExpressionDef>map(parameter -> ExpressionDef.constant(erasedName(parameter.getType())))
+                    .toList()),
+                ExpressionDef.constant(erasedName(method.getReturnType()))
+            ))
+            .toList();
+        return ClassTypeDef.of(BeanTypeHierarchy.class).instantiate(
+            BEAN_TYPE_HIERARCHY_CONSTRUCTOR,
+            ExpressionDef.constant(beanType),
+            ClassTypeDef.of(BeanTypeHierarchy.TypeRef.class).array().instantiate(typeRefs),
+            ClassTypeDef.of(BeanTypeHierarchy.DeclaredMethod.class).array().instantiate(methods)
+        );
+    }
+
+    /**
+     * Collects a type and, depth first, its super class and its interfaces, each once. Object is named as a super
+     * class, it is not collected.
+     */
+    private static void collectHierarchy(ClassElement type, Map<String, ClassElement> types) {
+        if (types.containsKey(type.getName()) || type.getName().equals(Object.class.getName())) {
+            return;
+        }
+        types.put(type.getName(), type);
+        if (!type.isInterface()) {
+            type.getSuperType().ifPresent(parent -> collectHierarchy(parent, types));
+        }
+        type.getInterfaces().forEach(anInterface -> collectHierarchy(anInterface, types));
+    }
+
+    /**
+     * The name {@link Class#getName()} gives the erasure of a type: an array is named by its descriptor.
+     */
+    private static String erasedName(ClassElement type) {
+        if (!type.isArray()) {
+            return type.getName();
+        }
+        ClassElement component = type;
+        StringBuilder name = new StringBuilder();
+        while (component.isArray()) {
+            name.append('[');
+            component = component.fromArray();
+        }
+        if (!component.isPrimitive()) {
+            return name.append('L').append(component.getName()).append(';').toString();
+        }
+        return name.append(switch (component.getName()) {
+            case "boolean" -> 'Z';
+            case "byte" -> 'B';
+            case "char" -> 'C';
+            case "short" -> 'S';
+            case "int" -> 'I';
+            case "long" -> 'J';
+            case "float" -> 'F';
+            case "double" -> 'D';
+            default -> throw new IllegalStateException("Unknown primitive type: " + component.getName());
+        }).toString();
     }
 
     /**

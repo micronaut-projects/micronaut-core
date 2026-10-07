@@ -991,13 +991,26 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     @Override
-    public Optional<BeanTypeHierarchy> getTypeHierarchy() {
-        // read once: the recorded hierarchy loads the classes it names
+    public final Optional<BeanTypeHierarchy> getTypeHierarchy() {
+        // built once, when first asked for
         if (!typeHierarchyRead) {
-            typeHierarchy = BeanTypeHierarchy.of(beanType, annotationMetadata).orElse(null);
+            typeHierarchy = buildTypeHierarchy();
             typeHierarchyRead = true;
         }
         return Optional.ofNullable(typeHierarchy);
+    }
+
+    /**
+     * Builds the hierarchy of the bean type; generated for an introspection compiled with
+     * {@link io.micronaut.core.annotation.Introspected#hierarchy()}.
+     *
+     * @return The hierarchy, or {@code null} if the introspection does not describe it
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected @Nullable BeanTypeHierarchy buildTypeHierarchy() {
+        return null;
     }
 
     @Override

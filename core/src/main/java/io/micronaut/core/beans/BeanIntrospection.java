@@ -492,7 +492,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      */
     @Experimental
     default Optional<BeanTypeHierarchy> getTypeHierarchy() {
-        return BeanTypeHierarchy.of(getBeanType(), getAnnotationMetadata());
+        return Optional.empty();
     }
 
     /**
