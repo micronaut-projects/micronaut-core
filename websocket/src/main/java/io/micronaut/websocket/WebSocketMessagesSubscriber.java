@@ -15,6 +15,7 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
@@ -34,7 +35,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Denis Stepanov
  * @since 5.3.0
  */
-final class WebSocketMessagesSubscriber implements Subscriber<Object> {
+@Internal
+public final class WebSocketMessagesSubscriber implements Subscriber<Object> {
 
     private final WebSocketSession session;
     private final MediaType mediaType;
@@ -61,9 +63,10 @@ final class WebSocketMessagesSubscriber implements Subscriber<Object> {
      * @param mediaType The media type of the messages
      * @param sent      Completes with {@code true} when all the messages were sent, with
      *                  {@code false} when the session closed first: completing it before, e.g.
-     *                  cancelling it, cancels the publisher
+     *                  cancelling it, cancels the publisher. Completed already, it sends nothing
+     *                  and cancels the publisher at once
      */
-    WebSocketMessagesSubscriber(WebSocketSession session, MediaType mediaType, CompletableFuture<Boolean> sent) {
+    public WebSocketMessagesSubscriber(WebSocketSession session, MediaType mediaType, CompletableFuture<Boolean> sent) {
         this.session = session;
         this.mediaType = mediaType;
         this.sent = sent;

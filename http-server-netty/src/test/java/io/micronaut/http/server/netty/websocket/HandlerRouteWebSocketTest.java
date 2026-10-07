@@ -474,6 +474,31 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
+    void aClientThatDropsTheConnectionWhileTheMessagesWaitIsNoticedAtOnce() throws Exception {
+        try (RawClient raw = new RawClient(server.getPort(), "/ws/drop")) {
+            ByteArrayOutputStream burst = new ByteArrayOutputStream();
+            for (int i = 0; i < 4; i++) {
+                burst.writeBytes(RawClient.frame(0x1, "m" + i));
+            }
+            raw.write(burst.toByteArray());
+            assertEquals("drop m0", event());
+            // the handler of m0 does not complete, m1 waits: the pending messages are full
+            assertNull(context.getBean(Events.class).events.poll(200, TimeUnit.MILLISECONDS));
+            // the connection is dropped without a close
+        }
+        // an abnormal closure, noticed at once rather than at the idle timeout
+        assertEquals("drop close 1006", event());
+    }
+
+    @Test
+    void aStreamSentByTheCloseHandlerSendsNothingAfterTheCloseOfThePeer() throws Exception {
+        Client client = connect("/ws/close-send-all");
+        client.close(1000, "done");
+        assertEquals(Set.of("late cancelled", "late sent all false"), Set.of(event(), event()));
+        assertNull(client.messages.poll(200, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
     void pingsReadAtOnceAreAllAnswered() throws Exception {
         try (RawClient raw = new RawClient(server.getPort(), "/ws/burst")) {
             raw.write(concat(RawClient.frame(0x9, "one"), RawClient.frame(0x9, "two"), RawClient.frame(0x9, "three")));
@@ -1204,6 +1229,20 @@ class HandlerRouteWebSocketTest {
                         log.add("unbounded close " + reason.getCode());
                         return null;
                     }));
+                routes.GET("/ws/drop").webSocket(ws -> ws
+                    .maxPendingMessages(1)
+                    .onMessage(String.class, (session, message) -> {
+                        log.add("drop " + message);
+                        return new CompletableFuture<>();
+                    })
+                    .onClose((session, reason) -> {
+                        log.add("drop close " + reason.getCode());
+                        return null;
+                    }));
+                routes.GET("/ws/close-send-all").webSocket(ws -> ws
+                    .onMessage(String.class, (session, message) -> null)
+                    .onClose((session, reason) -> session.sendAllAsync(new Ticks("late", 2, true, log))
+                        .thenAccept(all -> log.add("late sent all " + all))));
                 routes.GET("/ws/close-discards").webSocket(ws -> ws
                     .onMessage(String.class, (session, message) -> {
                         log.add("start " + message);

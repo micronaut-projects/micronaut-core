@@ -231,10 +231,12 @@ public sealed interface WebSocketEndpointSpec permits WebSocketRouteEndpoint.Spe
     /**
      * The most messages of a connection read ahead of its handlers: {@code 16} by default. A
      * message sent in fragments counts each of its fragments, so that the messages that wait take
-     * a bounded amount of memory. Once that many wait, the connection decodes and reads nothing
-     * until a handler is done, which also holds back the pings and the close that follow them,
-     * e.g. when a handler does not complete; frames that arrive at once beyond the limit stay
-     * undecoded. {@code 0} reads all the time, without backpressure: the pings and
+     * a bounded amount of memory. Once that many wait, the connection decodes nothing until a
+     * handler is done, which also holds back the pings and the close that follow them, e.g. when a
+     * handler does not complete; frames that arrive at once beyond the limit stay undecoded. It
+     * still reads up to 64 KiB more, undecoded, so that a client that drops the connection
+     * without a close is noticed at once, with an abnormal closure ({@code 1006}); beyond that it
+     * reads nothing more until a handler is done. {@code 0} reads all the time, without backpressure: the pings and
      * the close are never held back, and the messages that wait are kept in memory, however many.
      *
      * @param maxPendingMessages The most messages read ahead, or {@code 0} for no limit
