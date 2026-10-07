@@ -692,7 +692,7 @@ public final class DevRuntime implements Closeable {
                 LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
             }
             if (old instanceof DefaultBeanContext defaultBeanContext && old.isRunning()) {
-                retained = defaultBeanContext.stopRetaining(retentionPredicate(old, retentionAllowed));
+                retained = defaultBeanContext.stopRetaining(retentionCriteria(retentionPredicate(old, retentionAllowed)));
             } else if (old.isRunning()) {
                 old.stop();
             }
@@ -747,6 +747,29 @@ public final class DevRuntime implements Closeable {
                 }
             }
             return false;
+        };
+    }
+
+    /**
+     * What a restart retains: what the predicate retains, unless a bean it holds or received is of a class of a
+     * generation, which the restart replaces and the bean would keep running.
+     */
+    private static DefaultBeanContext.RetentionCriteria retentionCriteria(Predicate<BeanRegistration<?>> retain) {
+        return new DefaultBeanContext.RetentionCriteria() {
+            @Override
+            public boolean retain(BeanRegistration<?> registration) {
+                return retain.test(registration);
+            }
+
+            @Override
+            public Set<String> invalidatedBy(BeanRegistration<?> registration) {
+                return Set.of();
+            }
+
+            @Override
+            public boolean isReplaced(Class<?> type) {
+                return type.getClassLoader() instanceof GenerationClassLoader;
+            }
         };
     }
 
