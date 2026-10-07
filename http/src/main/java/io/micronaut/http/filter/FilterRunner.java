@@ -26,8 +26,12 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +58,8 @@ import java.util.function.BiFunction;
  */
 @Internal
 public class FilterRunner {
+
+    private static final Logger LOG = LoggerFactory.getLogger(FilterRunner.class);
 
     @Nullable
     private final List<InternalHttpFilter> preMatchingFilters;
@@ -453,13 +459,15 @@ public class FilterRunner {
             if (!filter.isFiltersResponse()) {
                 continue;
             }
+            // the elements of the body before the filter: a filter can replace them in place
+            BodyElements<?> elements = elementsOf(context.response());
             ExecutionFlow<FilterContext> flow = filter.processResponseFilter(context, exception);
             FilterContext flowContext = flow.tryCompleteValue();
             if (flowContext != null) {
                 // Imperative flow: Unwrap the context and continue the loop
                 if (context != flowContext) {
                     // Response modified by the filter
-                    closeReplacedResponse(context.response(), flowContext.response());
+                    closeReplacedResponse(context.response(), elements, flowContext.response());
                     flow = processResponse(flowContext.request(), Objects.requireNonNull(flowContext.response()), flowContext.propagatedContext()).map(flowContext::withResponse);
                     exception = null;
                     flowContext = flow.tryCompleteValue();
@@ -468,6 +476,7 @@ public class FilterRunner {
                         continue;
                     }
                 } else {
+                    closeDroppedElements(elements, flowContext.response());
                     continue;
                 }
             }
@@ -478,13 +487,14 @@ public class FilterRunner {
                 .flatMap(newContext -> {
                     if (finalContext != newContext) {
                         // Response modified by the filter
-                        closeReplacedResponse(finalContext.response(), newContext.response());
+                        closeReplacedResponse(finalContext.response(), elements, newContext.response());
                         return processResponse(newContext.request(), Objects.requireNonNull(newContext.response()), newContext.propagatedContext()).map(newContext::withResponse);
                     }
+                    closeDroppedElements(elements, newContext.response());
                     return ExecutionFlow.just(newContext);
                 })
                 .onErrorResume(throwable -> {
-                    closeReplacedResponse(finalContext.response(), null);
+                    closeReplacedResponse(finalContext.response(), elements, null);
                     return processFailurePropagateException(throwable, finalContext);
                 })
                 .flatMap(newContext -> filterResponse(newContext, iterator, newContext.response() == null ? finalException : null));
@@ -501,16 +511,55 @@ public class FilterRunner {
     }
 
     /**
-     * Close a response that carries body bytes when a filter drops it, i.e. when the response
-     * replacing it does not carry the same bytes.
+     * Close what a filter dropped: a response that carries body bytes, when the response replacing
+     * it does not carry the same bytes, and the {@link BodyElements} of the body.
      *
-     * @param previous The previous response
-     * @param next     The response replacing it, or {@code null} if it was replaced by a failure
+     * @param previous         The previous response
+     * @param previousElements The elements of the body before the filter, see {@link #elementsOf}
+     * @param next             The response replacing it, or {@code null} if it was replaced by a failure
      */
-    private static void closeReplacedResponse(@Nullable HttpResponse<?> previous, @Nullable HttpResponse<?> next) {
+    private static void closeReplacedResponse(@Nullable HttpResponse<?> previous, @Nullable BodyElements<?> previousElements, @Nullable HttpResponse<?> next) {
         if (previous instanceof ByteBodyHttpResponse<?> byteBodyResponse && previous != next && !carriesBytes(next, byteBodyResponse.byteBody())) {
             byteBodyResponse.close();
         }
+        closeDroppedElements(previousElements, next);
+    }
+
+    /**
+     * Close the elements of the body before a filter when the response after it no longer has
+     * them, e.g. the filter replaced the response, or its body in place. Elements replaced with
+     * other elements are not closed: the new ones take them over, e.g. they wrap them.
+     *
+     * @param elements The elements before the filter, or {@code null}
+     * @param next     The response after the filter, or {@code null} if it was replaced by a failure
+     */
+    private static void closeDroppedElements(@Nullable BodyElements<?> elements, @Nullable HttpResponse<?> next) {
+        if (elements == null || elementsOf(next) != null) {
+            return;
+        }
+        try {
+            elements.close();
+        } catch (Throwable e) {
+            LOG.warn("Failed to close the elements of a response body dropped by a filter", e);
+        }
+    }
+
+    /**
+     * The {@link BodyElements} body of a response, through its wrappers. Only a mutable
+     * response holds its body as it is: reading the body of another, e.g. of a client response,
+     * may convert it.
+     *
+     * @param response The response
+     * @return The elements, or {@code null}
+     */
+    private static @Nullable BodyElements<?> elementsOf(@Nullable HttpResponse<?> response) {
+        while (response != null) {
+            if (response instanceof MutableHttpResponse<?> mutable) {
+                return mutable.body() instanceof BodyElements<?> elements ? elements : null;
+            }
+            response = response instanceof HttpResponseWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
+        return null;
     }
 
     private static boolean carriesBytes(@Nullable HttpResponse<?> response, ByteBody bytes) {
