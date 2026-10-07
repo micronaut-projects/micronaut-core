@@ -34,7 +34,7 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
         return [String[], Object[], AnnotationValue[]]
     }
 
-    // the beans of the specs of the other processors, but the one @Import adds: KSP has no beans added by visitors
+    // the beans of the specs of the other processors, but the one @Import adds (AssociatedBeanSpec covers @Import under KSP)
     private static final String BEANS = '''
 package test
 

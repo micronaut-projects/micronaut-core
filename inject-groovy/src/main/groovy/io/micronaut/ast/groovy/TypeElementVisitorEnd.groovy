@@ -52,6 +52,9 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
 
         GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
+        // a compilation without a compilation unit visits the types as the transform is invoked, with no phase
+        // operation ending the round
+        TypeElementVisitorTransform.finishRound(visitorContext, source)
         if (loadedVisitors != null) {
             List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
@@ -68,6 +71,8 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         }
 
         final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = TypeElementVisitorTransform.beanDefinitionBuilders.get()
+        // the beans registered as the visitors finish
+        beanDefinitionBuilders.addAll(visitorContext.getBeanElementBuilders())
         if (beanDefinitionBuilders) {
             DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(visitorContext)
             try {
@@ -91,6 +96,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
 
         TypeElementVisitorTransform.loadedVisitors.remove()
         TypeElementVisitorTransform.beanDefinitionBuilders.remove()
+        TypeElementVisitorTransform.roundPending.remove()
         BeanDefinitionWriter.finish()
     }
 

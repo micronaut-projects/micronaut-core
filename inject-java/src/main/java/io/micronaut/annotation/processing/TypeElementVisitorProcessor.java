@@ -351,6 +351,24 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 }
             }
 
+            if (!roundEnv.processingOver()) {
+                // nothing generated in the final round is processed, so it is not a round for the visitors
+                for (LoadedVisitor loadedVisitor : loadedVisitors) {
+                    try {
+                        loadedVisitor.getVisitor().finishRound(javaVisitorContext);
+                    } catch (ProcessingException e) {
+                        var originatingElement = (JavaNativeElement) e.getOriginatingElement();
+                        error(originatingElement == null ? null : originatingElement.element(), "%s", e.getMessage());
+                    } catch (Throwable e) {
+                        var stackTraceWriter = new StringWriter();
+                        e.printStackTrace(new PrintWriter(stackTraceWriter));
+
+                        error("Error finishing the round of type visitor [%s]: %s\n%s",
+                            loadedVisitor.getVisitor(), e.getMessage(), stackTraceWriter);
+                    }
+                }
+            }
+
             for (LoadedVisitor loadedVisitor : loadedVisitors) {
                 try {
                     loadedVisitor.getVisitor().finish(javaVisitorContext);

@@ -61,6 +61,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
             // left on this thread by a compilation that failed before TypeElementVisitorEnd could clear it
             TypeElementVisitorTransform.loadedVisitors.remove()
             TypeElementVisitorTransform.beanDefinitionBuilders.remove()
+            TypeElementVisitorTransform.roundPending.remove()
             loadedVisitors = null
         }
         if (ast != null) {
@@ -126,6 +127,11 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
         def val = CachedEnvironment.getProperty(ELEMENT_VISITORS_PROPERTY)
         if (val) {
             for (v in val.split(",")) {
+                if (loadedVisitors.containsKey(v)) {
+                    // one instance per compilation, as for the service loaded visitors: a source the compilation
+                    // queues later, a generated one, comes past here again
+                    continue
+                }
                 def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
                 if (visitor instanceof TypeElementVisitor) {
                     LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, compilationUnit, visitor)
