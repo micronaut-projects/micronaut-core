@@ -288,10 +288,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     private Collection<BeanRegistration<?>> registrationsToAdopt;
     /**
-     * While a {@link #stopRetaining(Predicate)} is in progress, which registrations it keeps.
+     * While a {@link #stopRetaining(RetentionCriteria)} is in progress, which registrations it keeps.
      */
     @Nullable
-    private volatile Predicate<BeanRegistration<?>> retentionPredicate;
+    private volatile RetentionCriteria retentionCriteria;
     private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
     /**
      * Retained registrations this context has no definition for, destroyed once its listeners exist.
@@ -4267,14 +4267,46 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @Internal
     @Experimental
-    public synchronized Collection<BeanRegistration<?>> stopRetaining(Predicate<BeanRegistration<?>> retain) {
+    public Collection<BeanRegistration<?>> stopRetaining(Predicate<BeanRegistration<?>> retain) {
         ArgumentUtils.requireNonNull("retain", retain);
+        return stopRetaining(new RetentionCriteria() {
+            @Override
+            public boolean retain(BeanRegistration<?> registration) {
+                return retain.test(registration);
+            }
+
+            @Override
+            public Set<String> invalidatedBy(BeanRegistration<?> registration) {
+                return Set.of();
+            }
+        });
+    }
+
+    /**
+     * Stops the context as {@link #stopRetaining(Predicate)} does, retaining the singletons the criteria
+     * {@link RetentionCriteria#retain(BeanRegistration) retain}. A configuration bean, one of
+     * {@link io.micronaut.context.annotation.ConfigurationProperties}, {@link io.micronaut.context.annotation.EachProperty}
+     * or another {@link ConfigurationReader}, that a retained bean holds does not keep it from being retained when its
+     * prefix is one of the prefixes {@link RetentionCriteria#invalidatedBy(BeanRegistration) whose change releases} the
+     * retained bean, or under one: the configuration bean is not retained, the next context creates its own, and the
+     * retained bean keeps what it copied from it, which stays valid until a change under that prefix releases the
+     * bean. A retained bean must therefore not keep its configuration bean, only its values. A configuration bean
+     * under another prefix is treated as any other bean the retained bean holds.
+     *
+     * @param criteria Which singleton registrations to keep alive
+     * @return The retained registrations, in no particular order
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public synchronized Collection<BeanRegistration<?>> stopRetaining(RetentionCriteria criteria) {
+        ArgumentUtils.requireNonNull("criteria", criteria);
         retainedOnStop.clear();
-        retentionPredicate = retain;
+        retentionCriteria = criteria;
         try {
             stop();
         } finally {
-            retentionPredicate = null;
+            retentionCriteria = null;
         }
         List<BeanRegistration<?>> retained = List.copyOf(retainedOnStop);
         retainedOnStop.clear();
@@ -4592,7 +4624,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         // only an entry of configuration nested in another's: an @EachBean member, or a top-level entry, is found by the
         // lookup when its origin or its entry is still there, and is gone otherwise
         if (path == null || qualifier == null || !path.hasDynamicSegments() || delegate.getTarget() instanceof BeanDefinitionDelegate<T>
-            || !delegate.getTarget().hasStereotype(io.micronaut.context.annotation.ConfigurationReader.class)
+            || !delegate.getTarget().hasStereotype(ConfigurationReader.class)
             || !(this instanceof PropertyResolver resolver) || !resolver.containsProperties(path.prefix())) {
             return null;
         }
@@ -4712,6 +4744,33 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 collectDependencies(dependent, into, visited);
             }
         }
+    }
+
+    /**
+     * What {@link #stopRetaining(RetentionCriteria)} asks about the singletons of the context it stops.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public interface RetentionCriteria {
+
+        /**
+         * Whether a singleton survives the restart, with what it holds.
+         *
+         * @param registration The singleton's registration
+         * @return True to retain it
+         */
+        boolean retain(BeanRegistration<?> registration);
+
+        /**
+         * The configuration prefixes a change under which releases a singleton this retains: a configuration bean
+         * under one of them that the singleton holds is not retained with it, nor does it keep it from being retained.
+         *
+         * @param registration The retained singleton's registration
+         * @return The prefixes, empty when no configuration change releases it
+         */
+        Set<String> invalidatedBy(BeanRegistration<?> registration);
     }
 
     /**
@@ -5166,7 +5225,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
-     * The instances a {@link #stopRetaining(Predicate)} in progress keeps, and their registrations. An
+     * The instances a {@link #stopRetaining(RetentionCriteria)} in progress keeps, and their registrations. An
      * instance registered under several definitions is kept when any of its registrations is accepted,
      * and every registration of it is kept, so the instance stays reachable under each of them.
      *
@@ -5174,19 +5233,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The retained instances, by identity; empty when no retention is in progress
      */
     private Set<Object> retainedBeans(List<BeanRegistration> registrations) {
-        Predicate<BeanRegistration<?>> retain = retentionPredicate;
-        if (retain == null) {
+        RetentionCriteria criteria = retentionCriteria;
+        if (criteria == null) {
             return Set.of();
         }
         Map<Object, AtomicBoolean> beans = new IdentityHashMap<>();
         for (BeanRegistration<?> registration : registrations) {
-            if (registration.bean == null || !retain.test(registration)) {
+            if (registration.bean == null || !criteria.retain(registration)) {
                 continue;
             }
             // a retained bean keeps the singletons it holds, so they are retained with it; one of them bound to
-            // this context (a provider, a proxy, the context itself) keeps the whole closure from being retained
+            // this context (a provider, a proxy, the context itself) keeps the whole closure from being retained,
+            // except configuration a change of which releases the bean: it is not retained, but made again by the next context
             List<BeanRegistration<?>> closure = new ArrayList<>();
-            BeanRegistration<?> bound = collectRetentionClosure(registration, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
+            Set<String> invalidatedBy = criteria.invalidatedBy(registration);
+            BeanRegistration<?> bound = collectRetentionClosure(registration, invalidatedBy, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
                     LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy or the context, which are bound to this context",
@@ -5226,21 +5287,28 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * the closure that is retained with it. Known only when the dependency graph is recorded; without it
      * the closure is the bean alone and the caller answers for what it holds.
      *
+     * @param invalidatedBy The prefixes a change under which releases the retained bean: a configuration bean under one
+     * of them is left out of the closure rather than examined
      * @return The first member bound to this context, which keeps the closure from being retained, or null
      */
     @Nullable
-    private BeanRegistration<?> collectRetentionClosure(BeanRegistration<?> registration, List<BeanRegistration<?>> closure, Set<Object> visited) {
+    private BeanRegistration<?> collectRetentionClosure(BeanRegistration<?> registration, Set<String> invalidatedBy,
+                                                       List<BeanRegistration<?>> closure, Set<Object> visited) {
         if (!visited.add(registration)) {
             return null;
         }
-        if (holdsContextBoundState(registration)) {
+        if (!closure.isEmpty() && isCoveredConfiguration(registration.beanDefinition, invalidatedBy)) {
+            // the next context binds it again; the retained bean holds only what it copied, valid until a change releases it
+            return null;
+        }
+        if (holdsContextBoundState(registration, invalidatedBy)) {
             return registration;
         }
         closure.add(registration);
         if (dependencyGraph == null) {
             return null;
         }
-        return collectRetentionClosure(registration.beanDefinition, closure, visited);
+        return collectRetentionClosure(registration.beanDefinition, invalidatedBy, closure, visited);
     }
 
     /**
@@ -5248,7 +5316,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * its owner and contributes what it received in turn.
      */
     @Nullable
-    private BeanRegistration<?> collectRetentionClosure(BeanDefinition<?> definition, List<BeanRegistration<?>> closure, Set<Object> visited) {
+    private BeanRegistration<?> collectRetentionClosure(BeanDefinition<?> definition, Set<String> invalidatedBy,
+                                                       List<BeanRegistration<?>> closure, Set<Object> visited) {
         if (dependencyGraph == null) {
             return null;
         }
@@ -5259,9 +5328,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             BeanRegistration<?> bound;
             if (edge.dependency().isSingleton()) {
                 BeanRegistration<?> dependency = singletonScope.findBeanRegistration(edge.dependency());
-                bound = dependency == null ? null : collectRetentionClosure(dependency, closure, visited);
+                bound = dependency == null ? null : collectRetentionClosure(dependency, invalidatedBy, closure, visited);
+            } else if (isCoveredConfiguration(edge.dependency(), invalidatedBy)) {
+                bound = null;
             } else if (visited.add(edge.dependency())) {
-                bound = collectRetentionClosure(edge.dependency(), closure, visited);
+                bound = collectRetentionClosure(edge.dependency(), invalidatedBy, closure, visited);
             } else {
                 bound = null;
             }
@@ -5272,8 +5343,35 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return null;
     }
 
-    private boolean holdsContextBoundState(BeanRegistration<?> registration) {
-        return holdsContextBoundState(registration, Collections.newSetFromMap(new IdentityHashMap<>()));
+    private boolean holdsContextBoundState(BeanRegistration<?> registration, Set<String> invalidatedBy) {
+        return holdsContextBoundState(registration, invalidatedBy, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    /**
+     * Whether a definition is of configuration, {@link io.micronaut.context.annotation.ConfigurationProperties},
+     * {@link io.micronaut.context.annotation.EachProperty} or another {@link ConfigurationReader}, whose prefix is one
+     * of the given prefixes or under one: a change of it is a change under that prefix. The prefix of an
+     * {@code @EachProperty} entry is the entry's own.
+     */
+    private static boolean isCoveredConfiguration(BeanDefinition<?> definition, Set<String> invalidatedBy) {
+        if (invalidatedBy.isEmpty() || !definition.hasStereotype(ConfigurationReader.class)) {
+            return false;
+        }
+        String prefix = definition instanceof BeanDefinitionDelegate<?> delegate
+            ? delegate.getConfigurationPath().map(ConfigurationPath::prefix).orElse(null) : null;
+        if (prefix == null) {
+            prefix = definition.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
+        }
+        if (prefix == null || prefix.isEmpty()) {
+            return false;
+        }
+        for (String covering : invalidatedBy) {
+            if (prefix.equals(covering) || prefix.length() > covering.length() && prefix.startsWith(covering)
+                && (prefix.charAt(covering.length()) == '.' || prefix.charAt(covering.length()) == '[')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -5298,7 +5396,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             || bean instanceof BeanResolutionContext;
     }
 
-    private boolean holdsContextBoundState(BeanRegistration<?> registration, Set<Object> visited) {
+    private boolean holdsContextBoundState(BeanRegistration<?> registration, Set<String> invalidatedBy, Set<Object> visited) {
         if (!visited.add(registration)) {
             return false;
         }
@@ -5316,6 +5414,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         if (dependencyGraph != null) {
             for (BeanDependencyGraph.BeanDependency dependency : dependencyGraph.dependenciesOf(registration.beanDefinition)) {
+                if (isCoveredConfiguration(dependency.dependency(), invalidatedBy)) {
+                    continue;
+                }
                 if (dependency.lazy() || dependency.dependency().isProxy() || dependency.dependency() instanceof AbstractProviderDefinition) {
                     return true;
                 }
@@ -5324,7 +5425,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         // what an owned prototype holds, the bean holds through it
         if (registration instanceof BeanDisposingRegistration<?> disposing && !disposing.dependentBeans().isEmpty()) {
             for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
-                if (holdsContextBoundState(dependent, visited)) {
+                if (!isCoveredConfiguration(dependent.beanDefinition, invalidatedBy) && holdsContextBoundState(dependent, invalidatedBy, visited)) {
                     return true;
                 }
             }

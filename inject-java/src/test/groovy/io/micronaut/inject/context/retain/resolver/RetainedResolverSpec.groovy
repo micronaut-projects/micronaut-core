@@ -65,6 +65,38 @@ class RetainedResolverSpec extends Specification {
         Channel.CLOSED.get() == 1
     }
 
+    void "a configuration bean the resolver resolved under a prefix that releases the bean is neither retained nor held"() {
+        given:
+        ApplicationContext first = start(List.of())
+        Connection connection = first.getBean(Connection)
+        ConnectionSettings settings = first.getBean(ConnectionSettings)
+
+        when:
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(new DefaultBeanContext.RetentionCriteria() {
+            @Override
+            boolean retain(BeanRegistration<?> registration) {
+                return Connection.isAssignableFrom(registration.beanType)
+            }
+
+            @Override
+            Set<String> invalidatedBy(BeanRegistration<?> registration) {
+                return Set.of('resolver.connection')
+            }
+        })
+        ApplicationContext second = start(retained)
+        BeanRegistration<?> resolver = second.getBeanRegistration(Connection, null).dependentBeans().find { it.bean instanceof BeanDependencyResolver }
+
+        then: "the connection is adopted, ordered before the broker it resolved, and holds nothing of the stopped context's configuration"
+        second.getBean(Connection).is(connection)
+        !retained*.bean.any { it.is(settings) }
+        resolver.dependencies.requiredBeans().any { it.bean.is(connection.broker) }
+        !resolver.dependencies.requiredBeans().any { it.bean.is(settings) }
+        !second.getBean(ConnectionSettings).is(settings)
+
+        cleanup:
+        second?.close()
+    }
+
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
         return ApplicationContext.builder()
             .properties(['spec.name': 'RetainedResolverSpec'])

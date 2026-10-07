@@ -15,6 +15,6 @@ public class ConnectionFactory {
 
     @Singleton
     Connection connection(BeanDependencyResolver resolver) {
-        return new Connection(resolver.getBean(Channel.class), resolver.getBean(Broker.class));
+        return new Connection(resolver.getBean(Channel.class), resolver.getBean(Broker.class), resolver.getBean(ConnectionSettings.class).getTimeout());
     }
 }
