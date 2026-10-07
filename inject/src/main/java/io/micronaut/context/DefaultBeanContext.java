@@ -3555,7 +3555,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
         }
         // Unknown scope, prototype scope etc
-        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        return createRegistration(resolutionContext, beanType, qualifier, definition, true).markDependent();
     }
 
     private <T> BeanRegistration<T> intializeEagerBean(@Nullable BeanResolutionContext resolutionContext,
@@ -3704,7 +3704,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     final <T> BeanRegistration<T> createFreshRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> definition) {
         return createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
-            definition, resolutionContext != null, true);
+            definition, resolutionContext != null, true).markDependent();
     }
 
     @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
