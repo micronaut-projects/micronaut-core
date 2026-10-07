@@ -56,7 +56,7 @@ snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="delivery", in
 <2> Up to 4 messages of a connection are handled at the same time, in any order.
 <3> Up to 32 messages are read ahead of the handlers.
 
-The pings are answered as they are read, and a close is handled as soon as it is read, while the handlers that run go on: the messages read before it that still wait for their turn are discarded, except for a message stream, which receives them before it completes. Once `maxPendingMessages` messages wait, the connection decodes and reads nothing until a handler is done, the pings and the close included, even when many frames arrive at once; `maxPendingMessages(0)` reads all the time, without backpressure.
+The pings are answered as they are read, and a close is handled as soon as it is read, while the handlers that run go on: the messages read before it that still wait for their turn are discarded, except for a message stream, which receives them before it completes. Once `maxPendingMessages` messages wait, the connection decodes nothing until a handler is done, the pings and the close included, even when many frames arrive at once. It still reads up to 64 KiB more, undecoded, so that a client that drops the connection without a close is noticed at once, with an abnormal closure (`1006`). `maxPendingMessages(0)` reads all the time, without backpressure.
 
 IMPORTANT: A handler that returns a stage that does not complete, e.g. the stage of `sendAllAsync` for a stream that does not end, holds the next messages of its connection back. A handler that streams while the connection receives starts the stream and returns `null`.
 

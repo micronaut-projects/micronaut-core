@@ -58,6 +58,7 @@ import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
 import io.micronaut.websocket.event.WebSocketSessionOpenEvent;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -112,6 +113,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * The name of the handler before the frame decoder of a WebSocket route, see {@link #decodeHeld()}.
      */
     private static final String DECODE_TRIGGER = "websocket-decode-trigger";
+
+    /**
+     * The most bytes a connection to a WebSocket route reads on, undecoded, while its pending
+     * messages are full, see {@link HeldReads}: it reads so that it notices a client that drops
+     * the connection without a close.
+     */
+    private static final int MAX_HELD_READ_BYTES = 64 * 1024;
 
     private final NettyWebSocketSession serverSession;
     private final Channel channel;
@@ -183,6 +191,12 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     @Nullable
     private ChannelHandlerContext decodeTrigger;
+    /**
+     * The handler before {@link #frameDecoder} that holds the bytes read while the pending frames
+     * are full, see {@link HeldReads}. Event loop only.
+     */
+    @Nullable
+    private HeldReads heldReads;
     /**
      * Whether {@link #frameDecoder} decoded one frame at a time, so that it may hold the bytes of
      * frames. Event loop only.
@@ -462,8 +476,10 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         if (pipeline.get(WebSocketFrameDecoder.class) instanceof ByteToMessageDecoder decoder) {
             ChannelHandlerContext decoderContext = pipeline.context(decoder);
             if (decoderContext != null) {
-                pipeline.addBefore(decoderContext.name(), DECODE_TRIGGER, new ChannelInboundHandlerAdapter());
+                HeldReads held = new HeldReads();
+                pipeline.addBefore(decoderContext.name(), DECODE_TRIGGER, held);
                 decodeTrigger = pipeline.context(DECODE_TRIGGER);
+                heldReads = held;
                 frameDecoder = decoder;
                 updateDecoding();
             }
@@ -605,7 +621,20 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         }
         updateDecoding();
         decodeHeld();
+        HeldReads held = heldReads;
+        ChannelHandlerContext trigger = decodeTrigger;
+        if (held != null && trigger != null && !trigger.isRemoved() && !pendingFull() && held.release(trigger)) {
+            // the bytes read while the pending frames were full: decoded like a read
+            decodeHeld();
+        }
         readAhead(ctx);
+    }
+
+    /**
+     * @return Whether the frames that wait for the handlers fill the limit of pending frames
+     */
+    private boolean pendingFull() {
+        return maxPendingFrames > 0 && pendingFrames.size() >= maxPendingFrames;
     }
 
     /**
@@ -668,8 +697,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     private void readAhead(ChannelHandlerContext ctx) {
-        if (maxPendingFrames == 0 || pendingFrames.size() < maxPendingFrames) {
+        if (!pendingFull()) {
             ctx.read();
+        } else {
+            HeldReads held = heldReads;
+            if (held != null && held.heldBytes() < MAX_HELD_READ_BYTES) {
+                // read on, undecoded, so that a client that drops the connection is noticed at
+                // once rather than at the idle timeout
+                ctx.read();
+            }
         }
     }
 
@@ -759,6 +795,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         handlerContext = null;
         frameDecoder = null;
         decodeTrigger = null;
+        heldReads = null;
         WebSocketFrame frame;
         while ((frame = pendingFrames.poll()) != null) {
             frame.release();
@@ -782,4 +819,78 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         super.handlerRemoved(ctx);
     }
 
+
+    /**
+     * The handler before the frame decoder of a connection to a WebSocket route with a limit of
+     * pending frames: while the pending frames are full, the connection still reads, up to
+     * {@link #MAX_HELD_READ_BYTES}, so that it notices a client that drops the connection without a
+     * close, and this handler holds the bytes it reads undecoded, so that the pending frames stay
+     * within their limit. The held bytes go to the decoder, in order, once there is room again.
+     * Event loop only.
+     */
+    private final class HeldReads extends ChannelInboundHandlerAdapter {
+        @Nullable
+        private CompositeByteBuf held;
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            if (held != null && !pendingFull()) {
+                release(ctx);
+            }
+            if (msg instanceof ByteBuf bytes && (held != null || pendingFull())) {
+                CompositeByteBuf buffer = held;
+                if (buffer == null) {
+                    buffer = ctx.alloc().compositeBuffer(Integer.MAX_VALUE);
+                    held = buffer;
+                }
+                buffer.addComponent(true, bytes);
+                return;
+            }
+            ctx.fireChannelRead(msg);
+        }
+
+        /**
+         * @return The bytes held
+         */
+        int heldBytes() {
+            CompositeByteBuf buffer = held;
+            return buffer == null ? 0 : buffer.readableBytes();
+        }
+
+        /**
+         * Give the held bytes to the decoder.
+         *
+         * @param ctx The context of this handler
+         * @return Whether there were bytes held
+         */
+        boolean release(ChannelHandlerContext ctx) {
+            CompositeByteBuf buffer = held;
+            if (buffer == null) {
+                return false;
+            }
+            held = null;
+            ctx.fireChannelRead(buffer);
+            return true;
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            // the connection is gone: nobody handles the frames that were not decoded
+            discard();
+            super.channelInactive(ctx);
+        }
+
+        @Override
+        public void handlerRemoved(ChannelHandlerContext ctx) {
+            discard();
+        }
+
+        private void discard() {
+            CompositeByteBuf buffer = held;
+            if (buffer != null) {
+                held = null;
+                buffer.release();
+            }
+        }
+    }
 }

@@ -474,6 +474,23 @@ class HandlerRouteWebSocketTest {
     }
 
     @Test
+    void aClientThatDropsTheConnectionWhileTheMessagesWaitIsNoticedAtOnce() throws Exception {
+        try (RawClient raw = new RawClient(server.getPort(), "/ws/drop")) {
+            ByteArrayOutputStream burst = new ByteArrayOutputStream();
+            for (int i = 0; i < 4; i++) {
+                burst.writeBytes(RawClient.frame(0x1, "m" + i));
+            }
+            raw.write(burst.toByteArray());
+            assertEquals("drop m0", event());
+            // the handler of m0 does not complete, m1 waits: the pending messages are full
+            assertNull(context.getBean(Events.class).events.poll(200, TimeUnit.MILLISECONDS));
+            // the connection is dropped without a close
+        }
+        // an abnormal closure, noticed at once rather than at the idle timeout
+        assertEquals("drop close 1006", event());
+    }
+
+    @Test
     void aStreamSentByTheCloseHandlerSendsNothingAfterTheCloseOfThePeer() throws Exception {
         Client client = connect("/ws/close-send-all");
         client.close(1000, "done");
@@ -1210,6 +1227,16 @@ class HandlerRouteWebSocketTest {
                     })
                     .onClose((session, reason) -> {
                         log.add("unbounded close " + reason.getCode());
+                        return null;
+                    }));
+                routes.GET("/ws/drop").webSocket(ws -> ws
+                    .maxPendingMessages(1)
+                    .onMessage(String.class, (session, message) -> {
+                        log.add("drop " + message);
+                        return new CompletableFuture<>();
+                    })
+                    .onClose((session, reason) -> {
+                        log.add("drop close " + reason.getCode());
                         return null;
                     }));
                 routes.GET("/ws/close-send-all").webSocket(ws -> ws
