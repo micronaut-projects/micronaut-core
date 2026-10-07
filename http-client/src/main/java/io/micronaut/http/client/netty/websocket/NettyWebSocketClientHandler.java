@@ -21,6 +21,8 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.execution.DelayedExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
@@ -49,8 +51,6 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.jspecify.annotations.Nullable;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 
 import java.util.Collections;
 import java.util.List;
@@ -70,7 +70,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * Generic version of {@link #webSocketBean}.
      */
     private final WebSocketBean<T> genericWebSocketBean;
-    private final Sinks.One<T> completion = Sinks.one();
+    private final DelayedExecutionFlow<T> completion = DelayedExecutionFlow.create();
     @Nullable
     private final UriMatchInfo matchInfo;
     @Nullable
@@ -150,7 +150,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 ctx.channel().config().setAutoRead(true);
                 ctx.read();
             } else {
-                completion.tryEmitError(future.cause());
+                completion.tryCompleteExceptionally(future.cause());
             }
         });
     }
@@ -166,7 +166,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 handshaker.finishHandshake(ch, res);
             } catch (Exception e) {
                 try {
-                    completion.tryEmitError(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
+                    completion.tryCompleteExceptionally(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
                 } finally {
                     // clientSession isn't set yet, so we do the close manually instead of through session.close
                     ch.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
@@ -193,7 +193,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 this.clientBodyArgument = null;
 
                 try {
-                    completion.tryEmitError(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
+                    completion.tryCompleteExceptionally(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
                 } finally {
                     if (getSession().isOpen()) {
                         getSession().close(CloseReason.INTERNAL_ERROR);
@@ -212,7 +212,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     this.clientPongArgument = null;
 
                     try {
-                        completion.tryEmitError(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
+                        completion.tryCompleteExceptionally(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
                     } finally {
                         if (getSession().isOpen()) {
                             getSession().close(CloseReason.INTERNAL_ERROR);
@@ -224,9 +224,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
             callOpenMethod(ctx).onComplete((v, t) -> {
                 if (t != null) {
-                    completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + t.getMessage(), t));
+                    completion.tryCompleteExceptionally(new WebSocketSessionException("Error opening WebSocket client session: " + t.getMessage(), t));
                 } else {
-                    completion.tryEmitValue(targetBean);
+                    completion.tryComplete(targetBean);
                 }
             });
             return;
@@ -262,18 +262,25 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
-        completion.tryEmitError(cause);
+        completion.tryCompleteExceptionally(cause);
         super.exceptionCaught(ctx, cause);
     }
 
-    public final Mono<T> getHandshakeCompletedMono() {
-        return completion.asMono();
+    /**
+     * A flow that completes with the client endpoint bean once the handshake has completed and the
+     * open method has been called, or with the error that prevented that.
+     *
+     * @return The handshake completion flow
+     * @since 5.3.0
+     */
+    public final ExecutionFlow<T> getHandshakeCompletedFlow() {
+        return completion;
     }
 
     @Override
     protected void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
         if (!handshaker.isHandshakeComplete()) {
-            completion.tryEmitError(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
             return;
         }
         super.handleCloseReason(ctx, cr, writeCloseReason);

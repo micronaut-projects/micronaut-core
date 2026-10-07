@@ -1094,8 +1094,8 @@ final class NettyHttpClient implements
     @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
         setupConversionService(request);
-        return toMono(resolveRequestURI(request), PropagatedContext.getOrEmpty()).flux()
-            .switchMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, null));
+        return connectWebSocketOnSubscribe(() -> resolveRequestURI(request)
+            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, null)));
     }
 
     @Override
@@ -1104,8 +1104,8 @@ final class NettyHttpClient implements
         String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
         uri = UriTemplate.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
-        return toMono(resolveRequestURI(request), PropagatedContext.getOrEmpty()).flux()
-            .switchMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, webSocketBean));
+        return connectWebSocketOnSubscribe(() -> resolveRequestURI(request)
+            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, webSocketBean)));
 
     }
 
@@ -1114,12 +1114,24 @@ final class NettyHttpClient implements
         stop();
     }
 
-    private <T> Publisher<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
+    /**
+     * Run the websocket connect for every subscription, like the other request methods.
+     *
+     * @param connect Starts the connect
+     * @param <T> The client endpoint type
+     * @return A Flux, as before: callers may use Flux operators on the returned publisher
+     */
+    private static <T> Flux<T> connectWebSocketOnSubscribe(Supplier<ExecutionFlow<T>> connect) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return Flux.from(ReactivePropagation.propagate(propagatedContext, ReactiveExecutionFlow.toPublisher(connect)));
+    }
+
+    private <T> ExecutionFlow<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
         RequestKey requestKey;
         try {
             requestKey = new RequestKey(this, uri);
         } catch (HttpClientException e) {
-            return Flux.error(e);
+            return ExecutionFlow.error(e);
         }
 
         if (webSocketBean == null) {
@@ -1158,11 +1170,11 @@ final class NettyHttpClient implements
             conversionService);
 
         if (!isRunning()) {
-            return Mono.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
+            return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
         }
 
         return connectionManager.connectForWebsocket(requestKey, handler)
-            .then(handler.getHandshakeCompletedMono());
+            .then(handler::getHandshakeCompletedFlow);
     }
 
     private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(PropagatedContext propagatedContext, MutableHttpRequest<I> request, Argument<?> errorType, ResolvedTarget target) {
