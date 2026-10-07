@@ -17,6 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import java.lang.reflect.Method;
@@ -38,9 +39,34 @@ public interface MethodReference<T, R> extends AnnotationMetadataDelegate, Annot
     Argument[] getArguments();
 
     /**
+     * The {@link Method} this reference stands for.
+     *
+     * <p>A reference for which {@link #hasTargetMethod()} is {@code false} stands for no method, and returns
+     * {@code null} here despite the declaration: the method invoked for a {@code POST_CONSTRUCT} or
+     * {@code PRE_DESTROY} interception of a bean that binds the event without declaring a callback of that kind.
+     * Code that may be handed such a method, an interceptor of a lifecycle event among them, asks
+     * {@link #hasTargetMethod()} first.</p>
+     *
      * @return The target method
      */
     Method getTargetMethod();
+
+    /**
+     * Whether this reference stands for a {@link Method} that {@link #getTargetMethod()} returns. It is
+     * {@code false} only for the method invoked for a {@code POST_CONSTRUCT} or {@code PRE_DESTROY} interception
+     * of a bean that binds the event without declaring a callback of that kind, for which
+     * {@link #getTargetMethod()} returns {@code null}.
+     *
+     * <p>It answers without looking the method up, so a method that cannot be looked up answers {@code true} and
+     * fails as {@link #getTargetMethod()} does.</p>
+     *
+     * @return Whether there is a target method
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean hasTargetMethod() {
+        return true;
+    }
 
     /**
      * @return Return the return type

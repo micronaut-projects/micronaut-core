@@ -209,11 +209,18 @@ public final class ReflectionExecutables {
      * type, tolerating the erasure: the arguments of a method inherited from a generic super type report the
      * resolved types, where the method declares the erased ones.
      *
+     * <p>The method invoked for a {@code POST_CONSTRUCT} or {@code PRE_DESTROY} interception of a bean that binds
+     * the event without declaring a callback of that kind stands for no method, and {@code null} is returned for
+     * it, as {@link MethodReference#hasTargetMethod()} tells.</p>
+     *
      * @param method The executable method, or any method reference
-     * @return The method
+     * @return The method, or {@code null} when the reference stands for none
      * @throws NoSuchMethodError When no method of the declaring type matches
      */
-    public static Method targetMethod(MethodReference<?, ?> method) {
+    public static @Nullable Method targetMethod(MethodReference<?, ?> method) {
+        if (!method.hasTargetMethod()) {
+            return null;
+        }
         try {
             return method.getTargetMethod();
         } catch (NoSuchMethodError | UnsupportedOperationException e) {
