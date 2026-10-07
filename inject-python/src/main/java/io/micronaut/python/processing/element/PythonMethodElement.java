@@ -89,6 +89,8 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private final ClassElement owningType;
     private final ClassElement returnType;
     private final PythonParameterElement[] parameters;
+    /** The parameters injected with a bean ({@code ctx: ApplicationContext = Inject()}), hidden from the method. */
+    private final List<InjectedArgument> injectedArguments = new ArrayList<>();
     private final MethodElementAnnotationsHelper helper;
 
     private ClassElement resolvedGenericReturnType;
@@ -757,10 +759,52 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
         for (int i = offset; i < size; i++) {
             ArgumentDef argDef = arguments.get(i);
+            if (isInjectedArgument(argDef)) {
+                // a bean, not an argument of the method: the bridge passes the bean the module or object holds
+                injectedArguments.add(new InjectedArgument(i - offset, argDef.name(), injectedAttributeName(functionDef.name(), argDef.name())));
+                continue;
+            }
             created.add(new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory()));
         }
 
         return created.toArray(new PythonParameterElement[0]);
+    }
+
+    /**
+     * The parameters injected with a bean, by their position among the Python parameters (the receiver excluded):
+     * left out of the method Micronaut sees, they are passed by the generated bridge from the attribute the bean is
+     * injected into.
+     *
+     * @return The injected parameters, in declaration order
+     */
+    public List<InjectedArgument> injectedArguments() {
+        return List.copyOf(injectedArguments);
+    }
+
+    /**
+     * The name of the attribute holding the bean of an injected parameter; the processor declares it.
+     *
+     * @param functionName  The function name
+     * @param parameterName The parameter name
+     * @return The attribute name
+     */
+    public static String injectedAttributeName(String functionName, String parameterName) {
+        return "micronaut_inject_" + functionName + "_" + parameterName;
+    }
+
+    private static boolean isInjectedArgument(ArgumentDef argument) {
+        return !argument.variadic() && argument.decorators().stream()
+            .anyMatch(decorator -> "jakarta.inject.Inject".equals(decorator.annotationName()));
+    }
+
+    /**
+     * A parameter injected with a bean.
+     *
+     * @param position  The position among the Python parameters, the receiver excluded
+     * @param name      The parameter name
+     * @param attribute The attribute holding the bean
+     */
+    public record InjectedArgument(int position, String name, String attribute) {
     }
 
     @Override

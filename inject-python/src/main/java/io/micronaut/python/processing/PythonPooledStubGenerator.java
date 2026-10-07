@@ -29,6 +29,7 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.element.PythonMethodElement;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.python.processing.element.PythonScriptElement;
@@ -553,6 +554,15 @@ final class PythonPooledStubGenerator {
             List<ExpressionDef> parameterExpressions = new ArrayList<>();
             for (int i = 0; i < methodElement.getParameters().length; i++) {
                 parameterExpressions.add(methodParameters.get(i));
+            }
+            if (methodElement instanceof PythonMethodElement pythonMethod) {
+                // a parameter injected with a bean (ctx: ApplicationContext = Inject()): the bean injected into the
+                // module attribute the processor declares, read through the pool's module cache as a property is
+                for (PythonMethodElement.InjectedArgument injected : pythonMethod.injectedArguments()) {
+                    int index = Math.min(injected.position(), parameterExpressions.size());
+                    parameterExpressions.add(index, PYTHON_CONTEXT_RUNTIME.invokeStatic("pooledScriptAttribute", POLYGLOT_VALUE,
+                        List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(injected.attribute()))));
+                }
             }
             List<ExpressionDef> args = new ArrayList<>();
             // the holder first, so a proxy takes over when the module is advised
