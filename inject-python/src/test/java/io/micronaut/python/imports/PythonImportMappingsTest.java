@@ -15,7 +15,6 @@
  */
 package io.micronaut.python.imports;
 
-import io.micronaut.python.imports.ClassIndex.TypeInfo;
 import io.micronaut.python.imports.ClassIndex.TypeKind;
 import io.micronaut.python.imports.PythonModuleMapping.ClashPolicy;
 import io.micronaut.python.imports.ResolvedModule.Kind;
@@ -172,7 +171,8 @@ class PythonImportMappingsTest {
             .clashPolicy(ClashPolicy.FAIL)
             .build());
 
-        PythonImportMappingException e = assertThrows(PythonImportMappingException.class, () -> mappings.resolver(index).resolve("pyronaut.data"));
+        PythonImportMappings.Resolver resolver = mappings.resolver(index);
+        PythonImportMappingException e = assertThrows(PythonImportMappingException.class, () -> resolver.resolve("pyronaut.data"));
         assertTrue(e.getMessage().contains("[Id]"), e.getMessage());
         assertTrue(e.getMessage().contains("jakarta.persistence.Id"), e.getMessage());
     }
@@ -185,7 +185,8 @@ class PythonImportMappingsTest {
             .prefer("Id", "com.example.Id")
             .build());
 
-        assertThrows(PythonImportMappingException.class, () -> mappings.resolver(index).resolve("pyronaut.data"));
+        PythonImportMappings.Resolver resolver = mappings.resolver(index);
+        assertThrows(PythonImportMappingException.class, () -> resolver.resolve("pyronaut.data"));
     }
 
     @Test
@@ -272,7 +273,8 @@ class PythonImportMappingsTest {
             mapper(1, PythonModuleMapping.builder("pyronaut.data").javaPackage("io.micronaut.data.annotation").build())
         ));
 
-        assertThrows(PythonImportMappingException.class, () -> mappings.resolver(index).resolve("pyronaut.data"));
+        PythonImportMappings.Resolver resolver = mappings.resolver(index);
+        assertThrows(PythonImportMappingException.class, () -> resolver.resolve("pyronaut.data"));
     }
 
     @Test
@@ -287,9 +289,14 @@ class PythonImportMappingsTest {
 
     @Test
     void invalidModuleNamesAreRejected() {
-        assertThrows(IllegalArgumentException.class, () -> PythonModuleMapping.builder("http").javaPackage("a").build());
-        assertThrows(IllegalArgumentException.class, () -> PythonModuleMapping.builder("pyronaut.http-x").javaPackage("a").build());
-        assertThrows(IllegalArgumentException.class, () -> PythonModuleMapping.builder("pyronaut.http").build());
+        PythonModuleMapping.Builder notDotted = PythonModuleMapping.builder("http").javaPackage("a");
+        PythonModuleMapping.Builder notIdentifier = PythonModuleMapping.builder("pyronaut.http-x").javaPackage("a");
+        PythonModuleMapping.Builder emptySegment = PythonModuleMapping.builder("pyronaut..http").javaPackage("a");
+        PythonModuleMapping.Builder noSources = PythonModuleMapping.builder("pyronaut.http");
+        assertThrows(IllegalArgumentException.class, notDotted::build);
+        assertThrows(IllegalArgumentException.class, notIdentifier::build);
+        assertThrows(IllegalArgumentException.class, emptySegment::build);
+        assertThrows(IllegalArgumentException.class, noSources::build);
     }
 
     @Test

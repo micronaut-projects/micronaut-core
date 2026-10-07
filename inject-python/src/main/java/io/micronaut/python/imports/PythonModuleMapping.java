@@ -66,7 +66,8 @@ public record PythonModuleMapping(
     boolean replaces,
     @Nullable String requiredArtifact) {
 
-    private static final Pattern MODULE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+");
+    private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_]\\w*");
+    private static final String BINARY_NAME = "binaryName";
 
     /**
      * Validates and copies the mapping.
@@ -83,7 +84,7 @@ public record PythonModuleMapping(
      */
     public PythonModuleMapping {
         Objects.requireNonNull(module, "module");
-        if (!MODULE_NAME.matcher(module).matches()) {
+        if (!isModuleName(module)) {
             throw new IllegalArgumentException("Invalid Python module name [" + module + "]: a curated module is a dotted name of at least two identifiers, such as pyronaut.http");
         }
         if (sources == null || sources.isEmpty()) {
@@ -94,6 +95,22 @@ public record PythonModuleMapping(
         preferredPackages = preferredPackages == null ? List.of() : List.copyOf(preferredPackages);
         clashPolicy = clashPolicy == null ? ClashPolicy.SOURCE_ORDER : clashPolicy;
         exclude = Collections.unmodifiableSet(new LinkedHashSet<>(exclude == null ? Set.of() : exclude));
+    }
+
+    /**
+     * Whether a name is a dotted name of at least two Python identifiers.
+     */
+    private static boolean isModuleName(String module) {
+        String[] segments = module.split("\\.", -1);
+        if (segments.length < 2) {
+            return false;
+        }
+        for (String segment : segments) {
+            if (!IDENTIFIER.matcher(segment).matches()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -171,7 +188,7 @@ public record PythonModuleMapping(
              * @param alias      The Python name
              */
             public JavaType {
-                Objects.requireNonNull(binaryName, "binaryName");
+                Objects.requireNonNull(binaryName, BINARY_NAME);
             }
         }
 
@@ -187,7 +204,7 @@ public record PythonModuleMapping(
              * @param include    The names of the methods to export
              */
             public StaticMethods {
-                Objects.requireNonNull(binaryName, "binaryName");
+                Objects.requireNonNull(binaryName, BINARY_NAME);
                 include = Collections.unmodifiableSet(new LinkedHashSet<>(include == null ? Set.of() : include));
             }
         }
@@ -206,7 +223,7 @@ public record PythonModuleMapping(
              * @param include    The names of the constants to export
              */
             public Constants {
-                Objects.requireNonNull(binaryName, "binaryName");
+                Objects.requireNonNull(binaryName, BINARY_NAME);
                 include = Collections.unmodifiableSet(new LinkedHashSet<>(include == null ? Set.of() : include));
             }
         }

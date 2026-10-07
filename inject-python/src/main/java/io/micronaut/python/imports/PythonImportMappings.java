@@ -59,6 +59,8 @@ public final class PythonImportMappings {
         "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
     );
     private static final Set<String> SKIPPED_TYPE_NAMES = Set.of("package-info", "module-info");
+    private static final String PYTHON_MODULE = "Python module [";
+    private static final String JAVA_TYPE = "the Java type [";
 
     /**
      * The contributions to each module, highest precedence first, after replacement.
@@ -199,12 +201,12 @@ public final class PythonImportMappings {
         Source first = mapping.sources().getFirst();
         String what = switch (first) {
             case Source.JavaPackage javaPackage -> "the Java package [" + javaPackage.name() + "]";
-            case Source.JavaType javaType -> "the Java type [" + javaType.binaryName() + "]";
-            case Source.StaticMethods staticMethods -> "the Java type [" + staticMethods.binaryName() + "]";
-            case Source.Constants constants -> "the Java type [" + constants.binaryName() + "]";
+            case Source.JavaType javaType -> JAVA_TYPE + javaType.binaryName() + "]";
+            case Source.StaticMethods staticMethods -> JAVA_TYPE + staticMethods.binaryName() + "]";
+            case Source.Constants constants -> JAVA_TYPE + constants.binaryName() + "]";
         };
         String artifact = mapping.requiredArtifact() != null ? ": add the dependency " + mapping.requiredArtifact() : "";
-        return "Python module [" + module + "] requires " + what + ", which is not on the class path" + artifact;
+        return PYTHON_MODULE + module + "] requires " + what + ", which is not on the class path" + artifact;
     }
 
     private static boolean isExported(TypeInfo type) {
@@ -267,7 +269,7 @@ public final class PythonImportMappings {
                 return Optional.of(cached);
             }
             if (!resolving.add(module)) {
-                throw new PythonImportMappingException("Python module [" + module + "] is nested in itself");
+                throw new PythonImportMappingException(PYTHON_MODULE + module + "] is nested in itself");
             }
             try {
                 ResolvedModule result = resolveModule(module, mappings);
@@ -312,7 +314,7 @@ public final class PythonImportMappings {
                             members.put(member.name(), member);
                             owners.put(member.name(), mapping);
                         } else {
-                            errors.add("Python module [" + module + "] has contributions binding [" + member.name() + "] to both ["
+                            errors.add(PYTHON_MODULE + module + "] has contributions binding [" + member.name() + "] to both ["
                                 + existing.target() + "] and [" + member.target() + "]: declare prefer(\"" + member.name()
                                 + "\", ...) in one of them, or let one replace the other");
                         }
@@ -382,7 +384,7 @@ public final class PythonImportMappings {
                         return new Clash(name, candidates, candidate, "prefer");
                     }
                 }
-                errors.add("Python module [" + module + "] prefers [" + preferred + "] for [" + name + "], which is none of its candidates "
+                errors.add(PYTHON_MODULE + module + "] prefers [" + preferred + "] for [" + name + "], which is none of its candidates "
                     + targets(candidates));
                 return null;
             }
@@ -401,7 +403,7 @@ public final class PythonImportMappings {
                 }
             }
             if (policy == ClashPolicy.FAIL) {
-                errors.add("Python module [" + module + "] exports [" + name + "] from more than one source " + targets(candidates)
+                errors.add(PYTHON_MODULE + module + "] exports [" + name + "] from more than one source " + targets(candidates)
                     + ": declare prefer(\"" + name + "\", ...) or preferPackage(...) to choose one, or exclude(\"" + name + "\")");
                 return null;
             }
