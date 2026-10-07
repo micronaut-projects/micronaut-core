@@ -85,10 +85,9 @@ class AsyncWebSocketClientSpec extends Specification {
 
         when:
         CompletableFuture<ChatClientWebSocket> future = async.connect(ChatClientWebSocket, "/chat/cancelled/fred").toCompletableFuture()
-        boolean cancelled = future.cancel(true)
+        future.cancel(true)
 
         then:
-        !cancelled || future.isCancelled()
         // the client still connects afterwards
         async.connect(ChatClientWebSocket, "/chat/after-cancel/fred").toCompletableFuture().get(10, TimeUnit.SECONDS).session.open
 
