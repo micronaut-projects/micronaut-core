@@ -44,8 +44,7 @@ class PieceReaderPublisherConcurrencyTest {
 
     @Test
     void requestsOnAnotherThreadNeverAskForASecondPiece() throws Exception {
-        ExecutorService requester = Executors.newSingleThreadExecutor();
-        try {
+        try (ExecutorService requester = Executors.newSingleThreadExecutor(); AutoCloseable stop = requester::shutdownNow) {
             for (int round = 0; round < 200; round++) {
                 int count = 500;
                 Flux<ReadBuffer> input = Flux.range(0, count)
@@ -87,8 +86,6 @@ class PieceReaderPublisherConcurrencyTest {
                 assertNull(failure.get(), () -> "round " + r + " failed: " + failure.get());
                 assertEquals(count, received.get());
             }
-        } finally {
-            requester.shutdownNow();
         }
     }
 
@@ -111,10 +108,12 @@ class PieceReaderPublisherConcurrencyTest {
 
             @Override
             public void onError(Throwable t) {
+                // nothing to do in this test
             }
 
             @Override
             public void onComplete() {
+                // nothing to do in this test
             }
         });
         subscription.get().request(1);
@@ -138,18 +137,22 @@ class PieceReaderPublisherConcurrencyTest {
         lines.subscribe(new Subscriber<>() {
             @Override
             public void onSubscribe(Subscription s) {
+                // nothing to do in this test
             }
 
             @Override
             public void onNext(String s) {
+                // nothing to do in this test
             }
 
             @Override
             public void onError(Throwable t) {
+                // nothing to do in this test
             }
 
             @Override
             public void onComplete() {
+                // nothing to do in this test
             }
         });
         Counted counted = new Counted("x");
@@ -193,8 +196,7 @@ class PieceReaderPublisherConcurrencyTest {
 
     @Test
     void cancelRacingRequestNeverFailsTheRequest() throws Exception {
-        ExecutorService canceller = Executors.newSingleThreadExecutor();
-        try {
+        try (ExecutorService canceller = Executors.newSingleThreadExecutor(); AutoCloseable stop = canceller::shutdownNow) {
             for (int round = 0; round < 2000; round++) {
                 StrictElements elements = new StrictElements();
                 AtomicReference<Subscription> subscription = new AtomicReference<>();
@@ -207,6 +209,7 @@ class PieceReaderPublisherConcurrencyTest {
 
                     @Override
                     public void onNext(Integer integer) {
+                        // nothing to do in this test
                     }
 
                     @Override
@@ -216,6 +219,7 @@ class PieceReaderPublisherConcurrencyTest {
 
                     @Override
                     public void onComplete() {
+                        // nothing to do in this test
                     }
                 });
                 CountDownLatch start = new CountDownLatch(1);
@@ -237,8 +241,6 @@ class PieceReaderPublisherConcurrencyTest {
                 assertFalse(elements.overlapped.get(), "a read and close overlapped");
                 assertTrue(elements.closed);
             }
-        } finally {
-            canceller.shutdownNow();
         }
     }
 
@@ -263,6 +265,7 @@ class PieceReaderPublisherConcurrencyTest {
 
             @Override
             public void close() {
+                // nothing to do in this test
             }
         };
         AtomicReference<Subscription> subscription = new AtomicReference<>();
@@ -274,14 +277,17 @@ class PieceReaderPublisherConcurrencyTest {
 
             @Override
             public void onNext(Counted counted) {
+                // nothing to do in this test
             }
 
             @Override
             public void onError(Throwable t) {
+                // nothing to do in this test
             }
 
             @Override
             public void onComplete() {
+                // nothing to do in this test
             }
         });
         subscription.get().request(1);
@@ -316,6 +322,7 @@ class PieceReaderPublisherConcurrencyTest {
 
         @Override
         public void complete() {
+            // nothing to do in this test
         }
 
         @Override
@@ -429,6 +436,7 @@ class PieceReaderPublisherConcurrencyTest {
 
         @Override
         public void close() {
+            // nothing to do in this test
         }
     }
 

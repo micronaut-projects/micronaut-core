@@ -226,6 +226,7 @@ class PieceReadersTest {
 
         @Override
         public void complete() {
+            // nothing to do in this test
         }
 
         @Override

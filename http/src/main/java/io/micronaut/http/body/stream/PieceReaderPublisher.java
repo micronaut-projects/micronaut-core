@@ -64,11 +64,11 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      */
     private final AtomicReference<@Nullable I> piece = new AtomicReference<>();
 
-    private volatile @Nullable Subscriber<? super T> downstream;
-    private volatile @Nullable Subscription upstream;
+    private final AtomicReference<@Nullable Subscriber<? super T>> downstream = new AtomicReference<>();
+    private final AtomicReference<@Nullable Subscription> upstream = new AtomicReference<>();
     private volatile boolean pieceRequested;
     private volatile boolean inputEnded;
-    private volatile @Nullable Throwable inputFailure;
+    private final AtomicReference<@Nullable Throwable> inputFailure = new AtomicReference<>();
     private volatile boolean cancelled;
 
     // only accessed by the drain loop
@@ -117,16 +117,18 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
             subscriber.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
+                    // the refused subscriber is only failed
                 }
 
                 @Override
                 public void cancel() {
+                    // the refused subscriber is only failed
                 }
             });
             subscriber.onError(new IllegalStateException("The elements of a body can be subscribed to only once"));
             return;
         }
-        downstream = subscriber;
+        downstream.set(subscriber);
         subscriber.onSubscribe(this);
         input.subscribe(this);
     }
@@ -135,7 +137,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     public void request(long n) {
         if (n <= 0) {
             cancelled = true;
-            inputFailure = new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n);
+            inputFailure.set(new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n));
         } else {
             long current;
             long next;
@@ -186,7 +188,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
 
     @Override
     public void onSubscribe(Subscription s) {
-        upstream = s;
+        upstream.set(s);
         drain();
     }
 
@@ -195,14 +197,14 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         if (!piece.compareAndSet(null, next)) {
             // §1.1: more pieces than requested
             discard.accept(next);
-            inputFailure = new IllegalStateException("The input emitted more pieces than were requested");
+            inputFailure.set(new IllegalStateException("The input emitted more pieces than were requested"));
         }
         drain();
     }
 
     @Override
     public void onError(Throwable t) {
-        inputFailure = t;
+        inputFailure.set(t);
         drain();
     }
 
@@ -236,7 +238,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      * request the next piece when the pieces read so far complete no requested element.
      */
     private void drainOnce() {
-        Subscriber<? super T> subscriber = downstream;
+        Subscriber<? super T> subscriber = downstream.get();
         if (subscriber == null) {
             return;
         }
@@ -245,7 +247,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         try {
             while (true) {
                 if (cancelled) {
-                    Throwable failure = inputFailure;
+                    Throwable failure = inputFailure.get();
                     terminate(true);
                     if (failure instanceof IllegalArgumentException) {
                         // §3.9
@@ -253,7 +255,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                     }
                     return;
                 }
-                Throwable failure = inputFailure;
+                Throwable failure = inputFailure.get();
                 if (failure != null && readerFailure == null) {
                     // the input failed: the elements not emitted yet are dropped
                     terminate(false);
@@ -320,7 +322,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                     }
                     return;
                 }
-                Subscription s = upstream;
+                Subscription s = upstream.get();
                 if (s != null && !pieceRequested) {
                     pieceRequested = true;
                     s.request(1);
@@ -360,7 +362,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     }
 
     private void cancelUpstream() {
-        Subscription s = upstream;
+        Subscription s = upstream.get();
         if (s != null && upstreamCancelRequested && !upstreamCancelled) {
             upstreamCancelled = true;
             s.cancel();

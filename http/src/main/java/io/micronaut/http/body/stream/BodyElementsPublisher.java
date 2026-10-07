@@ -23,6 +23,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -30,6 +31,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -50,7 +52,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
     private final AtomicBoolean subscribed = new AtomicBoolean();
     private final AtomicLong requested = new AtomicLong();
     private final AtomicInteger wip = new AtomicInteger();
-    private volatile @Nullable Subscriber<? super T> downstream;
+    private final AtomicReference<@Nullable Subscriber<? super T>> downstream = new AtomicReference<>();
     private volatile boolean cancelled;
     private volatile boolean reading;
     private volatile boolean done;
@@ -80,16 +82,18 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             subscriber.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
+                    // the refused subscriber is only failed
                 }
 
                 @Override
                 public void cancel() {
+                    // the refused subscriber is only failed
                 }
             });
             subscriber.onError(new IllegalStateException("The elements can be subscribed to only once"));
             return;
         }
-        downstream = subscriber;
+        downstream.set(subscriber);
         subscriber.onSubscribe(this);
     }
 
@@ -102,7 +106,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             }
             done = true;
             cancel();
-            Subscriber<? super T> subscriber = downstream;
+            Subscriber<? super T> subscriber = downstream.get();
             if (subscriber != null) {
                 subscriber.onError(new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n));
             }
@@ -146,7 +150,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
                 } catch (Throwable e) {
                     read = CompletableFuture.failedFuture(e);
                 }
-                read.whenComplete(this::onRead);
+                read.whenComplete((element, error) -> onRead(Objects.requireNonNullElse(element, Optional.empty()), error));
             }
             missed = wip.addAndGet(-missed);
             if (missed == 0) {
@@ -155,13 +159,11 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         }
     }
 
-    private void onRead(@Nullable Optional<T> element, @Nullable Throwable error) {
-        Subscriber<? super T> subscriber = downstream;
+    private void onRead(Optional<T> element, @Nullable Throwable error) {
+        Subscriber<? super T> subscriber = downstream.get();
         if (cancelled || done || subscriber == null) {
-            if (element != null) {
-                // read while the subscription was cancelled: e.g. a reference counted buffer
-                element.ifPresent(this::discard);
-            }
+            // read while the subscription was cancelled: e.g. a reference counted buffer
+            element.ifPresent(this::discard);
             return;
         }
         if (error != null) {
@@ -169,7 +171,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             subscriber.onError(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
             return;
         }
-        if (element == null || element.isEmpty()) {
+        if (element.isEmpty()) {
             done = true;
             subscriber.onComplete();
             return;
