@@ -570,9 +570,20 @@ abstract class MultiplexedServerHandler {
                 }
 
                 if (sendContinue) {
-                    writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, requiredCtx().voidPromise());
                     sendContinue = false;
+                    writeContinue();
                 }
+            }
+
+            /**
+             * Write the interim {@code 100 Continue} response and flush it. The body may be
+             * subscribed to after the inbound read has completed (e.g. after an async step), in
+             * which case no read-complete flush follows. {@link #flush()} still holds the flush
+             * back while reading, so the in-read case is coalesced as before.
+             */
+            private void writeContinue() {
+                writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, requiredCtx().voidPromise());
+                flush();
             }
 
             @Override
