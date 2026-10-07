@@ -581,6 +581,10 @@ abstract class AbstractJdkHttpClient {
                 }
                 return;
             }
+            if (result.isCancelled()) {
+                // the cancellation of the exchange aborted the request: nobody waits for an outcome
+                return;
+            }
             Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
             Throwable mapped;
             if (cause instanceof IOException io) {
@@ -622,6 +626,11 @@ abstract class AbstractJdkHttpClient {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, response.statusCode(), response.uri());
                 }
                 result.tryComplete(new JdkByteBodyResponse(response, response.body(), conversionService));
+                return;
+            }
+            if (result.isCancelled()) {
+                // the cancellation of the exchange aborted the request: nobody waits for an outcome
+                releaseUnclaimed(selection);
                 return;
             }
             Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
