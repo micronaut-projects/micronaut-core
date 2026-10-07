@@ -30,6 +30,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * {@link BodyElements} as a publisher, without Reactor: one {@link BodyElements#next()} per
@@ -45,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class BodyElementsPublisher<T> implements Publisher<T>, Subscription {
 
     private final BodyElements<T> elements;
+    private final @Nullable Consumer<? super T> discard;
     private final AtomicBoolean subscribed = new AtomicBoolean();
     private final AtomicLong requested = new AtomicLong();
     private final AtomicInteger wip = new AtomicInteger();
@@ -59,7 +61,17 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
      * @param elements The elements, which the publisher takes over
      */
     public BodyElementsPublisher(BodyElements<T> elements) {
+        this(elements, null);
+    }
+
+    /**
+     * @param elements The elements, which the publisher takes over
+     * @param discard  Releases an element that arrives once the subscription was cancelled, or
+     *                 {@code null} to release a {@link ReferenceCounted} one
+     */
+    public BodyElementsPublisher(BodyElements<T> elements, @Nullable Consumer<? super T> discard) {
         this.elements = elements;
+        this.discard = discard;
     }
 
     @Override
@@ -148,7 +160,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         if (cancelled || done || subscriber == null) {
             if (element != null) {
                 // read while the subscription was cancelled: e.g. a reference counted buffer
-                element.ifPresent(BodyElementsPublisher::discard);
+                element.ifPresent(this::discard);
             }
             return;
         }
@@ -170,8 +182,11 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         drain();
     }
 
-    private static void discard(Object element) {
-        if (element instanceof ReferenceCounted counted) {
+    private void discard(T element) {
+        Consumer<? super T> d = discard;
+        if (d != null) {
+            d.accept(element);
+        } else if (element instanceof ReferenceCounted counted) {
             counted.release();
         }
     }
