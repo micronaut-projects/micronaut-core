@@ -174,10 +174,12 @@ import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -354,6 +356,23 @@ final class NettyHttpClient implements
     static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
         String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
         return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
+    }
+
+    /**
+     * @param request The request
+     * @return Whether the request accepts {@code text/event-stream}, possibly among other types
+     */
+    private static boolean acceptsEvents(io.micronaut.http.HttpRequest<?> request) {
+        for (MediaType accepted : request.getHeaders().accept()) {
+            if (accepted.matches(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isEventStream(io.micronaut.http.HttpResponse<?> response) {
+        return response.getContentType().map(MediaType.TEXT_EVENT_STREAM_TYPE::matches).orElse(false);
     }
 
     /**
@@ -562,7 +581,9 @@ final class NettyHttpClient implements
     private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> errorType) {
 
         if (request instanceof MutableHttpRequest<?> httpRequest) {
-            httpRequest.accept(MediaType.TEXT_EVENT_STREAM_TYPE);
+            // replace, rather than add to, what the caller accepts: a server that may answer with another type, such
+            // as JSON, would otherwise do so, and the body would yield no event
+            httpRequest.getHeaders().set(io.micronaut.http.HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
         }
 
         return Flux.create(emitter ->
@@ -626,7 +647,8 @@ final class NettyHttpClient implements
                                             if (d.length == 0) {
                                                 currentEvent.data = content.toByteArray();
                                             } else {
-                                                currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
+                                                // data lines are joined with a line feed
+                                                currentEvent.data = ArrayUtils.concat(ArrayUtils.concat(d, (byte) '\n'), content.toByteArray());
                                             }
                                         }
                                         case "id" -> {
@@ -742,6 +764,89 @@ final class NettyHttpClient implements
             B decoded = reader.read(eventType, MediaType.APPLICATION_JSON_TYPE, request.getHeaders(), data);
             return Event.of(byteBufferEvent, Objects.requireNonNull(decoded));
         });
+    }
+
+    @Override
+    public <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+        setupConversionService(request);
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return new MicronautFlux<>(Flux.defer(() -> {
+            MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
+            if (!acceptsEvents(mutableRequest)) {
+                // keep what the caller accepts, such as application/json, and accept an event stream too
+                mutableRequest.getHeaders().add(io.micronaut.http.HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
+            }
+            return toMono(resolveRequestURI(mutableRequest), propagatedContext)
+                .flatMapMany(target -> exchangeEventStreamImpl(propagatedContext, mutableRequest, eventType, errorType, target));
+        }));
+    }
+
+    private <I, B> Flux<HttpResponse<Event<B>>> exchangeEventStreamImpl(PropagatedContext propagatedContext, MutableHttpRequest<I> request, Argument<B> eventType, Argument<?> errorType, ResolvedTarget target) {
+        return toMono(buildStreamExchange(propagatedContext, request, target, errorType, true, true), propagatedContext).flatMapMany(response -> {
+            if (!(response instanceof NettyStreamedHttpResponse)) {
+                throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
+            }
+            StreamedHttpResponse streamedResponse = NettyHttpResponseBuilder.toStreamResponse(response);
+            Flux<ByteBuf> content = Flux.from(streamedResponse).map(HttpContent::content);
+            Flux<Event<B>> events;
+            if (isEventStream(response)) {
+                // each event is decoded as soon as its lines arrive
+                MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
+                SseEventDecoder decoder = new SseEventDecoder(sizeLimits().maxBufferSize());
+                events = content.concatMapIterable(line -> {
+                        try {
+                            return decoder.line(line);
+                        } finally {
+                            line.release();
+                        }
+                    })
+                    .map(event -> Event.of(event, readEventData(reader, eventType, MediaType.APPLICATION_JSON_TYPE, response, event.getData())));
+            } else {
+                // a single body, such as JSON, is one event
+                MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+                MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(mediaType));
+                long maxBufferSize = sizeLimits().maxBufferSize();
+                events = content
+                    .collect(ByteArrayOutputStream::new, (body, chunk) -> {
+                        try {
+                            long length = (long) body.size() + chunk.readableBytes();
+                            if (length > maxBufferSize) {
+                                throw new ContentLengthExceededException(maxBufferSize, length);
+                            }
+                            chunk.readBytes(body, chunk.readableBytes());
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        } finally {
+                            chunk.release();
+                        }
+                    })
+                    .filter(body -> body.size() > 0)
+                    .map(body -> Event.of(readEventData(reader, eventType, mediaType, response, body.toByteArray())))
+                    .flux();
+            }
+            return events
+                .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
+                .map(event -> eventResponse(streamedResponse, event))
+                // without an event, the status and the headers of the response are still of interest
+                .switchIfEmpty(Mono.fromSupplier(() -> eventResponse(streamedResponse, null)))
+                .onErrorMap(e -> e instanceof HttpClientException ? e : decorate(new HttpClientException("Error consuming Server Sent Events: " + e.getMessage(), e)));
+        });
+    }
+
+    private <B> B readEventData(MessageBodyReader<B> reader, Argument<B> eventType, MediaType mediaType, HttpResponse<?> response, byte[] data) {
+        B decoded = reader.read(eventType, mediaType, response.getHeaders(), byteBufferFactory.wrap(Unpooled.wrappedBuffer(data)));
+        if (decoded == null) {
+            throw new HttpClientException("Event data decoded to null for type " + eventType);
+        }
+        return decoded;
+    }
+
+    private <B> HttpResponse<Event<B>> eventResponse(StreamedHttpResponse streamedResponse, @Nullable Event<B> event) {
+        NettyStreamedHttpResponse<Event<B>> response = new NettyStreamedHttpResponse<>(streamedResponse, conversionService);
+        if (event != null) {
+            response.setBody(event);
+        }
+        return new HttpResponseWrapper<>(response);
     }
 
     @Override
@@ -1118,19 +1223,36 @@ final class NettyHttpClient implements
     /**
      * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}.
      */
-    @SuppressWarnings("MagicNumber")
     private <I> ExecutionFlow<HttpResponse<?>> buildStreamExchange(
         PropagatedContext propagatedContext,
         MutableHttpRequest<I> request,
         ResolvedTarget target,
         @Nullable Argument<?> errorType) {
+        return buildStreamExchange(propagatedContext, request, target, errorType, false, shouldBufferErrorBody(errorType));
+    }
+
+    /**
+     * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}, {@link #exchangeEventStream}.
+     *
+     * @param eventsByContentType Whether the body is split into event stream lines only when the response is an event
+     *                            stream, whatever the request accepts
+     * @param bufferErrorBody Whether the body of an error response is buffered, to be decoded into the error type
+     */
+    @SuppressWarnings("MagicNumber")
+    private <I> ExecutionFlow<HttpResponse<?>> buildStreamExchange(
+        PropagatedContext propagatedContext,
+        MutableHttpRequest<I> request,
+        ResolvedTarget target,
+        @Nullable Argument<?> errorType,
+        boolean eventsByContentType,
+        boolean bufferErrorBody) {
         return this.sendRequestWithRedirects(
             propagatedContext,
             null,
             request.uri(target.uri()),
             target.selection(),
             (req, resp) -> {
-                if (resp.code() >= 400 && !shouldBufferErrorBody(errorType)) {
+                if (resp.code() >= 400 && !bufferErrorBody) {
                     // The error body will never be consumed by the caller, so discard it right
                     // away. Otherwise the connection would stay reserved until the read timeout.
                     resp.close();
@@ -1142,7 +1264,7 @@ final class NettyHttpClient implements
                     resp.close();
                     body = Flux.empty();
                 } else {
-                    if (isAcceptEvents(req)) {
+                    if (isEventStreamBody(req, resp, eventsByContentType)) {
                         if (bb instanceof AvailableByteBody anbb) {
                             // same semantics as the streaming branch, but this is eager so it's more
                             // lax wrt unclosed responses.
@@ -1158,10 +1280,21 @@ final class NettyHttpClient implements
                     }
                 }
 
-                return readBodyOnError(errorType, ExecutionFlow.<HttpResponse<?>>just(toStreamingResponse(resp, body))
+                return readBodyOnError(bufferErrorBody ? errorType : null, ExecutionFlow.<HttpResponse<?>>just(toStreamingResponse(resp, body))
                     .flatMap(r -> handleStreamHttpError(r, true)));
             }
         );
+    }
+
+    private static boolean isEventStreamBody(io.micronaut.http.HttpRequest<?> request, NettyClientByteBodyResponse response, boolean eventsByContentType) {
+        if (response.code() >= 400) {
+            // the body of an error is read as a whole, to decode it into the error type
+            return false;
+        }
+        if (eventsByContentType) {
+            return isEventStream(response);
+        }
+        return isAcceptEvents(request);
     }
 
     private <B> MutableHttpResponse<B> toStreamingResponse(NettyClientByteBodyResponse resp, Publisher<HttpContent> content) {
@@ -1415,7 +1548,7 @@ final class NettyHttpClient implements
     }
 
     private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, ExecutionFlow<HttpResponse<?>> publisher) {
-        if (errorType != null && shouldBufferErrorBody(errorType)) {
+        if (errorType != null) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException exception) {
                     final HttpResponse<?> response = exception.getResponse();
@@ -1424,8 +1557,10 @@ final class NettyHttpClient implements
                         final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                         nettyResponse.subscribe(new Subscriber<>() {
                             final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
+                            final long maxBufferSize = sizeLimits().maxBufferSize();
                             @Nullable
                             Subscription s;
+                            boolean done;
 
                             @Override
                             public void onSubscribe(Subscription s) {
@@ -1435,18 +1570,37 @@ final class NettyHttpClient implements
 
                             @Override
                             public void onNext(HttpContent httpContent) {
+                                if (done) {
+                                    httpContent.release();
+                                    return;
+                                }
+                                long length = (long) buffer.readableBytes() + httpContent.content().readableBytes();
+                                if (length > maxBufferSize) {
+                                    httpContent.release();
+                                    Objects.requireNonNull(s).cancel();
+                                    onError(new ContentLengthExceededException(maxBufferSize, length));
+                                    return;
+                                }
                                 buffer.addComponent(true, httpContent.content());
                                 Objects.requireNonNull(s).request(1);
                             }
 
                             @Override
                             public void onError(Throwable t) {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 buffer.release();
                                 completeExceptionallySafe(delayed, t);
                             }
 
                             @Override
                             public void onComplete() {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 try {
                                     FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
                                     boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;

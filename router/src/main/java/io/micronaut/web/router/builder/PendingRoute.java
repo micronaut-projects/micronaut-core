@@ -89,7 +89,8 @@ final class PendingRoute {
      * other route is dropped and the terminal fails.
      *
      * @return The URI template, under the prefix
-     * @throws IllegalStateException if the route is not a route of {@code GET} only
+     * @throws IllegalStateException if the route is not a route of {@code GET} only, or has media
+     *                               types or a response type
      */
     String webSocketTemplate() {
         String template = getTemplate;
@@ -147,13 +148,24 @@ final class PendingRoute {
      * @throws NullPointerException if it is {@code null}
      */
     <T> T terminal(@Nullable T terminal, String name) {
-        checkPending();
         if (terminal == null) {
-            ended = true;
-            builder.dropPending(this);
-            throw new NullPointerException(name);
+            throw missing(name);
         }
+        checkPending();
         return terminal;
+    }
+
+    /**
+     * Drop the route that was given no handler or response.
+     *
+     * @param name The name of the missing handler or response, for the message
+     * @return The error to throw
+     */
+    NullPointerException missing(String name) {
+        checkPending();
+        ended = true;
+        builder.dropPending(this);
+        return new NullPointerException(name);
     }
 
     /**
@@ -165,13 +177,13 @@ final class PendingRoute {
         builder.dropPending(this);
     }
 
-    private void record(Consumer<HandlerRoutes> setting) {
+    private void addSetting(Consumer<HandlerRoutes> setting) {
         checkPending();
         settings.add(setting);
     }
 
-    private void recordBody(String name, Consumer<HandlerRoutes> setting) {
-        record(setting);
+    private void addBodySetting(String name, Consumer<HandlerRoutes> setting) {
+        addSetting(setting);
         if (bodySetting == null) {
             bodySetting = name;
         }
@@ -186,40 +198,40 @@ final class PendingRoute {
 
     void consumes(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        recordBody("consumes", routes -> routes.consumes(checked));
+        addBodySetting("consumes", added -> added.consumes(checked));
     }
 
     void consumesAll() {
-        recordBody("consumesAll", HandlerRoutes::consumesAll);
+        addBodySetting("consumesAll", HandlerRoutes::consumesAll);
     }
 
     void produces(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        recordBody("produces", routes -> routes.produces(checked));
+        addBodySetting("produces", added -> added.produces(checked));
     }
 
     void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
         Objects.requireNonNull(annotationMetadata, "annotationMetadata");
-        record(routes -> routes.annotationMetadata(annotationMetadata));
+        addSetting(added -> added.annotationMetadata(annotationMetadata));
     }
 
     void annotate(AnnotationValue<?> annotationValue) {
         Objects.requireNonNull(annotationValue, "annotationValue");
-        record(routes -> routes.annotate(annotationValue));
+        addSetting(added -> added.annotate(annotationValue));
     }
 
     void responseType(Argument<?> responseType) {
         Objects.requireNonNull(responseType, "responseType");
-        recordBody("responseType", routes -> routes.responseType(responseType));
+        addBodySetting("responseType", added -> added.responseType(responseType));
     }
 
     void executeOn(String executorName) {
         String name = RouteArguments.executorName(executorName);
-        record(routes -> routes.executeOn(name));
+        addSetting(added -> added.executeOn(name));
     }
 
     void nonBlocking() {
-        record(HandlerRoutes::nonBlocking);
+        addSetting(HandlerRoutes::nonBlocking);
     }
 
     void port(String port) {
@@ -227,32 +239,33 @@ final class PendingRoute {
     }
 
     void port(int port) {
+        builder.checkPort();
         int checked = RouteArguments.port(port);
-        record(routes -> routes.port(checked));
+        addSetting(added -> added.port(checked));
     }
 
     void attribute(String name, Object value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
-        record(routes -> routes.attribute(name, value));
+        addSetting(added -> added.attribute(name, value));
     }
 
     void order(int order) {
-        record(routes -> routes.order(order));
+        addSetting(added -> added.order(order));
     }
 
     void where(RouteCondition condition) {
         Objects.requireNonNull(condition, "condition");
-        record(routes -> routes.where(condition));
+        addSetting(added -> added.where(condition));
     }
 
     void constrain(Predicate<? super PathVariables> accepted) {
         Objects.requireNonNull(accepted, "accepted");
-        record(routes -> routes.constrain(accepted));
+        addSetting(added -> added.constrain(accepted));
     }
 
     void filter(FilterRegistration filter) {
         // the filter spec of the registration may choose its executor until the route is built
-        record(routes -> routes.filter(filter));
+        addSetting(added -> added.filter(filter));
     }
 }

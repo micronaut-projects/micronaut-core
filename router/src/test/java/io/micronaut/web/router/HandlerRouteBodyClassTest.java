@@ -25,6 +25,7 @@ import io.micronaut.web.router.builder.BodyRequestHandler;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +56,21 @@ class HandlerRouteBodyClassTest {
         for (HttpRequest<?> request : List.of(HttpRequest.POST("/post", ""), HttpRequest.PUT("/put", ""),
             HttpRequest.PATCH("/patch", ""), HttpRequest.PATCH("/patch-argument", ""), HttpRequest.DELETE("/delete", ""),
             HttpRequest.create(HttpMethod.CUSTOM, "/propfind", "PROPFIND"), HttpRequest.POST("/declared", ""))) {
+            MethodBasedRouteInfo<?, ?> route = (MethodBasedRouteInfo<?, ?>) route(router, request);
+            assertEquals(Item.class, route.getRequestBodyType().orElseThrow().getType(), request.getMethodName() + " " + request.getPath());
+        }
+    }
+
+    @Test
+    void theBodyTypeOfALocatedRouteAsAClassIsTheArgumentOfTheClass() {
+        LocatedRoutes<?> table = TestLocatedRoutes.of(Item.class, items -> {
+            items.POST("/body").body(Item.class).handle((request, pathVariables, target, item) -> HttpResponse.ok());
+            items.PUT("/declared-body").body(Item.class).handle((request, pathVariables, target, item) -> HttpResponse.ok());
+            items.PATCH("/handler").body(Item.class).handle((request, pathVariables, item) -> HttpResponse.ok(item.name()));
+        });
+        Router router = router(routes -> routes.locate("/located", (request, pathVariables) -> new Item("t"), target -> table));
+        for (HttpRequest<?> request : List.of(HttpRequest.POST("/located/body", ""), HttpRequest.PUT("/located/declared-body", ""),
+            HttpRequest.PATCH("/located/handler", ""))) {
             MethodBasedRouteInfo<?, ?> route = (MethodBasedRouteInfo<?, ?>) route(router, request);
             assertEquals(Item.class, route.getRequestBodyType().orElseThrow().getType(), request.getMethodName() + " " + request.getPath());
         }

@@ -24,20 +24,23 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.RouteLocator;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.StringJoiner;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * Adds the routes to handler functions to a {@link RouteAssembly}: the routes of the builder of
- * the {@link HttpRoutes} beans, see {@link DefaultHttpRouteBuilder}, and of a
+ * the {@link HttpRoutes} beans, see {@link DefaultHttpRouteBuilder}, of the {@link LocatedRoutes}
+ * of located targets, see {@link DefaultLocatedHttpRouteBuilder}, and of a
  * group of routes, see {@link DefaultHttpRouteGroup}, which prefixes their URIs and applies its
  * filters to them.
  *
@@ -45,9 +48,10 @@ import java.util.function.Supplier;
  * @since 5.3.0
  */
 @Internal
-abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
+abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits DefaultHttpRouteBuilder, AbstractHttpRouteGroup, DefaultLocatedHttpRouteBuilder {
 
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
+    private static final String STATUS = "status";
 
     final RouteAssembly assembly;
     /**
@@ -104,7 +108,26 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @return The port, see {@link RouteArguments#port(String, PropertyPlaceholderResolver)}
      */
     final int resolvePort(String port) {
+        checkPort();
         return RouteArguments.port(port, placeholderResolver);
+    }
+
+    /**
+     * @return Whether the routes are the routes of located targets, see {@link LocatedRoutes}
+     */
+    boolean located() {
+        return false;
+    }
+
+    /**
+     * Fail if the routes cannot open a port: located routes are on the ports of their locator routes.
+     *
+     * @throws IllegalArgumentException if they cannot
+     */
+    final void checkPort() {
+        if (located()) {
+            throw new IllegalArgumentException("Located routes cannot expose ports: they are on the ports of their locator routes");
+        }
     }
 
     /**
@@ -127,13 +150,13 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
     }
 
     @Override
-    public final HttpRouteSpec route(HttpMethod method, String uri) {
+    public HttpRouteSpec route(HttpMethod method, String uri) {
         standardMethod(method);
         return pending(method.name(), uri, method == HttpMethod.GET, (template, handler) -> List.of(route(method, template, handler.get())));
     }
 
     @Override
-    public final HttpRouteSpec route(Set<HttpMethod> methods, String uri) {
+    public HttpRouteSpec route(Set<HttpMethod> methods, String uri) {
         Objects.requireNonNull(methods, "methods");
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
@@ -158,7 +181,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
     }
 
     @Override
-    public final HttpRouteSpec route(String httpMethodName, String uri) {
+    public HttpRouteSpec route(String httpMethodName, String uri) {
         RouteArguments.httpMethodName(httpMethodName);
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
@@ -168,7 +191,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
     }
 
     @Override
-    public final HttpRouteSpec any(String uri) {
+    public HttpRouteSpec any(String uri) {
         return pending("any", uri, false, this::anyMethod);
     }
 
@@ -290,32 +313,94 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
 
     @Override
     public final StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
-        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(status, STATUS);
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
     @Override
     public final StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler) {
-        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(status, STATUS);
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
     @Override
-    public final void group(Consumer<HttpRouteGroup> routes) {
-        Objects.requireNonNull(routes, "routes");
-        declareGroup(prefix, routes);
+    public final <T> void locate(String prefixUri, LocatorHandler<? extends T> locator,
+                                 Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
     }
 
     @Override
-    public final void path(String prefix, Consumer<HttpRouteGroup> routes) {
-        Objects.requireNonNull(routes, "routes");
-        declareGroup(RoutePrefix.of(prefix, this.prefix), routes);
+    public final <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator,
+                                      Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
     }
 
-    private void declareGroup(@Nullable RoutePrefix groupPrefix, Consumer<HttpRouteGroup> routes) {
+    /**
+     * The media types and the executor of the groups of a locator route, which the routes it
+     * locates inherit: they are given to the settings when the outermost group is closed, like
+     * to the routes of the groups.
+     *
+     * @return The settings, or {@code null} outside a group
+     */
+    private @Nullable RouteSettings locatorGroupSettings() {
+        RouteGroupDefaults defaults = groupDefaults();
+        if (defaults == null) {
+            return null;
+        }
+        RouteSettings settings = new RouteSettings(port -> { }, null);
+        defaults.add(List.of(settings), 0);
+        return settings;
+    }
+
+    private void locate(String prefixUri, RouteLocator locator) {
+        Objects.requireNonNull(prefixUri, "prefixUri");
+        RoutePrefix.checkPath(prefixUri, "a locator route");
         checkOpen();
-        DefaultHttpRouteGroup group = new DefaultHttpRouteGroup(assembly, assembly.groupFilters(groupFilters),
-            assembly.routeGroup(groupSettings), new RouteGroupDefaults(groupDefaults()), groupPrefix, placeholderResolver);
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
+        for (String template : RouteLocator.templates(uri(prefixUri))) {
+            for (HttpMethod method : HttpMethod.values()) {
+                if (method != HttpMethod.CUSTOM) {
+                    // the routes of the target decide which media types they consume and produce, inheriting
+                    // the ones of the groups; the located route carries the filters of the groups of the locator route
+                    grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+                }
+            }
+            // a request with a custom method is located too, and matched against the located
+            // routes of its method, or of any method
+            grouped(assembly.addRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+        }
+    }
+
+    /**
+     * Declare a group of routes, see {@link HttpRouteBuilder#group(Consumer)}.
+     *
+     * @param factory Creates the group
+     * @param routes  Declares the routes and the filters of the group
+     * @param <G>     The type of the group
+     */
+    final <G extends AbstractHttpRouteGroup<?>> void declareGroup(GroupFactory<G> factory, Consumer<? super G> routes) {
+        Objects.requireNonNull(routes, "routes");
+        declareGroup(prefix, factory, routes);
+    }
+
+    /**
+     * Declare a group of routes under a prefix, see {@link HttpRouteBuilder#path(String, Consumer)}.
+     *
+     * @param groupPrefix The prefix of the group, under the prefix of the builder
+     * @param factory     Creates the group
+     * @param routes      Declares the routes and the filters of the group
+     * @param <G>         The type of the group
+     */
+    final <G extends AbstractHttpRouteGroup<?>> void declarePath(String groupPrefix, GroupFactory<G> factory, Consumer<? super G> routes) {
+        Objects.requireNonNull(routes, "routes");
+        declareGroup(RoutePrefix.of(groupPrefix, this.prefix), factory, routes);
+    }
+
+    private <G extends AbstractHttpRouteGroup<?>> void declareGroup(@Nullable RoutePrefix groupPrefix, GroupFactory<G> factory,
+                                                                    Consumer<? super G> routes) {
+        checkOpen();
+        G group = factory.create(assembly, assembly.groupFilters(groupFilters), assembly.routeGroup(groupSettings),
+            new RouteGroupDefaults(groupDefaults()), groupPrefix, placeholderResolver);
         group.declaredBy(declaringBean);
         try {
             routes.accept(group);
@@ -336,8 +421,8 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
 
     final void checkOpen() {
         if (closed) {
-            throw new IllegalStateException("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
-                + "not after it returned");
+            throw new IllegalStateException("The route builder is closed: declare the routes inside "
+                + (located() ? "LocatedRoutes" : "HttpRoutes") + ".routes(...), not after it returned");
         }
         RouteAssembly.RouteFilters filters = groupFilters;
         if (filters != null && filters.isClosed()) {
@@ -368,6 +453,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         checkOpen();
         // global on the builder, local to the routes of the group in a group
         RouteAssembly.RouteGroup settings = groupSettings;
+        if (settings == null) {
+            checkGlobal("error");
+        }
         RouteAssembly.DefaultErrorRoute route = settings == null
             ? assembly.addErrorRoute(null, type, handle(handler))
             : settings.addErrorRoute(type, handle(handler));
@@ -378,10 +466,27 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         checkOpen();
         // global on the builder, local to the routes of the group in a group
         RouteAssembly.RouteGroup settings = groupSettings;
+        if (settings == null) {
+            checkGlobal(STATUS);
+        }
         RouteAssembly.DefaultStatusRoute route = settings == null
             ? assembly.addStatusRoute(null, status, handle(handler))
             : settings.addStatusRoute(status, handle(handler));
         return new DefaultStatusRouteSpec(route, handler);
+    }
+
+    /**
+     * Fail if the routes cannot declare a global error or status route: located routes declare
+     * them in a group, local to the routes of the group.
+     *
+     * @param kind The kind of the route, for the message
+     * @throws IllegalArgumentException if they cannot
+     */
+    private void checkGlobal(String kind) {
+        if (located()) {
+            throw new IllegalArgumentException("Located routes cannot declare global " + kind + " routes, which belong to the application routes: "
+                + "declare them in a group of the located routes, local to its routes, e.g. routes.group(group -> group." + kind + "(...))");
+        }
     }
 
     /**
@@ -422,5 +527,26 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
             Objects.requireNonNull(mediaType, "mediaTypes must not contain null");
         }
         return copy;
+    }
+
+    /**
+     * Creates a group of routes.
+     *
+     * @param <G> The type of the group
+     */
+    @FunctionalInterface
+    interface GroupFactory<G extends AbstractHttpRouteGroup<?>> {
+
+        /**
+         * @param assembly            The assembly the routes are added to
+         * @param filters             The filters of the group
+         * @param settings            The other settings of the group
+         * @param defaults            The media types and the executor of the group
+         * @param prefix              The prefix of the URI templates of the routes, or {@code null}
+         * @param placeholderResolver Resolves the placeholders of the ports given as strings, or {@code null}
+         * @return The group
+         */
+        G create(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings,
+                 RouteGroupDefaults defaults, @Nullable RoutePrefix prefix, @Nullable PropertyPlaceholderResolver placeholderResolver);
     }
 }

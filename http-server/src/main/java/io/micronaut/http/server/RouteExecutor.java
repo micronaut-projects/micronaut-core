@@ -64,6 +64,7 @@ import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -199,7 +200,8 @@ public final class RouteExecutor {
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
-        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getUriMatchTemplate().toString());
+        // a located route has the template under the prefixes of its locator routes
+        BasicHttpAttributes.setUriTemplate(request, RouteLocator.uriTemplate(route));
     }
 
     static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {
@@ -305,7 +307,9 @@ public final class RouteExecutor {
     }
 
     static boolean isIgnorable(Throwable cause) {
-        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException) {
+        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException
+            || RouteLocator.isAbandonment(cause)) {
+            // the client went away, e.g. before a route locator located its target
             return true;
         }
         String message = cause.getMessage();
@@ -368,7 +372,7 @@ public final class RouteExecutor {
                 }
                 if (errorRoute == null) {
                     // handle error with a status route of the groups of the handler route
-                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode());
+                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode(), cause);
                 }
                 if (errorRoute == null) {
                     // handle error with a method that is global with bad request
@@ -834,7 +838,7 @@ public final class RouteExecutor {
             // full response case: the publisher is subscribed to right away, a publisher that
             // completes synchronously yields an imperative flow and the rest of the lifecycle
             // stays free of Reactor operators
-            return subscribeSingle(propagatedContext, request, publisher)
+            return subscribeSingle(propagatedContext, request, publisher, routeInfo)
                 .<MutableHttpResponse<?>>flatMap(o -> {
                     if (o instanceof Optional<?> optional) {
                         o = optional.isPresent() ? optional.get() : EMPTY;
@@ -887,22 +891,31 @@ public final class RouteExecutor {
      * request and the propagated context are available in the Reactor context of the publisher, and
      * the propagated context is bound as a thread-local for the subscription and the signals.
      * <p>The publisher is subscribed to right away, so a publisher that completes synchronously
-     * yields an imperative flow. The exception is a filter that subscribes to the response
-     * publisher itself ({@link ReactiveFilterChainElement}): it may add values to the Reactor
-     * context, so the publisher stays lazy and is subscribed to by the filter.
+     * yields an imperative flow. A value that arrives during the subscription is only seen once
+     * the subscription returns, which is soon on the event loop, where nothing may block. There
+     * are two exceptions, where the publisher stays lazy and is subscribed to by the consumer of
+     * the response, so its value is passed on as it arrives:
+     * <ul>
+     *     <li>A filter that subscribes to the response publisher itself
+     *     ({@link ReactiveFilterChainElement}): it may add values to the Reactor context.</li>
+     *     <li>A route on an executor: it may block. A publisher that emits the response and then
+     *     keeps the thread, e.g. a {@code Mono.create} that emits the first event of a streamed
+     *     body and goes on working, would hold the response until it is done.</li>
+     * </ul>
      *
      * @param propagatedContext The propagated context
      * @param request           The request
      * @param publisher         The publisher
+     * @param routeInfo         The route
      * @return The flow of the first value, immediate if the publisher completed synchronously
      */
-    private ExecutionFlow<Object> subscribeSingle(PropagatedContext propagatedContext, HttpRequest<?> request, Publisher<Object> publisher) {
+    private ExecutionFlow<Object> subscribeSingle(PropagatedContext propagatedContext, HttpRequest<?> request, Publisher<Object> publisher, RouteInfo<?> routeInfo) {
         if (publisher instanceof Fuseable.ScalarCallable<?>) {
             // Mono.just, Mono.empty, Mono.error: nothing observes the context
             return ReactiveExecutionFlow.fromPublisherEager(publisher, propagatedContext)
                 .map(o -> o == null ? EMPTY : o);
         }
-        if (ReactiveFilterChainElement.isPresent(propagatedContext)) {
+        if (ReactiveFilterChainElement.isPresent(propagatedContext) || routeInfo.getExecutor(serverConfiguration.getThreadSelection()) != null) {
             Mono<Object> lazy = Mono.from(publisher)
                 .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request))
                 .defaultIfEmpty(EMPTY);
@@ -1011,7 +1024,7 @@ public final class RouteExecutor {
                                                                        RouteInfo<?> routeInfo) {
         if (isSinglePublisher) {
             // the single value is the body, an empty publisher is a missing body
-            return subscribeSingle(propagatedContext, request, bodyPublisher)
+            return subscribeSingle(propagatedContext, request, bodyPublisher, routeInfo)
                 .map(b -> b == EMPTY ? emptyResponse(request, routeInfo) : response.body(b));
         }
         MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));

@@ -44,6 +44,7 @@ import java.util.function.Supplier;
  */
 @Internal
 final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
+    private static final String HANDLER = "handler";
 
     private static final String RESPONSE = "response";
 
@@ -142,6 +143,20 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
         return this;
     }
 
+    /**
+     * Check the handler of a terminal: a terminal without a handler drops the route and fails.
+     *
+     * @param handler The handler
+     * @param <H>     Its type
+     * @return The handler
+     */
+    <H> H checked(@Nullable H handler) {
+        if (handler == null) {
+            throw route.missing(HANDLER);
+        }
+        return handler;
+    }
+
     @Override
     public FilterSpec<HttpRouteSpec> addFilter(FilterRegistration filter) {
         route.filter(filter);
@@ -166,13 +181,13 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
 
     @Override
     public void handle(RequestHandler handler) {
-        RequestHandler checked = route.terminal(handler, "handler");
+        RequestHandler checked = route.terminal(handler, HANDLER);
         route.end(() -> HandlerMethod.of(checked), null, 0);
     }
 
     @Override
     public void handleAsync(AsyncRequestHandler handler) {
-        AsyncRequestHandler checked = route.terminal(handler, "handler");
+        AsyncRequestHandler checked = route.terminal(handler, HANDLER);
         route.end(() -> HandlerMethod.of(checked), null, 0);
     }
 
