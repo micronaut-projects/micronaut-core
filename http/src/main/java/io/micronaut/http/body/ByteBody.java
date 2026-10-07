@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.HttpHeaders;
@@ -127,6 +128,22 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      */
     default Publisher<ReadBuffer> toReadBufferPublisher() {
         return BodyPublishers.map(toByteArrayPublisher(), ReadBufferFactory.getJdkFactory()::adapt);
+    }
+
+    /**
+     * Get this body as {@link ReadBuffer}s pulled one at a time, without Reactive Streams: a
+     * piece of the body is read when {@link BodyElements#next()} asks for it. The caller must
+     * close the buffers it receives, and {@link BodyElements#close() close} the elements if it
+     * does not read them to the end, which discards the rest of the body.
+     * <p>This is a primary operation. After this operation, no other primary operation or
+     * {@link #split()} may be done.
+     *
+     * @return The pieces of the body
+     * @since 5.3.0
+     */
+    @Experimental
+    default BodyElements<ReadBuffer> toReadBufferElements() {
+        return ByteBodyElements.readBuffers(move());
     }
 
     /**

@@ -81,22 +81,14 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
     }
 
     /**
-     * The elements as a publisher for the reactive API: the elements are pushed as the pieces of
-     * the body are read, by a lock-free publisher without a future per element. These elements
-     * can no longer be pulled.
+     * The pieces of a body as they are received, pulled one at a time, see
+     * {@link io.micronaut.http.body.ByteBody#toReadBufferElements()}.
      *
-     * @return The publisher of the elements, for one subscriber
+     * @param body The body, which the elements take over
+     * @return The pieces, each of which its consumer closes
      */
-    public Publisher<T> toPublisher() {
-        synchronized (this) {
-            if (subscribed || done) {
-                throw new IllegalStateException("The elements were read already");
-            }
-            subscribed = true;
-            done = true;
-        }
-        Publisher<T> elements = PieceReaders.publisher(InternalByteBody.toUnbufferedReadBufferPublisher(body), reader);
-        return Flux.from(elements).onErrorMap(wrap::apply);
+    public static ByteBodyElements<ReadBuffer> readBuffers(CloseableByteBody body) {
+        return new ByteBodyElements<>(body, new ReadBufferPieces(), Function.identity());
     }
 
     @Override
