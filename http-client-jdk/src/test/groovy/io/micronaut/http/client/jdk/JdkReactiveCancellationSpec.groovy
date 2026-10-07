@@ -17,6 +17,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -35,7 +36,7 @@ class JdkReactiveCancellationSpec extends Specification {
         // the read timeout does not close the connection while the test waits
         ApplicationContext ctx = ApplicationContext.run(['micronaut.http.client.read-timeout': '60s'])
         HttpClient client = ctx.createBean(HttpClient, upstream.uri('/').toURL())
-        AtomicBoolean bodyReleased = new AtomicBoolean()
+        CountDownLatch bodyReleased = new CountDownLatch(1)
         AtomicReference<Subscription> subscription = new AtomicReference<>()
         AtomicReference<Object> received = new AtomicReference<>()
         AtomicBoolean signalledAfterCancel = new AtomicBoolean()
@@ -80,7 +81,7 @@ class JdkReactiveCancellationSpec extends Specification {
             case 'raw with a body':
                 ByteBodyFactory factory = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
                 CloseableByteBody body = factory.adapt(Flux.just(ReadBufferFactory.getJdkFactory().adapt('xy'.bytes)).concatWith(Flux.never()),
-                    BodySizeLimits.UNLIMITED, null, { bodyReleased.set(true) } as Runnable)
+                    BodySizeLimits.UNLIMITED, null, { bodyReleased.countDown() } as Runnable)
                 ctx.getBean(RawHttpClient).exchange(HttpRequest.POST(upstream.uri('/pending'), null), body, null).subscribe(subscriber)
                 break
             case 'proxy':
@@ -109,7 +110,7 @@ class JdkReactiveCancellationSpec extends Specification {
         phase == 'while the body arrives' && !true || connection.awaitClosed(5)
 
         and: 'its body is released'
-        api != 'raw with a body' || phase != 'before the response' || bodyReleased.get()
+        api != 'raw with a body' || phase != 'before the response' || bodyReleased.await(5, TimeUnit.SECONDS)
 
         when: 'the client goes on'
         def next = Mono.from(client.exchange(HttpRequest.GET('/next'), String)).toFuture()
