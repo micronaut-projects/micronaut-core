@@ -99,8 +99,7 @@ public class DefaultHttpClient implements
      */
     DefaultHttpClient(NettyHttpClient nettyHttpClient) {
         this.nettyHttpClient = Objects.requireNonNull(nettyHttpClient, "nettyHttpClient");
-        this.asyncHttpClient = nettyHttpClient.toAsync();
-        this.asyncSseClient = nettyHttpClient.toAsyncSse();
+        this.asyncHttpClient = nettyHttpClient.toAsyncStreaming();
     }
 
     /**

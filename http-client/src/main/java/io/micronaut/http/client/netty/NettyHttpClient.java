@@ -32,7 +32,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.functional.ThrowingFunction;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableByteBodyHttpResponse;
@@ -41,13 +40,14 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.AvailableByteBody;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CharSequenceBodyWriter;
-import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.stream.BodyElementsPublisher;
 import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.client.AbstractHttpClient;
@@ -63,7 +63,6 @@ import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.StreamingHttpClient;
-import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
@@ -88,9 +87,7 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
-import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
-import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.json.JsonMapper;
@@ -108,7 +105,6 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -160,7 +156,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -258,6 +253,36 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     @Override
     protected ByteBufferFactory<?, ?> byteBufferFactory() {
         return byteBufferFactory;
+    }
+
+    /**
+     * The pieces of the body of {@code dataStream} and {@code exchangeStream}, read as the Netty
+     * client always read them: Netty buffers, as they arrived, with the bytes that wait for the
+     * subscriber limited by {@code max-content-length}.
+     *
+     * @param body  The body, which the pieces take over
+     * @param lines Whether the body is split into the lines of an event stream
+     * @return The pieces of the body
+     */
+    @Override
+    protected BodyElements<ByteBuffer<?>> streamPieces(CloseableByteBody body, boolean lines) {
+        return new StreamedBodyPieces(body, lines, sizeLimits().maxBufferSize());
+    }
+
+    /**
+     * The pieces of the body of {@code dataStream} and {@code exchangeStream}: Netty buffers,
+     * released after {@code onNext} unless the subscriber retained them.
+     *
+     * @param pieces The pieces
+     * @return The publisher of the pieces
+     */
+    @Override
+    protected Publisher<ByteBuffer<?>> streamPiecesPublisher(BodyElements<ByteBuffer<?>> pieces) {
+        if (pieces instanceof StreamedBodyPieces streamed) {
+            return streamed.publisher();
+        }
+        // e.g. the empty body of a response without one
+        return new BodyElementsPublisher<>(pieces);
     }
 
     @Override
@@ -443,77 +468,6 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             connectionManager.refresh();
         }
         return this;
-    }
-
-    @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
-        return dataStream(request, DEFAULT_ERROR_TYPE);
-    }
-
-    @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> errorType) {
-        // the request is sent with the context of the caller, as it always was
-        setupConversionService(request);
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
-            .flatMapMany(response -> pieces(Objects.requireNonNull(response.body(), "The response has no body"))));
-    }
-
-    /**
-     * The pieces of the body of {@link #dataStream} and {@link #exchangeStream}: Netty buffers,
-     * released after {@code onNext} unless the subscriber retained them.
-     *
-     * @param elements The pieces
-     * @return The publisher of the pieces
-     */
-    private static Publisher<ByteBuffer<?>> pieces(BodyElements<ByteBuffer<?>> elements) {
-        if (elements instanceof StreamedBodyPieces streamed) {
-            return streamed.publisher();
-        }
-        // e.g. the empty body of a response without one
-        return new BodyElementsPublisher<>(elements);
-    }
-
-    @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
-        return exchangeStream(request, DEFAULT_ERROR_TYPE);
-    }
-
-    @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
-        setupConversionService(request);
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType), propagatedContext)
-            .flatMapMany(response -> {
-                BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
-                return Flux.from(pieces(pieces))
-                    .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<ByteBuffer<?>>(response, piece));
-            }));
-    }
-
-    @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Argument<O> type) {
-        return jsonStream(request, type, DEFAULT_ERROR_TYPE);
-    }
-
-    @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
-        // the request is sent with the context of the caller, as it always was
-        setupConversionService(request);
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(jsonStreamFlow(propagatedContext, toMutableRequest(request), type, errorType, shouldBufferErrorBody(errorType)), propagatedContext)
-            .flatMapMany(NettyHttpClient::elements));
-    }
-
-    /**
-     * The elements of the body of a response, as a publisher.
-     *
-     * @param response The response
-     * @param <T>      The type of an element
-     * @return The elements
-     */
-    private static <T> Publisher<T> elements(HttpResponse<BodyElements<T>> response) {
-        return new BodyElementsPublisher<>(Objects.requireNonNull(response.body(), "The response has no elements"));
     }
 
     @Override
@@ -796,89 +750,6 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         } else {
             return NettyByteBodyFactory.empty();
         }
-    }
-
-    private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, ExecutionFlow<HttpResponse<?>> publisher) {
-        if (errorType != null) {
-            return publisher.onErrorResume(clientException -> {
-                if (clientException instanceof HttpClientResponseException exception) {
-                    final HttpResponse<?> response = exception.getResponse();
-                    if (response instanceof NettyStreamedHttpResponse<?> streamedResponse) {
-                        DelayedExecutionFlow<HttpResponse<?>> delayed = DelayedExecutionFlow.create();
-                        final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
-                        nettyResponse.subscribe(new Subscriber<>() {
-                            final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
-                            final long maxBufferSize = sizeLimits().maxBufferSize();
-                            @Nullable
-                            Subscription s;
-                            boolean done;
-
-                            @Override
-                            public void onSubscribe(Subscription s) {
-                                this.s = s;
-                                s.request(1);
-                            }
-
-                            @Override
-                            public void onNext(HttpContent httpContent) {
-                                if (done) {
-                                    httpContent.release();
-                                    return;
-                                }
-                                long length = (long) buffer.readableBytes() + httpContent.content().readableBytes();
-                                if (length > maxBufferSize) {
-                                    httpContent.release();
-                                    Objects.requireNonNull(s).cancel();
-                                    onError(new ContentLengthExceededException(maxBufferSize, length));
-                                    return;
-                                }
-                                buffer.addComponent(true, httpContent.content());
-                                Objects.requireNonNull(s).request(1);
-                            }
-
-                            @Override
-                            public void onError(Throwable t) {
-                                if (done) {
-                                    return;
-                                }
-                                done = true;
-                                buffer.release();
-                                completeExceptionallySafe(delayed, t);
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                if (done) {
-                                    return;
-                                }
-                                done = true;
-                                try {
-                                    FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                    boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;
-                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, hasErrorType ? (Argument<Object>) errorType : null, hasErrorType, conversionService);
-                                    completeExceptionallySafe(delayed, decorate(new HttpClientResponseException(
-                                        fullHttpResponse.status().reasonPhrase(),
-                                        null,
-                                        fullNettyClientHttpResponse,
-                                        hasErrorType ? new HttpClientErrorDecoder() {
-                                            @Override
-                                            public Argument<?> getErrorType(MediaType mediaType) {
-                                                return errorType;
-                                            }
-                                        } : HttpClientErrorDecoder.DEFAULT
-                                    )));
-                                } finally {
-                                    buffer.release();
-                                }
-                            }
-                        });
-                        return delayed;
-                    }
-                }
-                return ExecutionFlow.error(clientException);
-            });
-        }
-        return publisher;
     }
 
     @Override

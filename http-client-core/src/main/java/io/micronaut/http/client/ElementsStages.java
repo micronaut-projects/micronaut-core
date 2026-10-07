@@ -97,6 +97,18 @@ public final class ElementsStages {
     }
 
     /**
+     * The future of the result of an exchange whose body was read whole: cancelling it before
+     * the result arrived cancels the exchange.
+     *
+     * @param flow The flow of the result
+     * @param <R>  The type of the result
+     * @return The future of the result
+     */
+    public static <R> CompletableFuture<R> result(ExecutionFlow<R> flow) {
+        return toFuture(flow, result -> { });
+    }
+
+    /**
      * Close the elements of the response of a streaming exchange, if it has them.
      *
      * @param response The response
