@@ -22,6 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.visitor.PackageElementVisitor;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.visitor.util.ProcessorOptionsSystemProperties;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -39,8 +40,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
 
 /**
  * <p>The annotation processed used to execute package element visitors.</p>
@@ -91,10 +90,8 @@ public sealed class PackageElementVisitorProcessor extends AbstractInjectAnnotat
         Collection<? extends PackageElementVisitor<?>> packageElementVisitors = findPackageElementVisitors();
 
         // set supported options as system properties to keep compatibility
-        // in particular for micronaut-openapi
-        processingEnv.getOptions().entrySet().stream()
-            .filter(entry -> entry.getKey() != null && entry.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
-            .forEach(entry -> System.setProperty(entry.getKey(), entry.getValue() == null ? EMPTY_STRING : entry.getValue()));
+        // in particular for micronaut-openapi, they are restored once the processing is over
+        ProcessorOptionsSystemProperties.apply(processingEnv.getElementUtils(), processingEnv.getOptions());
 
         this.packageVisitors = new ArrayList<>(packageElementVisitors.size());
 
@@ -160,6 +157,17 @@ public sealed class PackageElementVisitorProcessor extends AbstractInjectAnnotat
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        ProcessorOptionsSystemProperties.acquire(this);
+        try {
+            return processRound(annotations, roundEnv);
+        } finally {
+            if (roundEnv.processingOver()) {
+                ProcessorOptionsSystemProperties.release(this);
+            }
+        }
+    }
+
+    private boolean processRound(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         javaVisitorContext.newRound();
         if (packageVisitors.isEmpty() || processingGeneratedAnnotation(annotations)) {
             return false;
