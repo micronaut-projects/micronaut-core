@@ -37,6 +37,7 @@ import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.python.processing.model.AttributeDef;
 import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.element.PythonGenericPlaceholderElement;
 import io.micronaut.python.processing.element.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.model.TypeRef;
 
@@ -182,6 +183,10 @@ public final class PythonTypeResolver {
         ElementAnnotationMetadata metadata = typeUseAnnotationMetadata(typeNode, decorators, visitorContext);
         if (metadata.isEmpty()) {
             return baseType;
+        }
+        if (baseType instanceof PythonGenericPlaceholderElement placeholder) {
+            // A type annotation on a type variable, such as Annotated[E, ...]: the annotated copy is still the type variable
+            return placeholder.withTypeUseAnnotationMetadata(metadata);
         }
         return TypeAnnotatedClassElement.of(baseType, metadata);
     }
