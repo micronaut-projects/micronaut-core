@@ -23,7 +23,9 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -45,6 +47,7 @@ public final class FormFieldFlows {
     /**
      * Take the first item of a publisher and map it. The publisher is cancelled once the item
      * arrived; the result is {@code null} when the publisher completes without an item.
+     * Cancelling the result cancels the publisher, like the future of a {@code Mono}.
      *
      * @param source The publisher
      * @param map    Maps the item, must not return {@code null}
@@ -53,8 +56,8 @@ public final class FormFieldFlows {
      * @return The result
      */
     public static <T, R> CompletableFuture<@Nullable R> first(Publisher<T> source, Function<? super T, ? extends R> map) {
-        CompletableFuture<@Nullable R> result = new CompletableFuture<>();
-        source.subscribe(new FirstSubscriber<T>(result) {
+        FirstFuture<@Nullable R> result = new FirstFuture<>();
+        subscribe(source, result, new FirstSubscriber<T>(result) {
             @Override
             void onFirst(T item) {
                 R mapped;
@@ -70,6 +73,11 @@ public final class FormFieldFlows {
             }
         });
         return result;
+    }
+
+    private static <T> void subscribe(Publisher<T> source, FirstFuture<?> result, FirstSubscriber<T> subscriber) {
+        result.subscriber = subscriber;
+        source.subscribe(subscriber);
     }
 
     /**
@@ -92,7 +100,8 @@ public final class FormFieldFlows {
      * Take the first item of a publisher, complete it with a flow, and map the value of the flow.
      * The publisher is cancelled once the item arrived; the result is {@code null} when the
      * publisher completes without an item, or the flow completes without a value, and the value
-     * is then not mapped.
+     * is then not mapped. Cancelling the result cancels the publisher, or the flow once the item
+     * arrived, like the future of a {@code Mono}.
      *
      * @param source   The publisher
      * @param complete Completes the item
@@ -105,8 +114,8 @@ public final class FormFieldFlows {
     public static <T, V, R> CompletableFuture<@Nullable R> firstFlatMap(Publisher<T> source,
                                                                        Function<? super T, ? extends ExecutionFlow<? extends V>> complete,
                                                                        Function<? super V, ? extends R> map) {
-        CompletableFuture<@Nullable R> result = new CompletableFuture<>();
-        source.subscribe(new FirstSubscriber<T>(result) {
+        FirstFuture<@Nullable R> result = new FirstFuture<>();
+        subscribe(source, result, new FirstSubscriber<T>(result) {
             @Override
             void onFirst(T item) {
                 ExecutionFlow<? extends V> flow;
@@ -134,6 +143,8 @@ public final class FormFieldFlows {
                         result.complete(mapped);
                     }
                 });
+                // observed first: a delayed flow refuses to be observed once it was cancelled
+                running(flow);
             }
         });
         return result;
@@ -164,12 +175,40 @@ public final class FormFieldFlows {
      */
     private abstract static class FirstSubscriber<T> implements Subscriber<T> {
         private final CompletableFuture<?> result;
-        @Nullable
-        private Subscription subscription;
-        private boolean done;
+        private final AtomicBoolean done = new AtomicBoolean();
+        private volatile @Nullable Subscription subscription;
+        private volatile @Nullable ExecutionFlow<?> running;
+        private volatile boolean cancelled;
 
         FirstSubscriber(CompletableFuture<?> result) {
             this.result = result;
+        }
+
+        /**
+         * The result was cancelled: the publisher, or the flow of the item, is cancelled. An item
+         * that arrives afterwards is closed.
+         */
+        final void cancelled() {
+            cancelled = true;
+            done.set(true);
+            Subscription s = subscription;
+            if (s != null) {
+                s.cancel();
+            }
+            ExecutionFlow<?> flow = running;
+            if (flow != null) {
+                flow.cancel();
+            }
+        }
+
+        /**
+         * @param flow The flow of the item, cancelled with the result
+         */
+        final void running(ExecutionFlow<?> flow) {
+            running = flow;
+            if (cancelled) {
+                flow.cancel();
+            }
         }
 
         /**
@@ -182,35 +221,57 @@ public final class FormFieldFlows {
         @Override
         public final void onSubscribe(Subscription s) {
             subscription = s;
+            if (cancelled) {
+                s.cancel();
+                return;
+            }
             s.request(Long.MAX_VALUE);
         }
 
         @Override
         public final void onNext(T item) {
-            if (done) {
+            if (!done.compareAndSet(false, true)) {
+                if (cancelled) {
+                    // nobody takes it
+                    close(item, new CancellationException("The result was cancelled"));
+                }
                 return;
             }
-            done = true;
             Objects.requireNonNull(subscription).cancel();
             onFirst(item);
         }
 
         @Override
         public final void onError(Throwable t) {
-            if (done) {
-                return;
+            if (done.compareAndSet(false, true)) {
+                result.completeExceptionally(t);
             }
-            done = true;
-            result.completeExceptionally(t);
         }
 
         @Override
         public final void onComplete() {
-            if (done) {
-                return;
+            if (done.compareAndSet(false, true)) {
+                result.complete(null);
             }
-            done = true;
-            result.complete(null);
+        }
+    }
+
+    /**
+     * The result of {@link #first} and {@link #firstFlatMap}: cancelling it cancels the reading.
+     *
+     * @param <R> The type of the result
+     */
+    private static final class FirstFuture<R> extends CompletableFuture<R> {
+        private volatile @Nullable FirstSubscriber<?> subscriber;
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            boolean cancelled = super.cancel(mayInterruptIfRunning);
+            FirstSubscriber<?> s = subscriber;
+            if (cancelled && s != null) {
+                s.cancelled();
+            }
+            return cancelled;
         }
     }
 

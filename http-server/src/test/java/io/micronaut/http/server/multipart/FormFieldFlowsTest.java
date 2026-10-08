@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -92,6 +93,72 @@ class FormFieldFlowsTest {
         source.next(item);
         assertTrue(result.isCompletedExceptionally());
         assertTrue(item.closed, "nobody took the item");
+    }
+
+    @Test
+    void cancellingTheResultOfFirstCancelsTheSource() {
+        Source<Item> source = new Source<>();
+        CompletableFuture<Integer> result = FormFieldFlows.first(source, item -> 1);
+        assertFalse(source.cancelled);
+        assertTrue(result.cancel(false));
+        assertTrue(source.cancelled, "like the future of a Mono");
+        // an item that arrives anyway is closed: nobody takes it
+        Item late = new Item();
+        source.next(late);
+        assertTrue(late.closed);
+        assertTrue(result.isCancelled());
+    }
+
+    @Test
+    void firstCancelledBeforeTheSubscriptionCancelsIt() {
+        AtomicReference<Subscriber<? super String>> subscriber = new AtomicReference<>();
+        Publisher<String> lazy = subscriber::set;
+        CompletableFuture<Integer> result = FormFieldFlows.first(lazy, String::length);
+        result.cancel(false);
+        AtomicBoolean cancelled = new AtomicBoolean();
+        AtomicLong requested = new AtomicLong();
+        subscriber.get().onSubscribe(new Subscription() {
+            @Override
+            public void request(long n) {
+                requested.addAndGet(n);
+            }
+
+            @Override
+            public void cancel() {
+                cancelled.set(true);
+            }
+        });
+        assertTrue(cancelled.get());
+        assertEquals(0, requested.get());
+    }
+
+    @Test
+    void cancellingTheResultOfFirstFlatMapCancelsTheFlow() {
+        Source<String> source = new Source<>();
+        DelayedExecutionFlow<Integer> flow = DelayedExecutionFlow.create();
+        AtomicBoolean flowCancelled = new AtomicBoolean();
+        flow.onCancel(() -> flowCancelled.set(true));
+        CompletableFuture<Integer> result = FormFieldFlows.firstFlatMap(source, s -> flow);
+        source.next("abc");
+        assertFalse(flowCancelled.get());
+        result.cancel(false);
+        assertTrue(flowCancelled.get(), "the flow of the item is cancelled");
+    }
+
+    @Test
+    void firstFlatMapCancelledWhileTheFlowStartsCancelsTheFlow() {
+        Source<String> source = new Source<>();
+        DelayedExecutionFlow<Integer> flow = DelayedExecutionFlow.create();
+        AtomicBoolean flowCancelled = new AtomicBoolean();
+        flow.onCancel(() -> flowCancelled.set(true));
+        AtomicReference<CompletableFuture<Integer>> result = new AtomicReference<>();
+        result.set(FormFieldFlows.firstFlatMap(source, s -> {
+            // cancelled after the item was taken, before its flow is known
+            result.get().cancel(false);
+            return flow;
+        }));
+        source.next("abc");
+        assertTrue(flowCancelled.get());
     }
 
     @Test
