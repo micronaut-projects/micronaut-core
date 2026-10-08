@@ -3,6 +3,7 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.scheduling.io.watch.FileWatcher;
+import io.micronaut.scheduling.io.watch.FileWatcherRegistration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -47,7 +48,7 @@ class DevFileWatcherTest {
             assertTrue(first.isRunning());
 
             // a restart closes what the retired generation registered; the new generation registers again
-            FileWatcher.Registration registration = registration(watching);
+            FileWatcherRegistration registration = registration(watching);
             assertTrue(registration.isActive());
             DevFileWatcher firstWatcher = (DevFileWatcher) first.getBean(FileWatcher.class);
             assertEquals(1, firstWatcher.openRegistrations());
@@ -111,9 +112,9 @@ class DevFileWatcherTest {
             @io.micronaut.context.annotation.Context
             public class Watching {
                 public final java.util.List<java.nio.file.Path> seen = new java.util.concurrent.CopyOnWriteArrayList<>();
-                public final io.micronaut.scheduling.io.watch.FileWatcher.Registration registration;
+                public final io.micronaut.scheduling.io.watch.FileWatcherRegistration registration;
                 public Watching(io.micronaut.scheduling.io.watch.FileWatcher watcher, @io.micronaut.context.annotation.Value("${app.watched}") String watched) {
-                    registration = watcher.watch(java.nio.file.Path.of(watched), batch -> batch.changes().forEach(change -> seen.add(change.path())));
+                    registration = watcher.directory(java.nio.file.Path.of(watched)).watch(batch -> batch.changes().forEach(change -> seen.add(change.path())));
                 }
             }
             """);
@@ -142,8 +143,8 @@ class DevFileWatcherTest {
         return (List<Path>) watching.getClass().getField("seen").get(watching);
     }
 
-    private static FileWatcher.Registration registration(Object watching) throws Exception {
-        return (FileWatcher.Registration) watching.getClass().getField("registration").get(watching);
+    private static FileWatcherRegistration registration(Object watching) throws Exception {
+        return (FileWatcherRegistration) watching.getClass().getField("registration").get(watching);
     }
 
     private static void awaitSeen(Object watching, Path file) throws Exception {

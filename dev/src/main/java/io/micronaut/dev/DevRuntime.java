@@ -58,7 +58,7 @@ import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
-import io.micronaut.scheduling.io.watch.FileWatcher;
+import io.micronaut.scheduling.io.watch.FileWatcherRegistration;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -166,7 +166,7 @@ public final class DevRuntime implements Closeable {
      */
     private volatile boolean startFailed;
     private @Nullable DirectoryWatcher watcher;
-    private final Map<Path, FileWatcher.Registration> pinnedWatches = new ConcurrentHashMap<>();
+    private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private @Nullable LiveReloadServer liveReload;
     private @Nullable Instrumentation instrumentation;
     private volatile int redefinitions;
@@ -432,7 +432,7 @@ public final class DevRuntime implements Closeable {
     /**
      * @return The directories outside the roots that a context's file watcher bean registered, kept watched for the process
      */
-    Map<Path, FileWatcher.Registration> pinnedWatches() {
+    Map<Path, FileWatcherRegistration> pinnedWatches() {
         return pinnedWatches;
     }
 
