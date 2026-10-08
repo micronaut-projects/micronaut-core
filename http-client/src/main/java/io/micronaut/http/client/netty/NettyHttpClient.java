@@ -1099,7 +1099,7 @@ final class NettyHttpClient implements
         // the target is resolved when connect is called, the connection made for each subscription
         return toMono(resolveRequestURI(request), propagatedContext).flux()
             .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
-                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null)));
+                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null, false)));
     }
 
     @Override
@@ -1109,7 +1109,7 @@ final class NettyHttpClient implements
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return toMono(resolveRequestURI(request), propagatedContext).flux()
             .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
-                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean)));
+                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean, false)));
     }
 
     @Override
@@ -1129,7 +1129,7 @@ final class NettyHttpClient implements
     <T extends AutoCloseable> ExecutionFlow<NettyWebSocketClientHandler<T>> connectFlow(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
         setupConversionService(request);
         return resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null));
+            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null, true));
     }
 
     /**
@@ -1145,7 +1145,7 @@ final class NettyHttpClient implements
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
         MutableHttpRequest<Object> request = webSocketRequest(webSocketBean, parameters);
         return resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean));
+            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean, true));
     }
 
     private static MutableHttpRequest<Object> webSocketRequest(WebSocketBean<?> webSocketBean, Map<String, Object> parameters) {
@@ -1213,10 +1213,11 @@ final class NettyHttpClient implements
                                                                              @Nullable LoadBalancerSelection selection,
                                                                              MutableHttpRequest<?> request,
                                                                              Class<T> clientEndpointType,
-                                                                             @Nullable WebSocketBean<T> webSocketBean) {
+                                                                             @Nullable WebSocketBean<T> webSocketBean,
+                                                                             boolean awaitCompletionStages) {
         ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
         try {
-            flow = connectWebSocket(uri, request, clientEndpointType, webSocketBean);
+            flow = connectWebSocket(uri, request, clientEndpointType, webSocketBean, awaitCompletionStages);
         } catch (RuntimeException e) {
             releaseSelection(selection);
             throw e;
@@ -1249,7 +1250,7 @@ final class NettyHttpClient implements
         });
     }
 
-    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
+    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean, boolean awaitCompletionStages) {
         RequestKey requestKey;
         try {
             requestKey = new RequestKey(this, uri);
@@ -1294,6 +1295,10 @@ final class NettyHttpClient implements
             // by default the handshake response is awaited without a limit, as before
             configuration.getHandshakeTimeout().orElse(null));
 
+        if (awaitCompletionStages) {
+            // the async client awaits the stages of the handlers, the reactive one as before
+            handler.awaitCompletionStages();
+        }
         if (!isRunning()) {
             return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
         }

@@ -77,6 +77,8 @@ webSocketClient.connect(ChatClientWebSocket.class, "/chat/football/fred")
 
 Each call connects once. Cancelling the future of the stage before the connection is established, or completing it otherwise, for example with `orTimeout`, aborts the connect; an endpoint that connects after that is closed. The stage may complete on an event loop thread, so its continuations must not block. They run with the propagated context of the caller of `connect`.
 
+With the `AsyncWebSocketClient` of the Netty client, a `CompletionStage` returned by an `@OnOpen` or `@OnMessage` method of the endpoint is awaited like a returned `Publisher`: the stage of `connect` completes once the stage of `@OnOpen` completed, and a failed stage reaches the `@OnError` method. The messages are still handled as they are read: the next message does not wait for the stage of the previous one. The stage of an `@OnClose` or `@OnError` method does not hold the close back. The reactive `WebSocketClient` treats such a stage as a plain value, as before.
+
 The injected client, and the one returned by `toAsyncWebSocket()`, are views of the underlying HTTP client: closing them closes that client, which is shared with the other injection points of the same client. Outside of an application use `AsyncWebSocketClient.create(uri)`, and close the client once done.
 
 [TIP]

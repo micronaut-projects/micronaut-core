@@ -24,6 +24,7 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -72,6 +73,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -297,11 +299,36 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         } catch (Exception e) {
             return ExecutionFlow.error(e);
         }
+        if (result instanceof CompletionStage<?> stage && awaitsCompletionStages()) {
+            if (webSocketBean.closeMethod().orElse(null) == messageHandler || webSocketBean.errorMethod().orElse(null) == messageHandler) {
+                // the close does not wait for the stage of a close or error handler
+                stage.whenComplete((ignored, error) -> {
+                    if (error != null && LOG.isErrorEnabled()) {
+                        LOG.error("Error of the stage of the handler {} of WebSocket bean [{}]: {}", messageHandler.getExecutableMethod(), webSocketBean.getTarget(), error.getMessage(), error);
+                    }
+                });
+                return ExecutionFlow.just(stage);
+            }
+            // the handler is done once its stage completes, as for a publisher
+            return CompletableFutureExecutionFlow.just(stage);
+        }
         if (Publishers.isConvertibleToPublisher(result)) {
             return ReactiveExecutionFlow.fromPublisherEager(Publishers.convertToPublisher(conversionService, result), PropagatedContext.getOrEmpty());
         } else {
             return ExecutionFlow.just(result);
         }
+    }
+
+    /**
+     * Whether the {@link CompletionStage} a handler returns is awaited like a publisher: the open
+     * or message handler is done, and fails, with its stage. Otherwise the stage is a value of the
+     * handler, as before 5.3.
+     *
+     * @return Whether the stages of the handlers are awaited. {@code false} by default
+     * @since 5.3.0
+     */
+    protected boolean awaitsCompletionStages() {
+        return false;
     }
 
     @Override
