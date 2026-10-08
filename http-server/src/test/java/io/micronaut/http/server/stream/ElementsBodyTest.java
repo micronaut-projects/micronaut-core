@@ -18,6 +18,7 @@ package io.micronaut.http.server.stream;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -289,6 +290,49 @@ class ElementsBodyTest {
             throw new IllegalStateException("cannot close");
         });
         assertDoesNotThrow(() -> ResponseStreams.discard(elements));
+    }
+
+    @Test
+    void cancellingTheBodyBeforeTheFirstElementClosesTheElements() {
+        CompletableFuture<Optional<String>> pending = new CompletableFuture<>();
+        AtomicBoolean closed = new AtomicBoolean();
+        Encoder encoder = new Encoder();
+        ExecutionFlow<CloseableByteBody> flow = ResponseStreams.stream(FACTORY, BodyElements.of(() -> pending, () -> closed.set(true)), encoder, 1024);
+        assertFalse(closed.get());
+        flow.cancel();
+        assertTrue(closed.get(), "nobody takes the body: the elements are closed");
+        assertTrue(encoder.closed.get());
+        // an element that arrives afterwards is not sent
+        assertDoesNotThrow(() -> pending.complete(Optional.of("late")));
+    }
+
+    @Test
+    void theElementsAreClosedOnTheExecutorWhenTheStreamClosesOnAnEventLoop() throws Exception {
+        ByteBodyFactory eventLoop = new ByteBodyFactory(ByteArrayBufferFactory.INSTANCE, ReadBufferFactory.getJdkFactory()) {
+            @Override
+            public boolean isEventLoopThread() {
+                return true;
+            }
+        };
+        AtomicReference<Thread> closedOn = new AtomicReference<>();
+        List<Runnable> tasks = new ArrayList<>();
+        BodyElements<String> elements = BodyElements.of(() -> CompletableFuture.completedFuture(Optional.empty()), () -> closedOn.set(Thread.currentThread()));
+        Consumer consumer = new Consumer(true);
+        consumer.subscribe(ResponseStreams.stream(eventLoop, elements, new Encoder(), 1024, tasks::add));
+        assertTrue(consumer.complete);
+        assertNull(closedOn.get(), "not closed on the event loop");
+        assertEquals(1, tasks.size());
+        tasks.getFirst().run();
+        assertSame(Thread.currentThread(), closedOn.get());
+    }
+
+    @Test
+    void elementsAreClosedOnTheClosingThreadOffAnEventLoop() {
+        AtomicBoolean closed = new AtomicBoolean();
+        List<Runnable> tasks = new ArrayList<>();
+        ResponseStreams.discard(BodyElements.of(() -> CompletableFuture.completedFuture(Optional.empty()), () -> closed.set(true)), FACTORY, tasks::add);
+        assertTrue(closed.get());
+        assertTrue(tasks.isEmpty());
     }
 
     private static Throwable firstFailure(BodyElements<?> elements, Encoder encoder) {

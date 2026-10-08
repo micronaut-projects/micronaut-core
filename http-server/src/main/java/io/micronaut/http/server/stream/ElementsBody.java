@@ -30,8 +30,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -55,7 +57,17 @@ final class ElementsBody {
     private final ByteBodyFactory factory;
     private final int highWaterMark;
     private final PropagatedContext context;
+    /**
+     * Runs the close of the elements when the stream closes on an event loop, or {@code null} to
+     * close them on the closing thread.
+     */
+    private final @Nullable Executor closeExecutor;
     private final DelayedExecutionFlow<CloseableByteBody> firstElement = DelayedExecutionFlow.create();
+    /**
+     * Whether the first element (or the end, or a failure) was answered, or the answer was
+     * cancelled: whichever comes first decides what happens to the body.
+     */
+    private final AtomicBoolean answered = new AtomicBoolean();
     /**
      * Whether a pull loop runs or an element is on its way.
      */
@@ -78,8 +90,9 @@ final class ElementsBody {
      */
     private boolean first = true;
 
-    private ElementsBody(ByteBodyFactory factory, BodyElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
+    private ElementsBody(ByteBodyFactory factory, BodyElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark, @Nullable Executor closeExecutor) {
         this.factory = factory;
+        this.closeExecutor = closeExecutor;
         this.highWaterMark = highWaterMark;
         this.elements = elements;
         this.encoder = encoder;
@@ -99,12 +112,25 @@ final class ElementsBody {
      * @param elements      The elements
      * @param encoder       Encodes the elements
      * @param highWaterMark The high-water mark of the stream
+     * @param closeExecutor Closes the elements when the stream closes on an event loop, or
+     *                      {@code null} to close them on the closing thread
      * @return Completes with the body once the first element or the end is available, or
-     * exceptionally if the first element fails
+     * exceptionally if the first element fails. Cancelling it before closes the elements
      */
-    static ExecutionFlow<CloseableByteBody> start(ByteBodyFactory factory, BodyElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark) {
-        ElementsBody body = new ElementsBody(factory, elements, encoder, highWaterMark);
+    static ExecutionFlow<CloseableByteBody> start(ByteBodyFactory factory, BodyElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark, @Nullable Executor closeExecutor) {
+        ElementsBody body;
+        try {
+            body = new ElementsBody(factory, elements, encoder, highWaterMark, closeExecutor);
+        } catch (Throwable e) {
+            try {
+                encoder.close();
+            } finally {
+                ResponseStreams.discard(elements);
+            }
+            throw e;
+        }
         body.stream.onClose(ignored -> body.close());
+        body.firstElement.onCancel(body::cancelled);
         body.stream.onDemand(body::pull);
         body.pull();
         return body.firstElement;
@@ -236,7 +262,9 @@ final class ElementsBody {
     private void respond() {
         if (first) {
             first = false;
-            firstElement.complete(stream.body());
+            if (answered.compareAndSet(false, true)) {
+                firstElement.complete(stream.body());
+            }
         }
     }
 
@@ -244,10 +272,22 @@ final class ElementsBody {
         if (first) {
             // nothing was sent: the error is answered like an error of the route
             first = false;
-            stream.abandon(error);
-            firstElement.completeExceptionally(error);
+            if (answered.compareAndSet(false, true)) {
+                stream.abandon(error);
+                firstElement.completeExceptionally(error);
+            }
         } else {
             stream.fail(error);
+        }
+    }
+
+    /**
+     * Nobody waits for the body anymore: the response was cancelled before the first element.
+     * The stream is abandoned, which closes the elements.
+     */
+    private void cancelled() {
+        if (answered.compareAndSet(false, true)) {
+            stream.abandon(new CancellationException("The response was cancelled before its first element"));
         }
     }
 
@@ -260,7 +300,8 @@ final class ElementsBody {
             try {
                 encoder.close();
             } finally {
-                ResponseStreams.discard(elements);
+                // a cursor may block while it closes: not on the event loop
+                ResponseStreams.discard(elements, factory, closeExecutor);
             }
         }
     }
