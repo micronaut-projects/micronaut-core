@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Send an event, and suspend until its stage completes: [SseEmitter.sendAndAwait] without
- * blocking the thread.
+ * Send an event, and suspend until its stage completes, which paces the coroutine to the client
+ * without blocking the thread.
  *
  * @param event The event
  * @since 5.3.0
@@ -39,8 +39,8 @@ suspend fun SseEmitter.sendAwait(event: Event<*>) {
 }
 
 /**
- * Send an event with the given data, and suspend until its stage completes: [SseEmitter.sendAndAwait]
- * without blocking the thread.
+ * Send an event with the given data, and suspend until its stage completes, which paces the
+ * coroutine to the client without blocking the thread.
  *
  * @param data The data of the event, or an [Event]
  * @since 5.3.0
