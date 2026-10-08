@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.body.stream;
 
+import io.micronaut.core.annotation.Internal;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -89,6 +90,7 @@ class ReactorInteropTest {
         assertEquals(1, completed.get());
     }
 
+    @Internal
     private static final class ReactorHidingClassLoader extends URLClassLoader {
         private ReactorHidingClassLoader() {
             super(new URL[]{ReactorInterop.class.getProtectionDomain().getCodeSource().getLocation()},
