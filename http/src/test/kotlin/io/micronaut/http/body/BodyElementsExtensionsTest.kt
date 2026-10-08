@@ -74,12 +74,22 @@ class BodyElementsExtensionsTest {
 
     @Test
     fun anElementTheServerDoesNotTakeIsClosed() {
+        assertUndeliveredElementIsClosed(failingClose = false)
+    }
+
+    @Test
+    fun anElementThatFailsToCloseIsDiscardedQuietly() {
+        // the failure is logged: the stream of the flow is not affected
+        assertUndeliveredElementIsClosed(failingClose = true)
+    }
+
+    private fun assertUndeliveredElementIsClosed(failingClose: Boolean) {
         val emitted = mutableListOf<Element>()
         val second = CompletableDeferred<Unit>()
         val elements = flow {
             var n = 0
             while (true) {
-                val element = Element()
+                val element = Element(failingClose)
                 synchronized(emitted) { emitted.add(element) }
                 if (n++ == 1) {
                     second.complete(Unit)
@@ -101,12 +111,15 @@ class BodyElementsExtensionsTest {
         assertTrue(!first.closed, "the delivered element belongs to the caller")
     }
 
-    class Element : AutoCloseable {
+    class Element(private val failingClose: Boolean) : AutoCloseable {
         @Volatile
         var closed = false
 
         override fun close() {
             closed = true
+            if (failingClose) {
+                throw java.io.IOException("cannot close")
+            }
         }
     }
 }

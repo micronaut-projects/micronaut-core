@@ -118,17 +118,7 @@ final class ElementsBody {
      * exceptionally if the first element fails. Cancelling it before closes the elements
      */
     static ExecutionFlow<CloseableByteBody> start(ByteBodyFactory factory, BodyElements<?> elements, ResponseStreams.ElementEncoder encoder, int highWaterMark, @Nullable Executor closeExecutor) {
-        ElementsBody body;
-        try {
-            body = new ElementsBody(factory, elements, encoder, highWaterMark, closeExecutor);
-        } catch (Throwable e) {
-            try {
-                encoder.close();
-            } finally {
-                ResponseStreams.discard(elements);
-            }
-            throw e;
-        }
+        ElementsBody body = new ElementsBody(factory, elements, encoder, highWaterMark, closeExecutor);
         body.stream.onClose(ignored -> body.close());
         body.firstElement.onCancel(body::cancelled);
         body.stream.onDemand(body::pull);

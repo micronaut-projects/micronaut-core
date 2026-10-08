@@ -40,7 +40,6 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyWriter;
@@ -54,7 +53,6 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.ReactiveFilterChainElement;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
-import io.micronaut.http.server.binding.ServerRequestBody;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.multipart.FormFactory;
@@ -813,12 +811,7 @@ public final class RouteExecutor {
      * @param elements The elements
      */
     void discardElements(HttpRequest<?> request, BodyElements<?> elements) {
-        ServerHttpRequest<?> server = ServerRequestBody.of(request);
-        if (server == null) {
-            ResponseStreams.discard(elements);
-        } else {
-            ResponseStreams.discard(elements, server.byteBodyFactory(), blockingExecutor.get());
-        }
+        ResponseStreams.discard(elements, request, blockingExecutor.get());
     }
 
     private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {

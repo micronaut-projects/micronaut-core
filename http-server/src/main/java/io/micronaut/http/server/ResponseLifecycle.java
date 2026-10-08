@@ -341,19 +341,17 @@ public abstract class ResponseLifecycle {
                                                                                    MutableHttpResponse<?> response,
                                                                                    BodyElements<?> elements,
                                                                                    @Nullable RouteInfo<Object> routeInfo) {
-        ResponseStreams.ElementEncoder encoder;
-        int highWaterMark;
         try {
-            encoder = elementEncoder(request, response, routeInfo);
-            highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
-        } catch (Throwable e) {
-            // nothing streams the elements
+            ResponseStreams.ElementEncoder encoder = elementEncoder(request, response, routeInfo);
+            int highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
+            // closing the elements may block, e.g. a database cursor: not on the event loop
+            return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark, ioExecutor())
+                .map(body -> ByteBodyHttpResponseWrapper.wrap(response, body));
+        } catch (RuntimeException e) {
+            // nothing streams the elements. The encoder holds nothing before its first element
             ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
             return ExecutionFlow.error(e);
         }
-        // closing the elements may block, e.g. a database cursor: not on the event loop
-        return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark, ioExecutor())
-            .map(body -> ByteBodyHttpResponseWrapper.wrap(response, body));
     }
 
     /**

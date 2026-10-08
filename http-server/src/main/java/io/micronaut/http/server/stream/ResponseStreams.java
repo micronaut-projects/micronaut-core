@@ -19,9 +19,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.server.binding.ServerRequestBody;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +79,8 @@ public final class ResponseStreams {
      *                      close them on the closing thread
      * @return Completes with the body once the first element (or the end) is available, or
      * exceptionally if producing or encoding the first element failed: nothing was sent then
+     * @throws IllegalArgumentException if the high-water mark is not positive: the caller closes
+     * the elements then
      */
     public static ExecutionFlow<CloseableByteBody> stream(ByteBodyFactory factory,
                                                           BodyElements<?> elements,
@@ -116,6 +121,24 @@ public final class ResponseStreams {
             }
         }
         discard(elements);
+    }
+
+    /**
+     * Close the elements of the response to a request like
+     * {@link #discard(BodyElements, ByteBodyFactory, Executor)}, with the body factory of the server
+     * request, or on this thread if the request is none.
+     *
+     * @param elements The elements
+     * @param request  The request
+     * @param executor The executor that may block, or {@code null} to close them on this thread
+     */
+    public static void discard(BodyElements<?> elements, HttpRequest<?> request, @Nullable Executor executor) {
+        ServerHttpRequest<?> server = ServerRequestBody.of(request);
+        if (server == null) {
+            discard(elements);
+        } else {
+            discard(elements, server.byteBodyFactory(), executor);
+        }
     }
 
     /**
