@@ -33,6 +33,11 @@ import java.io.IOException;
  * it is read: a reader that pulls one element at a time decodes nothing ahead of its caller, and
  * holds the bytes of the elements it has not polled yet.</p>
  *
+ * <p>An element that {@link #poll()} returns is handed over to the caller: an element that holds
+ * resources, e.g. a reference counted buffer, is released by the caller. The reader releases the
+ * pieces it was fed, and, when it is {@link #close() closed}, the bytes of the elements it holds
+ * that were not polled.</p>
+ *
  * <p>The methods are called one at a time, never concurrently.</p>
  *
  * @param <T> The type of an element
