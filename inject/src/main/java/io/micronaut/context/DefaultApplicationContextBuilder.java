@@ -73,7 +73,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Boolean deduceEnvironments = null;
     private boolean deducePackage = true;
     private boolean deduceCloudEnvironment = false;
-    private ClassLoader classLoader = getClass().getClassLoader();
+    private final ClassLoader defaultClassLoader = getClass().getClassLoader();
+    private ClassLoader classLoader = defaultClassLoader;
     private boolean explicitClassLoader = false;
     private boolean envPropertySource = true;
     private final List<String> envVarIncludes = new ArrayList<>();
@@ -429,9 +430,10 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             // before it builds, so the configurers of that loader are found as well
             // Only a loader that sees the default one's classes is adopted: the default loader itself or one of its
             // descendants, never a parent, which would lose the classes only the default loader sees
+            // The default loader, not the one an earlier mainClass(...) call adopted, decides: the last main class wins
             ClassLoader mainClassLoader = mainClass.getClassLoader();
-            if (!explicitClassLoader && mainClassLoader != null && delegatesTo(mainClassLoader, this.classLoader)) {
-                this.classLoader = mainClassLoader;
+            if (!explicitClassLoader) {
+                this.classLoader = mainClassLoader != null && delegatesTo(mainClassLoader, defaultClassLoader) ? mainClassLoader : defaultClassLoader;
             }
             String name = mainClass.getPackage().getName();
             if (StringUtils.isNotEmpty(name)) {

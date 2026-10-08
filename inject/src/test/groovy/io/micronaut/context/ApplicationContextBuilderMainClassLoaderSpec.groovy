@@ -58,6 +58,23 @@ class ApplicationContextBuilderMainClassLoaderSpec extends Specification {
 
     }
 
+    void "the last main class decides the loader, each checked against the default loader"() {
+        given: "main classes of two sibling children of the default loader"
+        GroovyClassLoader first = new GroovyClassLoader(getClass().classLoader)
+        GroovyClassLoader second = new GroovyClassLoader(getClass().classLoader)
+        Class<?> firstMain = first.parseClass('package example.first; class Application {}')
+        Class<?> secondMain = second.parseClass('package example.second; class Application {}')
+
+        expect:
+        ApplicationContext.builder().mainClass(firstMain).mainClass(secondMain).classLoader == secondMain.classLoader
+        secondMain.classLoader != firstMain.classLoader
+        ApplicationContext.builder().mainClass(firstMain).mainClass(java.sql.Driver).classLoader == ApplicationContext.classLoader
+
+        cleanup:
+        first.close()
+        second.close()
+    }
+
     private static boolean isAncestor(ClassLoader ancestor, ClassLoader loader) {
         for (ClassLoader current = loader; current != null; current = current.parent) {
             if (current.is(ancestor)) {
