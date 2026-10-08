@@ -17,7 +17,6 @@ package io.micronaut.http.server.binding;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -40,7 +39,7 @@ import java.util.Optional;
  */
 @Internal
 @Singleton
-@Primary
+@io.micronaut.core.annotation.Order(100) // Preserve precedence of custom and generic registries.
 public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRegistry {
 
     private final DefaultRequestBinderRegistry internalRequestBinderRegistry;

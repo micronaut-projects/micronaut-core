@@ -44,6 +44,41 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 /** The legacy Netty registry bean and the lifecycle use the same mutable shared registry. */
 class SharedBinderRegistryTest {
     @Test
+    void customRegistryRetainsItsSelectionPrecedence() {
+        try (ApplicationContext context = ApplicationContext.run(java.util.Map.of("spec.name", "custom-registry"))) {
+            assertInstanceOf(CustomRegistry.class, context.getBean(io.micronaut.http.bind.ServerRequestBinderRegistry.class));
+            assertInstanceOf(CustomRegistry.class, context.getBean(RequestArgumentSatisfier.class).getBinderRegistry());
+        }
+    }
+
+    @Test
+    void customPrimaryRegistryDoesNotCompeteWithTheSharedDefault() {
+        try (ApplicationContext context = ApplicationContext.run(java.util.Map.of("spec.name", "primary-registry"))) {
+            assertInstanceOf(PrimaryRegistry.class, context.getBean(io.micronaut.http.bind.ServerRequestBinderRegistry.class));
+        }
+    }
+
+    @Internal
+    @jakarta.inject.Singleton
+    @io.micronaut.context.annotation.Requires(property = "spec.name", value = "custom-registry")
+    @io.micronaut.core.annotation.Order(-1000)
+    static class CustomRegistry extends io.micronaut.http.bind.DefaultRequestBinderRegistry implements io.micronaut.http.bind.ServerRequestBinderRegistry {
+        CustomRegistry(io.micronaut.core.convert.ConversionService conversionService) {
+            super(conversionService);
+        }
+    }
+
+    @Internal
+    @jakarta.inject.Singleton
+    @io.micronaut.context.annotation.Primary
+    @io.micronaut.context.annotation.Requires(property = "spec.name", value = "primary-registry")
+    static class PrimaryRegistry extends io.micronaut.http.bind.DefaultRequestBinderRegistry implements io.micronaut.http.bind.ServerRequestBinderRegistry {
+        PrimaryRegistry(io.micronaut.core.convert.ConversionService conversionService) {
+            super(conversionService);
+        }
+    }
+
+    @Test
     void nettyAdapterRetainsTheSharedFormCapabilityForOtherTransports() {
         try (ApplicationContext context = ApplicationContext.run(); FormRequest request = new FormRequest()) {
             var binder = context.getBean(NettyBodyAnnotationBinder.class);
@@ -55,7 +90,7 @@ class SharedBinderRegistryTest {
     @Test
     void registeringThroughTheLegacyBeanAffectsTheLifecycle() {
         try (ApplicationContext context = ApplicationContext.run()) {
-            RequestBinderRegistry shared = context.getBean(RequestBinderRegistry.class);
+            RequestBinderRegistry shared = context.getBean(io.micronaut.http.bind.ServerRequestBinderRegistry.class);
             assertInstanceOf(DefaultServerRequestBinderRegistry.class, shared);
             NettyServerRequestBinderRegistry legacy = context.getBean(NettyServerRequestBinderRegistry.class);
             TypedRequestArgumentBinder<Marker> binder = new TypedRequestArgumentBinder<>() {

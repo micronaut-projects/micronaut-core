@@ -42,7 +42,7 @@ import jakarta.inject.Singleton;
  */
 @Internal
 @Singleton
-@Order(100)
+@Order(200)
 @Deprecated(since = "5.3.0", forRemoval = true)
 public final class NettyServerRequestBinderRegistry implements ServerRequestBinderRegistry {
     private final DefaultServerRequestBinderRegistry delegate;

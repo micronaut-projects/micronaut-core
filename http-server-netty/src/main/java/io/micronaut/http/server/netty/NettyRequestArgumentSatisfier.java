@@ -26,6 +26,11 @@ import jakarta.inject.Singleton;
 @Singleton
 @Internal
 final class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
+    @jakarta.inject.Inject
+    NettyRequestArgumentSatisfier(io.micronaut.http.bind.ServerRequestBinderRegistry requestBinderRegistry) {
+        super(requestBinderRegistry);
+    }
+
     NettyRequestArgumentSatisfier(NettyServerRequestBinderRegistry requestBinderRegistry) {
         super(requestBinderRegistry);
     }
