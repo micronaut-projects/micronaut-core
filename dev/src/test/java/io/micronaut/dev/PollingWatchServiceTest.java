@@ -2,7 +2,6 @@ package io.micronaut.dev;
 
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
-import io.micronaut.scheduling.io.watch.WatchOptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -78,7 +77,7 @@ class PollingWatchServiceTest {
             .quietPeriod(Duration.ofMillis(50))
             .build()
             .start()) {
-            watcher.watch(directory, WatchOptions.DEFAULT, batches::add);
+            watcher.directory(directory).watch(batches::add);
             Path nested = Files.createDirectories(directory.resolve("pkg"));
             Files.writeString(nested.resolve("module.py"), "x");
             Path changed = directory.resolve("pkg").resolve("module.py").toAbsolutePath().normalize();

@@ -61,7 +61,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
         boolean mac = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
         if (mac && NativeImageUtils.inImageRuntimeCode()) {
             PollingWatchService polling = new PollingWatchService(java.time.Duration.ofMillis(NATIVE_POLL_MILLIS));
-            return new DevWatchService(polling, (directory, service) -> polling.register(directory), null);
+            return new DevWatchService(polling, (directory, service) -> polling.register(directory), true);
         }
         if (mac && ClassUtils.isPresent(MAC_SERVICE, loader)) {
             try {
