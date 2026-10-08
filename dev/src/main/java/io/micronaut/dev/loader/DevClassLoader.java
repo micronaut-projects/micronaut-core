@@ -16,7 +16,7 @@
 package io.micronaut.dev.loader;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.beans.BeanIntrospector;
+import io.micronaut.core.beans.ReloadableBeanIntrospector;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -125,9 +125,10 @@ public final class DevClassLoader extends ClassLoader {
         GenerationClassLoader previous = current;
         current = snapshot(previous.generation() + 1, roots);
         retired.add(new WeakReference<>(previous));
-        MicronautMetaServiceLoaderUtils.invalidate(this);
-        MicronautMetaServiceLoaderUtils.invalidate(previous);
-        BeanIntrospector.SHARED.invalidate();
+        MicronautMetaServiceLoaderUtils.invalidate();
+        // this loader now delegates to another generation, and the retired one is gone for good
+        ReloadableBeanIntrospector.invalidateShared(this);
+        ReloadableBeanIntrospector.invalidateShared(previous);
         return previous;
     }
 

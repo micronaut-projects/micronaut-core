@@ -53,7 +53,7 @@ import java.util.Properties;
  * <pre>
  * micronaut.dev.main-class=example.Application
  * micronaut.dev.project-dir=.
- * micronaut.dev.strategy=auto
+ * micronaut.dev.strategy=restart
  * micronaut.dev.runtime-classpath=@runtime.argfile
  * micronaut.dev.reloadable=build/classes/java/main,build/resources/main
  * micronaut.dev.compile-classpath=@compile.argfile
@@ -116,7 +116,7 @@ public final class DevManifest {
         this.directory = directory;
         this.mainClass = require(properties, "main-class");
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
-        this.strategy = ReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
+        this.strategy = ReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "restart").trim().toUpperCase(Locale.ROOT));
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
         this.reloadableRoots = paths(directory, require(properties, "reloadable"));
         this.compileClasspath = paths(directory, properties.getProperty(PREFIX + "compile-classpath", ""));

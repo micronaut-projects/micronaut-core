@@ -96,7 +96,7 @@ class DevManifestSpec extends Specification {
         DevManifest manifest = DevManifest.of(dir, properties)
 
         then:
-        manifest.strategy() == ReloadStrategy.AUTO
+        manifest.strategy() == ReloadStrategy.RESTART
         manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
         manifest.liveReload().isEnabled(true)
         !manifest.liveReload().isEnabled(false)
