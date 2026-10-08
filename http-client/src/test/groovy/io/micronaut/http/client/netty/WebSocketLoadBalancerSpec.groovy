@@ -17,18 +17,59 @@ import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The outcome of a websocket connect is reported to the load balancer that selected the instance.
+ * A websocket connect and the load balancer that selects its instance.
  */
 class WebSocketLoadBalancerSpec extends Specification {
 
-    void 'a handshake that succeeds is reported as a success'() {
+    void 'the reactive connect selects the instance when it is called, as before'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        def balancer = new RecordingLoadBalancer(URI.create('http://127.0.0.1:1'))
+        def client = client(ctx, balancer, new DefaultHttpClientConfiguration())
+
+        when: 'connect is called without a subscription'
+        client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')
+
+        then:
+        balancer.selections.get() == 1
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
+    void 'by default a handshake that succeeds only releases the selection'() {
         given:
         def server = new WebSocketConnectCancelSpec.RawWebSocketServer(true)
         def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
         def balancer = new RecordingLoadBalancer(server.uri)
         def client = client(ctx, balancer, new DefaultHttpClientConfiguration())
+
+        when:
+        def endpoint = Mono.from(client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')).block(Duration.ofSeconds(10))
+
+        then:
+        endpoint != null
+        balancer.outcomes == [LoadBalancer.Outcome.CANCELLED]
+
+        cleanup:
+        endpoint?.close()
+        client?.close()
+        ctx?.close()
+        server?.close()
+    }
+
+    void 'with report-handshake-outcome a handshake that succeeds is reported as a success'() {
+        given:
+        def server = new WebSocketConnectCancelSpec.RawWebSocketServer(true)
+        def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        def balancer = new RecordingLoadBalancer(server.uri)
+        def configuration = new DefaultHttpClientConfiguration()
+        configuration.reportHandshakeOutcome = true
+        def client = client(ctx, balancer, configuration)
 
         when:
         def endpoint = Mono.from(client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')).block(Duration.ofSeconds(10))
@@ -44,13 +85,14 @@ class WebSocketLoadBalancerSpec extends Specification {
         server?.close()
     }
 
-    void 'a handshake read timeout is reported as a timeout and carries the service id'() {
+    void 'a handshake timeout carries the service id, and is reported as a timeout with report-handshake-outcome #report'() {
         given:
         def server = new WebSocketConnectCancelSpec.RawWebSocketServer(false)
         def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
         def balancer = new RecordingLoadBalancer(server.uri)
         def configuration = new DefaultHttpClientConfiguration()
-        configuration.readTimeout = Duration.ofSeconds(1)
+        configuration.handshakeTimeout = Duration.ofSeconds(1)
+        configuration.reportHandshakeOutcome = report
         def client = client(ctx, balancer, configuration)
 
         when:
@@ -60,12 +102,17 @@ class WebSocketLoadBalancerSpec extends Specification {
         ExecutionException e = thrown()
         e.cause instanceof ReadTimeoutException
         ((ReadTimeoutException) e.cause).serviceId == 'raw'
-        balancer.outcomes == [LoadBalancer.Outcome.TIMEOUT]
+        balancer.outcomes == [outcome]
 
         cleanup:
         client?.close()
         ctx?.close()
         server?.close()
+
+        where:
+        report | outcome
+        false  | LoadBalancer.Outcome.CANCELLED
+        true   | LoadBalancer.Outcome.TIMEOUT
     }
 
     void 'a cancelled connect releases the selection'() {
@@ -101,6 +148,7 @@ class WebSocketLoadBalancerSpec extends Specification {
 
     static class RecordingLoadBalancer implements LoadBalancer {
         final List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>()
+        final AtomicInteger selections = new AtomicInteger()
         final ServiceInstance instance
 
         RecordingLoadBalancer(URI uri) {
@@ -109,7 +157,10 @@ class WebSocketLoadBalancerSpec extends Specification {
 
         @Override
         Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-            return Mono.just(instance)
+            return Mono.fromSupplier {
+                selections.incrementAndGet()
+                instance
+            }
         }
 
         @Override

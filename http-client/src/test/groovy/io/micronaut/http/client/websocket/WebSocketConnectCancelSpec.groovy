@@ -95,12 +95,37 @@ class WebSocketConnectCancelSpec extends Specification {
         server?.close()
     }
 
-    void 'the handshake fails with the read timeout when the server never answers the upgrade'() {
+    void 'by default the handshake waits without a limit, whatever the read timeout'() {
         given:
         RawWebSocketServer server = new RawWebSocketServer(false)
         ApplicationContext ctx = ApplicationContext.run([
                 'spec.name'                        : 'WebSocketConnectCancelSpec',
-                'micronaut.http.client.read-timeout': '1s'
+                'micronaut.http.client.read-timeout': '500ms'
+        ])
+        WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
+
+        when:
+        CompletableFuture<CancelClient> future = Mono.from(client.connect(CancelClient, '/ws')).toFuture()
+        server.awaitUpgradeRequest()
+        Thread.sleep(1500)
+
+        then: 'as before 5.3, nothing fails the connect'
+        !future.isDone()
+        !server.closedWithin(100)
+
+        cleanup:
+        future?.cancel(true)
+        client?.close()
+        ctx?.close()
+        server?.close()
+    }
+
+    void 'the handshake fails with the handshake timeout when the server never answers the upgrade'() {
+        given:
+        RawWebSocketServer server = new RawWebSocketServer(false)
+        ApplicationContext ctx = ApplicationContext.run([
+                'spec.name'                             : 'WebSocketConnectCancelSpec',
+                'micronaut.http.client.handshake-timeout': '1s'
         ])
         WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
 

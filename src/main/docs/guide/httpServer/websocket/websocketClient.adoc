@@ -72,6 +72,8 @@ $ mn create-websocket-client MyChat
 ----
 ====
 
-==== Handshake timeout
+==== Handshake timeout and load balancing
 
-The response to the upgrade request is read under the `read-timeout` of the client (`micronaut.http.client.read-timeout`, or the `read-timeout` of a service client): a server that does not answer the upgrade in time fails the connect with a api:http.client.exceptions.ReadTimeoutException[], and the connection is closed. A negative or zero `read-timeout` disables the limit. Cancelling the subscription to `connect` before the endpoint is emitted closes the connection.
+By default a connect waits for the response to its upgrade request without a limit. Set `handshake-timeout` (`micronaut.http.client.handshake-timeout`, or the `handshake-timeout` of a service client) to fail a connect whose server does not answer the upgrade in time with a api:http.client.exceptions.ReadTimeoutException[]; the connection is then closed. Cancelling the subscription to `connect` before the endpoint is emitted closes the connection.
+
+The selection of a load balancer is released once the handshake is done. Set `report-handshake-outcome` to `true` to report the outcome of the handshake to the load balancer instead: a success, or a timeout of `handshake-timeout`.

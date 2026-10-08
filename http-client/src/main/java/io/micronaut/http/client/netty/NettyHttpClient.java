@@ -1094,8 +1094,11 @@ final class NettyHttpClient implements
     @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
         setupConversionService(request);
-        return connectWebSocketOnSubscribe(() -> resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null)));
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        // the target is resolved when connect is called, the connection made for each subscription
+        return toMono(resolveRequestURI(request), propagatedContext).flux()
+            .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
+                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null)));
     }
 
     @Override
@@ -1104,8 +1107,10 @@ final class NettyHttpClient implements
         String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
         uri = UriTemplate.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
-        return connectWebSocketOnSubscribe(() -> resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean)));
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return toMono(resolveRequestURI(request), propagatedContext).flux()
+            .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
+                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean)));
 
     }
 
@@ -1121,13 +1126,13 @@ final class NettyHttpClient implements
      * discarded by Reactor, and its connection is closed too. A cancel after the endpoint was
      * delivered (for example {@code Mono.from(flux)}) leaves the connection open.
      *
+     * @param propagatedContext The context of the caller of connect
      * @param connect Starts the connect
      * @param <T> The client endpoint type
      * @return A Flux, as before: callers may use Flux operators on the returned publisher
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static <T> Flux<T> connectWebSocketOnSubscribe(Supplier<ExecutionFlow<NettyWebSocketClientHandler<T>>> connect) {
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+    private static <T> Flux<T> connectWebSocketOnSubscribe(PropagatedContext propagatedContext, Supplier<ExecutionFlow<NettyWebSocketClientHandler<T>>> connect) {
         Mono<NettyWebSocketClientHandler<T>> handlers = Mono.<NettyWebSocketClientHandler<T>>create(sink -> {
             ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
             try {
@@ -1159,8 +1164,10 @@ final class NettyHttpClient implements
     }
 
     /**
-     * Connect a websocket to the target the load balancer selected: the outcome is reported to the
-     * load balancer, and a handshake read timeout carries the service id like any other.
+     * Connect a websocket to the target the load balancer selected: the selection is released once
+     * the handshake is done, and its outcome reported with
+     * {@link HttpClientConfiguration#isReportHandshakeOutcome()}. A handshake timeout carries the
+     * service id like any other read timeout.
      */
     private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri,
                                                                              @Nullable LoadBalancerSelection selection,
@@ -1174,19 +1181,27 @@ final class NettyHttpClient implements
             releaseSelection(selection);
             throw e;
         }
+        boolean reportOutcome = configuration.isReportHandshakeOutcome();
         if (selection != null) {
             if (flow instanceof DelayedExecutionFlow<?> delayed) {
-                // a cancelled connect reports nothing: release the selection
                 delayed.onCancel(selection::release);
             }
             flow = flow.map(handler -> {
-                selection.report(LoadBalancer.Outcome.SUCCESS);
+                if (reportOutcome) {
+                    selection.report(LoadBalancer.Outcome.SUCCESS);
+                } else {
+                    selection.release();
+                }
                 return handler;
             });
         }
         return flow.onErrorResume(error -> {
             if (error instanceof ReadTimeoutException timeout) {
-                report(selection, LoadBalancer.Outcome.TIMEOUT);
+                if (reportOutcome) {
+                    report(selection, LoadBalancer.Outcome.TIMEOUT);
+                } else {
+                    releaseSelection(selection);
+                }
                 return ExecutionFlow.error(decorate(timeout));
             }
             releaseSelection(selection);
@@ -1236,8 +1251,8 @@ final class NettyHttpClient implements
             mediaTypeCodecRegistry,
             handlerRegistry,
             conversionService,
-            // the handshake response is read like any other response
-            configuration.getReadTimeout().orElse(null));
+            // by default the handshake response is awaited without a limit, as before
+            configuration.getHandshakeTimeout().orElse(null));
 
         if (!isRunning()) {
             return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
