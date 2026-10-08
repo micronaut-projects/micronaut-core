@@ -423,6 +423,15 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return target.getTargetMethod();
     }
 
+    /**
+     * @return Whether the route implements a bean method that has a target method
+     */
+    @Override
+    public boolean hasTargetMethod() {
+        ExecutableMethod<?, ?> target = implemented();
+        return target != null && target.hasTargetMethod();
+    }
+
     @Override
     public ReturnType<R> getReturnType() {
         ReturnType<R> annotated = annotatedReturnType;

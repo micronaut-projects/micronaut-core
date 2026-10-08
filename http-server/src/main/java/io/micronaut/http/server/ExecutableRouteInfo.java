@@ -49,6 +49,11 @@ final class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements Met
     }
 
     @Override
+    public boolean hasTargetMethod() {
+        return method.hasTargetMethod();
+    }
+
+    @Override
     public ReturnType<R> getReturnType() {
         return method.getReturnType();
     }

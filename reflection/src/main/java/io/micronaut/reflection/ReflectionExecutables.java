@@ -209,9 +209,8 @@ public final class ReflectionExecutables {
      * type, tolerating the erasure: the arguments of a method inherited from a generic super type report the
      * resolved types, where the method declares the erased ones.
      *
-     * <p>The method invoked for a {@code POST_CONSTRUCT} or {@code PRE_DESTROY} interception of a bean that binds
-     * the event without declaring a callback of that kind stands for no method, and {@code null} is returned for
-     * it, as {@link MethodReference#hasTargetMethod()} tells.</p>
+     * <p>A reference that stands for no Java method, as {@link MethodReference#hasTargetMethod()} tells, returns
+     * {@code null}. The return type is nullable since 5.3.0, so Kotlin and NullAway callers see {@code Method?}.</p>
      *
      * @param method The executable method, or any method reference
      * @return The method, or {@code null} when the reference stands for none

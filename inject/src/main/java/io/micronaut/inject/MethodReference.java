@@ -41,24 +41,26 @@ public interface MethodReference<T, R> extends AnnotationMetadataDelegate, Annot
     /**
      * The {@link Method} this reference stands for.
      *
-     * <p>A reference for which {@link #hasTargetMethod()} is {@code false} stands for no method, and returns
-     * {@code null} here despite the declaration: the method invoked for a {@code POST_CONSTRUCT} or
-     * {@code PRE_DESTROY} interception of a bean that binds the event without declaring a callback of that kind.
-     * Code that may be handed such a method, an interceptor of a lifecycle event among them, asks
-     * {@link #hasTargetMethod()} first.</p>
+     * <p>A reference for which {@link #hasTargetMethod()} is {@code false} stands for no Java method: this returns
+     * {@code null} for it despite the declaration, or throws {@link UnsupportedOperationException}. Code that may be
+     * handed such a reference, an interceptor of a lifecycle event among them, asks {@link #hasTargetMethod()}
+     * first.</p>
      *
-     * @return The target method
+     * @return The target method, or {@code null} when {@link #hasTargetMethod()} is {@code false}
      */
     Method getTargetMethod();
 
     /**
-     * Whether this reference stands for a {@link Method} that {@link #getTargetMethod()} returns. It is
-     * {@code false} only for the method invoked for a {@code POST_CONSTRUCT} or {@code PRE_DESTROY} interception
-     * of a bean that binds the event without declaring a callback of that kind, for which
-     * {@link #getTargetMethod()} returns {@code null}.
+     * Whether this reference stands for a Java {@link Method} that {@link #getTargetMethod()} returns.
      *
-     * <p>It answers without looking the method up, so a method that cannot be looked up answers {@code true} and
-     * fails as {@link #getTargetMethod()} does.</p>
+     * <p>A reference that stands for no Java method answers {@code false}, and {@link #getTargetMethod()} then
+     * returns {@code null} or throws {@link UnsupportedOperationException}. The method invoked for a
+     * {@code POST_CONSTRUCT} or {@code PRE_DESTROY} interception of a bean that binds the event without declaring a
+     * callback of that kind is one, as is a route to a handler function. A reference that wraps another answers
+     * what the wrapped one answers.</p>
+     *
+     * <p>It answers without looking the method up, so a method that should exist but cannot be found reflectively
+     * answers {@code true} and fails as {@link #getTargetMethod()} does.</p>
      *
      * @return Whether there is a target method
      * @since 5.3.0

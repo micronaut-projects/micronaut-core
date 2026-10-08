@@ -4688,6 +4688,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
+        public boolean hasTargetMethod() {
+            return method.hasTargetMethod();
+        }
+
+        @Override
         public Class getDeclaringType() {
             return target.getClass();
         }
@@ -4744,6 +4749,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         @Override
         public Method getTargetMethod() {
             return method.getTargetMethod();
+        }
+
+        @Override
+        public boolean hasTargetMethod() {
+            return method.hasTargetMethod();
         }
 
         @Override
@@ -5094,6 +5104,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         @Override
         public Method getTargetMethod() {
             return method.getTargetMethod();
+        }
+
+        @Override
+        public boolean hasTargetMethod() {
+            return method.hasTargetMethod();
         }
 
         @Override
