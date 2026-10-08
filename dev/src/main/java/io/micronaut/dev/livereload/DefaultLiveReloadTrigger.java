@@ -16,7 +16,7 @@
 package io.micronaut.dev.livereload;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.DevRuntime;
 import jakarta.inject.Singleton;
@@ -32,7 +32,7 @@ import java.nio.file.Path;
  */
 @Internal
 @Singleton
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 @Requires(beans = DevRuntime.class)
 final class DefaultLiveReloadTrigger implements LiveReloadTrigger {
 

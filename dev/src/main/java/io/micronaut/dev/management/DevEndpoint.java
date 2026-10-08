@@ -16,7 +16,7 @@
 package io.micronaut.dev.management;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.DevRuntime;
@@ -55,7 +55,7 @@ import java.util.Map;
 @Internal
 @Endpoint(id = DevEndpoint.NAME)
 @Requires(classes = {Endpoint.class, HttpHostResolver.class})
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 @Requires(beans = DevRuntime.class)
 public class DevEndpoint {
 
