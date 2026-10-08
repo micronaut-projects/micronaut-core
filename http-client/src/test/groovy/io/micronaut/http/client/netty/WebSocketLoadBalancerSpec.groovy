@@ -221,6 +221,11 @@ class WebSocketLoadBalancerSpec extends Specification {
 
         RawResponseServer(@Nullable String response) {
             Thread.startDaemon('raw-response-server') {
+                serve(response)
+            }
+        }
+
+        private void serve(@Nullable String response) {
                 try (Socket socket = serverSocket.accept()) {
                     InputStream input = socket.inputStream
                     StringBuilder request = new StringBuilder()
@@ -236,8 +241,8 @@ class WebSocketLoadBalancerSpec extends Specification {
                         socket.outputStream.flush()
                     }
                 } catch (IOException ignored) {
+                    // Closing the fixture aborts an accept or read that is still pending.
                 }
-            }
         }
 
         URI getUri() {

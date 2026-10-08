@@ -59,7 +59,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -104,7 +103,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * What the handshake says about the instance, see {@link #getHandshakeOutcome()}: empty when
      * it says nothing, {@code null} until it is known. The first outcome wins.
      */
-    private final AtomicReference<Optional<LoadBalancer.Outcome>> handshakeOutcome = new AtomicReference<>();
+    private final AtomicReference<@Nullable HandshakeResult> handshakeOutcome = new AtomicReference<>();
     /**
      * Whether the channel was connected: a close before that is a failure to connect. Event loop only.
      */
@@ -463,11 +462,16 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         if (connectCancelled) {
             return null;
         }
-        Optional<LoadBalancer.Outcome> outcome = handshakeOutcome.get();
-        return outcome == null ? null : outcome.orElse(null);
+        HandshakeResult result = handshakeOutcome.get();
+        return result == null ? null : result.outcome();
     }
 
     private void settleHandshakeOutcome(LoadBalancer.@Nullable Outcome outcome) {
-        handshakeOutcome.compareAndSet(null, Optional.ofNullable(outcome));
+        handshakeOutcome.compareAndSet(null, new HandshakeResult(outcome));
+    }
+
+    /** A settled handshake, including one that provides no load-balancer outcome. */
+    @Internal
+    private record HandshakeResult(LoadBalancer.@Nullable Outcome outcome) {
     }
 }
