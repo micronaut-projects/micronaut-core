@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.GenericPlaceholderElementAnnotationMetadata
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import java.util.*
 import java.util.function.Function
 
@@ -103,7 +104,7 @@ internal class KotlinGenericPlaceholderElement(
         elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this)
     }
 
-    override fun copyThis() = KotlinGenericPlaceholderElement(
+    override fun copyThis() = copyArrayTypeAnnotations(KotlinGenericPlaceholderElement(
         genericNativeType,
         upper,
         resolved,
@@ -115,17 +116,19 @@ internal class KotlinGenericPlaceholderElement(
     ).also {
         it.typeArgument = typeArgument
         it.useType = useType
-    }
+    })
 
     override fun isGenericPlaceholder() = true
 
     private fun isUse() = useType != null || typeArgument != null
 
-    override fun getAnnotationMetadataToWrite() = resolvedGenericTypeAnnotationMetadata
+    override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
+        arrayDimensionTypeAnnotationMetadata() ?: resolvedGenericTypeAnnotationMetadata
 
     override fun getGenericTypeAnnotationMetadata() = resolvedGenericTypeAnnotationMetadata
 
-    override fun getTypeAnnotationMetadata() = resolvedTypeAnnotationMetadata
+    override fun getTypeAnnotationMetadata(): MutableAnnotationMetadataDelegate<AnnotationMetadata> =
+        arrayDimensionTypeAnnotationMetadata() ?: resolvedTypeAnnotationMetadata
 
     override fun getAnnotationMetadata() = resolvedAnnotationMetadata
 
@@ -134,7 +137,7 @@ internal class KotlinGenericPlaceholderElement(
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
         super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata)
 
-    override fun withArrayDimensions(arrayDimensions: Int) = KotlinGenericPlaceholderElement(
+    override fun withArrayDimensions(arrayDimensions: Int) = copyArrayTypeAnnotations(KotlinGenericPlaceholderElement(
         genericNativeType,
         upper,
         resolved,
@@ -146,7 +149,7 @@ internal class KotlinGenericPlaceholderElement(
     ).also {
         it.typeArgument = typeArgument
         it.useType = useType
-    }
+    })
 
     override fun getBounds() = bounds
 

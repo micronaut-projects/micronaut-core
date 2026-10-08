@@ -46,6 +46,8 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.kotlin.processing.annotation.KotlinAnnotations
 import java.util.*
 
 internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
@@ -646,7 +648,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             val qualifiedNameString = qualifiedName.asString()
             val primitiveArray = primitiveArrays[qualifiedNameString]
             if (primitiveArray != null) {
-                return primitiveArray
+                return if (type == null) primitiveArray else withDimensionAnnotations(primitiveArray, primitiveArray.fromArray(), type)
             }
             val canBePrimitive =
                 type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
@@ -661,14 +663,18 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 if (arrayType == null) {
                     return visitorContext.getClassElement(Object::class.java.name).get().toArray()
                 }
-                val component = arrayType.resolve()
-                return newTypeArgument(
+                val component = newTypeArgument(
                     owner,
-                    component,
+                    arrayType.resolve(),
                     parentTypeArguments,
                     visitedTypes,
                     false
-                ).toArray()
+                )
+                if (component is KotlinGenericPlaceholderElement) {
+                    // Keep the occurrence, and its annotations, apart from the declaration of the variable
+                    component.typeArgument = type.arguments[0]
+                }
+                return withDimensionAnnotations(component.toArray(), component, type)
             }
         }
         val typeArguments = if (stripTypeArguments) {
@@ -703,6 +709,39 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 visitorContext
             )
         }
+    }
+
+    /**
+     * Keeps every dimension of an array use separately from the legacy metadata of its component, innermost
+     * first: those of the component, and then that of the array type itself.
+     */
+    private fun withDimensionAnnotations(array: ClassElement, component: ClassElement, type: KSType): ClassElement {
+        val annotations = ArrayList<MutableAnnotationMetadataDelegate<AnnotationMetadata>>()
+        var dimension = component
+        while (dimension.isArray) {
+            annotations.add(dimension.typeAnnotationMetadata)
+            dimension = dimension.fromArray()
+        }
+        annotations.reverse()
+        annotations.add(
+            elementAnnotationMetadataFactory.buildTypeAnnotations(
+                visitorContext.annotationMetadataBuilder.lookupOrBuild(TypeUseKey(type), KotlinAnnotations(type.annotations)),
+                type
+            )
+        )
+        return when (array) {
+            is KotlinClassElement -> array.withArrayTypeAnnotations(annotations)
+            is PrimitiveElement -> array.withArrayTypeAnnotations(annotations)
+            else -> array
+        }
+    }
+
+    /**
+     * The cache key of the annotations of one use of a type, which a type equal to it used elsewhere does not share.
+     */
+    private class TypeUseKey(private val type: KSType) {
+        override fun equals(other: Any?) = other is TypeUseKey && other.type === type
+        override fun hashCode() = System.identityHashCode(type)
     }
 
     override fun toString(): String {
