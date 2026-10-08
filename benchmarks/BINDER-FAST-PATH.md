@@ -1,5 +1,8 @@
 # Buffered-form fast paths
 
+See [matched before/after investigation](BINDER-BEFORE-AFTER.md) for subsequent
+native baseline comparisons, real HTTP controls and async-profiler evidence.
+
 Production changes belong to #13813; these benchmark fixtures and measurements
 belong to #13816. No benchmark workflow or performance gate is added.
 
