@@ -46,8 +46,9 @@ public final class ReactorInterop {
 
     private static @Nullable Class<?> reactorType() {
         try {
-            // A class literal uses normal linkage, not reflective class loading. Keep the
-            // optional dependency out of native publisher paths when linkage fails.
+            // Unlike ClassUtils.isPresent, this class literal does not use Class.forName
+            // or require reflection metadata in a native image. Catch missing linkage so
+            // native Reactive Streams publishers can also be used without Reactor.
             return CorePublisher.class;
         } catch (NoClassDefFoundError e) {
             return null;
