@@ -100,7 +100,7 @@ class RetainedResolverSpec extends Specification {
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
         return ApplicationContext.builder()
             .properties(['spec.name': 'RetainedResolverSpec'])
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

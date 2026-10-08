@@ -82,7 +82,7 @@ class NestedEachPropertyRetentionSpec extends Specification {
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained, Map<String, Object> properties) {
         return ApplicationContext.builder()
             .properties(['spec.name': 'NestedEachPropertyRetentionSpec'] + properties)
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

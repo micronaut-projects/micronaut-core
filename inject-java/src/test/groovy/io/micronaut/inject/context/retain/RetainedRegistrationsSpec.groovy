@@ -35,7 +35,7 @@ class RetainedRegistrationsSpec extends Specification {
         given: "a running context that records what its beans receive"
         ApplicationContext first = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         Consumer consumer = first.getBean(Consumer)
         Expensive expensive = consumer.expensive
@@ -59,7 +59,7 @@ class RetainedRegistrationsSpec extends Specification {
         when: "a new context adopts the retained registrations"
         ApplicationContext second = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
         Consumer newConsumer = second.getBean(Consumer)
@@ -94,7 +94,7 @@ class RetainedRegistrationsSpec extends Specification {
         given: "two singletons that each own a prototype holding the same singleton"
         ApplicationContext first = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         LeaseHolderA a = first.getBean(LeaseHolderA)
         LeaseHolderB b = first.getBean(LeaseHolderB)
@@ -103,7 +103,7 @@ class RetainedRegistrationsSpec extends Specification {
         when: "a new context adopts both, then destroys one of them and the prototype it owns"
         ApplicationContext second = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
         def graph = second.findDependencyGraph().get()
@@ -170,7 +170,7 @@ class RetainedRegistrationsSpec extends Specification {
         given:
         ApplicationContext first = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         Expensive expensive = first.getBean(Consumer).expensive
         def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType == Expensive }
@@ -179,7 +179,7 @@ class RetainedRegistrationsSpec extends Specification {
         when: "the new context supplies a helper of its own"
         ApplicationContext second = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .singletons(replacement)
             .retainedRegistrations(retained)
             .start()
@@ -280,7 +280,7 @@ class RetainedRegistrationsSpec extends Specification {
         def feed = new Feed("x")
         ApplicationContext first = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         first.registerSingleton(Feed, feed, io.micronaut.inject.qualifiers.Qualifiers.byName("x"))
         FeedReader reader = first.getBean(FeedReader, io.micronaut.inject.qualifiers.Qualifiers.byName("x"))
@@ -290,7 +290,7 @@ class RetainedRegistrationsSpec extends Specification {
             .sort(false) { it.bean instanceof FeedReader ? 0 : 1 }
         ApplicationContext second = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
 
@@ -315,7 +315,7 @@ class RetainedRegistrationsSpec extends Specification {
         LazyHolder.DESTROYED.set(0)
         ApplicationContext first = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         first.getBean(Chain)
         first.getBean(Consumer)

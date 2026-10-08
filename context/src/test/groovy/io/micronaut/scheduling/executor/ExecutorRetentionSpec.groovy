@@ -105,7 +105,7 @@ class ExecutorRetentionSpec extends Specification {
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained, Map<String, Object> properties = ['micronaut.executors.retained.type': 'fixed', 'micronaut.executors.retained.number-of-threads': '1']) {
         return ApplicationContext.builder()
             .properties(['spec.name': 'ExecutorRetentionSpec'] + properties)
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

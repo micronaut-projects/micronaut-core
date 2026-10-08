@@ -101,7 +101,7 @@ class RetainedFactoryProductSpec extends Specification {
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained, Map<String, Object> extra = [:]) {
         return ApplicationContext.builder()
             .properties(['spec.name': 'RetainedFactoryProductSpec', 'factory-pools.main.size': '2'] + extra)
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

@@ -83,7 +83,7 @@ class RetainedConfigurationSpec extends Specification {
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
         return ApplicationContext.builder()
             .properties(['spec.name': 'RetainedConfigurationSpec', 'my.pool.size': '3', 'my.pool.limits.max': '7', 'other.pool.size': '2'])
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

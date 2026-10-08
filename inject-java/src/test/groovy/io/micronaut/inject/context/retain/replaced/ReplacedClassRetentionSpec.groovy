@@ -92,7 +92,7 @@ class ReplacedClassRetentionSpec extends Specification {
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
         return ApplicationContext.builder()
             .properties(['spec.name': 'ReplacedClassRetentionSpec'])
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

@@ -112,7 +112,7 @@ class RetainAnnotationSpec extends Specification {
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
         ApplicationContext.builder()
             .properties('spec.name': 'RetainAnnotationSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

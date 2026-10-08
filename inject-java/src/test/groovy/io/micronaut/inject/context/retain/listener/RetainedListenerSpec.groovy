@@ -61,7 +61,7 @@ class RetainedListenerSpec extends Specification {
         }
         return ApplicationContext.builder()
             .properties(properties)
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
     }

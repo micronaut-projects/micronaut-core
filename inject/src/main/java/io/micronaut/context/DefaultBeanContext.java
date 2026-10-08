@@ -5551,7 +5551,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (isCoveredConfiguration(dependency.dependency(), invalidatedBy)) {
                     continue;
                 }
-                if (dependency.lazy() || dependency.dependency().isProxy() || dependency.dependency() instanceof AbstractProviderDefinition) {
+                if (dependency.lazy() || dependency.dependency().isProxy()) {
                     return true;
                 }
             }
