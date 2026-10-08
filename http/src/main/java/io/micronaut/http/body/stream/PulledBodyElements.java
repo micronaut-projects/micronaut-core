@@ -50,7 +50,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
 
     private static final String CLOSED_MESSAGE = "The elements of the body were closed";
     private static final CompletionStage<?> END = CompletableFuture.completedStage(Optional.empty());
-    private static final CompletionStage<@Nullable Void> CLOSED = CompletableFuture.completedStage(null);
+    private static final CompletionStage<@Nullable Void> CLOSED_STAGE = CompletableFuture.completedStage(null);
 
     // guarded by this
     private final ArrayDeque<T> queue = new ArrayDeque<>();
@@ -263,7 +263,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
         CancellationException cancelled;
         synchronized (this) {
             if (closed != null) {
-                return CLOSED;
+                return CLOSED_STAGE;
             }
             cancelled = new CancellationException(CLOSED_MESSAGE);
             closed = cancelled;
@@ -283,7 +283,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
         // nobody takes them
         queued.forEach(BodyElementsLoop::discard);
         release();
-        return CLOSED;
+        return CLOSED_STAGE;
     }
 
     @Override

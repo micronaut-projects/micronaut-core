@@ -276,7 +276,7 @@ public final class EventStreams {
                 CompletableFuture<Optional<ByteBuffer<?>>> piece = pieces.next().toCompletableFuture();
                 if (!piece.isDone()) {
                     piece.whenComplete((value, error) -> {
-                        boolean more = read(value, error);
+                        boolean more = read(error == null ? Objects.requireNonNull(value).orElse(null) : null, error);
                         if (readAgain() && more) {
                             demand();
                         }
@@ -291,7 +291,7 @@ public final class EventStreams {
                     readAgain();
                     return;
                 }
-                if (!read(value, null)) {
+                if (!read(value.orElse(null), null)) {
                     readAgain();
                     return;
                 }
@@ -325,13 +325,13 @@ public final class EventStreams {
         /**
          * @return Whether more pieces can be read: the body did not end or fail
          */
-        private boolean read(@Nullable Optional<ByteBuffer<?>> piece, @Nullable Throwable error) {
+        private boolean read(@Nullable ByteBuffer<?> piece, @Nullable Throwable error) {
             if (error != null) {
                 fail(wrap(error));
                 return false;
             }
             try {
-                if (piece == null || piece.isEmpty()) {
+                if (piece == null) {
                     if (decoder == null) {
                         byte[] bytes;
                         synchronized (this) {
@@ -345,7 +345,7 @@ public final class EventStreams {
                     end();
                     return false;
                 }
-                byte[] bytes = piece.get().toByteArray();
+                byte[] bytes = piece.toByteArray();
                 if (decoder == null) {
                     synchronized (this) {
                         long length = (long) body.size() + bytes.length;

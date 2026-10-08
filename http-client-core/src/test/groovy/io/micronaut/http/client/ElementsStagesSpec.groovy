@@ -139,6 +139,7 @@ class ElementsStagesSpec extends Specification {
 
         @Override
         void close() {
+            // This test client owns no transport resources.
         }
     }
 
