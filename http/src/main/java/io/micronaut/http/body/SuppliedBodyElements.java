@@ -91,6 +91,7 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
         CompletableFuture<@Nullable Void> result = new CompletableFuture<>();
         start(result);
         result.whenComplete((ignored, error) -> end(result));
+        BodyElementsLoop.closeOnFailure(this, result);
         // the loop reads the function directly: this operation spans the reads
         BodyElementsLoop.run(next, consumer, result);
         return result;

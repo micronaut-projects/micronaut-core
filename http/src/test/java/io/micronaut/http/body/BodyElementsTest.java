@@ -177,7 +177,7 @@ class BodyElementsTest {
     }
 
     @Test
-    void defaultForEachFailsWithTheConsumerWithoutClosing() {
+    void defaultForEachFailsWithTheConsumerAndClosesTheElements() {
         AtomicInteger closed = new AtomicInteger();
         BodyElements<Integer> elements = new BodyElements<>() {
             @Override
@@ -193,7 +193,7 @@ class BodyElementsTest {
         CompletableFuture<Void> each = elements.forEach(element -> CompletableFuture.failedFuture(new IllegalStateException("consumer"))).toCompletableFuture();
         CompletionException failure = assertThrows(CompletionException.class, each::join);
         assertEquals("consumer", failure.getCause().getMessage());
-        assertEquals(0, closed.get());
+        assertEquals(1, closed.get());
     }
 
     @Test
@@ -229,6 +229,49 @@ class BodyElementsTest {
         assertEquals(1, closed.get());
         assertEquals(1, released.get());
         assertThrows(IllegalStateException.class, elements::next);
+    }
+
+    @Test
+    void ofForEachClosesTheElementsWhenReadingFails() {
+        AtomicInteger closed = new AtomicInteger();
+        BodyElements<String> elements = BodyElements.of(() -> CompletableFuture.failedFuture(new IllegalStateException("read")), closed::incrementAndGet);
+        CompletableFuture<Void> done = elements.forEach(element -> CompletableFuture.completedFuture(null)).toCompletableFuture();
+        assertThrows(CompletionException.class, done::join);
+        assertEquals(1, closed.get());
+    }
+
+    @Test
+    void defaultForEachTakesTheElementsThatArePolledWithoutAStage() {
+        AtomicInteger reads = new AtomicInteger();
+        List<Integer> available = new ArrayList<>(List.of(1, 2, 3));
+        BodyElements<Integer> elements = new BodyElements<>() {
+            @Override
+            public Integer poll() {
+                return available.isEmpty() ? null : available.remove(0);
+            }
+
+            @Override
+            public CompletionStage<Optional<Integer>> next() {
+                reads.incrementAndGet();
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+        };
+        List<Integer> consumed = new ArrayList<>();
+        elements.forEach(element -> {
+            consumed.add(element);
+            return CompletableFuture.completedFuture(null);
+        }).toCompletableFuture().join();
+        assertEquals(List.of(1, 2, 3), consumed);
+        // only the end was read with a stage
+        assertEquals(1, reads.get());
+    }
+
+    @Test
+    void theDefaultsKnowNothingAhead() {
+        BodyElements<String> elements = () -> CompletableFuture.completedFuture(Optional.empty());
+        assertEquals(null, elements.poll());
+        assertEquals(BodyElements.State.PENDING, elements.state());
+        assertEquals(null, elements.failure());
     }
 
     /**
