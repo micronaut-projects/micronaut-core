@@ -967,7 +967,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <B>       The event data type
      * @return The flow of the response, whose body is the events
      */
-    <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+    final <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         setupConversionService(request);
         return exchangeEventStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), eventType, errorType);
     }
@@ -987,7 +987,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <I>       The request body type
      * @return The flow of the response, whose body is the pieces of the response body
      */
-    <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(HttpRequest<I> request, Argument<?> errorType) {
+    final <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         return exchangeElementsFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), errorType, true,
             (req, response) -> ElementsResponse.of(response, BodyPieces.elements(response.byteBody().move())));
@@ -1043,7 +1043,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <O>       The type of an element
      * @return The flow of the response, whose body is the elements
      */
-    <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+    final <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
         setupConversionService(request);
         return jsonStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), type, errorType, true);
     }
