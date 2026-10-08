@@ -26,17 +26,7 @@ import io.micronaut.core.annotation.Experimental;
 @Experimental
 public enum ReloadStrategy {
     /**
-     * The application context is stopped and a new one started on the new classes. Beans a
-     * {@link BeanRetentionPolicy} retains survive; everything else is created again.
+     * The application context is stopped and a new one started on the new classes.
      */
-    RESTART,
-    /**
-     * The application context stays. The bean definitions of the changed classes are replaced in it
-     * and the beans that referenced them are repaired as a {@link BeanReloadPolicy} decides.
-     */
-    RELOAD,
-    /**
-     * {@link #RELOAD} when every affected bean has a policy answer, {@link #RESTART} otherwise.
-     */
-    AUTO
+    RESTART
 }

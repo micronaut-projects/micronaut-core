@@ -36,13 +36,13 @@ import java.util.Set;
  *
  * <p>The event is published before any bean is touched. Listeners use it to forget cached state
  * about classes of the retired generation: a cache keyed by class evicts every key for which
- * {@link #isStale(Class)} holds. Registries built from beans (routes, scheduled jobs, message
+ * {@link #isStaleType(Class)} holds. Registries built from beans (routes, scheduled jobs, message
  * consumers) do not listen here; they watch the beans they are built from and receive the change
  * as a batch. Listeners that need the exact classes look at {@link #changes()}.</p>
  *
  * <p>The launcher publishes the event in a {@link ReloadStrategy#RESTART restart} as well, to the
- * context being stopped, so that beans a {@link BeanRetentionPolicy} carries over can clean up
- * what they cached about the retired classes.</p>
+ * context being stopped, so that beans carried over to the next context can clean up what they cached
+ * about the retired classes.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -51,7 +51,6 @@ import java.util.Set;
 @NullMarked
 public final class ClassChangeEvent extends ApplicationEvent {
 
-    private final int generation;
     private final Set<ClassLoader> retiredLoaders;
     private final ClassLoader newLoader;
     private final List<ClassChange> changes;
@@ -61,14 +60,12 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * Creates the event.
      *
      * @param source The launcher or component publishing the event
-     * @param generation The number of the generation being retired, counted from one
      * @param retiredLoaders The classloaders of the generations retired by this change; a class loaded by one of them is stale
      * @param newLoader The classloader of the new generation
      * @param changes The changed classes
-     * @param strategy The strategy the launcher applies, {@link ReloadStrategy#RESTART} or {@link ReloadStrategy#RELOAD}
+     * @param strategy The strategy the launcher applies
      */
     public ClassChangeEvent(Object source,
-                            int generation,
                             Set<ClassLoader> retiredLoaders,
                             ClassLoader newLoader,
                             List<ClassChange> changes,
@@ -77,21 +74,10 @@ public final class ClassChangeEvent extends ApplicationEvent {
         Objects.requireNonNull(retiredLoaders, "retiredLoaders");
         Set<ClassLoader> identity = Collections.newSetFromMap(new IdentityHashMap<>());
         identity.addAll(retiredLoaders);
-        this.generation = generation;
         this.retiredLoaders = Collections.unmodifiableSet(identity);
         this.newLoader = Objects.requireNonNull(newLoader, "newLoader");
         this.changes = List.copyOf(Objects.requireNonNull(changes, "changes"));
         this.strategy = Objects.requireNonNull(strategy, "strategy");
-        if (strategy == ReloadStrategy.AUTO) {
-            throw new IllegalArgumentException("The strategy of a change is the one applied, RESTART or RELOAD, not AUTO");
-        }
-    }
-
-    /**
-     * @return The number of the generation being retired, counted from one
-     */
-    public int generation() {
-        return generation;
     }
 
     /**
@@ -116,7 +102,7 @@ public final class ClassChangeEvent extends ApplicationEvent {
     }
 
     /**
-     * @return The strategy applied: {@link ReloadStrategy#RESTART} or {@link ReloadStrategy#RELOAD}
+     * @return The strategy applied
      */
     public ReloadStrategy strategy() {
         return strategy;
@@ -130,7 +116,7 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * @param type The class
      * @return True if the class must no longer be used
      */
-    public boolean isStale(@Nullable Class<?> type) {
+    public boolean isStaleType(@Nullable Class<?> type) {
         return type != null && type.getClassLoader() != null && retiredLoaders.contains(type.getClassLoader());
     }
 
@@ -140,24 +126,24 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * @param definition The definition
      * @return True if the definition must no longer be used
      */
-    public boolean isStale(@Nullable BeanDefinition<?> definition) {
+    public boolean isStaleDefinition(@Nullable BeanDefinition<?> definition) {
         if (definition == null) {
             return false;
         }
-        if (isStale(definition.getClass()) || isStale(definition.getBeanType())) {
+        if (isStaleType(definition.getClass()) || isStaleType(definition.getBeanType())) {
             return true;
         }
         // a factory-produced bean's definition class is generated next to the factory, whose class may be stale
         // while the produced type is a library type
-        if (definition.getDeclaringType().filter(this::isStale).isPresent()) {
+        if (definition.getDeclaringType().filter(this::isStaleType).isPresent()) {
             return true;
         }
         // a delegate (an @EachBean registration, a qualified factory bean) is a framework class wrapping the
         // generated definition; a proxy definition names the definition it targets
         if (definition instanceof DelegatingBeanDefinition<?> delegating && delegating.getTarget() != definition) {
-            return isStale(delegating.getTarget());
+            return isStaleDefinition(delegating.getTarget());
         }
-        return definition instanceof ProxyBeanDefinition<?> proxy && (isStale(proxy.getTargetDefinitionType()) || isStale(proxy.getTargetType()));
+        return definition instanceof ProxyBeanDefinition<?> proxy && (isStaleType(proxy.getTargetDefinitionType()) || isStaleType(proxy.getTargetType()));
     }
 
     /**
@@ -166,8 +152,8 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * @param method The method
      * @return True if the method must no longer be invoked
      */
-    public boolean isStale(@Nullable ExecutableMethod<?, ?> method) {
-        return method != null && isStale(method.getDeclaringType());
+    public boolean isStaleMethod(@Nullable ExecutableMethod<?, ?> method) {
+        return method != null && isStaleType(method.getDeclaringType());
     }
 
     /**
@@ -177,7 +163,7 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * @return True if the instance belongs to a retired generation
      */
     public boolean isStaleInstance(@Nullable Object instance) {
-        return instance != null && isStale(instance.getClass());
+        return instance != null && isStaleType(instance.getClass());
     }
 
     /**
@@ -197,6 +183,6 @@ public final class ClassChangeEvent extends ApplicationEvent {
 
     @Override
     public String toString() {
-        return "ClassChangeEvent{generation=" + generation + ", strategy=" + strategy + ", changes=" + changes.size() + '}';
+        return "ClassChangeEvent{strategy=" + strategy + ", changes=" + changes.size() + '}';
     }
 }

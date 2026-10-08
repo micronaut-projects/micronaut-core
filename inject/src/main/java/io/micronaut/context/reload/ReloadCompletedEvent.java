@@ -26,14 +26,13 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The new generation of the application's classes is in place: its bean definitions are registered,
- * the bean definition and executable method processors ran over them, and its eager beans started.
+ * The new generation of the application's classes is in place: its bean definitions are registered
+ * and the context that now runs the application started its eager beans.
  *
  * <p>Listeners rebuild what they derive from the set of beans, such as a route table or a registry
  * of consumers, and re-run startup work that depends on the shape of application classes, such as
  * schema generation for changed entities. The event is published in the context that is now
- * current: the same context after a {@link ReloadStrategy#RELOAD reload}, the new one after a
- * {@link ReloadStrategy#RESTART restart}.</p>
+ * current, the new one after a {@link ReloadStrategy#RESTART restart}.</p>
  *
  * @author graemerocher
  * @since 5.3.0

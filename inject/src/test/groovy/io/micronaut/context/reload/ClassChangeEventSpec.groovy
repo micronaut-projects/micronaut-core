@@ -26,31 +26,24 @@ class ClassChangeEventSpec extends Specification {
         GroovyClassLoader current = new GroovyClassLoader(getClass().classLoader)
         Class<?> retiredCopy = retired.parseClass('package example; class Reloadable {}')
         Class<?> currentCopy = current.parseClass('package example; class Reloadable {}')
-        def event = new ClassChangeEvent(this, 1, [retiredCopy.classLoader] as Set, currentCopy.classLoader,
-            [new ClassChange("example.Reloadable", ClassChange.Kind.MODIFIED)], ReloadStrategy.RELOAD)
+        def event = new ClassChangeEvent(this, [retiredCopy.classLoader] as Set, currentCopy.classLoader,
+            [new ClassChange("example.Reloadable", ClassChange.Kind.MODIFIED)], ReloadStrategy.RESTART)
 
         expect:
-        event.isStale(retiredCopy)
+        event.isStaleType(retiredCopy)
         event.isStaleInstance(retiredCopy.getDeclaredConstructor().newInstance())
-        !event.isStale(currentCopy)
-        !event.isStale(String)
-        !event.isStale((Class) null)
+        !event.isStaleType(currentCopy)
+        !event.isStaleType(String)
+        !event.isStaleType(null)
+        !event.isStaleDefinition(null)
+        !event.isStaleMethod(null)
         event.affects("example.Reloadable")
         !event.affects("example.Other")
-        event.generation() == 1
-        event.strategy() == ReloadStrategy.RELOAD
+        event.strategy() == ReloadStrategy.RESTART
         event.retiredLoaders().contains(retiredCopy.classLoader)
 
         cleanup:
         retired.close()
         current.close()
-    }
-
-    void "the strategy of a change is the one applied"() {
-        when:
-        new ClassChangeEvent(this, 1, [] as Set, getClass().classLoader, [], ReloadStrategy.AUTO)
-
-        then:
-        thrown(IllegalArgumentException)
     }
 }
