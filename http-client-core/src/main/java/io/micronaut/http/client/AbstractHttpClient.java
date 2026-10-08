@@ -1453,8 +1453,19 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The events
      */
     private <I, B> Publisher<Event<B>> eventStreamOrError(HttpRequest<I> request, Argument<B> eventType, @Nullable Argument<?> errorType) {
-        return elements(() -> exchangeElementsFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType, AcceptEvents.ONLY, shouldBufferErrorBody(errorType),
-            (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)));
+        setupConversionService(request);
+        if (request instanceof MutableHttpRequest<?> httpRequest) {
+            // replace, rather than add to, what the caller accepts: a server that may answer with another type, such
+            // as JSON, would otherwise do so, and the body would yield no event
+            httpRequest.getHeaders().set(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
+        }
+        // as it always did, the event stream sends the request with the context of the subscriber
+        return Flux.defer(() -> {
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+            return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
+                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
+                .flatMapMany(AbstractHttpClient::elements);
+        });
     }
 
     // ---- streams
@@ -1466,8 +1477,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(HttpRequest<I> request, @Nullable Argument<?> errorType) {
+        // the request is sent with the context of the caller, as it always was
+        setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(dataStreamFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
+        return Flux.defer(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
             .flatMapMany(response -> streamPiecesPublisher(Objects.requireNonNull(response.body(), "The response has no body"))));
     }
 
@@ -1480,7 +1493,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(dataStreamFlow(request, errorType), propagatedContext)
+        return Flux.defer(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType), propagatedContext)
             .flatMapMany(response -> {
                 BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
                 return Flux.from(streamPiecesPublisher(pieces))
@@ -1522,10 +1535,8 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <T>      The type of an element
      * @return The elements
      */
-    private static <T> Publisher<T> elements(Supplier<ExecutionFlow<HttpResponse<BodyElements<T>>>> exchange) {
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(exchange.get(), propagatedContext)
-            .flatMapMany(response -> Flux.from(publisher(Objects.requireNonNull(response.body(), "The response has no elements")))));
+    private static <T> Publisher<T> elements(HttpResponse<BodyElements<T>> response) {
+        return publisher(Objects.requireNonNull(response.body(), "The response has no elements"));
     }
 
     /**
