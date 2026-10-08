@@ -616,12 +616,17 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         if (type != null) {
             val typeDeclaration = type.declaration
             if (typeDeclaration is KSTypeParameter) {
-                return resolveTypeParameter(
+                val placeholder = resolveTypeParameter(
                     owner!!,
                     typeDeclaration,
                     parentTypeArguments,
                     visitedTypes
                 )
+                if (placeholder is KotlinGenericPlaceholderElement) {
+                    // A use of the type parameter reports its own annotations, not the declaration's
+                    placeholder.useType = type
+                }
+                return placeholder
             }
         }
         val qualifiedName = declaration.qualifiedName

@@ -70,7 +70,6 @@ final class BodyStream implements BufferConsumer.Upstream {
     private static final CompletionStage<Void> DONE = CompletableFuture.completedStage(null);
 
     private final ReentrantLock lock = new ReentrantLock();
-    private final ByteBodyFactory factory;
     private final BufferConsumer buffer;
     private final CloseableByteBody body;
     private final Executor executor;
@@ -116,7 +115,6 @@ final class BodyStream implements BufferConsumer.Upstream {
      * @param bodyless      Whether the body is never written, the response of a HEAD request
      */
     BodyStream(ByteBodyFactory factory, PropagatedContext context, int highWaterMark, boolean bodyless) {
-        this.factory = factory;
         this.executor = factory.streamingBodyExecutor();
         this.context = context;
         this.highWaterMark = checkHighWaterMark(highWaterMark);
@@ -131,13 +129,6 @@ final class BodyStream implements BufferConsumer.Upstream {
      */
     CloseableByteBody body() {
         return body;
-    }
-
-    /**
-     * @return Whether blocking the current thread would block an event loop
-     */
-    boolean isEventLoopThread() {
-        return factory.isEventLoopThread();
     }
 
     /**

@@ -71,4 +71,55 @@ class BodyElementsExtensionsTest {
         cancelled.invokeOnCompletion { cause.complete(cancelled.getCompleted()) }
         assertTrue(cause.get(10, TimeUnit.SECONDS) is kotlinx.coroutines.CancellationException)
     }
+
+    @Test
+    fun anElementTheServerDoesNotTakeIsClosed() {
+        assertUndeliveredElementIsClosed(failingClose = false)
+    }
+
+    @Test
+    fun anElementThatFailsToCloseIsDiscardedQuietly() {
+        // the failure is logged: the stream of the flow is not affected
+        assertUndeliveredElementIsClosed(failingClose = true)
+    }
+
+    private fun assertUndeliveredElementIsClosed(failingClose: Boolean) {
+        val emitted = mutableListOf<Element>()
+        val second = CompletableDeferred<Unit>()
+        val elements = flow {
+            var n = 0
+            while (true) {
+                val element = Element(failingClose)
+                synchronized(emitted) { emitted.add(element) }
+                if (n++ == 1) {
+                    second.complete(Unit)
+                }
+                emit(element)
+            }
+        }.asBodyElements()
+        val first = elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS).get()
+        // the flow offers the second element, which nobody takes
+        val offered = java.util.concurrent.CompletableFuture<Unit>()
+        second.invokeOnCompletion { offered.complete(Unit) }
+        offered.get(10, TimeUnit.SECONDS)
+        elements.close()
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (!synchronized(emitted) { emitted[1].closed } && System.nanoTime() < deadline) {
+            Thread.sleep(10)
+        }
+        assertTrue(synchronized(emitted) { emitted[1].closed }, "the undelivered element is closed")
+        assertTrue(!first.closed, "the delivered element belongs to the caller")
+    }
+
+    class Element(private val failingClose: Boolean) : AutoCloseable {
+        @Volatile
+        var closed = false
+
+        override fun close() {
+            closed = true
+            if (failingClose) {
+                throw java.io.IOException("cannot close")
+            }
+        }
+    }
 }

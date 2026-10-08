@@ -31,8 +31,8 @@ import io.micronaut.http.sse.SseEmitter;
  *
  * <p>The handler runs like the handler of an asynchronous route: on the event loop unless the
  * route {@link RouteSpec#executeOn(String) executes on} an executor. On an executor it may
- * block, and pace itself with {@link SseEmitter#sendAndAwait}: the response is sent while it
- * still runs. A {@code HEAD} request runs the handler too, and sends the headers of the stream
+ * block, and pace itself by waiting for the stage of each {@link SseEmitter#send(Object) send},
+ * e.g. with {@code join()}: the response is sent while it still runs. A {@code HEAD} request runs the handler too, and sends the headers of the stream
  * without its events.</p>
  *
  * <pre>{@code
@@ -49,7 +49,7 @@ import io.micronaut.http.sse.SseEmitter;
  * // blocking, on virtual threads: the stream ends when the handler returns
  * routes.GET("/jobs/{id}/log").executeOn(TaskExecutors.VIRTUAL).sse((request, pathVariables, events) -> {
  *     for (LogLine line : jobs.tail(pathVariables.getString("id"), events.lastEventId())) {
- *         events.sendAndAwait(Event.of(line.text()).id(line.offset()));
+ *         events.send(Event.of(line.text()).id(line.offset())).toCompletableFuture().join();
  *     }
  * });
  * }</pre>

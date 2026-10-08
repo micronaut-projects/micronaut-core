@@ -89,7 +89,7 @@ public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends Ro
      * <pre>{@code
      * routes.POST("/completions").body(Prompt.class).executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, prompt, events) -> {
      *     for (String token : model.generate(prompt)) {
-     *         events.sendAndAwait(token);
+     *         events.send(token).toCompletableFuture().join();
      *     }
      * });
      * }</pre>
