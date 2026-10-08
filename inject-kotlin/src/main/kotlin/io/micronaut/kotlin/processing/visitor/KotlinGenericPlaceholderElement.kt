@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
@@ -49,6 +50,11 @@ internal class KotlinGenericPlaceholderElement(
 
     internal var typeArgument: KSTypeArgument? = null
 
+    /**
+     * The type of a use of the type parameter, absent for the type parameter itself.
+     */
+    internal var useType: KSType? = null
+
     constructor(
         genericNativeType: KotlinTypeParameterNativeElement,
         resolved: KotlinClassElement?,
@@ -67,7 +73,21 @@ internal class KotlinGenericPlaceholderElement(
     )
 
     private val resolvedTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
-        GenericPlaceholderElementAnnotationMetadata(this, upper)
+        GenericPlaceholderElementAnnotationMetadata(this, representingAnnotations)
+    }
+
+    /**
+     * The element providing the annotations of the type this placeholder represents.
+     * A use of the type parameter resolved to the unresolved type parameter itself doesn't report the type parameter's annotations.
+     */
+    private val representingAnnotations: KotlinClassElement by lazy {
+        val resolved = resolved
+        if (isUse() && resolved is KotlinGenericPlaceholderElement && resolved.resolved == null
+            && resolved.genericNativeType.declaration == genericNativeType.declaration) {
+            selectClassElementRepresentingThisPlaceholder(null, bounds)!!
+        } else {
+            upper
+        }
     }
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         if (presetAnnotationMetadata != null) {
@@ -75,7 +95,7 @@ internal class KotlinGenericPlaceholderElement(
         } else {
             AnnotationMetadataHierarchy(
                 true,
-                upper.annotationMetadata,
+                representingAnnotations.annotationMetadata,
                 resolvedGenericTypeAnnotationMetadata
             )
         }
@@ -93,9 +113,14 @@ internal class KotlinGenericPlaceholderElement(
         elementAnnotationMetadataFactory,
         visitorContext,
         arrayDimensions
-    ).also { it.typeArgument = typeArgument })
+    ).also {
+        it.typeArgument = typeArgument
+        it.useType = useType
+    })
 
     override fun isGenericPlaceholder() = true
+
+    private fun isUse() = useType != null || typeArgument != null
 
     override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
         arrayDimensionTypeAnnotationMetadata() ?: resolvedGenericTypeAnnotationMetadata
@@ -121,7 +146,10 @@ internal class KotlinGenericPlaceholderElement(
         elementAnnotationMetadataFactory,
         visitorContext,
         arrayDimensions
-    ).also { it.typeArgument = typeArgument })
+    ).also {
+        it.typeArgument = typeArgument
+        it.useType = useType
+    })
 
     override fun getBounds() = bounds
 

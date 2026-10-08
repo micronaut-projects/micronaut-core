@@ -66,6 +66,7 @@ noReflection {
     allowIn("io.micronaut.python.processing.element.AbstractPythonElement", "ENUM_CONSTANTS")
     allowIn("io.micronaut.python.processing.element.PythonAnnotationElement", "ENUM_CONSTANTS")
     allowIn("io.micronaut.python.processing.element.PythonScriptElement", "SERVICE_LOADING")
+    allowIn("io.micronaut.python.imports.PythonImportMappings", "SERVICE_LOADING")
     allowIn("io.micronaut.python.processing.element.TypeAnnotatedClassElement", "CLASS_NAMES")
     allowIn("io.micronaut.python.processing.util.PythonAnnotationTypes", "ANNOTATIONS", "CLASS_MEMBERS", "CLASS_NAMES", "ENUM_CONSTANTS")
     allowIn("io.micronaut.python.processing.visitor.LoadedVisitor", "GENERIC_SIGNATURES")
