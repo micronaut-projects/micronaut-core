@@ -9,6 +9,20 @@ The server selects the ann:websocket.annotation.ServerWebSocket[] bean that upgr
 * A route condition of the bean's `@OnOpen` or `@OnMessage` method, e.g. `@RouteCondition`, is now evaluated: an upgrade request that does not meet it is answered with `404`.
 * Of several WebSocket routes that match a path, the most specific URI template wins, then the lowest order.
 
+=== A `CompletionStage` returned by a WebSocket client handler is awaited (5.3)
+
+A ann:websocket.annotation.ClientWebSocket[] method annotated with ann:websocket.annotation.OnOpen[] or ann:websocket.annotation.OnMessage[] that returns a `CompletionStage` is now done when the stage completes, as it was already for a returned `Publisher`, and a failed stage reaches the ann:websocket.annotation.OnError[] method. Previously the stage was treated as a plain value and its failure was lost. As a consequence, the `connect` of a client whose `@OnOpen` method returns a stage completes only once that stage completes. The messages of a client are still handled as they are read: the next message does not wait for the stage of the previous one. The stage of an ann:websocket.annotation.OnClose[] or `@OnError` method does not hold the close back.
+
+=== The Netty WebSocket broadcaster broadcasts through `broadcastAsync` (5.3)
+
+`NettyServerWebSocketBroadcaster`, the api:websocket.WebSocketBroadcaster[] of the Netty server, implements `broadcastAsync` natively, and its `broadcast` and `broadcastSync` methods call it. Previously `broadcastAsync` was the interface default that subscribed to `broadcast`. A subclass that overrides `broadcast` to change how messages are broadcast should override `broadcastAsync(Object, MediaType, Predicate)` instead; a subclass that overrides `broadcastAsync` must not call `super.broadcast`, which calls `broadcastAsync` again.
+
+`broadcastSync` now fails like `broadcastAsync`: with a api:websocket.exceptions.WebSocketSessionException[], and not for a session that closed during the broadcast.
+
+=== The blocking WebSocket sends do not wait on an event loop thread (5.3)
+
+`WebSocketSession.sendSync` and `WebSocketBroadcaster.broadcastSync` of the Netty server and client no longer wait for the write when they are called on an event loop thread, for example in an `@OnMessage` method or a WebSocket route handler that runs on the event loop. Waiting there could fail with a `BlockingOperationException`, or, for `broadcastSync`, block the event loop for good, since the writes it waits for may have to run on that thread. They still fail when the write has already failed, and a later failure is logged. Use `sendAsync` and `broadcastAsync` to act on the outcome of the write, or run the handler on another executor, for example with `@ExecuteOn(TaskExecutors.BLOCKING)`.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
