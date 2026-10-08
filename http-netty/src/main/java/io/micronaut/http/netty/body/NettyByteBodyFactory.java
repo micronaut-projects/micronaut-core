@@ -37,12 +37,14 @@ import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -72,6 +74,18 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer.Upstream upstream) {
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(limits, upstream);
         return new StreamingBody(sb, new StreamingNettyByteBody(sb));
+    }
+
+    @Override
+    public Executor streamingBodyExecutor() {
+        // a StreamingNettyByteBody.SharedBuffer must be fed on its loop
+        return loop;
+    }
+
+    @Override
+    public boolean isEventLoopThread() {
+        // this loop, or the loop of another connection
+        return loop.inEventLoop() || ThreadExecutorMap.currentExecutor() != null;
     }
 
     @Override

@@ -104,10 +104,7 @@ class _MicronautJavaAnnotation:
                     f"@{self.__name__} was applied bare to {args[0]!r} through a name the compiler did not recognise "
                     f"as the annotation; write @{self.__name__}() or apply it under the name it is imported as")
 
-        def decorator(target):
-            return target
-
-        return decorator
+        return _MicronautAnnotationMarker((self.__name__,))
 
     def _value_member_holds_class(self):
         if self._value_holds_class is None:
@@ -137,6 +134,32 @@ class _MicronautJavaAnnotation:
 
     def __repr__(self):
         return f"<Java annotation {self.java_class_name}>"
+
+
+class _MicronautAnnotationMarker:
+    """
+    What a call of an annotation decorator returns: applied as a decorator it returns its target unchanged, the
+    annotation metadata having been compiled into the generated Java class; used as a parameter default or a module
+    attribute value (``content_type: str = Header()``) it marks the parameter or attribute, and only the compiler
+    reads it. Markers join with ``&`` (``NotBlank() & Size(max=50)``). A direct Python caller that omits a marked
+    argument receives the marker, as with FastAPI's ``Query()``; it prints as ``<Header marker>`` to show it.
+    """
+
+    __slots__ = ('_names',)
+
+    def __init__(self, names):
+        self._names = names
+
+    def __call__(self, target):
+        return target
+
+    def __and__(self, other):
+        if isinstance(other, _MicronautAnnotationMarker):
+            return _MicronautAnnotationMarker(self._names + other._names)
+        return NotImplemented
+
+    def __repr__(self):
+        return '<' + ' & '.join(self._names) + ' marker>'
 
 
 _micronaut_java_annotations = {}

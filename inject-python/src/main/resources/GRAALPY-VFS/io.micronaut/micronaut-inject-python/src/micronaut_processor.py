@@ -36,7 +36,6 @@ ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 _JAVA_INT_MIN = -2 ** 31
 _JAVA_INT_MAX = 2 ** 31 - 1
 
-
 class UnresolvedAnnotationMemberError(ValueError):
     """
     A decorator member value references a Java class member (Outer.NAME) that the class does not declare.
@@ -227,6 +226,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.java_keyword_method_aliases = {}  # Track keyword-safe aliases on Java type references
         self.type_vars = {}  # Track TypeVar assignments: variable_name -> TypeVar
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
+        self.annotated_aliases = {}  # Module-level aliases of Annotated[...]: alias name -> the Annotated subscript
         self.imported_source_files = {}  # Track local Python imports: simple_name -> source file
         self.local_annotation_definition_cache = {}
         self.local_annotation_source_loading = set()
@@ -612,6 +612,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Module():
                 # Process the module and create script element if we have script-level constructs
                 self.current_class = None
+                self.annotated_aliases.update(self._collect_annotated_aliases(node.body))
                 self.local_classes.update(
                     stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
                 )
@@ -707,6 +708,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # This allows us to detect @dataclass and other non-Micronaut decorators
             decorators = []
             for d in node.decorator_list:
+                if self._is_dataclass_decorator(d):
+                    # Keep the marker spelling understood by the Java element model, including aliases.
+                    decorators.append(DecoratorDef("dataclass", "dataclasses.dataclass", None, {}, []))
+                    continue
                 # First try to get it as a Micronaut decorator
                 micronaut_decorator = decorator_to_function(self, d)
                 if micronaut_decorator is not None:
@@ -751,6 +756,24 @@ class MicronautAstVisitor(ast.NodeVisitor):
             finally:
                 # Check if this is a dataclass and generate constructor if needed
                 is_dataclass = any(self._is_dataclass_decorator(dec) for dec in node.decorator_list)
+
+                if is_dataclass:
+                    # Data's MappedEntity mapper supplies identity indexes; do not shadow it
+                    # with the default introspection inferred for an ordinary dataclass.
+                    decorators = list(self.current_class.decorators())
+                    mapped_entity = "io.micronaut.data.annotation.MappedEntity"
+                    if (any(self._has_stereotype(attr.decorators(), marker)
+                            for attr in self.current_class_attributes
+                            for marker in ("io.micronaut.data.annotation.Id", "io.micronaut.data.annotation.GeneratedValue"))
+                            and not self._has_stereotype(decorators, mapped_entity)):
+                        decorators.append(DecoratorDef("MappedEntity", mapped_entity, None, {}, []))
+                    if not self._has_introspection(decorators) and not self._has_stereotype(decorators, mapped_entity):
+                        decorators.append(DecoratorDef("Introspected", "io.micronaut.core.annotation.Introspected", None, {}, []))
+                    current = self.current_class
+                    self.current_class = JavaClassDef(current.name(), current.packageName(), current.bases(), decorators,
+                        current.typeParams(), current.functions(), current.attributes(), current.properties(),
+                        current.nestedClasses(), current.constructor(), current.frozenDataclass(), current.isEnum(),
+                        current.values(), current.documentation())
 
                 if is_dataclass and self.current_class.constructor() is None:
                     # Generate constructor from dataclass attributes
@@ -823,12 +846,22 @@ class MicronautAstVisitor(ast.NodeVisitor):
             self.current_class_nested_types = previous_nested_types
             self.last_attribute = previous_last_attribute
 
+    def _has_introspection(self, decorators):
+        return self._has_stereotype(decorators, "io.micronaut.core.annotation.Introspected")
+
+    def _has_stereotype(self, decorators, annotation_name):
+        for decorator in decorators:
+            if (decorator.annotationName() == annotation_name
+                    or self._has_stereotype(decorator.stereotypes(), annotation_name)):
+                return True
+            annotation_type = _java_class_element(self.visitor_context, decorator.annotationName())
+            if annotation_type is not None and annotation_type.getAnnotationMetadata().hasStereotype(annotation_name):
+                return True
+        return False
+
     def _is_dataclass_decorator(self, decorator):
         target = decorator.func if isinstance(decorator, ast.Call) else decorator
-        return (
-            (isinstance(target, ast.Name) and target.id == "dataclass") or
-            (isinstance(target, ast.Attribute) and target.attr == "dataclass")
-        )
+        return self._resolved_callable_name(target) == "dataclasses.dataclass"
 
     def _is_frozen_dataclass_decorator(self, decorator):
         if not isinstance(decorator, ast.Call) or not self._is_dataclass_decorator(decorator):
@@ -905,8 +938,27 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                 if node.value:
                     self._track_current_class_constant(attr_name, node.value)
-                default_factory_name = self._dataclass_default_factory_name(node.value)
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None, default_factory_name)
+                has_default = node.value is not None
+                default_factory_name = None
+                if (any(d.annotationName() == "dataclasses.dataclass" for d in self.current_class.decorators())
+                        and isinstance(node.value, ast.Call)
+                        and self._resolved_callable_name(node.value.func) == "dataclasses.field"):
+                    keywords = {}
+                    for keyword in node.value.keywords:
+                        if keyword.arg is not None:
+                            keywords[keyword.arg] = keyword.value
+                        else:
+                            for key, keyword_value in self._literal_dict_entries(keyword.value):
+                                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                                    keywords[key.value] = keyword_value
+                                else:
+                                    keywords[None] = keyword_value
+                    default = keywords.get("default")
+                    factory = keywords.get("default_factory")
+                    has_default = default is not None or factory is not None or None in keywords
+                    value = literal_attribute_value(default) if default is not None else None
+                    default_factory_name = self._callable_name(factory) if factory is not None else None
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, has_default, decorators, None, is_static, None, default_factory_name)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
 
@@ -937,17 +989,24 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return TypeRef("set")
         return TypeRef("object")
 
-    def _dataclass_default_factory_name(self, value_node):
-        if not isinstance(value_node, ast.Call):
-            return None
-        function_name = self._callable_name(value_node.func)
-        if function_name not in ("field", "dataclasses.field"):
-            return None
-        for keyword in value_node.keywords:
-            if keyword.arg != "default_factory":
-                continue
-            return self._callable_name(keyword.value)
-        return None
+    def _literal_dict_entries(self, node):
+        # Resolve literal **field_options without evaluating user expressions.
+        if isinstance(node, (ast.Name, ast.Attribute)):
+            value = convert_ast_value(node, self)
+            if isinstance(value, dict):
+                node = ast.parse(repr(value), mode="eval").body
+        if not isinstance(node, ast.Dict):
+            yield None, node
+            return
+        for key, value in zip(node.keys, node.values):
+            if key is None:
+                yield from self._literal_dict_entries(value)
+            else:
+                yield key, value
+
+    def _resolved_callable_name(self, node):
+        name = self._callable_name(node)
+        return self._resolve_dotted_name(name.split(".")) if name else None
 
     def _callable_name(self, node):
         if isinstance(node, ast.Name):
@@ -1200,11 +1259,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             attr_name = node.targets[0].id
-            # Skip special dunder attributes and private attributes
-            if not attr_name.startswith('__') and not attr_name.startswith('_'):
+            # Skip special dunder attributes, private attributes and aliases of Annotated[...]
+            if not attr_name.startswith('__') and not attr_name.startswith('_') and attr_name not in self.annotated_aliases:
                 return True
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             attr_name = node.target.id
+            if attr_name in self.annotated_aliases:
+                return False
             # Skip special dunder attributes and private attributes
             if not attr_name.startswith('__') and not attr_name.startswith('_'):
                 return True
@@ -1244,16 +1305,22 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     annotation = ast.dump(node.annotation)
 
                 value = literal_attribute_value(node.value) if node.value else None
+                # a value that calls annotations (embedded_server: EmbeddedServer = Inject()) is a marker: it
+                # annotates the attribute, whose value the injection sets
+                markers = self._annotation_marker_decorators(node.value) if node.value else None
+                has_value = node.value is not None and not markers
+                if markers:
+                    value = None
 
                 # Check for typing.Annotated and extract decorators from metadata
-                decorators = []
+                decorators = list(markers) if markers else []
                 type_name = annotation  # Default to full annotation
 
                 if self._is_annotated_subscript(node.annotation):
                     parsed_annotation, parsed_decorators = self._parse_annotated_type(node.annotation)
                     if parsed_annotation:
                         type_name = parsed_annotation   # Use extracted type for typeName
-                        decorators = parsed_decorators  # Add any decorators found
+                        decorators = list(parsed_decorators) + decorators  # the Annotated metadata, then any markers
 
                         # Check if the parsed type annotation is nullable and add @Nullable decorator
                         if self._is_nullable_type_annotation(parsed_annotation):
@@ -1271,8 +1338,73 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # Script attributes are typically static
                 is_static = False
 
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None)
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, has_value, decorators, None, is_static, None)
                 self.current_script_attributes.append(attr_def)
+
+    def _declare_injected_argument(self, func_node, arg, type_annotation, markers):
+        """
+        Declare the attribute a parameter injected with a bean (``ctx: ApplicationContext = Inject()``) is injected
+        into, on the class of a method or on the module of a function: the generated bridge passes the bean from it,
+        the parameter being no argument of the method Micronaut sees. The name is the one PythonMethodElement uses.
+        """
+        # the bridges that pass the bean cover instance methods and module functions without *args: reject the rest
+        # rather than let the function receive the marker in place of the bean
+        unsupported = None
+        if func_node.args.vararg is not None:
+            unsupported = "a function that declares *args"
+        elif self.current_class is not None and is_static_method(func_node):
+            unsupported = "a static or class method"
+        if unsupported is not None:
+            self.unresolved_member_errors.append(
+                f"The parameter [{arg.arg}] of [{func_node.name}] is injected with Inject(), which {unsupported} "
+                f"does not support: inject the bean into an attribute instead"
+            )
+            return False
+        name = f"micronaut_inject_{func_node.name}_{arg.arg}"
+        annotation = ast.unparse(arg.annotation) if arg.annotation is not None else ""
+        attribute = JavaAttributeDef(name, annotation, type_annotation, None, False, list(markers), None, False, None)
+        if self.current_class is not None:
+            self.current_class_attributes.append(attribute)
+        else:
+            self.current_script_attributes.append(attribute)
+        return True
+
+    def _annotation_marker_decorators(self, node):
+        """
+        The annotations a parameter default or a module attribute value applies as a marker, or None when the
+        value is no marker: a call of an annotation (``Header()``, ``http.Header("X-Trace")``), or several joined
+        with ``&`` (``NotBlank() & Size(max=50)``). The call reads as it does as a decorator. An annotation used
+        without a call (``= Header``) is reported, since it would be a default of the annotation's own type.
+        """
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
+            left = self._annotation_marker_decorators(node.left)
+            right = self._annotation_marker_decorators(node.right) if left else None
+            return left + right if left and right else None
+        if isinstance(node, ast.Call) and self._names_annotation(node.func):
+            decorator = self._parse_metadata_call(node)
+            return [decorator] if decorator is not None else None
+        if isinstance(node, (ast.Name, ast.Attribute)) and self._names_annotation(node):
+            self.unresolved_member_errors.append(
+                f"The annotation [{ast.unparse(node)}] is a default value without being called: write "
+                f"[{ast.unparse(node)}()] to apply it to the parameter or attribute as a marker"
+            )
+        return None
+
+    def _names_annotation(self, node):
+        """Whether an expression names an annotation: a generated or Python-defined decorator, or a qualified one."""
+        if isinstance(node, ast.Name):
+            return node.id in self.known_decorators
+        if isinstance(node, ast.Attribute):
+            parts = []
+            current = node
+            while isinstance(current, ast.Attribute):
+                parts.insert(0, current.attr)
+                current = current.value
+            if not isinstance(current, ast.Name):
+                return False
+            parts.insert(0, current.id)
+            return find_known_decorator_by_annotation_name(self, self._resolve_dotted_name(parts)) is not None
+        return False
 
     def _is_script_function(self, node):
         parent = getattr(node, "parent", None)
@@ -1374,8 +1506,39 @@ class MicronautAstVisitor(ast.NodeVisitor):
         return False
 
     def _is_annotated_subscript(self, node):
-        """Whether an annotation is ``Annotated[...]`` under any of its spellings."""
+        """Whether an annotation is ``Annotated[...]`` under any of its spellings, or an alias of one."""
+        node = self._alias_target(node)
         return isinstance(node, ast.Subscript) and self._is_annotated_name(node.value)
+
+    def _collect_annotated_aliases(self, body):
+        """
+        The module-level aliases of ``Annotated[...]``: ``type Name = Annotated[...]`` (PEP 695),
+        ``Name: TypeAlias = Annotated[...]`` and ``Name = Annotated[...]``. A parameter, attribute or field annotated
+        with the alias carries the alias's metadata, so constraints are written once and reused.
+        """
+        aliases = {}
+        type_alias = getattr(ast, 'TypeAlias', None)
+        for statement in body:
+            name = value = None
+            if type_alias is not None and isinstance(statement, type_alias) and isinstance(statement.name, ast.Name) \
+                    and not statement.type_params:
+                name, value = statement.name.id, statement.value
+            elif isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name) and statement.value is not None \
+                    and ast.unparse(statement.annotation) in ('TypeAlias', 'typing.TypeAlias', 'typing_extensions.TypeAlias'):
+                name, value = statement.target.id, statement.value
+            elif isinstance(statement, ast.Assign) and len(statement.targets) == 1 and isinstance(statement.targets[0], ast.Name):
+                name, value = statement.targets[0].id, statement.value
+            if name is not None and isinstance(value, ast.Subscript) and self._is_annotated_name(value.value):
+                aliases[name] = value
+        return aliases
+
+    def _alias_target(self, node):
+        """The ``Annotated[...]`` an annotation names through a module-level alias, else the annotation itself."""
+        seen = set()
+        while isinstance(node, ast.Name) and node.id in self.annotated_aliases and node.id not in seen:
+            seen.add(node.id)
+            node = self.annotated_aliases[node.id]
+        return node
 
     def _parse_annotated_type(self, annotation_node):
         """
@@ -1384,6 +1547,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         decorators = []
         type_annotation = TypeRef("object")  # default fallback
+        annotation_node = self._alias_target(annotation_node)
 
         # Parse the Annotated subscript arguments
         if isinstance(annotation_node, ast.Subscript):
@@ -2209,6 +2373,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Get default value
             default_value = default_values[i]
             has_default = i >= num_no_defaults
+            # a default that calls annotations (content_type: str = Header(), q: str = NotBlank() & Size(max=50))
+            # is a marker: it annotates the parameter, which has no default on the Java side
+            injected = False
+            markers = self._annotation_marker_decorators(default_value) if default_value is not None else None
+            if markers:
+                decorators.extend(markers)
+                default_value = None
+                has_default = False
+                if any(marker.annotationName() == 'jakarta.inject.Inject' for marker in markers):
+                    injected = self._declare_injected_argument(func_node, arg, type_annotation, markers)
             if default_value is not None:
                 try:
                     # Try to evaluate the value
@@ -2219,7 +2393,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Get parameter documentation
             param_doc = param_docs.get(arg_name, None)
 
-            arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc))
+            argument = ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc)
+            arguments.append(argument.withInjected(True) if injected else argument)
 
         vararg = func_node.args.vararg
         if vararg is not None:

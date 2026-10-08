@@ -26,7 +26,7 @@ class MicronautMetaServiceLoaderUtilsInvalidateSpec extends Specification {
     @TempDir
     Path root
 
-    void "invalidating a loader makes the next lookup scan the index again"() {
+    void "invalidating makes the next lookup scan the index again"() {
         given:
         Path service = Files.createDirectories(root.resolve("META-INF/micronaut/example.Service"))
         Files.writeString(service.resolve("a.A"), "")
@@ -42,7 +42,7 @@ class MicronautMetaServiceLoaderUtilsInvalidateSpec extends Specification {
         MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(loader, "example.Service") == ["a.A"] as Set
 
         when:
-        MicronautMetaServiceLoaderUtils.invalidate(loader)
+        MicronautMetaServiceLoaderUtils.invalidate()
 
         then:
         MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(loader, "example.Service") == ["a.A", "b.B"] as Set

@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
  * @see BeanIntrospector
  * @see BeanIntrospection
  */
-class DefaultBeanIntrospector implements BeanIntrospector {
+class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
 
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
@@ -190,23 +190,37 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     }
 
     @Override
-    public void invalidate() {
+    public void invalidate(ClassLoader changed) {
+        ArgumentUtils.requireNonNull("changed", changed);
         synchronized (this) {
-            // the index is rebuilt from the META-INF/micronaut entries, which are cached per loader too
-            MicronautMetaServiceLoaderUtils.invalidate(classLoader);
-            for (ClassLoader other : List.copyOf(otherIntrospections.keySet())) {
-                MicronautMetaServiceLoaderUtils.invalidate(other);
+            // the index is rebuilt from the META-INF/micronaut entries, whose cache one invalidation makes stale
+            MicronautMetaServiceLoaderUtils.invalidate();
+            if (sees(classLoader, changed)) {
+                introspectionMap = null;
+                fallbacks = null;
             }
-            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-            if (contextClassLoader != null) {
-                MicronautMetaServiceLoaderUtils.invalidate(contextClassLoader);
-            }
-            introspectionMap = null;
-            fallbacks = null;
-            otherIntrospections.clear();
-            otherFallbacks.clear();
+            removeSeeing(otherIntrospections, changed);
+            removeSeeing(otherFallbacks, changed);
             invalidations++;
         }
+    }
+
+    private static void removeSeeing(Map<ClassLoader, ?> cache, ClassLoader changed) {
+        synchronized (cache) {
+            cache.keySet().removeIf(loader -> sees(loader, changed));
+        }
+    }
+
+    /**
+     * Whether a loader sees the classes of another: it is that loader, or delegates to it as one of its parents.
+     */
+    private static boolean sees(@Nullable ClassLoader loader, ClassLoader changed) {
+        for (ClassLoader current = loader; current != null; current = current.getParent()) {
+            if (current == changed) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Map<String, BeanIntrospectionReference<Object>> getIntrospections(ClassLoader effectiveClassLoader) {

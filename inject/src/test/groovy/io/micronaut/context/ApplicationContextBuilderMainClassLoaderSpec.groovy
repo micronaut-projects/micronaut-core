@@ -40,4 +40,47 @@ class ApplicationContextBuilderMainClassLoaderSpec extends Specification {
         explicit.close()
         child.close()
     }
+
+    void "a main class whose loader does not see the default loader's classes leaves the default loader"() {
+        given: "a main class of a parent of the default loader, and one of a loader beside it"
+        Class<?> parentMain = java.sql.Driver
+        def beside = new io.micronaut.inject.annotation.AnnotationTypeClassLoaderSpec.OwnCopy()
+        Class<?> besideMain = beside.define(io.micronaut.inject.annotation.Reloaded.name)
+
+        expect:
+        parentMain.classLoader != null
+        isAncestor(parentMain.classLoader, ApplicationContext.classLoader)
+        ApplicationContext.builder().mainClass(parentMain).classLoader == ApplicationContext.classLoader
+        ApplicationContext.builder().mainClass(besideMain).classLoader == ApplicationContext.classLoader
+
+        and: "the main class still supplies the package to scan"
+        ApplicationContext.builder().mainClass(besideMain).@packages.contains('io.micronaut.inject.annotation')
+
+    }
+
+    void "the last main class decides the loader, each checked against the default loader"() {
+        given: "main classes of two sibling children of the default loader"
+        GroovyClassLoader first = new GroovyClassLoader(getClass().classLoader)
+        GroovyClassLoader second = new GroovyClassLoader(getClass().classLoader)
+        Class<?> firstMain = first.parseClass('package example.first; class Application {}')
+        Class<?> secondMain = second.parseClass('package example.second; class Application {}')
+
+        expect:
+        ApplicationContext.builder().mainClass(firstMain).mainClass(secondMain).classLoader == secondMain.classLoader
+        secondMain.classLoader != firstMain.classLoader
+        ApplicationContext.builder().mainClass(firstMain).mainClass(java.sql.Driver).classLoader == ApplicationContext.classLoader
+
+        cleanup:
+        first.close()
+        second.close()
+    }
+
+    private static boolean isAncestor(ClassLoader ancestor, ClassLoader loader) {
+        for (ClassLoader current = loader; current != null; current = current.parent) {
+            if (current.is(ancestor)) {
+                return true
+            }
+        }
+        return false
+    }
 }

@@ -116,22 +116,19 @@ public final class MicronautMetaServiceLoaderUtils {
     }
 
     /**
-     * Forgets the cached service entries of the given classloader, so that the next lookup scans the
-     * {@code META-INF/micronaut/} index again.
+     * Forgets the cached service entries, so that the next lookup scans the {@code META-INF/micronaut/}
+     * index again, whichever loader it is for.
      *
-     * <p>The cache is keyed by classloader identity. A loader whose visible classes change while its
-     * identity stays the same, as a development launcher's delegating loader does when it swaps the
-     * generation it delegates to, has to call this after every swap.</p>
+     * <p>The cache holds the entries of one classloader, keyed by its identity. A loader whose visible
+     * classes change while its identity stays the same, as a development launcher's delegating loader does
+     * when it swaps the generation it delegates to, has to call this after every swap.</p>
      *
-     * @param classLoader The classloader whose entries are stale
      * @since 5.3.0
      */
-    public static void invalidate(ClassLoader classLoader) {
+    @Internal
+    public static void invalidate() {
         CACHE_GENERATION.incrementAndGet();
-        CacheEntry ce = cacheEntry;
-        if (ce != null && ce.classLoader.get() == classLoader) {
-            cacheEntry = null;
-        }
+        cacheEntry = null;
     }
 
     /**
