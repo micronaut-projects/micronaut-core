@@ -16,6 +16,7 @@
 package io.micronaut.function.client;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.function.LocalFunctionRegistry;
@@ -56,7 +57,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     void aLocalDefinitionCompletesRightAway() {
         FunctionDefinition local = () -> "local";
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0], local);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0], local);
 
         assertSame(local, client.getFunctionAsync("local").toCompletableFuture().getNow(null));
         assertEquals(0, discoveryClient.serviceIds.size());
@@ -65,7 +66,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void theFirstInstanceThatIsUpAndOffersTheFunctionIsSelected() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
         String key = LocalFunctionRegistry.FUNCTION_PREFIX + "max";
 
         CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
@@ -88,7 +89,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void noInstanceFailsWithFunctionNotFound() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
 
         CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
         discoveryClient.serviceIds.get(0).complete(List.of("math"));
@@ -125,7 +126,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void aFailingLookupFailsTheFunction() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
         IllegalStateException error = new IllegalStateException("boom");
 
         CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
@@ -138,7 +139,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void cancellingTheLookupCancelsTheServiceIds() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
 
         client.getFunctionAsync("max").toCompletableFuture().cancel(false);
 
@@ -148,7 +149,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void aServiceThatOffersTheFunctionCompletesTheLookupWithoutWaitingForTheOthers() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
         String key = LocalFunctionRegistry.FUNCTION_PREFIX + "max";
 
         CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
@@ -166,7 +167,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void aServiceThatFailsBeforeAMatchFailsTheLookupAndCancelsTheOthers() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
         IllegalStateException error = new IllegalStateException("boom");
 
         CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
@@ -182,7 +183,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     void aMatchThatIsAlreadyKnownStopsTheLookup() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
         discoveryClient.completeInstancesWith = List.of(instance("up", HealthStatus.UP, Map.of(LocalFunctionRegistry.FUNCTION_PREFIX + "max", "/max")));
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
 
         CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
         discoveryClient.serviceIds.get(0).complete(List.of("math", "other"));
@@ -195,7 +196,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void cancellingTheLookupCancelsTheInstanceLookups() {
         AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient();
-        DefaultFunctionDiscoveryClient client = new AsyncFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
 
         CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
         discoveryClient.serviceIds.get(0).complete(List.of("a", "b"));
@@ -226,14 +227,83 @@ class DefaultFunctionDiscoveryClientAsyncTest {
     @Test
     void theDefaultBeanLooksUpWithoutAPublisher() {
         try (ApplicationContext context = ApplicationContext.run()) {
-            assertInstanceOf(AsyncFunctionDiscoveryClient.class, context.getBean(FunctionDiscoveryClient.class));
+            assertSame(DefaultFunctionDiscoveryClient.class, context.getBean(FunctionDiscoveryClient.class).getClass());
         }
     }
 
+    @Test
+    void theSharedStagesOfTheDiscoveryClientAreNotCancelled() {
+        CompletableFuture<List<ServiceInstance>> shared = new CompletableFuture<>();
+        AsyncDiscoveryClient discoveryClient = new AsyncDiscoveryClient() {
+            @Override
+            public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+                return serviceId.equals("shared") ? shared : super.getInstancesAsync(serviceId);
+            }
+        };
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+        String key = LocalFunctionRegistry.FUNCTION_PREFIX + "max";
+
+        CompletableFuture<FunctionDefinition> future = client.getFunctionAsync("max").toCompletableFuture();
+        discoveryClient.serviceIds.get(0).complete(List.of("shared", "math"));
+        discoveryClient.instances.get(0).complete(List.of(instance("up", HealthStatus.UP, Map.of(key, "/max"))));
+
+        assertEquals("max", future.getNow(null).getName());
+        assertFalse(shared.isDone());
+    }
+
+    @Test
+    void aDiscoveryClientWithoutStagesIsCalledThroughItsPublishers() {
+        String key = LocalFunctionRegistry.FUNCTION_PREFIX + "max";
+        // like a mock that only stubs the publisher methods
+        DiscoveryClient discoveryClient = new DiscoveryClient() {
+            @Override
+            public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+                return Mono.just(List.of(instance("up", HealthStatus.UP, Map.of(key, "/max"))));
+            }
+
+            @Override
+            public Publisher<List<String>> getServiceIds() {
+                return Mono.just(List.of("math"));
+            }
+
+            @Override
+            public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public CompletionStage<List<String>> getServiceIdsAsync() {
+                return null;
+            }
+
+            @Override
+            public String getDescription() {
+                return "mock";
+            }
+
+            @Override
+            public void close() {
+                // the test client holds no resources
+            }
+        };
+        DefaultFunctionDiscoveryClient client = new DefaultFunctionDiscoveryClient(discoveryClient, new FunctionDefinitionProvider[0]);
+
+        assertEquals(Optional.of(URI.create("http://up:8080/max")), client.getFunctionAsync("max").toCompletableFuture().join().getURI());
+    }
+
+    @Test
+    void theDefaultAdapterFailsWithFunctionNotFoundForAnEmptyPublisher() {
+        FunctionDiscoveryClient client = functionName -> Mono.empty();
+
+        ExecutionException e = assertThrows(ExecutionException.class, () -> client.getFunctionAsync("max").toCompletableFuture().get());
+        assertInstanceOf(FunctionNotFoundException.class, e.getCause());
+    }
+
     /**
-     * Fails the publisher methods, so that only the stages can serve.
+     * Fails the publisher methods, so that only the stages can serve. Its stages are new for
+     * each call, so the framework may cancel them.
      */
-    private static final class AsyncDiscoveryClient implements DiscoveryClient {
+    private static class AsyncDiscoveryClient implements DiscoveryClient {
         final List<String> requested = new ArrayList<>();
         final List<CompletableFuture<List<ServiceInstance>>> instances = new ArrayList<>();
         final List<CompletableFuture<List<String>>> serviceIds = new ArrayList<>();
@@ -253,7 +323,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
         @Override
         public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
             requested.add(serviceId);
-            CompletableFuture<List<ServiceInstance>> future = new CompletableFuture<>();
+            CompletableFuture<List<ServiceInstance>> future = CompletionStagePublishers.future();
             if (completeInstancesWith != null) {
                 future.complete(completeInstancesWith);
             }
@@ -263,7 +333,7 @@ class DefaultFunctionDiscoveryClientAsyncTest {
 
         @Override
         public CompletionStage<List<String>> getServiceIdsAsync() {
-            CompletableFuture<List<String>> future = new CompletableFuture<>();
+            CompletableFuture<List<String>> future = CompletionStagePublishers.future();
             serviceIds.add(future);
             return future;
         }

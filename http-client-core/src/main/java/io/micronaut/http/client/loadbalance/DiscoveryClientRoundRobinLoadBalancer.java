@@ -15,11 +15,18 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
+import io.micronaut.discovery.DiscoveryClientStages;
 import io.micronaut.discovery.ServiceInstance;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>A {@link io.micronaut.http.client.LoadBalancer} that uses the {@link DiscoveryClient} and a
@@ -67,5 +74,35 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return Publishers.map(discoveryClient.getInstances(serviceID), instances -> getNextAvailable(instances, discriminator));
+    }
+
+    /**
+     * Selects from {@link DiscoveryClient#getInstancesAsync(String)} without a publisher. A
+     * subclass is selected through {@link #select(Object)}, so that its override keeps working.
+     * Cancelling the stage cancels the lookup when the discovery client adapts a publisher.
+     *
+     * @param discriminator An object used to discriminate the server to select
+     * @return A stage completed with the selected instance
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
+        if (getClass() != DiscoveryClientRoundRobinLoadBalancer.class) {
+            return super.selectAsync(discriminator);
+        }
+        CompletableFuture<List<ServiceInstance>> instances = DiscoveryClientStages.getInstances(discoveryClient, serviceID).toCompletableFuture();
+        if (instances.isDone() && !instances.isCompletedExceptionally()) {
+            // a cached or static discovery client: select right away, without a derived future
+            try {
+                return CompletableFuture.completedFuture(getNextAvailable(orEmpty(instances.join()), discriminator));
+            } catch (RuntimeException e) {
+                return CompletableFuture.failedFuture(e);
+            }
+        }
+        return CompletionStagePublishers.map(instances, list -> getNextAvailable(orEmpty(list), discriminator));
+    }
+
+    private static List<ServiceInstance> orEmpty(@Nullable List<ServiceInstance> instances) {
+        return instances == null ? Collections.emptyList() : instances;
     }
 }

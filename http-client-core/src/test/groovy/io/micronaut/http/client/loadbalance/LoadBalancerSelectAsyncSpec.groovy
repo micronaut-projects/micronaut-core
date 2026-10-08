@@ -1,6 +1,8 @@
 package io.micronaut.http.client.loadbalance
 
+import io.micronaut.core.async.publisher.CompletionStagePublishers
 import io.micronaut.core.async.publisher.Publishers
+import io.micronaut.discovery.DefaultCompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.StaticServiceInstanceList
@@ -15,6 +17,7 @@ import spock.lang.Specification
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class LoadBalancerSelectAsyncSpec extends Specification {
@@ -79,7 +82,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
 
     void 'the fixed load balancer selects its instance right away'() {
         given:
-        def loadBalancer = new AsyncFixedLoadBalancer(URI.create('http://fixed:8080/ctx'))
+        def loadBalancer = new FixedLoadBalancer(URI.create('http://fixed:8080/ctx'))
 
         when:
         def future = loadBalancer.selectAsync(null).toCompletableFuture()
@@ -91,7 +94,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
 
     void 'the service instance list load balancer selects right away, round robin'() {
         given:
-        def loadBalancer = new AsyncServiceInstanceListRoundRobinLoadBalancer(
+        def loadBalancer = new ServiceInstanceListRoundRobinLoadBalancer(
                 new StaticServiceInstanceList('svc', [URI.create('http://one:8080'), URI.create('http://two:8080')]))
 
         when:
@@ -103,7 +106,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
 
     void 'the service instance list load balancer fails the stage when no instance is available'() {
         given:
-        def loadBalancer = new AsyncServiceInstanceListRoundRobinLoadBalancer(new StaticServiceInstanceList('svc', []))
+        def loadBalancer = new ServiceInstanceListRoundRobinLoadBalancer(new StaticServiceInstanceList('svc', []))
 
         when:
         def future = loadBalancer.selectAsync(null).toCompletableFuture()
@@ -123,7 +126,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     void 'the discovery client load balancer selects from getInstancesAsync'() {
         given:
         def discoveryClient = new AsyncOnlyDiscoveryClient()
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
 
         when:
         def first = loadBalancer.selectAsync(null).toCompletableFuture()
@@ -150,7 +153,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         given:
         def down = ServiceInstance.builder('svc', URI.create('http://down:8080')).status(HealthStatus.DOWN).build()
         def discoveryClient = new AsyncOnlyDiscoveryClient()
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
 
         when:
         def future = loadBalancer.selectAsync(null).toCompletableFuture()
@@ -163,7 +166,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     void 'the discovery client load balancer fails when no instance is available'() {
         given:
         def discoveryClient = new AsyncOnlyDiscoveryClient()
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
 
         when:
         def future = loadBalancer.selectAsync(null).toCompletableFuture()
@@ -179,7 +182,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     void 'the discovery client load balancer fails with the error of the discovery client'() {
         given:
         def discoveryClient = new AsyncOnlyDiscoveryClient()
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
         def error = new IllegalStateException('discovery down')
 
         when:
@@ -195,7 +198,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     void 'cancelling the discovery client selection cancels the lookup'() {
         given:
         def discoveryClient = new AsyncOnlyDiscoveryClient()
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
 
         when:
         loadBalancer.selectAsync(null).toCompletableFuture().cancel(false)
@@ -207,7 +210,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     void 'the discovery client load balancer adapts a discovery client that only has publishers'() {
         given:
         DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient(instances: [ONE])
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
 
         expect:
         loadBalancer.selectAsync(null).toCompletableFuture().getNow(null).is(ONE)
@@ -217,7 +220,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     void 'the discovery client load balancer fails when the publisher of the discovery client is empty'() {
         given:
         DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient(instances: null)
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
 
         when:
         loadBalancer.selectAsync(null).toCompletableFuture().get()
@@ -227,12 +230,57 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         e.cause instanceof NoAvailableServiceException
     }
 
-    void 'the factories create the load balancers that select without a publisher'() {
+    void 'the factories create the built-in load balancers, which select without a publisher'() {
         expect:
-        new DiscoveryClientLoadBalancerFactory(new AsyncOnlyDiscoveryClient()).create('svc') instanceof AsyncDiscoveryClientRoundRobinLoadBalancer
-        new ServiceInstanceListLoadBalancerFactory().create(new StaticServiceInstanceList('svc', [URI.create('http://one:8080')])) instanceof AsyncServiceInstanceListRoundRobinLoadBalancer
-        LoadBalancer.fixed(URI.create('http://fixed:8080')) instanceof AsyncFixedLoadBalancer
-        LoadBalancer.fixed(URI.create('http://fixed:8080').toURL()) instanceof AsyncFixedLoadBalancer
+        new DiscoveryClientLoadBalancerFactory(new AsyncOnlyDiscoveryClient()).create('svc').getClass() == DiscoveryClientRoundRobinLoadBalancer
+        new ServiceInstanceListLoadBalancerFactory().create(new StaticServiceInstanceList('svc', [URI.create('http://one:8080')])).getClass() == ServiceInstanceListRoundRobinLoadBalancer
+        LoadBalancer.fixed(URI.create('http://fixed:8080')).getClass() == FixedLoadBalancer
+        LoadBalancer.fixed(URI.create('http://fixed:8080').toURL()).getClass() == FixedLoadBalancer
+    }
+
+    void 'a discovery client mock that only stubs getInstances is selected through it'() {
+        given:
+        DiscoveryClient discoveryClient = Mock(DiscoveryClient)
+        discoveryClient.getInstances('svc') >> Flux.just([ONE])
+        def loadBalancer = new DiscoveryClientLoadBalancerFactory(new DefaultCompositeDiscoveryClient(discoveryClient)).create('svc')
+
+        expect:
+        loadBalancer.selectAsync().toCompletableFuture().get(5, TimeUnit.SECONDS).is(ONE)
+    }
+
+    void 'a discovery client stage that completes with null is replaced by the publisher'() {
+        given:
+        DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient() {
+            @Override
+            CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+                CompletableFuture.completedFuture(null)
+            }
+        }
+        discoveryClient.instances = [TWO]
+
+        expect:
+        new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient).selectAsync().toCompletableFuture().getNow(null).is(TWO)
+    }
+
+    void 'cancelling one selection does not cancel a shared stage of the discovery client'() {
+        given:
+        def shared = new CompletableFuture<List<ServiceInstance>>()
+        DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient() {
+            @Override
+            CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+                shared
+            }
+        }
+        def loadBalancer = new DiscoveryClientLoadBalancerFactory(new DefaultCompositeDiscoveryClient(discoveryClient)).create('svc')
+
+        when:
+        loadBalancer.selectAsync().toCompletableFuture().cancel(false)
+        def second = loadBalancer.selectAsync().toCompletableFuture()
+        shared.complete([ONE])
+
+        then:
+        !shared.isCancelled()
+        second.getNow(null).is(ONE)
     }
 
     void 'a subclass of the fixed load balancer that overrides select is selected through it'() {
@@ -294,14 +342,14 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         }
 
         when:
-        def disposable = Flux.from(new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient).select(null)).subscribe()
+        def disposable = Flux.from(new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient).select(null)).subscribe()
         disposable.dispose()
 
         then:
         cancelled.get() == 1
 
         when:
-        new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient).selectAsync(null).toCompletableFuture().cancel(false)
+        new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient).selectAsync(null).toCompletableFuture().cancel(false)
 
         then:
         cancelled.get() == 2
@@ -310,14 +358,15 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     void 'the discovery client load balancer selects right away from instances that are already known'() {
         given:
         DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient(instances: [ONE, TWO])
-        def loadBalancer = new AsyncDiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
+        def loadBalancer = new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient)
 
         expect:
         (1..3).collect { loadBalancer.selectAsync(null).toCompletableFuture().getNow(null) } == [ONE, TWO, ONE]
     }
 
     /**
-     * Fails the publisher methods, so that only the stages can serve.
+     * Fails the publisher methods, so that only the stages can serve. Its stages are new for each
+     * call, so the framework may cancel them.
      */
     static class AsyncOnlyDiscoveryClient implements DiscoveryClient {
         final List<String> requested = []
@@ -336,7 +385,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         @Override
         CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
             requested << serviceId
-            def future = new CompletableFuture<List<ServiceInstance>>()
+            CompletableFuture<List<ServiceInstance>> future = CompletionStagePublishers.future()
             futures << future
             return future
         }

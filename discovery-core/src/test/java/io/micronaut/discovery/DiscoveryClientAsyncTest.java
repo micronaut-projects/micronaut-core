@@ -93,7 +93,7 @@ class DiscoveryClientAsyncTest {
     void theCompositeConcatenatesTheClientsInOrder() {
         AsyncClient first = new AsyncClient("first");
         AsyncClient second = new AsyncClient("second");
-        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(first, second);
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(first, second);
 
         CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("myService").toCompletableFuture();
         // the service ID is hyphenated, like for the publisher
@@ -113,7 +113,7 @@ class DiscoveryClientAsyncTest {
 
     @Test
     void theCompositeAdaptsClientsThatOnlyHavePublishers() {
-        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(
             new PublisherClient("one", Publishers.just(List.of(A)), Publishers.just(List.of("one"))),
             new PublisherClient("empty", Publishers.empty(), Publishers.empty()),
             new PublisherClient("two", Publishers.just(List.of(B)), Publishers.just(List.of("two")))
@@ -126,10 +126,10 @@ class DiscoveryClientAsyncTest {
     }
 
     @Test
-    void oneFailingClientFailsTheCompositeAndCancelsTheOthers() {
+    void oneFailingClientFailsTheCompositeAndTheOthersAreIgnored() {
         AsyncClient first = new AsyncClient("first");
         AsyncClient second = new AsyncClient("second");
-        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(first, second);
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(first, second);
         IllegalStateException error = new IllegalStateException("boom");
 
         CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("my-service").toCompletableFuture();
@@ -137,30 +137,89 @@ class DiscoveryClientAsyncTest {
 
         ExecutionException e = assertThrows(ExecutionException.class, instances::get);
         assertSame(error, e.getCause());
-        assertTrue(first.instances.get(0).isCancelled());
+        // the stage of a client may be shared: it is not cancelled, its result is ignored
+        assertFalse(first.instances.get(0).isDone());
+        first.instances.get(0).complete(List.of(A));
+        assertTrue(instances.isCompletedExceptionally());
         // the publisher fails too
         PublisherClient failing = new PublisherClient("failing", Mono.error(error), Mono.error(error));
-        DiscoveryClient publishers = new AsyncCompositeDiscoveryClient(new PublisherClient("ok", Publishers.just(List.of(A)), Publishers.just(List.of())), failing);
+        DiscoveryClient publishers = new DefaultCompositeDiscoveryClient(new PublisherClient("ok", Publishers.just(List.of(A)), Publishers.just(List.of())), failing);
         assertSame(error, assertThrows(IllegalStateException.class, () -> Mono.from(publishers.getInstances("my-service")).block()));
         e = assertThrows(ExecutionException.class, () -> publishers.getInstancesAsync("my-service").toCompletableFuture().get());
         assertSame(error, e.getCause());
     }
 
     @Test
-    void cancellingTheCompositeCancelsTheClients() {
-        AsyncClient first = new AsyncClient("first");
-        AsyncClient second = new AsyncClient("second");
-        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(first, second);
+    void oneFailingClientCancelsTheSubscriptionsOfTheOthers() {
+        AtomicInteger cancelled = new AtomicInteger();
+        IllegalStateException error = new IllegalStateException("boom");
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(
+            new PublisherClient("never", Flux.<List<ServiceInstance>>never().doOnCancel(cancelled::incrementAndGet), Flux.never()),
+            new PublisherClient("failing", Mono.error(error), Mono.error(error))
+        );
+
+        CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("my-service").toCompletableFuture();
+
+        assertTrue(instances.isCompletedExceptionally());
+        assertEquals(1, cancelled.get());
+    }
+
+    @Test
+    void cancellingTheCompositeCancelsTheSubscriptionsButNotTheStagesOfTheClients() {
+        AtomicInteger cancelled = new AtomicInteger();
+        AsyncClient async = new AsyncClient("async");
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(
+            new PublisherClient("never", Flux.never(), Flux.<List<String>>never().doOnCancel(cancelled::incrementAndGet)),
+            async
+        );
 
         composite.getServiceIdsAsync().toCompletableFuture().cancel(false);
 
-        assertTrue(first.serviceIds.get(0).isCancelled());
-        assertTrue(second.serviceIds.get(0).isCancelled());
+        assertEquals(1, cancelled.get());
+        assertFalse(async.serviceIds.get(0).isDone());
+    }
+
+    @Test
+    void aSharedStageOfAClientIsNotCancelled() {
+        CompletableFuture<List<ServiceInstance>> shared = new CompletableFuture<>();
+        AsyncClient client = new AsyncClient("shared") {
+            @Override
+            public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+                return shared;
+            }
+        };
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(client, new PublisherClient("other", Publishers.just(List.of(B)), Publishers.just(List.of())));
+
+        composite.getInstancesAsync("my-service").toCompletableFuture().cancel(false);
+        CompletableFuture<List<ServiceInstance>> second = composite.getInstancesAsync("my-service").toCompletableFuture();
+        shared.complete(List.of(A));
+
+        assertFalse(shared.isCancelled());
+        assertEquals(List.of(A, B), second.getNow(null));
+    }
+
+    @Test
+    void aClientWithoutStagesIsCalledThroughItsPublishers() {
+        // a mock that only stubs the publisher methods returns null, or a stage completed with null
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(
+            new MockLikeClient(null, Publishers.just(List.of(A)), Publishers.just(List.of("a"))),
+            new MockLikeClient(CompletableFuture.completedFuture(null), Publishers.just(List.of(B)), Publishers.just(List.of("b")))
+        );
+
+        assertEquals(List.of(A, B), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of("a", "b"), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        CompletableFuture<Object> later = new CompletableFuture<>();
+        DiscoveryClient single = new DefaultCompositeDiscoveryClient(new MockLikeClient(later, Publishers.just(List.of(C)), Publishers.just(List.of("c"))));
+        CompletableFuture<List<ServiceInstance>> instances = single.getInstancesAsync("my-service").toCompletableFuture();
+        CompletableFuture<List<String>> serviceIds = single.getServiceIdsAsync().toCompletableFuture();
+        later.complete(null);
+        assertEquals(List.of(C), instances.getNow(null));
+        assertEquals(List.of("c"), serviceIds.getNow(null));
     }
 
     @Test
     void aCompositeWithoutClientsIsEmpty() {
-        DiscoveryClient composite = new AsyncCompositeDiscoveryClient();
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient();
 
         assertEquals(List.of(), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
         assertEquals(List.of(), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
@@ -211,12 +270,13 @@ class DiscoveryClientAsyncTest {
     @Test
     void theCompositeWithOneClientReturnsItsStage() {
         AsyncClient client = new AsyncClient("only");
-        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(client);
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(client);
 
         CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("myService").toCompletableFuture();
 
         assertEquals(List.of("my-service"), client.requested);
-        assertSame(client.instances.get(0), instances);
+        client.instances.get(0).complete(List.of(A));
+        assertEquals(List.of(A), instances.getNow(null));
     }
 
     @Test
@@ -225,7 +285,7 @@ class DiscoveryClientAsyncTest {
         PublisherClient never = new PublisherClient("never",
             Flux.<List<ServiceInstance>>never().doOnCancel(cancelled::incrementAndGet),
             Flux.<List<String>>never().doOnCancel(cancelled::incrementAndGet));
-        DiscoveryClient composite = new AsyncCompositeDiscoveryClient(never, new PublisherClient("other", Flux.never(), Flux.never()));
+        DiscoveryClient composite = new DefaultCompositeDiscoveryClient(never, new PublisherClient("other", Flux.never(), Flux.never()));
 
         Flux.from(composite.getInstances("my-service")).subscribe().dispose();
         Flux.from(composite.getServiceIds()).subscribe().dispose();
@@ -236,8 +296,7 @@ class DiscoveryClientAsyncTest {
     @Test
     void theDefaultBeanCombinesTheStages() {
         try (ApplicationContext context = ApplicationContext.run()) {
-            assertTrue(context.getBean(DiscoveryClient.class) instanceof AsyncCompositeDiscoveryClient);
-            assertTrue(context.getBean(DefaultCompositeDiscoveryClient.class) instanceof AsyncCompositeDiscoveryClient);
+            assertSame(DefaultCompositeDiscoveryClient.class, context.getBean(DiscoveryClient.class).getClass());
         }
     }
 
@@ -268,6 +327,44 @@ class DiscoveryClientAsyncTest {
         }
     }
 
+    /**
+     * Like a mock that only stubs the publisher methods.
+     */
+    private record MockLikeClient(CompletableFuture<?> stage, Publisher<List<ServiceInstance>> instances, Publisher<List<String>> serviceIds) implements DiscoveryClient {
+
+        @Override
+        public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+            return instances;
+        }
+
+        @Override
+        public Publisher<List<String>> getServiceIds() {
+            return serviceIds;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+            return (CompletionStage<List<ServiceInstance>>) stage;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public CompletionStage<List<String>> getServiceIdsAsync() {
+            return (CompletionStage<List<String>>) stage;
+        }
+
+        @Override
+        public String getDescription() {
+            return "mock";
+        }
+
+        @Override
+        public void close() {
+            // the test client holds no resources
+        }
+    }
+
     private record PublisherClient(String name, Publisher<List<ServiceInstance>> instances, Publisher<List<String>> serviceIds) implements DiscoveryClient {
 
         @Override
@@ -294,7 +391,7 @@ class DiscoveryClientAsyncTest {
     /**
      * Fails the publisher methods, so that only the stages can serve.
      */
-    private static final class AsyncClient implements DiscoveryClient {
+    private static class AsyncClient implements DiscoveryClient {
         final String name;
         final List<String> requested = new ArrayList<>();
         final List<CompletableFuture<List<ServiceInstance>>> instances = new ArrayList<>();
