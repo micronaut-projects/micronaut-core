@@ -26,7 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -103,13 +102,7 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting graceful shutdown...");
         }
-        CompletionStage<?> stage;
-        try {
-            stage = manager.shutdownGracefully();
-        } catch (RuntimeException e) {
-            stage = CompletableFuture.failedStage(e);
-        }
-        stage.whenComplete((result, error) -> {
+        manager.shutdownGracefully().whenComplete((result, error) -> {
             if (error != null) {
                 LOG.warn("Error in graceful shutdown. This is against the GracefulShutdownCapable contract!", error);
                 future.completeExceptionally(error);
