@@ -30,12 +30,16 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -61,6 +65,8 @@ public class NettyWebSocketSession implements WebSocketSession {
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
     public static final AttributeKey<NettyWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyWebSocketSession.class);
 
     private final String id;
     private final Channel channel;
@@ -194,18 +200,33 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
+    /**
+     * Send the message and wait until it is written. On an event loop thread it does not wait,
+     * since the write may have to run on that thread: it fails if the write already failed, and a
+     * later failure is logged.
+     *
+     * @param message   The message
+     * @param mediaType The media type of the message
+     */
     @Override
     public void sendSync(Object message, MediaType mediaType) {
         if (isOpen()) {
             if (message != null) {
                 try {
-                    WebSocketFrame frame;
-                    if (message instanceof WebSocketFrame socketFrame) {
-                        frame = socketFrame;
-                    } else {
-                        frame = messageEncoder.encodeMessage(message, mediaType);
+                    ChannelFuture write = channel.writeAndFlush(encodeMessage(message, mediaType));
+                    if (ThreadExecutorMap.currentExecutor() != null) {
+                        if (!write.isDone()) {
+                            write.addListener(f -> {
+                                if (!f.isSuccess() && LOG.isErrorEnabled()) {
+                                    LOG.error("Failed to send a WebSocket message of session {}: {}", id, f.cause().getMessage(), f.cause());
+                                }
+                            });
+                        } else if (!write.isSuccess()) {
+                            throw new WebSocketSessionException("Send Failure: " + write.cause().getMessage(), write.cause());
+                        }
+                        return;
                     }
-                    channel.writeAndFlush(frame).sync().get();
+                    write.sync().get();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
@@ -224,7 +245,7 @@ public class NettyWebSocketSession implements WebSocketSession {
             return Flux.empty();
         }
         // each subscription sends, as before: a closed session fails the publisher, not the call
-        return Flux.defer(() -> Mono.fromFuture(() -> sendAsync(message, mediaType), true));
+        return Mono.fromFuture(() -> sendAsync(message, mediaType), true).flux();
     }
 
     /**
