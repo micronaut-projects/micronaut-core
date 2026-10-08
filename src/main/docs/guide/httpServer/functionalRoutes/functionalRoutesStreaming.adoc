@@ -5,7 +5,7 @@ The handler of `sse(...)`, an api:web.router.builder.SseHandler[], `(request, pa
 snippet::io.micronaut.docs.server.functional.StreamRoutes[tags="imports,clazz", indent=0, title="Server-sent events and streamed responses"]
 
 <1> The stream ends when the handler returns. On an executor the handler may block: the response is sent with the first event while the handler still runs. An exception after the first event ends the stream abruptly, since the status was sent.
-<2> `sendAndAwait` waits until the client took the event, give or take the high-water mark, so a slow client paces the sender instead of filling the memory. On an event loop, `send` returns a stage that completes then.
+<2> `send` returns a stage that completes once the client took the event, give or take the high-water mark. Waiting for it before the next send, here with `join()` on the thread of the blocking executor the handler runs on, paces the sender to a slow client instead of filling the memory. On an event loop, continue in the stage instead of waiting for it.
 <3> `keepOpen()` keeps the stream open after the handler returns: the events are sent later, from callbacks or another thread. A heartbeat sends a comment when no event was sent for the period, which also sends the response before the first event.
 <4> `complete()` ends the stream, and `fail(...)` fails it.
 <5> `isWritable()` tells whether a send would wait: a sender that would rather drop events, e.g. a broadcast to many clients, checks it.

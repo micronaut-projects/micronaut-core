@@ -28,6 +28,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 import java.util.Optional
 import kotlin.coroutines.CoroutineContext
 
@@ -36,6 +37,8 @@ import kotlin.coroutines.CoroutineContext
  * collected in a coroutine as the server pulls the elements, one at a time, so it is suspended
  * while the client does not take them. The coroutine is cancelled when the server closes the
  * elements, e.g. when the client disconnects, and runs with the propagated context of the caller.
+ * An element the flow emitted that the server does not take, because the elements were closed,
+ * is closed if it is [AutoCloseable], e.g. a [CloseableByteBody].
  *
  * ```
  * routes.GET("/books") { _, _ ->
@@ -50,8 +53,9 @@ import kotlin.coroutines.CoroutineContext
 @Experimental
 fun <T : Any> Flow<T>.asBodyElements(context: CoroutineContext = Dispatchers.Default): BodyElements<T> {
     val flow = this
-    // rendezvous: the flow emits the next element only once the server took the previous one
-    val channel = Channel<T>(Channel.RENDEZVOUS)
+    // rendezvous: the flow emits the next element only once the server took the previous one.
+    // An element sent or received while the elements are closed is released
+    val channel = Channel<T>(Channel.RENDEZVOUS) { element -> closeUndelivered(element) }
     val scope = CoroutineScope(KotlinCoroutinePropagation.addPropagatedContext(context + SupervisorJob(), PropagatedContext.getOrEmpty()))
     val producer = scope.launch(start = CoroutineStart.LAZY) {
         try {
@@ -67,7 +71,8 @@ fun <T : Any> Flow<T>.asBodyElements(context: CoroutineContext = Dispatchers.Def
     }
     return BodyElements.of({
         producer.start()
-        scope.future {
+        // undispatched: an element the flow already offers completes the stage on this thread
+        scope.future(start = CoroutineStart.UNDISPATCHED) {
             val result = channel.receiveCatching()
             val element = result.getOrNull()
             if (element == null) {
@@ -78,4 +83,14 @@ fun <T : Any> Flow<T>.asBodyElements(context: CoroutineContext = Dispatchers.Def
     }, {
         scope.cancel()
     })
+}
+
+private fun closeUndelivered(element: Any) {
+    if (element is AutoCloseable) {
+        try {
+            element.close()
+        } catch (e: Exception) {
+            LoggerFactory.getLogger(BodyElements::class.java).debug("Failed to close an element of a flow that was not delivered", e)
+        }
+    }
 }

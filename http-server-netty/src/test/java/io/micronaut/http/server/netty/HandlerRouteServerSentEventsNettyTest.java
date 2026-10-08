@@ -52,8 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Netty specifics of the server-sent events routes: the event stream is exempt from the
- * compression that applies to other text responses, a blocking send is refused on the event loop,
- * the heartbeat keeps the connection from the idle timeout, and the events reach an HTTP/2 client
+ * compression that applies to other text responses, the heartbeat keeps the connection from the idle timeout, and the events reach an HTTP/2 client
  * one by one.
  */
 class HandlerRouteServerSentEventsNettyTest {
@@ -70,14 +69,6 @@ class HandlerRouteServerSentEventsNettyTest {
             String sse = exchange(server, "GET /netty-sse/events HTTP/1.1\r\nHost: localhost\r\nAccept-Encoding: gzip\r\nConnection: close\r\n\r\n");
             assertFalse(head(sse).contains("content-encoding"), sse);
             assertTrue(sse.contains("data: " + "e".repeat(2000)), sse);
-        }
-    }
-
-    @Test
-    void blockingSendIsRefusedOnTheEventLoop() throws IOException {
-        try (ApplicationContext ctx = run(Map.of())) {
-            String response = exchange(ctx.getBean(EmbeddedServer.class), "GET /netty-sse/event-loop HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-            assertTrue(response.contains("data: refused"), response);
         }
     }
 
@@ -212,14 +203,6 @@ class HandlerRouteServerSentEventsNettyTest {
                     HttpResponse.ok("data: " + "p".repeat(2000) + "\n\n").contentType(MediaType.TEXT_EVENT_STREAM_TYPE));
                 routes.GET("/netty-sse/events").sse((request, pathVariables, events) -> {
                     events.send("e".repeat(2000));
-                    events.complete();
-                });
-                routes.GET("/netty-sse/event-loop").sse((request, pathVariables, events) -> {
-                    try {
-                        events.sendAndAwait(Event.of("blocked"));
-                    } catch (IllegalStateException e) {
-                        events.send("refused");
-                    }
                     events.complete();
                 });
                 routes.GET("/netty-sse/heartbeat").sse((request, pathVariables, events) -> {

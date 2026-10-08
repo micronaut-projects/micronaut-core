@@ -667,7 +667,7 @@ public class HandlerRouteServerSentEventsTest {
                 routes.GET("/sse/flood").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
                     recorder.record("flood", events);
                     for (int i = 0; i < FLOOD_EVENTS; i++) {
-                        events.sendAndAwait(Event.of(KILOBYTE).id(String.valueOf(i)));
+                        events.send(Event.of(KILOBYTE).id(String.valueOf(i))).toCompletableFuture().join();
                         recorder.sent.incrementAndGet();
                     }
                 });
@@ -679,7 +679,7 @@ public class HandlerRouteServerSentEventsTest {
                 });
                 routes.GET("/sse/blocking").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> {
                     for (int i = 0; i < 100; i++) {
-                        events.sendAndAwait(String.valueOf(i));
+                        events.send(String.valueOf(i)).toCompletableFuture().join();
                     }
                 });
                 routes.GET("/sse/context").sse((request, pathVariables, events) -> contextStream(recorder, events));
@@ -707,7 +707,7 @@ public class HandlerRouteServerSentEventsTest {
                     recorder.record("blocking-break", events);
                     // a high-water mark of one byte: the send returns once the connection took the
                     // event, so the failure does not overtake it
-                    events.highWaterMark(1).sendAndAwait("one");
+                    events.highWaterMark(1).send("one").toCompletableFuture().join();
                     throw new IllegalStateException("database went away");
                 });
                 routes.GET("/sse/late-keep-open").sse((request, pathVariables, events) ->

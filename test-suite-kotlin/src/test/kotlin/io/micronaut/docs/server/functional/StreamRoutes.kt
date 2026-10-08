@@ -28,7 +28,7 @@ class StreamRoutes(@Named(TaskExecutors.SCHEDULED) private val scheduler: TaskSc
     override fun routes(routes: HttpRouteBuilder) {
         routes.GET("/countdown/{from}").executeOn(TaskExecutors.BLOCKING).sse { request, pathVariables, events -> // <1>
             for (i in pathVariables.getInt("from") downTo 1) {
-                events.sendAndAwait(Event.of(i).id(i.toString())) // <2>
+                events.send(Event.of(i).id(i.toString())).toCompletableFuture().join() // <2>
             }
         }
         routes.GET("/ticks").sse { request, pathVariables, events ->

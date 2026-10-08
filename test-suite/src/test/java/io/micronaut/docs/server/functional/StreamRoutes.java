@@ -40,7 +40,7 @@ public class StreamRoutes implements HttpRoutes {
     public void routes(HttpRouteBuilder routes) {
         routes.GET("/countdown/{from}").executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, events) -> { // <1>
             for (int i = pathVariables.getInt("from"); i > 0; i--) {
-                events.sendAndAwait(Event.of(i).id(String.valueOf(i))); // <2>
+                events.send(Event.of(i).id(String.valueOf(i))).toCompletableFuture().join(); // <2>
             }
         });
         routes.GET("/ticks").sse((request, pathVariables, events) -> {

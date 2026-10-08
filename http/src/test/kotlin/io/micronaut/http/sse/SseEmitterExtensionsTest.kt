@@ -120,10 +120,6 @@ class SseEmitterExtensionsTest {
 
         override fun comment(comment: String): CompletionStage<Void> = CompletableFuture.completedFuture(null)
 
-        override fun sendAndAwait(event: Event<*>) {
-            sent.add(event)
-        }
-
         override fun isWritable(): Boolean = open
 
         override fun isOpen(): Boolean = open

@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  * <pre>{@code
  * routes.POST("/completions").body(Prompt.class).executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, prompt, events) -> {
  *     for (String token : model.generate(prompt)) {
- *         events.sendAndAwait(token);
+ *         events.send(token).toCompletableFuture().join();
  *     }
  * });
  * }</pre>
