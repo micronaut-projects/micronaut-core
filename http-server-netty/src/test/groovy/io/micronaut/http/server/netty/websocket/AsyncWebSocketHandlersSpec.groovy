@@ -18,6 +18,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -36,20 +37,36 @@ class AsyncWebSocketHandlersSpec extends Specification {
 
     PollingConditions conditions = new PollingConditions(timeout: 10)
 
-    void "a client handler that returns a failed stage reaches the error handler"() {
+    void "the reactive client treats the stage of a handler as a value, as before"() {
         given:
         StageClient stageClient = connect('failing')
 
         when:
         stageClient.send('fail')
+        stageClient.send('after')
 
-        then:
+        then: 'the failure of the stage does not reach the error handler'
         conditions.eventually {
-            stageClient.errors.any { it.message == 'handler stage failed' }
+            stageClient.handled.contains('after')
         }
+        stageClient.errors.empty
+        stageClient.session.open
 
         cleanup:
         stageClient?.close()
+    }
+
+    void "the reactive connect does not wait for the stage of the open method, as before"() {
+        when:
+        PendingOpenClient pendingOpen = Flux.from(client.connect(PendingOpenClient, "/async-handlers/pending-open")).blockFirst(Duration.ofSeconds(10))
+
+        then:
+        pendingOpen != null
+        !pendingOpen.opened.isDone()
+
+        cleanup:
+        pendingOpen?.opened?.complete(null)
+        pendingOpen?.close()
     }
 
     void "a client handler is done once its stage completes"() {
@@ -200,5 +217,20 @@ class AsyncWebSocketHandlersSpec extends Specification {
         }
 
         abstract void send(String message)
+    }
+
+    @Requires(property = 'spec.name', value = 'AsyncWebSocketHandlersSpec')
+    @ClientWebSocket('/async-handlers/{room}')
+    static abstract class PendingOpenClient implements AutoCloseable {
+        final CompletableFuture<Object> opened = new CompletableFuture<>()
+
+        @OnOpen
+        CompletionStage<?> onOpen() {
+            return opened
+        }
+
+        @OnMessage
+        void onMessage(String message) {
+        }
     }
 }

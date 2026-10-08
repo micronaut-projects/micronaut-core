@@ -12,6 +12,7 @@ import io.micronaut.websocket.annotation.ServerWebSocket
 import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -22,11 +23,11 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 
-class ClientHandlerStageFragmentsSpec extends Specification {
+class ClientHandlerFragmentsSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientHandlerStageFragmentsSpec'])
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientHandlerFragmentsSpec'])
 
     @Shared
     @AutoCleanup
@@ -34,7 +35,7 @@ class ClientHandlerStageFragmentsSpec extends Specification {
 
     PollingConditions conditions = new PollingConditions(timeout: 10)
 
-    void "a client stage that fails while the next message is fragmented does not truncate it"() {
+    void "a client handler that fails later while the next message is fragmented does not truncate it"() {
         given:
         FragClient c = Flux.from(client.connect(FragClient, "/client-stage-fragments")).blockFirst()
 
@@ -57,7 +58,7 @@ class ClientHandlerStageFragmentsSpec extends Specification {
         c?.close()
     }
 
-    @Requires(property = 'spec.name', value = 'ClientHandlerStageFragmentsSpec')
+    @Requires(property = 'spec.name', value = 'ClientHandlerFragmentsSpec')
     @ServerWebSocket('/client-stage-fragments')
     static class FragServer {
         @OnMessage
@@ -69,7 +70,7 @@ class ClientHandlerStageFragmentsSpec extends Specification {
         }
     }
 
-    @Requires(property = 'spec.name', value = 'ClientHandlerStageFragmentsSpec')
+    @Requires(property = 'spec.name', value = 'ClientHandlerFragmentsSpec')
     @ClientWebSocket('/client-stage-fragments')
     static abstract class FragClient implements AutoCloseable {
         static volatile CompletableFuture<Object> pending
@@ -77,13 +78,13 @@ class ClientHandlerStageFragmentsSpec extends Specification {
         final Collection<Throwable> errors = new ConcurrentLinkedQueue<>()
 
         @OnMessage
-        CompletionStage<?> onMessage(String message) {
+        Mono<?> onMessage(String message) {
             if (message == 'first') {
                 pending = new CompletableFuture<>()
-                return pending
+                return Mono.fromFuture(pending)
             }
             handled.add(message)
-            return CompletableFuture.completedFuture(null)
+            return Mono.empty()
         }
 
         @OnError

@@ -24,7 +24,6 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -73,7 +72,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -303,11 +301,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected abstract NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
 
     /**
-     * Invokes the given executable. The flow of a handler that returns a {@link CompletionStage}
-     * or a publisher completes once the handler is done; the stage of a close or error handler
-     * does not hold the close back. The messages of a client are handled as they are read: the
-     * next message does not wait for the stage of the handler of the previous one (only a
-     * WebSocket route of the server handles its messages one after the other).
+     * Invokes the given executable.
      *
      * @param boundExecutable The bound executable
      * @param messageHandler  The message handler
@@ -320,28 +314,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         } catch (Exception e) {
             return ExecutionFlow.error(e);
         }
-        if (result instanceof CompletionStage<?> stage) {
-            if (isCloseOrErrorHandler(messageHandler)) {
-                // the close does not wait for the stage of a close or error handler: the close of
-                // the peer is answered at once, the stage runs on
-                stage.whenComplete((ignored, error) -> {
-                    if (error != null && LOG.isErrorEnabled()) {
-                        LOG.error("Error of the stage of the handler {} of WebSocket bean [{}]: {}", messageHandler.getExecutableMethod(), webSocketBean.getTarget(), error.getMessage(), error);
-                    }
-                });
-                return ExecutionFlow.just(stage);
-            }
-            // the handler is done once its stage completes, as for a publisher
-            return CompletableFutureExecutionFlow.just(stage);
-        } else if (Publishers.isConvertibleToPublisher(result)) {
+        if (Publishers.isConvertibleToPublisher(result)) {
             return ReactiveExecutionFlow.fromPublisherEager(Publishers.convertToPublisher(conversionService, result), PropagatedContext.getOrEmpty());
         } else {
             return ExecutionFlow.just(result);
         }
-    }
-
-    private boolean isCloseOrErrorHandler(MethodExecutionHandle<?, ?> handler) {
-        return webSocketBean.closeMethod().orElse(null) == handler || webSocketBean.errorMethod().orElse(null) == handler;
     }
 
     @Override
