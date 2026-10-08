@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.websocket;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 
@@ -108,6 +109,7 @@ public interface WebSocketClientFactory {
      * @return The client
      * @since 5.3.0
      */
+    @Experimental
     default AsyncWebSocketClient createAsyncWebSocketClient(@Nullable URI uri) {
         return createWebSocketClient(uri).toAsyncWebSocket();
     }
@@ -122,6 +124,7 @@ public interface WebSocketClientFactory {
      * @return The client
      * @since 5.3.0
      */
+    @Experimental
     default AsyncWebSocketClient createAsyncWebSocketClient(@Nullable URI uri, HttpClientConfiguration configuration) {
         return createWebSocketClient(uri, configuration).toAsyncWebSocket();
     }

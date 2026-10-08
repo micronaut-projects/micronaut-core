@@ -15,6 +15,7 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -22,19 +23,28 @@ import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A {@link WebSocketClient} whose connections complete a {@link CompletionStage} instead of
- * emitting from a Reactive Streams publisher.
+ * The counterpart of {@link WebSocketClient} whose connections complete a
+ * {@link CompletionStage} instead of emitting from a Reactive Streams publisher, see
+ * {@link WebSocketClient#toAsyncWebSocket()}.
  *
  * <p>Each call connects once. Cancelling the future of the stage (see
- * {@link CompletionStage#toCompletableFuture()}) before the connection is established aborts it;
- * a client endpoint that connects after that is closed.</p>
+ * {@link CompletionStage#toCompletableFuture()}) before the connection is established, or
+ * completing it otherwise, e.g. with {@link CompletableFuture#orTimeout}, aborts it; a client
+ * endpoint that connects after that is closed. The stage may complete on an event loop thread:
+ * do not block in its continuations.</p>
+ *
+ * <p>A client obtained from {@link WebSocketClient#toAsyncWebSocket()}, or injected, is a view
+ * of that client: closing it closes the underlying client, which an injected client shares with
+ * the other injection points of the same client.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
+@Experimental
 public interface AsyncWebSocketClient extends AutoCloseable {
 
     /**
