@@ -230,7 +230,7 @@ record MethodFilter<T>(FilterOrder order,
                 } else if (isStage(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     // CompletionStage or CompletableFuture: a returned stage is completed with the
                     // context of the continuation
-                    if (isStage(returnType) && isResponse(returnType.getWrappedType())) {
+                    if (returnType.isAsync() && isResponse(returnType.getWrappedType())) {
                         continuationCreator = ResultAwareCompletionStageContinuationImpl::new;
                     } else {
                         continuationCreator = CompletionStageContinuationImpl::new;
@@ -1169,7 +1169,6 @@ record MethodFilter<T>(FilterOrder order,
                 context = context.withPropagatedContext(PropagatedContext.find().orElse(context.propagatedContext()));
             }
             filterContext.set(context);
-            PropagatedContext downstreamContext = context.propagatedContext();
             ExecutionFlow<FilterContext> flow;
             try {
                 flow = downstream.apply(context);
@@ -1183,6 +1182,7 @@ record MethodFilter<T>(FilterOrder order,
             downstreamFlow.set(responseFlow);
             DownstreamFuture<HttpResponse<?>> future = new DownstreamFuture<>(responseFlow);
             responseFlow.onComplete((response, error) -> {
+                PropagatedContext downstreamContext = afterMethodContext().propagatedContext();
                 // the callbacks of the stages run with the context of the downstream
                 Runnable complete = () -> {
                     if (error != null) {

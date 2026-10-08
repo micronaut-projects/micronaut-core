@@ -1557,7 +1557,7 @@ class FilterRunnerSpec extends Specification {
     static class MinimalFuture<T> extends CompletableFuture<T> {
     }
 
-    def 'the response filters see the request a completion stage continuation proceeded with'() {
+    def 'the response filters see the request a completion stage continuation proceeded with'(Class stageType) {
         given:
         def req1 = HttpRequest.GET("/req1")
         def req2 = HttpRequest.GET("/req2")
@@ -1568,8 +1568,16 @@ class FilterRunnerSpec extends Specification {
                     seenByResponseFilter = request
                     null
                 },
-                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
-                    continuation.request(req2).proceed().thenApply { it }
+                before(ReturnType.of(stageType, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    def returned = new MinimalFuture<HttpResponse<?>>()
+                    continuation.request(req2).proceed().whenComplete { response, error ->
+                        if (error != null) {
+                            returned.completeExceptionally(error)
+                        } else {
+                            returned.complete(response)
+                        }
+                    }
+                    returned
                 }
         ]
 
@@ -1579,6 +1587,9 @@ class FilterRunnerSpec extends Specification {
         then:
         result.tryCompleteValue().status() == HttpStatus.OK
         seenByResponseFilter.is(req2)
+
+        where:
+        stageType << [CompletionStage, CompletableFuture, MinimalFuture]
     }
 
     def 'the stages of a completion stage continuation complete with the propagated context'() {
@@ -1602,6 +1613,34 @@ class FilterRunnerSpec extends Specification {
         then:
         result.tryCompleteValue().status() == HttpStatus.OK
         seen.is(element)
+    }
+
+    def 'continuation callbacks see context mutations made downstream'() {
+        given:
+        def initial = new TestContextElement()
+        def changed = new TestContextElement()
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        Object seen = null
+        List<GenericHttpFilter> filters = [
+            before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                continuation.proceed().thenApply { response ->
+                    seen = PropagatedContext.getOrEmpty().find(TestContextElement).orElse(null)
+                    response
+                }
+            },
+            before(ReturnType.of(void), [Argument.of(io.micronaut.core.propagation.MutablePropagatedContext)]) { mutable ->
+                mutable.replace(initial, changed)
+                null
+            }
+        ]
+
+        when:
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET('/'), PropagatedContext.empty().plus(initial))
+        downstream.complete(HttpResponse.ok())
+
+        then:
+        result.tryCompleteValue().status() == HttpStatus.OK
+        seen.is(changed)
     }
 
     def 'elements dropped by a response filter are closed by the runner'() {
